@@ -46,7 +46,7 @@ import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { STREET_BUILDINGS, STREET_LOTS } from "./street.ts";
 import { affine, geomOf, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
-import { bakeRoof, silhouette, type Piece, type RoofArt } from "./box-draw.ts";
+import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
 import { farColosseumShows } from "./turn.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
@@ -786,7 +786,7 @@ export class Renderer {
     this.boxes = STREET_TOWN ? streetBoxes(PROPS) : [];
     this.plans = this.boxes.map((b) => newPlan(b.box));
     this.homeBox = this.places.map((h) => this.boxes.find((b) => b.home === h.id) ?? null);
-    this.propBox = PROPS.map((pr, i) => (pr.kind === "front" ? this.boxes.find((b) => b.kind !== "home" && b.lot === STREET_LOTS.indexOf(STREET_BUILDINGS[pr.lot!]!)) : this.boxes.find((b) => b.prop === i)) ?? null);
+    this.propBox = PROPS.map((pr, i) => (pr.kind === "front" ? this.boxes.find((b) => b.kind !== "home" && b.lot === STREET_LOTS.indexOf(STREET_BUILDINGS[pr.lot!]!)) : this.boxes.find((b) => b.prop === i || b.props.includes(i))) ?? null);
     this.partItems = [];
     for (const b of this.boxes) if (b.kind !== "shed" && b.kind !== "hedge") for (let k = 0; k < 4; k++) this.partItems.push(newItem("part", b.i * 4 + k));
     this.items = [...this.houseItems, ...this.bossItems, ...this.propItems, ...this.partItems];
@@ -1530,7 +1530,7 @@ export class Renderer {
       const p = this.plans[b.i]!;
       rel(v, this.camX, this.camY, b.fx, b.fy, this.rq);
       const R = radial(v, this.rq.dx, this.rq.dz);
-      if (R < v.rim + 9 && na < ahead.length) {
+      if (R < v.rim + 6 && na < ahead.length) {
         ahead[na] = b.i;
         this.aheadD[na++] = R;
       }
@@ -1552,12 +1552,12 @@ export class Renderer {
         let best = -1;
         for (let j = 0; j < na; j++) {
           const b = this.boxes[ahead[j]!]!;
-          if (this.roofs.get(fine ? b.box : b.low)?.has(`${b.facing}${east ? 1 : 0}`)) continue;
+          if (this.instArt[(fine ? 2 : 0) + (east ? 1 : 0)]![b.i]) continue;
           if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
         }
         if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
         const b = this.boxes[ahead[best]!]!;
-        this.roofArt(b, fine ? b.box : b.low, east);
+        this.roofArt(b, fine, east);
       }
     }
   }
@@ -1569,15 +1569,22 @@ export class Renderer {
     return c > 30 || c < 15;
   }
 
-  /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for. */
-  private roofArt(b: BoxInst, box: TownBox, east: boolean): RoofArt {
+  /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
+  private roofArt(b: BoxInst, fine: boolean, east: boolean): RoofArt {
+    const box = fine ? b.box : b.low;
+    const slot = (fine ? 2 : 0) + (east ? 1 : 0);
+    const had = this.instArt[slot]![b.i];
+    if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
     const key = `${b.facing}${east ? 1 : 0}`;
     let a = m.get(key);
     if (!a) m.set(key, (a = bakeRoof(b, box, east)));
+    this.instArt[slot]![b.i] = a;
     return a;
   }
+  /** Each box's roof paintings as it last asked for them, by low or full art and heading (no lookup a frame). */
+  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], []];
 
   /** A box-backed item's place (its front's; a shed or hedge: the whole box's), from its plan. */
   private frontPos(it: Item, b: BoxInst): void {
@@ -1586,7 +1593,8 @@ export class Renderer {
     const whole = b.kind === "shed" || b.kind === "hedge";
     it.dx = p.front.dx;
     it.dz = p.front.dz;
-    it.on = (whole ? p.on : p.front.on) && radial(v, it.dx, it.dz) < v.rim;
+    // (A run of hedge is drawn by its first square's item; the others stand down.)
+    it.on = (whole ? p.on : p.front.on) && radial(v, it.dx, it.dz) < v.rim && (b.props.length === 0 || it.i === b.prop);
     it.sz = it.kind === "prop" ? it.dz + 0.05 : it.dz;
   }
   /** A side's, back's or roof's item: its place from its box's plan. */
@@ -1767,7 +1775,9 @@ export class Renderer {
   private drawWall(w: WallPlan, img: HTMLCanvasElement, ch: Character, alpha: number, glow: Glow | null, tall: boolean, now: number, phase: number): void {
     const n = w.strips;
     const pw = ch.w;
-    const sil = w.shade > 0.004 ? silhouette(img) : null;
+    // (Its shade: the picture darkened once a shade, the art's two exactly and every twentieth between them while the camera turns.)
+    const shade = restShade(w.shade) || Math.round(w.shade * 20) / 20;
+    const pic = shade > 0.004 ? shadedImg(img, shade) : img;
     const bb = this.bb;
     bb[0] = bb[1] = Infinity;
     bb[2] = bb[3] = -Infinity;
@@ -1777,8 +1787,7 @@ export class Renderer {
       const u1 = ((j + 1) * pw) / n;
       this.wallAffine(w, ch, u0, u1, tall);
       const m = this.M;
-      this.drawT(img, m, u0, 0, u1 - u0, ch.h, u0, 0, u1 - u0, ch.h, alpha, j < n - 1);
-      if (sil) this.drawT(sil, m, u0, 0, u1 - u0, ch.h, u0, 0, u1 - u0, ch.h, alpha * w.shade, j < n - 1);
+      this.drawT(pic, m, u0, 0, u1 - u0, ch.h, u0, 0, u1 - u0, ch.h, alpha, j < n - 1);
       this.coverT(img, m, u0, 0, u1 - u0, ch.h, alpha);
       // (Its box: the strip's corners.)
       for (let c = 0; c < 4; c++) {
@@ -1792,6 +1801,7 @@ export class Renderer {
         if (y > bb[3]!) bb[3] = y;
       }
     }
+    this.untransform();
     if (glow && this.lightK * alpha > 0.004) {
       const fl = this.flicker(now, phase);
       const crisp = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare >= 1.5;
@@ -1806,9 +1816,11 @@ export class Renderer {
   private drawRoof(b: BoxInst, B: TownBox, p: BoxPlan, alpha: number): void {
     if (p.nOrder === 0 || alpha <= 0.004) return;
     const g = geomOf(B);
-    const east = clamp(this.heading / 90, 0, 1);
-    const artN = east < 0.996 ? this.roofArt(b, B, false) : null;
-    const artE = east > 0.004 ? this.roofArt(b, B, true) : null;
+    // (Its north painting to 38 degrees round, its east one from 52, the two blended between: a blend draws twice, so it's kept short.)
+    const east = clamp((this.heading - 38) / 14, 0, 1);
+    const fine = B === b.box && this.paint.kind === "webgl";
+    const artN = east < 0.996 ? this.roofArt(b, fine, false) : null;
+    const artE = east > 0.004 ? this.roofArt(b, fine, true) : null;
     for (let o = 0; o < p.nOrder; o++) {
       const i = p.order[o]!;
       const fg = g.faces[i]!;
@@ -1829,6 +1841,7 @@ export class Renderer {
           }
       }
     }
+    this.untransform();
   }
   /** A roof's painted piece through this.M (its texture's points to the screen). */
   private drawPiece(pc: Piece, a: number): void {
@@ -1845,6 +1858,11 @@ export class Renderer {
     ctx.setTransform(DPR * m[0]!, DPR * m[1]!, DPR * m[2]!, DPR * m[3]!, DPR * m[4]!, DPR * m[5]!);
     ctx.globalAlpha = a;
     ctx.drawImage(img, sx, sy, sw, sh, dx, dy, seam ? dw + 0.6 / Math.max(0.01, Math.hypot(m[0]!, m[1]!)) : dw, dh);
+    // (The transform is left as it is: the caller puts the town's back once its pieces are drawn, `untransform`.)
+  }
+  /** The town's own transform and full strength back, after pieces drawn through `drawT`. */
+  private untransform(): void {
+    const { ctx, DPR } = this;
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
   }

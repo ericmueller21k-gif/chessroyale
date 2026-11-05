@@ -37,21 +37,26 @@ const INK = [42, 33, 24] as const;
 const RIM = [247, 241, 227] as const;
 const SHEET = 512;
 
-/** A tile's pixels (37 x 37 RGBA), by tile and palette (or a box's own tile). */
-const tiles = new Map<string, Uint8ClampedArray>();
-function tilePixels(box: TownBox, tex: FaceGeom["tex"], own: Character | null): Uint8ClampedArray {
+/** A tile's pixels (RGBA; 37 x 37, or a box's own: a run of hedge's tops side by side), by tile and palette. */
+export interface Tile {
+  w: number;
+  h: number;
+  data: Uint8ClampedArray;
+}
+const tiles = new Map<string, Tile>();
+function tilePixels(box: TownBox, tex: FaceGeom["tex"], own: Character | null): Tile {
   const key = own ? `own:${own.id}` : `${box.id}:${tex}`;
   let t = tiles.get(key);
   if (!t) {
     const ch = own ?? roofTile(tex, { ...box.roofPal }, `${tex}-${box.id}`);
-    t = renderFrame(ch, ch.anims.idle!.frames[0]!).data;
+    t = renderFrame(ch, ch.anims.idle!.frames[0]!);
     tiles.set(key, t);
   }
   return t;
 }
 
-/** Is (x, y) on the inside of the edge a -> b (the face's corners run counter-clockwise in its texture frame), by at least -`pad`? */
-function inside(xs: Float64Array, ys: Float64Array, idx: readonly number[], x: number, y: number, pad: number): boolean {
+/** A convex polygon's edges as lines (a, b, c: a x + b y + c is the distance inside), for many inside tests. */
+function edges(xs: Float64Array, ys: Float64Array, idx: readonly number[]): Float64Array {
   // (The corners' winding in the texture frame: the sign of the area.)
   let area = 0;
   for (let k = 0; k < idx.length; k++) {
@@ -60,16 +65,23 @@ function inside(xs: Float64Array, ys: Float64Array, idx: readonly number[], x: n
     area += xs[a]! * ys[b]! - xs[b]! * ys[a]!;
   }
   const s = area >= 0 ? 1 : -1;
+  const out = new Float64Array(idx.length * 3);
   for (let k = 0; k < idx.length; k++) {
     const a = idx[k]!;
     const b = idx[(k + 1) % idx.length]!;
     const ex = xs[b]! - xs[a]!;
     const ey = ys[b]! - ys[a]!;
     const len = Math.hypot(ex, ey) || 1;
-    // Signed distance from the edge's line, inside positive.
-    const d = (s * (ex * (y - ys[a]!) - ey * (x - xs[a]!))) / len;
-    if (d < -pad) return false;
+    // d = s (ex (y - ya) - ey (x - xa)) / len
+    out[k * 3] = (-s * ey) / len;
+    out[k * 3 + 1] = (s * ex) / len;
+    out[k * 3 + 2] = (s * (ey * xs[a]! - ex * ys[a]!)) / len;
   }
+  return out;
+}
+/** Is (x, y) inside the polygon (its `edges`), or within `pad` of it? */
+function inside(e: Float64Array, x: number, y: number, pad: number): boolean {
+  for (let k = 0; k < e.length; k += 3) if (e[k]! * x + e[k + 1]! * y + e[k + 2]! < -pad) return false;
   return true;
 }
 
@@ -77,17 +89,17 @@ function inside(xs: Float64Array, ys: Float64Array, idx: readonly number[], x: n
  * A face's pixels, painted (pure: no canvas): its tile in its rows' direction, times `light`, its ink edge and rim; `w` x `h` with a
  * pixel's margin all round, texture point (X, Y) at pixel (X - tx0 + 1, Y - ty0 + 1).
  */
-export function facePixels(fg: FaceGeom, tile: Uint8ClampedArray, light: number): { w: number; h: number; data: Uint8ClampedArray; mask: Uint8Array } {
+export function facePixels(fg: FaceGeom, tile: Tile, light: number): { w: number; h: number; data: Uint8ClampedArray; mask: Uint8Array } {
   const w = fg.tw + 2;
   const h = fg.th + 2;
   const data = new Uint8ClampedArray(w * h * 4);
   const mask = new Uint8Array(w * h);
-  const idx = Array.from({ length: fg.n }, (_, k) => k);
+  const e = edges(fg.tx, fg.ty, Array.from({ length: fg.n }, (_, k) => k));
   for (let j = 0; j < h; j++)
     for (let i = 0; i < w; i++) {
       const X = fg.tx0 - 1 + i + 0.5;
       const Y = fg.ty0 - 1 + j + 0.5;
-      if (!inside(fg.tx, fg.ty, idx, X, Y, 0.35)) continue;
+      if (!inside(e, X, Y, 0.35)) continue;
       mask[j * w + i] = 1;
     }
   // How far each pixel is inside (1: on the edge), up to 4, through its four neighbours.
@@ -115,11 +127,11 @@ export function facePixels(fg: FaceGeom, tile: Uint8ClampedArray, light: number)
       // (Rows along u: the tile's x along the face's first edge; along t: its y.)
       const a = fg.rows === "u" ? X : Y;
       const b = fg.rows === "u" ? Y : X;
-      const o = ((((b % 37) + 37) % 37) * 37 + (((a % 37) + 37) % 37)) * 4;
-      let r = tile[o]! * light;
-      let g = tile[o + 1]! * light;
-      let bl = tile[o + 2]! * light;
-      const al = tile[o + 3]!;
+      const o = ((((b % tile.h) + tile.h) % tile.h) * tile.w + (((a % tile.w) + tile.w) % tile.w)) * 4;
+      const px = tile.data;
+      let r = px[o]! * light;
+      let g = px[o + 1]! * light;
+      let bl = px[o + 2]! * light;
       const dk = dist[k]!;
       if (dk === 1 && !fg.soft) {
         r += (INK[0] - r) * 0.85;
@@ -134,14 +146,14 @@ export function facePixels(fg: FaceGeom, tile: Uint8ClampedArray, light: number)
       data[q] = r;
       data[q + 1] = g;
       data[q + 2] = bl;
-      data[q + 3] = al < 10 ? 255 : 255;
+      data[q + 3] = 255;
     }
   return { w, h, data, mask };
 }
 
 /** A triangle of a face's painting: its pixels inside the triangle (and a pixel past its edges, inside the face), cropped. */
 function triPixels(fg: FaceGeom, whole: { w: number; h: number; data: Uint8ClampedArray; mask: Uint8Array }, a: number, b: number, c: number) {
-  const idx = [a, b, c];
+  const e = edges(fg.tx, fg.ty, [a, b, c]);
   const X0 = Math.max(0, Math.floor(Math.min(fg.tx[a]!, fg.tx[b]!, fg.tx[c]!) - fg.tx0));
   const Y0 = Math.max(0, Math.floor(Math.min(fg.ty[a]!, fg.ty[b]!, fg.ty[c]!) - fg.ty0));
   const X1 = Math.min(whole.w, Math.ceil(Math.max(fg.tx[a]!, fg.tx[b]!, fg.tx[c]!) - fg.tx0) + 3);
@@ -155,7 +167,7 @@ function triPixels(fg: FaceGeom, whole: { w: number; h: number; data: Uint8Clamp
       const wj = Y0 + j;
       const k = wj * whole.w + wi;
       if (!whole.mask[k]) continue;
-      if (!inside(fg.tx, fg.ty, idx, fg.tx0 - 1 + wi + 0.5, fg.ty0 - 1 + wj + 0.5, 1.2)) continue;
+      if (!inside(e, fg.tx0 - 1 + wi + 0.5, fg.ty0 - 1 + wj + 0.5, 1.2)) continue;
       const q = (j * w + i) * 4;
       data.set(whole.data.subarray(k * 4, k * 4 + 4), q);
     }
@@ -237,20 +249,25 @@ export function bakeRoof(b: BoxInst, box: TownBox, east: boolean): RoofArt {
   return { faces };
 }
 
-/** A picture's black silhouette (a wall's shade is it laid over the wall), made once a picture. */
-const silhouettes = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
-export function silhouette(img: HTMLCanvasElement): HTMLCanvasElement {
-  let s = silhouettes.get(img);
+/** A wall's shade if it's one the camera rests at (the art's 6% or 30%: the camera facing north or east), else 0. */
+export const restShade = (shade: number): number => (Math.abs(shade - 0.06) < 1e-3 ? 0.06 : Math.abs(shade - 0.3) < 1e-3 ? 0.3 : 0);
+/** A picture darkened by `shade`, made once a picture and shade (a few: render.ts rounds a turning wall's to a twentieth): one draw. */
+const shadedImgs = new WeakMap<HTMLCanvasElement, Map<number, HTMLCanvasElement>>();
+export function shadedImg(img: HTMLCanvasElement, shade: number): HTMLCanvasElement {
+  let m = shadedImgs.get(img);
+  if (!m) shadedImgs.set(img, (m = new Map()));
+  let s = m.get(shade);
   if (!s) {
     s = document.createElement("canvas");
     s.width = img.width;
     s.height = img.height;
     const g = s.getContext("2d")!;
     g.drawImage(img, 0, 0);
-    g.globalCompositeOperation = "source-in";
+    g.globalCompositeOperation = "source-atop";
+    g.globalAlpha = shade;
     g.fillStyle = "#0b0a12";
     g.fillRect(0, 0, s.width, s.height);
-    silhouettes.set(img, s);
+    m.set(shade, s);
   }
   return s;
 }

@@ -52,7 +52,15 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       else expect([b.fx, b.fy]).toEqual([l.c0 - 0.5 + b.box.inset, l.r0 + l.w / 2 - 0.5]);
     }
     expect(BOXES.filter((b) => b.kind === "shed")).toHaveLength(PROPS.filter((p) => p.kind === "shed").length);
-    expect(BOXES.filter((b) => b.kind === "hedge")).toHaveLength(PROPS.filter((p) => p.kind === "hedge").length);
+    // The hedges in runs along their lines (up to five squares a run, each square once), each drawn by its first square.
+    const runs = BOXES.filter((b) => b.kind === "hedge");
+    const squares = runs.flatMap((b) => b.props).sort((a, b) => a - b);
+    expect(squares).toEqual(PROPS.flatMap((p, i) => (p.kind === "hedge" ? [i] : [])));
+    for (const b of runs) {
+      expect(b.props[0]).toBe(b.prop);
+      expect(b.props.length).toBeLessThanOrEqual(5);
+      expect(b.box.front.w).toBe(37 * b.props.length);
+    }
     // Seam Avenue's own fronts face west (the camera faces east there), as planned.
     expect(LOTS.filter((b) => PLAN.lots[b.lot]!.street === "seam-ave").every((b) => b.facing === "W" && b.ux === 0 && b.uy === -1)).toBe(true);
   });

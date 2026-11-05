@@ -53,8 +53,10 @@ export interface BoxInst {
   /** Its left and right sides, covered by a neighbour at least as tall: never drawn. */
   hideL: boolean;
   hideR: boolean;
-  /** A tile for every roof face in place of the face's own (a hedge's top: dressing.ts hedgeTop). */
+  /** A tile for every roof face in place of the face's own (a hedge's top: dressing.ts hedgeTop, a run's side by side). */
   tile: Character | null;
+  /** A run of hedge: every prop it stands for (the first, `prop`, draws it). */
+  props: number[];
 }
 
 /** Where a picture `w` px wide stands, centred on (cx, cy) along its front line facing `facing`. */
@@ -62,21 +64,42 @@ function place(facing: "S" | "W", cx: number, cy: number, w: number) {
   return facing === "S" ? { ox: cx - w / SQ / 2, oy: cy, ux: 1, uy: 0, bx: 0, by: 1 } : { ox: cx, oy: cy + w / SQ / 2, ux: 0, uy: -1, bx: 1, by: 0 };
 }
 
-/** A hedge's square as a box: its front (a plane facing the street) and its top (one face, its own tile). */
-const hedgeBoxes = new Map<number, TownBox>();
-function hedgeBox(v: number): TownBox {
-  let b = hedgeBoxes.get(v);
-  if (!b) {
-    const front = hedgeFront(v);
-    b = {
-      id: `hedge-${v}`, front, lights: [], lot: { w: 1, d: 1 }, inset: 0, depth: HEDGE.deep, body: { x0: 0, x1: SQ }, left: null, right: null,
-      roof: [{ pts: [[0, 0, HEDGE.tall], [SQ, 0, HEDGE.tall], [SQ, 1, HEDGE.tall], [0, 1, HEDGE.tall]], tex: "hedge", rows: "u", soft: true }],
-      roofPal: hedgeTop(v).palette, taper: 1,
-    };
-    hedgeBoxes.set(v, b);
-  }
-  return b;
+/** Pictures side by side, in one picture (a run of hedge's squares): each one's parts, moved along. */
+function sideBySide(id: string, chs: Character[]): Character {
+  const parts: Record<string, Character["parts"][string]> = {};
+  const layers: { part: string; x: number; y: number }[] = [];
+  chs.forEach((ch, k) => {
+    for (const l of ch.anims.idle!.frames[0]!.layers) {
+      parts[`s${k}${l.part}`] = ch.parts[l.part]!;
+      layers.push({ part: `s${k}${l.part}`, x: l.x + k * SQ, y: l.y });
+    }
+  });
+  const h = chs[0]!;
+  return { ...h, id, name: id, w: SQ * chs.length, parts, anims: { idle: { frames: [{ layers, ms: 1000 }], loop: true } } };
 }
+/**
+ * A run of hedge (its squares' flowers `vs`, in order along its front) as one box: its front (a plane facing the street) and its top
+ * (one face, its squares' own tiles side by side). A run is drawn in two pieces, not two a square (Nov 5, round 3: a frame's cost).
+ */
+const hedgeBoxes = new Map<string, { box: TownBox; tile: Character }>();
+function hedgeRun(vs: number[]): { box: TownBox; tile: Character } {
+  const key = vs.join("");
+  let r = hedgeBoxes.get(key);
+  if (!r) {
+    const W = SQ * vs.length;
+    const front = sideBySide(`hedge-${key}`, vs.map((v) => hedgeFront(v)));
+    const tile = sideBySide(`hedge-top-${key}`, vs.map((v) => hedgeTop(v)));
+    const box: TownBox = {
+      id: `hedge-${key}`, front, lights: [], lot: { w: vs.length, d: 1 }, inset: 0, depth: HEDGE.deep, body: { x0: 0, x1: W }, left: null, right: null,
+      roof: [{ pts: [[0, 0, HEDGE.tall], [W, 0, HEDGE.tall], [W, 1, HEDGE.tall], [0, 1, HEDGE.tall]], tex: "hedge", rows: "u", soft: true }],
+      roofPal: tile.palette, taper: 1,
+    };
+    hedgeBoxes.set(key, (r = { box, tile }));
+  }
+  return r;
+}
+/** The longest run of hedge drawn as one (squares): longer ones split, so each sorts near its own depth. */
+const HEDGE_RUN = 5;
 
 /** The game's id for the art's home id ("blitz" is Dash's). */
 const gameHome = (id: string): HomeId => (id === "blitz" ? "dash" : id) as HomeId;
@@ -89,7 +112,7 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
   const out: BoxInst[] = [];
   const add = (kind: BoxKind, box: TownBox, low: TownBox, facing: "S" | "W", cx: number, cy: number, extra: Partial<BoxInst>) => {
     const p = place(facing, cx, cy, box.front.w);
-    out.push({ i: out.length, kind, box, low, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, ...extra });
+    out.push({ i: out.length, kind, box, low, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, props: [], ...extra });
   };
   STREET_LOTS.forEach((l, lot) => {
     const box = l.kind === "home" ? homeBox(l.id as ArtHomeId) : building(l.id as never, l.w, l.v);
@@ -102,15 +125,34 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
     if (pr.kind === "shed") {
       const b = shed(pr.v);
       add("shed", b, b, "S", pr.x, pr.y - 0.4, { prop });
-    } else if (pr.kind === "hedge") {
-      const b = hedgeBox(pr.v);
-      const tile = hedgeTop(pr.v);
-      // (A hedge's x, y is the back of its top. One running east to west faces the street south of it; one along Seam Avenue, north
-      // to south (a half square's x), faces west.)
-      if (pr.x === Math.round(pr.x)) add("hedge", b, b, "S", pr.x, pr.y - HEDGE.deep, { prop, tile });
-      else add("hedge", b, b, "W", pr.x - HEDGE.deep, pr.y, { prop, tile });
     }
   });
+  // The hedges, in runs along their lines (a hedge's x, y is the back of its top; one running east to west faces the street south of
+  // it, one along Seam Avenue, north to south (a half square's x), faces west): squares side by side, up to HEDGE_RUN a run.
+  const hedges = props.map((pr, i) => ({ pr, i })).filter((h) => h.pr.kind === "hedge");
+  const ew = hedges.filter((h) => h.pr.x === Math.round(h.pr.x)).sort((a, b) => a.pr.y - b.pr.y || a.pr.x - b.pr.x);
+  const ns = hedges.filter((h) => h.pr.x !== Math.round(h.pr.x)).sort((a, b) => a.pr.x - b.pr.x || b.pr.y - a.pr.y);
+  const runs = (list: typeof hedges, next: (a: (typeof hedges)[number]["pr"], b: (typeof hedges)[number]["pr"]) => boolean) => {
+    const out2: (typeof hedges)[] = [];
+    for (const h of list) {
+      const last = out2[out2.length - 1];
+      if (last && last.length < HEDGE_RUN && next(last[last.length - 1]!.pr, h.pr)) last.push(h);
+      else out2.push([h]);
+    }
+    return out2;
+  };
+  for (const run of runs(ew, (a, b) => a.y === b.y && b.x === a.x + 1)) {
+    const { box, tile } = hedgeRun(run.map((h) => h.pr.v));
+    const a = run[0]!.pr;
+    const z = run[run.length - 1]!.pr;
+    add("hedge", box, box, "S", (a.x + z.x) / 2, a.y - HEDGE.deep, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
+  }
+  for (const run of runs(ns, (a, b) => a.x === b.x && b.y === a.y - 1)) {
+    const { box, tile } = hedgeRun(run.map((h) => h.pr.v));
+    const a = run[0]!.pr;
+    const z = run[run.length - 1]!.pr;
+    add("hedge", box, box, "W", a.x - HEDGE.deep, (a.y + z.y) / 2, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
+  }
   for (const b of out) {
     // (W-facing: the front's middle is the line's middle too.)
     b.fx = b.ox + (b.ux * b.box.front.w) / SQ / 2;
@@ -512,7 +554,8 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
     atCam(wp.x, wp.y);
     fp.dz = cq.dz;
     // In one piece when the affine through its first, second and last corners puts a quad's third within a pixel of where it is.
-    fp.whole = fg.n === 3 || wholeFits(fg, fp) < f.boxWholePx;
+    // (A hedge's top is thin: always one piece.)
+    fp.whole = fg.n === 3 || b.kind === "hedge" || wholeFits(fg, fp) < (FINE ? f.boxWholePxFine : f.boxWholePx);
     fp.on = true;
     p.light[i] = faceLight(nw.x, nw.y, fg.nz, v.hc, v.hs);
     fdz[nOrd] = fp.dz;

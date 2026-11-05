@@ -102,7 +102,9 @@ export const TOWN_FEEL = {
    * many pixels of where one piece puts it.
    */
   boxTinyPx: 3,
-  boxWholePx: 0.75,
+  boxWholePxFine: 0.75,
+  /** (The 2D fallback's: a triangle costs it as much as a whole face, so it takes a little more error for one draw.) */
+  boxWholePx: 2,
   /**
    * A wall (a side, or a front seen at a slant) is drawn in upright strips, so its far end stands shorter than its near one: enough that
    * its top steps at most this many pixels a strip, up to this many strips. WebGL's are fine (a strip costs it a few vertices), the 2D
