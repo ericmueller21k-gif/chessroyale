@@ -21,7 +21,7 @@ Christmas lights, HOLLOW_LIGHTS), the FAQ.
    - **At 3 and at 7 out, you're forced into a bad move**: that turn's move is played for you, and it's a bad one.
    - **At 10 out you lose outright.** The whole screen turns black, he says something, then you lose: the game ends as a loss.
    - The −5 doesn't apply in solo any more, and nor does the 5-a-turn rule (the bulbs replace them). **Crowd and raid games keep
-     today's points**, because Eric only spoke of solo. Say so in the decision, and point it out in the report for Eric.
+     today's points** (Eric, Nov 5: "bulbs only apply in solo for now to avoid a griever spamming bad moves"). Say so in the decision.
 2. **Bigger darkness, everywhere he plays.** As well as the single dark square, he now also darkens **a few 2 x 2 blocks**
    (hiding what's in them: "if you don't know where say the bishop moves to in it, that's just your loss"), and **once a game a
    3 x 3 block for 2 turns**. Pick the cadence and how many 2 x 2 blocks a game. Every number goes in settings. Also choose the
