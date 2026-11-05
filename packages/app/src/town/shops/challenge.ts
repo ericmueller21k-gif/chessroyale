@@ -537,7 +537,8 @@ export const CHALLENGE_FEEL = {
    * the match; about 15.5 s from just inside the door (the art's 14.9 s from its shorter walk-on).
    *
    * The crumple (`crumple`, the art's CRUMPLE_TIMING: crumple-gl.ts): the screen crumpled over black (`crumpleMs`), held as a ball
-   * (`holdMs`; longer while the match loads, up to `maxHoldMs`, then it opens onto whatever shows), opened as the match screen
+   * (`holdMs`; longer while the match loads; once it shows, its picture has `maxHoldMs`, or the ball fades through black onto it instead),
+   * opened as the match screen
    * (`openMs`), its creases' shade lingering on the flat match (`lingerMs`). Without WebGL (or if it fails), a cross-fade through black:
    * to black over `fadeMs`, held black while the match loads, up from black over `fadeMs`.
    */
@@ -555,7 +556,7 @@ export const CHALLENGE_FEEL = {
     quietMs: 2400,
     crumpleAfterMs: 250,
     swapMs: 250,
-    crumple: { crumpleMs: 800, holdMs: 400, openMs: 800, lingerMs: 260, maxHoldMs: 4000, fadeMs: 350 },
+    crumple: { crumpleMs: 800, holdMs: 400, openMs: 800, lingerMs: 260, maxHoldMs: 3000, fadeMs: 350 },
   },
   /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by

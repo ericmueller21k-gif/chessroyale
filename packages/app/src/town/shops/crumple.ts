@@ -321,24 +321,42 @@ export function fillMesh(b: MeshBuf, p: number, o: CrumpleOpts, shadeP = p): voi
   const sg = shadeP === p ? b.grid : b.sgrid;
   if (sg !== b.grid) gridAt(b, shadeP, o, sg);
   const W1 = b.cols + 1;
-  const at = (g: Float32Array, i: number, j: number): V3 => {
-    const k = (j * W1 + i) * 3;
-    return [g[k]!, g[k + 1]!, g[k + 2]!];
-  };
+  const G = b.grid;
+  // (No allocation a frame: each triangle's corners by index, its shade as `shadeOf` works it out, inline.)
+  const [lx, ly, lz] = L;
+  const flat = 0.42 + 0.68 * lz;
+  const k3 = new Int32Array(3);
   let v = 0;
   for (let j = 0; j < b.rows; j++)
     for (let i = 0; i < b.cols; i++) {
       const cut = (i + j) % 2 === 0 ? CUT_A : CUT_B;
       for (let t = 0; t < 2; t++) {
-        const c = [cut[t * 3]!, cut[t * 3 + 1]!, cut[t * 3 + 2]!];
-        const { shade, back } = shadeOf(at(sg, i + c[0]![0], j + c[0]![1]), at(sg, i + c[1]![0], j + c[1]![1]), at(sg, i + c[2]![0], j + c[2]![1]));
-        for (const [di, dj] of c) {
-          const q = at(b.grid, i + di, j + dj);
-          const k = o.F / (o.F - q[2]);
-          b.pos[v * 3] = ((q[0] * k) / b.W) * 2;
-          b.pos[v * 3 + 1] = -((q[1] * k) / b.H) * 2;
+        for (let c = 0; c < 3; c++) {
+          const [di, dj] = cut[t * 3 + c]!;
+          k3[c] = ((j + dj) * W1 + i + di) * 3;
+        }
+        const a = k3[0]!;
+        const bb = k3[1]!;
+        const cc = k3[2]!;
+        const ux = sg[bb]! - sg[a]!, uy = sg[bb + 1]! - sg[a + 1]!, uz = sg[bb + 2]! - sg[a + 2]!;
+        const vx = sg[cc]! - sg[a]!, vy = sg[cc + 1]! - sg[a + 1]!, vz = sg[cc + 2]! - sg[a + 2]!;
+        let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+        const m = Math.hypot(nx, ny, nz) || 1;
+        nx /= m;
+        ny /= m;
+        nz /= m;
+        const back = nz < 0;
+        if (back) (nx = -nx), (ny = -ny), (nz = -nz);
+        const lam = Math.max(0, nx * lx + ny * ly + nz * lz);
+        const shade = Math.max(0.22, Math.min(1.12, (0.42 + 0.68 * lam) / flat));
+        for (let c = 0; c < 3; c++) {
+          const q = k3[c]!;
+          const z = G[q + 2]!;
+          const k = o.F / (o.F - z);
+          b.pos[v * 3] = ((G[q]! * k) / b.W) * 2;
+          b.pos[v * 3 + 1] = -((G[q + 1]! * k) / b.H) * 2;
           // (Nearer, larger z: smaller depth. Well inside the clip range for any ball.)
-          b.pos[v * 3 + 2] = -q[2] / 4000;
+          b.pos[v * 3 + 2] = -z / 4000;
           b.shade[v] = shade;
           b.back[v] = back ? 1 : 0;
           v++;
@@ -353,16 +371,16 @@ export interface CrumpleBeats {
   holdMs: number;
   openMs: number;
   lingerMs: number;
-  maxHoldMs: number;
 }
 /**
- * The whole beat `t` ms from its start, the match screen ready (taken, on its texture) `ready` ms from its start (Infinity: not yet):
+ * The whole beat `t` ms from its start, the match screen ready (taken, on its texture) `ready` ms from its start (Infinity: not yet);
+ * `late`: the match shows but its picture didn't come in time (the cover's own limit):
  * crumpled over `crumpleMs`; held as a ball at least `holdMs`, and until the match screen has been ready for half a hold (the swap from
  * the still to it, cross-faded on the small ball, `mix`); opened over `openMs`; flat, its creases' shade fading over `lingerMs` (`live`:
- * from there the live match screen shows under the shade); done. Not ready by `crumpleMs + maxHoldMs`: "fail" (the room fades through
- * black to the match instead). The ball turns a little while held and back as it opens (the art's crumpleAt).
+ * from there the live match screen shows under the shade); done. `late` and not ready: "fail" (the ball fades through black to the
+ * match instead). Held as a ball for as long as the match takes to load (as Hollow's dark holds). The ball turns a little while held and back as it opens (the art's crumpleAt).
  */
-export function crumpleBeat(t: number, ready: number, T: CrumpleBeats): { phase: "crumple" | "hold" | "open" | "linger" | "done" | "fail"; p: number; turn: number; mix: number; linger: number; openAt: number } {
+export function crumpleBeat(t: number, ready: number, T: CrumpleBeats, late = false): { phase: "crumple" | "hold" | "open" | "linger" | "done" | "fail"; p: number; turn: number; mix: number; linger: number; openAt: number } {
   const ease = (u: number) => (u < 0.5 ? 2 * u * u : 1 - 2 * (1 - u) * (1 - u));
   const sm = (u: number) => {
     const c = Math.min(1, Math.max(0, u));
@@ -372,7 +390,7 @@ export function crumpleBeat(t: number, ready: number, T: CrumpleBeats): { phase:
   const openAt = Math.max(T.crumpleMs + T.holdMs, ready + half);
   if (t < T.crumpleMs) return { phase: "crumple", p: ease(t / T.crumpleMs), turn: 0, mix: 0, linger: 1, openAt };
   if (t < openAt) {
-    if (ready === Infinity && t >= T.crumpleMs + T.maxHoldMs) return { phase: "fail", p: 1, turn: 0.35, mix: 0, linger: 1, openAt };
+    if (ready === Infinity && late) return { phase: "fail", p: 1, turn: 0.35, mix: 0, linger: 1, openAt };
     return { phase: "hold", p: 1, turn: 0.35 * sm((t - T.crumpleMs) / (openAt - T.crumpleMs)), mix: ready === Infinity ? 0 : sm((t - (openAt - half)) / half), linger: 1, openAt };
   }
   const o = t - openAt;

@@ -9,8 +9,8 @@
  * Never stuck, never in the match's way:
  * - No WebGL (or a shader, a texture or the context failing; or the room's picture failing): a short cross-fade through black instead
  *   (`fade`): to black, held while the match loads, up from black onto it.
- * - The match's picture is waited for as a ball at most `maxHoldMs`; past it (or if it fails) the ball fades to black and the match
- *   comes up from black.
+ * - It holds as a ball for as long as the match takes to load (as Hollow's dark holds black); once the match shows, its picture has
+ *   `maxHoldMs`: past it (or if it fails) the ball fades to black and the match comes up from black.
  * - Every phase goes by the clock; a last limit takes the cover away whatever happens.
  *
  * As the other transitions (intro.ts Storm): a canvas over the whole page, outside the town's tree, taking every tap; `covered` resolves
@@ -33,7 +33,7 @@ const MATCH_DOM_MS = 1500;
 /** The pictures (and the cover) are drawn at most at this many device pixels a CSS pixel: a phone's memory and upload time. */
 const MAX_DPR = 2;
 /** Whatever happens, the cover is gone this long (ms) after `out()`: past every beat and limit. */
-const LAST_MS = T.maxHoldMs + T.crumpleMs + T.openMs + T.lingerMs + 3000;
+const LAST_MS = T.maxHoldMs + T.holdMs + T.openMs + T.lingerMs + T.fadeMs * 2 + 3000;
 
 /** The room's DOM layer, taken ahead (`prepareCrumple`: as the quiet line goes, while nothing on the page changes). */
 let ahead: DomLayer | null = null;
@@ -216,6 +216,8 @@ export function startCrumple(intro: LoadedIntro): Storm {
   const layer = ahead ?? domLayer(W, H, ROOM_DOM_MS);
   ahead = null;
   let readyAt = Infinity;
+  /** When the match showed under the cover (out()), or -1: its picture has `maxHoldMs` from then. */
+  let outAt = -1;
   let failed = "";
   let t0 = 0;
   let raf = 0;
@@ -248,7 +250,7 @@ export function startCrumple(intro: LoadedIntro): Storm {
       if (u < 1) raf = requestAnimationFrame(frame);
       return;
     }
-    const b = crumpleBeat(t, readyAt === Infinity ? Infinity : readyAt - t0, T);
+    const b = crumpleBeat(t, readyAt === Infinity ? Infinity : readyAt - t0, T, outAt >= 0 && now - outAt > T.maxHoldMs);
     if (b.phase === "fail") {
       fail("match-late");
       raf = requestAnimationFrame(frame);
@@ -302,6 +304,7 @@ export function startCrumple(intro: LoadedIntro): Storm {
   const out = async () => {
     await covered;
     if (fallback) return fallback.out();
+    outAt = performance.now();
     const last = setTimeout(end, LAST_MS);
     // The match screen, shown under the cover now: taken as the room's was, put on the ball.
     try {
