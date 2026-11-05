@@ -398,6 +398,38 @@ export interface Base {
   from?: number;
 }
 
+/**
+ * A capture, recorded where a move is played (playOnBoard: the boss's moves, the crowd's, a move a power plays for
+ * either), so the screens read what happened instead of guessing it from the board (Eric, Nov 5: the queen banners
+ * fire "literally when a capture is written"). `ply`: the moves on the board once it's played (the position after it
+ * is fenAtPly(history, ply)); `side`: who moved; `piece` and `color`: what it took. A power that changes the board
+ * between moves (a burn, a bounce, a freeze) writes none; Folio's Revision, crossing a move out, removes its record.
+ */
+export interface Capture {
+  ply: number;
+  side: "w" | "b";
+  from: string;
+  to: string;
+  piece: "p" | "n" | "b" | "r" | "q";
+  color: "w" | "b";
+}
+
+/**
+ * What a move takes as it's played from `fen`, as a record at `ply` (null: it takes nothing). The piece on the square it
+ * lands on, if the other side's; a pawn's diagonal step onto an empty square takes en passant. (A Chess960 castling,
+ * the king onto its own rook, takes nothing.)
+ */
+export function captureOf(fen: string, uci: string, ply: number): Capture | null {
+  const from = uci.slice(0, 2);
+  const to = uci.slice(2, 4);
+  const mover = pieceAt(fen, from);
+  if (!mover) return null;
+  const target = pieceAt(fen, to);
+  if (target && target.color !== mover.color && target.type !== "k") return { ply, side: mover.color, from, to, piece: target.type, color: target.color };
+  if (!target && mover.type === "p" && from[0] !== to[0]) return { ply, side: mover.color, from, to, piece: "p", color: mover.color === "w" ? "b" : "w" };
+  return null;
+}
+
 /** The latest base at or before `ply` (none: the starting position). */
 export function baseAt(ply: number, bases?: readonly Base[] | null): Base {
   let b: Base = { ply: 0, fen: START_FEN };

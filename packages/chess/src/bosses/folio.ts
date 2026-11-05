@@ -559,7 +559,9 @@ export const folioBattle = {
     if (evals.length > ply) evals[ply] = expected;
     // (The move that led to the position it goes back to, unless that position began the board: a base of its own.)
     const lastMove = baseAt(ply - 2, board.bases).ply === ply - 2 ? null : (board.history[ply - 3] ?? null);
-    b.boards.set(board.id, { ...board, fen: last.fen, expected, lastMove, evals, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: last.fen, from: ply - 2 }] });
+    // (The two moves crossed out took nothing: their capture records go, so no banner ever reads one.)
+    const captures = board.captures?.filter((c) => c.ply <= ply - 2);
+    b.boards.set(board.id, { ...board, fen: last.fen, expected, lastMove, evals, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen: last.fen, from: ply - 2 }], ...(captures ? { captures } : {}) });
     const at = boss.crowdMoves;
     const longer = <T extends { until: number } | null>(x: T): T => (x && x.until >= at ? { ...x, until: x.until + 1 } : x);
     const mark = f.mark && attackStands(last.fen, f.mark, boss.crowdSide) ? longer(f.mark) : null;

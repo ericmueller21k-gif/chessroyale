@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
-import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, queenSlain, withPiece } from "@chessroyale/chess";
+import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
 import { SnackTime, bounceFen, bounceJolt, snackPawnShown } from "../components/BigBoy.tsx";
@@ -14,6 +14,7 @@ import { gardenerFen } from "../components/Gardener.tsx";
 import { timberFen } from "../components/Timber.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
 import { rememberBoss } from "../boss-history.ts";
+import { bannerOn, dueQueenBanner, resetBattleBanners } from "../battle-banners.ts";
 import { bossKit } from "../characters/kits.ts";
 import { bossMoveCues, kingSay, resetKingSpeech } from "../godKing.ts";
 import { FightBanner } from "../components/FightBanner.tsx";
@@ -250,7 +251,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   }, [foeIntro]);
   // A new boss battle: the God King starts afresh (he'll introduce himself on your first move). This device remembers
   // the boss, so the next random one is another.
-  useState(() => intro && !loading && (resetKingSpeech(), bossVoice.reset(), resetBeats()));
+  useState(() => intro && !loading && (resetKingSpeech(), bossVoice.reset(), resetBeats(), resetBattleBanners()));
   useState(() => intro && !loading && rememberBoss(boss.id, `${boss.id}:${history.join("")}`));
   // The boss's mate: its attack on the crowd's king (its kit has one), from KING_ATTACK.mateAt into the screen's last
   // KING_ATTACK.mateHoldMs; the result waits for it (bossTurnShowMs). No power's moment comes with a mate, but Chub &
@@ -304,14 +305,12 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
       live = false;
     };
   }, [boss.board.fen, thinking]);
-  // The boss takes your queen: its banner and face, once for his move. His lastMove stays that capture until he moves
-  // again, so the turn after your move (the Slam's, a step's) brought it back: it shows only while his move is still
-  // the board's last move (Eric, Oct 25: "the queen capture banner happened again").
-  const lastOnBoard = boss.board.history[boss.board.history.length - 1];
-  const tookQueen = !intro && !thinking && !victim && !funhouse && !bounce && boss.lastMove?.captured === "q" && !!lastOnBoard && lastOnBoard === boss.lastMove.move;
-  // You take the boss's queen: your banner (the God King's face), while the boss "thinks" (it waits for it). Only your
-  // capture, and only in the thinking straight after it (queenSlain: not again after Big Boy's bounce).
-  const slewQueen = !intro && !!thinkingNow && !victim && queenSlain(boss);
+  // The queen banners, events of their captures (battle-banners.ts; Eric, Nov 5): read from the capture record of the
+  // board's newest move, never the board. QUEEN DOWN! (his face) as his move that took your queen lands; QUEEN SLAIN!
+  // (the God King's) in his thinking straight after yours took his. Each once for its ply: a later screen of the turn
+  // (the Slam's, a bounce's, the funhouse's, his second thinking) never brings it back.
+  const queenDue = intro || loading || victim ? null : dueQueenBanner(boss, thinkingNow ? "thinking" : thinking ? null : "move", `${boss.id}:${boss.startMove}`);
+  const queenBanner = queenDue && bannerOn(queenDue.key, now, bossBannerMs()) ? queenDue : null;
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
@@ -529,8 +528,8 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
             {intro && t >= tl.bannerAt && <FightBanner text="START!" sound="bannerStart" ms={tl.total - tl.bannerAt} />}
             {/* (The queen banners are silent for now: Eric, Oct 11, the gasp sounded wrong. Its file is kept, unused:
                 queenGasp in sound.ts, public/sounds/banner/queen-gasp.mp3.) */}
-            {slewQueen && <FightBanner key={`slew-${history.length}`} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={bossBannerMs()} />}
-            {tookQueen && <FightBanner tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={bossBannerMs()} />}
+            {queenBanner?.kind === "slain" && <FightBanner key={queenBanner.key} tone="hero" face={<GodKingPortrait side={boss.crowdSide} />} text="QUEEN SLAIN!" sub={`You take ${bossInText(boss.name)}'s queen`} ms={bossBannerMs()} />}
+            {queenBanner?.kind === "down" && <FightBanner key={queenBanner.key} tone="boss" face={<BossFace boss={boss} />} text="QUEEN DOWN!" sub={`${bossInText(boss.name, true)} takes your queen`} ms={bossBannerMs()} />}
             {loading && <BrainLoading match={match} boss={boss} />}
             {showCard && (
               // (After the loading step, whose card it takes over from: no entrance, so the board doesn't blink between.)

@@ -881,7 +881,7 @@ describe("Alfil's view and timing", () => {
   it("his moments' lengths are the server's and the screens' (POWER_FX); QUEEN SLAIN! never again after one of his steps", () => {
     for (const k of ["tusks", "fuse", "slam", "land"] as const) expect(POWER_FX[k]).toBe(ALFIL_FX[k]);
     // Your move took his queen; then his cast played: the thinking for his move is the turn's second.
-    const board = { history: ["d1d8"], bases: [{ ply: 0, fen: "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1" }] };
+    const board = { history: ["d1d8"], bases: [{ ply: 0, fen: "3qk3/8/8/8/8/8/8/3QK3 w - - 0 1" }], captures: [{ ply: 1, side: "w" as const, from: "d1", to: "d8", piece: "q" as const, color: "b" as const }] };
     const view = { crowdSide: "w" as const, crowdMoves: 5, board, powers: { events: [] as { kind: string }[] } };
     expect(queenSlain(view)).toBe(true);
     expect(queenSlain({ ...view, powers: { events: [{ kind: "tusks" }] } })).toBe(false);

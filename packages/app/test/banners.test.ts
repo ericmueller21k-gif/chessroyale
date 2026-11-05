@@ -184,7 +184,7 @@ describe("a boss's banners a second shorter", () => {
     expect(bossShowMs({ captured: "q" })).toBe(3100 + bannerPlusMs());
     expect(bossShowMs({ captured: "q" }, true)).toBe(3100 + bannerPlusMs());
     expect(bossShowMs({ captured: "q" })).toBeGreaterThanOrEqual(bossBannerMs());
-    const took = { crowdSide: "w" as const, crowdMoves: 3, board: { history: ["e2e4", "e7e5", "d1h5", "d8h4", "h5h4"] } };
+    const took = { crowdSide: "w" as const, crowdMoves: 3, board: { history: ["e2e4", "e7e5", "d1h5", "d8h4", "h5h4"], captures: [{ ply: 5, side: "w" as const, from: "h5", to: "h4", piece: "q" as const, color: "b" as const }] } };
     expect(bossThinkMs(took)).toBe(bossBannerMs() + 500);
     expect(PHASE_CHANGE.bannerMs).toBe(1400 + bannerPlusMs());
     expect(PHASE_CHANGE.total).toBe(PHASE_CHANGE.bannerAt + PHASE_CHANGE.bannerMs);
