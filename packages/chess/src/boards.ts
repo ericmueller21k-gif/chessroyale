@@ -1,6 +1,6 @@
 import type { BoardStatus } from "@chessroyale/core";
 import type { Opening } from "./openings.ts";
-import { applyMove, baseAt, fenAfter, gameEndWith, withoutPiece, type Base, type GameEnd } from "./rules.ts";
+import { applyMove, baseAt, captureOf, fenAfter, gameEndWith, withoutPiece, type Base, type Capture, type GameEnd } from "./rules.ts";
 
 /** A board is a supply of positions: an opening played out, then one drawn move per round. */
 export interface BoardState {
@@ -20,6 +20,11 @@ export interface BoardState {
   evals?: number[];
   /** Positions changed between moves (a piece G-REX's fire destroyed): the moves after each are played from it. */
   bases?: Base[];
+  /**
+   * Every capture on this board, recorded as its move was played (playOnBoard; a Revision removes the ones it crosses out).
+   * Missing on a board from before Nov 5, 2026 (a match stored then): its captures from here on are recorded.
+   */
+  captures?: Capture[];
 }
 
 /** The boss battle's board: a fresh game from the starting position. */
@@ -54,10 +59,12 @@ export function newBoard(id: number, opening: Opening, plies: number, generation
   };
 }
 
-/** Plays the drawn move. `moverExpected` is the mover's expected score after it (from the round's search). */
+/** Plays the drawn move, and records what it takes (`captures`). `moverExpected` is the mover's expected score after it (from the round's search). */
 export function playOnBoard(board: BoardState, move: string, moverExpected: number): BoardState {
+  const taken = captureOf(board.fen, move, board.history.length + 1);
   return {
     ...board,
+    ...(taken ? { captures: [...(board.captures ?? []), taken] } : {}),
     history: [...board.history, move],
     fen: applyMove(board.fen, move),
     expected: 1 - moverExpected,

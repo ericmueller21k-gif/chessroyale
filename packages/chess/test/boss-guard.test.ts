@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_BANNER } from "@chessroyale/core";
-import { DEFAULT_BOSS_GUARD, bossMoveFrom, bossThinkMs, moveLoss, queenSlain, withinGuard, type EngineLike, type QueenSlainView } from "../src/index.ts";
+import { BOSS_OPENING, DEFAULT_BOSS_GUARD, bossMoveFrom, bossThinkMs, moveLoss, newBoard, playOnBoard, queenSlain, withinGuard, type EngineLike, type QueenSlainView } from "../src/index.ts";
 import { START_FEN } from "../src/rules.ts";
 
 /** An engine whose top moves and limited-strength pick are scripted. */
@@ -54,7 +54,9 @@ describe("the boss's blunder guard", () => {
 describe("queen captures in the boss battle", () => {
   // 1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd4 4. Nf3 Qc4 5. Bxc4 (a made-up line where White's bishop takes the queen)
   const line = ["e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5d4", "g1f3", "d4c4", "f1c4"];
-  const view = (history: string[], crowdSide: "w" | "b" = "w", powers: QueenSlainView["powers"] = null): QueenSlainView => ({ crowdSide, crowdMoves: Math.ceil(history.length / 2), powers, board: { history } });
+  // (The board as the runner plays it, move by move: playOnBoard writes each capture's record, which queenSlain reads.)
+  const played = (history: string[]) => history.reduce((b, m) => playOnBoard(b, m, 0.5), newBoard(0, BOSS_OPENING, 0));
+  const view = (history: string[], crowdSide: "w" | "b" = "w", powers: QueenSlainView["powers"] = null): QueenSlainView => ({ crowdSide, crowdMoves: Math.ceil(history.length / 2), powers, board: played(history) });
   it("spots the crowd taking the boss's queen, and the boss waits for its banner", () => {
     expect(queenSlain(view(line))).toBe(true);
     expect(queenSlain(view(line.slice(0, -1)))).toBe(false);
