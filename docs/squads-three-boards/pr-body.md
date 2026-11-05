@@ -42,8 +42,13 @@ deploy finishes on 4 boards). Decision note: `docs/decisions/2026-11-05-squads-t
 - **Quick board jump** is in the gear's list and in Settings → Squads. The switch and its line under the board are gone.
 - **Under the board:** only the move arrows and the turn order.
   - The turn order is one queue for the board on screen: all 8 players in the order they'll move there.
-  - Your row says "Your turn · play now" or "Waiting for N players". A row's tap shows that position.
+  - Your row is a bold "You" and your move. While you're on top and your move there is on, it also says "Your turn · play
+    now". A row's tap shows that position.
+  - Long names are cut with an ellipsis and never wrap; the move column stays in one place on every row.
   - A phone shows 4 rows and opens all 8 over the board. A computer shows all 8.
+  - It's never rebuilt (Eric): its element is made once and moved into each board's view before paint. Tapping another
+    tiny board, or a move landing, changes only the rows' order and moves, and the rows glide there (about 220 ms, rows
+    kept by player).
   - "Back to my board", the "Your move" box and the rules line are removed.
 - **Nothing cut off at the bottom** with the browser bar, at 390 × 664, 393 × 659, 428 × 746 and 360 × 560.
 - **Coach marks:** three, in place of the replay tip. The last one has "Don't show these again".
@@ -57,7 +62,8 @@ deploy finishes on 4 boards). Decision note: `docs/decisions/2026-11-05-squads-t
 
 ## Player-visible changes and new text
 
-- "Your turn · play now"; "Waiting for 1 player" / "Waiting for N players" (the turn order).
+- "Your turn · play now" (your row in the turn order, on top while your move there is on). Screen readers also hear
+  "Waiting for N players" on your row; it isn't shown.
 - The coach marks:
   - "Tap here for settings, like Quick board jump."
   - "Tap to replay moves: the last 2, all of them, or off."
@@ -146,7 +152,11 @@ rule text is updated to match.
 - New unit checks in `packages/app/test/squads-view.test.ts`: the board queue, your row's words, the folded rows.
 - New: `e2e/squads-three-boards.spec.ts`, phone and computer:
   - A 3-board Relay plays to a result, with the mini boards checked.
-  - The queue: its size, the mover lit, your place, a row's tap.
+  - The queue: its size, the mover lit, your row's words, a row's tap. Real-length names (6-20 characters, such as
+    "QueenSacrificeQueen" and "knightrider_2009"): one row height, the move column in one place, nothing wrapped, at
+    every phone size including 360 × 560.
+  - The turn order is never rebuilt: tapping each tiny board in turn keeps the same element (a marker survives), its
+    box, and the same element for each player's row, while the order changes.
   - The coach marks run once.
   - Nothing below the bottom edge at the phone sizes.
   - Added to `e2e/areas.json` (Squads).
@@ -172,6 +182,11 @@ Same code, with Relay on 3 boards against 4 (median lobby, then 90th percentile)
   points, so a level score always includes a draw.
   - All three drawn always goes to side 1, which is Black on two boards. **For Eric to know.**
 
+## Recordings
+
+- `docs/squads-three-boards/turn-order-glide-phone.gif` and `turn-order-glide-desktop.gif`: tapping across the three
+  tiny boards. The rows glide to each board's order and nothing else in the box moves.
+
 ## Local runs
 
 - Typecheck: green.
@@ -182,6 +197,8 @@ Same code, with Relay on 3 boards against 4 (median lobby, then 90th percentile)
     green.
   - Three tests failed first and were fixed: the replay tests now follow Eric's rule, a test lobby's opener is never the
     waiting seat, and the coach marks' OK locator. All three passed on rerun.
+  - After Eric's last corrections, `squads-three-boards` ran green on phone and computer: 9 passed, 1 skipped (the phone-only
+    sizes test, on the computer).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

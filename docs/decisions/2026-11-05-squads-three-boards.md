@@ -26,7 +26,7 @@ grayed finished mini board, the "Jump to my next board" switch and its line unde
 - **The drain**: a squad moves on two boards in one half and one in the other; the team clock already counts who's
   thinking at once.
 - **The result**: best 2 of 3. The match ends as soon as the other squad can't catch up even winning every board left
-  (the director's call, Nov 5). Each finished board shares out one point, so this is exactly "more than half the
+  (the director's call, Nov 5; Eric agrees it ends once a squad has won 2). Each finished board shares out one point, so this is exactly "more than half the
   points": 1½–½ with one board left can still end level, and plays on.
 - **The tie** (the director's call on Eric's "if it was all draws … black gets an extra point for a draw or whatever";
   **Eric's to change**): 1. more boards drawn as Black (as Armageddon gives a draw to Black); 2. more team bank left;
@@ -59,12 +59,22 @@ grayed finished mini board, the "Jump to my next board" switch and its line unde
   does it; the third coach mark says so), the "Your move" box and the rules line.
 - **The turn order** (Eric's correction: "one queue for the board you're viewing"): all 8 players in the order they'll
   move on the board on screen, the next there on top; whoever moves drops to the bottom. The ring makes the next 8 moves
-  on any board all 8 players once. Your row: "Your turn · play now", or "Waiting for 2 players" (how many move there
-  before you). Each row: the squad's color and the move they last played (a tap shows that position). A phone shows 4
-  rows, a tap opens all 8 over the board (upward, so nothing below moves); a computer all 8 beside the board. One call:
-  with you further down than 4th, a phone's folded box shows the top 3 and your row, so it always says where you
-  stand. (Options mocked first: the 6 seated players, or all 8 in two team columns; Eric picked all 8, then asked for
-  the one queue.)
+  on any board all 8 players once. Each row: the squad's color, the whole name (cut with an ellipsis, never wrapped)
+  and the move they last played (a tap shows that position), the move column in one place on every row.
+  - Your row (Eric, from the stills): a bold "You" and your move. No "Waiting for N players"; the order says it.
+    "Your turn · play now" while you're on top. My call: only while your move there is actually on, since between
+    halves "now" would come too soon. Screen readers still hear your place.
+  - A phone shows 4 rows, a tap opens all 8 over the board (upward, so nothing below moves); a computer shows all 8
+    beside the board. My call: with you further down than 4th, a phone's folded box shows the top 3 and your row.
+  - **Never rebuilt** (Eric: "his test of working as good as we want"): each board's view is drawn afresh, but the turn
+    order's element is made once and moved into the new view's slot before the screen is painted. Its rows are kept by
+    player and glide to their new places (FLIP, about 220 ms; none with reduced motion). Proof: an e2e check (the same
+    element, box and row elements across the three boards), and two recordings,
+    `docs/squads-three-boards/turn-order-glide-phone.gif` and `-desktop.gif`.
+  - Options mocked first: the 6 seated players, or all 8 in two team columns. Eric picked all 8, then asked for the one
+    queue.
+- **Stills and tests use real-length names** (Eric): "QueenSacrificeQueen", "knightrider_2009", "Zugzwang Zoe",
+  "TheBishopOfBanter", "pawnstorm77" and others, 6-20 characters.
 - **Nothing cut off at the bottom** with the browser bar: 390 × 664 (iPhone 13), 393 × 659 (iPhone 15), 428 × 746, a
   short Android at 360 × 560 (its tiny boards and rows a little smaller).
 - **The coach marks** (in place of the replay tip): three, one at a time, at a player's Relay: "Tap here for
