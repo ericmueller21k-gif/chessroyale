@@ -11,7 +11,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  * switches, views that name no board, and an app that never says.
  */
 
-const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
+const VOTES_MS = (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 const WINDOW = SQUADS_LOBBY.watching.coalesceMs;
 
 beforeEach(() => clearTopCache());
@@ -42,13 +42,13 @@ describe("squads lobby: who's watching", () => {
     expect(L.last(a, "viewers")!.full).toBeUndefined();
     // Ann moves to another board: hers whole; Bo hears she's gone.
     L.advance(WINDOW);
-    L.core.message(a, { t: "view", key: "r0m2", board: 3 });
-    expect(L.last(a, "viewers")).toMatchObject({ boards: { "r0m2/3": [a] }, full: true });
+    L.core.message(a, { t: "view", key: "r0m2", board: 2 });
+    expect(L.last(a, "viewers")).toMatchObject({ boards: { "r0m2/2": [a] }, full: true });
     expect(L.last(b, "viewers")!.boards).toEqual({ "r0m0/1": [b] });
     // The same board again: nothing. No board (the results): nothing to anyone (nobody else is on hers).
     L.advance(WINDOW);
     const before = L.all(a, "viewers").length + L.all(b, "viewers").length;
-    L.core.message(a, { t: "view", key: "r0m2", board: 3 });
+    L.core.message(a, { t: "view", key: "r0m2", board: 2 });
     L.core.message(a, { t: "view", key: null });
     L.advance(WINDOW);
     expect(L.all(a, "viewers").length + L.all(b, "viewers").length).toBe(before);
@@ -66,8 +66,8 @@ describe("squads lobby: who's watching", () => {
     const start = L.now;
     // 50 switches each from two people over 2 s (one every 40 ms), through Cy's board and others.
     for (let i = 0; i < 50; i++) {
-      L.core.message(a, { t: "view", key: `r0m${i % 4}`, board: i % 4 });
-      L.core.message(b, { t: "view", key: `r0m${(i + 1) % 4}`, board: (i + 2) % 4 });
+      L.core.message(a, { t: "view", key: `r0m${i % 4}`, board: i % 3 });
+      L.core.message(b, { t: "view", key: `r0m${(i + 1) % 4}`, board: (i + 2) % 3 });
       L.advance(40);
     }
     L.advance(WINDOW);
@@ -78,10 +78,10 @@ describe("squads lobby: who's watching", () => {
       // Small: one board's ids.
       for (const m of got) expect(Object.keys(m.boards)).toHaveLength(1);
     }
-    // Where they ended (i = 49): Ann on r0m1/1, with Cy; Bo on r0m2/3. Cy's last word on her board says so.
+    // Where they ended (i = 49): Ann on r0m1/1, with Cy; Bo on r0m2/0. Cy's last word on her board says so.
     expect(L.last(c, "viewers")!.boards).toEqual({ "r0m1/1": [a, c] });
     expect(L.last(a, "viewers")!.boards).toEqual({ "r0m1/1": [a, c] });
-    expect(L.last(b, "viewers")!.boards).toEqual({ "r0m2/3": [b] });
+    expect(L.last(b, "viewers")!.boards).toEqual({ "r0m2/0": [b] });
   });
 
   it("a view that names no board counts as none; only people view (bots never send it)", () => {
@@ -90,7 +90,7 @@ describe("squads lobby: who's watching", () => {
     L.core.message(a, { t: "view", key: "r0m0", board: 2 });
     for (const bad of [
       { key: "r9m9", board: 0 },
-      { key: "r0m0", board: 4 },
+      { key: "r0m0", board: 3 },
       { key: "r0m0", board: 1.5 },
       { key: "r0m0", board: "2" },
       { key: 7, board: 0 },

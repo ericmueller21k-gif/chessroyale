@@ -895,7 +895,8 @@ export class SquadsCore {
     this.r.phase = "filled";
     this.r.filledAt = now;
     this.r.solos = [];
-    this.r.timer = { kind: "begin", at: now + FRONT_DOOR.fillShowMs };
+    // (The first vote opens a little after the full lobby shows, Eric, Nov 5: its timer and the bots' votes with it.)
+    this.r.timer = { kind: "begin", at: now + FRONT_DOOR.fillShowMs + this.s.firstVoteDelaySeconds * 1000 };
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
   }
 

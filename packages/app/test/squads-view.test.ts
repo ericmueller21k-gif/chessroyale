@@ -3,6 +3,9 @@ import type { NetDuty, NetSquadsLobby, NetSquadsHalf, NetTeamClock, SquadsBlock,
 import { START_FEN, applyMove, inCheck } from "@chessroyale/chess";
 import {
   SQUAD_NAMES,
+  lastMovesBy,
+  relayMover,
+  turnOrder,
   bankText,
   cheatArrows,
   cheatEval,
@@ -470,5 +473,53 @@ describe("Mercenary on screen", () => {
     expect(canTapChip({ ...m, visible: { a0: "e2e4" } }, "a0", 1_000)).toBe(false);
     expect(canTapChip({ ...m, mode: "classic" }, "a0", 1_000)).toBe(false);
     expect(canTapChip({ ...m, current: half(m.current!.duties, [{ board: 0, by: "a0", at: 500 }]) }, "a0", 1_000)).toBe(false);
+  });
+});
+
+describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: all 8 in ring order, the mover lit)", () => {
+  const sides = [
+    { squadId: 0, seats: ["a0", "a1", "a2", "a3"] },
+    { squadId: 1, seats: ["b0", "b1", "b2", "b3"] },
+  ];
+  const board = (id: number, moves: string[]) => ({ id, white: (id % 2) as 0 | 1, moves, startFen: START_FEN, fen: START_FEN, lastMove: null, result: null });
+  const at = (turn: number, moves: string[][], duties: { board: number; side: 0 | 1; players: string[] }[], locked: string[] = []) =>
+    ({
+      sides,
+      turn,
+      state: "half",
+      locked,
+      boards: moves.map((mv, i) => board(i, mv)),
+      current: { seq: 1, turn, half: "w", startedAt: 0, duties: duties.map((d) => ({ ...d, role: "move", deadline: 1 })), scouts: [], forced: [], chips: [] },
+    }) as unknown as LocalMatch;
+
+  it("one size on every board: yours first, 4 a squad in ring order; the movers lit until they've moved", () => {
+    const m = at(0, [[], [], []], [
+      { board: 2, side: 0, players: ["a0"] },
+      { board: 0, side: 0, players: ["a1"] },
+      { board: 1, side: 1, players: ["b0"] },
+    ]);
+    const [mine, theirs] = turnOrder(m, "b2");
+    expect(mine.map((r) => r.id)).toEqual(["b0", "b1", "b2", "b3"]);
+    expect(theirs.map((r) => r.id)).toEqual(["a0", "a1", "a2", "a3"]);
+    expect(theirs.filter((r) => r.lit).map((r) => r.id)).toEqual(["a0", "a1"]);
+    expect(mine.find((r) => r.you)!.id).toBe("b2");
+    // This turn's boards: side 0 board 3, 1, 2 and the fourth waits; side 1 board 2, 3, 1.
+    expect(theirs.map((r) => r.board)).toEqual([2, 0, 1, null]);
+    expect(mine.map((r) => r.board)).toEqual([1, 2, 0, null]);
+    expect(turnOrder({ ...m, locked: ["a0"] } as LocalMatch, "b2")[1].filter((r) => r.lit).map((r) => r.id)).toEqual(["a1"]);
+    for (const t of [1, 2, 3, 4]) for (const col of turnOrder({ ...m, turn: t } as LocalMatch, "a0")) expect(col).toHaveLength(4);
+  });
+
+  it("each player's last move, from the schedule: its board and ply (a row's tap shows the position after it)", () => {
+    // Turn 1's White half and Black's reply on every board.
+    const m = at(1, [["e2e4", "e7e5"], ["d2d4", "d7d5"], ["c2c4", "c7c5"]], []);
+    expect(relayMover(m, 2, 0)).toBe("a0");
+    expect(relayMover(m, 0, 0)).toBe("a1");
+    expect(relayMover(m, 1, 1)).toBe("a2");
+    expect(relayMover(m, 1, 0)).toBe("b0");
+    const last = lastMovesBy(m);
+    expect(last.get("a0")).toEqual({ board: 2, ply: 0 });
+    expect(last.get("b2")).toEqual({ board: 0, ply: 1 });
+    expect(last.get("a3")).toBeUndefined();
   });
 });

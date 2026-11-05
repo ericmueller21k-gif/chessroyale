@@ -6,7 +6,6 @@ import {
   nextPrice,
   pairSchedule,
   relayMovesOf,
-  relayRing,
   relaySeat,
   type AssistUse,
   type Colour,
@@ -146,22 +145,13 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
 
 // ---------------- The turn order under the board (Relay; Eric, Nov 5, round 2) ----------------
 
-/**
- * The two ways the turn order can list a match's players, mocked both for Eric (Nov 5): "seated", the 6 at the boards
- * this turn (3 a squad, in the order they move), with your waiting teammate as "next in"; "ring", all 8 in ring order,
- * each squad's 4 in the order they move, round and round.
- */
-export type TurnOrderStyle = "seated" | "ring";
-
 export interface TurnRow {
   id: string;
   side: Side;
   /** To move now (lit): a move asked of them this half, not yet made. */
   lit: boolean;
   you: boolean;
-  /** "Next in": your teammate waiting this turn (seated only). */
-  nextIn: boolean;
-  /** The board of their move this turn (null: they wait this turn). */
+  /** The board of their move this turn (null: it's their turn to wait). */
   board: number | null;
   /** The move they last played in this match: its board and ply (null: none yet). */
   last: { board: number; ply: number } | null;
@@ -191,34 +181,22 @@ export function lastMovesBy(m: Pick<LocalMatch, "sides" | "boards">): Map<string
 }
 
 /**
- * The turn order (Relay): one column a squad, yours first, its players in the order they move this turn (seated) or in
- * ring order (ring), the player to move lit. Every column keeps the same number of rows on every board (ring: 4;
- * seated: 3, and yours a 4th, your waiting teammate "next in"; theirs an empty 4th), so the box keeps one size.
+ * The turn order (Relay; Eric, Nov 5: all 8 players, in ring order, the mover lit): one column a squad, yours first,
+ * its players in the order they move, round and round (move k is seat k mod 4's), so a column never reorders and the
+ * box keeps one size on every board.
  */
-export function turnOrder(m: Pick<LocalMatch, "sides" | "boards" | "turn" | "state" | "current" | "locked">, me: string | null, style: TurnOrderStyle): [TurnRow[], TurnRow[]] {
+export function turnOrder(m: Pick<LocalMatch, "sides" | "boards" | "turn" | "state" | "current" | "locked">, me: string | null): [TurnRow[], TurnRow[]] {
   const mine = sideIn(m, me);
   const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
   const n = m.boards.length;
   const last = lastMovesBy(m);
   const toMove = new Set(m.state === "half" && m.current ? m.current.duties.filter((d) => d.role === "move").flatMap((d) => d.players).filter((p) => !m.locked.includes(p)) : []);
-  const row = (side: Side, seat: number, nextIn = false): TurnRow => {
-    const seats = m.sides[side].seats;
-    const id = seats[seat]!;
-    const here = relayMovesOf(seat, m.turn, 1, n, side, seats.length)[0];
-    return { id, side, lit: toMove.has(id), you: id === me, nextIn, board: here && here.turn === m.turn ? here.board : null, last: last.get(id) ?? null };
-  };
   return order.map((side) => {
-    const size = m.sides[side].seats.length;
-    if (style === "ring" || n >= size) return Array.from({ length: size }, (_, seat) => row(side, seat));
-    // Seated: this turn's movers in the order they move (the ring's), then your waiting teammate.
-    const ring = relayRing(n, side);
-    const seated = ring.map((_, j) => (n * m.turn + j) % size);
-    const rows = seated.map((seat) => row(side, seat));
-    if (side === mine) {
-      const waiting = Array.from({ length: size }, (_, seat) => seat).find((seat) => !seated.includes(seat));
-      if (waiting !== undefined) rows.push(row(side, waiting, true));
-    }
-    return rows;
+    const seats = m.sides[side].seats;
+    return seats.map((id, seat): TurnRow => {
+      const here = relayMovesOf(seat, m.turn, 1, n, side, seats.length)[0];
+      return { id, side, lit: toMove.has(id), you: id === me, board: here && here.turn === m.turn ? here.board : null, last: last.get(id) ?? null };
+    });
   }) as [TurnRow[], TurnRow[]];
 }
 

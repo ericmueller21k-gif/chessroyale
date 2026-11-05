@@ -508,7 +508,7 @@ async function simLobby(cfg: Config, index: number, lab: Lab, s: SquadsSettings)
 
   // Each match's length, then the lobby's: a match starts as soon as its two feeder matches (and the bracket's show) are done.
   const ends: number[][] = [];
-  const votes = squadsVotes(s).length * (s.voteSeconds + s.voteResultSeconds);
+  const votes = s.firstVoteDelaySeconds + squadsVotes(s).length * (s.voteSeconds + s.voteResultSeconds);
   for (const round of [0, 1, 2] as SquadsRound[]) {
     const stats: MatchStat[] = [];
     ends.push([]);
@@ -672,7 +672,7 @@ push(
   `- Past the cap on a move it's missed. They also miss outright (a distraction) ${pct(MISS_CHANCE)} of the time: the half waits to their deadline.`,
   "",
   `A half lasts as long as its slowest player, plus the show: ${S.moveShowSeconds} s for a Relay half's moves, ${S.pairRevealSeconds} s for the pair's reveal,`,
-  `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(squadsVotes(S).length * (S.voteSeconds + S.voteResultSeconds))} s of votes come first.`,
+  `${S.finalRevealSeconds} s for the final's reveal. A match starts as soon as its two feeder matches are done, after ${S.roundBreakSeconds} s of bracket; ${f1(S.firstVoteDelaySeconds + squadsVotes(S).length * (S.voteSeconds + S.voteResultSeconds))} s of votes (the first opening ${S.firstVoteDelaySeconds} s in) come first.`,
   "",
 );
 

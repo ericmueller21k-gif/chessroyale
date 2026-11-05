@@ -148,9 +148,10 @@ export function onReplayChange(fn: () => void): () => void {
 
 /**
  * The coach marks (Eric, Nov 5, round 2): three tips one at a time at a player's first Relay, the rest of the screen
- * dimmed, a pointer on one thing, a short line and OK; a tap anywhere or OK goes on. Once per device
- * (`brc.squads.coach`: "1" once seen through), no "Don't show again" for now (Eric). Due in a lobby joined from the
- * queue (the solo queue's PLAY, or its party's), or a test lobby's link with the test switch `?coach`.
+ * dimmed, a pointer on one thing, a short line and OK; a tap anywhere or OK goes on. The last has "Don't show these
+ * again" by its OK (Eric, Nov 5, his answer): ticked, they never show again on this device (`brc.squads.coach`: "1");
+ * not ticked, they show again at the next lobby's Relay. Due in a lobby joined from the queue (the solo queue's PLAY,
+ * or its party's), or a test lobby's link with the test switch `?coach`.
  */
 export const COACH_MARKS = [
   { id: "settings", target: ".mm-more", text: "Tap here for settings, like Quick board jump." },
@@ -170,9 +171,10 @@ export function coachSeen(): boolean {
   }
 }
 
-/** The coach marks are done on this device (the last one's OK). */
-export function coachDone() {
+/** The coach marks are through for this lobby (the last one's OK); with "Don't show these again" ticked, for good. */
+export function coachDone(never: boolean) {
   coachFor = null;
+  if (!never) return;
   try {
     localStorage.setItem(COACH_KEY, "1");
   } catch {

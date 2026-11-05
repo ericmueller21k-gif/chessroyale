@@ -111,12 +111,13 @@ function spotOf(sel: string): Spot | null {
 /**
  * The first-time tips (Eric, Nov 5, round 2): three coach marks, one at a time, like games do (move-replay.ts,
  * `COACH_MARKS`): the screen dims but for the one thing, a short line points to it from a small box with its words and
- * OK; a tap anywhere or OK goes to the next. Once per device, at a player's first Relay (`coachDue`). `at`: a test
- * switch's start (stills).
+ * OK; a tap anywhere or OK goes to the next. At a player's Relay, until the last one's "Don't show these again" is
+ * ticked (`coachDue`). `at`: a test switch's start (stills).
  */
 export function CoachMarks({ code, at = 0 }: { code: string | null; at?: number }) {
   const [i, setI] = useState<number | null>(() => (coachDue(code) ? at : null));
   const [spot, setSpot] = useState<Spot | null>(null);
+  const [never, setNever] = useState(false);
   const mark = i === null ? null : COACH_MARKS[i]!;
   useLayoutEffect(() => {
     if (!mark) return;
@@ -133,7 +134,7 @@ export function CoachMarks({ code, at = 0 }: { code: string | null; at?: number 
   if (!mark || !spot) return null;
   const go = () => {
     const n = nextCoachMark(i!);
-    if (n === null) coachDone();
+    if (n === null) coachDone(never);
     setI(n);
   };
   const w = innerWidth;
@@ -167,9 +168,17 @@ export function CoachMarks({ code, at = 0 }: { code: string | null; at?: number 
           {mark.text}
         </p>
         <div class="cm-foot">
-          <span class="cm-step muted">
-            {i! + 1} of {COACH_MARKS.length}
-          </span>
+          {nextCoachMark(i!) === null ? (
+            // (The last: "Don't show these again", Eric, Nov 5. A tap on it ticks it, and goes no further.)
+            <label class="cm-never" onClick={(e) => e.stopPropagation()}>
+              <input type="checkbox" checked={never} onChange={(e) => setNever(e.currentTarget.checked)} />
+              Don't show these again
+            </label>
+          ) : (
+            <span class="cm-step muted">
+              {i! + 1} of {COACH_MARKS.length}
+            </span>
+          )}
           <button
             type="button"
             class="fd-btn primary cm-ok"

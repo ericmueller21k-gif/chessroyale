@@ -5,7 +5,10 @@ import type { NetDuty, NetSquadsHalf, SquadsEvent } from "@chessroyale/chess/squ
 import {
   COACH_MARKS,
   byOfHalf,
+  coachDone,
+  coachDue,
   nextCoachMark,
+  queuedSquads,
   nextReplayMode,
   readReplayMode,
   replayDue,
@@ -184,5 +187,25 @@ describe("The first-time tips: three coach marks, one at a time", () => {
     expect(COACH_MARKS.map((c) => c.id)).toEqual(["settings", "replay", "boards"]);
     expect(COACH_MARKS.map((c) => c.text)).toEqual(["Tap here for settings, like Quick board jump.", "Tap to replay moves: the last 2, all of them, or off.", "Tap a board to watch it. Tap yours to come back."]);
     expect([0, 1, 2].map(nextCoachMark)).toEqual([1, 2, null]);
+  });
+
+  it("run once a lobby; \"Don't show these again\" unticked, they come back at the next lobby; ticked, never again", () => {
+    const store = new Map<string, string>();
+    const was = (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    try {
+      expect(coachDue("abcde")).toBe(false);
+      queuedSquads("ABCDE");
+      expect(coachDue("abcde")).toBe(true);
+      coachDone(false);
+      expect(coachDue("ABCDE")).toBe(false);
+      queuedSquads("FGHJK");
+      expect(coachDue("FGHJK")).toBe(true);
+      coachDone(true);
+      queuedSquads("LMNPQ");
+      expect(coachDue("LMNPQ")).toBe(false);
+    } finally {
+      (globalThis as { localStorage?: unknown }).localStorage = was;
+    }
   });
 });

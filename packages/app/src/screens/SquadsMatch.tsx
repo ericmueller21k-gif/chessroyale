@@ -27,7 +27,6 @@ import {
   bankText,
   squadColour,
   turnOrder,
-  type TurnOrderStyle,
   type TurnRow,
   blockBankNow,
   hasBlocks,
@@ -632,7 +631,7 @@ function MatchView({
   }, [banner?.at]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
   const computer = useMedia(COMPUTER_LAYOUT);
-  const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} style={turnOrderStyle()} onRow={canShow ? onShow : null} shownBoard={boardId} shownPly={history.browsing ? history.ply : null} /> : null;
+  const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} onRow={canShow ? onShow : null} shownBoard={boardId} shownPly={history.browsing ? history.ply : null} /> : null;
   return (
     <div class={`screen game sq-game sq-${m.format}${m.round === 2 ? " sq-is-final" : ""}`}>
       <div class="hud-row">
@@ -641,6 +640,14 @@ function MatchView({
           <button type="button" class="sq-next" onClick={onNextRound} aria-label="Next round (test)" title="Next round (test)">
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <path d="M2.5 3.2v9.6l6-4.8zM8.5 3.2v9.6l6-4.8z" fill="currentColor" />
+            </svg>
+          </button>
+        )}
+        {/* (Cheat lines, test controls only: on a phone's Relay a tiny switch here, its lines the arrows on the board.) */}
+        {client.test && m.format === "relay" && !computer && (
+          <button type="button" disabled={cheatFen === null} class={`sq-next sq-cheat-mini${client.cheatLines ? " on" : ""}`} aria-pressed={client.cheatLines} aria-label="Cheat lines (test)" title="Cheat lines (test)" onClick={() => client.toggleCheatLines()}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M2 13L13 2M9 2h4v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
         )}
@@ -753,7 +760,7 @@ function MatchView({
       </div>
       <div class="sq-panel">
         {m.format === "relay" && computer && turnBox}
-        {cheatFen !== null && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
+        {cheatFen !== null && !(m.format === "relay" && !computer) && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
         {m.mode === "mercenary" && d && m.state === "half" && d.duty.board === boardId && (
           <StockfishToken
             left={mySide === null ? 0 : stockfishLeft(m, mySide)}
@@ -820,11 +827,6 @@ function QuickJumpRow() {
   return <SwitchRow icon="⤳" label={JUMP_NEXT_LABEL} on={on} onClick={() => setSquadsJumpNext(!on)} />;
 }
 
-/** The turn order's look (Eric's to pick, Nov 5: both mocked): `?turnorder=ring` (a test switch), else the 6 seated. */
-function turnOrderStyle(): TurnOrderStyle {
-  return testParams().get("turnorder") === "ring" ? "ring" : "seated";
-}
-
 /** A test switch for the stills: `?coachat=N` starts the coach marks at the Nth (from 1). */
 function coachStart(): number {
   const n = Number(testParams().get("coachat"));
@@ -832,13 +834,14 @@ function coachStart(): number {
 }
 
 /**
- * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left"):
- * a box of one size on every board, a column a squad (yours first), its players in the order they move, the player to
- * move lit; each with the board they play this turn and, on the right, the move they last played (as the scoreboard
- * shows moves). A tap on a row shows the board at the position after that move.
+ * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left";
+ * his pick: all 8 in ring order): a box of one size on every board, a column a squad (yours first), its players in the
+ * order they move, the player to move lit; each with the board they play this turn (none: their turn to wait) and, on
+ * the right, the move they last played (as the scoreboard shows moves). A tap on a row shows the board at the position
+ * after that move.
  */
-function TurnOrderBox({ client, m, style, onRow, shownBoard, shownPly }: { client: SquadsClient; m: LocalMatch; style: TurnOrderStyle; onRow: ((board: number, ply: number) => void) | null; shownBoard: number; shownPly: number | null }) {
-  const cols = turnOrder(m, client.myId, style);
+function TurnOrderBox({ client, m, onRow, shownBoard, shownPly }: { client: SquadsClient; m: LocalMatch; onRow: ((board: number, ply: number) => void) | null; shownBoard: number; shownPly: number | null }) {
+  const cols = turnOrder(m, client.myId);
   const key = m.boards.map((b) => b.moves.length).join();
   const sans = useMemo(() => {
     const out = new Map<string, string>();
@@ -848,11 +851,11 @@ function TurnOrderBox({ client, m, style, onRow, shownBoard, shownPly }: { clien
       out.set(r.id, safeSan(fenAtPly(b.moves, r.last.ply, [{ ply: 0, fen: b.startFen }]), b.moves[r.last.ply]!));
     }
     return out;
-  }, [key, style, m.turn]);
+  }, [key, m.turn]);
   const rows = 4;
   const nameOf = (r: TurnRow) => (r.you ? "You" : short(client.nameOf(r.id)));
   return (
-    <div class={`sq-to sq-to-${style}`} role="group" aria-label="Turn order">
+    <div class="sq-to" role="group" aria-label="Turn order">
       {cols.map((col, c) => (
         <div key={c} class="sq-to-col" style={{ "--sq": squadColour(m.sides[col[0]?.side ?? 0].squadId) }} role="list">
           {Array.from({ length: rows }, (_, i) => {
@@ -865,14 +868,13 @@ function TurnOrderBox({ client, m, style, onRow, shownBoard, shownPly }: { clien
                 key={r.id}
                 type="button"
                 role="listitem"
-                class={`sq-to-row${r.lit ? " lit" : ""}${r.you ? " you" : ""}${r.nextIn ? " next-in" : ""}${shown ? " shown" : ""}`}
+                class={`sq-to-row${r.lit ? " lit" : ""}${r.you ? " you" : ""}${r.board === null ? " waits" : ""}${shown ? " shown" : ""}`}
                 disabled={!r.last || !onRow}
                 onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
                 aria-label={`${nameOf(r)}${r.lit ? ", to move" : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
               >
                 <span class={`sq-to-board${colour ? ` is-${colour}` : ""}`}>{r.board === null ? "" : r.board + 1}</span>
                 <span class="sq-to-name">{nameOf(r)}</span>
-                {r.nextIn && <span class="sq-to-tag">next in</span>}
                 <span class="sq-to-move">{r.last ? sans.get(r.id) : ""}</span>
               </button>
             );
@@ -1000,7 +1002,7 @@ function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; min
 function CheatLines({ on, top, fen, onToggle }: { on: boolean; top: MoveScore[] | null; fen: string; onToggle: () => void }) {
   return (
     <div class="sq-cheat">
-      <button type="button" class={`sq-next sq-cheat-btn${on ? " on" : ""}`} aria-pressed={on} onClick={onToggle}>
+      <button type="button" class={`sq-cheat-btn${on ? " on" : ""}`} aria-pressed={on} onClick={onToggle}>
         Cheat lines
       </button>
       {on &&

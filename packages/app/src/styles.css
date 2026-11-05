@@ -16402,7 +16402,21 @@ button.sq-tiny {
   align-items: center;
   gap: 6px 8px;
 }
-.sq-cheat-btn.on {
+.sq-cheat-btn {
+  flex: none;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sq-cheat-btn.on,
+.sq-cheat-mini.on {
   border-style: solid;
   background: var(--accent);
   color: var(--accent-text);
@@ -16576,6 +16590,8 @@ button.sq-tiny {
 }
 .sq-game.sq-relay .board-area .board-wrap {
   width: min(100%, calc(var(--app-h) - 362px));
+  /* (The turn order under it: a short phone's least, 360 × 560 with its bars, keeps everything on screen.) */
+  min-width: 240px;
 }
 .sq-clockline {
   display: inline-flex;
@@ -23656,9 +23672,9 @@ button.sq-tiny {
 }
 
 /* ---- Squads: Relay on 3 boards and a cleaner match screen (Eric, Nov 5, round 2; docs/decisions/2026-11-05-squads-three-boards.md) ---- */
-/* The turn order under the board: a column a squad (yours first, its color along the top), its players in the order they
-   move, the player to move lit, each with the board they play this turn and the move they last played. One size on every
-   board: four rows a column, always (a gap where there's no one). */
+/* The turn order under the board: a column a squad (yours first, its color along the top), its 4 players in ring order
+   (the order they move, round and round), the player to move lit, each with the board they play this turn (none and
+   greyed: their turn to wait) and the move they last played. One size on every board. */
 .sq-to {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -23709,7 +23725,7 @@ button.sq-tiny {
 .sq-to-row.you .sq-to-name {
   font-weight: 800;
 }
-.sq-to-row.next-in {
+.sq-to-row.waits:not(.lit) {
   color: var(--muted);
 }
 .sq-to-row.shown {
@@ -23738,16 +23754,6 @@ button.sq-tiny {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-.sq-to-tag {
-  padding: 2px 4px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
 }
 .sq-to-move {
   min-width: 3.4em;
@@ -23826,6 +23832,18 @@ button.sq-tiny {
 }
 .cm-step {
   font-size: 12px;
+}
+.cm-never {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.cm-never input {
+  width: 20px;
+  height: 20px;
 }
 .cm-ok {
   min-width: 80px;

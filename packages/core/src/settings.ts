@@ -3283,6 +3283,11 @@ export interface SquadsSettings {
   partyMax: number;
   /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (the majority vote). Armageddon is always one. */
   boards: { relay: number; pairs: number; final: number };
+  /**
+   * Seconds between the full lobby showing and its first pre-game vote opening (Eric, Nov 5: players reading the intro
+   * missed the vote). The vote, its timer and the bots' votes all start after it.
+   */
+  firstVoteDelaySeconds: number;
   /** The pre-game votes (Start, Clock): seconds each is open, the result's showing, bots that don't vote. */
   voteSeconds: number;
   voteResultSeconds: number;
@@ -3454,6 +3459,8 @@ export const SQUADS: SquadsSettings = {
   partyMax: 4,
   // Eric, Nov 5: Relay on 3 boards, each squad's fourth player waiting to slot in (the ring: squads/schedule.ts); 4 before.
   boards: { relay: 3, pairs: 2, final: 1 },
+  // Eric, Nov 5: 3 s more before the first vote opens, so players reading the intro don't miss it.
+  firstVoteDelaySeconds: 3,
   voteSeconds: 8,
   // (4.2 s: the winner's banner a second longer, as every banner since Eric, Oct 15; was 3.2.)
   voteResultSeconds: 4.2,

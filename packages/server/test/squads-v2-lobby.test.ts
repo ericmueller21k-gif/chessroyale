@@ -12,7 +12,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 /** The votes before the bracket: a test lobby whose mode is set holds Start and Clock only (no Mode vote). */
-const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
+const VOTES_MS = (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 /** The bracket's intro: a Mercenary test lobby that skips rounds has a longer one, to shop in. */
 const introMs = (start: number, mode: "classic" | "mercenary") => (start > 0 && mode === "mercenary" ? Math.max(SQUADS_LOBBY.bracketIntroSeconds, SQUADS_LOBBY.testShopSeconds) : SQUADS_LOBBY.bracketIntroSeconds) * 1000;
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
