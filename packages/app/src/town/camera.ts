@@ -79,6 +79,13 @@ export interface View {
   rimN: number;
   rimPx: Float64Array;
   rimPy: Float64Array;
+  /**
+   * Which way it faces (the street town's turning camera, Nov 5, round 3): degrees from north, clockwise (90: east), and its cosine
+   * and sine. World offsets (east, north) turn into the camera's (dx across, dz ahead) through `toCam`; 0 everywhere in today's town.
+   */
+  heading: number;
+  hc: number;
+  hs: number;
 }
 
 export function newView(): View {
@@ -107,7 +114,37 @@ export function newView(): View {
     rimN: 0,
     rimPx: new Float64Array(RIM_STEPS + 1),
     rimPy: new Float64Array(RIM_STEPS + 1),
+    heading: 0,
+    hc: 1,
+    hs: 0,
   };
+}
+
+/** Faces the camera `deg` degrees from north, clockwise (the street town's turn). Nothing else of the view changes. */
+export function setHeading(v: View, deg: number): void {
+  if (v.heading === deg) return;
+  v.heading = deg;
+  const a = (deg * Math.PI) / 180;
+  v.hc = Math.cos(a);
+  v.hs = Math.sin(a);
+  // (Exact at the quarters, so a camera facing east lays the squares as exactly as one facing north.)
+  if (deg % 90 === 0) ((v.hc = Math.round(v.hc)), (v.hs = Math.round(v.hs)));
+}
+
+/** A world offset (ex east, ey north, in squares) in the camera's frame: `out.dx` across (right), `out.dz` ahead. */
+export function toCam(v: View, ex: number, ey: number, out: { dx: number; dz: number }): void {
+  out.dx = ex * v.hc - ey * v.hs;
+  out.dz = ex * v.hs + ey * v.hc;
+}
+/** Where the world point (x, y) is from the camera's focus (camX, camY), the shortest way round the wrap, in the camera's frame. */
+export function rel(v: View, camX: number, camY: number, x: number, y: number, out: { dx: number; dz: number }): void {
+  toCam(v, wrapF(x - camX), wrapF(y - camY), out);
+}
+/** A camera-frame offset (dx across, dz ahead) back in the world's (east, north): `out.dx` east, `out.dz` north. */
+export function fromCam(v: View, dx: number, dz: number, out: { dx: number; dz: number }): void {
+  const ex = dx * v.hc + dz * v.hs;
+  out.dz = -dx * v.hs + dz * v.hc;
+  out.dx = ex;
 }
 
 const KEYS = ["h", "th", "back", "R", "kx", "fW", "cy", "rim", "rimX"] as const;
@@ -278,6 +315,10 @@ export function forEachSquare(
   nearFirst: boolean,
   visit: (c: number, r: number, cu: number, ru: number, q: Quad) => boolean | void,
 ): void {
+  if (v.hs !== 0 || v.hc !== 1) {
+    turnedSquares(v, camX, camY, nearFirst, visit);
+    return;
+  }
   const near = Math.floor(camY - v.back + 0.5) - 1; // the row under the camera
   const far = Math.ceil(camY + v.rim + 1);
   for (let i = 0; i <= far - near; i++) {
@@ -337,6 +378,87 @@ function scanRow(v: View, camX: number, camY: number, ru: number, visit: (c: num
     quad[7] = ny[i]!;
     const cu = c0 + i;
     if (visit(wrapI(cu), r, cu, ru, quad)) return true;
+  }
+  return false;
+}
+
+// The turned camera's squares (the street town's, Nov 5, round 3): a grid of the corners round the focus, each square from its four.
+const TG = N + 2;
+const gx = new Float64Array(TG * TG);
+const gy = new Float64Array(TG * TG);
+const gz = new Float64Array(TG * TG);
+const gok = new Uint8Array(TG * TG);
+const tSq = new Int32Array(N * N * 2);
+const tDz = new Float64Array(N * N);
+const tOrder = new Int32Array(N * N);
+const tq = { dx: 0, dz: 0 };
+/**
+ * forEachSquare's way when the camera is turned off north (the street town's turn): the squares within the rim round the focus, each
+ * from the corners of a grid turned into the camera's frame, its corners far left, far right, near right, near left as the nearest
+ * quarter turn has them. Near first (sorted by depth) for picking; otherwise in no order (the ground's fills are by color).
+ */
+function turnedSquares(v: View, camX: number, camY: number, nearFirst: boolean, visit: (c: number, r: number, cu: number, ru: number, q: Quad) => boolean | void): boolean {
+  const R = Math.min(N / 2 - 1, Math.ceil(v.rim * Math.max(1, v.rimX)) + 2);
+  const c0 = Math.round(camX) - R;
+  const r0 = Math.round(camY) - R;
+  const n = 2 * R + 1;
+  // The corners: (i, j) is the south-west corner of square (c0 + i, r0 + j).
+  for (let j = 0; j <= n; j++)
+    for (let i = 0; i <= n; i++) {
+      const k = j * TG + i;
+      toCam(v, c0 + i - 0.5 - camX, r0 + j - 0.5 - camY, tq);
+      gok[k] = proj(v, tq.dx, tq.dz, 0, ta) ? 1 : 0;
+      gx[k] = ta.x;
+      gy[k] = ta.y;
+      gz[k] = tq.dz;
+    }
+  // (Which corner is far left: the quarter the camera faces most nearly. Its corners NW, NE, SE, SW turned by that quarter.)
+  const quarter = ((Math.round(v.heading / 90) % 4) + 4) % 4;
+  let m = 0;
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const k = j * TG + i;
+      // (NW, NE, SE, SW.)
+      const ks0 = k + TG;
+      const ks1 = k + TG + 1;
+      const ks2 = k + 1;
+      const ks3 = k;
+      if (!gok[ks0] || !gok[ks1] || !gok[ks2] || !gok[ks3]) continue;
+      toCam(v, c0 + i - camX, r0 + j - camY, tq);
+      if (radial(v, tq.dx, tq.dz) > v.rim + 0.75 || tq.dz < -v.back - 1) continue;
+      // Past the curve: its farthest corner no higher on screen than its nearest.
+      let kf = ks0;
+      let kn = ks0;
+      for (let e = 1; e < 4; e++) {
+        const kk = e === 1 ? ks1 : e === 2 ? ks2 : ks3;
+        if (gz[kk]! > gz[kf]!) kf = kk;
+        if (gz[kk]! < gz[kn]!) kn = kk;
+      }
+      if (gy[kf]! >= gy[kn]! - 0.15) continue;
+      const xmin = Math.min(gx[ks0]!, gx[ks1]!, gx[ks2]!, gx[ks3]!);
+      const xmax = Math.max(gx[ks0]!, gx[ks1]!, gx[ks2]!, gx[ks3]!);
+      if (xmax < 0 || xmin > v.W || Math.min(gy[ks0]!, gy[ks1]!, gy[ks2]!, gy[ks3]!) > v.H) continue;
+      tSq[m * 2] = i;
+      tSq[m * 2 + 1] = j;
+      tDz[m] = tq.dz;
+      tOrder[m] = m;
+      m++;
+    }
+  if (nearFirst) tOrder.subarray(0, m).sort((a, b) => tDz[a]! - tDz[b]!);
+  for (let o = 0; o < m; o++) {
+    const s = tOrder[o]!;
+    const i = tSq[s * 2]!;
+    const j = tSq[s * 2 + 1]!;
+    const k = j * TG + i;
+    for (let e = 0; e < 4; e++) {
+      const w = (e + quarter) % 4;
+      const kk = w === 0 ? k + TG : w === 1 ? k + TG + 1 : w === 2 ? k + 1 : k;
+      quad[e * 2] = gx[kk]!;
+      quad[e * 2 + 1] = gy[kk]!;
+    }
+    const cu = c0 + i;
+    const ru = r0 + j;
+    if (visit(wrapI(cu), wrapI(ru), cu, ru, quad)) return true;
   }
   return false;
 }

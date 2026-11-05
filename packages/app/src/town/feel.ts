@@ -89,6 +89,34 @@ export const TOWN_FEEL = {
    */
   streetNearCut: 0.9,
   streetTreeFade: 1.5,
+  /**
+   * The street town's turning camera (Nov 5, round 3): it faces north everywhere but Seam Avenue, where it faces east, and turns in
+   * the avenue's four crossings (turn.ts), easing over this many ms a quarter turn (a feel number: about a run across a crossing).
+   */
+  streetTurnMs: 500,
+  /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
+  streetTurnClouds: 1.3,
+  /**
+   * The buildings' boxes (Nov 5, round 3; box-draw.ts): a roof face whose drawing would be under this many pixels across is left out
+   * (a water tank's legs from afar), and a face is drawn in one piece (not two triangles) when its last corner would land within this
+   * many pixels of where one piece puts it.
+   */
+  boxTinyPx: 3,
+  boxWholePx: 0.75,
+  /**
+   * A wall (a side, or a front seen at a slant) is drawn in upright strips, so its far end stands shorter than its near one: enough that
+   * its top steps at most this many pixels a strip, up to this many strips. WebGL's are fine (a strip costs it a few vertices), the 2D
+   * fallback's coarser (each is a draw there; the step stays under the roof's eave, drawn over it).
+   */
+  boxStripFine: 1.5,
+  boxStripsFine: 24,
+  boxStrip: 4,
+  boxStrips: 8,
+  /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). */
+  boxBakeMs: 2.5,
+  /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
+  nameOverRoof: 6,
+  nameDropStep: 3,
   /** Zoomed out: the camera's height x (1 + this). */
   zoomOutHeight: 0.75,
   /** Zoomed out: how far back x (1 + this). */
