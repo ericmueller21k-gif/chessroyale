@@ -162,6 +162,8 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
   },
 };
 
+/** What a home's palette falls back to (wood for posts and planks, a red-and-cream canvas). */
+const HOME_DEFAULTS = { a: "#8a6a4a", b: "#a8875f", c: "#c8aa7e", d: "#5e3b22", e: "#8a5a33", f: "#b07a48", n: "#d84545", o: "#fbf3e6", l: "#7a4a2c" };
 /** The homes' depth from the front line back (squares) and the front's inset on its lot. */
 export const HOME_DEPTH = 2.3;
 export const HOME_INSET = 0.45;
@@ -179,7 +181,7 @@ export function homeBox(id: HomeId): TownBox {
   if (hit) return hit;
   const s = HOME_SPECS[id];
   const f = frontOf(id);
-  const pal = { ...BASE, ...s.pal };
+  const pal = { ...BASE, ...HOME_DEFAULTS, ...s.pal };
   const L = Math.round(HOME_DEPTH * SQ);
   const side = s.side ?? { mat: "plaster" };
   // A tapered home's sides run in toward the back, so each is a little longer than the depth.

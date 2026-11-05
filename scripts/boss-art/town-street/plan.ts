@@ -80,6 +80,8 @@ export interface Prop {
 }
 export const PROPS: Prop[] = [];
 export const TABLES: { c: number; r: number }[] = [];
+/** The fountain's four squares (it stands on them). */
+export const FOUNTAIN: { c: number; r: number }[] = [];
 
 // ---- Sidewalks, then the streets' board over them where they cross.
 // Seam Street's (r 43 and 2) and Seam Avenue's (c 43 and 2) all the way round; Fountain Street's (r 12 and 17), Colosseum
@@ -103,6 +105,7 @@ PARK_PLAN.forEach((line, v) => {
     if (ch === "L") PROPS.push({ kind: "lamp", x: c, y: r, v: 0 });
     if (ch === "T") (PROPS.push({ kind: "table", x: c, y: r, v: 0 }), TABLES.push({ c, r }));
     if (ch === "F") PROPS.push({ kind: "fountain", x: c + 0.5, y: r - 1.5, v: 0 });
+    if (ch === "F" || ch === "f") FOUNTAIN.push({ c, r });
   }
 });
 // The park's south walk out to Seam Street (South Lane: paving, c 21..24, r 3..8).
@@ -318,7 +321,7 @@ export function blockedSquares(): Set<number> {
   for (const p of PROPS) {
     if (p.kind === "hedge" || p.kind === "bed" || p.kind === "bush") continue;
     if (p.kind === "fountain") {
-      for (const [dc, dr] of [[-0.5, 1], [0.5, 1], [-0.5, 2], [0.5, 2]] as const) b.add(at(Math.round(p.x + dc), Math.round(p.y + dr)));
+      for (const f of FOUNTAIN) b.add(at(f.c, f.r));
       continue;
     }
     b.add(at(Math.round(p.x), Math.round(p.y)));
@@ -338,3 +341,18 @@ export const TURN_ZONES = [
   { street: "colosseum-row", rows: [21, 25] },
   { street: "upper-st", rows: [29, 34] },
 ] as const;
+
+// ---- The lamps, settled: only on sidewalk squares, never on a door square (one there steps a square along the sidewalk).
+{
+  const doors = new Set(LOTS.filter((l) => l.kind === "home").map((l) => { const d = doorSquare(l); return at(d.c, d.r); }));
+  for (let i = PROPS.length - 1; i >= 0; i--) {
+    const p = PROPS[i]!;
+    if (p.kind !== "lamp") continue;
+    if (ground[at(p.x, p.y)] !== PAVE) { PROPS.splice(i, 1); continue; }
+    const alongX = ground[at(p.x + 1, p.y)] === PAVE || ground[at(p.x - 1, p.y)] === PAVE;
+    for (const step of [0, 1, -1, 2, -2]) {
+      const [x, y] = alongX ? [p.x + step, p.y] : [p.x, p.y + step];
+      if (ground[at(x, y)] === PAVE && !doors.has(at(x, y))) { p.x = wrap(x); p.y = wrap(y); break; }
+    }
+  }
+}

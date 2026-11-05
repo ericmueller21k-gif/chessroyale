@@ -65,6 +65,8 @@ export interface Scene {
   /** Props to draw in `only` mode; `noYou`: no pawn of yours (the sheets). */
   props?: typeof PROPS;
   noYou?: boolean;
+  /** A closer lens (the sheets' showcases: setView's mag). */
+  mag?: number;
   /** Bosses out by their homes, bots: where they stand (squares) and which way they face. */
   bosses?: { id: HomeId; x: number; y: number; flip?: boolean }[];
   bots?: { x: number; y: number; dark?: boolean }[];
@@ -230,7 +232,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
   sn = Math.sin(th);
   camX = s.x;
   camY = s.y;
-  setView(v, s.W, s.H, 0);
+  setView(v, s.W, s.H, 0, s.mag ?? 1);
   const skyh = mixRGB(s.sky, (c) => c.sky[4]!);
   const horizon = rgb(skyh);
   const mist = mixMist(s.sky);
@@ -791,7 +793,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
       const b = shed(pr.v);
       const a = artOfBox(b);
       const w = a.img.width / SQ;
-      plane(a, pr.x - w / 2, pr.y - 0.4, 1, 0, 0, -1, { lots: false });
+      plane(a, pr.x - w / 2, pr.y - 0.4, 1, 0, 0, -1); // (between the camera and you it isn't drawn, as the lots aren't)
       box(a, pr.x - w / 2, pr.y - 0.4, 1, 0, 0, 1);
     } else if (pr.kind === "bed") billboard(`bed${pr.v}`, bed(pr.v), pr.x, pr.y);
   }
@@ -846,7 +848,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
     const cx = COLISEUM.c0 + (COLISEUM.size - 1) / 2, fy = COLISEUM.r0 - 0.5;
     const [dx, dz] = rel(cx, fy);
     const Rr = radial(v, dx, dz);
-    if (dz > 0 && Rr > v.rim && Rr <= v.rim + TOWN_FEEL.farReach && cs > 0.7) {
+    if (!s.only && dz > 0 && Rr > v.rim && Rr <= v.rim + TOWN_FEEL.farReach && cs > 0.7) {
       const t = (v.rim - 0.05) / Rr;
       if (proj(v, dx * t, dz * t, 0, pt)) {
         const k = pt.k * (v.rim / Rr);
@@ -926,7 +928,7 @@ export async function draw(cv: HTMLCanvasElement, s: Scene): Promise<{ figures: 
     g.restore();
   }
   g.globalAlpha = 1;
-  for (const t of tags) t();
+  if (!s.noYou) for (const t of tags) t();
   if (s.caption) caption(g, s.caption, s.W);
   return { figures, strips, quads, fill: Math.round(fillPx / (s.W * s.H) * 100) / 100, planes: items.length };
 }
@@ -980,9 +982,9 @@ function caption(g: CanvasRenderingContext2D, text: string, W: number) {
 }
 
 /** A showcase: one lot (or props) alone at its plan spot, seen from the street at `heading` (a 3/4 view at 35). */
-async function showcase(lot: Lot | null, props: typeof PROPS, x: number, y: number, heading: number, W = 320, H = 280, sky: SkyWeights = { dawn: 0, day: 1, dusk: 0, night: 0 }): Promise<HTMLCanvasElement> {
+async function showcase(lot: Lot | null, props: typeof PROPS, x: number, y: number, heading: number, W = 320, H = 280, mag = 1.75, sky: SkyWeights = { dawn: 0, day: 1, dusk: 0, night: 0 }): Promise<HTMLCanvasElement> {
   const c = document.createElement("canvas");
-  await draw(c, { W, H, x, y, heading, sky, near: "open", only: true, lots: lot ? [lot] : [], props, noYou: true });
+  await draw(c, { W, H, x, y, heading, sky, near: "open", only: true, lots: lot ? [lot] : [], props, noYou: true, mag });
   return c;
 }
 function label(g: CanvasRenderingContext2D, text: string, x: number, y: number, size = 22, bold = true) {
@@ -1017,7 +1019,7 @@ export async function sheetBuildings(cv: HTMLCanvasElement): Promise<void> {
     g.drawImage(sc, 16, y0 + 8, sc.width * 0.55, sc.height * 0.55);
     let x = 16 + sc.width * 0.55 + 24;
     const base = y0 + 300;
-    label(g, `${DESIGN_NAMES[id]}: ${wsq} squares wide, 3 deep`, 16, y0 + 340, 22);
+    label(g, `${DESIGN_NAMES[id]}: ${wsq} squares wide, 3 deep`, x, y0 + 30, 22);
     for (let v2 = 0; v2 < 3; v2++) {
       const b = building(id, wsq, v2);
       const img = toCanvas(b.id, b.front);
