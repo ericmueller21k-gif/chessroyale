@@ -68,6 +68,11 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     // (The rows replace every everyday building; the tall ones stay, each a tower of look-alike parts.)
     expect(STREET_BUILDINGS.filter((b) => b.kind === "tall")).toHaveLength(PLAN.lots.filter((l) => l.kind === "tall").length);
     for (const b of STREET_BUILDINGS) {
+      // (Round 5: the back wall and the Colosseum's side walls: their own art, where the plan puts them.)
+      if (b.kind === "wall") {
+        expect(b.wall && b.at, b.name).toBeTruthy();
+        continue;
+      }
       expect(b.look && b.at, b.name).toBeTruthy();
       if (b.kind === "tall") continue;
       const side = ROW_SIDES.find((s) => s.street === b.street && s.facing === b.facing && Math.abs((b.facing === "S" || b.facing === "N" ? b.at!.y : b.at!.x) - (b.facing === "S" || b.facing === "W" ? s.d0 - 0.5 + s.inset : s.d0 + 0.5 - s.inset)) < 1e-9);

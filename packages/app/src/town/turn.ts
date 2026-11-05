@@ -1,7 +1,7 @@
 /**
- * The street town's camera's turn (Nov 5; round 3 made it, round 4's chase camera aims it): the heading eases over
- * `TOWN_FEEL.streetTurnMs` a quarter turn, about you (the camera keeps following you). The arrow keys go through it. Pure: no DOM,
- * nothing allocated on a frame.
+ * The street town's camera's turn (Nov 5; round 3 made it; round 5: north, but for a boss home's strip, strips.ts, and a drag's look
+ * round, LookAround): the heading eases over `TOWN_FEEL.streetTurnMs` a quarter turn, about you (the camera keeps following you). The
+ * arrow keys go through the normal heading (never the look round's). Pure: no DOM, nothing allocated on a frame.
  */
 import { TOWN_FEEL } from "./feel.ts";
 
@@ -61,19 +61,58 @@ export function screenStep(dc: number, dr: number, quarter: number, out: { dc: n
   out.dr = -dc * fc + dr * fr || 0;
 }
 
+/** The angle equal to `target` (mod 360) nearest `cur`: so an eased turn goes the short way round. */
+export const nearestTurn = (target: number, cur: number): number => target + 360 * Math.round((cur - target) / 360);
+
 /**
- * The chase camera's heading (Nov 5, round 4; brief-town-rows.md "the player's view"): behind you, looking the way you walk, snapped to
- * the four board directions. `cur` is where it's aiming now (any multiple of 90, unwrapped); a step (dc, dr) on a leg of `leg` squares
- * that way (`last`: the path's last leg) turns it, the shortest way round, when:
- *  - by the keys (`keys`): any step but one straight back (down steps back without turning; left and right turn you);
- *  - on a tap's path: a leg of 2 squares or more, or the last leg (so a zig-zag doesn't whip it round).
- * Answers the heading to aim at (`cur` if it stays).
+ * Looking around (Nov 5, round 5; Eric: "hold your mouse, move it a little to the left and bring it back to the right … so you could see
+ * what the houses are to your left … but not where your pawn is standing or which direction he's facing … when you start to run again,
+ * it snaps back"). A drag turns the camera about your pawn by an offset on top of its normal heading: dragging left turns the view left
+ * (you see more to your left), `TOWN_FEEL.streetLookPerWidth` degrees a screen's width. Letting go keeps it; your first step eases it back
+ * over `streetLookBackMs`. Pure: Town.tsx feeds it the drag and the step.
  */
-export function chaseTarget(cur: number, dc: number, dr: number, leg: number, last: boolean, keys: boolean): number {
-  if (!dc && !dr) return cur;
-  const want = dc > 0 ? 90 : dc < 0 ? 270 : dr > 0 ? 0 : 180;
-  const d = ((((want - cur) % 360) + 540) % 360) - 180;
-  if (Math.abs(d) < 1) return cur;
-  if (keys) return Math.abs(d) > 179 ? cur : cur + d;
-  return leg >= 2 || last ? cur + (Math.abs(d) > 179 ? 180 : d) : cur;
+export class LookAround {
+  /** The offset (degrees) the drag set, or where the ease back started from. */
+  private off = 0;
+  private from = 0;
+  private t0 = -Infinity;
+  private dragFrom: number | null = null;
+  /** The offset at `now` (degrees, clockwise: positive looks right). */
+  at(now: number): number {
+    if (this.t0 === -Infinity) return this.off;
+    const t = (now - this.t0) / TOWN_FEEL.streetLookBackMs;
+    if (t >= 1) {
+      this.t0 = -Infinity;
+      this.off = 0;
+      return 0;
+    }
+    return this.from * (1 - ease(t));
+  }
+  /** Whether it's turned off the normal view (or still easing back) at `now`. */
+  turned(now: number): boolean {
+    return this.at(now) !== 0;
+  }
+  /** A drag begins (from wherever it is now: catching an ease back mid-way). */
+  grab(now: number): void {
+    this.off = this.at(now);
+    this.t0 = -Infinity;
+    this.dragFrom = this.off;
+  }
+  /** The drag is `dx` px across a box `width` px wide: dragging left (dx < 0) turns the view left. */
+  drag(dx: number, width: number): void {
+    if (this.dragFrom === null) return;
+    this.off = this.dragFrom + (TOWN_FEEL.streetLookPerWidth * dx) / Math.max(1, width);
+  }
+  /** Let go: the view stays turned. */
+  release(): void {
+    this.dragFrom = null;
+  }
+  /** You set off (an arrow, a tap, the on-screen arrows): ease back to the normal view. Nothing while dragging or already there. */
+  back(now: number): void {
+    if (this.dragFrom !== null || this.t0 !== -Infinity || this.off === 0) return;
+    // (The short way round.)
+    this.off = nearestTurn(this.off, 0);
+    this.from = this.off;
+    this.t0 = now;
+  }
 }

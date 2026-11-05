@@ -20,6 +20,7 @@ Colosseum plaza"; "the south edge is closed by a row of buildings". What this do
   replace them all); the props move with their rows (none on the plaza but a tree at each strip's outer column, lamps every 6 columns
   along the closing row's sidewalk).
 - `wrap`: {"ew": true, "ns": false}: the one switch (Eric may close east-west later).
+Round 5 (the section above `out`): the grove beside the Colosseum and along the back, its walls and gates, the back wall.
 """
 import json
 import sys
@@ -122,6 +123,43 @@ col["r0"] = src["coliseum"]["r0"] + 6
 col["statues"] = [{"c": t["c"], "r": t["r"] + 6} for t in col["statues"]]
 col["gate"] = [{"c": t["c"], "r": t["r"] + 6} for t in col["gate"]]
 assert col["r0"] + col["size"] - 1 == N - 1, "the Colosseum's top row is the north edge"
+
+# ---- Round 5 (Nov 5, later; Eric: "The Colosseum is literally the edge of the top center of the map … we shouldn't see any houses
+# behind it … put a gate to the left and right of it … trees and shrubs … you can't go past it. It's all blocked off … the entire back
+# wall of the map … is totally blocked"):
+# - beside the Colosseum (the plaza's strips, columns 13..16 and 29..32, from its front line, row 34, up to the edge) is a grove: not
+#   walked on, trees and thick shrubs; the plaza is only in front of it (rows 31..33);
+# - on its front line either side of it, a wall with a closed gate (decorative);
+# - along the whole north edge behind the town's back rows (rows 44..45, the tall lots there gone), a grove too, and the back wall
+#   on the edge itself.
+COL_C = range(col["c0"], col["c0"] + col["size"])
+GROVE = set()
+for r in range(34, 46):
+    for c in PLAZA:
+        GROVE.add((c, r))
+for r in (44, 45):
+    for c in range(N):
+        if c not in COL_C:
+            GROVE.add((c, r))
+for (c, r) in GROVE:
+    ground[r] = ground[r][:c] + "g" + ground[r][c + 1:]
+lots = [l for l in lots if not (l["kind"] == "tall" and l["r0"] >= 44)]
+props = [p for p in props if (round(p["x"]), round(p["y"])) not in GROVE and not (31 <= round(p["y"]) <= 33 and round(p["x"]) in PLAZA and p["kind"] != "lamp")]
+for (c, r) in sorted(GROVE):
+    # Trees on every other square, a shrub between them along the walls' backs and the back rows' gardens.
+    v = (c * 7 + r * 3) % 3
+    if (c + r) % 2 == 0:
+        props.append({"kind": "tree", "x": c, "y": r, "v": v})
+    elif r in (35, 44):
+        props.append({"kind": "bush", "x": c, "y": r, "v": v})
+def wall(name, c0, r0, w, inset, h, gate, depth):
+    return {"kind": "wall", "id": "wall", "v": 0, "c0": c0, "r0": r0, "w": w, "d": 1, "facing": "S", "street": "plaza", "name": name,
+            "inset": inset, "depth": depth, "wall": {"w": w, "h": h, "gate": gate, "depth": depth}}
+# (The gates clear of the chess pieces standing before the walls: the west one near its outer end, the east one too.)
+lots.append(wall("The Colosseum's west wall", 13, 34, 4, 0.5, 166, 32, 0.6))
+lots.append(wall("The Colosseum's east wall", 29, 34, 4, 0.5, 166, 118, 0.6))
+for i, (c0, w) in enumerate([(0, 6), (6, 6), (12, 5), (29, 5), (34, 6), (40, 6)]):
+    lots.append(wall(f"The back wall ({i + 1})", c0, 45, w, 1.0, 148, None, 0.5))
 
 out = {
     "size": src["size"],

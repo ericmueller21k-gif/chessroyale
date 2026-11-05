@@ -19,6 +19,7 @@ import { HEDGE, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { homeBox, type HomeId as ArtHomeId } from "./home-boxes.ts";
 import { STREET_LOTS, type StreetLot } from "./street.ts";
 import { lookalike } from "./lookalike.ts";
+import { wallArt } from "./wall.ts";
 import type { Facing } from "./rows.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
@@ -27,7 +28,7 @@ import type { HomeId } from "./world.ts";
 const SQ = 37;
 
 /** What a box is: a boss's home, an everyday building on a row, a bigger one behind the rows, a garden's shed or a square of hedge. */
-export type BoxKind = "home" | "house" | "tall" | "shed" | "hedge";
+export type BoxKind = "home" | "house" | "tall" | "wall" | "shed" | "hedge";
 
 /** A box standing in the town. */
 export interface BoxInst {
@@ -97,6 +98,7 @@ function withRear(box: TownBox): TownBox {
 export function lotArt(l: StreetLot, low = false): TownBox {
   if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)));
   if (l.look) return big(lookalike(l.look));
+  if (l.wall) return wallArt(l.wall);
   return big(building(l.id as never, l.w, l.v));
 }
 

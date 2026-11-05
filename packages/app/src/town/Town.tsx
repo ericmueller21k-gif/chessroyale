@@ -49,7 +49,8 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
-import { Turn, chaseTarget, quarterOf, screenStep } from "./turn.ts";
+import { LookAround, Turn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { baseHeading, stripAt } from "./strips.ts";
 import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
@@ -670,7 +671,8 @@ function startTown(
   let heading = turn.to;
   /** (The street town's keys: the quarter you faced as the keys held changed.) */
   let keyQuarter = 0;
-  const legNow = { dc: 0, dr: 0, last: false };
+  /** (Round 5) A drag's look round, on top of the normal heading (north, or a home's strip's). */
+  const look = new LookAround();
   /** (Tests) The heading held (the turn's stills), or null. */
   let pinHeading: number | null = null;
   let follow = true;
@@ -953,13 +955,14 @@ function startTown(
     // (Kept near the world's middle so the numbers never grow, however far you walk round.)
     camX = START.c + wrapFX(camX - START.c);
     camY = START.r + wrapFY(camY - START.r);
-    // The street town's chase camera (round 4): behind you, the way you walk (turn.ts chaseTarget), eased; a glide or a look round keeps it.
+    // The street town's one view (round 5; Eric: "There should be one view point no matter what, always"): north, but on a boss home's
+    // strip, facing its front (strips.ts), eased either way; walking, the arrows and taps never turn it. A drag's look round goes on top
+    // (LookAround), eased back as you set off.
     if (STREET_TOWN) {
-      if (follow && !glide) {
-        const n = town.you.walker.leg(legNow);
-        if (n) turn.aim(chaseTarget(turn.to, legNow.dc, legNow.dr, n, legNow.last, walkByKeys), now);
-      }
-      heading = pinHeading ?? turn.at(now);
+      const h = town.you.walker.here();
+      turn.aim(nearestTurn(baseHeading(h.c, h.r), turn.to), now);
+      if (town.you.walker.moving()) look.back(now);
+      heading = pinHeading ?? turn.at(now) + look.at(now);
     }
   };
 
@@ -1235,11 +1238,6 @@ function startTown(
   // The arrow keys set off: as a tap walk does, the card closes, the camera follows you and the walk stands you up. Held, the walker
   // runs on (keys.start: each frame while it stands still; the walk itself asks for each next square).
   let keysOn = false;
-  /**
-   * (Round 4) Whether your walk now is the arrows' (until a tap starts another): the chase camera turns for the keys' steps by their own
-   * rule (down steps back without turning), also for a step still under way after the key is let go.
-   */
-  let walkByKeys = false;
   /** The place the held arrows last ran you into (its card asked once a hold): "" none. */
   let keysAsked = "";
   /**
@@ -1252,8 +1250,8 @@ function startTown(
     const dr = (isHeld("up") ? 1 : 0) - (isHeld("down") ? 1 : 0);
     if ((dc === 0) === (dr === 0)) return;
     const h = town.you.walker.here();
-    // (Through the street town's heading: up is up the screen.)
-    screenStep(dc, dr, quarterOf(heading), turned);
+    // (Through the street town's normal heading, never a look round's: up is the normal view's up.)
+    screenStep(dc, dr, quarterOf(turn.to), turned);
     const c = colI(h.c + turned.dc);
     const rr = rowI(h.r + turned.dr);
     if (c < 0 || rr < 0) return;
@@ -1269,7 +1267,6 @@ function startTown(
       keysAsked = "";
       return;
     }
-    walkByKeys = true;
     if (!keysOn) {
       keysOn = true;
       leaveClose();
@@ -1303,9 +1300,12 @@ function startTown(
       // Past the threshold: the square lets go (no pulse, no walk) and you look around.
       r.release(performance.now(), false);
       leaveClose();
-      follow = false;
+      // (The street town, round 5: a drag turns the camera about your pawn, which stays put and keeps facing its way.)
+      if (STREET_TOWN) look.grab(performance.now());
+      else follow = false;
       glide = null;
     }
+    if (STREET_TOWN) return void look.drag(e.clientX - drag.x, r.W);
     // (Across and along the screen, turned into the world's east and north by the camera's heading.)
     fromCam(r.view, -(e.clientX - drag.x) / drag.kx, (e.clientY - drag.y) / drag.ky, dragTo);
     camX = drag.cx + dragTo.dx;
@@ -1314,6 +1314,7 @@ function startTown(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
+    look.release();
     const now = performance.now();
     if (closing) {
       if (press.up("") !== "drag") setCard(null);
@@ -1333,7 +1334,6 @@ function startTown(
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
     walkOff();
     town.you.sit = p.card?.kind === "table";
-    if (p.dest) walkByKeys = false;
     if (p.dest && walkWalker(town.you.walker, p.dest)) {
       follow = true;
       glide = null;
@@ -1346,6 +1346,7 @@ function startTown(
   };
   const onCancel = () => {
     drag = null;
+    look.release();
     press.cancel();
     r.release(performance.now(), false);
   };
@@ -1407,6 +1408,10 @@ function startTown(
       ? {
           zoom: zoomCur,
           zoomTarget,
+          // (Round 5: the normal heading (north, or a home's strip's) and a drag's look round on top.)
+          headingBase: turn.to,
+          strip: STREET_TOWN ? (stripAt(town.you.walker.hereC(), town.you.walker.hereR())?.home ?? null) : null,
+          look: look.at(performance.now()),
           // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
           parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
@@ -1539,14 +1544,13 @@ function startTown(
   // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
   // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
   /** (Tests) Where you stand (your square, the way you face) and whether you're walking: a boss's challenge brings you back here. */
-  const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving() } : null);
+  const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr] } : null);
   // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure
   // the frame rate walking a set route, Nov 5). True if there's a way.
   const hookWalk = (sq: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return false;
     follow = true;
     glide = null;
-    walkByKeys = false;
     return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
   };
   // ... `__townHeading(deg | null)` (the street town's turn, Nov 5, round 3): the camera faces `deg` from north and stays so (the turn's
@@ -1660,8 +1664,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
-      walkByKeys = false;
-      if (!to || !walkWalker(town.you.walker, to)) return;
+        if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
       follow = true;
       glide = null;
@@ -1679,8 +1682,7 @@ function startTown(
       cancelMeet(town);
       town.you.sit = false;
       const to = spotNear(town, town.you.walker, h.door, false);
-      walkByKeys = false;
-      if (!to || !walkWalker(town.you.walker, to)) return false;
+        if (!to || !walkWalker(town.you.walker, to)) return false;
       challengeStand = stood;
       challenging = i;
       boss.held = true;

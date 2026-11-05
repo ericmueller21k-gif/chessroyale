@@ -7,7 +7,6 @@ const { layRow, ROW_SIDES, ROW_PX, ROW_OVERLAP_PX, alongSign, homeSpan, splitGap
 const { homeBox } = await import("../src/town/home-boxes.ts");
 const { lookalikeWith } = await import("../src/town/lookalike.ts");
 const { STREET_LOTS, colosseumSeen, homesOn } = await import("../src/town/street.ts");
-const { chaseTarget } = await import("../src/town/turn.ts");
 const { N, WRAP, rowI, colI } = await import("../src/town/camera.ts");
 const { HOMES, PROPS, START, findPath, stepsFrom, tdist, walkable } = await import("../src/town/world.ts");
 const { streetBoxes, boxPoint, solidTop, pxOf } = await import("../src/town/boxes.ts");
@@ -128,7 +127,8 @@ describe("the rows (round 4)", () => {
   });
   it("the skyline's towers stand over every row (6 to 9 floors), windows on every side, their sky above", () => {
     const towers = STREET_LOTS.filter((l) => l.kind === "tall");
-    expect(towers.length).toBeGreaterThanOrEqual(8);
+    // (Round 5: the four on the town's back rows gave way to the grove along the back wall: six left, behind South Street's row.)
+    expect(towers.length).toBeGreaterThanOrEqual(6);
     const rowTop = Math.max(...STREET_LOTS.filter((l) => l.look && l.kind !== "tall").map((l) => lookalikeWith(l.look!).box.front.h));
     for (const t of towers) {
       const { box, parts } = lookalikeWith(t.look!);
@@ -217,8 +217,9 @@ describe("the town wraps east-west only (round 4; Eric: the Colosseum at the nor
     expect(tdist({ c: 1, r: 5 }, { c: 44, r: 5 })).toBe(3);
   });
   it("a path never crosses the north or south edge, and does cross east-west the short way", () => {
-    // The plaza's top (the north edge) to South Street (the bottom street): down through the town, every step one row at most.
-    const from = { c: 14, r: 45 };
+    // The plaza before the Colosseum (round 5: beside it is a grove now) to South Street (the bottom street): down through the town,
+    // every step one row at most.
+    const from = { c: 22, r: 33 };
     expect(walkable(from.c, from.r)).toBe(true);
     const path = findPath(from, (c, r) => c === 14 && r === 5, walkable)!;
     expect(path).not.toBeNull();
@@ -229,7 +230,7 @@ describe("the town wraps east-west only (round 4; Eric: the Colosseum at the nor
       expect(s.r).toBeLessThan(N);
       prev = s;
     }
-    expect(path.length).toBeGreaterThan(40);
+    expect(path.length).toBeGreaterThan(28);
     // East-west: from just east of the seam to just west of it, three steps over it.
     const across = findPath({ c: 1, r: 5 }, (c, r) => c === 44 && r === 5, walkable)!;
     expect(across.map((s) => s.c)).toEqual([0, 45, 44]);
@@ -323,30 +324,12 @@ describe("the zoom steps and the park's step out (round 4)", () => {
   });
 });
 
-describe("the chase camera's heading (round 4; replaces round 3's heading on every square)", () => {
-  it("keys: forward stays, left and right turn a quarter, back doesn't turn", () => {
-    expect(chaseTarget(0, 0, 1, 1, true, true)).toBe(0);
-    expect(chaseTarget(0, 1, 0, 1, true, true)).toBe(90);
-    expect(chaseTarget(0, -1, 0, 1, true, true)).toBe(-90);
-    expect(chaseTarget(0, 0, -1, 1, true, true)).toBe(0);
-    expect(chaseTarget(270, 0, 1, 1, true, true)).toBe(360);
-  });
-  it("a tap's path: turns for a leg of 2 or more, or the last leg; not for a 1-square jog", () => {
-    expect(chaseTarget(0, 1, 0, 1, false, false)).toBe(0);
-    expect(chaseTarget(0, 1, 0, 2, false, false)).toBe(90);
-    expect(chaseTarget(0, 1, 0, 1, true, false)).toBe(90);
-    expect(chaseTarget(0, 0, -1, 3, false, false)).toBe(180);
-  });
-  it("a corner's turn eases over 0.4 to 0.6 s (Eric: a short smoothing on a corner, no lag otherwise)", () => {
-    expect(TOWN_FEEL.streetTurnMs).toBeGreaterThanOrEqual(400);
-    expect(TOWN_FEEL.streetTurnMs).toBeLessThanOrEqual(600);
-  });
-});
+// (Round 5: the chase camera's heading tests went with it: test/town-fixed.test.ts has the one fixed view.)
 
 describe("the Colosseum hides behind the rows (round 4; replaces round 3's 45 degrees of north)", () => {
   it("shows up the promenade, across its plaza and down Upper Street, which open onto it; hides from the streets behind the rows", () => {
     expect(colosseumSeen(22, 27)).toBe(true);
-    expect(colosseumSeen(14, 40)).toBe(true);
+    expect(colosseumSeen(14, 32)).toBe(true);
     expect(colosseumSeen(40, 37)).toBe(true);
     expect(colosseumSeen(8, 21)).toBe(false);
     expect(colosseumSeen(8, 5)).toBe(false);
