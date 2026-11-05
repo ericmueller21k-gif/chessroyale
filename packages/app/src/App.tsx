@@ -476,8 +476,8 @@ export function App() {
     void squadsTestLobby(squadsTestStart, new URLSearchParams(location.search).get("clock"), new URLSearchParams(location.search)).then((r) => {
       setRejoining(false);
       if ("code" in r) {
-        // (`?replaytip`, a test switch: this test lobby counts as queueing, for the first-time tip.)
-        if (testParams().has("replaytip")) queuedSquads(r.code);
+        // (`?coach`, a test switch: this test lobby counts as queueing, for the first-time tips, the coach marks.)
+        if (testParams().has("coach")) queuedSquads(r.code);
         joinSquads(r.code);
       } else {
         history.replaceState(null, "", "/");

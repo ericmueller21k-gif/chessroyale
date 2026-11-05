@@ -1,11 +1,10 @@
 import { useEffect, useLayoutEffect, useState } from "preact/hooks";
-import { GearIcon } from "./MatchMenu.tsx";
 import { squareAt } from "./SquadsBlocks.tsx";
-import { closeTip, onReplayChange, replayOn, setReplayOn, tagText, tipDue } from "../move-replay.ts";
+import { COACH_MARKS, coachDone, coachDue, nextCoachMark, nextReplayMode, onReplayChange, replayMode, setReplayMode, tagText, type ReplayMode } from "../move-replay.ts";
 
 /**
  * Move replay on screen (Eric, Nov 5; move-replay.ts): the replay button by the gear, its icon, the name tag over a
- * replayed move's piece, and the first-time tip.
+ * replayed move's piece; and Squads' first-time tips, the coach marks (Nov 5, round 2).
  */
 
 /** Rewind: a ring turning back on itself, its arrowhead at the top, and a back-step inside. Drawn, in currentColor. */
@@ -22,35 +21,55 @@ export function ReplayIcon({ size = 20 }: { size?: number }) {
 }
 
 /** The replay button's setting (per account on this device), kept in step wherever it's drawn. */
-export function useReplayOn(): boolean {
-  const [on, setOn] = useState(replayOn);
-  useEffect(() => onReplayChange(() => setOn(replayOn())), []);
-  return on;
+export function useReplayMode(): ReplayMode {
+  const [mode, setMode] = useState(replayMode);
+  useEffect(() => onReplayChange(() => setMode(replayMode())), []);
+  return mode;
 }
 
+const MODE_NAME: Record<ReplayMode, string> = { off: "off", two: "the last 2 moves", all: "all moves since you last played" };
+
+/** The dots of the button's trail, first to last (a longer trail for "all"): where on the ring, how big, how faint. */
+const TRAIL: Record<Exclude<ReplayMode, "off">, readonly (readonly [number, number, number])[]> = {
+  two: [
+    [0, 2.1, 1],
+    [-24, 1.6, 0.6],
+    [-46, 1.2, 0.3],
+  ],
+  all: [
+    [0, 2.2, 1],
+    [-20, 1.9, 0.8],
+    [-40, 1.6, 0.6],
+    [-60, 1.35, 0.45],
+    [-80, 1.1, 0.3],
+    [-100, 0.9, 0.18],
+  ],
+};
+
 /**
- * The replay button, next to the gear in Squads' top line (Eric, Nov 5): on or off. On, a few dots chase slowly round
- * its edge, like a game's toggled-on ability; off, the plain icon.
+ * The replay button, next to the gear in Squads' top line (Eric, Nov 5; round 2): no box, only the drawn ring. A tap
+ * steps off → the last 2 moves → all moves since you last played → off. Off: greyed, nothing turning; the last 2: dots
+ * chase round it at a moderate pace with a short trail; all: twice as fast, a longer trail.
  */
 export function ReplayButton() {
-  const on = useReplayOn();
+  const mode = useReplayMode();
+  const next = nextReplayMode(mode);
   return (
     <button
       type="button"
-      class={`rp-btn${on ? " on" : ""}`}
-      aria-pressed={on}
-      aria-label={on ? "Move replay: on" : "Move replay: off"}
-      title={on ? "Move replay is on: coming back to a board, the moves you missed play back first" : "Move replay is off"}
-      onClick={() => setReplayOn(!on)}
+      class={`rp-btn is-${mode}`}
+      data-mode={mode}
+      aria-label={`Move replay: ${MODE_NAME[mode]}. Tap for ${MODE_NAME[next]}.`}
+      title={`Move replay: ${MODE_NAME[mode]}`}
+      onClick={() => setReplayMode(next)}
     >
       <ReplayIcon />
-      {on && (
-        <svg class="rp-trail" viewBox="0 0 44 42" aria-hidden="true">
-          {/* (Three dots, smaller and fainter behind the first, on the button's rounded edge; the group turns.) */}
+      {mode !== "off" && (
+        <svg class="rp-trail" viewBox="0 0 40 40" aria-hidden="true">
           <g class="rp-trail-spin">
-            <circle cx="22" cy="2.6" r="2.1" />
-            <circle cx="15.4" cy="3.6" r="1.6" opacity="0.65" />
-            <circle cx="9.6" cy="6.4" r="1.2" opacity="0.35" />
+            {TRAIL[mode].map(([deg, r, o], i) => (
+              <circle key={i} cx={20 + 17.5 * Math.sin((deg * Math.PI) / 180)} cy={20 - 17.5 * Math.cos((deg * Math.PI) / 180)} r={r} opacity={o} />
+            ))}
           </g>
         </svg>
       )}
@@ -73,7 +92,7 @@ export function ReplayTag({ square, names, orientation, tone }: { square: string
   );
 }
 
-/** Where a button is on screen, for the tip's lit rings. */
+/** Where a thing is on screen, for a coach mark's lit hole and its pointer. */
 interface Spot {
   x: number;
   y: number;
@@ -86,26 +105,22 @@ function spotOf(sel: string): Spot | null {
   if (!el) return null;
   const b = el.getBoundingClientRect();
   if (!b.width) return null;
-  // (A rounded box round the button, a little bigger, so two side by side each keep their own.)
-  return { x: b.left - 3, y: b.top - 3, w: b.width + 6, h: b.height + 6 };
+  return { x: b.left - 4, y: b.top - 4, w: b.width + 8, h: b.height + 8 };
 }
 
 /**
- * The first-time tip (Eric, Nov 5): the first time this account queues for Squads, on the first screen with the gear
- * and the replay button, the screen dims but for those two (rings round them), and a small box says what each does,
- * with "Don't show this again" and OK. Not ticked, it comes back the next time they queue.
+ * The first-time tips (Eric, Nov 5, round 2): three coach marks, one at a time, like games do (move-replay.ts,
+ * `COACH_MARKS`): the screen dims but for the one thing, a short line points to it from a small box with its words and
+ * OK; a tap anywhere or OK goes to the next. Once per device, at a player's first Relay (`coachDue`). `at`: a test
+ * switch's start (stills).
  */
-export function ReplayTip({ code }: { code: string | null }) {
-  const [due, setDue] = useState(() => tipDue(code));
-  const [never, setNever] = useState(false);
-  const [spots, setSpots] = useState<{ replay: Spot; gear: Spot } | null>(null);
+export function CoachMarks({ code, at = 0 }: { code: string | null; at?: number }) {
+  const [i, setI] = useState<number | null>(() => (coachDue(code) ? at : null));
+  const [spot, setSpot] = useState<Spot | null>(null);
+  const mark = i === null ? null : COACH_MARKS[i]!;
   useLayoutEffect(() => {
-    if (!due) return;
-    const place = () => {
-      const replay = spotOf(".rp-btn");
-      const gear = spotOf(".mm-more");
-      setSpots(replay && gear ? { replay, gear } : null);
-    };
+    if (!mark) return;
+    const place = () => setSpot(spotOf(mark.target));
     place();
     // (The top line can settle a frame later, and the window can turn.)
     const t = setTimeout(place, 120);
@@ -114,57 +129,55 @@ export function ReplayTip({ code }: { code: string | null }) {
       clearTimeout(t);
       removeEventListener("resize", place);
     };
-  }, [due]);
-  if (!due || !spots) return null;
-  const ok = () => {
-    closeTip(never);
-    setDue(false);
+  }, [mark?.id]);
+  if (!mark || !spot) return null;
+  const go = () => {
+    const n = nextCoachMark(i!);
+    if (n === null) coachDone();
+    setI(n);
   };
   const w = innerWidth;
   const h = innerHeight;
-  const top = Math.max(spots.replay.y + spots.replay.h, spots.gear.y + spots.gear.h) + 12;
+  // The box under the thing (or over it, low on the screen), as wide as fits; the pointer from the box to the thing.
+  const boxW = Math.min(300, w - 32);
+  const below = spot.y + spot.h + 150 < h;
+  const cx = spot.x + spot.w / 2;
+  const left = Math.max(16, Math.min(w - 16 - boxW, cx - boxW / 2));
+  const gap = 34;
+  const top = below ? spot.y + spot.h + gap : undefined;
+  const bottom = below ? undefined : h - spot.y + gap;
+  const lineFrom = below ? spot.y + spot.h : spot.y;
+  const lineTo = below ? spot.y + spot.h + gap : spot.y - gap;
   return (
-    <div class="rp-tip" role="dialog" aria-modal="true" aria-labelledby="rp-tip-title">
-      <svg class="rp-tip-dim" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+    <div class="cm" role="dialog" aria-modal="true" aria-labelledby="cm-text" data-mark={mark.id} onClick={go}>
+      <svg class="cm-dim" width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
         <defs>
-          <mask id="rp-tip-holes">
+          <mask id="cm-hole">
             <rect width={w} height={h} fill="#fff" />
-            {[spots.replay, spots.gear].map((s, i) => (
-              <rect key={i} x={s.x} y={s.y} width={s.w} height={s.h} rx={14} fill="#000" />
-            ))}
+            <rect x={spot.x} y={spot.y} width={spot.w} height={spot.h} rx={12} fill="#000" />
           </mask>
         </defs>
-        <rect width={w} height={h} fill="rgba(0,0,0,0.62)" mask="url(#rp-tip-holes)" />
-        {[spots.replay, spots.gear].map((s, i) => (
-          <rect key={i} class="rp-tip-ring" x={s.x} y={s.y} width={s.w} height={s.h} rx={14} />
-        ))}
+        <rect width={w} height={h} fill="rgba(0,0,0,0.66)" mask="url(#cm-hole)" />
+        <rect class="cm-ring" x={spot.x} y={spot.y} width={spot.w} height={spot.h} rx={12} />
+        <line class="cm-line" x1={cx} y1={lineFrom} x2={cx} y2={lineTo} />
+        <circle class="cm-dot" cx={cx} cy={lineTo} r={3.5} />
       </svg>
-      <div class="rp-tip-box" style={{ top: `${Math.min(top, h - 260)}px` }}>
-        <h2 class="rp-tip-title" id="rp-tip-title">
-          Two quick settings
-        </h2>
-        <p class="rp-tip-line">
-          <span class="rp-tip-icon">
-            <ReplayIcon size={18} />
-          </span>
-          <span>
-            Move replay is on: when the rotation brings you back to a board, the moves you missed play back first, and you get a little extra time for them. Tap <ReplayIcon size={14} /> to turn it off.
-          </span>
+      <div class="cm-box" style={{ left: `${left}px`, width: `${boxW}px`, ...(top !== undefined ? { top: `${top}px` } : { bottom: `${bottom}px` }) }}>
+        <p class="cm-text" id="cm-text">
+          {mark.text}
         </p>
-        <p class="rp-tip-line">
-          <span class="rp-tip-icon">
-            <GearIcon size={18} />
+        <div class="cm-foot">
+          <span class="cm-step muted">
+            {i! + 1} of {COACH_MARKS.length}
           </span>
-          <span>
-            Tap <GearIcon size={14} /> to turn off Animations for a calmer board: picks show as names only.
-          </span>
-        </p>
-        <div class="rp-tip-foot">
-          <label class="rp-tip-never">
-            <input type="checkbox" checked={never} onChange={(e) => setNever(e.currentTarget.checked)} />
-            Don't show this again
-          </label>
-          <button type="button" class="fd-btn primary rp-tip-ok" onClick={ok}>
+          <button
+            type="button"
+            class="fd-btn primary cm-ok"
+            onClick={(e) => {
+              e.stopPropagation();
+              go();
+            }}
+          >
             OK
           </button>
         </div>

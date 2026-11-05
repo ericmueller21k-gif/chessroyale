@@ -217,6 +217,7 @@ const SquadTiny = memo(
   next,
   on,
   over,
+  won,
   onTap,
 }: {
   fen: string;
@@ -226,28 +227,42 @@ const SquadTiny = memo(
   next: boolean;
   on: boolean;
   over: boolean;
+  /** A finished board (Nov 5, round 2): the winning squad's color (a border and a check mark), "draw" (½), or null. */
+  won: string | null;
   onTap?: () => void;
 }) {
   const body = (
     <>
       <TinyBoard fen={fen} lastMove={lastMove} />
+      {won === "draw" ? (
+        <span class="sq-done draw" aria-hidden="true">
+          ½
+        </span>
+      ) : won ? (
+        <span class="sq-done" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="14" height="14">
+            <path d="M3.2 8.4l3 3 6.6-7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+      ) : null}
       {you && <span class="sq-mark you">YOU</span>}
       {!you && next && <span class="sq-mark next">NEXT</span>}
     </>
   );
-  const cls = `sq-tiny${on ? " on" : ""}${over ? " over" : ""}${you ? " is-you" : ""}`;
+  const cls = `sq-tiny${on ? " on" : ""}${over ? " over" : ""}${you ? " is-you" : ""}${won ? (won === "draw" ? " is-draw" : " is-won") : ""}`;
+  const style = won && won !== "draw" ? { "--sq-won": won } : undefined;
   return onTap ? (
-    <button type="button" class={cls} aria-label={`Watch ${label}`} onClick={onTap}>
+    <button type="button" class={cls} style={style} aria-label={`Watch ${label}`} onClick={onTap}>
       {body}
     </button>
   ) : (
-    <span class={cls} aria-label={label}>
+    <span class={cls} style={style} aria-label={label}>
       {body}
     </span>
   );
   },
   // (A new tap handler each time the screen draws is the same handler: it only says which board to open.)
-  (a, b) => a.fen === b.fen && a.lastMove === b.lastMove && a.label === b.label && a.you === b.you && a.next === b.next && a.on === b.on && a.over === b.over && !a.onTap === !b.onTap,
+  (a, b) => a.fen === b.fen && a.lastMove === b.lastMove && a.label === b.label && a.you === b.you && a.next === b.next && a.on === b.on && a.over === b.over && a.won === b.won && !a.onTap === !b.onTap,
 );
 
 /**
@@ -278,6 +293,14 @@ export function SquadsBoards({
   );
 }
 
+/** A finished board's mark: the winning squad's color, "draw", or null (still going). */
+function wonBy(m: LocalMatch, b: LocalMatch["boards"][number]): string | null {
+  if (!b.result) return null;
+  if (b.result.winner === null) return "draw";
+  const side = b.result.winner === "w" ? b.white : b.white === 0 ? 1 : 0;
+  return squadColour(m.sides[side].squadId);
+}
+
 function MatchBoards({ m, client, mine, watching, onWatch }: { m: LocalMatch; client: SquadsClient; mine: number | null; watching: string | null; onWatch: ((key: string, board: number) => void) | null }) {
   const ours = m.sides.some((s) => s.squadId === mine);
   // (Your marks follow the board you're on: during the show after a turn's second half, still last turn's.)
@@ -294,6 +317,7 @@ function MatchBoards({ m, client, mine, watching, onWatch }: { m: LocalMatch; cl
           next={!!marks && marks.next === b.id && marks.next !== marks.you}
           on={watching === `${m.key}/${b.id}`}
           over={!!b.result || m.state === "over"}
+          won={wonBy(m, b)}
           onTap={onWatch ? () => onWatch(m.key, b.id) : undefined}
         />
       ))}

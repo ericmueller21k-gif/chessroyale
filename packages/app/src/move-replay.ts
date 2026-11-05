@@ -80,32 +80,59 @@ export function tagText(names: readonly string[]): string {
   return text.length > R.tagChars ? `${text.slice(0, R.tagChars - 1).trimEnd()}…` : text;
 }
 
-// ---------------- The replay button and the first-time tip, per account ----------------
+// ---------------- The replay button's three settings, per account ----------------
 
 /**
- * The app keeps no settings on the account (prefs.ts is per device), so both are kept per account on this device:
- * `brc.squads.replay.<user id>` ("1" on, "0" off; unset: on) and `brc.squads.tip.<user id>` ("1": don't show the tip
- * again). A guest's under "guest".
+ * The replay button (Eric, Nov 5, round 2): a tap steps through three settings. "two": the last 2 moves (your teammate's
+ * last move on the board and the opponent's reply, then it's your move); "all": every move since you last played the
+ * board; "off": none. Off on a device's first match (`SQUADS_LOBBY.replay.mode`).
+ */
+export type ReplayMode = "off" | "two" | "all";
+export const REPLAY_MODES: readonly ReplayMode[] = ["off", "two", "all"];
+
+/** The next setting a tap gives: off → the last 2 → all → off. */
+export const nextReplayMode = (m: ReplayMode): ReplayMode => (m === "off" ? "two" : m === "two" ? "all" : "off");
+
+/** How many of the `missed` moves a setting replays. */
+export const replayMovesFor = (m: ReplayMode, missed: number): number => (m === "off" ? 0 : m === "two" ? Math.min(2, Math.max(0, missed)) : Math.max(0, missed));
+
+/**
+ * Whether a replay plays (Eric, Nov 5, round 2: "replay only when it's your turn"): at the start of your move on a board
+ * you've just come to. Never on a board you were already watching when your move there began (you sat there waiting
+ * for the opponent, or Quick board jump took you there early: you saw those moves), never when it isn't your move.
+ * `arrivedSeq`: the half in which this board came on screen; `dutySeq`: the half of your move on it (null: none).
+ */
+export const replayDue = (dutySeq: number | null, arrivedSeq: number | null): boolean => dutySeq !== null && arrivedSeq !== null && arrivedSeq >= dutySeq;
+
+/** A stored setting read as today's: "off", "two", "all"; the first button's "1" (on: every move) and "0" (off). */
+export function readReplayMode(v: string | null): ReplayMode | null {
+  if (v === "off" || v === "two" || v === "all") return v;
+  if (v === "1") return "all";
+  if (v === "0") return "off";
+  return null;
+}
+
+/**
+ * The app keeps no settings on the account (prefs.ts is per device), so it's kept per account on this device:
+ * `brc.squads.replay.<user id>` (a guest's under "guest"), the same key as the first button's on/off.
  */
 const who = () => account().profile?.user.id ?? "guest";
 const replayKey = () => `brc.squads.replay.${who()}`;
-const tipKey = () => `brc.squads.tip.${who()}`;
 const listeners = new Set<() => void>();
-let replayMemory: boolean | null = null;
+let replayMemory: ReplayMode | null = null;
 
-export function replayOn(): boolean {
+export function replayMode(): ReplayMode {
   try {
-    const v = localStorage.getItem(replayKey());
-    return v === null ? (replayMemory ?? R.on) : v === "1";
+    return readReplayMode(localStorage.getItem(replayKey())) ?? replayMemory ?? R.mode;
   } catch {
-    return replayMemory ?? R.on;
+    return replayMemory ?? R.mode;
   }
 }
 
-export function setReplayOn(on: boolean) {
-  replayMemory = on;
+export function setReplayMode(m: ReplayMode) {
+  replayMemory = m;
   try {
-    localStorage.setItem(replayKey(), on ? "1" : "0");
+    localStorage.setItem(replayKey(), m);
   } catch {
     // No storage: it lasts until a reload.
   }
@@ -117,40 +144,49 @@ export function onReplayChange(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
-/** "Don't show this again" was ticked on the tip (this account, this device). */
-export function tipDismissed(): boolean {
+// ---------------- First-time tips: the coach marks, once per device ----------------
+
+/**
+ * The coach marks (Eric, Nov 5, round 2): three tips one at a time at a player's first Relay, the rest of the screen
+ * dimmed, a pointer on one thing, a short line and OK; a tap anywhere or OK goes on. Once per device
+ * (`brc.squads.coach`: "1" once seen through), no "Don't show again" for now (Eric). Due in a lobby joined from the
+ * queue (the solo queue's PLAY, or its party's), or a test lobby's link with the test switch `?coach`.
+ */
+export const COACH_MARKS = [
+  { id: "settings", target: ".mm-more", text: "Tap here for settings, like Quick board jump." },
+  { id: "replay", target: ".rp-btn", text: "Tap to replay moves: the last 2, all of them, or off." },
+  { id: "boards", target: ".sq-match.ours", text: "Tap a board to watch it. Tap yours to come back." },
+] as const;
+export type CoachMark = (typeof COACH_MARKS)[number];
+
+const COACH_KEY = "brc.squads.coach";
+let coachFor: string | null = null;
+
+export function coachSeen(): boolean {
   try {
-    return localStorage.getItem(tipKey()) === "1";
+    return localStorage.getItem(COACH_KEY) === "1";
   } catch {
     return false;
   }
 }
 
-export function dismissTip() {
+/** The coach marks are done on this device (the last one's OK). */
+export function coachDone() {
+  coachFor = null;
   try {
-    localStorage.setItem(tipKey(), "1");
+    localStorage.setItem(COACH_KEY, "1");
   } catch {
-    // No storage: it shows the next time.
+    // No storage: they show again next time.
   }
 }
 
-/**
- * The first-time tip shows the first time this account queues for Squads (the solo queue's PLAY, or its party's), on
- * the first screen of that lobby with the gear and the replay button (the votes, or a match), once per queue, until
- * it's dismissed with "Don't show this again" ticked. `queued`: a lobby joined from the queue (or a test lobby's link
- * with the test switch `?replaytip`).
- */
-let tipFor: string | null = null;
-
+/** A lobby joined from the queue (or a test lobby with `?coach`): the coach marks may show in its Relay. */
 export function queuedSquads(code: string) {
-  tipFor = tipDismissed() ? null : code.toUpperCase();
+  coachFor = coachSeen() ? null : code.toUpperCase();
 }
 
-/** Whether the tip is due in this lobby now. */
-export const tipDue = (code: string | null | undefined): boolean => !!code && tipFor === code.toUpperCase() && !tipDismissed();
+/** Whether the coach marks are due in this lobby now. */
+export const coachDue = (code: string | null | undefined): boolean => !!code && coachFor === code.toUpperCase() && !coachSeen();
 
-/** The tip's OK: gone for this queue; with the box ticked, for good (this account, this device). */
-export function closeTip(never: boolean) {
-  tipFor = null;
-  if (never) dismissTip();
-}
+/** The coach mark after `i` (null: that was the last). */
+export const nextCoachMark = (i: number): number | null => (i + 1 < COACH_MARKS.length ? i + 1 : null);

@@ -7,7 +7,8 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, setSquadsJumpNext, squadsJumpNext, type BoardColors } from "../prefs.ts";
+import { JUMP_NEXT_INFO, JUMP_NEXT_LABEL } from "../squads-view.ts";
 import { clearAllPremoves } from "../board/yours.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
@@ -211,6 +212,8 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const [anim, setAnim] = useState(crowdAnimations);
   const [trail, setTrail] = useState(crowdTrail);
   const [chatOn, setChatOn] = useState(() => !chatOff());
+  // (Squads: Quick board jump, read afresh as prefs change.)
+  const jumpNext = squadsJumpNext();
   const [busy, setBusy] = useState(false);
   // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
   const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
@@ -298,6 +301,13 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         <Toggle title="Arrows and highlights" checked={boardMarksOn()} disabled={!mouse} onChange={setBoardMarksOn}>
           With a mouse: right-drag for an arrow, right-click to color a square (hold Ctrl, Alt or Shift for other colors). A
           left-click clears them. Only you see them.
+        </Toggle>
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">SQUADS</h2>
+        <Toggle title={JUMP_NEXT_LABEL} checked={jumpNext} onChange={setSquadsJumpNext}>
+          {JUMP_NEXT_INFO}
         </Toggle>
       </section>
 

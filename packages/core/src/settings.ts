@@ -2582,10 +2582,16 @@ export const SQUADS_LOBBY = {
    * Move replay on screen (Eric, Nov 5; the rule's free time: SQUADS.replaySecondsPerMove). Coming back to a board, the
    * moves played there since you last played it land one by one: the first `firstMs` after your half begins, then one
    * every `stepMs`, the last held until the extra free time is over (SQUADS.replaySecondsPerMove a move, so it always fits).
-   * `on`: the replay button's setting on a device (an account) that hasn't set it. A name tag over each moved piece:
-   * `tagChars` letters at most, then "…".
+   * `mode`: the replay button's setting on a device (an account) that hasn't set it: off (Eric, Nov 5, round 2: the
+   * button steps off, the last 2 moves, all of them). A name tag over each moved piece: `tagChars` letters at most,
+   * then "…".
    */
-  replay: { on: true, firstMs: 150, stepMs: 450, tagChars: 12 },
+  replay: { mode: "off" as "off" | "two" | "all", firstMs: 150, stepMs: 450, tagChars: 12 },
+  /**
+   * The countdown tick (Eric, Nov 5: in the free seconds it "makes you panic"): once a second while your squad's real
+   * bank has this many seconds or fewer left and you still have a move to make; never in the free seconds.
+   */
+  tickBankSeconds: 5,
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */

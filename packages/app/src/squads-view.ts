@@ -1,4 +1,4 @@
-import { SQUADS, type MercItem, type SquadsSettings } from "@chessroyale/core";
+import { SQUADS, SQUADS_LOBBY, type MercItem, type SquadsSettings } from "@chessroyale/core";
 import {
   MERC_ITEMS,
   chipWindows,
@@ -6,6 +6,8 @@ import {
   nextPrice,
   pairSchedule,
   relayMovesOf,
+  relayRing,
+  relaySeat,
   type AssistUse,
   type Colour,
   type NetWallet,
@@ -142,6 +144,84 @@ export function myBoards(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "
   return { you: 0, next: null };
 }
 
+// ---------------- The turn order under the board (Relay; Eric, Nov 5, round 2) ----------------
+
+/**
+ * The two ways the turn order can list a match's players, mocked both for Eric (Nov 5): "seated", the 6 at the boards
+ * this turn (3 a squad, in the order they move), with your waiting teammate as "next in"; "ring", all 8 in ring order,
+ * each squad's 4 in the order they move, round and round.
+ */
+export type TurnOrderStyle = "seated" | "ring";
+
+export interface TurnRow {
+  id: string;
+  side: Side;
+  /** To move now (lit): a move asked of them this half, not yet made. */
+  lit: boolean;
+  you: boolean;
+  /** "Next in": your teammate waiting this turn (seated only). */
+  nextIn: boolean;
+  /** The board of their move this turn (null: they wait this turn). */
+  board: number | null;
+  /** The move they last played in this match: its board and ply (null: none yet). */
+  last: { board: number; ply: number } | null;
+}
+
+/** Who played each move of a Relay match, by board and ply, from the schedule (the rules' own: the ring, or one board along). */
+export function relayMover(m: Pick<NetSquadsMatch, "sides" | "boards">, board: number, ply: number): string | null {
+  const b = m.boards[board];
+  if (!b) return null;
+  const side: Side = ply % 2 === 0 ? b.white : b.white === 0 ? 1 : 0;
+  const seats = m.sides[side].seats;
+  return seats[relaySeat(m.boards.length, board, ply >> 1, seats.length, side)] ?? null;
+}
+
+/** Each player's last move in a Relay match (its board and ply), from the boards' moves. */
+export function lastMovesBy(m: Pick<LocalMatch, "sides" | "boards">): Map<string, { board: number; ply: number }> {
+  const out = new Map<string, { board: number; ply: number }>();
+  for (const b of m.boards) {
+    for (let p = 0; p < b.moves.length; p++) {
+      const id = relayMover(m, b.id, p);
+      if (!id) continue;
+      const was = out.get(id);
+      if (!was || was.ply < p) out.set(id, { board: b.id, ply: p });
+    }
+  }
+  return out;
+}
+
+/**
+ * The turn order (Relay): one column a squad, yours first, its players in the order they move this turn (seated) or in
+ * ring order (ring), the player to move lit. Every column keeps the same number of rows on every board (ring: 4;
+ * seated: 3, and yours a 4th, your waiting teammate "next in"; theirs an empty 4th), so the box keeps one size.
+ */
+export function turnOrder(m: Pick<LocalMatch, "sides" | "boards" | "turn" | "state" | "current" | "locked">, me: string | null, style: TurnOrderStyle): [TurnRow[], TurnRow[]] {
+  const mine = sideIn(m, me);
+  const order: Side[] = mine === 1 ? [1, 0] : [0, 1];
+  const n = m.boards.length;
+  const last = lastMovesBy(m);
+  const toMove = new Set(m.state === "half" && m.current ? m.current.duties.filter((d) => d.role === "move").flatMap((d) => d.players).filter((p) => !m.locked.includes(p)) : []);
+  const row = (side: Side, seat: number, nextIn = false): TurnRow => {
+    const seats = m.sides[side].seats;
+    const id = seats[seat]!;
+    const here = relayMovesOf(seat, m.turn, 1, n, side, seats.length)[0];
+    return { id, side, lit: toMove.has(id), you: id === me, nextIn, board: here && here.turn === m.turn ? here.board : null, last: last.get(id) ?? null };
+  };
+  return order.map((side) => {
+    const size = m.sides[side].seats.length;
+    if (style === "ring" || n >= size) return Array.from({ length: size }, (_, seat) => row(side, seat));
+    // Seated: this turn's movers in the order they move (the ring's), then your waiting teammate.
+    const ring = relayRing(n, side);
+    const seated = ring.map((_, j) => (n * m.turn + j) % size);
+    const rows = seated.map((seat) => row(side, seat));
+    if (side === mine) {
+      const waiting = Array.from({ length: size }, (_, seat) => seat).find((seat) => !seated.includes(seat));
+      if (waiting !== undefined) rows.push(row(side, waiting, true));
+    }
+    return rows;
+  }) as [TurnRow[], TurnRow[]];
+}
+
 /**
  * Quick board jump (Relay; Eric, Oct 14 as "Jump to my next board"; in the Squads settings since Nov 5): the board to
  * study once you've moved, the one you play next (one board along). If it has finished (you'd sit that move out and
@@ -269,6 +349,22 @@ export function replayCount(d: Pick<NetDuty, "players" | "replay"> | null | unde
   if (!d || !playerId) return 0;
   const i = d.players.indexOf(playerId);
   return i < 0 ? 0 : (d.replay?.[i] ?? 0);
+}
+
+/**
+ * The countdown tick (Eric, Nov 5: it "makes you panic"): only while your squad's real bank is running out, its last
+ * `SQUADS_LOBBY.tickBankSeconds`, never in your move's free seconds (the delay), and only while you still have a move
+ * to make. The whole second of bank left to tick for (one tick each), or null: no tick now.
+ */
+export function tickSecond(m: Pick<LocalMatch, "state" | "current" | "banks" | "delayMs" | "locked" | "lockedAt" | "sides">, me: string | null, now: number): number | null {
+  if (!me || m.state !== "half" || !m.current || m.locked.includes(me)) return null;
+  const d = m.current.duties.find((x) => x.players.includes(me));
+  if (!d) return null;
+  // (Still in the free seconds: the bank isn't running.)
+  if (now < m.current.startedAt + dutyFreeMs(m, d)) return null;
+  const bank = liveBank(m, d.side, now);
+  if (bank <= 0 || bank > SQUADS_LOBBY.tickBankSeconds * 1000) return null;
+  return Math.ceil(bank / 1000);
 }
 
 /** How many of a side's moves are draining its bank right now (2: Relay's two movers, twice as fast). */
