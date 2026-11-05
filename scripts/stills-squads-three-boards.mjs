@@ -116,8 +116,9 @@ async function frame(p, file, phone) {
   const dark = await p.evaluate(() => matchMedia("(prefers-color-scheme: dark)").matches);
   const bg = dark ? "#1c1c1e" : "#f2f1ee";
   const ink = dark ? "#fff" : "#111";
-  const pg = await b.newPage({ viewport: { width: PHONE.w, height: PHONE.h }, deviceScaleFactor: 3 });
-  await pg.setContent(`<!doctype html><html><body style="margin:0;width:${PHONE.w}px;height:${PHONE.h}px;background:${bg};font:600 15px -apple-system,system-ui,sans-serif;color:${ink};position:relative;overflow:hidden">
+  const H = PHONE.top + PHONE.page + 133;
+  const pg = await b.newPage({ viewport: { width: PHONE.w, height: H }, deviceScaleFactor: 3 });
+  await pg.setContent(`<!doctype html><html><body style="margin:0;width:${PHONE.w}px;height:${H}px;background:${bg};font:600 15px -apple-system,system-ui,sans-serif;color:${ink};position:relative;overflow:hidden">
     <div style="position:absolute;left:0;right:0;top:0;height:${PHONE.top}px;display:flex;align-items:center;justify-content:space-between;padding:0 30px 0 34px;box-sizing:border-box"><span>1:02</span><span style="letter-spacing:2px">▂▄▆ ◠ ▭</span></div>
     <img src="data:image/png;base64,${shot}" style="position:absolute;left:0;top:${PHONE.top}px;width:${PHONE.w}px;height:${PHONE.page}px">
     <div style="position:absolute;left:0;right:0;top:${PHONE.top + PHONE.page}px;bottom:0;background:${bg};display:flex;gap:10px;align-items:flex-start;justify-content:center;padding-top:12px;box-sizing:border-box">

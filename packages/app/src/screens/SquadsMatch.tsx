@@ -380,7 +380,8 @@ export function freeLine(m: LocalMatch, me: string | null): string {
 /** One line of plain-language rules for each format. */
 function rulesLine(m: LocalMatch): string {
   // (Relay: no blocks, Mercenary too; they come from the shop, after round 1: Eric, Oct 19.)
-  if (m.format === "relay") return "Each turn you make one move, one board along.";
+  // (3 boards and 4 a squad since Nov 5: the ring. A match stored on 4 boards keeps its line.)
+  if (m.format === "relay") return m.boards.length < 4 ? "Your squad moves in turn, each move one board along; one of you waits to slot in. Best 2 of 3 boards." : "Each turn you make one move, one board along.";
   if (m.format === "pairs") return "You and your partner each pick; a coin plays one. Pick the same move and it plays for sure: a token.";
   return "Your whole squad votes: the most picked move plays (a tie: a coin). Copy a teammate with a tap.";
 }

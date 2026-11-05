@@ -23848,3 +23848,21 @@ button.sq-tiny {
 .cm-ok {
   min-width: 80px;
 }
+/* A short phone (a small Android with its browser bars, 360 × 560): the tiny boards and the turn order's rows a little
+   smaller, the board the rest, so nothing is cut off at the bottom. */
+@media (max-height: 620px) and (max-width: 899px) {
+  .sq-relay .sq-boards {
+    --tb: 33px;
+  }
+  .sq-relay .sq-to-col {
+    grid-template-rows: repeat(4, 16px);
+  }
+  .sq-relay .sq-to-row {
+    height: 16px;
+    font-size: 11px;
+  }
+  .sq-game.sq-relay .board-area .board-wrap {
+    width: min(100%, calc(var(--app-h) - 338px));
+    min-width: 200px;
+  }
+}
