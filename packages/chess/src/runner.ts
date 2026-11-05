@@ -107,6 +107,8 @@ import {
   boingoBattle,
   shownAngle,
   hollowBattle,
+  blackedOut,
+  type DarkTryResult,
   moveLoss,
   pigBattle,
   pigTurn,
@@ -548,8 +550,28 @@ export class MatchRunner {
   }
 
   /** Hollow's dark: a move attempt that touches a dark square, sent unchecked (see hollowBattle.darkTry). */
-  darkTry(playerId: string, move: string): { kind: "move"; move: string } | { kind: "wrong"; tries: number; out: boolean } | { kind: "refused" } {
+  darkTry(playerId: string, move: string): DarkTryResult {
     return hollowBattle.darkTry(this.battle, playerId, move);
+  }
+
+  /** Hollow in Boss alone: the dark is to play your move this turn (a 3rd or 7th bulb out), not yet picked. */
+  darkForcedDue(): boolean {
+    return hollowBattle.darkForcedDue(this.battle);
+  }
+
+  /** The dark's move for you (a bad one: darkForcedMoveFrom), from this device's engine: the turn's only move from now. */
+  async playDarkForced(engine: EngineLike = this.opts.engines[0]!): Promise<string> {
+    return hollowBattle.playDarkForced(this.battle, engine);
+  }
+
+  /** Sets the dark's move for you (an engine's answer; see hollowBattle.applyDarkForced). */
+  applyDarkForced(move: string): string {
+    return hollowBattle.applyDarkForced(this.battle, move);
+  }
+
+  /** The battle was Hollow's by his last bulb (Boss alone): for the result screen (the results' `blackout`). */
+  get bossBlackout(): boolean {
+    return blackedOut(this.state.boss);
   }
 
   /** Hollow's dark: each player's wrong attempts into the dark this round. */
@@ -1379,7 +1401,7 @@ export class MatchRunner {
   }
 
   stageComplete(): boolean {
-    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss);
+    if (this.state.boss) return this.finalGameOver() || this.state.boss.crowdMoves >= this.settings.bossMaxMoves || this.bossOutOfTime() || carrotBattle.won(this.state.boss) || blackedOut(this.state.boss);
     if (this.state.final) return finalComplete(this.state, this.settings) || this.finalGameOver();
     return stageComplete(this.state, this.settings);
   }
@@ -1943,7 +1965,8 @@ export class MatchRunner {
     const b = this.state.boss!;
     const timeout = this.bossOutOfTime() && !this.finalGameOver();
     const winner = this.gameWinner();
-    const result = timeout || this.bossCarrotWin ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
+    // (Hollow's last bulb out, Boss alone: his, whatever the board says.)
+    const result = timeout || this.bossCarrotWin || blackedOut(b) ? "boss" : winner === null ? "draw" : winner === b.crowdSide ? "crowd" : "boss";
     this.state = finishBoss(this.state, this.opts.rng, result, this.settings);
     this.bossTimedOut = timeout;
     return result;

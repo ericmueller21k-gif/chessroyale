@@ -67,9 +67,9 @@
  *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
-import { BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
+import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
 import { BOSS_POWERS } from "@chessroyale/core";
-import { MatchRunner, PASS_WAIT, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
+import { MatchRunner, PASS_WAIT, darkSquares, touchesDark, scrambleOn, creaseCost, powerMomentMs, waterAnswer, inCheck, materialOf, applyMove, bossMoveFrom, passScores, repaintPick, botRoster, carrotSpots, carrotsOf, carrotsOpen, castAnswer, chooseSplit, fenAfter, fuseFrom, gameEndWith, hopFrom, hopOptions, legalMoves, passAnswer, passTurn, pickSlam, pieceAt, raceOn, slamPawnsLost, slamScores, splitRoom, START_FEN, withPiece, withoutPiece, type Base, type EngineLike, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -281,6 +281,31 @@ interface RaidPatch {
    * the move's time (the bank and the increment, or a scrambled move's 3 s), nobody picked: his flag, a random legal move.
    */
   rushSec?: number;
+  /**
+   * Hollow (id hollow): Boss alone instead of a Solo raid: one bot (its tier's) against him alone, on Boss alone's settings
+   * (BOSS_ALONE_SCORING, no boss strikes) and his solo bulbs (`hollowBulbs`: docs/decisions/2026-11-05-hollow-bulbs.md).
+   */
+  alone?: boolean;
+  /**
+   * Hollow: a player in the dark. The bots know the board, so on their own they never try a move into the dark. With
+   * `darkMiss`, each crowd turn whose planned pick touches a dark square, that player first tries a wrong move into the
+   * dark with this chance, and again after each wrong one (so 0.3 averages about 0.43 wrong tries a dark-touching turn):
+   * a stand-in for a person who misremembers what the dark hides. Alone only (in a crowd a wrong try costs points and
+   * never the battle).
+   */
+  darkMiss?: number;
+}
+
+/** A wrong move into the dark: from a dark square to one it can't legally go to (the first such, for the sim's model). */
+function wrongDarkTry(fen: string, dark: readonly string[]): string | null {
+  const legal = new Set(legalMoves(fen));
+  for (const d of dark)
+    for (const f of "abcdefgh")
+      for (let r = 1; r <= 8; r++) {
+        const m = `${d}${f}${r}`;
+        if (`${f}${r}` !== d && !legal.has(m) && !legal.has(`${m}q`)) return m;
+      }
+  return null;
 }
 
 /** His thinking (bossThinkMs, at least 1.2 s) and his move on screen (bossShowMs, 1.8 s) each turn, for the sim's clock. */
@@ -321,11 +346,15 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       while (strikeTurns.size < strikes) strikeTurns.add(6 + Math.floor(strikeRng() * 25));
       // (A boss whose powers are built before its art: met as the test link does, bossUnfinished.)
       // (Dash: Boss Battle's clock, the bank his slaps take from: the player's time model below.)
-      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}) } as Settings;
+      const s = { ...settings, ...RAID_SETTINGS, ...(bossId === "dash" ? bossClockSettings({ ...settings, ...RAID_SETTINGS }) : {}), bossId, bossUnfinished: true, engineNodes: RAID_NODES, bossNodes: RAID_NODES, ...(patch.tier ? { bossFixedElo: patch.tier } : {}), ...(patch.difficulty ? { bossDifficulty: patch.difficulty } : {}), ...(patch.alone ? { ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: true } : {}) } as Settings;
       // (The clock for the hippo gardener's seeds: the crowd's pick (patch.pickSec), the reveal, his turn and the moments.)
       let clockMs = 0;
       const pickSec = patch.pickSec ?? 10;
-      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, s.lobbySize, s), clock: () => clockMs });
+      const runner = new MatchRunner({ settings: s, rng, engines, library, entrants: botRoster(rng, patch.alone ? 1 : s.lobbySize, s), clock: () => clockMs });
+      // (Hollow, a player in the dark: patch.darkMiss. The wrong tries, the bulbs out, the forced moves (each one's loss
+      // against the best, in points) and a blackout.)
+      const darkRng = mulberry32(seed * 49157 + g);
+      const hollow = { darkTurns: 0, wrong: 0, bulbsOut: 0, forced: [] as { at: number; move: string; loss: number | null }[], blackout: null as number | null, blocks: [] as { turn: number; size: number; squares: number }[] };
       const ults: { kind: string; turn: number }[] = [];
       // (Folio: each Crease as it landed, its line, what it cost the crowd as it fell (this engine, the position it fell on)
       // and by the engine that picked it on the warning's position; and each warned crease that didn't land, the guard
@@ -338,6 +367,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         if (!p || p.turn === seen) return;
         seen = p.turn;
         for (const e of p.events) if (ULT_EVENTS.has(e.kind)) ults.push({ kind: e.kind, turn: e.turn });
+        for (const e of p.events) if ((e.kind as string) === "darkBlock") hollow.blocks.push({ turn: e.turn, size: (e as { size?: number }).size ?? 2, squares: e.squares?.length ?? 0 });
       };
       look();
       let struck = 0;
@@ -416,6 +446,41 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
         const crowd = runner.boss!.crowdSide;
         return materialOf(fen, crowd) - materialOf(fen, crowd === "w" ? "b" : "w");
+      };
+      /** Hollow's dark for the player (patch.darkMiss): true when the bulbs ran out (the battle is over). */
+      const hollowDark = async (): Promise<boolean> => {
+        const picks = await runner.planBotPicks();
+        const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+        const dark = darkSquares(runner.boss);
+        for (const pl of runner.alive()) {
+          const move = picks.get(pl.id);
+          if (!move || !touchesDark(move, dark, fen)) continue;
+          hollow.darkTurns++;
+          while (darkRng() < patch.darkMiss!) {
+            const wrong = wrongDarkTry(fen, dark);
+            if (!wrong) break;
+            const out = runner.darkTry(pl.id, wrong) as { kind: string; out?: boolean; bulbs?: number; forced?: boolean; blackout?: boolean };
+            if (out.kind !== "wrong") break;
+            hollow.wrong++;
+            hollow.bulbsOut = out.bulbs ?? hollow.bulbsOut;
+            if (out.blackout) {
+              hollow.blackout = runner.boss!.crowdMoves;
+              return true;
+            }
+            if (out.forced) {
+              const forced = await runner.playDarkForced(engines[0]);
+              (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, forced);
+              const [best] = await engines[0]!.topMoves(fen, 1);
+              const both = best ? await engines[0]!.scoreMoves(fen, [best.move, forced]) : [];
+              const b = both.find((m) => m.move === best?.move)?.expected;
+              const f = both.find((m) => m.move === forced)?.expected;
+              hollow.forced.push({ at: runner.boss!.crowdMoves, move: forced, loss: b === undefined || f === undefined ? null : Math.round(Math.max(0, b - f) * 1000) / 10 });
+              break;
+            }
+            if (out.out) break;
+          }
+        }
+        return false;
       };
       const t0 = Date.now();
       while (!runner.isOver()) {
@@ -665,7 +730,11 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             const round = runner.resolveBoard(id, ids, Object.fromEntries(ids.map((x) => [x, null])), evaluation);
             runner.finishRound([round], Object.fromEntries(ids.map((x) => [x, allowed])));
           } else await runner.score(new Map());
-        } else await runner.score(new Map());
+        } else {
+          // (Hollow, a player in the dark: wrong tries before the pick; a forced move played for them; the blackout ends it.)
+          if (patch.darkMiss && bossId === "hollow" && (await hollowDark())) continue;
+          await runner.score(new Map());
+        }
         if (tusksBefore && runner.boss!.powers?.fusion?.why === "taken" && runner.boss!.powers.fusion.at === runner.boss!.crowdMoves) alfil.taken++;
         if (runner.boss!.powers?.landed?.early && runner.boss!.powers.landed.at === runner.boss!.crowdMoves) alfil.early++;
         if (runner.bossKillDue()) runner.bossKill();
@@ -678,7 +747,7 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
       const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}) };
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }
