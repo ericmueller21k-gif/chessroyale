@@ -175,12 +175,14 @@ function frontOf(id: HomeId): { ch: Character; lights: readonly LightSpot[]; sig
   return { ch: h.ch, lights: h.lights, sign: h.sign };
 }
 /**
- * The domes with fewer faces, for the 2D fallback (the art's notes, Nov 5: "draw each as one mesh in WebGL. On the 2D fallback, cut them
- * to 6 x 3 faces"; code round 3).
+ * The domes (and Boingo's vault) with fewer faces, for the 2D fallback (the art's notes, Nov 5: "draw each as one mesh in WebGL. On the
+ * 2D fallback, cut them to 6 x 3 faces"; code round 3).
  */
 const LOW_ROOF: Partial<Record<HomeId, Face[]>> = {
   gingerbread: iced(domeRoof(28, 104, 4, 89, "crumb", 6, 3)),
   hopper: domeRoof(4, 140, 0, 68, "turf", 6, 3),
+  // (Boingo's barrel vault: four faces round instead of eight, so its funhouse keeps to the art's 12 to 20 draws.)
+  clown: [...vaultRoof(28, 116, 90, 111, "canvas", 4), ...blockF(14, 28, 0, 0.22, 0, 104, "slate"), ...blockF(116, 130, 0, 0.22, 0, 104, "slate")],
 };
 const cache = new Map<string, TownBox>();
 /** A home as a box (its lot is 4 squares across, Alfil's 6; 3 deep). `low`: its dome with fewer faces (the 2D fallback's). */

@@ -47,6 +47,7 @@ import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
 import { STREET_BUILDINGS, STREET_LOTS } from "./street.ts";
 import { affine, geomOf, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { bakeRoof, silhouette, type Piece, type RoofArt } from "./box-draw.ts";
+import { farColosseumShows } from "./turn.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -1418,7 +1419,7 @@ export class Renderer {
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
     // (The street town's turn: only while the camera faces within 45 degrees of north.)
-    if (!col.on && this.heading <= 45) this.drawFarColiseum(col, now);
+    if (!col.on && farColosseumShows(this.heading)) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") {

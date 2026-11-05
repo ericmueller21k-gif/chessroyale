@@ -5,7 +5,7 @@
  * second a quarter turn (`TOWN_FEEL.streetTurnMs`), about you (the camera keeps following you). The arrow keys
  * go through it: up is always up the screen. Pure: no DOM, nothing allocated on a frame.
  */
-import PLAN from "./street-plan.json";
+import PLAN from "./street-plan.json" with { type: "json" };
 import { N, wrapI } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 
@@ -62,6 +62,9 @@ export class Turn {
   }
 }
 
+/** The Colosseum's far drawing (seen past the world's rim) shows only while the camera faces within 45 degrees of north (the art's). */
+export const farColosseumShows = (heading: number): boolean => Math.abs(((((heading + 180) % 360) + 360) % 360) - 180) <= 45;
+
 /** The quarter turn a heading is nearest (0 north, 1 east, 2 south, 3 west): the arrow keys' frame. */
 export const quarterOf = (heading: number): number => ((Math.round(heading / 90) % 4) + 4) % 4;
 
@@ -75,6 +78,6 @@ export function screenStep(dc: number, dr: number, quarter: number, out: { dc: n
   const fc = q === 1 ? 1 : q === 3 ? -1 : 0;
   const fr = q === 0 ? 1 : q === 2 ? -1 : 0;
   // Right is ahead turned a quarter clockwise: (fc, fr) -> (fr, -fc).
-  out.dc = dc * fr + dr * fc;
-  out.dr = -dc * fc + dr * fr;
+  out.dc = dc * fr + dr * fc || 0;
+  out.dr = -dc * fc + dr * fr || 0;
 }

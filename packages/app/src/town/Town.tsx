@@ -663,6 +663,8 @@ function startTown(
    */
   const turn = new Turn(STREET_TOWN ? camAt(town.you.walker.c, town.you.walker.r) : 0);
   let heading = turn.to;
+  /** (Tests) The heading held (the turn's stills), or null. */
+  let pinHeading: number | null = null;
   let follow = true;
   /** The camera's speed while it follows you (squares a second): the spring's state. */
   let vx = 0;
@@ -946,7 +948,7 @@ function startTown(
         const h = town.you.walker.here();
         turn.aim(camAt(h.c, h.r), now);
       }
-      heading = turn.at(now);
+      heading = pinHeading ?? turn.at(now);
     }
   };
 
@@ -1508,6 +1510,12 @@ function startTown(
     glide = null;
     return walkYou(town, { kind: "square", c: wrapI(sq[0]), r: wrapI(sq[1]) });
   };
+  // ... `__townHeading(deg | null)` (the street town's turn, Nov 5, round 3): the camera faces `deg` from north and stays so (the turn's
+  // stills: its middle frame), or (null) turns as you walk again.
+  const hookHeading = (deg: number | null) => {
+    if (!testSwitchesAllowed()) return;
+    pinHeading = deg;
+  };
   const hookRide = () => {
     if (!testSwitchesAllowed()) return null;
     const you = town.people.indexOf(town.you);
@@ -1548,7 +1556,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1567,6 +1575,7 @@ function startTown(
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townWalk = hookWalk;
+  hooks.__townHeading = hookHeading;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
 
@@ -1705,6 +1714,7 @@ function startTown(
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townWalk;
+      delete hooks.__townHeading;
       delete hooks.__townRide;
       delete hooks.__townYou;
       painter.dispose();
