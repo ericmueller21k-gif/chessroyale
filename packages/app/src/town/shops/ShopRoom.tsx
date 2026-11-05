@@ -1365,6 +1365,9 @@ function startRoom(
     const here = you.here();
     if (here.c === waitFor.c && here.r === waitFor.r) return void (waitFor = null);
     const path = wayRoundElves(here, waitFor);
+    // (On the stairs or the catwalk the only way round is back the way you came and over by the other staircase: you wait for the
+    // way ahead to clear instead (Eric, Nov 5: it turned back halfway down), unless an elf is waiting for you too.)
+    if (path && isUp(lv, here.c, here.r) && !(walkerLoops.some((w) => w.waiting) || pair!.waiting) && path.length > (findPath(room, here, waitFor)?.length ?? 0)) return;
     if (path) {
       you.go(path);
       waitFor = null;
