@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { KEY_DIR, hold, isHeld, keySteps, keyWalk, releaseAll, type KeyStep } from "../src/town/arrows.ts";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { Walker } from "../src/town/world.ts";
+import { Walker, screenRow } from "../src/town/world.ts";
+import { makeRoom, stepFor } from "../src/town/shops/room.ts";
 
 /**
  * Walking with the arrow keys (Eric, Nov 4; docs/areas/town-square.md, "Arrow keys"): hold a key and you run that way, square to
@@ -125,5 +126,64 @@ describe("keyWalk: a held key runs the walker on, at a tap's pace, and a release
     run(w, k, 0, 1000);
     expect(w.hereC()).toBeLessThanOrEqual(6);
     expect(w.hereR()).toBeGreaterThanOrEqual(8);
+  });
+});
+
+/**
+ * Eric's rule (Nov 5: "if you hold up in one of the rooms, it actually gave you the kind of sensation you're running down"): up is up
+ * the screen everywhere, in the town and in every room. The town's rows run away from the camera (a row more is up the screen), a
+ * room's toward it (a row less is up): the walker knows which (`rowsUp`), and its view and the arrow keys both follow it.
+ */
+describe("Eric's rule (Nov 5): up is up the screen in the town and in every room (Walker.rowsUp)", () => {
+  const run = (w: Walker, k: { start: () => void }, ms: number) => {
+    for (let t = 0; t < ms; t += 16) {
+      k.start();
+      w.update(t);
+    }
+  };
+  /** Where `dir` held for a few steps takes a walker on (5, 5) whose rows run `rowsUp`, as the screen sees it, and the view it shows. */
+  const walk = (rowsUp: 1 | -1, dir: "up" | "down" | "left" | "right", to?: (c: number, r: number, dc: number, dr: number) => { c: number; r: number } | null) => {
+    const w = new Walker({ c: 5, r: 5 }, TOWN_FEEL.youStepMs, true, TOWN_FEEL.walkEase);
+    w.rowsUp = rowsUp;
+    const k = keyWalk(w, (c, r) => c >= 2 && c <= 8 && r >= 2 && r <= 8, undefined, to);
+    hold(dir, true);
+    run(w, k, 130);
+    const view = w.view;
+    hold(dir, false);
+    run(w, k, 1000);
+    // (On screen: right is a column more, up is a row more times rowsUp.)
+    return { right: Math.sign(w.hereC() - 5), up: Math.sign(screenRow(w.hereR() - 5, rowsUp)) || 0, view };
+  };
+  const want = { up: { right: 0, up: 1, view: 1 }, down: { right: 0, up: -1, view: 2 }, left: { right: -1, up: 0, view: 0 }, right: { right: 1, up: 0, view: 0 } } as const;
+
+  it("screenRow: a row more is up the screen in the town, down it in a room; the same flip both ways", () => {
+    expect(screenRow(1, 1)).toBe(1);
+    expect(screenRow(1, -1)).toBe(-1);
+    expect(screenRow(-1, -1)).toBe(1);
+    for (const up of [1, -1] as const) for (const d of [-2, -1, 0, 1, 2]) expect(screenRow(screenRow(d, up), up)).toBe(d);
+  });
+
+  for (const [where, rowsUp] of [["the town", 1], ["a room", -1]] as const)
+    for (const dir of ["up", "down", "left", "right"] as const)
+      it(`${where}: ${dir} goes ${dir} the screen and shows its ${dir === "up" ? "back" : dir === "down" ? "front" : "side"}`, () => {
+        expect(walk(rowsUp, dir)).toEqual(want[dir]);
+      });
+
+  it("a room's row: up is a row less (toward the counter), down a row more (toward the door), through the room's own steps (stepFor)", () => {
+    const room = makeRoom([], [], 20);
+    const to = (c: number, r: number, dc: number, dr: number) => stepFor(room, c, r, dc, dr);
+    for (const dir of ["up", "down", "left", "right"] as const) expect(walk(-1, dir, to), dir).toEqual(want[dir]);
+  });
+
+  it("the walker's view follows rowsUp for any walk (a tap's too): a row less in a room is its back, in the town its front", () => {
+    const room = new Walker({ c: 5, r: 5 }, 100, false);
+    room.rowsUp = -1;
+    room.go([{ c: 5, r: 4 }]);
+    room.update(0);
+    expect(room.view, "a room: a row less is up the screen, its back").toBe(1);
+    const town = new Walker({ c: 5, r: 5 }, 100, false);
+    town.go([{ c: 5, r: 4 }]);
+    town.update(0);
+    expect(town.view, "the town: a row less is down the screen, its front").toBe(2);
   });
 });

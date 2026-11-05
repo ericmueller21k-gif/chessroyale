@@ -376,9 +376,6 @@ function toneOf(c: HTMLCanvasElement | undefined): string {
 /** The most of Jefferson's crew drawn in a frame (seven giraffes, two machines, the pallet). */
 const CREW_MAX = 12;
 
-/** A Walker's view (the town's: 1 up the screen, its rows running away from the camera) as a room draws it (rows toward the camera). */
-const roomView = (v: 0 | 1 | 2): 0 | 1 | 2 => (v === 1 ? 2 : v === 2 ? 1 : 0);
-
 /** The pawn's base's foot down its box (render.ts's PAWN_FOOT: the path's bottom at y 39.5, and half its outline). */
 const PAWN_FOOT = (39.5 + 0.75) / 45;
 const SHADOW = "rgb(60,35,10)";
@@ -429,9 +426,10 @@ function startRoom(
   const n = room.n;
   const g = cv.getContext("2d")!;
   const you = new Walker(room.start, f.youStepMs, true, f.walkEase);
-  // (Facing the counter, north: away from the camera. The Walker's views are the town's, whose rows run away from the camera;
-  // a room's run toward it, so its back and front swap: roomView.)
-  you.view = 2;
+  // (A room's rows run toward the camera, the town's away: up the screen is a row less. The walker's views and the arrow keys
+  // follow it: Walker.rowsUp. Facing the counter, north: up the screen, its back.)
+  you.rowsUp = -1;
+  you.view = 1;
   /** The rider drawn inside now (your ride's, its frames ready; SHOP_FEEL.rideInside), or null: on foot. */
   const riding = (): Rider | null => {
     if (!S.rideInside) return null;
@@ -456,14 +454,15 @@ function startRoom(
   const rp = ci?.rope ?? null;
   const across = marks?.layout === "across";
   const boss = ci && marks ? new Walker({ c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
+  if (boss) boss.rowsUp = -1;
   // The arrow keys walk you about the room (arrows.ts): a square the floor has and nobody's (the challenge's boss, if it's here).
   // Not during a challenge's intro, whose script walks you.
-  // (A room's rows run toward the camera, the town's away: up the screen is a row less. Ginger's levels: along their chain only.)
+  // (Up the screen is a row less here: keyWalk turns it by `you.rowsUp`. Ginger's levels: along their chain only.)
   const keys = keyWalk(
     you,
     (c, r) => walkable(room, c, r) && !(boss && boss.goalC() === c && boss.goalR() === r) && !elfTakes(c, r),
     undefined,
-    (c, r, dc, dr) => stepFor(room, c, r, dc, -dr),
+    (c, r, dc, dr) => stepFor(room, c, r, dc, dr),
   );
   let keysOn = false;
   const bossPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
@@ -1736,7 +1735,7 @@ function startRoom(
    * lifted by its hop; its shadows as the town's (smaller and lighter as it lifts); your tag over its top standing.
    */
   const drawRiding = (rd: Rider, now: number) => {
-    const view = roomView(you.view);
+    const view = you.view;
     const rv = rd.views[view];
     const flip = rv.facing === "side" ? you.facing : 1;
     const box = f.youSquares;
@@ -3232,7 +3231,7 @@ function startRoom(
     return pt.x >= 0 && pt.x <= W && pt.y >= 0 && pt.y <= H ? { x: pt.x, y: pt.y } : null;
   };
   const hookCam = () => (testSwitchesAllowed() ? { zoom: zoomCur, zoomTarget, room: def.home, follow, focus: [camX, camY] } : null);
-  const hookRide = () => (testSwitchesAllowed() ? { ...seen, stepMs: you.stepMs } : null);
+  const hookRide = () => (testSwitchesAllowed() ? { ...seen, stepMs: you.stepMs, foot: youFoot.on ? [youFoot.x, youFoot.y] : null } : null);
   /** (Tests) A challenge's state: its step ("walk" until you're both on your marks), where you and the boss stand, the line and the board showing. */
   const hookIntro = () => {
     if (!testSwitchesAllowed() || !ci || !boss) return null;
