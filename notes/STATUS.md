@@ -193,3 +193,5 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - #503 street town rounds 3+4 (full-e2e) open, CI watcher bbq7z90is. Merge on green → admins see it; Eric walks it in the morning, then
   flip STREET_TOWN for everyone on his OK. Follow-ups: bigger Colosseum; Moo paddock / Ginger dome low in rows; bulgy bodies.
 - Disk filled at ~08:00: removed 13 merged+pushed worktrees (clean, nothing ahead). Keep cleaning finished worktrees.
+- LIVE 13:06 UTC: #503 street town rounds 3+4 (admins only), main green at 6ce41d19. Next: Eric walks it (morning) → his OK → flip
+  STREET_TOWN for everyone. Follow-ups: bigger Colosseum; Moo/Ginger low in rows. Helper slots free.
