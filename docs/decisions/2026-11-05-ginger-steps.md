@@ -23,8 +23,9 @@ click, how far the tapped square's middle had moved from the click: with each ta
 CI's retry did ("5,7" expected, "5,6" received, at 54 and 71 px).
 
 **The fix (the test only).** Each tap is aimed once you've stopped and the view rests on you (`viewOnYou`: the camera's focus
-within 0.01 of a square of your square), before the shopkeeper's card check and the read. Every check is unchanged. Runs: see
-the PR.
+within 0.01 of a square of your square), before the shopkeeper's card check and the read. Every check is unchanged. Runs: on the
+computer 20 of 20 (10 with the 80 ms gap that reproduced the failure, 10 plain, 2 workers), on the phone 20 of 20, and
+`e2e/shop.spec.ts` whole on both (32 of 32).
 
 **Not changed (for the director).** The shop resolves a tap's square at the pointer's release with the camera as it is then;
 the town resolves it at the press and again at the release and walks only if both agree. A player tapping mid-walk with a
