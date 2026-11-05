@@ -759,9 +759,9 @@ table(
   ),
 );
 
-push("## Ties", "", "Rounds 1 and 2: a level match goes to the squad with more team bank left (a coin if exactly level). A drawn final goes to Armageddon.", "");
+push("## Ties", "", "Rounds 1 and 2: a level match goes to the squad with more boards drawn as Black (Nov 5), then more team bank left (a coin if exactly level). A drawn final goes to Armageddon.", "");
 table(
-  ["Clock", "R1 clinched early", "R1 level → bank", "R2 level → bank", "Level → coin", "Median bank gap deciding a tie (s)", "Final drawn → Armageddon", "Armageddon won by Black"],
+  ["Clock", "R1 clinched early", "R1 level → draws as Black", "R1 level → bank", "R2 level → bank", "Level → coin", "Median bank gap deciding a tie (s)", "Final drawn → Armageddon", "Armageddon won by Black"],
   CLOCKS.map((c) => {
     const rs = byClock(c);
     const share = (i: number, p: (m: MatchStat) => boolean) => {
@@ -773,6 +773,7 @@ table(
     return [
       c.label,
       share(0, (m) => m.how === "clinch"),
+      share(0, (m) => m.how === "black_draws"),
       share(0, (m) => m.how === "time"),
       share(1, (m) => m.how === "time"),
       `${ties.filter((m) => m.how === "coin").length} of ${ties.length}`,

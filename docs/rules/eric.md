@@ -167,19 +167,25 @@ How Eric likes design work run (Eric, Oct 29). These are habits, not hard rules;
 
 ## Squads: move replay (Eric, Nov 5)
 
-- **Coming back to a board, the moves you missed replay, then your free seconds run; the free time is the free seconds +
-  0.5 s for each move played there since you last played it, replay on or off.** Every mode where you come back to a board
-  (Relay, Pairs). Each move lands one by one with its from and to marked; a tap on the board (or starting a move) skips it.
-  The rule is the server's (`SQUADS.replaySecondsPerMove`, `Duty.freeMs`), and the clock on screen runs from it.
+- **Coming back to a board, the free time is the free seconds + 0.5 s for each move played there since you last played
+  it, replay or not; as your move there starts the moves replay as the replay button says (Eric, Nov 5, round 2: the last
+  2, or all since you last played there), unless you watched both of the last two moves there land.** Every mode where you
+  come back to a board (Relay, Pairs). Each move lands one by one with its from and to marked; a tap on the board (or
+  starting a move) skips it. The rule is the server's (`SQUADS.replaySecondsPerMove`, `Duty.freeMs`), and the clock on
+  screen runs from it.
   - Guards: `packages/chess/test/squads-replay.test.ts` (every check: "Move replay: the free time grows by 0.5 s a move…");
-    `packages/app/test/move-replay.test.ts` ("the moves you missed, in order…", "turning the replay off changes nothing on the
-    clock"); `e2e/squads-replay.spec.ts`, "Relay: coming back to a board, the moves you missed replay…", phone and computer.
-  - Decision: [2026-11-05-move-replay.md](../decisions/2026-11-05-move-replay.md).
+    `packages/app/test/move-replay.test.ts` ("the moves you missed, in order…", "the replay button's setting changes
+    nothing on the clock", "none if you watched both of the last two moves land…"); `e2e/squads-replay.spec.ts`, "Relay:
+    the replay button steps off, the last 2, all…" and "Relay with Quick board jump…", phone and computer.
+  - Decisions: [2026-11-05-move-replay.md](../decisions/2026-11-05-move-replay.md),
+    [2026-11-05-squads-three-boards.md](../decisions/2026-11-05-squads-three-boards.md).
 - **Who played each replayed move: a name tag over the moved piece, one box size; a long name smaller; over 12 characters cut
   with "…" ("Christopher…").** Guards: `packages/app/test/move-replay.test.ts`, "a name tag's words…"; the e2e above (every
   tag the same size, the long name smaller and cut).
-- **The replay button sits next to the gear, on or off (per account, on this device); on, a few dots chase slowly round its
-  edge; off, the plain icon.** Guard: the e2e above (the trail only while on).
-- **The first time an account queues for Squads, a tip: the screen dimmed, the gear and the replay button lit, a box saying what
-  each does, "Don't show this again" and OK; not ticked, it shows the next time they queue.** Guard: `e2e/squads-replay.spec.ts`,
-  "the first-time tip…", phone and computer.
+- **The replay button sits next to the gear, no box, only the drawn ring (Eric, Nov 5, round 2): a tap steps off (greyed,
+  still) → the last 2 moves (a moderate spin, a short trail) → all (twice as fast, a longer trail) → off; off on a first
+  match; per account, on this device.** Guard: the first e2e above (the cycle, the speeds and trails).
+- **At a player's Relay, three coach marks one at a time (settings, the replay button, the tiny boards); a tap or OK goes on;
+  the last has "Don't show these again": ticked, never again on that device; not ticked, again next time (Eric, Nov 5,
+  round 2; they replace the first-time tip).** Guards: `packages/app/test/move-replay.test.ts`, "The first-time tips…";
+  `e2e/squads-three-boards.spec.ts`, "the coach marks…", phone and computer.
