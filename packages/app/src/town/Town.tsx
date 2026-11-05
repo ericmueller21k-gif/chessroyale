@@ -39,7 +39,7 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, fromCam, proj, wrapF, wrapI } from "./camera.ts";
+import { N, colI, fromCam, proj, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
@@ -50,6 +50,7 @@ import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
 import { Turn, chaseTarget, quarterOf, screenStep } from "./turn.ts";
+import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
@@ -638,7 +639,8 @@ function startTown(
       ? (c, r, dc, dr) => {
           // (Round 4's chase camera: through the way you faced as the hold began, so a held left or right turns you once and runs on.)
           screenStep(dc, dr, keyQuarter, turned);
-          return { c: wrapI(c + turned.dc), r: wrapI(r + turned.dr) };
+          // (Off the world past the north or south edge: a row of -1, which no one stands on.)
+          return { c: colI(c + turned.dc), r: rowI(r + turned.dr) };
         }
       : undefined,
   );
@@ -677,6 +679,10 @@ function startTown(
   let glide: { x: number; y: number } | null = null;
   let zoomCur = (STREET_TOWN ? f.streetStartZoomedOut : f.startZoomedOut) ? 1 : 0;
   let zoomTarget = zoomCur;
+  // The street town's zoom (round 4, zoom-steps.ts): steps, and the park's step out; zoomCur is its step there (0 in .. 3 the overview).
+  const startSq = town.you.walker.here();
+  const sz = new StreetZoom(f.streetStartZoomedOut ? f.streetZoomStart + 1 : f.streetZoomStart, parkSide(startSq.c, startSq.r) !== false);
+  if (STREET_TOWN) zoomCur = zoomTarget = sz.step;
   // The sky by the device's clock, read about once a minute; `?sky=day|dawn|dusk|night` holds one look (for Eric, tests).
   const pinned = skyOverride(new URLSearchParams(location.search).get("sky"));
   const clock = (): SkyWeights => {
@@ -923,9 +929,9 @@ function startTown(
   const updateCamera = (dt: number, now: number) => {
     if (glide) {
       const k = 1 - Math.exp(-f.glideRate * dt);
-      camX += wrapF(glide.x - camX) * k;
-      camY += wrapF(glide.y - camY) * k;
-      if (Math.hypot(wrapF(glide.x - camX), wrapF(glide.y - camY)) < 0.03) glide = null;
+      camX += wrapFX(glide.x - camX) * k;
+      camY += wrapFY(glide.y - camY) * k;
+      if (Math.hypot(wrapFX(glide.x - camX), wrapFY(glide.y - camY)) < 0.03) glide = null;
     } else if (follow) {
       // A critically damped spring toward your pawn (or, up close, the statue's square), solved exactly for the frame
       // (steady at any frame rate).
@@ -933,8 +939,8 @@ function startTown(
       if (closeOn >= 0 && closeIn) ((p.x = STATUES[closeOn]!.c), (p.y = STATUES[closeOn]!.r));
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
-      const x = wrapF(camX - p.x);
-      const y = wrapF(camY - p.y);
+      const x = wrapFX(camX - p.x);
+      const y = wrapFY(camY - p.y);
       const jx = vx + w * x;
       const jy = vy + w * y;
       camX = p.x + (x + jx * dt) * e;
@@ -944,8 +950,8 @@ function startTown(
     }
     if (!follow || glide) vx = vy = 0;
     // (Kept near the world's middle so the numbers never grow, however far you walk round.)
-    camX = START.c + wrapF(camX - START.c);
-    camY = START.r + wrapF(camY - START.r);
+    camX = START.c + wrapFX(camX - START.c);
+    camY = START.r + wrapFY(camY - START.r);
     // The street town's chase camera (round 4): behind you, the way you walk (turn.ts chaseTarget), eased; a glide or a look round keeps it.
     if (STREET_TOWN) {
       if (follow && !glide) {
@@ -974,8 +980,16 @@ function startTown(
     if (!alive) return;
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
-    if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
+    if (STREET_TOWN) {
+      // (The park's step out as you come fully into it, back as you leave: zoom-steps.ts.)
+      const h = town.you.walker.here();
+      sz.where(parkSide(h.c, h.r), now);
+      zoomCur = sz.at(now);
+      if (zoomTarget !== sz.step) onZoom((zoomTarget = sz.step) > f.streetZoomStart);
+    } else {
+      zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
+      if (Math.abs(zoomTarget - zoomCur) < 0.001) zoomCur = zoomTarget;
+    }
     town.you.name = playerName();
     if (!pinned && now - skyAt > f.skyCheckMs) {
       skyAt = now;
@@ -1234,8 +1248,9 @@ function startTown(
     const h = town.you.walker.here();
     // (Through the street town's heading: up is up the screen.)
     screenStep(dc, dr, quarterOf(heading), turned);
-    const c = wrapI(h.c + turned.dc);
-    const rr = wrapI(h.r + turned.dr);
+    const c = colI(h.c + turned.dc);
+    const rr = rowI(h.r + turned.dr);
+    if (c < 0 || rr < 0) return;
     const home = plotAt[rr * N + c];
     const next: Card | null = home ? { kind: "home", i: HOMES.indexOf(home), confirm: false } : onColiseum(c, rr) ? { kind: "coliseum", i: HOMES.length, confirm: false } : null;
     const key = next ? `${next.kind}:${next.i}` : "";
@@ -1349,6 +1364,11 @@ function startTown(
 
   function setZoom(out: boolean) {
     leaveClose();
+    if (STREET_TOWN) {
+      zoomTarget = sz.press(out, performance.now());
+      onZoom(zoomTarget > f.streetZoomStart);
+      return;
+    }
     zoomTarget = out ? 1 : 0;
     onZoom(out);
   }
@@ -1377,6 +1397,8 @@ function startTown(
       ? {
           zoom: zoomCur,
           zoomTarget,
+          // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
+          parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
           focus: [camX, camY],
           statue: closeOn >= 0 ? STATUES[closeOn]!.id : null,
@@ -1473,13 +1495,13 @@ function startTown(
     if (!testSwitchesAllowed()) return;
     if (typeof id !== "string") {
       follow = false;
-      glide = { x: camX + wrapF(id[0] - camX), y: camY + wrapF(id[1] - camY) };
+      glide = { x: camX + wrapFX(id[0] - camX), y: camY + wrapFY(id[1] - camY) };
       return;
     }
     const h = HOMES.find((x) => x.id === id);
     if (!h) return;
     follow = false;
-    glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
+    glide = { x: camX + wrapFX(h.cx - camX), y: camY + wrapFY(h.cy - h.foot + 0.5 - f.glideAhead - camY) };
   };
   // ... `__townTags()`: the name tags drawn in the last frame: name, kind ("you", "bot", "sidekick"), alpha, pill and ink colors, and
   // where the pill is on the screen (Oct 28: they show only near you unless Town settings says "Everyone"; a sidekick's is blue).
@@ -1682,7 +1704,7 @@ function startTown(
       follow = false;
       // To a few squares in front of its picture's foot (a home's: half a square in front of its plot's middle).
       const y = h.cy - h.foot + 0.5 - f.glideAhead;
-      glide = { x: camX + wrapF(h.cx - camX), y: camY + wrapF(y - camY) };
+      glide = { x: camX + wrapFX(h.cx - camX), y: camY + wrapFY(y - camY) };
     },
     stop: () => {
       alive = false;

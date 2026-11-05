@@ -7,9 +7,9 @@
  */
 import { adminFirst, type ItemLook } from "@chessroyale/core";
 import { SELECT_LINES } from "../characters/boss-select.ts";
-import { N, wrapF, wrapI } from "./camera.ts";
+import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { ADMIN_TOWN, STREET_TOWN } from "./admin-town.ts";
-import { STREET_BUILDINGS, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, type SqBox } from "./street.ts";
+import { STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { SIDEKICK_SHEETS, type SidekickSheet } from "./sidekick-sheets.ts";
 
@@ -23,11 +23,13 @@ export interface Sq {
  * built it on 6 x 6: solid, you walk round it). `c0`, `r0` its first column and row. Its gate faces south, over the park
  * toward your start. (Row 28 since the park moved away from it: `WALK_ROWS`.)
  */
-export const COLISEUM = { c0: 17, r0: 28, size: 12 } as const;
+export const COLISEUM: { readonly c0: number; readonly r0: number; readonly size: number } = STREET_TOWN ? STREET_COLISEUM : { c0: 17, r0: 28, size: 12 };
+// The street town wraps east-west only (Nov 5, round 4: its plan's switch; the Colosseum at the north edge, nothing behind it).
+if (STREET_TOWN) ((WRAP.ew = STREET_WRAP.ew), (WRAP.ns = STREET_WRAP.ns));
 /** Whether (c, r) is the Colosseum's ground. */
 export const onColiseum = (c: number, r: number): boolean => {
   const i = wrapI(c) - COLISEUM.c0;
-  const j = wrapI(r) - COLISEUM.r0;
+  const j = rowI(r) - COLISEUM.r0;
   return i >= 0 && i < COLISEUM.size && j >= 0 && j < COLISEUM.size;
 };
 /**
@@ -497,7 +499,11 @@ for (const h of HOMES) for (let dr = -h.hd; dr <= h.hd; dr++) for (let dc = -h.h
  * never a lot, a garden, the grove or the Colosseum's ground.
  */
 export const walkable = (c: number, r: number): boolean => {
-  const k = wrapI(r) * N + wrapI(c);
+  const rr = rowI(r);
+  const cc = colI(c);
+  // (Off the world: past the street town's north or south edge.)
+  if (rr < 0 || cc < 0) return false;
+  const k = rr * N + cc;
   if (STREET_TOWN) return groundAt[k]! <= GRASS && !parkSolid[k];
   return plotAt[k] === null && !parkSolid[k] && !onColiseum(c, r);
 };
@@ -506,7 +512,8 @@ export const inWander = (h: Home, c: number, r: number): boolean => {
   const b = h.wander;
   if (!b) return false;
   const x = b.x0 + wrapI(c - b.x0);
-  const y = b.y0 + wrapI(r - b.y0);
+  const y = WRAP.ns ? b.y0 + wrapI(r - b.y0) : r;
+  if (y < b.y0) return false;
   return x <= b.x1 && y <= b.y1;
 };
 /**
@@ -515,9 +522,9 @@ export const inWander = (h: Home, c: number, r: number): boolean => {
  */
 export const bossGround = (h: Home, c: number, r: number): boolean => (h.wander ? inWander(h, c, r) : plotDist(h, c, r) <= TOWN_FEEL.bossRoam);
 /** Steps between two squares, the short way round. */
-export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapF(a.c - b.c)) + Math.abs(wrapF(a.r - b.r));
+export const tdist = (a: Sq, b: Sq): number => Math.abs(wrapFX(a.c - b.c)) + Math.abs(wrapFY(a.r - b.r));
 /** How far a square is from a home's plot (0 on it, 1 on the ring around it). */
-export const plotDist = (h: Home, c: number, r: number): number => Math.max(0, Math.abs(wrapF(c - h.cx)) - h.hw, Math.abs(wrapF(r - h.cy)) - h.hd);
+export const plotDist = (h: Home, c: number, r: number): number => Math.max(0, Math.abs(wrapFX(c - h.cx)) - h.hw, Math.abs(wrapFY(r - h.cy)) - h.hd);
 
 const DIRS = [
   [1, 0],
@@ -526,7 +533,10 @@ const DIRS = [
   [0, -1],
 ] as const;
 
-/** The shortest path (4 ways, wrapping) from `from` to the nearest square that `isGoal` takes, through squares `ok` takes. */
+/**
+ * The shortest path (4 ways, wrapping the ways the world wraps: the street town east-west only, never over its north or south edge) from
+ * `from` to the nearest square that `isGoal` takes, through squares `ok` takes.
+ */
 export function findPath(from: Sq, isGoal: (c: number, r: number) => boolean, ok: (c: number, r: number) => boolean): Sq[] | null {
   const start = from.r * N + from.c;
   const prev = new Int32Array(N * N).fill(-1);
@@ -542,8 +552,9 @@ export function findPath(from: Sq, isGoal: (c: number, r: number) => boolean, ok
       break;
     }
     for (const [dc, dr] of DIRS) {
-      const nc = wrapI(c + dc);
-      const nr = wrapI(r + dr);
+      const nc = colI(c + dc);
+      const nr = rowI(r + dr);
+      if (nc < 0 || nr < 0) continue;
       const nk = nr * N + nc;
       if (prev[nk] !== -1 || !ok(nc, nr)) continue;
       prev[nk] = k;
@@ -651,7 +662,7 @@ export class Walker {
     let pc = s.to.c;
     let pr = s.to.r;
     for (const q of this.queue) {
-      if (Math.sign(wrapF(q.c - pc)) !== out.dc || Math.sign(wrapF(q.r - pr)) !== out.dr) break;
+      if (Math.sign(wrapFX(q.c - pc)) !== out.dc || Math.sign(wrapFY(q.r - pr)) !== out.dr) break;
       n++;
       pc = q.c;
       pr = q.r;
@@ -697,8 +708,8 @@ export class Walker {
   }
   /** `first`: a step off from standing still. Whether it's the last is known now (a new path later doesn't change it). */
   private begin(to: Sq, t0: number, first: boolean): void {
-    const dc = wrapF(to.c - this.c);
-    const dr = wrapF(to.r - this.r);
+    const dc = wrapFX(to.c - this.c);
+    const dr = wrapFY(to.r - this.r);
     if (dc || dr) ((this.wdc = Math.sign(dc)), (this.wdr = Math.sign(dr)));
     if (dc) this.facing = dc < 0 ? -1 : 1;
     if (dc) this.view = 0;
@@ -1054,8 +1065,11 @@ export function stepsFrom(from: Sq, ok: (c: number, r: number) => boolean = walk
     const c = k % N;
     const r = (k - c) / N;
     for (const [dc, dr] of DIRS) {
-      const nk = wrapI(r + dr) * N + wrapI(c + dc);
-      if (d[nk] !== -1 || !ok(wrapI(c + dc), wrapI(r + dr))) continue;
+      const nc = colI(c + dc);
+      const nr = rowI(r + dr);
+      if (nc < 0 || nr < 0) continue;
+      const nk = nr * N + nc;
+      if (d[nk] !== -1 || !ok(nc, nr)) continue;
       d[nk] = d[k]! + 1;
       q.push(nk);
     }
@@ -1079,8 +1093,9 @@ export function spotNear(t: Town, w: Walker, at: Sq, beside: boolean): Sq | null
     for (let dr = -k; dr <= k; dr++)
       for (let dc = -k; dc <= k; dc++) {
         if (Math.max(Math.abs(dc), Math.abs(dr)) !== k) continue;
-        const c = wrapI(at.c + dc);
-        const r = wrapI(at.r + dr);
+        const c = colI(at.c + dc);
+        const r = rowI(at.r + dr);
+        if (c < 0 || r < 0) continue;
         const s = d[r * N + c]!;
         if (s < 0 || s >= bestD || !walkable(c, r) || taken(t, c, r, w)) continue;
         best = { c, r };
@@ -1219,8 +1234,9 @@ function bossesRoam(t: Town, now: number): void {
     for (let dc = -n; dc <= n; dc++)
       for (let dr = -n; dr <= n; dr++) {
         const d = Math.abs(dc) + Math.abs(dr);
-        const c = wrapI(h.c + dc);
-        const r = wrapI(h.r + dr);
+        const c = colI(h.c + dc);
+        const r = rowI(h.r + dr);
+        if (c < 0 || r < 0) continue;
         if (d >= 1 && d <= n && near(c, r) && !taken(t, c, r, w)) targets.push({ c, r });
       }
     if (!targets.length) continue;
@@ -1253,8 +1269,9 @@ function streetRoam(t: Town, b: Boss): void {
   const box = b.home.wander!;
   for (let x = Math.ceil(box.x0); x <= box.x1; x++)
     for (let y = Math.ceil(box.y0); y <= box.y1; y++) {
-      const c = wrapI(x);
-      const r = wrapI(y);
+      const c = colI(x);
+      const r = rowI(y);
+      if (c < 0 || r < 0) continue;
       if ((c !== rest.c || r !== rest.r) && walkable(c, r) && d[r * N + c]! > 0 && !taken(t, c, r, w)) targets.push({ c, r });
     }
   if (!targets.length) return;
@@ -1304,7 +1321,7 @@ function botsWander(t: Town, now: number): void {
  * persist there"): the park with its tables, the walk and the Colosseum's apron, as wide as the park, off the bosses'
  * roaming ground.
  */
-export const inSquare = (c: number, r: number): boolean => SQUARE_AREA[wrapI(r) * N + wrapI(c)] === 1;
+export const inSquare = (c: number, r: number): boolean => rowI(r) >= 0 && colI(c) >= 0 && SQUARE_AREA[rowI(r) * N + colI(c)] === 1;
 const SQUARE_AREA = new Uint8Array(N * N);
 if (!STREET_TOWN)
   for (let r = PARK.r1 - PARK.d + 1; r < COLISEUM.r0; r++)
@@ -1409,7 +1426,7 @@ function arrive(t: Town, b: Person, now: number): void {
   const to = b.trip!;
   if (b.going) {
     const door = homeDoor(b.bot!);
-    if ((c === to.c && r === to.r) || (Math.abs(wrapF(c - door.c)) <= 1 && Math.abs(wrapF(r - door.r)) <= 1)) b.leaves = now + TOWN_FEEL.botFadeMs;
+    if ((c === to.c && r === to.r) || (Math.abs(wrapFX(c - door.c)) <= 1 && Math.abs(wrapFY(r - door.r)) <= 1)) b.leaves = now + TOWN_FEEL.botFadeMs;
     else headHome(t, b, now);
     return;
   }
@@ -1495,8 +1512,9 @@ function wander(t: Town, bot: Person, sitting: boolean): void {
   for (let dc = -reach; dc <= reach; dc++)
     for (let dr = -reach; dr <= reach; dr++) {
       const d = Math.abs(dc) + Math.abs(dr);
-      const c = wrapI(h.c + dc);
-      const r = wrapI(h.r + dr);
+      const c = colI(h.c + dc);
+      const r = rowI(h.r + dr);
+      if (c < 0 || r < 0) continue;
       if (d >= lo && d <= reach && ok(c, r) && (!sitting || stoolAt(c, r)) && (sitting || d <= hi)) targets.push({ c, r });
     }
   if (!targets.length) return;

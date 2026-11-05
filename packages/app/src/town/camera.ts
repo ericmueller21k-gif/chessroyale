@@ -14,10 +14,23 @@ import { TOWN_FEEL, type CamSet } from "./feel.ts";
 /** The world is N x N squares and wraps on both axes. (Slices 1 to 5: 40; slice 6 made room for the park and the bigger Colosseum.) */
 export const N = 46;
 
+/**
+ * Which ways the world wraps. Today's town: both. The street town (Nov 5, round 4; Eric: "the Colosseum sits at the top centre, at the
+ * north edge ... nothing is behind it"): east-west only, as its plan's `wrap` switch says (world.ts sets it as the street town loads).
+ * North of row N - 1 and south of row 0 is off the world: nothing stands or walks there.
+ */
+export const WRAP = { ew: true, ns: true };
+
 /** Into [0, N). */
 export const wrapI = (v: number): number => ((v % N) + N) % N;
 /** Into [-N/2, N/2): the shortest way round. */
 export const wrapF = (v: number): number => ((((v + N / 2) % N) + N) % N) - N / 2;
+/** An east-west offset the shortest way round (when the world wraps that way), and a north-south one. */
+export const wrapFX = (v: number): number => (WRAP.ew ? wrapF(v) : v);
+export const wrapFY = (v: number): number => (WRAP.ns ? wrapF(v) : v);
+/** A column into [0, N) (wrapping east-west; -1 off the world when it doesn't), and a row (-1 off the world: north or south of it). */
+export const colI = (c: number): number => (WRAP.ew ? wrapI(c) : c >= 0 && c < N ? c : -1);
+export const rowI = (r: number): number => (WRAP.ns ? wrapI(r) : r >= 0 && r < N ? r : -1);
 export const clamp = (v: number, a: number, b: number): number => (v < a ? a : v > b ? b : v);
 
 /** A projected point: screen x, y (CSS pixels in the box), k = pixels per square there, and its depth. */
@@ -138,7 +151,7 @@ export function toCam(v: View, ex: number, ey: number, out: { dx: number; dz: nu
 }
 /** Where the world point (x, y) is from the camera's focus (camX, camY), the shortest way round the wrap, in the camera's frame. */
 export function rel(v: View, camX: number, camY: number, x: number, y: number, out: { dx: number; dz: number }): void {
-  toCam(v, wrapF(x - camX), wrapF(y - camY), out);
+  toCam(v, wrapFX(x - camX), wrapFY(y - camY), out);
 }
 /** A camera-frame offset (dx across, dz ahead) back in the world's (east, north): `out.dx` east, `out.dz` north. */
 export function fromCam(v: View, dx: number, dz: number, out: { dx: number; dz: number }): void {
@@ -154,6 +167,19 @@ const tmp = newPt();
  * Works the camera out for a box of W x H CSS pixels at a zoom (0 = normal, 1 = zoomed out), through a lens of `mag`
  * shifted `oy` down and `ox` right (the close-up; 1, 0, 0: none). Cheap when nothing changed.
  */
+/** The camera numbers at zoom step `s` (fractional between two steps: their numbers blended), into `out`. */
+export function stepCams(steps: readonly CamPair[], s: number, out: CamPair): CamPair {
+  const i = clamp(Math.floor(s), 0, steps.length - 2);
+  const t = clamp(s - i, 0, 1);
+  const a = steps[i]!;
+  const b = steps[i + 1]!;
+  for (const k of KEYS) {
+    out.tall[k] = a.tall[k] + (b.tall[k] - a.tall[k]) * t;
+    out.wide[k] = a.wide[k] + (b.wide[k] - a.wide[k]) * t;
+  }
+  return out;
+}
+
 export function setView(v: View, W: number, H: number, zoom: number, mag = 1, oy = 0, ox = 0, sets?: CamPair): void {
   if (!sets && !v.sets && v.W === W && v.H === H && v.zoom === zoom && v.mag === mag && v.oy === oy && v.ox === ox) return;
   v.sets = sets ?? null;
@@ -304,7 +330,8 @@ export function rimYAt(v: View, x: number): number | null {
 export type Quad = Float64Array;
 
 /**
- * Visits every ground square drawn this frame: (c, r) wrapped, (cu, ru) unwrapped near the camera, and its corners.
+ * Visits every ground square drawn this frame: (c, r) wrapped (-1 off the world: past the street town's north or south edge), (cu, ru)
+ * unwrapped near the camera, and its corners.
  * Far rows first (the drawing order), or near rows first (`nearFirst`, for picking: a nearer square wins). The visit
  * returns true to stop.
  */
@@ -360,7 +387,7 @@ function scanRow(v: View, camX: number, camY: number, ru: number, visit: (c: num
     nx[i] = tb.x;
     ny[i] = tb.y;
   }
-  const r = wrapI(ru);
+  const r = rowI(ru);
   for (let i = 0; i < n - 1; i++) {
     if (!ok[i] || !ok[i + 1]) continue;
     // Past the curve: the ground faces away here.
@@ -377,7 +404,7 @@ function scanRow(v: View, camX: number, camY: number, ru: number, visit: (c: num
     quad[6] = nx[i]!;
     quad[7] = ny[i]!;
     const cu = c0 + i;
-    if (visit(wrapI(cu), r, cu, ru, quad)) return true;
+    if (visit(colI(cu), r, cu, ru, quad)) return true;
   }
   return false;
 }
@@ -458,7 +485,7 @@ function turnedSquares(v: View, camX: number, camY: number, nearFirst: boolean, 
     }
     const cu = c0 + i;
     const ru = r0 + j;
-    if (visit(wrapI(cu), wrapI(ru), cu, ru, quad)) return true;
+    if (visit(colI(cu), rowI(ru), cu, ru, quad)) return true;
   }
   return false;
 }
@@ -486,6 +513,8 @@ export function pickSquare(v: View, camX: number, camY: number, x: number, y: nu
   let hit: { c: number; r: number } | null = null;
   forEachSquare(v, camX, camY, true, (c, r, _cu, _ru, q) => {
     if (!inQuad(x, y, q)) return false;
+    // (Off the world, past the street town's north or south edge: no square.)
+    if (c < 0 || r < 0) return true;
     hit = { c, r };
     return true;
   });

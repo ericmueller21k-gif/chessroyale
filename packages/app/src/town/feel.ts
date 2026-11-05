@@ -83,6 +83,41 @@ export const TOWN_FEEL = {
    */
   camStreetWide: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.4, fW: 0.6, cy: 0.4, rim: 16, rimX: 1.6 } as CamSet,
   camStreetTall: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.42, fW: 0.95, cy: 0.42, rim: 16, rimX: 1.2 } as CamSet,
+  /**
+   * The street town's zoom steps, − and + moving one a press (Nov 5, round 4; Eric: "I think this is a pretty good default"; "3 or 4 zoom
+   * steps"), phone and computer each: fully in (low and close, about head height, the horizon a little below the middle, the ground the
+   * lower 40%: the run-through frames), the default (camStreetTall / Wide: the mockup's), out (a step further back and higher: the
+   * mockup's zoomed-out view) and an overview (high, for finding your way: today's town's camera). Between two steps the camera blends
+   * their numbers. Every figure stays on screen at each.
+   */
+  streetZoomSteps: [
+    {
+      tall: { h: 1.5, th: 3, back: 2.6, R: 30, kx: 0.42, fW: 1.0, cy: 0.55, rim: 16, rimX: 1.2 },
+      wide: { h: 1.5, th: 3, back: 3.0, R: 30, kx: 0.4, fW: 0.42, cy: 0.55, rim: 16, rimX: 1.6 },
+    },
+    {
+      tall: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.42, fW: 0.95, cy: 0.42, rim: 16, rimX: 1.2 },
+      wide: { h: 3.2, th: 18, back: 3.0, R: 30, kx: 0.4, fW: 0.6, cy: 0.4, rim: 16, rimX: 1.6 },
+    },
+    {
+      tall: { h: 5.6, th: 24, back: 4.35, R: 30, kx: 0.42, fW: 0.95, cy: 0.42, rim: 20, rimX: 1.2 },
+      wide: { h: 5.6, th: 24, back: 4.35, R: 30, kx: 0.4, fW: 0.6, cy: 0.4, rim: 20, rimX: 1.6 },
+    },
+    {
+      tall: { h: 9.3, th: 42, back: 5.7, R: 30, kx: 0.42, fW: 1.31, cy: 0.36, rim: 12.5, rimX: 1.16 },
+      wide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 },
+    },
+  ] as readonly { tall: CamSet; wide: CamSet }[],
+  /** The step the street town opens at (the default, 1) and how long a press of − or + glides (ms). */
+  streetZoomStart: 1,
+  streetZoomMs: 350,
+  /**
+   * The park zooms out a step (Nov 5, round 4; Eric, a trial he may revert: "make it zoom out one level when you hit the area that's the
+   * … center town square … if it's like a nice transition"): coming into the park (the plus with the chess tables) eases the camera
+   * one step out over `parkZoomMs`; leaving eases back to the step you had. A press of − or + in the park wins. Off: false.
+   */
+  parkZoomOut: true,
+  parkZoomMs: 600,
   /** The box shapes (width / height) where the blend is all phone and all computer. */
   aspectTall: 0.6,
   aspectWide: 1.4,
@@ -96,12 +131,25 @@ export const TOWN_FEEL = {
    * squares nearer still. The low things there (hedges, beds, bushes) are drawn.
    */
   streetNearCut: 0.9,
+  /**
+   * Draw only what the rows let you see (Nov 5, round 4; seen.ts): at the in and default zoom steps, the ground, the props and the
+   * buildings no straight line from your square (or the camera's) reaches past the lots are left out; the skyline's towers always show.
+   */
+  streetCull: true,
   streetTreeFade: 1.5,
   /**
-   * The street town's turning camera (Nov 5, round 3): it faces north everywhere but Seam Avenue, where it faces east, and turns in
-   * the avenue's four crossings (turn.ts), easing over this many ms a quarter turn (a feel number: about a run across a crossing).
+   * The street town's chase camera's turn (Nov 5; round 4 aims it, turn.ts chaseTarget): a quarter turn eases over this many ms, the
+   * camera following you closely otherwise (Eric: "a short smoothing on a street-corner turn is fine (about 0.4 to 0.6 s), with no lag
+   * otherwise"; the mockup's 400).
    */
-  streetTurnMs: 400,
+  streetTurnMs: 500,
+  /**
+   * The street town's buildings drawn this much bigger than their pictures' 37 px a square (the homes and the rows' fronts together;
+   * hedges, sheds, lamps, trees and figures don't grow). 1: as drawn. (Nov 5, round 4: tried at 1.3 after the run-through frames; Eric:
+   * "don't scale the whole town up", so it stays 1 and the low fronts step up instead, rows.ts.) A home too wide for its row's end
+   * slides inward along it, whatever the scale; 1.3 is the most the rows hold.
+   */
+  streetBuildScale: 1,
   /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
   streetTurnClouds: 1.3,
   /**

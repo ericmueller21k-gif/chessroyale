@@ -340,9 +340,16 @@ export interface TownBox {
   right: SideArt | null;
   /** A wall standing at its back (seen over a low or open box: a crib's, a paddock's), as wide as the body. */
   back?: SideArt;
+  /**
+   * Its back wall seen from behind (round 4: the chase camera faces any way, so a row's backs and a tower's show from the gardens and the
+   * park), as wide as the body. Used when it has no `back`. Turned away (from the street) it isn't drawn, so it costs nothing there.
+   */
+  rear?: SideArt;
   /** Its roof faces, and the palette their tiles are painted in. */
   roof: readonly Face[];
   roofPal: Readonly<Record<string, string>>;
   /** Its width at the back as a share of the front's (1: a straight box). */
   taper: number;
+  /** Its picture's pixels a world square (37, the town's, unless drawn bigger: the street town's buildings, TOWN_FEEL.streetBuildScale). */
+  px?: number;
 }

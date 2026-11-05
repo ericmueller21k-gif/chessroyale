@@ -1,27 +1,9 @@
 /**
- * The street town's turning camera (Nov 5, round 3; the art's plan, town-plan-nov5.md "Streets and the camera"): it faces north
- * everywhere except on Seam Avenue, where it faces east, so it always looks at the fronts; on the avenue's four crossings (the turn
- * zones) it faces north, so it turns as you walk out of a crossing along the avenue or into one. The heading eases over about half a
- * second a quarter turn (`TOWN_FEEL.streetTurnMs`), about you (the camera keeps following you). The arrow keys
- * go through it: up is always up the screen. Pure: no DOM, nothing allocated on a frame.
+ * The street town's camera's turn (Nov 5; round 3 made it, round 4's chase camera aims it): the heading eases over
+ * `TOWN_FEEL.streetTurnMs` a quarter turn, about you (the camera keeps following you). The arrow keys go through it. Pure: no DOM,
+ * nothing allocated on a frame.
  */
-import PLAN from "./street-plan.json" with { type: "json" };
-import { N, wrapI } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
-
-const AVE = PLAN.streets.find((s) => s.cam !== 0)!;
-/** Seam Avenue's squares across (its board and a sidewalk either side: c 43..2), and the rows of its four crossings (the turn zones). */
-const onAve = new Uint8Array(N);
-for (let c = AVE.c0 - 1; c <= AVE.c1 + 1; c++) onAve[wrapI(c)] = 1;
-const inZone = new Uint8Array(N);
-for (const z of PLAN.turnZones) for (let r = z.rows[0]!; r <= z.rows[1]!; r++) inZone[wrapI(r)] = 1;
-
-/** Where the camera faces on square (c, r): east (90) on Seam Avenue outside its crossings, north (0) everywhere else. */
-export function camAt(c: number, r: number): 0 | 90 {
-  const cc = wrapI(Math.round(c));
-  const rr = wrapI(Math.round(r));
-  return onAve[cc] && !inZone[rr] ? (AVE.cam as 90) : 0;
-}
 
 /** Smooth in and out over 0..1. */
 const ease = (t: number): number => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -61,9 +43,6 @@ export class Turn {
     this.ms = 0;
   }
 }
-
-/** The Colosseum's far drawing (seen past the world's rim) shows only while the camera faces within 45 degrees of north (the art's). */
-export const farColosseumShows = (heading: number): boolean => Math.abs(((((heading + 180) % 360) + 360) % 360) - 180) <= 45;
 
 /** The quarter turn a heading is nearest (0 north, 1 east, 2 south, 3 west): the arrow keys' frame. */
 export const quarterOf = (heading: number): number => ((Math.round(heading / 90) % 4) + 4) % 4;

@@ -9,10 +9,10 @@
  * square's middle at whole numbers.
  */
 import PLAN from "./street-plan.json" with { type: "json" };
-import { N } from "./camera.ts";
+import { N, WRAP } from "./camera.ts";
 import type { Design } from "./buildings.ts";
 import type { LookSpec } from "./lookalike.ts";
-import { layRow, ROW_DEPTH, ROW_INSET, ROW_SIDES, type Facing, type RowHome } from "./rows.ts";
+import { layRow, ROW_PX, ROW_SIDES, type Facing, type RowHome, type RowSide } from "./rows.ts";
 import type { HomeId } from "./home-boxes.ts";
 
 /** A square's ground in the plan: the streets (the board), paving (sidewalks, the park's walks, the apron), the park's lawns, gardens (and the grove), a lot under a building, the Colosseum. */
@@ -60,13 +60,17 @@ export interface StreetLot {
   /** A row's look-alike front (round 4, rows.ts): its recipe, and its front line's middle (world), exact to the pixel. */
   look?: LookSpec;
   at?: { x: number; y: number };
+  /** A home slid along its row to fit (squares east): its lot, door and wander box stay; its picture moves (rows.ts layRow). */
+  shift?: number;
 }
 
+/** Where along a row side square coordinate `a` is: itself, or once round (a row running over the east-west wrap: a1 past N), or null. */
+const alongIn = (s: RowSide, a: number): number | null => (a > s.a0 && a < s.a1 ? a : a + N > s.a0 && a + N < s.a1 ? a + N : null);
 /** Is square (c, r) inside a row side's lots? */
 const inRow = (c: number, r: number) =>
   ROW_SIDES.find((s) => {
     const [a, d] = s.facing === "S" || s.facing === "N" ? [c, r] : [r, c];
-    return a > s.a0 && a < s.a1 && d >= Math.min(s.d0, s.d1) && d <= Math.max(s.d0, s.d1);
+    return alongIn(s, a) !== null && d >= Math.min(s.d0, s.d1) && d <= Math.max(s.d0, s.d1);
   }) ?? null;
 /**
  * The rows (round 4, rows.ts) over the plan: on each row side, the plan's everyday buildings go (its homes stay, anchoring the row) and
@@ -78,25 +82,40 @@ function withRows(lots: StreetLot[]): StreetLot[] {
       for (let dr = 0; dr < (l.facing === "S" || l.facing === "N" ? l.d : l.w); dr++) if (inRow(l.c0 + dc, l.r0 + dr)) return true;
     return false;
   };
-  const out = lots.filter((l) => l.kind !== "house" || !covered(l));
+  // (A row replaces the everyday buildings it covers; a bigger one behind the rows that a row now covers goes too: Seam Avenue's.)
+  const out = lots.filter((l) => l.kind === "home" || !covered(l)).map((l) => ({ ...l }));
   for (const side of ROW_SIDES) {
     const across = side.facing === "S" || side.facing === "N";
     const homes: RowHome[] = out
       .filter((l) => l.kind === "home" && l.facing === side.facing && inRow(l.c0, l.r0) === side)
-      .map((l) => ({ id: (l.id === "blitz" ? "blitz" : l.id) as HomeId, a: across ? l.c0 : l.r0, w: l.w }));
+      .map((l) => ({ id: l.id as HomeId, a: alongIn(side, across ? l.c0 : l.r0)!, w: l.w }));
     for (const p of layRow(side, homes)) {
-      if (p.kind !== "look") continue;
-      const mid = (p.s0 + p.s1) / 2;
-      const line = side.facing === "S" || side.facing === "W" ? side.d0 - 0.5 + ROW_INSET : side.d0 + 0.5 - ROW_INSET;
-      const a0 = Math.floor(p.s0 + 0.5);
+      if (p.kind === "home") {
+        const lot = out.find((l) => l.kind === "home" && l.id === p.home)!;
+        if (p.shift) lot.shift = p.shift;
+        continue;
+      }
+      // (Its middle in the world: a row over the wrap brought back into [0, N).)
+      const mid = (((p.s0 + p.s1) / 2) % N + N) % N;
+      const line = side.facing === "S" || side.facing === "W" ? side.d0 - 0.5 + side.inset : side.d0 + 0.5 - side.inset;
+      const a0 = Math.floor(mid - (p.s1 - p.s0) / 2 + 0.5);
       const w = Math.max(1, Math.round(p.s1 - p.s0));
       const d0 = Math.min(side.d0, side.d1);
       out.push({
         kind: "house", id: "look", v: 0, c0: across ? a0 : d0, r0: across ? d0 : a0, w, d: 3, facing: side.facing, street: side.street,
-        name: "Look-alike front", inset: ROW_INSET, depth: ROW_DEPTH, look: p.look, at: across ? { x: mid, y: line } : { x: line, y: mid },
+        name: "Look-alike front", inset: side.inset, depth: p.look!.depth, look: p.look, at: across ? { x: mid, y: line } : { x: line, y: mid },
       });
     }
   }
+  // The skyline (round 4): the bigger buildings behind the rows, towers of look-alike parts taller than any row (6 to 9 floors), windows
+  // on every side; their sky shows over them. Each keeps its lot.
+  out.forEach((l, i) => {
+    if (l.kind !== "tall") return;
+    const tower = l.id === "tower";
+    const seed = 7001 + i * 97;
+    l.look = { seed, w: Math.round(l.w * ROW_PX), tall: 2, floors: (tower ? 8 : 6) + (seed % 3), corner: null, depth: l.depth, px: ROW_PX, free: true, flat: false };
+    l.at = { x: l.c0 + l.w / 2 - 0.5, y: l.r0 - 0.5 + l.inset };
+  });
   return out;
 }
 export const STREET_LOTS: readonly StreetLot[] = withRows(PLAN.lots as StreetLot[]);
@@ -131,6 +150,11 @@ export const STREET_FOUNTAIN: readonly { c: number; r: number }[] = PLAN.park.fo
 /** Where you start: on the promenade just south of the fountain, facing north up it. */
 export const STREET_START = { c: PLAN.start.c, r: PLAN.start.r } as const;
 
+/** Which ways the town wraps (round 4, Eric's call): east-west (one switch, Eric may close it later) and north-south (no). */
+export const STREET_WRAP: { readonly ew: boolean; readonly ns: boolean } = PLAN.wrap;
+/** The Colosseum: its first column and row, its size (at the north edge, its top row the world's last). */
+export const STREET_COLISEUM = { c0: PLAN.coliseum.c0, r0: PLAN.coliseum.r0, size: PLAN.coliseum.size } as const;
+
 /** The streets, with the way the camera faces on each (degrees from north: Seam Avenue faces east, round 3's turn). */
 export const STREET_STREETS: readonly { id: string; name: string; axis: string; c0: number; c1: number; r0: number; r1: number; cam: number }[] = PLAN.streets;
 
@@ -157,8 +181,8 @@ export function colosseumSeen(x: number, y: number): boolean {
   for (const t of colTargets) {
     let dx = t.x - c0;
     let dy = t.y - r0;
-    dx -= N * Math.round(dx / N);
-    dy -= N * Math.round(dy / N);
+    if (WRAP.ew) dx -= N * Math.round(dx / N);
+    if (WRAP.ns) dy -= N * Math.round(dy / N);
     const n = Math.ceil(Math.hypot(dx, dy) * 4);
     let open = true;
     for (let k = 1; k < n; k++) {

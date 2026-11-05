@@ -12,7 +12,7 @@
  * Squares (c, r) and positions (x, y) as world.ts: x east, y north, a square's middle at whole numbers. A box's own space (the art's):
  * `u` a column of its front picture (px), `t` 0 at the front line to 1 at the back, `h` px up; 37 px a square.
  */
-import { N, proj, toCam, wrapF, type Pt, type View } from "./camera.ts";
+import { N, proj, toCam, wrapF, wrapFX, wrapFY, type Pt, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { building } from "./buildings.ts";
 import { HEDGE, hedgeFront, hedgeTop, shed } from "./dressing.ts";
@@ -65,19 +65,39 @@ export interface BoxInst {
  * Where a picture `w` px wide stands, centred on (cx, cy) along its front line facing `facing`: its left edge, the way along it (left to
  * right as you face it) and the way back.
  */
-function place(facing: Facing, cx: number, cy: number, w: number) {
-  const h = w / SQ / 2;
+function place(facing: Facing, cx: number, cy: number, w: number, px: number) {
+  const h = w / px / 2;
   if (facing === "S") return { ox: cx - h, oy: cy, ux: 1, uy: 0, bx: 0, by: 1 };
   if (facing === "N") return { ox: cx + h, oy: cy, ux: -1, uy: 0, bx: 0, by: -1 };
   if (facing === "W") return { ox: cx, oy: cy + h, ux: 0, uy: -1, bx: 1, by: 0 };
   return { ox: cx, oy: cy - h, ux: 0, uy: 1, bx: -1, by: 0 };
 }
 
-/** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4). */
-export function lotArt(l: StreetLot): TownBox {
-  if (l.kind === "home") return homeBox(l.id as ArtHomeId);
-  if (l.look) return lookalike(l.look);
-  return building(l.id as never, l.w, l.v);
+/** A box art's picture pixels a world square. */
+export const pxOf = (box: TownBox): number => box.px ?? SQ;
+/** The street town's buildings' pixels a square (drawn TOWN_FEEL.streetBuildScale bigger than the art's 37). */
+export const BUILD_PX = SQ / TOWN_FEEL.streetBuildScale;
+/** An art drawn bigger (its own copy, so the art's caches stay the art's). */
+const bigger = new WeakMap<TownBox, TownBox>();
+function big(box: TownBox): TownBox {
+  if (box.px === BUILD_PX) return box;
+  let b = bigger.get(box);
+  if (!b) bigger.set(box, (b = { ...box, px: BUILD_PX }));
+  return b;
+}
+/** A home's back seen from behind (round 4): its own side wall's picture across its body (a home with a `back` keeps that). */
+const rears = new WeakMap<TownBox, TownBox>();
+function withRear(box: TownBox): TownBox {
+  if (box.back || box.rear || !(box.left ?? box.right)) return box;
+  let b = rears.get(box);
+  if (!b) rears.set(box, (b = { ...box, rear: box.left ?? box.right! }));
+  return b;
+}
+/** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4), drawn the street town's bigger size. */
+export function lotArt(l: StreetLot, low = false): TownBox {
+  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)));
+  if (l.look) return big(lookalike(l.look));
+  return big(building(l.id as never, l.w, l.v));
 }
 
 /** Pictures side by side, in one picture (a run of hedge's squares): each one's parts, moved along. */
@@ -127,15 +147,15 @@ const gameHome = (id: string): HomeId => (id === "blitz" ? "dash" : id) as HomeI
 export function streetBoxes(props: readonly { kind: string; x: number; y: number; v: number }[]): BoxInst[] {
   const out: BoxInst[] = [];
   const add = (kind: BoxKind, box: TownBox, low: TownBox, facing: Facing, cx: number, cy: number, extra: Partial<BoxInst>) => {
-    const p = place(facing, cx, cy, box.front.w);
+    const p = place(facing, cx, cy, box.front.w, pxOf(box));
     out.push({ i: out.length, kind, box, low, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, props: [], ...extra });
   };
   STREET_LOTS.forEach((l, lot) => {
     const box = lotArt(l);
-    const low = l.kind === "home" ? homeBox(l.id as ArtHomeId, true) : box;
+    const low = l.kind === "home" ? lotArt(l, true) : box;
     // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.)
     if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
-    else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5, l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
+    else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
     else add(l.kind, box, low, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
   });
   props.forEach((pr, prop) => {
@@ -172,8 +192,8 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
   }
   for (const b of out) {
     // (W-facing: the front's middle is the line's middle too.)
-    b.fx = b.ox + (b.ux * b.box.front.w) / SQ / 2;
-    b.fy = b.oy + (b.uy * b.box.front.w) / SQ / 2;
+    b.fx = b.ox + (b.ux * b.box.front.w) / pxOf(b.box) / 2;
+    b.fy = b.oy + (b.uy * b.box.front.w) / pxOf(b.box) / 2;
   }
   coverSides(out);
   return out;
@@ -183,9 +203,10 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
 export function boxPoint(b: BoxInst, box: TownBox, u: number, t: number, out: { x: number; y: number }): void {
   const cxp = (box.body.x0 + box.body.x1) / 2;
   const lx = cxp + (u - cxp) * (1 - t * (1 - box.taper));
-  const ly = t * box.depth * SQ;
-  out.x = b.ox + (b.ux * lx + b.bx * ly) / SQ;
-  out.y = b.oy + (b.uy * lx + b.by * ly) / SQ;
+  const px = pxOf(box);
+  const ly = t * box.depth * px;
+  out.x = b.ox + (b.ux * lx + b.bx * ly) / px;
+  out.y = b.oy + (b.uy * lx + b.by * ly) / px;
 }
 
 /** A side's eave (px): its picture's height less the ink row. */
@@ -275,7 +296,7 @@ export function geomOf(box: TownBox): BoxGeom {
   let g = geoms.get(box);
   if (g) return g;
   const cxp = (box.body.x0 + box.body.x1) / 2;
-  const D = box.depth * SQ;
+  const D = box.depth * pxOf(box);
   let top = 0;
   const faces = box.roof.map((f: Face): FaceGeom => {
     const n = f.pts.length;
@@ -490,6 +511,10 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   if (!proj(v, ax2, az2, 0, pa) || !proj(v, bx, bz, 0, pb)) return;
   // Seen from the front only: its picture runs left to right on screen.
   if (pb.x - pa.x < 0.5) return;
+  // (A bigger box's picture: its k scaled, so a picture pixel is k / 37 screen pixels wherever a wall is drawn.)
+  const kk = SQ / pxOf(BX);
+  pa.k *= kk;
+  pb.k *= kk;
   const h0 = (ch.h * pa.k) / SQ;
   const h1 = (ch.h * pb.k) / SQ;
   if (pa.x > v.W + 2 || pb.x < -2 || Math.min(pa.y - h0, pb.y - h1) > v.H || Math.max(pa.y, pb.y) < 0) return;
@@ -529,8 +554,8 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   FINE = fine;
   CUT = cut;
   // Every point from the camera, the nearest way round the wrap from the box's front line's middle.
-  offX = wrapF(b.fx - camX) - b.fx;
-  offY = wrapF(b.fy - camY) - b.fy;
+  offX = wrapFX(b.fx - camX) - b.fx;
+  offY = wrapFY(b.fy - camY) - b.fy;
   p.on = false;
   p.draws = 0;
   p.minX = p.minY = Infinity;
@@ -544,7 +569,8 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   planWall(p.front, B.front, 0, 0, B.front.w, 0, 0, -1, 0);
   planWall(p.left, b.hideL ? null : (B.left?.ch ?? null), x0, 1, x0, 0, -1, 0, 0);
   planWall(p.right, b.hideR ? null : (B.right?.ch ?? null), x1, 0, x1, 1, 1, 0, 0);
-  planWall(p.back, B.back?.ch ?? null, x0, 1, x1, 1, 0, -1, 0.18);
+  if (B.back) planWall(p.back, B.back.ch, x0, 1, x1, 1, 0, -1, 0.18);
+  else planWall(p.back, B.rear?.ch ?? null, x1, 1, x0, 1, 0, 1, 0.1);
   // The roof's place in the order: its middle, a hair nearer than the sides' (drawn over them).
   boxPoint(b, box, (x0 + x1) / 2, 0.5, wp);
   atCam(wp.x, wp.y);
@@ -563,7 +589,8 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
     const ncz = nw.x * v.hs + nw.y * v.hc;
     boxPoint(b, box, fg.u[0]!, fg.t[0]!, wp);
     atCam(wp.x, wp.y);
-    if (-cq.dx * ncx + (-v.back - cq.dz) * ncz + (v.h - fg.h[0]! / SQ) * fg.nz <= 0) continue;
+    const bpx = pxOf(box);
+    if (-cq.dx * ncx + (-v.back - cq.dz) * ncz + (v.h - fg.h[0]! / bpx) * fg.nz <= 0) continue;
     // Its corners on screen (a point h px up drawn h k / 37 over its foot), its nearest depth.
     let ok = true;
     let x0s = Infinity;
@@ -580,7 +607,7 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
       }
       if (cq.dz < dzMin) dzMin = cq.dz;
       const x = pa.x;
-      const y = pa.y - (fg.h[k]! * pa.k) / SQ;
+      const y = pa.y - (fg.h[k]! * pa.k) / bpx;
       fp.x[k] = x;
       fp.y[k] = y;
       if (x < x0s) x0s = x;

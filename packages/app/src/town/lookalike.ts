@@ -29,6 +29,14 @@ export interface LookSpec {
   corner?: "L" | "R" | null;
   /** How deep the box runs back (squares). */
   depth: number;
+  /** A flat front (away from a corner): its roof flat at the eave, its cap a false front over it. */
+  flat?: boolean;
+  /** Its picture's pixels a world square (the street town's buildings are drawn bigger: boxes.ts BUILD_PX). */
+  px?: number;
+  /** Floors, in place of its height class's (a skyline tower behind the rows: more). */
+  floors?: number;
+  /** Free-standing (a skyline tower): windows on both sides, not party walls. */
+  free?: boolean;
 }
 
 // ---- The colours (dark, mid, light): warm cartoon walls, roofs, doors and awnings.
@@ -98,7 +106,7 @@ export function lookalike(spec: LookSpec): TownBox {
 }
 export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts } {
   const W = Math.max(12, Math.round(spec.w));
-  const key = `look-${spec.seed}-${W}-${spec.tall}-${spec.corner ?? ""}-${spec.depth}`;
+  const key = `look-${spec.seed}-${W}-${spec.tall}-${spec.corner ?? ""}-${spec.depth}${spec.flat ? "-f" : ""}-${spec.px ?? ""}-${spec.floors ?? ""}${spec.free ? "-x" : ""}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const r = rand(spec.seed * 2654435761 + W);
@@ -115,7 +123,7 @@ export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts 
     extra: r() < 0.3 ? { g: WALLS[wallI]![2], G: WALLS[wallI]![1] } : undefined,
   };
   const pal = paletteOf(cw);
-  const floors = FLOORS[spec.tall] + (spec.tall < 3 && W >= 90 && r() < 0.25 ? 1 : 0);
+  const floors = spec.floors ?? FLOORS[spec.tall] + (spec.tall < 3 && W >= 90 && r() < 0.25 ? 1 : 0);
   // A narrow front (under a square and a half) keeps to a slim cap; a landmark takes the tallest.
   let cap: Cap = pick(r, CAPS);
   if (W < 50 && (cap === "crenel" || cap === "mansard")) cap = "gable";
@@ -227,14 +235,17 @@ export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts 
   const front = character(key, W, H, pal, P);
 
   // The box: its sides (plain party walls, or at a corner a second front), its roof.
-  const D = Math.round(spec.depth * SQ);
+  const D = Math.round(spec.depth * (spec.px ?? SQ));
   const rows = Array.from({ length: floors - 1 }, (_, f) => ({ y: eave - GROUND - 3 - (f + 1) * FLOOR + Math.round((FLOOR - wh) / 2) + 1, h: wh }));
   const cornerSpec = { mat, rows: [...rows, { y: eave - GROUND + 8, h: 16 }], every: 30, trim: [eave - GROUND - 3] };
   const plain = { mat, rows: [], trim: [eave - GROUND - 3] };
-  const left = sideArt(`${key}-L`, pal, spec.corner === "L" ? cornerSpec : plain, D, eave, true);
-  const right = sideArt(`${key}-R`, pal, spec.corner === "R" ? cornerSpec : plain, D, eave, false);
+  const left = sideArt(`${key}-L`, pal, spec.corner === "L" || spec.free ? cornerSpec : plain, D, eave, true);
+  const right = sideArt(`${key}-R`, pal, spec.corner === "R" || spec.free ? cornerSpec : plain, D, eave, false);
+  // Its back (seen from behind: from the gardens, the park, the street behind a deep block): windows, no door.
+  const rear = sideArt(`${key}-B`, pal, { mat, rows, every: 30, trim: [eave - GROUND - 3] }, W, eave, false);
   let roof: Face[];
-  if (cap === "gable") roof = gableRoof(0, W, eave - 1, W / 2, eave + capH - 2, pick(r, ["shingle", "clay", "slate"] as const), 0, 1);
+  if (spec.flat) roof = flatRoof(0, W, eave + (cap === "crenel" ? 4 : 1));
+  else if (cap === "gable") roof = gableRoof(0, W, eave - 1, W / 2, eave + capH - 2, pick(r, ["shingle", "clay", "slate"] as const), 0, 1);
   else if (cap === "round") roof = vaultRoof(0, W, eave, eave + capH - 1, "slate", 5);
   else if (cap === "steps") roof = gableRoof(0, W, eave, W / 2, eave + capH - 2, "clay", 0, 1);
   else if (cap === "mansard") roof = [
@@ -244,7 +255,7 @@ export function lookalikeWith(spec: LookSpec): { box: TownBox; parts: LookParts 
   ];
   else roof = flatRoof(0, W, eave + (cap === "crenel" ? 4 : 1));
   const tb: TownBox = {
-    id: key, front, lights: L, lot: { w: W / SQ, d: 3 }, inset: 0, depth: spec.depth, body: { x0: 0, x1: W }, left, right, roof, roofPal: pal, taper: 1,
+    id: key, front, lights: L, lot: { w: W / SQ, d: 3 }, inset: 0, depth: spec.depth, body: { x0: 0, x1: W }, left, right, roof, roofPal: pal, taper: 1, px: spec.px, rear,
   };
   const out = { box: tb, parts: { wall: wallI, mat, cap, floors, shop, eave } };
   cache.set(key, out);
