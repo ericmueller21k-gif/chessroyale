@@ -18,7 +18,9 @@
  *   triangle drawn turned over is).
  * - **Drawing:** project each point (a mild perspective, focal length `F`), sort the triangles far to near, and draw each
  *   one as the screen's image mapped on it (an affine map from its three corners), then its shade over it (black at
- *   1 - shade, or a warm white over 1). The mockup does it on a 2D canvas (intro-folio-view.ts, `crumple`).
+ *   1 - shade, or a warm white over 1). The mockup does it on a 2D canvas (intro-folio-view.ts, `crumple`), each triangle
+ *   grown 1.2 px so its neighbours leave no seam, and a flat frame drawn as the plain image. In the game a WebGL quad mesh
+ *   (or a canvas with the same overlap) has no seams at all.
  * - **The open:** the same, `p` running back from 1 to 0, the image now the match screen (cross-faded while it's a ball).
  *   The creases' shade lingers a little after the sheet is flat and fades out (`creaseLinger`), so it reads as paper
  *   smoothed out, not a cut.
@@ -39,7 +41,7 @@ export interface CrumpleOpts {
   /** The ball's turn (radians, about the up axis) during the hold. */
   turn: number;
 }
-export const CRUMPLE_DEFAULTS: CrumpleOpts = { cols: 16, rows: 34, ball: 0.17, creases: 0.24, wrinkle: 38, F: 900, seed: 3, turn: 0 };
+export const CRUMPLE_DEFAULTS: CrumpleOpts = { cols: 16, rows: 34, ball: 0.17, creases: 0.28, wrinkle: 56, F: 900, seed: 3, turn: 0 };
 /** The beats (ms), a starting point tuned for a phone: crumple, hold, open (and how long the creases' shade lingers after). */
 export const CRUMPLE_TIMING = { crumple: 800, hold: 400, open: 800, creaseLinger: 260 } as const;
 
@@ -94,9 +96,13 @@ export function crumplePoint(x: number, y: number, p: number, W: number, H: numb
     const s = Math.sin(o.turn);
     [bx, bz] = [bx * c + bz * s, -bx * s + bz * c];
   }
-  // The halfway wrinkle (buckling before it balls), from a second field.
-  const wz = o.wrinkle * Math.sin(Math.PI * pv) * creaseField(y * 1.3 + 50, x * 1.3 - 20, o.seed + 7) * 2;
-  return [x + (bx - x) * pv, y + (by - y) * pv, bz * pv + wz];
+  // The halfway wrinkle (buckling before it balls), from a second field: mostly in depth, some sideways, so the sheet's
+  // outline breaks up as it goes (a sheet being crushed, not a pillow shrinking).
+  const mid = Math.sin(Math.PI * pv);
+  const wz = o.wrinkle * mid * creaseField(y * 1.3 + 50, x * 1.3 - 20, o.seed + 7) * 2;
+  const jx = o.wrinkle * 0.6 * mid * creaseField(x * 0.9 + 13, y * 0.9, o.seed + 3) * 2;
+  const jy = o.wrinkle * 0.6 * mid * creaseField(y * 0.9 - 31, x * 0.9 + 7, o.seed + 5) * 2;
+  return [x + (bx - x) * pv + jx, y + (by - y) * pv + jy, bz * pv + wz];
 }
 
 /** The light (top left, in front; y is down the screen, z toward us). */

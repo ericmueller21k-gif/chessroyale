@@ -170,7 +170,7 @@ function lights(t: number): { pools: Pool[]; halos: Halo[] } {
 
 // ---- The figures.
 type Fig = { ch: Character; anim: string; ms: number; at: readonly [number, number]; flip?: boolean; boss?: boolean; lift?: number; label?: string };
-const KID_AT: [number, number] = [9.5, 2.3];
+const KID_AT: [number, number] = [9.5, 2.4];
 function kidUp(t: number): Up {
   const p = P(KID_AT[0], KID_AT[1])!;
   const { i } = frameAt(TURTLE, "idle", t);
@@ -315,6 +315,8 @@ if (process.env.CHECK) {
 const times: number[] =
   mode === "room" ? [Number(rest[4] ?? 0)] : mode === "crumple" ? [] : rest[1] ? rest[1].split(",").map(Number) : Array.from({ length: Math.ceil(END / (1000 / 15)) }, (_, i) => Math.round((i * 1000) / 15));
 const plans = times.map(planAt);
+/** The intro's last still before the crumple (made now, so its pictures go to the page with the rest). */
+const STILL_PLAN = mode === "room" ? null : planAt(TL.crumple);
 
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROMIUM ?? "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: W, height: H + HEAD }, deviceScaleFactor: 1 });
@@ -346,7 +348,11 @@ await page.evaluate(
       gg.save();
       gg.beginPath();
       const cx = (x0! + x1! + x2!) / 3, cy = (y0! + y1! + y2!) / 3;
-      const pd = (x: number, y: number) => [x + Math.sign(x - cx) * pad, y + Math.sign(y - cy) * pad] as const;
+      // Grown away from its middle (not by the signs of x and y: that leaves a right triangle's long edge where it was).
+      const pd = (x: number, y: number) => {
+        const l = Math.hypot(x - cx, y - cy) || 1;
+        return [x + ((x - cx) / l) * pad * 2, y + ((y - cy) / l) * pad * 2] as const;
+      };
       gg.moveTo(...pd(x0!, y0!));
       gg.lineTo(...pd(x1!, y1!));
       gg.lineTo(...pd(x2!, y2!));
@@ -557,44 +563,74 @@ await page.evaluate(
       q.fillText("(stand-in match screen, mockup only)", W / 2, H + HEAD - 14);
     };
     // The crumple: the still (or the match screen) on the mesh's triangles, shaded; the paper's back where it's turned over.
-    w.drawCrumple = (tris: any[], mix: number, still: string) => {
+    w.drawCrumple = (tris: any[], mix: number, still: string, flat: boolean) => {
       const sc = document.getElementById(still) as HTMLCanvasElement;
       const mc = document.getElementById("match") as HTMLCanvasElement;
       g.setTransform(1, 0, 0, 1, 0, 0);
+      if (flat) {
+        // A flat frame (before it starts, once it's open and smoothed): the plain image, no mesh.
+        g.globalAlpha = 1;
+        g.drawImage(mix > 0 ? mc : sc, 0, 0);
+        return;
+      }
       g.globalAlpha = 1;
       g.globalCompositeOperation = "source-over";
       g.fillStyle = "#000";
       g.fillRect(0, 0, W, H + HEAD);
+      // The shade goes to buffers of its own, each triangle opaque (grown a hair, painted far to near, so a nearer one simply
+      // covers), then onto the picture once: multiplied (shade under 1) and screened (a warm sheen over 1). Drawn straight on
+      // the picture, neighbours' soft edges would leave a faint lattice.
+      const mk = (fillc: string) => {
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H + HEAD;
+        const x = c.getContext("2d")!;
+        x.fillStyle = fillc;
+        x.fillRect(0, 0, W, H + HEAD);
+        return [c, x] as const;
+      };
+      const [shC, sh] = mk("#fff");
+      const [hlC, hl] = mk("#000");
       for (const t of tris) {
         const d = t.s;
-        g.save();
-        g.beginPath();
         const cx = (d[0][0] + d[1][0] + d[2][0]) / 3, cy = (d[0][1] + d[1][1] + d[2][1]) / 3;
-        const pd = (x: number, y: number) => [x + Math.sign(x - cx) * 0.7, y + Math.sign(y - cy) * 0.7] as [number, number];
-        g.moveTo(...pd(d[0][0], d[0][1]));
-        g.lineTo(...pd(d[1][0], d[1][1]));
-        g.lineTo(...pd(d[2][0], d[2][1]));
-        g.closePath();
+        const pd = (x: number, y: number) => {
+          const l = Math.hypot(x - cx, y - cy) || 1;
+          return [x + ((x - cx) / l) * 2.4, y + ((y - cy) / l) * 2.4] as [number, number];
+        };
+        const path = (x: CanvasRenderingContext2D) => {
+          x.beginPath();
+          x.moveTo(...pd(d[0][0], d[0][1]));
+          x.lineTo(...pd(d[1][0], d[1][1]));
+          x.lineTo(...pd(d[2][0], d[2][1]));
+          x.closePath();
+        };
         if (t.back) {
+          // The paper's back: cream-grey, the screen faintly through it.
+          g.save();
+          path(g);
           g.fillStyle = "#e3dccd";
           g.fill();
-          g.globalAlpha = 0.13;
+          g.restore();
         }
-        g.restore();
-        if (mix < 1) (g.globalAlpha = (t.back ? 0.13 : 1) * (1 - mix)), tri(g, sc, t.uv, t.s, 0.7);
-        if (mix > 0) (g.globalAlpha = (t.back ? 0.13 : 1) * (mix < 1 ? mix : 1)), tri(g, mc, t.uv, t.s, 0.7);
+        const a = t.back ? 0.13 : 1;
+        if (mix < 1) (g.globalAlpha = a * (1 - mix)), tri(g, sc, t.uv, t.s, 1.2);
+        if (mix > 0) (g.globalAlpha = a * (mix < 1 ? mix : 1)), tri(g, mc, t.uv, t.s, 1.2);
         g.globalAlpha = 1;
-        // Its shade.
-        g.save();
-        g.beginPath();
-        g.moveTo(...pd(d[0][0], d[0][1]));
-        g.lineTo(...pd(d[1][0], d[1][1]));
-        g.lineTo(...pd(d[2][0], d[2][1]));
-        g.closePath();
-        g.fillStyle = t.shade < 1 ? `rgba(20,14,24,${(1 - t.shade).toFixed(3)})` : `rgba(255,248,232,${((t.shade - 1) * 1.6).toFixed(3)})`;
-        g.fill();
-        g.restore();
+        const lo = Math.round(255 * Math.min(1, t.shade));
+        path(sh);
+        sh.fillStyle = `rgb(${lo},${Math.round(lo * 0.97)},${Math.round(lo * 0.99)})`;
+        sh.fill();
+        const hi = Math.max(0, Math.min(1, (t.shade - 1) * 1.6));
+        path(hl);
+        hl.fillStyle = `rgb(${Math.round(255 * hi)},${Math.round(248 * hi)},${Math.round(232 * hi)})`;
+        hl.fill();
       }
+      g.globalCompositeOperation = "multiply";
+      g.drawImage(shC, 0, 0);
+      g.globalCompositeOperation = "screen";
+      g.drawImage(hlC, 0, 0);
+      g.globalCompositeOperation = "source-over";
     };
     w.snapshot = (id: string) => {
       const s = document.getElementById(id) as HTMLCanvasElement;
@@ -619,13 +655,14 @@ if (mode === "room") {
   for (const [n, t] of times.entries()) {
     const pl = plans[n]!;
     if (t >= stillT && !haveStill) {
-      await page.evaluate(({ pl, title }) => ((window as any).draw(pl, title), (window as any).snapshot("still")), { pl: planAt(stillT), title: TITLE });
+      await page.evaluate(({ pl, title }) => ((window as any).draw(pl, title), (window as any).snapshot("still")), { pl: STILL_PLAN, title: TITLE });
       haveStill = true;
     }
     if (t >= stillT) {
       const c = crumpleAt(t - stillT);
       const tris = crumpleMesh(c.p, W, H + HEAD, { ...CRUMPLE_DEFAULTS, turn: c.turn }, c.p === 0 ? 0.1 * c.linger : c.p);
-      await page.evaluate(({ tris, mix }) => (window as any).drawCrumple(tris, mix, "still"), { tris, mix: c.mix });
+      const flat = c.p === 0 && (t - stillT < 1 || c.linger === 0);
+      await page.evaluate(({ tris, mix, flat }) => (window as any).drawCrumple(tris, mix, "still", flat), { tris, mix: c.mix, flat });
     } else await page.evaluate(({ pl, title }) => (window as any).draw(pl, title), { pl, title: TITLE });
     await page.locator("#c").screenshot({ path: single ? `${outArg}/t${t}.png` : `${outArg}/f${String(n).padStart(3, "0")}.png` });
   }
@@ -635,14 +672,15 @@ if (mode === "room") {
   // The crumple alone, on the intro's last still before it (the board on the table), at 20 fps, with a lead-in and an end hold.
   mkdirSync(outArg, { recursive: true });
   await page.evaluate(() => (window as any).drawMatch());
-  await page.evaluate(({ pl, title }) => ((window as any).draw(pl, title), (window as any).snapshot("still")), { pl: planAt(TL.crumple), title: TITLE });
+  await page.evaluate(({ pl, title }) => ((window as any).draw(pl, title), (window as any).snapshot("still")), { pl: STILL_PLAN, title: TITLE });
   const total = CRUMPLE_TIMING.crumple + CRUMPLE_TIMING.hold + CRUMPLE_TIMING.open + CRUMPLE_TIMING.creaseLinger;
   const LEAD = 500, TAIL = 700;
   let n = 0;
   for (let ms = -LEAD; ms <= total + TAIL; ms += 50) {
     const c = crumpleAt(Math.max(0, ms));
     const tris = crumpleMesh(ms < 0 ? 0 : c.p, W, H + HEAD, { ...CRUMPLE_DEFAULTS, turn: c.turn }, c.p === 0 ? (ms < 0 ? 0 : 0.1 * c.linger) : c.p);
-    await page.evaluate(({ tris, mix }) => (window as any).drawCrumple(tris, mix, "still"), { tris, mix: ms < 0 ? 0 : c.mix });
+    const flat = ms <= 0 || (c.p === 0 && c.linger === 0);
+    await page.evaluate(({ tris, mix, flat }) => (window as any).drawCrumple(tris, mix, "still", flat), { tris, mix: ms < 0 ? 0 : c.mix, flat });
     await page.locator("#c").screenshot({ path: `${outArg}/c${String(n++).padStart(3, "0")}.png` });
   }
   console.log(`wrote ${n} crumple frames to ${outArg}`);

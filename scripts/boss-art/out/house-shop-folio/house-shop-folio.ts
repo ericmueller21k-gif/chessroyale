@@ -592,47 +592,49 @@ export const SHOP_FOLIO_BACKDROP = (() => {
   return def("backdrop", [4, 1], BDW, BDH, [74, BDH - 1], [[whole(c, true)]]);
 })();
 
-// ==== The counter (4 squares): a low folded-paper counter, 29 px tall (the turtle shows over it): its top a lit strip with a
-// gilt front edge, its front pleated, its ends folded in; a blank plaque in a gilt frame. On it, a stack of folded pages and a
-// brush on a rest at its west end; Folio's Boss Crate at its east end.
+// ==== The counter (4 squares): a low folded-paper writing counter, 19 px tall (the turtle is low: it shows over it): its top
+// a lit strip with a gilt front edge, its front pleated, its ends folded in. Its blank plaque is a folded tent card standing
+// on its top at the west end (the game writes on it); a stack of folded pages and a brush on a rest beside it; Folio's Boss
+// Crate at the east end; the middle left clear for the shopkeeper behind.
 
 const CW = 4 * T;
-const CH = 46;
+const CH = 40;
 const CFOOT = CH - 3;
-const CTOP = 14;
-const PLQ = { x: 44, y: CTOP + 10, w: 60, h: 14 } as const;
+const CTOP = 18;
+const PLQ = { x: 8, y: 3, w: 44, h: 13 } as const;
 export const SHOP_FOLIO_COUNTER_SIGN = signFace(PLQ.x, PLQ.y, PLQ.w, PLQ.h);
 export const SHOP_FOLIO_CRATE_AT: Pt = [122, CTOP + 3];
 export const SHOP_FOLIO_COUNTER = (() => {
   const c = cv(CW, CH);
   shadow(c, CW / 2, CFOOT, CW / 2 + 2, 3);
-  // Top: a lit strip seen from above (6 px), gilt along its front edge.
-  face(c, [[4, CTOP], [CW - 4, CTOP], [CW - 2, CTOP + 6], [2, CTOP + 6]], "A", { lo: "B" });
-  gilt(c, [2, CTOP + 6], [CW - 3, CTOP + 6], { glint: 0.15 });
+  // Top: a lit strip seen from above (5 px), gilt along its front edge.
+  face(c, [[4, CTOP], [CW - 4, CTOP], [CW - 2, CTOP + 5], [2, CTOP + 5]], "A", { lo: "B" });
+  gilt(c, [2, CTOP + 5], [CW - 3, CTOP + 5], { glint: 0.15 });
   // Front: vertical pleats (a lit face, a shaded face, a crease), the ends folded in (triangles).
-  for (let y = CTOP + 7; y < CFOOT; y++)
+  for (let y = CTOP + 6; y < CFOOT; y++)
     for (let x = 2; x < CW - 2; x++) {
       const u = (x - 2) % 8;
       put(c, x, y, u === 0 ? "A" : u < 4 ? "B" : u === 7 ? "D" : "C");
     }
-  face(c, [[2, CTOP + 7], [10, CTOP + 7], [2, CFOOT]], "C");
-  face(c, [[CW - 2, CTOP + 7], [CW - 10, CTOP + 7], [CW - 2, CFOOT]], "D");
+  face(c, [[2, CTOP + 6], [8, CTOP + 6], [2, CFOOT]], "C");
+  face(c, [[CW - 2, CTOP + 6], [CW - 8, CTOP + 6], [CW - 2, CFOOT]], "D");
   rect(c, 2, CFOOT - 2, CW - 4, 2, "D");
-  // The plaque: a blank cream card in a gilt frame (the game writes on it).
+  // The plaque: a tent card of cream paper standing on the top, a gilt frame round its face, its shaded back fold showing.
+  face(c, [[PLQ.x + 2, PLQ.y - 2], [PLQ.x + PLQ.w + 2, PLQ.y - 2], [PLQ.x + PLQ.w + 4, CTOP + 2], [PLQ.x + PLQ.w, CTOP + 2]], "C", { lo: "D" });
   face(c, [[PLQ.x - 1, PLQ.y - 1], [PLQ.x + PLQ.w + 1, PLQ.y - 1], [PLQ.x + PLQ.w + 1, PLQ.y + PLQ.h + 1], [PLQ.x - 1, PLQ.y + PLQ.h + 1]], "G", { hi: "H", lo: "g" });
   rect(c, PLQ.x + 1, PLQ.y + 1, PLQ.w - 1, PLQ.h - 1, "a");
-  rect(c, PLQ.x + 1, PLQ.y + PLQ.h - 1, PLQ.w - 1, 1, "B");
-  // On top, at its west end: a stack of folded pages, a brush on a little rest.
-  for (let j = 0; j < 4; j++) {
-    rect(c, 10 + (j % 2), CTOP + 2 - j * 2, 16, 2, j % 2 ? "B" : "A");
-    put(c, 25 + (j % 2), CTOP + 2 - j * 2, "C");
+  rect(c, PLQ.x - 1, PLQ.y + PLQ.h + 2, PLQ.w + 3, CTOP + 3 - (PLQ.y + PLQ.h + 2), "B");
+  // Beside it: a stack of folded pages, a brush on a little rest.
+  for (let j = 0; j < 3; j++) {
+    rect(c, 56 + (j % 2), CTOP + 1 - j * 2, 13, 2, j % 2 ? "B" : "A");
+    put(c, 68 + (j % 2), CTOP + 1 - j * 2, "C");
   }
-  cursive(c, 12, CTOP - 4, 12, "i", 5);
-  rect(c, 32, CTOP + 2, 6, 2, "S");
-  line(c, 30, CTOP + 1, 42, CTOP - 1, "8");
-  line(c, 30, CTOP + 2, 42, CTOP, "9");
-  put(c, 43, CTOP - 1, "T");
-  put(c, 44, CTOP - 1, "T");
+  cursive(c, 57, CTOP - 4, 10, "i", 5);
+  rect(c, 92, CTOP + 2, 5, 2, "S");
+  line(c, 88, CTOP + 1, 100, CTOP - 1, "8");
+  line(c, 88, CTOP + 2, 100, CTOP, "9");
+  put(c, 101, CTOP - 1, "T");
+  put(c, 102, CTOP - 1, "T");
   return def("counter", [4, 1], CW, CH, [74, CFOOT], [[whole(c, true)]]);
 })();
 
@@ -824,10 +826,15 @@ export const SHOP_FOLIO_BONSAI_CRANES = def("bonsai-cranes", [1, 1], BW, BH, [18
 
 const HC_H = 130;
 const HC_COLORS = [["p", "P"], ["y", "Y"], ["u", "U"], ["q", "Q"], ["x", "X"], ["A", "C"]] as const;
+function threadCv(phase: number): Cv {
+  const c = cv(T, HC_H);
+  const sway = (y: number) => (y < 14 ? 0 : 2.6 * Math.sin(phase) * ((y - 14) / 64));
+  for (let y = 0; y < 82; y++) put(c, 18 + sway(y), y, y < 14 ? "K" : "J");
+  return c;
+}
 function cranesCv(phase: number, order: number): Cv {
   const c = cv(T, HC_H);
   const sway = (y: number) => (y < 14 ? 0 : 2.6 * Math.sin(phase) * ((y - 14) / 64));
-  for (let y = 0; y < 82; y++) put(c, 18 + sway(y), y, y < 14 ? "J" : "l");
   for (let i = 0; i < 7; i++) {
     const y = 18 + i * 8;
     const [lit, deep] = HC_COLORS[(i + order) % HC_COLORS.length]!;
@@ -840,8 +847,10 @@ function cranesCv(phase: number, order: number): Cv {
   return c;
 }
 const SWAY = [0, 0.8, 1.4, 1.6, 1.4, 0.8, 0, -0.8, -1.4, -1.6, -1.4, -0.8].map((a) => Math.asin(Math.max(-1, Math.min(1, a / 1.6))));
-export const SHOP_FOLIO_CRANES = def("cranes", [1, 1], T, HC_H, [18, HC_H - 1], SWAY.map((ph) => [whole(cranesCv(ph, 0), true)]), 240);
-export const SHOP_FOLIO_CRANES_B = def("cranes-b", [1, 1], T, HC_H, [18, HC_H - 1], SWAY.map((_, i) => [whole(cranesCv(SWAY[(i + 4) % SWAY.length]!, 3), true)]), 240);
+/** (The thread its own layer without an outline, so it stays a thin line; the cranes and the tassel outlined.) */
+const craneFrame = (ph: number, order: number) => bits(bitOf(threadCv(ph), false), bitOf(cranesCv(ph, order), true));
+export const SHOP_FOLIO_CRANES = def("cranes", [1, 1], T, HC_H, [18, HC_H - 1], SWAY.map((ph) => craneFrame(ph, 0)), 240);
+export const SHOP_FOLIO_CRANES_B = def("cranes-b", [1, 1], T, HC_H, [18, HC_H - 1], SWAY.map((_, i) => craneFrame(SWAY[(i + 4) % SWAY.length]!, 3)), 240);
 
 // ==== Pages drifting upward in a corner, very slowly, like dust in light: a little pile of loose pages on the floor, and five
 // pages rising from it, turning (a face, edge-on, the back), swaying; near the top each thins to an ink outline and is gone.
@@ -1035,7 +1044,7 @@ export interface PoolDrift {
  * east wall's, flipped, west), its three colours in a slanting line; and the moon window's soft gold before the counter.
  */
 const windowPools = (piece: string, set: readonly (readonly [string, string])[]) =>
-  set.map(([lit], i) => ({ piece, x: 58 + i * 21, y: WALL_H + 4 + i * 5, rx: 19, ry: 8, color: GLOW[lit]!, strength: 0.3, drift: { dx: 9, dy: 4, ms: 40000, phase: i * 0.04 } as PoolDrift }));
+  set.map(([lit], i) => ({ piece, x: 56 + i * 22, y: WALL_H + 4 + i * 5, rx: 22, ry: 10, color: GLOW[lit]!, strength: 0.42, drift: { dx: 9, dy: 4, ms: 40000, phase: i * 0.04 } as PoolDrift }));
 export const SHOP_FOLIO_POOLS: readonly (LightPool & { piece: string; drift?: PoolDrift })[] = [
   ...windowPools("window", GLASS_A),
   ...windowPools("window-b", GLASS_B),
@@ -1129,7 +1138,7 @@ at("screen", 4, 15, true);
 at("screen", 14, 15, true);
 at("cranes", 6, 6, false);
 at("cranes-b", 13, 6, false);
-at("cranes-b", 5, 11, false);
+at("cranes-b", 6, 8, false);
 at("cranes", 14, 12, false);
 // -- The edges, drawn only in ink.
 at("sketch-pillar", 6, 2, true);

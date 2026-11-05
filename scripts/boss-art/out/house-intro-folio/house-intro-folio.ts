@@ -246,6 +246,7 @@ export const INTRO_FOLIO_PLANE = character("folio-intro-plane", "Folio's intro: 
   bank: { loop: false, frames: [pf(1, 0, true, 120), pf(2, 0, true, 160), pf(2, 1, true, 160), pf(1, 0, true, 120)] },
   drop: { loop: false, frames: [pf(1, 0, false, 100), pf(0, -1, false, 100), pf(0, -2, false, 120)] },
   away: { loop: true, frames: [pf(0, -2, false, 120), pf(0, -1, false, 120), pf(1, -2, false, 120)] },
+  idle: { loop: true, frames: [pf(0, 0, true, 1000)] },
 });
 
 // ==== 3. The board, seen from above (a top-view picture the code lays flat on the table's top), 40 x 40 px: folded in
@@ -309,6 +310,7 @@ export const INTRO_FOLIO_BOARD = character("folio-intro-board", "Folio's intro: 
   packet: { loop: true, frames: [{ ms: 1000, cvs: [boardCv(0)], outline: [true] }] },
   unfold: { loop: false, frames: BOARD_MS.map((ms, i) => ({ ms, cvs: [boardCv(i)], outline: [true], ...(i === 1 || i === 4 ? { cue: "unfold" } : {}) })) },
   full: { loop: true, frames: [{ ms: 1000, cvs: [boardCv(6)], outline: [true] }] },
+  idle: { loop: true, frames: [{ ms: 1000, cvs: [boardCv(6)], outline: [true] }] },
 });
 /** The packet's size on its own (its quarter of the board's top-view picture): the falling packet is the board's NW quarter. */
 export const INTRO_FOLIO_PACKET = { w: BD / 2, h: BD / 2 } as const;
@@ -319,7 +321,7 @@ export const INTRO_FOLIO_PACKET = { w: BD / 2, h: BD / 2 } as const;
 export const INTRO_FOLIO_TABLE_AT = [9.5, 10.5] as const;
 export const INTRO_FOLIO_STOOLS_AT = [[8.5, 10.5], [10.5, 10.5]] as const;
 /** The board laid on the table: its top-view picture this many squares across, its middle on the table's middle, at the top's height. */
-export const INTRO_FOLIO_BOARD_SQUARES = 1.15;
+export const INTRO_FOLIO_BOARD_SQUARES = 1.0;
 /**
  * The plane's route: in from beyond the east wall, high, gliding west to over the table (`fly`), banking over it (`bank`), the
  * packet let go over the table's middle (`drop`), then climbing away to the north-west and off the room (`away`). Each point
