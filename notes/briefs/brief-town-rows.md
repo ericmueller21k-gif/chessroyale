@@ -90,3 +90,30 @@ then most of them aren't actually like real buildings… they look alike."
 - **Most fronts are dummies.** They're look-alikes that can't be entered, made by a parts generator (body, colour, windows, door,
   roof), which also fills any width.
 - **Boss homes** are the distinct real buildings.
+
+## Eric's references, round 2 (Nov 5, later): the feel to match
+Files in `assets/town-rows/`: `eric-ref2-plaza.png`, `eric-ref3-overhead.webp`, `eric-ref4-street.jpg`, `eric-ref5-square.webp`.
+
+Eric: "look at how the background shows. There's depth to the buildings, but … they even did the same thing of like making the
+buildings flat when they could … it'll feel immersive when you're running through the town. Like you won't actually be able to see
+the Colosseum unless you're like running towards it … which is also why the zoom in by default is more zoomed in now. So it feels like
+you're actually running through the streets of Chess Town."
+
+**What to take from them.** These are the structure and the feel. We still don't copy the game's buildings, signs, statues, colours
+or layout.
+- **The rows wall in each street and square.** You see the street you're on, and a sky above a skyline of taller roofs peeking over
+  the rows: towers, a gable or two, treetops. You don't see across the town.
+- **Flat fronts wherever they work.** Real depth (box sides and roofs) goes only where the eye catches it: corners, free-standing
+  buildings, landmarks sticking up.
+- **Landmarks stay hidden until you head toward them.** The Colosseum shows only when you're on a street or square that opens onto it
+  and facing it; the rows hide it otherwise. This replaces round 3's "far drawing within 45 degrees of north" rule with real
+  occlusion by the rows. The same goes for the park.
+- **The camera is closer and lower,** so the rows are the main thing on screen, the street runs away from you, and fronts read at
+  eye level.
+  - Tune the pitch down from round 3 until a street looks like the references. Keep the chessboard roads readable underfoot.
+  - Keep taps and arrows working through the heading.
+  - The zoom out button still allows a higher view.
+  - Every figure must stay fully on screen (Eric, Nov 4).
+- **Plazas.** Squares can have a free-standing building on a raised plot (a boss home or the fountain), with sidewalks that have a
+  kerb edge.
+- **Our palette and pixel style.** Warm, cartoon and varied, but our own.
