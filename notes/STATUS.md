@@ -186,3 +186,4 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Round 3 (claude/town-boxes 42809163) DONE, no own PR: folds into round 4's PR (its fixed camera is replaced by the chase cam).
 - Round 4 helper (claude/town-rows, /home/user/cr-townrows, ports 8993/9493): mockup phase → show Eric → "go". Brief has 3 addenda
   (separate fronts butted, look-alike dummies; walled-in streets & hidden landmarks; chase camera along the street, two zooms).
+- Follow-up (Eric, Nov 5): the Colosseum taller and bigger, so it looms when it comes into view in the street town. After round 4.
