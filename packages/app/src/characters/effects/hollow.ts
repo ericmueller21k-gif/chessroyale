@@ -334,6 +334,88 @@ export const BULB_STRAND: Character = {
   },
 };
 
+// Boss alone (Eric, Nov 5): your ten bulbs, his own strand of lights (lights.ts: each bulb the battle's color for its place
+// on his strand), on a wire drooping between two hooks. One goes out with each wrong move into the dark.
+
+/** Each of the ten bulbs' keys: [main, shade, glint, glow] (as his figure's, characters/hollow.ts BULB_KEYS). */
+const LIFE_KEYS = Array.from({ length: 10 }, (_, i) => [0, 1, 2, 3].map((j) => String.fromCharCode(0xc0 + 4 * i + j)) as [string, string, string, string]);
+const LIFE_PALETTE: Record<string, string> = {
+  k: "#08070c",
+  w: "#3b3844",
+  W: "#5d5968",
+  o: "#2e2a36", // out: dark glass
+  O: "#1d1a23",
+  g: "#463f52",
+  x: "#ffffff",
+  U: "#c4a2ff",
+  ...Object.fromEntries(
+    LIFE_KEYS.flatMap((keys, b) => {
+      const c = bulbColour(DEFAULT_LIGHTS[b]!);
+      return [c.glass, c.shade, c.glint, `${c.glass}66`].map((v, i) => [keys[i]!, v]);
+    }),
+  ),
+};
+export const LIFE_W = 95;
+export const LIFE_H = 15;
+/** The bulbs' x (their middle) along the strand. */
+const LIFE_X = Array.from({ length: 10 }, (_, i) => 7 + 9 * i);
+const lifeWireY = (x: number) => Math.round(2 + 2.2 * Math.sin((Math.PI * (x - 1)) / (LIFE_W - 3)) + 0.7 * Math.sin((Math.PI * 4 * (x - 1)) / (LIFE_W - 3)));
+const LIFE_PARTS: Record<string, Part> = {
+  wire: (() => {
+    const cv = canvas(LIFE_W, LIFE_H);
+    for (let x = 1; x < LIFE_W - 1; x++) cv[lifeWireY(x)]![x] = "w";
+    return { grid: toGrid(cv) };
+  })(),
+};
+for (let b = 0; b < 10; b++) {
+  const [M, S, G, L] = LIFE_KEYS[b]!;
+  LIFE_PARTS[`on${b}`] = { grid: [".WW..", ".ww..", `${G}${M}${M}${M}${S}`, `${M}${M}${M}${M}${S}`, `${M}${M}${M}${S}${S}`, `.${M}${S}${S}.`, `..${S}..`] };
+  LIFE_PARTS[`off${b}`] = { grid: [".WW..", ".ww..", "gooOO", "ooooO", "oooOO", ".oOO.", "..O.."] };
+  const glow = canvas(9, 11);
+  ellipse(glow, 4.5, 6.5, 4.5, 4.5, L);
+  LIFE_PARTS[`glow${b}`] = { grid: toGrid(glow), outline: false };
+}
+/** The strand with `lit` bulbs on (the first ones), bulb `flick` drawn the other way (flickering), a glint on frame `g`. */
+function life(lit: number, ms: number, o: { flick?: number; g?: number; cue?: string; spark?: number } = {}): Frame {
+  const layers: Layer[] = [];
+  const on = (b: number) => (b < lit) !== (o.flick === b);
+  for (let b = 0; b < 10; b++) if (on(b)) layers.push({ part: `glow${b}`, x: LIFE_X[b]! - 4, y: lifeWireY(LIFE_X[b]!) - 1 });
+  layers.push({ part: "wire", x: 0, y: 0 });
+  for (let b = 0; b < 10; b++) layers.push({ part: `${on(b) ? "on" : "off"}${b}`, x: LIFE_X[b]! - 2, y: lifeWireY(LIFE_X[b]!) + 1 });
+  const specks: Speck[] = [];
+  if (o.g !== undefined && lit > 0) {
+    const b = (o.g * 3) % lit;
+    specks.push([LIFE_X[b]! - 1, lifeWireY(LIFE_X[b]!) + 3, "x"]);
+  }
+  if (o.spark !== undefined) {
+    const [x, y] = [LIFE_X[o.spark]!, lifeWireY(LIFE_X[o.spark]!) + 6];
+    specks.push([x, y, "x"], [x - 2, y - 1, "U"], [x + 2, y + 1, "U"], [x + 1, y + 3, "U"]);
+  }
+  return { ms, layers, specks, cue: o.cue };
+}
+export const LIFE_STRAND: Character = {
+  id: "life-strand",
+  name: "Your bulbs",
+  w: LIFE_W,
+  h: LIFE_H,
+  foot: [47, 14],
+  palette: LIFE_PALETTE,
+  // (Each bulb in the battle's color for its place on his strand: lights.ts.)
+  swap: lightsSwap(LIFE_KEYS),
+  parts: LIFE_PARTS,
+  anims: {
+    ...Object.fromEntries(Array.from({ length: 11 }, (_, n) => [`lit${n}`, { loop: true, frames: n ? [0, 1, 2, 3].map((i) => life(n, i === 0 ? 400 : 260, { g: i })) : [life(0, 600)] } satisfies Anim])),
+    // A bulb going out (a wrong move into the dark): it flickers, fizzes, sparks and dies, ending with one fewer lit.
+    ...Object.fromEntries(
+      Array.from({ length: 10 }, (_, i) => {
+        const from = i + 1;
+        const b = from - 1;
+        return [`out${from}`, { loop: false, frames: [life(from, 70, { flick: b, cue: "fizz" }), life(from, 60), life(from, 50, { flick: b }), life(from, 60), life(from, 40, { flick: b }), life(from - 1, 90, { spark: b }), life(from - 1, 220)] } satisfies Anim];
+      }),
+    ),
+  },
+};
+
 // Lights out: the board gone to night, one tile a square (so found pieces can show through), drawn on the shared
 // board canvas. The smoke drifting over it is one field across the board, repeating every 4 squares, so each square's
 // tile is one of 16 by where it is on screen (NIGHT_TILES).

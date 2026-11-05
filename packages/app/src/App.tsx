@@ -128,6 +128,10 @@ function overridesFromUrl(modeId?: ModeChoiceId, matchBoss = false): Partial<Set
     ...(pausedBosses().length ? { bossesOff: pausedBosses() } : {}),
     ...((POWER_IDS as readonly string[]).includes(q.get("power") ?? "") ? { bossPowerTest: q.get("power")! } : {}),
     ...(raid ? {} : chosenBoss() && bossInUrl() ? { bossId: chosenBoss() } : {}),
+    // Testing, Hollow: ?bulbs=N, Boss alone's strand starts with N bulbs out (3, 7 and 10 come fast); ?darkblock=2 or 3,
+    // his first cover brings a block of that size too.
+    ...(n("bulbs") !== undefined ? { hollowBulbsOut: n("bulbs") } : {}),
+    ...(q.get("darkblock") === "2" || q.get("darkblock") === "3" ? { hollowBlockTest: Number(q.get("darkblock")) as 2 | 3 } : {}),
     // Testing, solo: ?mate=1, the boss mates you at once (1.f3 e5 2.g4, its move): its attack on your king, then the result.
     ...(q.get("mate") === "1" ? { bossMateTest: true } : {}),
     // Testing, solo: ?paint=1 or 2 (with ?boss=smudgy), his rook already hidden where your king can step into its line: a move the

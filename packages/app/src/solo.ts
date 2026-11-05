@@ -6,6 +6,7 @@ import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
+import { BLACKOUT, DARK_FORCED } from "./components/Hollow.tsx";
 import { play, warmSounds } from "./sound.ts";
 import { trackCamo } from "./camo.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
@@ -93,7 +94,8 @@ export class SoloMatch implements GameView {
     // Boss alone (a raid without bots) keeps the old scoring; a Solo raid scores as every raid (RAID_SCORING). Boss alone
     // plays on Boss Battle's clock, 10 + 10 (BOSS_CLOCK; Eric, Oct 30), with no boss strikes (Eric, Oct 31); a Solo raid
     // keeps the raid's clock and strikes.
-    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, bossNoStrikes: true, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
+    // Against Hollow, Boss alone plays his ten bulbs instead of points (Eric, Nov 5: `hollowBulbs`, solo only).
+    if (baseSettings.raid && !raidBots) this.baseSettings = { ...baseSettings, ...BOSS_ALONE_SCORING, bossNoStrikes: true, hollowBulbs: true, ...(baseSettings.bossAloneClock ? bossClockSettings(baseSettings) : {}) };
     // (The hippo gardener's seeds count by this page's visible time, not an earlier online match's server.)
     setGardenSource(null);
     // (A game on this device: a tester's ?bannerplus= counts.)
@@ -614,15 +616,43 @@ export class SoloMatch implements GameView {
   darkTry(move: string) {
     if (this.phase.kind !== "play" || !this.runner.boss || Date.now() < this.playStartedAt - 300) return;
     if (this.frozen && Date.now() < this.frozen.until) return; // While the King strikes.
+    if (this.darkNote?.forced || this.darkNote?.blackout) return;
     const out = this.runner.darkTry(HUMAN, move);
     if (out.kind === "move") {
       this.darkNote = null;
       return this.submit(out.move);
     }
     if (out.kind === "refused") return;
-    this.darkNote = { move, at: Date.now(), tries: out.tries, out: out.out };
+    this.darkNote = { move, at: Date.now(), tries: out.tries, out: out.out, ...(out.bulbs !== undefined ? { bulbs: out.bulbs } : {}), ...(out.forced ? { forced: true } : {}), ...(out.blackout ? { blackout: true } : {}) };
+    // Boss alone, his bulbs (Nov 5): the 3rd and 7th out, the dark plays your move; the last, the battle is his.
+    if (out.forced) return void this.darkForcedTurn();
+    if (out.blackout) return this.blackoutTurn();
     if (out.out) return void this.score(null);
     this.emit();
+  }
+
+  /**
+   * The dark plays your move (Boss alone, the 3rd or 7th bulb out): your clock stops, the dark flashes over the board and
+   * he says so (DARK_FORCED), the rules pick a bad move (darkForcedMoveFrom, on this device's engine), and it's played as
+   * your move. Nothing else is taken meanwhile (the turn's only move is the dark's).
+   */
+  private async darkForcedTurn() {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    const started = Date.now();
+    this.emit();
+    const move = await this.runner.playDarkForced(this.engines[0]).catch(() => this.runner.applyDarkForced(""));
+    const wait = DARK_FORCED.ms - (Date.now() - started);
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    if (this.stopped || this.phase.kind !== "play") return;
+    void this.score(move);
+  }
+
+  /** The last bulb went out (Boss alone): the screen goes black (BLACKOUT), then the battle ends as his. */
+  private blackoutTurn() {
+    if (this.timer) clearTimeout(this.timer);
+    this.emit();
+    this.timer = setTimeout(() => this.nextRound(), BLACKOUT.ms);
   }
 
   // ---------------- Hollow's Lights out ----------------
@@ -1531,6 +1561,7 @@ export class SoloMatch implements GameView {
       // (The bullet clock ran out: the Hidden Boss won on time.)
       ...(this.runner.bossTimedOut ? { timeout: true } : {}),
       ...(this.runner.bossCarrotWin ? { carrots: true } : {}),
+      ...(this.runner.bossBlackout ? { blackout: true } : {}),
     });
   }
 }

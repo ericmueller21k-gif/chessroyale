@@ -11,7 +11,9 @@ import { bandpass, lowpass, noise, osc, render, rng, sine, soft, type Voice, sou
 export type HollowSound =
   | "hum" | "cast" | "whisper" | "pop" | "smash" | "tick" | "found" | "miss" | "relight" | "clink" | "lash"
   // His challenge intro (Nov 3: the darkness ball drinking the cave's light; shops/challenge.ts BOSS_INTROS.hollow's cues).
-  | "gutter" | "snuff" | "drain" | "tink" | "star" | "sip" | "pawn" | "blackout" | "settle";
+  | "gutter" | "snuff" | "drain" | "tink" | "star" | "sip" | "pawn" | "blackout" | "settle"
+  // Boss alone (Nov 5): one of your ten bulbs going out (a small fizz and pop), and the dark moving your piece for you.
+  | "fizz" | "forced";
 
 /** Short bursts at the given times, each shaped by `burst(age, i)`. */
 function grains(times: readonly number[], burst: (age: number, i: number) => number): Voice {
@@ -209,6 +211,21 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
     const rumble = murk(rate, 140, 229);
     return render(rate, 1.2, (t) => Math.min(1, t / 0.01) * Math.exp(-t / 0.35) * (boom(t) + 1.6 * rumble(t)));
   },
+  // One of your bulbs going out (a wrong move into the dark): the filament fizzing a moment, then a small, dull pop.
+  fizz: (rate) => {
+    const r = rng(241);
+    const spits = Array.from({ length: 18 }, () => 0.005 + r() ** 1.1 * 0.16);
+    const spit = grains(spits, (age) => Math.exp(-age / 0.004));
+    const fizz = bandpass(rate, () => 620, 1.2, lowpass(rate, 1100, lowpass(rate, 1400, noise(239))));
+    const pop = osc(rate, (t) => 90 + 120 * Math.exp(-Math.max(0, t - 0.18) / 0.02), sine);
+    return render(rate, 0.36, (t) => 2.2 * fizz(t) * Math.min(1, spit(t)) * Math.max(0, 1 - t / 0.2) + (t < 0.18 ? (pop(t), 0) : Math.exp(-(t - 0.18) / 0.04) * pop(t)));
+  },
+  // The dark moving your piece for you: a cold breath drawn in, and a low drag that sinks under it.
+  forced: (rate) => {
+    const breath = bandpass(rate, (t) => 240 + 380 * Math.min(1, t / 0.4), 1.3, murk(rate, 900, 243));
+    const drag = osc(rate, (t) => 70 - 26 * Math.min(1, t / 0.7), sine);
+    return render(rate, 0.8, (t) => Math.sin(Math.PI * Math.min(1, t / 0.8)) ** 1.2 * (1.7 * breath(t) + 0.8 * drag(t)));
+  },
   // The ball settling back into him in the dim light: a low breath out, sinking.
   settle: (rate) => {
     const breath = bandpass(rate, (t) => 420 - 240 * Math.min(1, t / 0.8), 1.2, murk(rate, 700, 233));
@@ -219,7 +236,7 @@ const SOUNDS: Record<HollowSound, (rate: number) => Float32Array> = {
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
 const LEVEL: Record<HollowSound, number> = { hum: 0.095, cast: 0.22, whisper: 0.75, pop: 0.32, smash: 0.26, tick: 0.255, found: 0.21, miss: 0.185, relight: 0.116, clink: 0.25, lash: 0.22,
-  gutter: 0.48, snuff: 0.3, drain: 0.29, tink: 0.15, star: 0.2, sip: 0.3, pawn: 0.2, blackout: 0.2, settle: 0.2 };
+  gutter: 0.48, snuff: 0.3, drain: 0.29, tink: 0.15, star: 0.2, sip: 0.3, pawn: 0.2, blackout: 0.2, settle: 0.2, fizz: 0.3, forced: 0.15 };
 
 const cache = soundCache("hollow");
 /** The samples for one of his sounds at a sample rate (made once, then reused). */

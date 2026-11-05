@@ -228,6 +228,8 @@
  *   darkMiss       square  miss (ends empty): a red-violet slash, for a wrong tap or a wrong move into the dark.
  *   bulbStrand     strip   lit3 … lit0 (loops), out3, out2, out1 (a bulb going out; each ends on the next lit<n>),
  *                          relight (ends on lit3); 44 x 15. Size its box to keep its shape (height = width x 15 / 44).
+ *   lifeStrand     strip   lit10 … lit0 (loops), out10 … out1 (a bulb going out, its `fizz`; each ends on the next
+ *                          lit<n>): Boss alone's ten bulbs (Nov 5), 95 x 15 (height = width x 15 / 95).
  *   nightSquare    square  Lights out, a tile a square: dim1, dim2 (one-shots that hold), dim3<t>, night<t>
  *                          (loop), close<t>, dawn<t> (ends empty), found, shown (loop), answer, answered (loop),
  *                          where <t> is the square's tile (16 by where it is, light or dark). Use nightItems().
@@ -557,6 +559,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   darkPour: { ch: EFFECT_SPRITES.darkPour, covers: "square", loop: "fly", sounds: {} },
   darkMiss: { ch: EFFECT_SPRITES.darkMiss, covers: "square", start: "miss", sounds: { miss: "hollowMiss" } },
   bulbStrand: { ch: EFFECT_SPRITES.bulbStrand, covers: "strip", loop: "lit3", counter: { prefix: "lit", max: 3 }, sounds: { pop: "hollowPop", relight: "hollowRelight" } },
+  lifeStrand: { ch: EFFECT_SPRITES.lifeStrand, covers: "strip", loop: "lit10", counter: { prefix: "lit", max: 10 }, sounds: { fizz: "hollowFizz" } },
   nightSquare: { ch: EFFECT_SPRITES.nightSquare, covers: "square", loop: "night0D", end: "dawn0D", sounds: { found: "hollowFound", answer: "hollowWhisper" } },
   nightLabel: { ch: EFFECT_SPRITES.nightLabel, covers: "square", loop: "a", sounds: {} },
   lashHit: { ch: EFFECT_SPRITES.lashHit, covers: "square", start: "hitFL0", sounds: {} },

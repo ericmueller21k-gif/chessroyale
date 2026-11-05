@@ -157,6 +157,10 @@ export interface DarkNote {
   pending?: boolean;
   tries: number;
   out: boolean;
+  /** Boss alone, his bulbs (Nov 5): how many are out now; the dark plays this turn's move for you; the last went out. */
+  bulbs?: number;
+  forced?: boolean;
+  blackout?: boolean;
 }
 
 /** Hollow's Lights out as the screens see it (`at` in local time; every beat follows from it: lightsOutTimeline). */
@@ -222,7 +226,7 @@ export type Phase =
    * you left before the end (see GameView.resign): you resigned (a loss; `bot`: online, a bot plays your seat), or you
    * left once you were already out (your place as it stood; the winner isn't known).
    */
-  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; simul?: { won: number; of: number } };
+  | { kind: "results"; placement: number; winner: string; youWon: boolean; gameWinner?: "w" | "b" | null; bossResult?: "crowd" | "boss" | "draw"; left?: LeftResult; timeout?: boolean; carrots?: boolean; blackout?: boolean; simul?: { won: number; of: number } };
 
 /** One of the Hidden Boss's phase 2 boards as the screens see it (board 0 is yours). */
 export interface SimulBoardView {
