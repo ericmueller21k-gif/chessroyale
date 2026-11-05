@@ -200,11 +200,18 @@ export function boardQueue(m: Pick<LocalMatch, "sides" | "boards" | "state" | "c
   return out;
 }
 
-/** Where you stand in a board's queue: "Your turn · play now" on top, else how many move there before you. */
+/**
+ * Your row's words (Eric, Nov 5: only on top): "Your turn · play now" while you're on top and your move there is on now
+ * (between halves, or the other half first, it would say "now" too soon); else none (the queue's order says the rest).
+ */
 export function queueLine(rows: readonly TurnRow[]): string | null {
+  return rows[0]?.you && rows[0].lit ? "Your turn · play now" : null;
+}
+
+/** How many move on the board before you (screen readers hear it: "Waiting for 2 players"); null: not in it. */
+export function queuePlace(rows: readonly TurnRow[]): number | null {
   const i = rows.findIndex((r) => r.you);
-  if (i < 0) return null;
-  return i === 0 ? "Your turn · play now" : `Waiting for ${i} ${i === 1 ? "player" : "players"}`;
+  return i < 0 ? null : i;
 }
 
 /**

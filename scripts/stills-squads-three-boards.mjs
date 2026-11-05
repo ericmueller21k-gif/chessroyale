@@ -4,7 +4,8 @@
 // A phone (iPhone 13/15, 390 × 844) is shot as Safari shows the page with its bars (the page 390 × 664 between the status
 // bar and the browser bar, both drawn round it), and a computer at 1440 × 900. Each still is a Relay test lobby played
 // with real taps; finished boards (the tiny boards' checks) are set on this device's copy of the match, a mockup.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { chromium, devices } from "@playwright/test";
 import { Chess } from "chess.js";
 
@@ -30,7 +31,24 @@ async function open(kind, extra = "", scheme = "light") {
   });
   await p.goto(`${url}/squads/test/relay?nolanding&debug&clock=180,30,2,2,60&seat=white&mode=classic${extra}`);
   await p.getByRole("button", { name: "Skip votes" }).click({ timeout: 60_000 });
+  await realNames(p);
   return { ctx, p, phone };
+}
+
+/** Real-length usernames (Eric, Nov 5: 6-20 characters, a mix), every player but you, in the lobby's order. */
+export const NAMES = ["QueenSacrificeQueen", "knightrider_2009", "Zugzwang Zoe", "TheBishopOfBanter", "pawnstorm77", "en_passant_enjoyer", "Fischer4ever", "CastleQueenside", "gambit_goblin", "BlunderMaster3000", "Ruy_Lopez_Fan", "rookie_rook"];
+async function realNames(p) {
+  await until(() => p.evaluate(() => !![...(window.squads?.matches?.values() ?? [])].some((m) => m.sides.some((sd) => sd.seats.includes(window.squads.myId)))), 90_000);
+  await p.evaluate((names) => {
+    const s = window.squads;
+    // (Your match's players first, so the 7 in it have 7 different names.)
+    const m = [...s.matches.values()].find((x) => x.sides.some((sd) => sd.seats.includes(s.myId)));
+    const mine = m.sides.flatMap((sd) => sd.seats);
+    const ids = [...mine, ...s.lobby.players.map((x) => x.id).filter((id) => !mine.includes(id))].filter((id) => id !== s.myId);
+    const was = s.nameOf.bind(s);
+    s.nameOf = (id) => (id === s.myId ? was(id) : names[ids.indexOf(id) % names.length] ?? was(id));
+    s.emit();
+  }, NAMES);
 }
 
 const seen = (p) =>
@@ -130,6 +148,19 @@ async function frame(p, file, phone) {
   await pg.close();
 }
 
+/** The turn order's rows: one height, the move column at one place, no name wrapped (each cut with an ellipsis instead). */
+async function rowCheck(p) {
+  return p.evaluate(() => {
+    const rows = [...document.querySelectorAll(".sq-to-row")];
+    const heights = new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height)));
+    const moves = new Set(rows.map((r) => Math.round(r.querySelector(".sq-to-move").getBoundingClientRect().right)));
+    const names = rows.map((r) => r.querySelector(".sq-to-name"));
+    const wrapped = names.filter((n) => n.getClientRects().length > 1 || n.getBoundingClientRect().height > 20).length;
+    const cut = names.filter((n) => n.scrollWidth > n.clientWidth + 0.5).length;
+    return { rows: rows.length, heights: [...heights], moveRights: [...moves], wrapped, cut };
+  });
+}
+
 /** Anything below the page's bottom edge (the screen scrolls, or a box runs past it): its selector and how far. */
 async function cutOff(p) {
   return p.evaluate(() => {
@@ -148,7 +179,7 @@ async function shot(p, name, kind) {
   await p.waitForTimeout(350);
   await frame(p, `${out}/${name}-${kind}.png`, kind === "phone");
   const cut = await cutOff(p);
-  console.log(name, kind, cut.length ? `CUT: ${cut.join("; ")}` : "nothing cut off");
+  console.log(name, kind, cut.length ? `CUT: ${cut.join("; ")}` : "nothing cut off", JSON.stringify(await rowCheck(p)));
 }
 
 /** The phone's top line, 3× (the replay button's states). */
@@ -165,7 +196,7 @@ async function topOf(p, name, upTo = ".sq-boards") {
 }
 
 /** Your row in the turn order of the board on screen: how many move there before you (0: your turn). */
-const myPlace = (p) => p.locator(".sq-to-row.you .sq-to-where").textContent().then((t) => (/^Your turn/.test(t) ? 0 : Number(t.match(/\d+/)?.[0] ?? -1)));
+const myPlace = (p) => p.locator(".sq-to-row.you").getAttribute("data-place").then(Number);
 
 const shots = {
   /**
@@ -224,6 +255,45 @@ const shots = {
     await shot(p, "settings", kind);
     await ctx.close();
   },
+  /**
+   * A recording (GIF) of tapping across your match's three tiny boards (Eric: the turn order never rebuilt; its rows
+   * glide to each board's order, nothing else in it moves). A phone with all 8 open, and a computer.
+   */
+  async glide(kind) {
+    const { ctx, p } = await open(kind);
+    const s = await nextDuty(p);
+    await move(p, s.fen);
+    await p.waitForTimeout(1_000);
+    if (kind === "phone") await p.locator(".sq-to-more").click();
+    const cdp = await ctx.newCDPSession(p);
+    const frames = [];
+    cdp.on("Page.screencastFrame", async (f) => {
+      frames.push({ t: f.metadata.timestamp * 1000, data: f.data });
+      await cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => undefined);
+    });
+    await cdp.send("Page.startScreencast", { format: "jpeg", quality: 85, everyNthFrame: 1 });
+    await p.waitForTimeout(600);
+    for (const i of [0, 1, 2, 0]) {
+      await p.locator(".sq-match.ours button.sq-tiny").nth(i).click();
+      await p.waitForTimeout(1_100);
+    }
+    await cdp.send("Page.stopScreencast");
+    const dir = `${out}/.frames-${kind}`;
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const list = [];
+    frames.forEach((f, i) => {
+      writeFileSync(`${dir}/f${String(i).padStart(5, "0")}.jpg`, Buffer.from(f.data, "base64"));
+      const next = frames[i + 1];
+      list.push(`file 'f${String(i).padStart(5, "0")}.jpg'`, `duration ${next ? Math.max(0.001, (next.t - f.t) / 1000).toFixed(3) : "0.5"}`);
+    });
+    writeFileSync(`${dir}/frames.txt`, list.join("\n") + "\n");
+    const scale = kind === "phone" ? 390 : 960;
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", `${dir}/frames.txt`, "-vf", `fps=25,scale=${scale}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4`, `${out}/turn-order-glide-${kind}.gif`]);
+    rmSync(dir, { recursive: true, force: true });
+    console.log(`wrote ${out}/turn-order-glide-${kind}.gif (${frames.length} frames)`);
+    await ctx.close();
+  },
   /** The coach marks, one at a time (a tap goes on). */
   async coach(kind) {
     const { ctx, p } = await open(kind, "&coach");
@@ -247,6 +317,7 @@ const shots = {
       PHONE.page = h;
       const { ctx, p } = await open("phone");
       await nextDuty(p);
+      console.log(`${w}x${h} rows`, await rowCheck(p));
       console.log(`${w}x${h}`, (await cutOff(p)).join("; ") || "nothing cut off");
       if (w === 360) await shot(p, "short-android", "phone");
       await ctx.close();

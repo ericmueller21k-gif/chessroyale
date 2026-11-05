@@ -23676,6 +23676,13 @@ button.sq-tiny {
    they'll move on it, the next there on top; each with their squad's color, your row saying where you stand, and the move
    they last played on the right. A phone: 4 rows (a fixed box), a tap on the strip at the right opens all 8 over the board
    (upward, so nothing below moves); a computer: all 8 in the column beside the board. */
+/* (The turn order's slot in each board's view, and its own element, made once and moved into it: no box of their own.) */
+.sq-island-slot,
+.sq-island {
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+}
 .sq-to {
   position: relative;
   display: grid;
@@ -23710,7 +23717,7 @@ button.sq-tiny {
 }
 .sq-to-row {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto 3.6em;
+  grid-template-columns: 4px minmax(0, 1fr) auto 4.6em;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -23771,10 +23778,12 @@ button.sq-tiny {
   color: inherit;
 }
 .sq-to-move {
+  overflow: hidden;
   color: var(--muted);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   text-align: right;
+  white-space: nowrap;
 }
 .sq-to-row.lit .sq-to-move {
   color: inherit;

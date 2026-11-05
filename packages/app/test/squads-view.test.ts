@@ -8,6 +8,7 @@ import {
   boardQueue,
   foldedRows,
   queueLine,
+  queuePlace,
   bankText,
   cheatArrows,
   cheatEval,
@@ -511,14 +512,18 @@ describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: one qu
     expect(after).toEqual([...before.slice(1), before[0]]);
   });
 
-  it("your row says where you stand; a phone's folded 4 keep your row", () => {
+  it("your row: \"Your turn · play now\" only on top (Eric: nothing lower down); your place for screen readers; a phone's folded 4 keep your row", () => {
     const m = at([[], [], []]);
     const q = (me: string) => boardQueue(m, 2, me);
-    expect(queueLine(q("a0"))).toBe("Your turn · play now");
-    expect(queueLine(q("a3"))).toBe("Waiting for 2 players");
-    expect(queueLine(q("b1"))).toBe("Waiting for 1 player");
-    expect(queueLine(q("b2"))).toBe("Waiting for 7 players");
+    // On top with your move on now: "Your turn · play now"; on top before it's on (no move asked yet): nothing yet.
+    expect(queueLine(boardQueue(at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]), 2, "a0"))).toBe("Your turn · play now");
+    expect(queueLine(q("a0"))).toBeNull();
+    expect(queueLine(q("a3"))).toBeNull();
     expect(queueLine(q("zz"))).toBeNull();
+    expect(queuePlace(q("a0"))).toBe(0);
+    expect(queuePlace(q("a3"))).toBe(2);
+    expect(queuePlace(q("b2"))).toBe(7);
+    expect(queuePlace(q("zz"))).toBeNull();
     expect(foldedRows(q("a3")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b0"]);
     // Further down: the top 3, then you.
     expect(foldedRows(q("b2")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b2"]);

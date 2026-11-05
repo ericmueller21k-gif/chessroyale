@@ -70,6 +70,36 @@ async function relayLobby(page: Page, extra = "") {
   await page.getByRole("button", { name: "Skip votes" }).click();
 }
 
+/** Real-length usernames (Eric, Nov 5: 6-20 characters, a mix) for every player but you, in the lobby's order. */
+const NAMES = ["QueenSacrificeQueen", "knightrider_2009", "Zugzwang Zoe", "TheBishopOfBanter", "pawnstorm77", "en_passant_enjoyer", "Fischer4ever", "CastleQueenside", "gambit_goblin", "BlunderMaster3000", "Ruy_Lopez_Fan", "rookie_rook"];
+async function realNames(page: Page) {
+  await expect.poll(() => page.evaluate(() => !!(window as any).squads?.lobby?.players?.length), { timeout: 30_000 }).toBe(true);
+  await page.evaluate((names) => {
+    const s = (window as any).squads;
+    // (Your match's players first, so the 7 in your match have 7 different names.)
+    const m = [...s.matches.values()].find((x: any) => x.sides.some((sd: any) => sd.seats.includes(s.myId)));
+    const mine: string[] = m ? m.sides.flatMap((sd: any) => sd.seats) : [];
+    const ids = [...mine, ...s.lobby.players.map((x: any) => x.id).filter((id: string) => !mine.includes(id))].filter((id: string) => id !== s.myId);
+    const was = s.nameOf.bind(s);
+    s.nameOf = (id: string) => (id === s.myId ? was(id) : (names[ids.indexOf(id) % names.length] ?? was(id)));
+    s.emit?.();
+  }, NAMES);
+}
+
+/** The turn order's rows: one height, the move column in one place, no name wrapped (a long one cut with an ellipsis). */
+const rowsLaidOut = (page: Page) =>
+  page.evaluate(() => {
+    const rows = [...document.querySelectorAll(".sq-to-row")];
+    const names = rows.map((r) => r.querySelector(".sq-to-name") as HTMLElement);
+    return {
+      heights: new Set(rows.map((r) => Math.round(r.getBoundingClientRect().height))).size,
+      moveRights: new Set(rows.map((r) => Math.round(r.querySelector(".sq-to-move")!.getBoundingClientRect().right))).size,
+      moveWidths: new Set(rows.map((r) => Math.round(r.querySelector(".sq-to-move")!.getBoundingClientRect().width))).size,
+      wrapped: names.filter((n) => n.getClientRects().length > 1).length,
+      ellipsis: names.every((n) => getComputedStyle(n).textOverflow === "ellipsis" && getComputedStyle(n).whiteSpace === "nowrap"),
+    };
+  });
+
 /** Every row of the turn order on screen: its name, whether lit, its "where you stand" words. */
 const queue = (page: Page) =>
   page.locator(".sq-to-row").evaluateAll((rows) => rows.map((r) => ({ name: r.querySelector(".sq-to-name")?.textContent ?? "", lit: r.classList.contains("lit"), where: r.querySelector(".sq-to-where")?.textContent ?? null })));
@@ -99,14 +129,18 @@ test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished 
   void s;
 });
 
-test("the turn order: one queue for the board on screen, one size on every board, the mover lit on top, your place said; a row's tap shows that position", async ({ page }) => {
+test("the turn order: one queue for the board on screen, one size on every board, the mover lit on top, \"Your turn · play now\" only on top; long names cut, the move column in place; a row's tap shows that position", async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   let s = await nextDuty(page);
+  await realNames(page);
   // Your move: you on top, lit, "Your turn · play now".
   const q0 = await queue(page);
   expect(q0[0]).toMatchObject({ name: "You", lit: true, where: "Your turn · play now" });
   expect(q0.filter((r) => r.lit)).toHaveLength(1);
+  // Real-length names (up to 20 letters): one row height, the move column in one place, nothing wrapped.
+  await page.waitForTimeout(300);
+  expect(await rowsLaidOut(page)).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   const phone = test.info().project.name === "phone";
   // A phone: 4 rows, a tap for all 8 (over the board: nothing below moves), and back; a computer: all 8.
   expect(q0).toHaveLength(phone ? 4 : 8);
@@ -128,11 +162,14 @@ test("the turn order: one queue for the board on screen, one size on every board
   await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(0);
   for (let i = 0; i < 3; i++) {
     await page.locator(".sq-match.ours button.sq-tiny").nth(i).click();
+    await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${i + 1}`);
     const b = (await box.boundingBox())!;
     expect(b.height).toBeCloseTo(size.height, 0);
     expect(b.width).toBeCloseTo(size.width, 0);
-    const where = await page.locator(".sq-to-row.you .sq-to-where").textContent();
-    expect(where).toMatch(/^(Your turn · play now|Waiting for 1 player|Waiting for [2-7] players)$/);
+    // Your row: nothing but "You" and your move (you've moved: no "Your turn · play now" anywhere; Eric).
+    expect(Number(await page.locator(".sq-to-row.you").getAttribute("data-place"))).toBeGreaterThanOrEqual(0);
+    expect(await page.locator(".sq-to-row.you .sq-to-where").textContent()).toBe("");
+    expect(await rowsLaidOut(page)).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }
   // A few halves on, a row with a last move: its tap shows that board at the position after it.
   s = await nextDuty(page, s.seq);
@@ -142,6 +179,41 @@ test("the turn order: one queue for the board on screen, one size on every board
   await row.click();
   await expect(page.locator(".history-nav.browsing")).toBeVisible();
   await expect(page.locator(".sq-to-row.shown")).toHaveCount(1);
+});
+
+test("the turn order is never rebuilt (Eric): tapping each tiny board in turn keeps the same box, at the same size, with the same row for each player; only the order changes", async ({ page }) => {
+  test.setTimeout(240_000);
+  await relayLobby(page);
+  const s = await nextDuty(page);
+  await realNames(page);
+  await play(page, quiet(s.fen!));
+  // (A phone: all 8 open, so every player's row is there on every board; it stays open across boards.)
+  if (test.info().project.name === "phone") await page.locator(".sq-to-more").click();
+  await expect(page.locator(".sq-to-row")).toHaveCount(8);
+  const box = page.locator(".sq-to");
+  const before = (await box.boundingBox())!;
+  await page.evaluate(() => {
+    const el = document.querySelector<HTMLElement>(".sq-to")!;
+    el.dataset.mark = "kept";
+    (window as any).__rows = Object.fromEntries([...el.querySelectorAll<HTMLElement>(".sq-to-row")].map((r) => [r.dataset.id, r]));
+    (window as any).__orders = [];
+  });
+  for (let i = 0; i < 3; i++) {
+    await page.locator(".sq-match.ours button.sq-tiny").nth(i).click();
+    await expect(page.locator(".sq-tiny.on")).toHaveCount(1);
+    await page.waitForTimeout(400);
+    const same = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>(".sq-to")!;
+      const rows = [...el.querySelectorAll<HTMLElement>(".sq-to-row")];
+      (window as any).__orders.push(rows.map((r) => r.dataset.id).join());
+      return { mark: el.dataset.mark ?? null, boxes: document.querySelectorAll(".sq-to").length, rows: rows.length, sameRows: rows.every((r) => (window as any).__rows[r.dataset.id!] === r) };
+    });
+    expect(same).toEqual({ mark: "kept", boxes: 1, rows: 8, sameRows: true });
+    const b = (await box.boundingBox())!;
+    expect([b.x, b.y, b.width, b.height].map(Math.round)).toEqual([before.x, before.y, before.width, before.height].map(Math.round));
+  }
+  // The order did change between boards (the queue is each board's).
+  expect(new Set(await page.evaluate(() => (window as any).__orders)).size).toBeGreaterThan(1);
 });
 
 test("the coach marks: three, one at a time, a tap goes on; unticked they come back next lobby; \"Don't show these again\" and never again", async ({ page }) => {
@@ -182,6 +254,7 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
   test.setTimeout(240_000);
   await relayLobby(page);
   await nextDuty(page);
+  await realNames(page);
   // iPhone 13 and 15 with Safari's bars, a big iPhone, a short Android with Chrome's.
   for (const [w, h] of [
     [390, 664],
@@ -202,5 +275,7 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
       return past;
     });
     expect(out, `${w}×${h}`).toEqual([]);
+    // The turn order's long names at every width: cut, never wrapped, the move column in place.
+    expect(await rowsLaidOut(page), `${w}×${h}`).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }
 });

@@ -1,4 +1,4 @@
-import type { ComponentChildren } from "preact";
+import { render, type ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY, bannerPlusMs } from "@chessroyale/core";
 import { applyMove, fenAtPly, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
@@ -29,6 +29,7 @@ import {
   boardQueue,
   foldedRows,
   queueLine,
+  queuePlace,
   type TurnRow,
   blockBankNow,
   hasBlocks,
@@ -758,10 +759,10 @@ function MatchView({
         <HistoryNav view={history} total={b.moves.length} clock={<ClockLine client={client} m={m} board={boardId} />} />
         {/* Relay (Nov 5, round 2): under the board only the move arrows and the turn order; whose turn it is shows there.
             (A computer: in the column beside the board, at its top.) */}
-        {m.format === "relay" && !computer && turnBox}
+        {m.format === "relay" && !computer && <Island id="sq-turn-order">{turnBox}</Island>}
       </div>
       <div class="sq-panel">
-        {m.format === "relay" && computer && turnBox}
+        {m.format === "relay" && computer && <Island id="sq-turn-order">{turnBox}</Island>}
         {cheatFen !== null && !(m.format === "relay" && !computer) && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
         {m.mode === "mercenary" && d && m.state === "half" && d.duty.board === boardId && (
           <StockfishToken
@@ -836,17 +837,76 @@ function coachStart(): number {
 }
 
 /**
+ * A part of the screen that is never rebuilt (Eric, Nov 5: the turn order "is never rebuilt or redrawn"): the match view
+ * is drawn afresh for each board (its board, moves and replay are the board's), but this part's element is made once and
+ * moved into each new view's slot before the screen is painted, its contents updated in place. So tapping another tiny
+ * board, or a move landing, changes only what's in it: the same element, the same size, the same rows. Gone (emptied)
+ * once no view holds it.
+ */
+const islands = new Map<string, HTMLElement>();
+function Island({ id, children }: { id: string; children: ComponentChildren }) {
+  const slot = useRef<HTMLDivElement>(null);
+  let el = islands.get(id);
+  if (!el && typeof document !== "undefined") {
+    el = document.createElement("div");
+    el.className = "sq-island";
+    islands.set(id, el);
+  }
+  useLayoutEffect(() => {
+    if (el && slot.current && el.parentNode !== slot.current) slot.current.appendChild(el);
+    return () => {
+      // (Another view takes it in the same commit; only if none has, it's emptied.)
+      setTimeout(() => {
+        if (el && !el.isConnected && islands.get(id) === el) {
+          render(null, el);
+          islands.delete(id);
+        }
+      }, 0);
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (el) render(<>{children}</>, el);
+  });
+  return <div class="sq-island-slot" ref={slot} />;
+}
+
+/**
+ * Rows that glide to their new places (FLIP, about 220 ms) when their order changes, as the scoreboards do: each row
+ * (`data-id`) kept by player, so its element is reused; where it was is measured before and after, and it slides from
+ * there. Nothing else moves.
+ */
+function useGlide(list: { current: HTMLElement | null }, order: string) {
+  const tops = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const root = list.current;
+    if (!root) return;
+    const rows = [...root.querySelectorAll<HTMLElement>("[data-id]")];
+    for (const row of rows) {
+      const id = row.dataset.id!;
+      const was = tops.current.get(id);
+      const now = row.offsetTop;
+      if (was !== undefined && was !== now && typeof row.animate === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        row.animate([{ transform: `translateY(${was - now}px)` }, { transform: "translateY(0)" }], { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+      }
+    }
+    tops.current = new Map(rows.map((r) => [r.dataset.id!, r.offsetTop]));
+  }, [order]);
+}
+
+/**
  * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left";
  * his correction: one queue for the board on screen): all 8 players in the order they'll move on this board, the next
  * there on top (lit while it's their move now), each with their squad's color and, on the right, the move they last
- * played (a tap shows that position). Your row says where you stand: "Your turn · play now", or how many move there
- * before you. A phone shows 4 rows (with you further down, the top 3 and yours) and a tap opens all 8 over the board,
+ * played (a tap shows that position). Your row is bold "You"; on top it says "Your turn · play now" (Eric: nothing
+ * lower down, the order says it). A phone shows 4 rows (with you further down, the top 3 and yours) and a tap opens all 8 over the board,
  * so nothing below moves; a computer all 8. One size per state on every board.
  */
 function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client: SquadsClient; m: LocalMatch; board: number; computer: boolean; onRow: ((board: number, ply: number) => void) | null; shownPly: number | null }) {
   const [open, setOpen] = useState(false);
   const queue = boardQueue(m, board, client.myId);
   const line = queueLine(queue);
+  const place = queuePlace(queue);
+  const waiting = place ? `Waiting for ${place} ${place === 1 ? "player" : "players"}` : null;
   const key = m.boards.map((b) => b.moves.length).join();
   const sans = useMemo(() => {
     const out = new Map<string, string>();
@@ -859,9 +919,12 @@ function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client:
   }, [key, board]);
   const all = computer || open;
   const rows = all ? queue : foldedRows(queue);
-  const nameOf = (r: TurnRow) => (r.you ? "You" : short(client.nameOf(r.id)));
+  const listRef = useRef<HTMLDivElement>(null);
+  useGlide(listRef, rows.map((r) => r.id).join());
+  // (Whole names, cut with an ellipsis by the row's width, never wrapped: the move's column keeps its place.)
+  const nameOf = (r: TurnRow) => (r.you ? "You" : client.nameOf(r.id));
   const list = (
-    <div class={`sq-to-list${all ? " all" : ""}`} role="list" aria-label={`Turn order on board ${board + 1}`}>
+    <div class={`sq-to-list${all ? " all" : ""}`} ref={listRef} role="list" aria-label={`Turn order on board ${board + 1}`}>
       {rows.map((r, i) => {
         const shown = !!r.last && shownPly !== null && r.last.board === board && r.last.ply + 1 === shownPly;
         const gap = !all && i === 3 && queue.indexOf(r) > 3;
@@ -871,14 +934,17 @@ function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client:
             type="button"
             role="listitem"
             class={`sq-to-row${i === 0 ? " top" : ""}${r.lit ? " lit" : ""}${r.you ? " you" : ""}${shown ? " shown" : ""}${gap ? " skip" : ""}`}
+            data-place={queue.indexOf(r)}
+            data-id={r.id}
             style={{ "--sq": squadColour(m.sides[r.side].squadId) }}
             disabled={!r.last || !onRow}
             onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
-            aria-label={`${nameOf(r)}${r.you && line ? `, ${line}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
+            aria-label={`${nameOf(r)}${r.you && (line ?? waiting) ? `, ${line ?? waiting}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
           >
             <span class="sq-to-mark" aria-hidden="true" />
             <span class="sq-to-name">{nameOf(r)}</span>
-            {r.you && line && <span class="sq-to-where">{line}</span>}
+            {/* (Only on top, Eric: "Your turn · play now"; lower down the queue's order says it. The move's column keeps its place.) */}
+            <span class="sq-to-where">{r.you && line ? line : ""}</span>
             <span class="sq-to-move">{r.last ? sans.get(r.id) : ""}</span>
           </button>
         );
