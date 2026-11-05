@@ -539,8 +539,10 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   await expect(crate.getByRole("button", { name: "Buy with 3 Folio tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  // The "being written" edge: the west-back corner, the margin line, the sketched lantern and lattice.
-  await walkTo([3, 5]);
+  // The "being written" edge: the west-back corner, the margin line, the sketched lantern and lattice. (Two hops: from the counter the
+  // corner is off a phone's screen.)
+  await walkTo([6, 8]);
+  await walkTo([3, 6]);
   await still("edge");
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
