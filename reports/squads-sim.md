@@ -98,13 +98,13 @@ All mixes.
 
 ## Ties
 
-Rounds 1 and 2: a level match goes to the squad with more team bank left (a coin if exactly level). A drawn final goes to Armageddon.
+Rounds 1 and 2: a level match goes to the squad with more boards drawn as Black (Nov 5), then more team bank left (a coin if exactly level). A drawn final goes to Armageddon.
 
-| Clock | R1 clinched early | R1 level → bank | R2 level → bank | Level → coin | Median bank gap deciding a tie (s) | Final drawn → Armageddon | Armageddon won by Black |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Bullet | 55.6% | 0.0% | 29.2% | 0 of 21 | 3.6 | 0.0% | – |
-| Blitz | 50.7% | 0.0% | 45.8% | 0 of 33 | 11.0 | 0.0% | – |
-| Rapid | 54.2% | 0.0% | 48.6% | 0 of 35 | 12.0 | 0.0% | – |
+| Clock | R1 clinched early | R1 level → draws as Black | R1 level → bank | R2 level → bank | Level → coin | Median bank gap deciding a tie (s) | Final drawn → Armageddon | Armageddon won by Black |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Bullet | 55.6% | 0.7% | 0.0% | 29.2% | 0 of 21 | 3.6 | 0.0% | – |
+| Blitz | 50.7% | 0.7% | 0.0% | 45.8% | 0 of 33 | 11.0 | 0.0% | – |
+| Rapid | 54.2% | 1.4% | 0.0% | 48.6% | 0 of 35 | 12.0 | 0.0% | – |
 
 ## Missed actions
 
@@ -233,3 +233,20 @@ Rapid was 5+3, with a 90th percentile of 54.5 minutes. The candidates replayed t
 - **The tail is long games:** a few lobbies whose games run long (in the longest, matches of 20 minutes and more).
   The 90th percentile moves 4-7 minutes between sets of lobbies (Blitz 40.9 on the calibration's 36, 45.5 on these
   72), so compare candidates on the same lobbies, as here.
+
+## Relay on 3 boards against 4 (Nov 5)
+
+The same code and seeds with Relay on 4 boards (`SQUADS_SIM_SET='{"boards":{"relay":4,"pairs":2,"final":1}}' npm run
+sim:squads`, written elsewhere), against this report (docs/decisions/2026-11-05-squads-three-boards.md):
+
+| Clock | Median lobby, 3 boards | …4 boards | 90th percentile, 3 | …4 | Relay match (mean min), 3 | …4 | Bank after Relay (faster / slower winners), 3 | …4 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Bullet | 31.7 | 34.1 | 37.3 | 43.9 | 6.8 | 8.4 | 100.5 / 112.2 s | 113.7 / 123.2 s |
+| Blitz | 39.4 | 42.7 | 50.2 | 53.4 | 10.4 | 12.2 | 154.9 / 152.6 s | 153.3 / 158.1 s |
+| Rapid | 45.7 | 44.4 | 54.5 | 52.6 | 12.2 | 13.3 | 181.8 / 167.4 s | 165.2 / 160.3 s |
+
+A Relay match is 1-2 minutes shorter (best 2 of 3 is decided sooner), so a lobby is about 3 minutes shorter on Bullet and
+Blitz and level on Rapid. The banks after Relay move by at most about 15 s either way, and no squad reaches sudden death
+on either (today's clocks with move replay's free time: the committed report from before then had 21-31%). A level Relay
+is rare (about 1%) and is always settled by the draws as Black: three boards make an odd number of points to share, so
+a level score always has a draw in it.
