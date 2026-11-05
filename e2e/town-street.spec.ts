@@ -232,7 +232,7 @@ async function tapSquare(page: Page, sq: readonly [number, number]) {
 const dist = (a: readonly number[], b: readonly number[]) => Math.abs(((a[0]! - b[0]! + 69) % 46) - 23) + Math.abs(a[1]! - b[1]!);
 
 for (const backend of ["2d", "webgl"] as const)
-  test(`the boxes and the turn (${backend}): walking east along Fountain Street onto Seam Avenue the camera turns, the fronts face you before and after; a tap and an arrow work mid-turn and after; every figure on screen at rest`, async ({ page }) => {
+  test(`the boxes and the turn (${backend}): walking east along Fountain Street onto Seam Avenue the camera turns, the fronts face you before and after;${backend === "2d" ? " a tap and an arrow work mid-turn and after;" : ""} every figure on screen at rest`, async ({ page }) => {
     // (WebGL in the headless tests is software, about a third of 2D's frame rate: more time.)
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     const errors = watchErrors(page);
@@ -277,6 +277,8 @@ for (const backend of ["2d", "webgl"] as const)
     c = await cam(page);
     expect(c.boxes.filter((b) => b.facing === "W" && b.kind !== "hedge" && b.facesYou).length, "Seam Avenue's fronts face you").toBeGreaterThanOrEqual(2);
     await figuresOnScreen(page);
+    // (The keys and taps go through the same heading on either renderer: walked on Canvas 2D, where the headless tests run faster.)
+    if (backend === "webgl") return void expect(errors, "no page or console errors").toEqual([]);
     // Mid-turn (held halfway): the up arrow walks you the way the screen's up points most nearly (east), and a tap where a square is drawn
     // walks you there.
     await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(50));
