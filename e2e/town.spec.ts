@@ -1335,19 +1335,26 @@ const tagOverHead = (p: Page, id: string, name: string) =>
     [id, name],
   );
 /**
- * Where square (c, r) is on screen once the camera has settled (Nov 1). The camera trails your walk and keeps gliding a moment
+ * Where to tap square (c, r) once the camera has settled (Nov 1). The camera trails your walk and keeps gliding a moment
  * after you stop; a square read while it glides moves before the click lands. Beside you on a phone, the next square's middle
  * is only about a quarter of a square (8 px) clear of your own tap box, so a click a few frames late tapped your own pawn and
  * you didn't move: what failed main's run on 60975fa ("beside you: 22,17").
+ * Nov 5: the point of the square a tap reaches (`__townAt("tap-square")`: its middle, or the nearest point of it clear of whatever
+ * is drawn over that), as a player would tap it, not its middle: someone standing on the square in front of it (toward the camera) is
+ * drawn over its middle on a phone, and a tap there is a tap on them (their card; you don't move).
  */
 async function squareSettled(page: Page, c: number, r: number): Promise<{ x: number; y: number }> {
-  const at = () => page.evaluate(([c, r]) => (window as unknown as { __townAt: (k: string, id: [number, number]) => { x: number; y: number } | null }).__townAt("square", [c, r]), [c, r] as [number, number]);
-  let prev = await at();
+  type At = (k: string, id: [number, number]) => { x: number; y: number } | null;
+  const at = () => page.evaluate(([c, r]) => ({ mid: (window as unknown as { __townAt: At }).__townAt("square", [c, r]), tap: (window as unknown as { __townAt: At }).__townAt("tap-square", [c, r]) }), [c, r] as [number, number]);
+  let prev = (await at()).mid;
   for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(50);
     const now = await at();
-    if (now && prev && Math.abs(now.x - prev.x) < 0.25 && Math.abs(now.y - prev.y) < 0.25) return now;
-    prev = now;
+    if (now.mid && prev && Math.abs(now.mid.x - prev.x) < 0.25 && Math.abs(now.mid.y - prev.y) < 0.25) {
+      if (!now.tap) throw new Error(`square ${c},${r}: no point of it a tap reaches (someone is drawn over all of it)`);
+      return now.tap;
+    }
+    prev = now.mid;
   }
   throw new Error(`square ${c},${r}: the camera never settled`);
 }
@@ -1369,6 +1376,22 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   page.on("request", (r) => {
     const path = new URL(r.url()).pathname;
     if (/ride/i.test(path) && !DRAWING_CHUNK.test(path)) fetched.push(r.url());
+  });
+  // The bots hold still from the town's first moment (`__townCall(-1)`, called as the town sets its hooks: no walk, no turns), where it
+  // places them: each at least 3 steps from you (world.ts `freeSpot`). So none stands on the squares beside you that the taps below aim
+  // at, or on the squares in front of them (toward the camera), drawn over them on a phone. (Frozen only after the ride's checks below,
+  // about 20 s on CI's WebGL phone run, they had wandered: Crumb stood on 23,16, in front of the square beside you, the tap opened its
+  // card and you didn't move: "beside you: 23,17" on f5e73337, both tries. docs/decisions/2026-11-05-rides-test-beside-you.md)
+  await page.addInitScript(() => {
+    let call: ((i: number) => void) | undefined;
+    Object.defineProperty(window, "__townCall", {
+      configurable: true,
+      get: () => call,
+      set: (f: ((i: number) => void) | undefined) => {
+        call = f;
+        f?.(-1);
+      },
+    });
   });
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -1408,11 +1431,12 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
     await expect.poll(async () => Math.abs((await you(page))[0] - c) + Math.abs((await you(page))[1] - r)).toBeLessThanOrEqual(1);
     await expect.poll(async () => (await rideNow(page)).you.anim).toBe("idle");
   };
-  // (The bots hold still: none walks across your way. `__townCall(-1)` stops new walks; one already under way, a bot coming out
-  // of its home to a spot near you, say, is let finish first, or it could claim the square beside you as you tap it.)
-  await page.evaluate(() => (window as unknown as { __townCall: (i: number) => void }).__townCall(-1));
+  // (The bots held still from the start, above: none walks across your way, and none stands within 2 steps of you, on or in front of
+  // the squares beside you.)
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townBots: () => { name: string; moving: boolean }[] }).__townBots().filter((b) => b.moving).map((b) => b.name)), { message: "the bots stand still", timeout: 15_000 }).toEqual([]);
   const [c0, r0] = await you(page);
+  const near = await page.evaluate(([c0, r0]) => (window as unknown as { __townBots: () => { name: string; at: string; home: boolean }[] }).__townBots().filter((b) => !b.home && b.at.split(",").map(Number).reduce((d, v, k) => d + Math.abs(v - (k ? r0 : c0)), 0) <= 2).map((b) => `${b.name} ${b.at}`), [c0, r0] as const);
+  expect(near, "no bot within 2 steps of you").toEqual([]);
   // A tap on the square right beside you walks you there, as on foot: your ride's reach isn't you (taps take the pawn's box).
   for (const c of [c0 + 1, c0]) {
     const at = await squareSettled(page, c, r0);
