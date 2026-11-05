@@ -1051,6 +1051,9 @@ export type SoundName =
   | "dashDing"
   | "dashChomp"
   | "dashStep"
+  // (His intro's, Nov 5: the shoe boxes landing, his jacket dusted off.)
+  | "dashThud"
+  | "dashBrush"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1385,6 +1388,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   dashDing: dashBoss("ding"),
   dashChomp: dashBoss("chomp"),
   dashStep: dashBoss("step"),
+  dashThud: dashBoss("thud"),
+  dashBrush: dashBoss("brush"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1668,6 +1673,8 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashDing: [["dash", "ding"]],
   dashChomp: [["dash", "chomp"]],
   dashStep: [["dash", "step"]],
+  dashThud: [["dash", "thud"]],
+  dashBrush: [["dash", "brush"]],
   kingCant: [["godKing", "cant"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */

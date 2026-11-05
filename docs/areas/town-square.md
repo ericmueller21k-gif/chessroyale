@@ -714,6 +714,20 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   before his brag. The room's own elves keep working. Every beat is `CHALLENGE_FEEL.ice` or the art's frames (`iceTimes`, `iceAt`,
   `iceCues`); about 13.2 s from the marks to the wipe. Twelve new sounds (`gingerCharge`, `gingerBlast`, `gingerBurst`, `gingerWhoosh`,
   `gingerStab`, `gingerStep`, `gingerHeave`, `gingerClack`, `gingerCast`, `gingerSparkle`, `gingerThump`, `gingerGust`), every cue his own.
+- **Dash's challenge (Nov 5, round 3, his own; Eric's design, intro-blitz-nov3.md; an admin's town only while he's in the game for
+  admins first):** you both walk on straight to where you stand through it all (`seated`): he at his own place (`BossIntro.clear`
+  2.08: the art's `BLITZ_INTRO_DROP_AT`, 72 of his pixels west of the table's foot, so every toss is drawn at the table), you at the
+  usual clear place. His line, "Yo yo yo! Dash in the building, fam!" (`CHALLENGE_FEEL.blitz.lineMs`, a short one). Then four dashes
+  (`BLITZ_DASHES`, each a beat): he bolts off to our left in a trail of dust (`INTRO_BLITZ_DUST` at his spot, from the bolt's whoosh),
+  is out of sight `awayMs`, races back, skids onto his spot and tosses: the shoe-box table lands (`INTRO_BLITZ_TABLE`, its own teal lid
+  on top), the board falls onto it (Big Boy's `boardDropMs` from `dropFrom`), the pieces appear with a pop (`INTRO_BLITZ_POP`, the
+  pieces from its own frame), both shoe-box stools land a square each side (`INTRO_BLITZ_STOOL`). His brag (he dusts off his jacket
+  and finger-guns you); no God King attack was drawn for him, so he stands through its beat; his clock rush (`INTRO_BLITZ_STORM` and
+  `_FRONT`, played as Alfil's sandstorm). Everything stands before any cover and nobody steps after the stools land. Every beat is
+  `CHALLENGE_FEEL.blitz` or the art's frames (`blitzTimes`, `blitzAt`, `blitzCues`); about 10 s from his line to the cover. His moves
+  `characters/dash-intro.ts` (his rig exported from `boss-blitz.ts`, his town frames as before), his props `shops/blitz-intro-art.ts`
+  (one lazy chunk). Two new sounds (`dashThud`, `dashBrush`); the rest his own (`dashWhoosh`, `dashSqueak`, `dashZip`, `dashDing`,
+  `dashTick`, `dashWhirr`) and the app's `pop`. Decision: [2026-11-05-dash-intro.md](../decisions/2026-11-05-dash-intro.md).
 - **Hollow's challenge (Nov 3):** his own intro since Nov 3, round 2 (below: "Hollow's own"); his line "Did you leave a light on?"; the
   rings in the ice (`SHOP_HOLLOW_MARKS`) give the table's place; his seat his own (`BossIntro.clear` 2.92, `marksFeel`'s `own`): his
   lash lies 1.6 squares out in front of his feet, so at the usual 2.6 it reached his stool. The pond is smaller than the other circles
@@ -724,8 +738,9 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Babur, Puddles and Dash (the default intro; Dash's since Nov 3, in an admin's town only, until his own in round 3: no God
-  King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`). Every
+  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Dash (his own, Nov 5, in an admin's town only: above; no God
+  King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`), Babur
+  and Puddles (the default intro). Every
   other boss's card works as before (its confirm, Leave, the Boss
   raid screen). Per player: it all happens on your own screen; the boss stays at its home for everyone else.
 - **The layout** (`layout`, per boss): **"across"** (the default, all five today): the boss on the table's west (the screen's
@@ -823,7 +838,8 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   every cue a sound, the cave's lights as ever without an intro), `packages/app/test/shop-hollow.test.ts` (his intro's moves on the
   ice, clear of his stool and the rock), the storm's edge, the wipe, back to where you stood), `packages/server/test/town-chat.test.ts` (the lines and the no-spam rule, and
   through the API), `e2e/boss-challenge.spec.ts` (phone and computer: Alfil, a quit then a finished challenge and the lines; Babur's
-  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back; Dash's default as an admin and back; Hollow's own and back: in to your seats, his line,
+  default intro and back; Big Boy's own intro and back; Timber's own as an admin and back; Dash's own as an admin and back (his line, the four dashes in order, each thing only from its
+  toss, off four times, nothing missing from the stools on, nobody moving, the clock rush); Hollow's own and back: in to your seats, his line,
   the table while it's lit, his channel line, the lanterns one by one, the string, his strand, the black, the dim light, the iris, the
   dark lifting off the battle, nobody moving and the table there throughout the drain), `e2e/shop.spec.ts` (Alfil's Pyramid's, Big Boy's Crib's and Dash's Kicks' crates), `e2e/town.spec.ts` (a boss without an inside, Folio: the
   Boss raid screen).

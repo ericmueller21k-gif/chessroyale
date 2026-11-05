@@ -10,6 +10,7 @@ import { SHOP_HOLLOW_FLOOR, SHOP_HOLLOW_LAYOUT, SHOP_HOLLOW_MARKS, SHOP_HOLLOW_P
 import { SHOP_PIG_LAYOUT, SHOP_PIG_MARKS } from "../src/town/shops/pig-art.ts";
 import { BOSS_PIG_INTRO, INTRO_PIG_BUCKET_B, INTRO_PIG_BUCKET_SEAT_H, INTRO_PIG_BUCKET_W } from "../src/town/shops/pig-intro-art.ts";
 import { BOSS_HOLLOW_INTRO, HOLLOW_INTRO_BALL_R, HOLLOW_INTRO_HEART, INTRO_HOLLOW_BULB_RUN, INTRO_HOLLOW_DARK, INTRO_HOLLOW_DIMPOOL, INTRO_HOLLOW_LANTERN_GLOW, INTRO_HOLLOW_LANTERN_OUT, INTRO_HOLLOW_PIECES, INTRO_HOLLOW_SHOWPIECE_OUT } from "../src/town/shops/hollow-intro-art.ts";
+import { INTRO_BLITZ_STOOL, INTRO_BLITZ_STOOL_SEAT_H } from "../src/town/shops/blitz-intro-art.ts";
 import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, INTRO_BIGBOY_STOOL_TOP_H, INTRO_BIGBOY_STOOL_W, INTRO_BIGBOY_SWIRL, INTRO_BIGBOY_SWIRL_FRONT, INTRO_BIGBOY_TABLE_PALETTE } from "../src/town/shops/bigboy-intro-art.ts";
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
@@ -61,7 +62,7 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson and Ginger their own, Babur, Puddles and Dash the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger and Dash their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
     expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "gingerbread", "grex", "hollow", "pig", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
@@ -70,8 +71,8 @@ describe("the challenge's flow", () => {
     expect(introOf("gardener")).toMatchObject({ custom: false, name: "Puddles", line: "Wipe your feet. Then let's see what grows." });
     expect(introOf("bigboy")).toMatchObject({ custom: true, name: "Big Boy", line: "My blocks! My board! Big boy go first!" });
     expect(introOf("timber")).toMatchObject({ custom: true, name: "Timber", line: "Hard hats on. We're building today.", layout: "across", cues: { storm: "timberSwoosh" } });
-    // (Dash, Nov 3: the default until his own intro, round 3; his line his entrance's first.)
-    expect(introOf("dash")).toMatchObject({ custom: false, name: "Dash", line: "Yo yo yo! Dash in the building, fam!", layout: "across", cues: { table: "pop", wipe: "dashWhoosh" } });
+    // (Dash, Nov 5: his own, round 3, his dashes and the clock rush; his line his entrance's first; you both walk on to where you stand.)
+    expect(introOf("dash")).toMatchObject({ custom: true, name: "Dash", line: "Yo yo yo! Dash in the building, fam!", layout: "across", seated: true, cues: { pop: "pop", storm: "dashWhirr" } });
     // (Hollow, Nov 3: his own, the dark; his line one of his entrance's, then a channel line; you both walk on to your seats.)
     expect(introOf("hollow")).toMatchObject({ custom: true, name: "Hollow", line: "Did you leave a light on?", layout: "across", seated: true, cues: { table: "pop", blackout: "hollowBlackout" } });
     // (Wrangler, Nov 4: his own, the lasso; his line a placeholder until Eric's Gemini lines; you both walk on to where you stand clear.)
@@ -982,7 +983,12 @@ describe("the challenge's pacing (Nov 2)", () => {
     for (let y = 0; y < f.h; y++) for (let x = 0; x < ch.foot[0] - PX / 2; x++) if (f.data[(y * f.w + x) * 4 + 3]! > 0) return y;
     return ch.foot[1];
   };
-  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, dash: PARK_TABLE, hollow: PARK_TABLE } as const;
+  const TABLES = { alfil: INTRO_ALFIL_TABLE, tiger: PARK_TABLE, gardener: PARK_TABLE, bigboy: INTRO_BIGBOY_BLOCKS, hollow: PARK_TABLE } as const;
+  /** Dash's shoe-box stools (his table has none in its picture, Nov 5): one `stoolOff` from the table's middle each side; their outer edges, and their seat. */
+  const shoeBoxes = () => {
+    const [l, r] = low(INTRO_BLITZ_STOOL, "idle", INTRO_BLITZ_STOOL.h);
+    return { west: F.stoolOff - l / PX, east: F.stoolOff + (r + 1) / PX, top: INTRO_BLITZ_STOOL_SEAT_H / PX };
+  };
   /** Wrangler's buckets (his stools, upside down: their `stool`), one `stoolOff` from the table's middle each side; their outer edges, and their seat. */
   const buckets = () => {
     const [l] = low(INTRO_PIG_BUCKET_B, "stool", INTRO_PIG_BUCKET_B.h);
@@ -1003,7 +1009,7 @@ describe("the challenge's pacing (Nov 2)", () => {
       // (Timber's clear place his own, from his log intro; Hollow's his own, BOSS_INTROS' `clear`: his lash reaches
       // further.)
       const m = marksOf(LAYOUTS[id], "across", id === "pig" ? SHOP_PIG_MARKS : null, id === "timber" ? marksFeel(TIMBER) : marksFeel(null, F, introOf(id)!.clear))!;
-      const st = id === "timber" ? stumps() : id === "pig" ? buckets() : stools(TABLES[id]);
+      const st = id === "timber" ? stumps() : id === "pig" ? buckets() : id === "dash" ? shoeBoxes() : stools(TABLES[id]);
       // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
       const bossEdge = m.table.c - st.west;
       const youEdge = m.table.c + st.east;

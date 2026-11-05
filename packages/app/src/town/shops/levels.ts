@@ -130,8 +130,13 @@ export function liftAt(lv: Levels | null, x: number, y: number): number {
   return 0;
 }
 
-/** Where a figure at (x, y), lifted `h`, is drawn among the room's pieces (their rows): on the levels, half a square nearer. */
-export const levelZ = (y: number, h: number): number => y + 0.51 * Math.min(1, h / 5);
+/**
+ * Where a figure at (x, y), lifted `h`, is drawn among the room's pieces (their rows): on the levels (lifted at all), half a square
+ * nearer. (Eased in over the first 5 px it once was, a figure stepping onto a flight's low square had, for a frame, its row's middle
+ * behind it and wasn't yet half a square nearer: drawn behind the stairs' card for that frame. Eric, Nov 5: "on the turn for a
+ * frame it bugs like crazy".)
+ */
+export const levelZ = (y: number, h: number): number => (h > 0 ? y + 0.51 : y);
 
 /** The squares a square links to along the chain (by k), or none. */
 export const linksOf = (lv: Levels | null, k: number): readonly number[] => lv?.links.get(k) ?? NONE;
