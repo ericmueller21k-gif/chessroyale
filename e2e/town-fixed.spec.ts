@@ -275,7 +275,8 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
   await open(page, "2d");
   await walkTo(page, [7, 21]);
   await shot("1-street-looking-north");
-  await walkTo(page, [5, 23]);
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("timber")), { timeout: 30_000 }).toBe(true);
+  await walkTo(page, [4, 23]);
   await shot("2-home-strip-timber");
   await walkTo(page, [22, 25]);
   await shot("3-colosseum-from-the-park");
