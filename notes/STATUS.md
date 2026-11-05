@@ -195,3 +195,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Disk filled at ~08:00: removed 13 merged+pushed worktrees (clean, nothing ahead). Keep cleaning finished worktrees.
 - LIVE 13:06 UTC: #503 street town rounds 3+4 (admins only), main green at 6ce41d19. Next: Eric walks it (morning) → his OK → flip
   STREET_TOWN for everyone. Follow-ups: bigger Colosseum; Moo/Ginger low in rows. Helper slots free.
+- Nov 5 ~19:00: Eric: Folio's sanctuary, director's design, "crank through it" (weekly usage resets today): FULL BUILD, NO REVIEW STOPS
+  (like the Wrangler trial): art (brief-folio-sanctuary-art.md, helper running on claude/boss-art) → shop code → intro code incl. the
+  screen crumple into the match → PRs → live. Beside-you root-cause helper running (claude/fix-beside-you). Queue for the next Opus slot:
+  bigger looming Colosseum in the street town; Moo/Ginger low in rows; board-carrying moments on computer (#110 note).
