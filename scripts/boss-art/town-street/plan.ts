@@ -126,6 +126,9 @@ export const STATUES = [
 import type { HomeId } from "../out/town-buildings/home-boxes.ts";
 import type { Design } from "../out/town-buildings/buildings.ts";
 import { HOME_DOOR_PX } from "../out/town-buildings/home-boxes.ts";
+import { HOUSES } from "../../../packages/app/src/town/houses/index.ts";
+/** Each home's sign's middle on its front (px); Timber's and Dash's drafts have none yet. */
+const SIGN_MID_PX: Partial<Record<HomeId, number>> = Object.fromEntries(Object.entries(HOUSES).map(([k, h]) => [k, h.sign.x + h.sign.w / 2]));
 export type { HomeId, Design };
 export type Facing = "S" | "W";
 export interface Lot {
@@ -315,6 +318,18 @@ export function doorSquare(l: Lot): { c: number; r: number } {
 export function wanderBox(l: Lot): { x0: number; x1: number; y0: number; y1: number } {
   return { x0: l.c0 - 0.3, x1: l.c0 + l.w - 0.7, y0: l.r0 - 1.3, y1: l.r0 - 0.15 };
 }
+/**
+ * Where a boss rests when it stops wandering (so its home's front stays in view, Eric: "the boss homes always visible"):
+ * on its sidewalk at the end of its wander box farther from its door, unless that end is in front of its sign's middle.
+ */
+export function restSquare(l: Lot): { c: number; r: number } {
+  const d = doorSquare(l);
+  const sign = SIGN_MID_PX[l.id as HomeId];
+  const signC = sign === undefined ? -1 : wrap(l.c0 + Math.floor((sign + (l.w * 37 - (l.id === "alfil" ? 208 : 144)) / 2) / 37));
+  const ends = [wrap(l.c0), wrap(l.c0 + l.w - 1)].filter((c) => c !== d.c && c !== signC);
+  const far = (ends.length ? ends : [wrap(l.c0)]).sort((a, b) => Math.abs(wrapF(b - d.c)) - Math.abs(wrapF(a - d.c)))[0]!;
+  return { c: far, r: wrap(l.r0 - 1) };
+}
 /** Squares a prop stands on and blocks (a tree, a table and its stools, the fountain, a bench, a lamp, a shed). */
 export function blockedSquares(): Set<number> {
   const b = new Set<number>();
@@ -342,9 +357,9 @@ export const TURN_ZONES = [
   { street: "upper-st", rows: [29, 34] },
 ] as const;
 
-// ---- The lamps, settled: only on sidewalk squares, never on a door square (one there steps a square along the sidewalk).
+// ---- The lamps, settled: only on sidewalk squares, never on a door square or a boss's rest square (one there steps a square along the sidewalk).
 {
-  const doors = new Set(LOTS.filter((l) => l.kind === "home").map((l) => { const d = doorSquare(l); return at(d.c, d.r); }));
+  const doors = new Set(LOTS.filter((l) => l.kind === "home").flatMap((l) => [doorSquare(l), restSquare(l)].map((d) => at(d.c, d.r))));
   for (let i = PROPS.length - 1; i >= 0; i--) {
     const p = PROPS[i]!;
     if (p.kind !== "lamp") continue;

@@ -84,7 +84,8 @@ for (const z of TURN_ZONES) for (let r = z.rows[0]; r <= z.rows[1]; r++) for (co
 for (const l of LOTS) {
   if (l.kind !== "home") continue;
   const wb = wanderBox(l);
-  b += `<rect x="${X(wb.x0)}" y="${Y(wb.y1)}" width="${(wb.x1 - wb.x0 + 1) * S}" height="${(wb.y1 - wb.y0 + 1) * S}" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+  const sx = (x: number) => ox + (x + 0.5) * S, sy = (y: number) => oy + (N - 0.5 - y) * S;
+  b += `<rect x="${sx(wb.x0)}" y="${sy(wb.y1)}" width="${(wb.x1 - wb.x0) * S}" height="${(wb.y1 - wb.y0) * S}" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="4 3"/>`;
   const d = doorSquare(l);
   b += `<rect x="${X(d.c) + 3}" y="${Y(d.r) + 3}" width="${S - 6}" height="${S - 6}" fill="#ffd76a" stroke="#1f2530" stroke-width="1.4"/>`;
 }

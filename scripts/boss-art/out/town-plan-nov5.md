@@ -4,8 +4,8 @@ The data the layout code (code round 2) needs, generated from `scripts/boss-art/
 `npx tsx scripts/boss-art/town-street/plan-doc.ts`, which also writes the same data as [town-plan-nov5.json](town-plan-nov5.json)
 and runs the checks at the end. The picture: [town-art/0-plan.png](town-art/0-plan.png). The art each lot names is in
 `out/town-buildings/` (`town-art-nov5.md` says how to use it). Eric approved this plan in the mockups (Nov 5); nothing in it
-moved since, except the colourways (now three a design), the lamps (now on whole squares) and what's new below (doors, wander
-boxes, the start, the walking and the turn zones).
+moved since, except the colourways (now three a design), the lamps (now on whole sidewalk squares, off every door and rest
+square) and what's new below (doors, rest squares, wander boxes, the start, the walking and the turn zones).
 
 ## Squares
 
@@ -102,27 +102,30 @@ face a camera but north's.
 
 - **Door square:** the sidewalk square in front of the home's door (Eric, Nov 5: a tap on the home walks you there). The
   door's middle on the front picture is `HOME_SPECS[id].door` (px); the front is centred on its lot.
+- **Rest square:** where the boss stands when it stops (and where it first appears): its sidewalk square at the end of its
+  wander box farther from its door, unless that end is in front of its sign's middle. So the door, the sign and most of the
+  front stay in view (Eric: "the boss homes always visible"). It walks the whole box between rests.
 - **Wander box:** the boss's own yard (the strip between the lot's front edge and its front line) and the sidewalk in front,
   its lot's width along; in square coordinates (a boss's foot stays inside).
 
-| Home | Boss | Lot | Door square | Wander box (x, y) |
-| --- | --- | --- | --- | --- |
-| Puddles' Botanical Garden | Puddles | c 8..11, r 3..5 | (9, 2) | x 7.70..11.30, y 1.70..2.85 |
-| Smudgy's Art Gallery | Smudgy | c 17..20, r 3..5 | (19, 2) | x 16.70..20.30, y 1.70..2.85 |
-| Folio's Folded House | Folio | c 25..28, r 3..5 | (26, 2) | x 24.70..28.30, y 1.70..2.85 |
-| Alfil's Pyramid | Alfil | c 34..39, r 3..5 | (37, 2) | x 33.70..39.30, y 1.70..2.85 |
-| Timber's Lumber Lodge | Timber | c 3..6, r 18..20 | (4, 17) | x 2.70..6.30, y 16.70..17.85 |
-| Sawyer's Woodshed | Sawyer | c 9..12, r 18..20 | (10, 17) | x 8.70..12.30, y 16.70..17.85 |
-| Ginger Igloo | Ginger | c 33..36, r 18..20 | (34, 17) | x 32.70..36.30, y 16.70..17.85 |
-| Jefferson's Fireworks | Jefferson | c 37..40, r 18..20 | (39, 17) | x 36.70..40.30, y 16.70..17.85 |
-| Boingo's Funhouse | Boingo | c 3..6, r 26..28 | (5, 25) | x 2.70..6.30, y 24.70..25.85 |
-| Babur's Circus | Babur | c 9..12, r 26..28 | (10, 25) | x 8.70..12.30, y 24.70..25.85 |
-| Big Boy's Crib | Big Boy | c 33..36, r 26..28 | (35, 25) | x 32.70..36.30, y 24.70..25.85 |
-| Dash's Kicks | Dash | c 39..42, r 26..28 | (41, 25) | x 38.70..42.30, y 24.70..25.85 |
-| Chub & Chirp's Grassland | Chub & Chirp | c 3..6, r 35..37 | (5, 34) | x 2.70..6.30, y 33.70..34.85 |
-| Wrangler's Stall | Wrangler | c 9..12, r 35..37 | (11, 34) | x 8.70..12.30, y 33.70..34.85 |
-| Moo & Moon Meadow | Moo & Moon | c 33..36, r 35..37 | (35, 34) | x 32.70..36.30, y 33.70..34.85 |
-| Hollow Peak | Hollow | c 37..40, r 35..37 | (39, 34) | x 36.70..40.30, y 33.70..34.85 |
+| Home | Boss | Lot | Door square | Rest square | Wander box (x, y) |
+| --- | --- | --- | --- | --- | --- |
+| Puddles' Botanical Garden | Puddles | c 8..11, r 3..5 | (9, 2) | (11, 2) | x 7.70..11.30, y 1.70..2.85 |
+| Smudgy's Art Gallery | Smudgy | c 17..20, r 3..5 | (19, 2) | (17, 2) | x 16.70..20.30, y 1.70..2.85 |
+| Folio's Folded House | Folio | c 25..28, r 3..5 | (26, 2) | (25, 2) | x 24.70..28.30, y 1.70..2.85 |
+| Alfil's Pyramid | Alfil | c 34..39, r 3..5 | (37, 2) | (34, 2) | x 33.70..39.30, y 1.70..2.85 |
+| Timber's Lumber Lodge | Timber | c 3..6, r 18..20 | (4, 17) | (6, 17) | x 2.70..6.30, y 16.70..17.85 |
+| Sawyer's Woodshed | Sawyer | c 9..12, r 18..20 | (10, 17) | (12, 17) | x 8.70..12.30, y 16.70..17.85 |
+| Ginger Igloo | Ginger | c 33..36, r 18..20 | (34, 17) | (36, 17) | x 32.70..36.30, y 16.70..17.85 |
+| Jefferson's Fireworks | Jefferson | c 37..40, r 18..20 | (39, 17) | (37, 17) | x 36.70..40.30, y 16.70..17.85 |
+| Boingo's Funhouse | Boingo | c 3..6, r 26..28 | (5, 25) | (3, 25) | x 2.70..6.30, y 24.70..25.85 |
+| Babur's Circus | Babur | c 9..12, r 26..28 | (10, 25) | (12, 25) | x 8.70..12.30, y 24.70..25.85 |
+| Big Boy's Crib | Big Boy | c 33..36, r 26..28 | (35, 25) | (33, 25) | x 32.70..36.30, y 24.70..25.85 |
+| Dash's Kicks | Dash | c 39..42, r 26..28 | (41, 25) | (39, 25) | x 38.70..42.30, y 24.70..25.85 |
+| Chub & Chirp's Grassland | Chub & Chirp | c 3..6, r 35..37 | (5, 34) | (3, 34) | x 2.70..6.30, y 33.70..34.85 |
+| Wrangler's Stall | Wrangler | c 9..12, r 35..37 | (11, 34) | (9, 34) | x 8.70..12.30, y 33.70..34.85 |
+| Moo & Moon Meadow | Moo & Moon | c 33..36, r 35..37 | (35, 34) | (33, 34) | x 32.70..36.30, y 33.70..34.85 |
+| Hollow Peak | Hollow | c 37..40, r 35..37 | (39, 34) | (37, 34) | x 36.70..40.30, y 33.70..34.85 |
 
 Lamps stand in some wander boxes' sidewalk (a boss walks round them):
 - Smudgy: a lamp at (20, 2)
@@ -275,22 +278,22 @@ far half and its front is street or sidewalk, out of any turn zone, with no tree
 
 **Nobody's start or path is blocked:**
 
-- Puddles's door square (9, 2): open, reached from the start
-- Smudgy's door square (19, 2): open, reached from the start
-- Folio's door square (26, 2): open, reached from the start
-- Alfil's door square (37, 2): open, reached from the start
-- Timber's door square (4, 17): open, reached from the start
-- Sawyer's door square (10, 17): open, reached from the start
-- Ginger's door square (34, 17): open, reached from the start
-- Jefferson's door square (39, 17): open, reached from the start
-- Boingo's door square (5, 25): open, reached from the start
-- Babur's door square (10, 25): open, reached from the start
-- Big Boy's door square (35, 25): open, reached from the start
-- Dash's door square (41, 25): open, reached from the start
-- Chub & Chirp's door square (5, 34): open, reached from the start
-- Wrangler's door square (11, 34): open, reached from the start
-- Moo & Moon's door square (35, 34): open, reached from the start
-- Hollow's door square (39, 34): open, reached from the start
+- Puddles's door square (9, 2): open, reached from the start; rest square (11, 2): open
+- Smudgy's door square (19, 2): open, reached from the start; rest square (17, 2): open
+- Folio's door square (26, 2): open, reached from the start; rest square (25, 2): open
+- Alfil's door square (37, 2): open, reached from the start; rest square (34, 2): open
+- Timber's door square (4, 17): open, reached from the start; rest square (6, 17): open
+- Sawyer's door square (10, 17): open, reached from the start; rest square (12, 17): open
+- Ginger's door square (34, 17): open, reached from the start; rest square (36, 17): open
+- Jefferson's door square (39, 17): open, reached from the start; rest square (37, 17): open
+- Boingo's door square (5, 25): open, reached from the start; rest square (3, 25): open
+- Babur's door square (10, 25): open, reached from the start; rest square (12, 25): open
+- Big Boy's door square (35, 25): open, reached from the start; rest square (33, 25): open
+- Dash's door square (41, 25): open, reached from the start; rest square (39, 25): open
+- Chub & Chirp's door square (5, 34): open, reached from the start; rest square (3, 34): open
+- Wrangler's door square (11, 34): open, reached from the start; rest square (9, 34): open
+- Moo & Moon's door square (35, 34): open, reached from the start; rest square (33, 34): open
+- Hollow's door square (39, 34): open, reached from the start; rest square (37, 34): open
 - The 12 tables' 24 stools: 24 of 24 reached from a walkable neighbour
 - The Colosseum's gate (22..23, 27): reached
 - Street (board) squares reached: 696 of 696

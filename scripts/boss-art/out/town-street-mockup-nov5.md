@@ -1,5 +1,9 @@
 # A street town: mockups (Nov 5)
 
+> **Superseded by the final art, [town-art-nov5.md](town-art-nov5.md) (Nov 5).** The rough fronts (`facades.ts`) and the
+> worked-out boxes (`box.ts`) this page describes were replaced by `out/town-buildings/`; the stills below are the mockups
+> Eric approved and are kept as they were.
+
 For Eric to look at and steer. Mockups only: no app code changed. Everything here is drawn by
 `scripts/boss-art/town-street/` (the plan `plan.ts`, the rough fronts `facades.ts`, the renderer `harness.ts`, the plan
 picture `plan-map.ts`, every still `stills.ts`), using the town's real camera (`town/camera.ts`: curve, pitch, the

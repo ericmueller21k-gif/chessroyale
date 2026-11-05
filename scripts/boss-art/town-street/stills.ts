@@ -24,30 +24,30 @@ type Boss = { id: HomeId; x: number; y: number; flip?: boolean };
 type Bot = { x: number; y: number; dark?: boolean };
 
 /**
- * Each street, standing on it 4 squares in front of its fronts (on the street's far half), the bosses out on their
- * sidewalks (in their wander boxes), a bot or two. The phone shows about 9 squares across at the fronts, the computer about
+ * Each street, standing on it 4 squares in front of its fronts (on the street's far half), the bosses on their rest squares
+ * (town-plan-nov5.md), a bot or two. The phone shows about 9 squares across at the fronts, the computer about
  * 17, so who's in view differs.
  */
 const streets: { tag: string; phone: S & { bosses?: Boss[]; bots?: Bot[] }; computer: S & { bosses?: Boss[]; bots?: Bot[] } }[] = [
   {
     tag: "1-seam-street",
-    phone: { x: 11.8, y: -1, heading: 0, bosses: [{ id: "gardener", x: 9.4, y: 2.1 }], bots: [{ x: 14.2, y: 1, dark: true }] },
-    computer: { x: 13, y: -1, heading: 0, bosses: [{ id: "gardener", x: 9.6, y: 2.1 }, { id: "smudgy", x: 19.2, y: 2.1, flip: true }], bots: [{ x: 15.5, y: 1 }, { x: 7, y: 44.5, dark: true }] },
+    phone: { x: 11.8, y: -1, heading: 0, bosses: [{ id: "gardener", x: 11, y: 2.1, flip: true }], bots: [{ x: 14.2, y: 1, dark: true }] },
+    computer: { x: 13, y: -1, heading: 0, bosses: [{ id: "gardener", x: 11, y: 2.1, flip: true }, { id: "smudgy", x: 17, y: 2.1 }], bots: [{ x: 15.5, y: 1 }, { x: 7, y: 44.5, dark: true }] },
   },
   {
     tag: "2-fountain-street",
-    phone: { x: 8, y: 14, heading: 0, bosses: [{ id: "timber", x: 5.6, y: 17.1 }], bots: [{ x: 9.6, y: 16, dark: true }] },
-    computer: { x: 8.5, y: 14, heading: 0, bosses: [{ id: "timber", x: 5.6, y: 17.1 }, { id: "sawyer", x: 11.4, y: 17.1, flip: true }], bots: [{ x: 3.2, y: 15 }, { x: 13.5, y: 16, dark: true }] },
+    phone: { x: 8, y: 14, heading: 0, bosses: [{ id: "timber", x: 6, y: 17.1, flip: true }], bots: [{ x: 9.6, y: 16, dark: true }] },
+    computer: { x: 8.5, y: 14, heading: 0, bosses: [{ id: "timber", x: 6, y: 17.1, flip: true }, { id: "sawyer", x: 12, y: 17.1, flip: true }], bots: [{ x: 3.2, y: 15 }, { x: 13.5, y: 16, dark: true }] },
   },
   {
     tag: "3-colosseum-row",
-    phone: { x: 37.6, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 35.4, y: 25.1 }], bots: [{ x: 39.5, y: 24 }] },
-    computer: { x: 36.5, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 34.6, y: 25.1 }, { id: "blitz", x: 40.6, y: 25.1, flip: true }], bots: [{ x: 31, y: 23, dark: true }, { x: 42.5, y: 24 }] },
+    phone: { x: 35.2, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 33, y: 25.1 }], bots: [{ x: 37.5, y: 24 }] },
+    computer: { x: 36.5, y: 22, heading: 0, bosses: [{ id: "bigboy", x: 33, y: 25.1 }, { id: "blitz", x: 39, y: 25.1 }], bots: [{ x: 31, y: 23, dark: true }, { x: 42.5, y: 24 }] },
   },
   {
     tag: "4-upper-street",
-    phone: { x: 38.6, y: 31, heading: 0, bosses: [{ id: "hollow", x: 38.4, y: 34.1 }], bots: [{ x: 36, y: 33, dark: true }] },
-    computer: { x: 38, y: 31, heading: 0, bosses: [{ id: "moo", x: 34.3, y: 34.1 }, { id: "hollow", x: 39.2, y: 34.1, flip: true }], bots: [{ x: 43.5, y: 32 }, { x: 31.5, y: 33, dark: true }] },
+    phone: { x: 38.6, y: 31, heading: 0, bosses: [{ id: "hollow", x: 37, y: 34.1 }], bots: [{ x: 36, y: 33, dark: true }] },
+    computer: { x: 38, y: 31, heading: 0, bosses: [{ id: "moo", x: 33, y: 34.1 }, { id: "hollow", x: 37, y: 34.1 }], bots: [{ x: 43.5, y: 32 }, { x: 31.5, y: 33, dark: true }] },
   },
   {
     tag: "5-seam-avenue",

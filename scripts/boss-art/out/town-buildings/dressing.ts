@@ -40,8 +40,10 @@ export function hedgeFront(v = 0): Character {
 }
 export function hedgeTop(v = 0): Character {
   return character(`hedge-top-${v}`, SQ, SQ, GREENS, [box(0, 0, SQ, SQ, (_i, _j, x, y) => {
-    const g = grain(x >> 1, (y >> 1) + v * 40, 53);
-    return g > 0.97 ? (v === 1 ? "u" : "t") : g > 0.6 ? "r" : g > 0.25 ? "s" : "S";
+    // Clipped leaves in soft clumps (3 px), a sprig of light on some, a flower now and then.
+    const c = grain(Math.floor(x / 3), Math.floor(y / 3) + v * 40, 53);
+    const f = grain(x, y, 57);
+    return f > 0.988 ? (v === 1 ? "u" : "t") : c > 0.72 ? (f > 0.5 ? "r" : "s") : c > 0.12 ? "s" : "S";
   }, false)], [0, SQ]);
 }
 export const HEDGE = { tall: 18, deep: 0.4 } as const;

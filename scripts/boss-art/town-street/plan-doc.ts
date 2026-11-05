@@ -10,7 +10,7 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   ARENA, BOARD, camAt, COLISEUM, FOUNTAIN, GARDEN, GRASS, ground, HOME_INFO, LOT, LOTS, N, PARK, PARK_PLAN, PAVE, PROPS, START, STATUES, STREETS, TABLES,
-  TURN_ZONES, blockedSquares, doorSquare, walkable, wanderBox, wrap, type HomeId, type Lot,
+  TURN_ZONES, blockedSquares, doorSquare, restSquare, walkable, wanderBox, wrap, type HomeId, type Lot,
 } from "./plan.ts";
 import { COLOURWAYS, DEPTH, DESIGN_NAMES, INSET, type Design } from "../out/town-buildings/buildings.ts";
 import { HOME_DEPTH, HOME_INSET } from "../out/town-buildings/home-boxes.ts";
@@ -69,7 +69,10 @@ for (const l of LOTS.filter((x) => x.kind === "home")) {
   const d = doorSquare(l);
   const ok = walkable(d.c, d.r, blocked) && reach(d.c, d.r);
   if (!ok) fails.push(`door ${l.id}`);
-  walkChecks.push(`${HOME_INFO[l.id as HomeId].boss}'s door square (${d.c}, ${d.r}): ${ok ? "open, reached from the start" : "FAILS (blocked or unreachable)"}`);
+  const rs = restSquare(l);
+  const rok = walkable(rs.c, rs.r, blocked) && reach(rs.c, rs.r);
+  if (!rok) fails.push(`rest ${l.id}`);
+  walkChecks.push(`${HOME_INFO[l.id as HomeId].boss}'s door square (${d.c}, ${d.r}): ${ok ? "open, reached from the start" : "FAILS (blocked or unreachable)"}; rest square (${rs.c}, ${rs.r}): ${rok ? "open" : "FAILS"}`);
 }
 let stoolsOk = 0;
 for (const t of TABLES) for (const dc of [-1, 1]) {
@@ -104,8 +107,8 @@ P("The data the layout code (code round 2) needs, generated from `scripts/boss-a
 P("`npx tsx scripts/boss-art/town-street/plan-doc.ts`, which also writes the same data as [town-plan-nov5.json](town-plan-nov5.json)");
 P("and runs the checks at the end. The picture: [town-art/0-plan.png](town-art/0-plan.png). The art each lot names is in");
 P("`out/town-buildings/` (`town-art-nov5.md` says how to use it). Eric approved this plan in the mockups (Nov 5); nothing in it");
-P("moved since, except the colourways (now three a design), the lamps (now on whole squares) and what's new below (doors, wander");
-P("boxes, the start, the walking and the turn zones).");
+P("moved since, except the colourways (now three a design), the lamps (now on whole sidewalk squares, off every door and rest");
+P("square) and what's new below (doors, rest squares, wander boxes, the start, the walking and the turn zones).");
 P();
 P("## Squares");
 P();
@@ -164,16 +167,20 @@ P("## The boss homes: doors and where the bosses wander");
 P();
 P("- **Door square:** the sidewalk square in front of the home's door (Eric, Nov 5: a tap on the home walks you there). The");
 P("  door's middle on the front picture is `HOME_SPECS[id].door` (px); the front is centred on its lot.");
+P("- **Rest square:** where the boss stands when it stops (and where it first appears): its sidewalk square at the end of its");
+P("  wander box farther from its door, unless that end is in front of its sign's middle. So the door, the sign and most of the");
+P("  front stay in view (Eric: \"the boss homes always visible\"). It walks the whole box between rests.");
 P("- **Wander box:** the boss's own yard (the strip between the lot's front edge and its front line) and the sidewalk in front,");
 P("  its lot's width along; in square coordinates (a boss's foot stays inside).");
 P();
-P("| Home | Boss | Lot | Door square | Wander box (x, y) |");
-P("| --- | --- | --- | --- | --- |");
+P("| Home | Boss | Lot | Door square | Rest square | Wander box (x, y) |");
+P("| --- | --- | --- | --- | --- | --- |");
 for (const l of LOTS.filter((x) => x.kind === "home")) {
   const sq = lotSquares(l);
   const d = doorSquare(l);
   const wb = wanderBox(l);
-  P(`| ${HOME_INFO[l.id as HomeId].name} | ${HOME_INFO[l.id as HomeId].boss} | c ${range(sq.c[0]!, sq.c[1]!)}, r ${range(sq.r[0]!, sq.r[1]!)} | (${d.c}, ${d.r}) | x ${wb.x0.toFixed(2)}..${wb.x1.toFixed(2)}, y ${wb.y0.toFixed(2)}..${wb.y1.toFixed(2)} |`);
+  const rs = restSquare(l);
+  P(`| ${HOME_INFO[l.id as HomeId].name} | ${HOME_INFO[l.id as HomeId].boss} | c ${range(sq.c[0]!, sq.c[1]!)}, r ${range(sq.r[0]!, sq.r[1]!)} | (${d.c}, ${d.r}) | (${rs.c}, ${rs.r}) | x ${wb.x0.toFixed(2)}..${wb.x1.toFixed(2)}, y ${wb.y0.toFixed(2)}..${wb.y1.toFixed(2)} |`);
 }
 if (wanderNotes.length) {
   P();
@@ -270,7 +277,7 @@ const json = {
   streets: STREETS,
   turnZones: TURN_ZONES,
   start: START,
-  lots: LOTS.map((l) => ({ ...l, art: artId(l), name: buildingName(l), inset: insetOf(l), depth: +depthOf(l).toFixed(3), ...(l.kind === "home" ? { door: doorSquare(l), wander: wanderBox(l) } : {}) })),
+  lots: LOTS.map((l) => ({ ...l, art: artId(l), name: buildingName(l), inset: insetOf(l), depth: +depthOf(l).toFixed(3), ...(l.kind === "home" ? { door: doorSquare(l), rest: restSquare(l), wander: wanderBox(l) } : {}) })),
   park: { ...PARK, plan: PARK_PLAN, tables: TABLES, fountain: FOUNTAIN },
   coliseum: { ...COLISEUM, statues: STATUES, gate: [{ c: 22, r: 27 }, { c: 23, r: 27 }] },
   props: PROPS,

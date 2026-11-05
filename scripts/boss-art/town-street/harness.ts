@@ -1019,7 +1019,7 @@ export async function sheetBuildings(cv: HTMLCanvasElement): Promise<void> {
     g.drawImage(sc, 16, y0 + 8, sc.width * 0.55, sc.height * 0.55);
     let x = 16 + sc.width * 0.55 + 24;
     const base = y0 + 300;
-    label(g, `${DESIGN_NAMES[id]}: ${wsq} squares wide, 3 deep`, x, y0 + 30, 22);
+    label(g, `${DESIGN_NAMES[id]} (${wsq} x 3)`, 16, y0 + 342, 18);
     for (let v2 = 0; v2 < 3; v2++) {
       const b = building(id, wsq, v2);
       const img = toCanvas(b.id, b.front);
