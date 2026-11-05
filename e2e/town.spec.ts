@@ -1381,7 +1381,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   // places them: each at least 3 steps from you (world.ts `freeSpot`). So none stands on the squares beside you that the taps below aim
   // at, or on the squares in front of them (toward the camera), drawn over them on a phone. (Frozen only after the ride's checks below,
   // about 20 s on CI's WebGL phone run, they had wandered: Crumb stood on 23,16, in front of the square beside you, the tap opened its
-  // card and you didn't move: "beside you: 23,17" on f5e73337, both tries.)
+  // card and you didn't move: "beside you: 23,17" on f5e73337, both tries. docs/decisions/2026-11-05-rides-test-beside-you.md)
   await page.addInitScript(() => {
     let call: ((i: number) => void) | undefined;
     Object.defineProperty(window, "__townCall", {
