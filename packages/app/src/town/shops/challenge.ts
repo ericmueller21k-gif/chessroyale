@@ -948,7 +948,8 @@ export const BLITZ_GEAR = ["table", "stool", "dust", "pop"] as const;
 export type BlitzGear = (typeof BLITZ_GEAR)[number];
 /**
  * Dash's intro (Nov 5; CHALLENGE_FEEL.blitz): each frame's ms and cue (the art's) for his moves and his props', and the frames things
- * happen on: the bolt's launch (his dust trail starts at his spot), the arrive's toss (what he brought lands: BLITZ_INTRO_DROP_AT, the
+ * happen on: the bolt's launch (his dust trail starts at his spot; from it he's running, off his spot), the arrive's skid (from it
+ * he's back on his spot), its toss (what he brought lands: BLITZ_INTRO_DROP_AT, the
  * table's foot), the pop's (the pieces show).
  */
 export interface BlitzAnims {
@@ -956,7 +957,7 @@ export interface BlitzAnims {
   moves: { readonly [m in BlitzMove]: readonly number[] };
   gear: { readonly [g in BlitzGear]: readonly number[] };
   cues: { readonly [k in BlitzMove | BlitzGear]: readonly (string | undefined)[] };
-  key: { whoosh: number; drop: number; pieces: number };
+  key: { whoosh: number; skid: number; drop: number; pieces: number };
 }
 /** Dash's BlitzAnims from his art: his moves (BOSS_BLITZ_INTRO), the table's and a stool's `land`, the dust trail, the pop. */
 export function blitzAnims(w: { mover: ArtLike; table: ArtLike; stool: ArtLike; dust: ArtLike; pop: ArtLike }): BlitzAnims {
@@ -969,7 +970,7 @@ export function blitzAnims(w: { mover: ArtLike; table: ArtLike; stool: ArtLike; 
     moves: by(BLITZ_MOVES, (m) => fr(w.mover, m).map((f) => f.ms)),
     gear: by(BLITZ_GEAR, (g) => fr(...gear[g]).map((f) => f.ms)),
     cues: { ...by(BLITZ_MOVES, (m) => fr(w.mover, m).map((f) => f.cue)), ...by(BLITZ_GEAR, (g) => fr(...gear[g]).map((f) => f.cue)) },
-    key: { whoosh: at(w.mover, "bolt", "whoosh"), drop: at(w.mover, "arrive", "drop"), pieces: at(w.pop, "idle", "pop") },
+    key: { whoosh: at(w.mover, "bolt", "whoosh"), skid: at(w.mover, "arrive", "skid"), drop: at(w.mover, "arrive", "drop"), pieces: at(w.pop, "idle", "pop") },
   };
 }
 /** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's), the icicle (Ginger's) or the dashes (Dash's). */
@@ -1487,6 +1488,11 @@ export interface BlitzNow {
   move: { anim: BlitzMove; frame: number } | null;
   /** He's off, out of sight (from his bolt's end to his arrive's start): none of him shows. */
   gone: boolean;
+  /**
+   * He stands on his spot (not mid-run: his bolt before its launch, his arrive from its skid, his brag, standing): all of him on the
+   * screen (Eric, Nov 4), and the town's shadows under him.
+   */
+  here: boolean;
   /** The dust trail's frame at his spot (INTRO_BLITZ_DUST, from the bolt's launch), or -1: none. */
   dust: number;
   /** The shoe-box table (from the first toss: its `land`, then its `idle`), or null: not yet. */
@@ -1515,12 +1521,14 @@ export function blitzAt(a: BlitzAnims, t: number, feel: Pick<typeof CHALLENGE_FE
     if (t >= d.launch && t < d.launch + sum(G.dust)) dust = frameAt(G.dust, t - d.launch, false);
   }
   if (t >= T.brag && t < T.brag + sum(M.brag)) move = { anim: "brag", frame: frameAt(M.brag, t - T.brag, false) };
+  const here = !gone && !(move?.anim === "bolt" && move.frame >= a.key.whoosh) && !(move?.anim === "arrive" && move.frame < a.key.skid);
   const landed = (from: number, ms: readonly number[]) => (t < from ? null : t < from + sum(ms) ? { anim: "land" as const, frame: frameAt(ms, t - from, false) } : { anim: "idle" as const, frame: 0 });
   const [d0, d1, d2, d3] = T.drop as [number, number, number, number];
   const fall = Math.min(1, Math.max(0, (t - d1) / Math.max(1, feel.boardDropMs)));
   return {
     move,
     gone,
+    here,
     dust,
     table: landed(d0, G.table),
     board: t < d1 ? null : feel.dropFrom * (1 - fall * fall),

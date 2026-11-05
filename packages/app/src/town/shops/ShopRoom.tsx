@@ -46,6 +46,7 @@ import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
+import type { BlitzNow } from "./challenge.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
 import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } from "./grex-crew-sheets.ts";
 import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
@@ -2002,6 +2003,46 @@ function startRoom(
     Object.assign(hisHook, { x: x0 + M.blastFrom[0] * k, y: y0 + M.blastFrom[1] * k, on: true });
   };
   const hisHook = { x: 0, y: 0, on: false };
+  /**
+   * Dash's dust trail in his intro (INTRO_BLITZ_DUST, its foot at his spot, at his pixels: it runs off to our left behind him), drawn
+   * just before him.
+   */
+  const drawBlitzDust = (now: number, n: BlitzNow) => {
+    if (n.dust < 0) return;
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const D = ci!.dash!.dust;
+    const k = (b.squares * pt.k) / b.ch.h;
+    const img = D.frames[n.dust]!;
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, pt.x - D.ch.foot[0] * k, pt.y - D.ch.foot[1] * k, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+  };
+  /**
+   * Dash in his intro (his dashes): his own move's frame (BOSS_BLITZ_INTRO, facing you as drawn: his bolt running off and his arrive
+   * racing back are in its frames), at his town figure's pixels, his foot on his spot; or none of him while he's off. The town's
+   * shadows only while he's on his spot (his frames mid-run carry their own).
+   */
+  const drawBlitzBoss = (now: number, n: BlitzNow) => {
+    if (n.gone || !n.move) return;
+    boss!.pose(now, bossPose);
+    if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
+    const b = ci!.boss;
+    const k = (b.squares * pt.k) / b.ch.h;
+    const M = ci!.dash!.mover;
+    const img = M.frames[n.move.anim][n.move.frame]!;
+    const x0 = pt.x - M.ch.foot[0] * k;
+    const y0 = pt.y - M.ch.foot[1] * k;
+    if (n.here) drawShadows(pt.x, pt.y, b.ch.w * k);
+    g.imageSmoothingEnabled = k < 1.5;
+    g.drawImage(img, x0, y0, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    if (n.here) {
+      Object.assign(bossHead, { x: pt.x, y: pt.y - (b.ch.foot[1] - b.ch.h * b.head) * k, on: true, px: b.squares * pt.k });
+      Object.assign(hisFoot, { x: pt.x, y: pt.y, k, on: true });
+    }
+  };
   /** A prop's frame at its foot on screen (x, y), `s` screen px a room px, mirrored or not. */
   const putProp = (img: CanvasImageSource & { width: number; height: number }, foot: readonly number[], x: number, y: number, s: number) =>
     g.drawImage(img, x - foot[0]! * s, y - foot[1]! * s, img.width * s, img.height * s);
@@ -2264,6 +2305,12 @@ function startRoom(
     if (rp && introNow?.rope && attackFrame < 0) return drawRopeBoss(now);
     if (ci.crew && introNow?.crew?.move && attackFrame < 0) return drawCrewBoss(now, introNow.crew.move);
     if (ci.ice && iceNow?.move && attackFrame < 0) return drawIceBoss(now, iceNow.move);
+    // (Dash's: his dust trail at his spot, under him; his own moves, or none of him while he's off.)
+    const bz = introNow?.blitz;
+    if (ci.dash && bz && attackFrame < 0) {
+      drawBlitzDust(now, bz);
+      if (bz.move || bz.gone) return drawBlitzBoss(now, bz);
+    }
     if (attackFrame >= 0 && ci.attack) return drawAttack(now);
     boss.pose(now, bossPose);
     if (!P(bossPose.x + bossOx(now), bossPose.y + bossOy(now))) return;
@@ -2309,6 +2356,7 @@ function startRoom(
     g.imageSmoothingEnabled = false;
     if (ci.wood) return drawWood(x, y, s);
     if (!n) return;
+    if (ci.dash) return drawBlitzCenter(n, x, y, s);
     const bl = ci.blocks;
     if (bl) {
       if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
@@ -2345,6 +2393,30 @@ function startRoom(
     if (!py) return;
     if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
     else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
+  };
+  /**
+   * Dash's table (his intro), the table's foot at (x, y), `s` a room pixel: the shoe-box stack as it lands (its `land`, then its `idle`:
+   * its top box's own teal lid until the board comes), both stools at their places as they land, the slab and board on it
+   * (`paintTable`, falling on from `board` squares up; its pieces from the pop's own frame), and the pop over it.
+   */
+  const drawBlitzCenter = (n: IntroNow, x: number, y: number, s: number) => {
+    const z = n.blitz;
+    const D = ci?.dash;
+    if (!z || !D || !marks) return;
+    const put = (img: HTMLCanvasElement, ch: Character, px: number, py: number, k: number) => g.drawImage(img, px - ch.foot[0] * k, py - ch.foot[1] * k, img.width * k, img.height * k);
+    g.imageSmoothingEnabled = false;
+    if (z.table) put(D.table.frames[z.table.anim][z.table.frame]!, D.table.ch, x, y, s);
+    if (z.stools) {
+      const img = D.stool.frames[z.stools.anim][z.stools.frame]!;
+      for (const at of [marks.bossStool, marks.youStool]) if (P(at.c, at.r, pq[0])) put(img, D.stool.ch, pq[0]!.x, pq[0]!.y, pq[0]!.k / SQ);
+    }
+    if (z.board !== null) {
+      g.save();
+      g.translate(0, -z.board * s * SQ);
+      paintTable(g, v, marks.table.c - camX, camY - marks.table.r, ci!.table.palette, marks.layout, 1, z.pieces ? 1 : 0);
+      g.restore();
+    }
+    if (z.pop >= 0) put(D.pop.frames[z.pop]!, D.pop.ch, x, y, s);
   };
   /**
    * Jefferson's table (his intro, from the walk in): the crate stack where the room's board stand stood (the same picture, its foot on
@@ -3232,6 +3304,22 @@ function startRoom(
             table: introNow.crew.table.anim,
             tableAt: [Math.round(crewTableAt().c * 1000) / 1000, Math.round(crewTableAt().r * 1000) / 1000],
             figs: crewHook(),
+          }
+        : null,
+      // (Dash's own: his move, whether he's off or on his spot, his dust trail, the shoe-box table, the board (how far over the
+      // table: 0 on it), the pieces, the pop, the stools.)
+      blitz: introNow?.blitz
+        ? {
+            move: introNow.blitz.move?.anim ?? null,
+            frame: introNow.blitz.move?.frame ?? -1,
+            gone: introNow.blitz.gone,
+            here: introNow.blitz.here,
+            dust: introNow.blitz.dust >= 0,
+            table: introNow.blitz.table?.anim ?? null,
+            board: introNow.blitz.board === null ? null : Math.round(introNow.blitz.board * 100) / 100,
+            pieces: introNow.blitz.pieces,
+            pop: introNow.blitz.pop >= 0,
+            stools: introNow.blitz.stools?.anim ?? null,
           }
         : null,
       table: !!introNow?.table,

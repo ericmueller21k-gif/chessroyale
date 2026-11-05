@@ -31,6 +31,7 @@ import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
+import { BLITZ_MOVES, blitzAnims, type BlitzMove } from "./challenge.ts";
 import { CHALLENGE_FEEL, CREW_MOVES, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
@@ -45,8 +46,10 @@ type IntroArt =
       | { rope: typeof import("./pig-intro-art.ts"); table: Character; pyramid?: undefined; blocks?: undefined; wood?: undefined }
       | { crew: typeof import("./grex-intro-art.ts"); table: Character; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
       | { ice: IceMods; table: Character; crew?: undefined; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
+      | { dash: typeof import("./blitz-intro-art.ts"); table: Character; ice?: undefined; crew?: undefined; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
     ) & {
       dark?: undefined;
+      dash?: typeof import("./blitz-intro-art.ts");
       ice?: IceMods;
       rope?: typeof import("./pig-intro-art.ts");
       crew?: typeof import("./grex-intro-art.ts");
@@ -56,7 +59,7 @@ type IntroArt =
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+  | { dark: typeof import("./hollow-intro-art.ts"); dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
 /** Ginger's: his props (shops/ginger-intro-art.ts), his moves (characters/ginger-intro.ts) and his elves (the board carriers). */
 interface IceMods {
   props: typeof import("./ginger-intro-art.ts");
@@ -93,6 +96,8 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   grex: () => import("./grex-intro-art.ts").then((m) => ({ crew: m, table: m.INTRO_GREX_TABLE, palette: m.INTRO_GREX_TABLE_PALETTE, storm: m.INTRO_GREX_STORM, front: m.INTRO_GREX_FRONT })),
   // (Ginger's: his moves, the blast, the icicle (his table), the crack and the puff, the light, the board and its two carriers, his
   // blizzard; the room's own elves keep working.)
+  // (Dash's: his moves, the shoe-box table and stools, his dust trail, the pieces' pop, his clock rush; one chunk.)
+  dash: () => import("./blitz-intro-art.ts").then((m) => ({ dash: m, table: m.INTRO_BLITZ_TABLE, palette: m.INTRO_BLITZ_TABLE_PALETTE, storm: m.INTRO_BLITZ_STORM, front: m.INTRO_BLITZ_FRONT })),
   gingerbread: () =>
     Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
       ice: { props, moves, elves },
@@ -167,6 +172,21 @@ export interface LoadedIntro {
   crew: CrewArt | null;
   /** Ginger's icicle (null: another's): his moves' frames, his props', the carriers', where things go; see IceArt. */
   ice: IceArt | null;
+  /** Dash's dashes (null: another's): his moves' frames, the shoe-box table's and stools', his dust trail's, the pop's; see DashArt. */
+  dash: DashArt | null;
+}
+
+/**
+ * Dash's intro, ready (shops/blitz-intro-art.ts, characters/dash-intro.ts; ShopRoom draws it): his moves' frames (BOSS_BLITZ_INTRO,
+ * at his town figure's pixels, facing you as drawn: not mirrored) and his dust trail's (at his pixels: its foot at his spot); the
+ * shoe-box table's and a stool's frames (`land`, `idle`) and the pop's (at the room's scale, their feet the table's and the stools').
+ */
+export interface DashArt {
+  mover: { ch: Character; frames: Record<BlitzMove, HTMLCanvasElement[]> };
+  dust: { ch: Character; frames: HTMLCanvasElement[] };
+  table: { ch: Character; frames: Record<"land" | "idle", HTMLCanvasElement[]> };
+  stool: { ch: Character; frames: Record<"land" | "idle", HTMLCanvasElement[]> };
+  pop: { ch: Character; frames: HTMLCanvasElement[] };
 }
 
 /**
@@ -309,8 +329,19 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let rope: RopeArt | null = null;
     let crew: CrewArt | null = null;
     let ice: IceArt | null = null;
+    let dash: DashArt | null = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.ice) {
+    if (art?.dash) {
+      const m = art.dash;
+      anims = blitzAnims({ mover: m.BOSS_BLITZ_INTRO, table: m.INTRO_BLITZ_TABLE, stool: m.INTRO_BLITZ_STOOL, dust: m.INTRO_BLITZ_DUST, pop: m.INTRO_BLITZ_POP });
+      dash = {
+        mover: { ch: m.BOSS_BLITZ_INTRO, frames: all(m.BOSS_BLITZ_INTRO, BLITZ_MOVES) },
+        dust: { ch: m.INTRO_BLITZ_DUST, frames: all(m.INTRO_BLITZ_DUST, ["idle"]).idle },
+        table: { ch: m.INTRO_BLITZ_TABLE, frames: all(m.INTRO_BLITZ_TABLE, ["land", "idle"]) },
+        stool: { ch: m.INTRO_BLITZ_STOOL, frames: all(m.INTRO_BLITZ_STOOL, ["land", "idle"]) },
+        pop: { ch: m.INTRO_BLITZ_POP, frames: all(m.INTRO_BLITZ_POP, ["idle"]).idle },
+      };
+    } else if (art?.ice) {
       const { props: m, moves: g, elves: e } = art.ice;
       const route = m.INTRO_GINGER_BOARD_ROUTE;
       const len = route.reduce((s, p, i) => (i ? s + Math.hypot(p[0] - route[i - 1]![0], p[1] - route[i - 1]![1]) : 0), 0);
@@ -459,6 +490,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       rope,
       crew,
       ice,
+      dash,
     };
   });
   p.catch(() => loading.delete(home));
