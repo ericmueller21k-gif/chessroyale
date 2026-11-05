@@ -304,7 +304,7 @@ for (const backend of ["2d", "webgl"] as const)
   });
 
 // The stills for Eric (STILLS=docs/street-town-boxes): a street by day and at dusk, the turn's three frames (from Fountain Street's
-// crossing onto Seam Avenue: before, halfway (held), after), and a boss home's sides (Boingo's Funhouse on Colosseum Row's corner).
+// crossing onto Seam Avenue: before, halfway (held), after), and a boss home's sides (Timber's Lumber Lodge, on Fountain Street's corner, from Seam Avenue).
 test("stills: the boxes and the turn", async ({ page }) => {
   test.skip(!STILLS, "stills only (STILLS=docs/street-town-boxes)");
   test.setTimeout(240_000);
@@ -330,6 +330,6 @@ test("stills: the boxes and the turn", async ({ page }) => {
   await page.evaluate(() => (window as unknown as { __townHeading: (h: number | null) => void }).__townHeading(null));
   await walkTo(page, [45, 19]);
   await shot("2-turn-3-after");
-  await walkTo(page, [1, 23]);
-  await shot("3-home-sides-funhouse");
+  await walkTo(page, [45, 20]);
+  await shot("3-home-sides-timber");
 });
