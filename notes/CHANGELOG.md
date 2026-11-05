@@ -5,6 +5,7 @@ summary and the session's recent history. Wording of older rows is shorter than 
 dropped. *(mine)* marks the director's own suggestions.
 
 ## Standing rules from Eric
+- Nov 5 ~18:40: #504 street town round 5 (fixed north view, drag to look round, Colosseum back wall) merged f5e73337, LIVE for admins. Main e2e red: webgl-phone town.spec:1421 rides "beside you: 23,17" (both tries; same as Nov 1). Helper (Opus high) root-causing on claude/fix-beside-you.
 - **Approval rule (Oct 31):** rare items and rides: design → Eric OK → API draws → drawing to Eric → OK → into the game.
 - **Ride review format (Oct 31):** one GIF per ride: run left, right, up, down quickly, then the idle. No contact sheets.
   A ride fits within 125 units wide (≈1.8 squares; 100 units = the pawn's box, drawn 1.45 squares wide).
