@@ -14,6 +14,8 @@
  *   Timber's (`wood`): his own moves (BOSS_BEAVER_INTRO: walk, lift, carry, setDown, gnaw, done), the log (lying, standing, gnawed),
  *   the shavings' fog (rise, hold, settle), his table (a gnawed log pedestal, no stools: its picture's middle alone) and a stump for
  *   each seat (idle, pop).
+ *   Dash's (`dash`, Nov 5): his own moves (BOSS_BLITZ_INTRO: bolt, arrive, brag), his dust trail, the shoe-box table and stools
+ *   (land, idle), the pieces' pop (shops/blitz-intro-art.ts, characters/dash-intro.ts).
  * - The boss itself (its town sprite, BOSS_ART: its `idle`), walking in and standing on its mark.
  * - The transition (`startTransition`): a boss's own (`startStorm`, Alfil's sandstorm), or the default (`startWipe`: a flash and a
  *   wipe to black). Each a canvas over the whole page (outside the town's tree, so it stays as the town closes and the
@@ -31,8 +33,7 @@ import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
-import { BLITZ_MOVES, blitzAnims, type BlitzMove } from "./challenge.ts";
-import { CHALLENGE_FEEL, CREW_MOVES, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
+import { BLITZ_MOVES, CHALLENGE_FEEL, CREW_MOVES, blitzAnims, type BlitzMove, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
  * A boss's intro art, as its file exports it: a pyramid that brings in its table (Alfil's), or toy blocks that are the table and its
