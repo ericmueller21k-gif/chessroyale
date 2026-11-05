@@ -59,6 +59,7 @@ import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { STREET_TOWN } from "./admin-town.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -137,7 +138,7 @@ export function TownScreen({
   const cardEl = useRef<HTMLDivElement>(null);
   const live = useRef<HTMLDivElement>(null);
   const ctl = useRef<Ctl | null>(null);
-  const [zoomedOut, setZoomedOut] = useState<boolean>(TOWN_FEEL.startZoomedOut);
+  const [zoomedOut, setZoomedOut] = useState<boolean>(STREET_TOWN ? TOWN_FEEL.streetStartZoomedOut : TOWN_FEEL.startZoomedOut);
   const [card, setCard] = useState<Card | null>(null);
   // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
@@ -648,7 +649,7 @@ function startTown(
   let vx = 0;
   let vy = 0;
   let glide: { x: number; y: number } | null = null;
-  let zoomCur = f.startZoomedOut ? 1 : 0;
+  let zoomCur = (STREET_TOWN ? f.streetStartZoomedOut : f.startZoomedOut) ? 1 : 0;
   let zoomTarget = zoomCur;
   // The sky by the device's clock, read about once a minute; `?sky=day|dawn|dusk|night` holds one look (for Eric, tests).
   const pinned = skyOverride(new URLSearchParams(location.search).get("sky"));
@@ -967,7 +968,7 @@ function startTown(
       const h = HOMES[goingIn]!;
       goingIn = -1;
       const at = { x: r.W / 2, y: r.H / 2 };
-      r.squareAt(h.cx, wrapI(h.cy - 1), at);
+      r.squareAt(h.entry.c, h.entry.r, at);
       onGoIn(h.id, at.x, at.y, challenging >= 0);
     }
     stepClose(dt);
@@ -1412,7 +1413,8 @@ function startTown(
     if (!b) return false;
     if (!b.held) {
       b.held = true;
-      const to = spotNear(town, b.walker, { c: b.home.cx, r: b.home.cy + 2 }, false);
+      // (The street town: to its rest square, the end of its box away from its door; nothing can stand behind a home there.)
+      const to = spotNear(town, b.walker, b.home.wander ? b.home.rest : { c: b.home.cx, r: b.home.cy + 2 }, false);
       if (to) walkWalker(b.walker, to);
     }
     return !b.walker.moving();
@@ -1558,7 +1560,7 @@ function startTown(
       leaveClose();
       cancelMeet(town);
       town.you.sit = false;
-      const to = spotNear(town, town.you.walker, { c: h.cx, r: wrapI(h.cy - 2) }, false);
+      const to = spotNear(town, town.you.walker, h.door, false);
       if (!to || !walkWalker(town.you.walker, to)) return;
       goingIn = i;
       follow = true;
@@ -1576,7 +1578,7 @@ function startTown(
       leaveClose();
       cancelMeet(town);
       town.you.sit = false;
-      const to = spotNear(town, town.you.walker, { c: h.cx, r: wrapI(h.cy - 2) }, false);
+      const to = spotNear(town, town.you.walker, h.door, false);
       if (!to || !walkWalker(town.you.walker, to)) return false;
       challengeStand = stood;
       challenging = i;
