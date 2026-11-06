@@ -12,6 +12,11 @@ spec anyway). Smudgy is live: this goes to everyone.
   blue, oxblood and plum, a few warm highlights; no real artist copied or named); a backdrop of paint shelves round a lamp-lit canvas;
   easels, canvas stacks, paint pots and brush jars; the Colosseum's pixel pieces (`colosseum/pieces-gba.ts`'s models) as sculptures on
   plinths. Its ceiling: dark beams over a skylight (`roof: "studio"`). The chat's night tone.
+- **Gallery picture lights** (Eric, after a first look: "lighting that comes down on the walls like in an art gallery"): a small brass
+  picture light at the top of every wall panel (the back wall's 16, both side walls' 36), its warm cone baked into the panel (the plaster
+  and the canvases' paints a shade lighter where it falls, `PICTURE_LIGHT`), and the room's lights at every placement: each bulb's halo
+  (`SHOP_SMUDGY_LIGHTS`) and a soft warm glow on the wall over each cone (`SHOP_SMUDGY_POOLS`). No lamps over the floor; the floor, the life
+  class and the table are as bright as before.
 - **The life class:** the Colosseum's knight turning on a round platform (16 frames, 6 s a turn) in the middle of the back half; eight
   art-student chameleons (Dabble's rig, sitting, in smocks, four colors) on stools in a ring round it, each at an easel facing it with a
   paint table beside it. One 32-frame loop (8 s) per color, shared by all eight: the canvas goes blank, outline, blocked colors,
@@ -65,7 +70,7 @@ spec anyway). Smudgy is live: this goes to everyone.
   loudness checks, run on every sound of the pack, kept and passing for the new four.
 - `packages/server/test/boss-tokens.test.ts`, the crates and their rides: gains `["smudgy", "smudgy-brush"]`.
 - (`packages/core/test/crates.test.ts`'s `NO_CRATE_YET` keeps `smudgy-brush`: "in no regular crate", as the others' rides.)
-- New, nothing removed: `packages/app/test/shop-smudgy.test.ts` (16: the room's walkable squares, the drop cloth and the table, the marks,
+- New, nothing removed: `packages/app/test/shop-smudgy.test.ts` (17: the room's walkable squares, the picture lights at every placement, the drop cloth and the table, the marks,
   the counter and keeper, the keeper's sheet and that it isn't a town bot, the knight and the ring, the painters' loops offset, the
   canvas's stages and the dips, the crate, the intro's beats in order, the cloth before the board before the reveal line, every cue a
   sound, the props drawn, the splatter's clock, and that it always ends in the match with no canvas to draw on); `e2e/shop.spec.ts`
@@ -73,12 +78,15 @@ spec anyway). Smudgy is live: this goes to everyone.
   the town …" (the 2D town and the WebGL town).
 
 ## Tests run
-- Unit: shop-smudgy, shop-folio, boss-challenge, shop-room, town-bots, boss-sounds-finite, boss-tokens, crates: pass. `npm run typecheck`
+- Unit: shop-smudgy (17), smudgy-wired, shop-folio, boss-challenge, shop-room, town-bots, boss-sounds-finite, boss-tokens, crates: pass. `npm run typecheck`
   (the app): pass.
 - e2e, locally (phone and desktop): Smudgy's shop test; his challenge on the 2D town and the WebGL town (`?gl=1`): 6 passed.
   Specs CI should run: all (full lane).
-- **Frame rate** (headless Chromium, a phone, the room standing 5 s just inside the door; a shared machine): Smudgy's 58.9 fps against
-  Folio's 59.2 (4x CPU: 12.7 against 12.1). The eight painters draw from four shared 32-frame loops.
+- **Frame rate** (headless Chromium, a phone, the room standing 5 s just inside the door; a shared machine): with the picture lights,
+  Smudgy's 58.6 fps against Folio's 59.8 (4x CPU: 12.5 against 13.2); before them, 58.9 against 59.2 (12.7 against 12.1). The eight
+  painters draw from four shared 32-frame loops; the lights' washes are baked into the walls, each placement adding one halo and one glow.
+- The whole app unit suite: 2,024 of 2,025 passed; `duel.test.ts`'s result-card test timed out once at its 5 s limit on the loaded shared
+  machine and passed on its own (4.97 s): it imports nothing this PR changes.
 
 ## Stills and GIFs (`docs/smudgy-home/`)
 - `door-*.png`, `table-*.png` (the cloth-covered table), `life-class-*.png`, `counter-*.png`, `sculptures-*.png`: phone and computer.
