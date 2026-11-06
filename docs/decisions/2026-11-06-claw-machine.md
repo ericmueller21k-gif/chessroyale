@@ -75,3 +75,10 @@ refuses the grant for them. A unit test keeps the grant admin-only.
 - `packages/server/test/account-data.test.ts`, "every table's columns are as pinned": the pinned list gains
   `claw_plays: "id user_id request boss won crate at"` (old: no such table). It guards no rule in `docs/rules/eric.md`.
 - No other check changed or removed. New: `packages/server/test/claw.test.ts`, `packages/app/test/claw.test.ts`, `e2e/claw.spec.ts`.
+
+## The cabinet on the 3D kit (Nov 6, later; brief-3d-kit)
+
+Eric: "the claw machine looks out of place … old school … pixelated." The cabinet is now a kit model (`town/kit/models/claw-cabinet.ts`):
+Boingo's palette in three-step ramps, 37 texels a square (the room's), a 1-texel ink outline, light baked as ramp steps, the arm and
+cable as quads, every move in whole texels. Glass is Boingo's faint wash key ("+"), not his 50% blue. While the view holds, the still
+parts are drawn from two cached pictures (the close-up keeps its frame rate). `claw/view.ts` is unchanged. New: `packages/app/test/claw-kit.test.ts`.
