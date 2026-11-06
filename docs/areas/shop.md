@@ -65,7 +65,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Jefferson's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride, everyone's; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Jefferson's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride and Boingo's with Boingo's Pogo, everyone's; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
@@ -125,9 +125,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
     `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops and the crates too, so the window
     counts the drops).
-- **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW`): a cabinet in his Funhouse
-  (the kit model `town/kit/models/claw-cabinet.ts`); its coin slot opens `openClawMachine()`. One boss token in, 25% of the time that boss's Boss
-  Crate, unopened: `POST /api/shop/claw {boss, request}` rolls it through the ledger (`clawOp`, keyed by `request`), the claw only shows it.
+- **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW`): its coin slot in his Funhouse opens `openClawMachine()`. One boss
+  token in, 25% of the time that boss's Boss Crate, unopened: `POST /api/shop/claw {boss, request}` rolls it through the ledger (`clawOp`, keyed by `request`).
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
   - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
