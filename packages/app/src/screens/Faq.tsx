@@ -144,7 +144,7 @@ export function FaqScreen({ onBack }: { onBack: () => void }) {
     <div class="fd-page fd-faq">
       <header class="fd-page-head">
         <BackButton onClick={onBack} label="Back to Settings" />
-        <h1>FAQ · How it works</h1>
+        <h1>HunChess Handbook</h1>
         <span class="fd-head-spacer" />
       </header>
       <p class="faq-intro">{FAQ_INTRO}</p>

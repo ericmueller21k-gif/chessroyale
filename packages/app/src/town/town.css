@@ -678,3 +678,125 @@ button.town-pic.player {
   margin-right: 5px;
   border-radius: 50%;
 }
+/*
+ * The street town's minimap (TownMap.tsx, minimap.ts; Nov 5): small in the world's top right corner, about 70% opaque, rounded; your dot
+ * bright, with a small arrow the way the camera faces. Clear of the chat box (top left), the arrow keys, the zoom pair and the focus
+ * button (bottom right) at every size. A tap opens it large in the middle of the box over a light scrim; a tap anywhere closes it.
+ */
+.tm-root {
+  display: contents;
+}
+.tm-small {
+  position: absolute;
+  top: 8px;
+  right: calc(8px + env(safe-area-inset-right));
+  /* (Under the chips and the cards, the overlay's 5; over the world.) */
+  z-index: 4;
+  box-sizing: content-box;
+  padding: 0;
+  border: 1px solid rgba(31, 37, 48, 0.45);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #6b9f52;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.tm-small canvas,
+.tm-big canvas {
+  display: block;
+}
+/* You: a bright dot with a white ring, its arrow ahead of it (up the map is north; turned by the camera's heading). */
+.tm-you {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+.tm-you::before {
+  content: "";
+  position: absolute;
+  left: -3.5px;
+  top: -3.5px;
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: #ff3b30;
+  border: 1.5px solid #fff;
+}
+.tm-you::after {
+  content: "";
+  position: absolute;
+  left: -3.5px;
+  top: -10px;
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-bottom: 5.5px solid #ff3b30;
+}
+.tm-you-big::before {
+  left: -6px;
+  top: -6px;
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.tm-you-big::after {
+  left: -6px;
+  top: -17px;
+  border-left-width: 6px;
+  border-right-width: 6px;
+  border-bottom-width: 9px;
+}
+.tm-scrim {
+  position: absolute;
+  inset: 0;
+  /* (Over everything in the box, the arrow keys' 6 and the door's black 7 too: a tap anywhere closes it.) */
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 14, 22, 0.32);
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: none;
+}
+.tm-big {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(31, 37, 48, 0.6);
+  background: #6b9f52;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  opacity: 0.96;
+}
+/* A boss's portrait on the large map: the chip's face in a ring of its home's color, its middle on the home. */
+.tm-face {
+  position: absolute;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  overflow: hidden;
+  background: #fff;
+  border: 2px solid var(--town-chip, #3b2f25);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+.tm-face canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+.tm-icon {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}

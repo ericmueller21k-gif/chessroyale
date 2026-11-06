@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 
 /**
  * The privacy policy, terms of service and copyright page (drafts until reviewed: DECISIONS.md, "Privacy policy and
@@ -52,7 +53,7 @@ test("privacy, terms and copyright: drafts, from Settings and the FAQ, Back retu
   await section.getByRole("link", { name: "Terms of service", exact: true }).click();
   await expectDraft(page, "Terms of service");
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "FAQ · How it works" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "HunChess Handbook" })).toBeVisible();
 
   // Opened straight from its address, Back goes home.
   await page.goto("/terms");

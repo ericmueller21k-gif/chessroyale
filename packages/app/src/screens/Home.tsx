@@ -18,6 +18,7 @@ import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
+import { Walkthrough } from "../components/Walkthrough.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
@@ -996,7 +997,7 @@ export function HomeScreen({
         <span>{loading ? "Loading the engine…" : hint}</span>
       </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
-      <button type="button" class="fd-play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       {error && <p class="fd-error">{error}</p>}
@@ -1007,7 +1008,7 @@ export function HomeScreen({
   // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
   // (`fd-town`; styles.css gives both the same size at every width).
   const chessTownButton = (
-    <button type="button" class="fd-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+    <button type="button" class="fd-town" data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
       <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
       <span class="fd-town-label">Chess Town</span>
     </button>
@@ -1016,7 +1017,7 @@ export function HomeScreen({
   // solo screen (Boss alone's form of the Boss raid screen). A half card, side by side with Auto chess under Other modes
   // (`rd-pair`, styles.css).
   const soloCard = (
-    <button type="button" class="rd-card rd-half" onClick={() => onRaid(true)}>
+    <button type="button" class="rd-card rd-half" data-tour="boss-battle" onClick={() => onRaid(true)}>
       <span class="rd-face" aria-hidden="true">
         <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
       </span>
@@ -1047,16 +1048,17 @@ export function HomeScreen({
        * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
        * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
+      <Walkthrough onShop={onShop} />
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} />
-          <button type="button" class="fd-icon-btn fd-top-shop" aria-label="Shop & crates" onClick={onShop}>
+          <AccountBar onProfile={onProfile} tourId="profile" />
+          <button type="button" class="fd-icon-btn fd-top-shop" data-tour="shop" aria-label="Shop & crates" onClick={onShop}>
             <ShopIcon />
           </button>
           <button
             type="button"
-            class="fd-icon-btn fd-top-friends"
+            class="fd-icon-btn fd-top-friends" data-tour="play-with-friends"
             aria-label={friendsNews ? `Friends, ${friendsNews} new` : "Friends"}
             onClick={() => setFriends(true)}
           >
@@ -1067,7 +1069,7 @@ export function HomeScreen({
               </span>
             )}
           </button>
-          <button type="button" class="fd-icon-btn fd-top-gear" aria-label="Settings" onClick={onSettings}>
+          <button type="button" class="fd-icon-btn fd-top-gear" data-tour="settings" aria-label="Settings" onClick={onSettings}>
             <GearIcon />
           </button>
         </div>

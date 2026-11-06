@@ -3,7 +3,8 @@ import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { TOO_YOUNG_LINE } from "@chessroyale/core";
 import { pickMode } from "./helpers.ts";
 

@@ -82,9 +82,10 @@ test("an admin's street town opens at its default zoom step, at the start (22, 2
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "false");
   const cam = (await page.evaluate(() => (window as unknown as Hooks).__townCam?.()))!;
-  // (Round 4: the zoom is a step, 0 in .. 3 the overview; the default, 1, from the first frame. You open in the park: no step out.)
-  expect(cam.zoom, "the default step from the first frame").toBe(1);
-  expect(cam.zoomTarget).toBe(1);
+  // (Round 4: the zoom is a step, 0 in .. 3 the overview; the default from the first frame, 2 since Nov 5 (Eric: "we're going with number
+  // three for the default"). You open in the park: no step out.)
+  expect(cam.zoom, "the default step from the first frame").toBe(2);
+  expect(cam.zoomTarget).toBe(2);
   // Facing north: the camera looks up the board from behind you, its focus on your column, ahead of you (rows rising).
   expect(Math.abs(cam.focus[0]! - 22)).toBeLessThan(0.01);
   expect(cam.focus[1]!).toBeGreaterThanOrEqual(25);

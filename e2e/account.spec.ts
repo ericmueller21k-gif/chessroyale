@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { soloFromHome } from "./helpers.ts";
 
 test("a guest profile: icon and name stick, a solo match goes on it", async ({ page }) => {

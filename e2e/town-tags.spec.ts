@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { BOTS } from "../packages/app/src/town/world.ts";
 import { wrapF } from "../packages/app/src/town/camera.ts";
 import { TOWN_FEEL } from "../packages/app/src/town/feel.ts";
