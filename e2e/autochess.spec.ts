@@ -1215,37 +1215,63 @@ test("lock in (behind `?lockin=1`): you lock before the opponent, and when it lo
 });
 
 /** Samples the board every 80 ms while you buy: their real pieces (revealed), their circles, your grayed pieces (unseen by them) and the yellow-bordered one (your next). */
-const watchReveals = (page: Page, ms: number) =>
-  page.evaluate(
-    (ms) =>
-      new Promise<{ t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[]>((resolve) => {
-        const out: { t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[] = [];
-        const t0 = performance.now();
-        const sqs = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getAttribute("data-square")!).sort();
-        const look = () => {
-          if (document.querySelector(".ac-root")?.getAttribute("data-phase") !== "buy" || performance.now() - t0 > ms) return resolve(out);
-          const black = sqs(".hb-board piece.black:not(.king)");
-          const circles = sqs(".ac-circle");
-          const unseen = sqs(".hb-board piece.white.ac-unseen");
-          const next = document.querySelector(".ac-next")?.getAttribute("data-square") ?? null;
-          out.push({
-            t: (performance.now() - t0) / 1000,
-            black,
-            circles,
-            unseen,
-            next,
-            // (A revealed piece has its gold ring and no circle; the yellow border is only ever on a grayed piece of yours.)
-            pinged: black.every((sq) => !!document.querySelector(`.ac-ping[data-square="${sq}"]`)),
-            clash: black.some((sq) => circles.includes(sq)),
-            nextOk: next === null || unseen.includes(next),
-          });
-          setTimeout(look, 80);
-        };
-        look();
-      }),
+type RevealSample = { t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean };
+/**
+ * The board while the first buy step runs, sampled in the page from the moment the step begins (`data-phase` turns "buy", seen by an
+ * observer set up before the page loads, `recordReveals`): at every change on the screen and every 80 ms, `t` in seconds from the
+ * step's start, up to `ms` or the step's end. (Nov 6: timed from when the test first saw the step, a busy runner's late look moved
+ * every reveal that much early: 4 of 15 runs under load saw "theirs at 6 s" at 4.7 to 5.5 s.)
+ */
+const watchReveals = async (page: Page, ms: number): Promise<RevealSample[]> => {
+  await page.waitForFunction(
+    (ms) => {
+      const w = window as unknown as { __acBuyAt?: number; __acBuyEnded?: boolean };
+      return w.__acBuyEnded || (w.__acBuyAt !== undefined && performance.now() - w.__acBuyAt > ms);
+    },
     ms,
+    { timeout: ms + 30_000 },
   );
-/** The first sample (seconds from the watch's start) where `test` holds. */
+  return page.evaluate((ms) => ((window as unknown as { __acReveals: RevealSample[] }).__acReveals ?? []).filter((x) => x.t <= ms / 1000), ms);
+};
+/** Sets up `watchReveals`' record: call before the page loads. */
+const recordReveals = (page: Page) =>
+  page.addInitScript(() => {
+    const w = window as unknown as { __acBuyAt?: number; __acBuyEnded?: boolean; __acReveals: unknown[] };
+    w.__acReveals = [];
+    const sqs = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getAttribute("data-square")!).sort();
+    let timer = 0;
+    const look = () => {
+      const phase = document.querySelector(".ac-root")?.getAttribute("data-phase");
+      if (w.__acBuyAt === undefined) {
+        if (phase !== "buy") return;
+        w.__acBuyAt = performance.now();
+        timer = window.setInterval(look, 80);
+      }
+      if (w.__acBuyEnded) return;
+      if (phase !== "buy") {
+        w.__acBuyEnded = true;
+        clearInterval(timer);
+        return;
+      }
+      const black = sqs(".hb-board piece.black:not(.king)");
+      const circles = sqs(".ac-circle");
+      const unseen = sqs(".hb-board piece.white.ac-unseen");
+      const next = document.querySelector(".ac-next")?.getAttribute("data-square") ?? null;
+      w.__acReveals.push({
+        t: (performance.now() - w.__acBuyAt) / 1000,
+        black,
+        circles,
+        unseen,
+        next,
+        // (A revealed piece has its gold ring and no circle; the yellow border is only ever on a grayed piece of yours.)
+        pinged: black.every((sq) => !!document.querySelector(`.ac-ping[data-square="${sq}"]`)),
+        clash: black.some((sq) => circles.includes(sq)),
+        nextOk: next === null || unseen.includes(next),
+      });
+    };
+    new MutationObserver(look).observe(document, { subtree: true, childList: true, attributes: true });
+  });
+/** The first sample (seconds from the step's start) where `test` holds. */
 const firstWhen = <T,>(samples: T[], test: (s: T) => boolean) => (samples.find(test) as { t: number } | undefined)?.t ?? null;
 
 test("while you buy their pieces are live circles (pawns too); every 1.5 s (quick) a piece is revealed piece for piece by kind: the later placed of a pair first; yours grayed until seen, the next one with a yellow border", { tag: "@phone-only" }, async ({ page }) => {
@@ -1253,6 +1279,7 @@ test("while you buy their pieces are live circles (pawns too); every 1.5 s (quic
   // Seed 1: you (king b2) start with a knight on c2 and a bishop on d2 (put down as the step begins: placed first). The bot puts a pawn on a6 at 1.21 s, bishops on d8
   // at 1.65 s and a5 at 2.16 s, and a knight on h8 at 2.53 s. The reveals (every 1.5 s): 1.5 nothing (no pawn of yours to match a6); 3 their d8 (placed after your
   // c2: theirs first); 4.5 your c2; 6 their a5 (paired with your d2, which would answer at 7.5: past the step). a6 and h8 have no match: circles to the end.
+  await recordReveals(page);
   await page.goto("/autochess?quick=1&seed=1&stars=n@c2:1,b@d2:1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const s = await watchReveals(page, 6800);
@@ -1287,8 +1314,9 @@ test("while you buy their pieces are live circles (pawns too); every 1.5 s (quic
   await expect(page.locator('.ac-next[data-square="c2"]')).toHaveCount(1, { timeout: 4000 });
   expect(await page.locator(".ac-next").evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/^rgb\(255, 214, 10\) 0px 0px 0px 2px inset$/);
   expect(await page.locator(`${BOARD_SEL.piece}.white.ac-unseen`).first().evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
-  // A ping as each of theirs turns into its piece: one for each reveal of theirs.
-  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.king)`)).toHaveCount(2, { timeout: 8000 });
+  // A ping as each of theirs turns into its piece: one for each reveal of theirs. (Read from this load's record, at the step's end: the
+  // two show for the last second and a half of the quick step only, which a poll on a busy runner can miss, Nov 6.)
+  expect((await watchReveals(page, 8000)).at(-1)!.black).toHaveLength(2);
   expect(await soundCount(page, "acReveal")).toBe(2);
   // The move step shows everything for real: no circle, nothing grayed or bordered.
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
@@ -1301,6 +1329,7 @@ test("while you buy their pieces are live circles (pawns too); every 1.5 s (quic
 test("the reveals come every 3 seconds of the 30: theirs at 6 s, your matching piece at 9 s; nothing of theirs shows while you have no match", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // Seed 11 (the full 30 s): the bot (king h8) puts a bishop on c8 at 3.40 s, then pawns at 6.96, 12.17 and 15.98 s. You start with a knight on c2 (king h1).
+  await recordReveals(page);
   await page.goto("/autochess?seed=11&stars=n@c2:1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const s = await watchReveals(page, 13_000);
