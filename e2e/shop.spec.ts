@@ -1236,25 +1236,27 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
     await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
   };
   await still("door");
-  await walkTo([11, 16]);
-  await walkTo([6, 10]);
-  await still("play-structure");
-  // (Clear of the Shopkeeper's talking range, whose card would take the next tap, and of the claw machine standing in front of the
-  // race's east end.)
-  await walkTo([10, 8]);
-  await walkTo([13, 8]);
-  await walkTo([16, 4]);
-  await still("squirt-race");
-  await walkTo([17, 7]);
-  await walkTo([17, 10]);
-  await walkTo([17, 13]);
-  await still("spin-game");
-  await walkTo([13, 15]);
-  await walkTo([8, 15]);
+  // (Short hops, mostly north, away from the camera: a square more than about four away, or behind you, can be off a phone's screen.
+  // Clear of the Shopkeeper's talking range, whose card would take the next tap.)
+  await walkTo([9, 19]);
+  await walkTo([6, 18]);
   await walkTo([4, 17]);
   await still("roll-ball");
-  await walkTo([6, 13]);
-  await walkTo([8, 10]);
+  await walkTo([7, 15]);
+  await walkTo([10, 14]);
+  await walkTo([14, 14]);
+  await walkTo([17, 13]);
+  await still("spin-game");
+  await walkTo([13, 10]);
+  await walkTo([9, 10]);
+  await walkTo([6, 10]);
+  await still("play-structure");
+  await walkTo([9, 8]);
+  await walkTo([12, 7]);
+  await walkTo([15, 6]);
+  await walkTo([16, 4]);
+  await still("squirt-race");
+  await walkTo([13, 6]);
   // The clown attendant behind the counter: a tap on him walks you up to the counter; his card says "Shopkeeper", no name.
   await viewOnYou(page);
   await expect.poll(() => shopAt(page, "keeper"), { message: "the Shopkeeper is drawn" }).not.toBeNull();
