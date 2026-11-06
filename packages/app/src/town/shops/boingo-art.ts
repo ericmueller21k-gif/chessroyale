@@ -211,7 +211,7 @@ const HEM_H = 24;
 // ==== The prize counter: a glass counter (4 squares), its shelves of small prizes behind the glass.
 
 const CW = 4 * T;
-const CH = 46;
+const CH = 32;
 function stuffy(c: Cv, x: number, y: number, body: string, dark: string) {
   ellipse(c, x, y, 4, 4, body);
   ellipse(c, x, y - 6, 3, 3, body);
@@ -228,9 +228,9 @@ function counterCv(): Cv {
   rect(c, 2, 12, CW - 4, CH - 18, "l");
   rect(c, 0, 8, CW, 3, "j");
   rect(c, 0, CH - 6, CW, 6, "p");
-  for (let x = 4; x < CW - 4; x += 8) stuffy(c, x + 2, 30, TOYS[(x >> 3) % TOYS.length]![0], TOYS[(x >> 3) % TOYS.length]![1]);
+  for (let x = 4; x < CW - 4; x += 8) stuffy(c, x + 2, 23, TOYS[(x >> 3) % TOYS.length]![0], TOYS[(x >> 3) % TOYS.length]![1]);
   // glass glints
-  for (let k = 0; k < 4; k++) line(c, 10 + k * 36, 14, 16 + k * 36, 26, "L");
+  for (let k = 0; k < 4; k++) line(c, 10 + k * 36, 13, 14 + k * 36, 21, "L");
   return c;
 }
 export const SHOP_BOINGO_COUNTER = upright("counter", 4, 1, CH, [counterCv()]);

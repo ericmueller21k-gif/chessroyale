@@ -1240,6 +1240,7 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await walkTo([6, 10]);
   await still("play-structure");
   await walkTo([10, 7]);
+  await walkTo([14, 5]);
   await walkTo([18, 4]);
   await still("squirt-race");
   await walkTo([18, 12]);
