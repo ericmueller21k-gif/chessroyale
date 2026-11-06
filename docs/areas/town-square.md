@@ -943,6 +943,18 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `__townAt("tap-square", …)`.
   - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
   - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
+- **The north edge (Nov 5): one back line, Meadow Street, the plaza's gateways, the Colosseum as a solid.**
+  - **The plan** (`scripts/street-plan-north.py`, its north edge section): 54 × 54. A back wall on the line y = 42.5 the whole way round
+    but for the Colosseum; nothing walks or stands north of it but the ring and a few treetops (the meadow, ground only). Upper Street is
+    gone: its four homes stand on **Meadow Street** (rows 4–7), new south of South Street.
+  - **The plaza** (rows 40–41) is walled along row 39 with three open gateways onto Colosseum Row (`wall.ts`: `arches`, `crest`); its
+    statues and chess pieces stand on row 42 as figures (props `statue`, `piece`).
+  - **The Colosseum** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`): 18 ring boxes (kind `ring`) round its oval and a portal
+    (kind `portal`, the Colosseum's place's picture), drawn from any heading; never cut by `streetNearCut`; no line of sight.
+  - **Moo's and Ginger's homes** 1.3x (`TOWN_FEEL.streetHomeScale`, `rows.ts homePx`).
+  - **Tests:** `packages/app/test/town-north-edge.test.ts`; `e2e/town-fixed.spec.ts` (the plaza's look round and gateway),
+    `e2e/town-street.spec.ts` (Meadow Street's cards).
+  - Decision: [2026-11-05-street-north-edge.md](../decisions/2026-11-05-street-north-edge.md). Stills: `docs/street-north-edge/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
