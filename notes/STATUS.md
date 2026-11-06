@@ -226,3 +226,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 6 ~02:50: Boingo room PAUSED at 70167f81 (left: claw walk-up zoom + slot box, sign text, arcade ceiling, an e2e hop blocked
   by the claw machine, remaining e2e, fps, stills, PR body). Tutorial (Haiku) PAUSED at 94079042 (left: computer side-menu
   data-tour + desktop e2e, stills, PR body, decision note; merge welcome-crate 8dac548a and turn TUTORIAL_CRATE_25 on).
+- Nov 6 02:55 ALL HELPERS PAUSED (Eric: resume one at a time on his go-ahead). Claw machine DONE at e7a50ec0 (claude/claw-machine;
+  ?claw=1 test switch until Boingo's room merges; Eric's test tokens via the existing admin grant + "Admin: +3 of each token"
+  button). Waiting to merge: #509 Welcome Crates (CI running), Squads (Eric's OK), Smudgy deploying (83ceba92).
+  Resume order to propose: Squads (needs only Eric's OK) → north edge → controls → Boingo room → claw → tutorial.
