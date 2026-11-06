@@ -969,7 +969,8 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
 - **The north edge (Nov 5): one back line, Meadow Street, the plaza's gateways, the Colosseum as a solid.**
   - **The plan** (`scripts/street-plan-north.py`, its north edge section): 54 × 54. A back wall on the line y = 42.5 the whole way round
     but for the Colosseum; nothing walks or stands north of it but the ring and a few treetops (the meadow, ground only). Upper Street is
-    gone: its four homes stand on **Meadow Street** (rows 4–7), new south of South Street.
+    gone: its four homes stand on **Meadow Street** (rows 4–6, three wide so South Street keeps its south sidewalk), new
+    south of South Street.
   - **The plaza** (rows 40–41) is walled along row 39 with three open gateways onto Colosseum Row (`wall.ts`: `arches`, `crest`); its
     statues and chess pieces stand on row 42 as figures (props `statue`, `piece`).
   - **The Colosseum** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`): 18 ring boxes (kind `ring`) round its oval and a portal

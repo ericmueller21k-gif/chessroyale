@@ -182,10 +182,10 @@ out = {
 #   the plaza (Boingo's, Babur's, Big Boy's, Dash's) back onto it. A solid wall runs along it the whole way round (east-west wraps), but
 #   for the Colosseum. North of it: the Colosseum (its oval, the arena inside) and a meadow nobody walks or sees but from high up; a few
 #   trees behind the plaza's stretch of the wall, their tops over it. No street, lot, home or tower.
-# - UPPER STREET AND ITS HOMES MOVE SOUTH: the map grows 8 rows south (a new street, Meadow Street, rows 4..7, between the closing row
-#   and South Street) and, as the world is square (camera.ts N), 8 columns east (copies of column 42, just west of Seam Avenue, which
+# - UPPER STREET AND ITS HOMES MOVE SOUTH: the map grows 8 rows south (a new street, Meadow Street, rows 4..6, between the closing row
+#   and South Street; three squares wide, so South Street's south side has its sidewalk, row 11, as every street has) and, as the world is square (camera.ts N), 8 columns east (copies of column 42, just west of Seam Avenue, which
 #   moves to columns 52, 53, 0, 1: every street and row runs 8 squares longer east). Hopper's, Wrangler's, Moo's and Hollow's lots
-#   stand on Meadow Street's north side at their old columns, fronts south (rows 9..11), backed by a row facing South Street (row 11), as
+#   stand on Meadow Street's north side at their old columns, fronts south (rows 8..10), backed by a row facing South Street (row 10), as
 #   Timber's block is; a lane (columns 21..24) crosses their block on the promenade's line, and Seam Avenue now runs from Meadow Street to
 #   Colosseum Row.
 # - THE PLAZA (columns 13..32 before the Colosseum) is framed by a wall along its front (row 39, Colosseum Row's north sidewalk there)
@@ -223,11 +223,13 @@ g = []
 for r in range(N):
     if r <= 3:
         g.append(list(wide[r]))
-    elif r <= 7:
+    elif r <= 6:
         g.append(["#"] * N)  # Meadow Street (and Seam Avenue crossing it)
-    elif r == 8:
+    elif r == 7 or r == 11:
+        # Meadow Street's north sidewalk and South Street's south one. (Without it, looking along South Street, its south row stood at
+        # the street's edge, so near the camera that the fronts the near cut leaves out showed sky beside you.)
         g.append(["#" if c in AVE_C else "=" for c in range(N)])
-    elif r <= 11:
+    elif r <= 10:
         g.append(["#" if c in AVE_C else "=" if c in AVE_SW or c in LANE else "L" for c in range(N)])
     elif r <= 42:
         g.append(list(wide[r - ADD_R]))
@@ -260,7 +262,7 @@ for s in out["streets"]:
         span = (s["c1"] - s["c0"]) + (ADD_C if s["c1"] >= 43 else 0)
         s.update(c1=s["c0"] + span, r0=mr(s["r0"]), r1=mr(s["r1"]))
     streets.append(s)
-streets.insert(0, {"id": "meadow-st", "name": "Meadow Street", "axis": "EW", "c0": 0, "c1": N - 1, "r0": 4, "r1": 7, "cam": 0})
+streets.insert(0, {"id": "meadow-st", "name": "Meadow Street", "axis": "EW", "c0": 0, "c1": N - 1, "r0": 4, "r1": 6, "cam": 0})
 for s in streets:
     if s["id"] == "south-st":
         s["c1"] = N - 1
@@ -274,10 +276,10 @@ for l in out["lots"]:
     if l["kind"] == "wall":
         continue
     if l["kind"] == "home" and l["id"] in MOVED:
-        # To Meadow Street's north side, its old column: its lot rows 9..11, its door and rest square on the sidewalk (row 8).
-        l.update(r0=9, street="meadow-st", door={"c": l["door"]["c"], "r": 8}, rest={"c": l["rest"]["c"], "r": 8})
+        # To Meadow Street's north side, its old column: its lot rows 8..10, its door and rest square on the sidewalk (row 7).
+        l.update(r0=8, street="meadow-st", door={"c": l["door"]["c"], "r": 7}, rest={"c": l["rest"]["c"], "r": 7})
         w = l["wander"]
-        l["wander"] = {"x0": w["x0"], "x1": w["x1"], "y0": 7.7, "y1": 8.85}
+        l["wander"] = {"x0": w["x0"], "x1": w["x1"], "y0": 6.7, "y1": 7.85}
     else:
         l["c0"] = mc(l["c0"])
         l["r0"] = mr(l["r0"])
@@ -325,7 +327,7 @@ for p in out["props"]:
 for c in range(1, N, 6):
     props.append({"kind": "lamp", "x": c, "y": 3, "v": 0})
 for c in (4, 10, 20, 25, 34, 40, mc(43)):
-    props.append({"kind": "lamp", "x": c, "y": 8, "v": 0})
+    props.append({"kind": "lamp", "x": c, "y": 7, "v": 0})
 props.append({"kind": "lamp", "x": mc(43), "y": 39, "v": 0})
 # The plinths' row against the back wall: the statues (world.ts STATUES: their squares are the plaza's before them; drawn here) and the
 # chess pieces: the bronze queen and king by the portal, a marble bishop and rook past the marble statue, a knight and a pawn past the

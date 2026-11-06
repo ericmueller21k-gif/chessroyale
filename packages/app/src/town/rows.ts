@@ -270,11 +270,11 @@ export const ROW_SIDES: readonly RowSide[] = [
   // buildings"). Nothing is behind it.
   sideOf("south-edge", "meadow-st", "N", -0.5, SIZE - 0.5, 2, 0, 1301, { corner0: false, corner1: false, flat: 2.0, landmark: true }),
   // Meadow Street's north side (its fronts face south: Hopper's, Wrangler's, Moo's and Hollow's homes), either side of the lane, and
-  // South Street's south side behind it: a 3-deep block, back to back, as Timber's is.
-  sideOf("meadow-n-west", "meadow-st", "S", AVE_W, 20.5, 9, 10, 1401, BACK),
-  sideOf("meadow-n-east", "meadow-st", "S", 24.5, AVE_E, 9, 10, 1402, { ...BACK, landmark: true }),
-  sideOf("south-s-west", "south-st", "N", AVE_W, 20.5, 11, 11, 1403, { ...BACK, inset: ROW_INSET_BACK, landmark: true }),
-  sideOf("south-s-east", "south-st", "N", 24.5, AVE_E, 11, 11, 1404, { ...BACK, inset: ROW_INSET_BACK }),
+  // South Street's south side behind it: a 3-deep block, back to back, as Timber's is, a sidewalk before each side.
+  sideOf("meadow-n-west", "meadow-st", "S", AVE_W, 20.5, 8, 9, 1401, BACK),
+  sideOf("meadow-n-east", "meadow-st", "S", 24.5, AVE_E, 8, 9, 1402, { ...BACK, landmark: true }),
+  sideOf("south-s-west", "south-st", "N", AVE_W, 20.5, 10, 10, 1403, { ...BACK, landmark: true }),
+  sideOf("south-s-east", "south-st", "N", 24.5, AVE_E, 10, 10, 1404, BACK),
   // South Street, north side (its fronts face south), either side of the promenade; the deep block's tall blocks behind.
   sideOf("south-n-west", "south-st", "S", AVE_W, 20.5, 17, 19, 501),
   sideOf("south-n-east", "south-st", "S", 24.5, AVE_E, 17, 19, 502, { landmark: true }),

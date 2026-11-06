@@ -20,11 +20,15 @@ Still an admin's town only (`STREET_TOWN`). Brief: `notes/briefs/brief-street-no
 
 ## Upper Street moved south: Meadow Street
 
-- Upper Street and its row of homes are gone from north of the line. The map grows 8 rows south: **Meadow Street** (rows 4–7) between
+- Upper Street and its row of homes are gone from north of the line. The map grows 8 rows south: **Meadow Street** (rows 4–6) between
   the closing row and South Street. Hopper's, Wrangler's, Moo's and Hollow's homes stand on its north side at their old columns, fronts
   south, backed by a row facing South Street, as Timber's block is; a lane crosses the block on the promenade's line.
 - The world is square (`camera.ts N`), so it grows 8 columns east too: 54 × 54. Every street runs 8 squares longer; Seam Avenue moves to
   columns 52, 53, 0 and 1 and runs from Meadow Street to Colosseum Row.
+- **Meadow Street is three squares wide** (the others are four), so South Street keeps a sidewalk on its south side (row 11). Without
+  it, South Street's south row stood right at the street's edge: looking along the street, the fronts beside the camera are the ones
+  the near cut leaves out (nothing between the camera and you), and sky showed beside Hollow Peak's roof. With the sidewalk, the row
+  stands as far from you as every other street's does.
 - Every boss home keeps its card, door, strip and rest square. The start is the same square of the park as before, (22, 25), and the
   park's zoom-out area moves with it.
 
