@@ -249,3 +249,12 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   walk crosses that square between two frames, so the tag pops. A real slow phone would see the same pop. Fix queued for the next
   Opus slot (after north edge; render.ts conflict): ease each tag's drawn alpha toward its target over ~150 ms (time-based), so a fade
   shows at any frame rate. Passed on #509's own PR run and main's previous run. Watching c570f6dc's run.
+
+## Nov 6 ~06:30 UTC
+- #512 Welcome meters MERGED 5eba461a (deploy + main CI watcher bnf7yw22d).
+- Main c570f6dc green.
+- #511 north edge: Eric OK'd the stills and the rotation check. Pushed 286ed215, CI watcher bgqfwvi8w; PR body updated. Merge on green, then live.
+- Next, one Opus at a time:
+  1. controls+minimap (a05e51bee0efe0164: merge main, e2e, PR full-e2e);
+  2. tag-fade time easing (render.ts), plus an American-spelling sweep of the comments/docs #511 added (coliseum-ring.ts, coliseum-shape.ts, boxes.ts, decision note, areas doc).
+- Then the Boingo and tutorial resumes.
