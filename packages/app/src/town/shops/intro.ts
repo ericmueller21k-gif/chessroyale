@@ -540,7 +540,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     // (Folio's neither: the crumple is its.)
     // (Smudgy's neither: the splatter is his.)
     // (Dash's neither: his attack on a king came after his intro, Nov 6; in it he stands through its beat, as drawn.)
-    const ka = dark || folio || cloth || def.id === "dash" ? null : (kit?.kingAttack ?? null);
+    const ka = dark || folio || cloth || def.name === "Dash" ? null : (kit?.kingAttack ?? null);
     const attack = ka
       ? {
           ch: ka.ch,

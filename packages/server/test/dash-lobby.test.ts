@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_POWERS, DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type Settings } from "@chessroyale/core";
-import { legalMoves, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
+import { legalMoves, rushTimeline, sanLineToUci, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
 /**
@@ -133,5 +133,66 @@ describe("Dash online: the server's clocks", () => {
     const next = L.toRound();
     expect(next.moveClock).toBe(BOSS_POWERS.scrambleSeconds);
     expect(L.runner().boss!.powers!.events.some((e) => e.kind === "flag")).toBe(true);
+  });
+});
+
+/**
+ * Dash's Scramble Rush online (Nov 6; docs/decisions/2026-11-06-dash-v2.md): the server times it as the crowd's turn begins, keeps
+ * each person's placements sent in their ten seconds (none after them), and judges them with the rules' own code as time's up: the
+ * crowd's mean under needCorrect, his extra move asked of the host before the crowd's turn. The game's board never changes.
+ */
+describe("Dash online: the Scramble Rush", () => {
+  /** To the Rush (the test switch: as the second turn begins): its message and the position it froze. */
+  function toRush() {
+    const L = dashLobby("rush");
+    L.crowdPlays();
+    for (let i = 0; i < 20 && !L.last("p1", "boss")?.rush; i++) {
+      if (L.runner().bossToMove()) {
+        const req = L.last("p1", "bossRequest");
+        if (req) {
+          L.inbox.set("p1", []);
+          L.core.message("p1", { t: "bossMove", key: req.key, move: legalMoves(L.runner().boards.get(L.runner().state.boards[0]!)!.fen)[0]! });
+          continue;
+        }
+      }
+      L.advance(2_000);
+    }
+    const msg = L.last("p1", "boss")!;
+    expect(msg.rush).toBeTruthy();
+    const fen = L.runner().boards.get(L.runner().state.boards[0]!)!.fen;
+    return { L, rush: msg.rush!, moves: msg.boss.powers!.dash!.rush!.moves, fen };
+  }
+  const back = (moves: readonly { from: string }[], n: number) => Object.fromEntries(moves.slice(0, n).map((m) => [m.from, m.from]));
+
+  it("both put 4 back in their ten seconds: held, no extra move, the crowd's turn; a placement before the ten seconds is refused", () => {
+    const { L, rush, moves, fen } = toRush();
+    const tl = rushTimeline();
+    // (Before the ten seconds: not kept.)
+    L.core.message("p1", { t: "rushPlace", key: rush.key, places: back(moves, 6) });
+    L.advance(tl.placeAt + 500 - (L.now() - rush.at));
+    for (const id of ["p1", "p2"]) L.core.message(id, { t: "rushPlace", key: rush.key, places: back(moves, 4) });
+    L.advance(tl.placeUntil + L.settings.lateGraceMs + 10 - (L.now() - rush.at));
+    const judged = L.runner().boss!.powers!.dash!.rush!;
+    expect(judged.correct).toBe(4);
+    expect(judged.extra).toBeUndefined();
+    expect(L.runner().boards.get(L.runner().state.boards[0]!)!.fen).toBe(fen);
+    expect(L.last("p1", "boss")!.boss.powers!.dash!.rush!.correct).toBe(4);
+    L.advance(tl.total - tl.placeUntil + 10);
+    expect(L.toRound().board!.fen).toBe(fen);
+  });
+
+  it("3 back on average (one 6, one 0), or a late placement: he moves again, asked of the host as his extra move, before the crowd's turn", () => {
+    const { L, rush, moves, fen } = toRush();
+    const tl = rushTimeline();
+    L.advance(tl.placeAt + 500 - (L.now() - rush.at));
+    L.core.message("p1", { t: "rushPlace", key: rush.key, places: back(moves, 6) });
+    L.advance(tl.placeUntil + L.settings.lateGraceMs + 10 - (L.now() - rush.at));
+    // (After the ten seconds and the grace: not kept.)
+    L.core.message("p2", { t: "rushPlace", key: rush.key, places: back(moves, 6) });
+    expect(L.runner().boss!.powers!.dash!.rush).toMatchObject({ correct: 3, extra: "due" });
+    expect(L.runner().boards.get(L.runner().state.boards[0]!)!.fen).toBe(fen);
+    L.advance(tl.total - tl.placeUntil + 10);
+    const req = L.last("p1", "bossRequest")!;
+    expect(req.extra).toBe(true);
   });
 });

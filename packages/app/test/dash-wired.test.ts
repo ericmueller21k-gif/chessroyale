@@ -165,7 +165,7 @@ describe("Dash's intro", () => {
     expect(fromLine).toBeGreaterThanOrEqual(9_000);
     expect(fromLine).toBeLessThanOrEqual(10_500);
     // (His intro has no God King attack in it (his attack on a king came after it, Nov 6): he stands through its beat.)
-    expect(readFileSync("packages/app/src/town/shops/intro.ts", "utf8")).toMatch(/def\.id === "dash" \? null : \(kit\?\.kingAttack/);
+    expect(readFileSync("packages/app/src/town/shops/intro.ts", "utf8")).toMatch(/def\.name === "Dash" \? null : \(kit\?\.kingAttack/);
   });
 
   it("each dash: he bolts off his spot (his dust trail from the launch), is out of sight, races back and skids onto it, tosses; he stands between", () => {
