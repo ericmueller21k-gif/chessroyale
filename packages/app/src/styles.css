@@ -13630,8 +13630,7 @@ img.qicon {
    `--bc-shift`) moves its drawing inside the box. The name column is one width, so the room beside it is the same for every boss. */
 @media (max-width: 899px), (max-height: 599px) {
   .boss-bar.has-char {
-    /* (116 px, Nov 6: a fixed height that fits his words' three rows under the name's meters, so the board never jumps.) */
-    --bar-h: 116px;
+    --bar-h: 99px;
     min-height: var(--bar-h);
     padding-left: 5px;
     gap: 12px;
@@ -13639,8 +13638,7 @@ img.qicon {
   /* (58 px wide, from 5 px in: the feet at its middle, 34 px from the bar's left edge, 48 px from the screen's; the name column 12 px past the box, 89 px from the screen's.) */
   .boss-char.place-bar {
     width: 58px;
-    /* (The figure keeps its 88 px box, as it was at the 99 px bar: the figure's size doesn't change.) */
-    height: 88px;
+    height: calc(var(--bar-h) - 11px);
     align-self: flex-end;
     margin: 0;
     z-index: 3;
@@ -13917,6 +13915,9 @@ img.qicon {
   top: auto;
   bottom: -4px;
   max-width: 100%;
+  /* (Two rows under the name, LVL and meter, in the God King's font size: the line's pitch is 1.4, so two rows and the box's frame fit the
+     bar's 99 px under the meter, 5 px clear: e2e/boss-bubble-header.spec.ts. A line too long for two rows is shortened: lines.test.ts.) */
+  line-height: 1.4;
   text-wrap: balance;
 }
 /* Its tail points at the portrait, at the bar's left (the God King's tail, turned): the same square, its left and bottom edges. */
@@ -13929,11 +13930,11 @@ img.qicon {
   border-bottom: 3px solid #1a1406;
   border-left: 3px solid #1a1406;
 }
-/* Three rows at most: a longer line ends in an ellipsis (the clip is inside the bubble, so the tail is not cut). */
+/* Two rows at most (a line too long for them is shortened, never clamped in the game's own lines): an ellipsis is only a last-resort net. */
 .bc-bar-bubble .speech-clip {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   overflow: hidden;
 }
 /* Three rows (a line too long for two at the room's width): the text wraps to fill the box, not balanced into narrow rows. */
@@ -13949,10 +13950,6 @@ img.qicon {
    under a status that wraps to two lines), and the bar's column gap and status font let "58 moves left" keep its one line beside
    the name column (the figure's box 58 px, the name column 130 px: docs/decisions/2026-10-24-boss-bar-same.md). */
 @media (max-width: 359px) {
-  /* (The status wraps to two lines here: three rows of the bubble's line take the room under it, 5 px clear, at the tighter pitch.) */
-  .bc-bar-bubble {
-    line-height: 1.4;
-  }
   .boss-bar.has-char {
     padding-right: 6px;
   }

@@ -917,7 +917,7 @@ export const PIG_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly 
   power: ["Git over here!", "C'mere, little doggie.", "Yoink!"],
   tug: ["Fine. Just a tug, then.", "Yoink, anyhow.", "A tug'll do."],
   ready: ["I've got you in my sights."],
-  ultimate: ["This board ain't big enough for the six of us.", "It's high noon!"],
+  ultimate: ["Too small for all six of us.", "It's high noon!"],
   kingAttack: ["Dance, little king!", "Crack! Crack! Yee-haw!", "Git along, your majesty!"],
 };
 export const PIG_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {

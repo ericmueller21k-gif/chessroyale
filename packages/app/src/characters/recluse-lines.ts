@@ -18,12 +18,12 @@
  */
 export const RECLUSE_LINES = {
   /** His entrance (the stare): one of these (placeholders). See `introE4` for a battle he opened with 1.e4 as White. */
-  intro: ["Sit down. Let's find out if you can really play.", "Forget your opening book. Here we play chess.", "Show me one move you didn't copy from somewhere."],
+  intro: ["Sit. Let's see if you can play.", "No opening book. Pure chess.", "Show me one move you didn't copy."],
   /** His entrance instead, when he's White and the battle's game opened 1.e4: the one place it reads right. */
   // QUOTE (A1): his note to 1 P-K4 in his game against Bisguier, Chess Life, Dec 1963, pp. 302-303; repeated in his 1969 book.
   introE4: "Best by test.",
   /** His ultimate as it comes, the clock turning to bullet: one, picked by the battle (placeholders: no verified quote fits). */
-  bullet: ["You're thinking too much. Stop calculating and play!", "Enough staring at the board. Pure chess now. Move!", "All that thinking, and still no idea. Play fast!"],
+  bullet: ["Stop calculating. Just play!", "Stop staring. Pure chess. Move!", "All that thinking, no idea. Hurry!"],
   /**
    * A few moves into the bullet clock, he adds time per move (Eric, Oct 14): grudging, too fast even for real chess. One,
    * picked by the battle (placeholders: ours, not his words; the clock that adds time per move was his own invention, so
@@ -48,15 +48,15 @@ export const RECLUSE_LINES = {
   /** He wins: one of these. */
   victory: [
     // QUOTE (A7): on Alekhine, "The Ten Greatest Masters in History", Chessworld, Jan-Feb 1964, pp. 56-61.
-    "He played book lines, but didn't know them very well.",
+    "He knew book lines, not their meaning.",
     "Memorized moves. I knew it.",
   ],
   /** Beaten: his mumbling as he slumps on his knees, one line after another. */
   fall: [
-    "No... the book said... bishop takes... no...",
+    "The book said... no... no...",
     // QUOTE (A8): press conference, Sep 21, 1992, in Seirawan & Stefanovic, No Regrets.
-    "Morphy, I think everyone agrees, was probably the greatest genius of them all.",
-    "Sixty-four squares... I counted every one...",
+    "Morphy was the greatest genius.",
+    "Sixty-four squares. I counted.",
   ],
   // ---- Phase 2 (DECISIONS.md, "The Hidden Boss, phase 2"): four boards of Chess960. ----
   /**

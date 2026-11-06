@@ -85,10 +85,10 @@ describe("the challenge's flow", () => {
     expect(introOf("gingerbread")).toMatchObject({ custom: true, name: "Ginger", line: "Cold enough for you?", layout: "across", crewLine: "Coming, boss!" });
     expect(introOf("gingerbread")!.seated).toBeUndefined();
     // (Folio, Nov 5: its own, the folding and the plane, then the crumple; its line its entrance's; a quiet line one of five.)
-    expect(introOf("folio")).toMatchObject({ custom: true, name: "Folio", line: "Every game is a draft. Shall we write one?", layout: "across", clear: 2.3 });
+    expect(introOf("folio")).toMatchObject({ custom: true, name: "Folio", line: "Every game's a draft. Write one?", layout: "across", clear: 2.3 });
     expect(introOf("folio")!.chant).toHaveLength(5);
     // (Smudgy, Nov 6: his own, the cloth whipped off, then the splatter; his line his entrance's first; his reveal line Eric's idea.)
-    expect(introOf("smudgy")).toMatchObject({ custom: true, name: "Smudgy", line: "Smudgy, artist. Don't touch the wet parts.", layout: "across", seated: true, chant: ["Careful, don't get any paint on the pieces!"] });
+    expect(introOf("smudgy")).toMatchObject({ custom: true, name: "Smudgy", line: "Artist at work. Wet paint!", layout: "across", seated: true, chant: ["Careful, don't get any paint on the pieces!"] });
   });
 
   it("the layout: across for all twelve today (the boss on the left, you on the right: Eric's normal look)", () => {

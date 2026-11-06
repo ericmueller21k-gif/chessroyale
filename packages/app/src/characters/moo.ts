@@ -1633,24 +1633,24 @@ export const MOO_PORTRAIT = { x: OX + 1, y: OY + 3, w: 44, h: 44 } as const;
  * Full Moon over. How often a moment speaks: MOO_CHANCE; a power's moment always has its line.
  */
 export const MOO_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonly string[]>> = {
-  entrance: ["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Moo, look! Little horses! (Moooo… {sparkle})"],
+  entrance: ["Hi! I'm Moo, best friend. (Moo! {heart})", "I watched your farm. Let's play! (Moo? {question})", "Moo, look! Little horses! (Moooo… {sparkle})"],
   move: ["Ooh, good one, Moo!", "(Moo.)", "Easy does it, buddy.", "(Moo. {pawn})"],
   capture: ["We got one! (MOO! {sparkle})", "Sorry, little piece! (Moo.)", "(Moo! {heart})"],
   hurt: ["Hey! That one was ours! (Moo. {anger})", "Moo! Are you okay?! (…moo.)", "(MOO! {anger})"],
   strike: ["Moonlight, coming down!", "(Moo! {sparkle})"],
-  power: ["Moonbeam! Stay right there, please.", "A little moonlight for you!", "Shhh. That one's napping now. (Moo. {zzz})"],
-  wax: ["I'm getting fuller, Moo… I can feel it! (Mooo…)", "Half a moon! Halfway there! (Moo! {moon})", "Almost full! (Moo moo! {sparkle})"],
+  power: ["Moonbeam! Stay right there, please.", "A little moonlight for you!", "Shhh. That one's napping. (Moo. {zzz})"],
+  wax: ["Getting fuller! Feel it? (Mooo…)", "Half a moon! Halfway there! (Moo! {moon})", "Almost full! (Moo moo! {sparkle})"],
   thinking: ["Hmm… which one, Moo? (Moo. {pawn})", "Moo's chewing on it. (Moo. {grass})"],
   check: ["Check! Did we do that? (MOO! {sparkle})", "Your king looks worried! (Moo? {question})"],
-  smug: ["Best friends make the best moves! (Moo! {heart})", "(Moo. {cowbell})"],
+  smug: ["Best friends, best moves! (Moo! {heart})", "(Moo. {cowbell})"],
   rattled: ["Uh-oh. Moo, hold me tighter. (Moo… {question})", "So many pieces, Moo! (Moo?!)"],
   victory: ["We did it, Moo! (MOOOO! {heart})", "Best night ever! (Moo! {cowbell})"],
-  defeat: ["That's okay, Moo. We have each other. (…moo. {heart})", "Time to go home… (Moo. {zzz})"],
-  ultimateWarn: ["Moo… I think I'm almost full… (Moo? {moon})", "Look up, everyone! (Mooo… {sparkle})"],
+  defeat: ["We have each other. (…moo. {heart})", "Time to go home… (Moo. {zzz})"],
+  ultimateWarn: ["Moo… I'm almost full… (Moo? {moon})", "Look up, everyone! (Mooo… {sparkle})"],
   ultimate: ["FULL MOON! Now, Moo! (MOOOOOO!!)", "Take my light, buddy! (MOO! {sparkle})"],
-  flurry: ["Moonbeams, everywhere! (MOO MOO MOO!)", "Lights out, little pieces!"],
+  flurry: ["Moonbeams! (MOO MOO MOO!)", "Lights out, little pieces!"],
   dazed: ["Oh dear. Too much moon. (…moo. {zzz})", "Easy, buddy. Easy. (Moo… {zzz})"],
-  kingAttack: ["Shine, shine, shine! (MOO! {sparkle})", "Sorry, King. Moo really wants to win! (Moo!)", "Moonbeam, moonbeam, moonbeam! (MOO!)"],
+  kingAttack: ["Shine, shine, shine! (MOO! {sparkle})", "Sorry, King. Moo wants to win! (Moo!)", "Moonbeam, moonbeam, moonbeam! (MOO!)"],
 };
 /** How often each moment speaks (Smudgy's, plus his wax, flurry and dazed always; his powers' moments always say theirs). */
 export const MOO_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, number>> = {

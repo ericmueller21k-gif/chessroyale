@@ -171,7 +171,7 @@ describe("its challenge intro (Nov 5: the art's timeline)", () => {
 
   it("its own, across, not seated: you both walk on to the clean page's marks, then step back a pace (it to 2.3 from the table's middle, you to the usual 2.2)", () => {
     const ci = introOf("folio")!;
-    expect(ci).toMatchObject({ custom: true, layout: "across", clear: 2.3, line: "Every game is a draft. Shall we write one?" });
+    expect(ci).toMatchObject({ custom: true, layout: "across", clear: 2.3, line: "Every game's a draft. Write one?" });
     expect(ci.seated).toBeUndefined();
     const m = marksOf(SHOP_FOLIO_LAYOUT, "across", SHOP_FOLIO_MARKS, marksFeel(anims, CHALLENGE_FEEL, ci.clear))!;
     expect([m.boss.c, m.you.c, m.bossClear.c, m.youClear.c]).toEqual([8, 11, 7.2, 9.5 + CHALLENGE_FEEL.clear.you]);

@@ -51,7 +51,7 @@ describe("the boss select", () => {
     expect([first, second]).toEqual(SELECT_LINES.recluse);
     expect(selectLine("recluse", second)).toBe(first);
     expect(selectLine("nobody", null)).toBeNull();
-    expect(SELECT_LINES.folio).toEqual(["Every game is a draft. Shall we write one?"]);
+    expect(SELECT_LINES.folio).toEqual(["Every game's a draft. Write one?"]);
     expect(selectLine("folio", SELECT_LINES.folio![0]!)).toBe(SELECT_LINES.folio![0]);
   });
 

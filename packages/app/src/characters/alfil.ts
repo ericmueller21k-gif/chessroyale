@@ -1028,7 +1028,7 @@ export const ALFIL_ATTACK: Character = { ...ALFIL, id: "alfil-attack", name: "Al
 export const ALFIL_PORTRAIT = { x: OX, y: OY - 3, w: 50, h: 38 } as const;
 
 /**
- * His lines (Eric's sheet, Oct 17: "Before your bishops, there was me.", "Two little pawns make one big problem.", "Hold
+ * His lines (Eric's sheet, Oct 17: "Before your bishops, there was me.", "Two pawns, one big problem.", "Hold
  * on to something.", "What goes up…" and the fusion's three; the rest in the same voice): short, said now and then
  * (ALFIL_CHANCE); a power's moment always has its line. `power` is his cast (two pawns glowing), `powerHit` the fusion
  * (it's his move: "Alfil spent his move on the fusion."), `ultimateWarn` the Slam coming, `ultimate` the Slam, and
@@ -1046,8 +1046,8 @@ export const ALFIL_LINES: Partial<Record<import("./boss-beats.ts").Beat, readonl
   defeat: ["Back to the ice…", "Replaced… again…", "The bishops can have it…"],
   victory: ["The board is mine again!", "Who needs bishops?", "Mammoth win!"],
   strike: ["Trampled!", "Out of my way!"],
-  power: ["Two little pawns make one big problem.", "Glow, little ones.", "Pawns today. Elephant tomorrow."],
-  powerHit: ["Worth the wait.", "I'll skip my move. You'll wish I hadn't.", "Patience. Something old is coming back."],
+  power: ["Two pawns, one big problem.", "Glow, little ones.", "Pawns today. Elephant tomorrow."],
+  powerHit: ["Worth the wait.", "I'll pass. You'll wish I hadn't.", "Patience. Something old is coming back."],
   ultimateWarn: ["Hold on to something.", "Feel that rumble?", "Brace yourselves…"],
   ultimate: ["What goes up…", "Up you go!", "Fly, little pieces!"],
   ultimateHit: ["…must come down.", "And down they come.", "Welcome back. Miss me?"],

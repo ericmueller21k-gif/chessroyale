@@ -1216,7 +1216,7 @@ export const HOLLOW_LINES: Partial<Record<Beat, readonly string[]>> = {
   defeat: ["The light… again…", "Remember me…", "Torn… apart…"],
   victory: ["Lights out. For good.", "Darkness wins.", "You forgot. They all do."],
   strike: ["Forgotten.", "Gone dark."],
-  darkFirst: ["Don't forget what's there. Forgetting costs."],
+  darkFirst: ["Forget, and it costs you."],
   power: ["Can you still see it?", "How do you like the dark?", "Remember it?", "Dark there now.", "Forgetting yet?"],
   claim: ["The dark side is mine.", "I'll take the dark.", "Black suits me."],
   ultimateWarn: ["It's getting dark…", "Feel it?"],

@@ -77,28 +77,20 @@ describe("the director's lines, as written", () => {
       expect(line.trim(), line).toBe(line);
     }
     // (Spot checks of the exact words, with their tokens and their "…".)
-    expect(MOO_LINES.entrance).toEqual(["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Moo, look! Little horses! (Moooo… {sparkle})"]);
+    expect(MOO_LINES.entrance).toEqual(["Hi! I'm Moo, best friend. (Moo! {heart})", "I watched your farm. Let's play! (Moo? {question})", "Moo, look! Little horses! (Moooo… {sparkle})"]);
     expect(MOO_LINES.dazed).toEqual(["Oh dear. Too much moon. (…moo. {zzz})", "Easy, buddy. Easy. (Moo… {zzz})"]);
-    expect(MOO_LINES.kingAttack![1]).toBe("Sorry, King. Moo really wants to win! (Moo!)");
+    expect(MOO_LINES.kingAttack![1]).toBe("Sorry, King. Moo wants to win! (Moo!)");
     // (Every one of his ten icons is said somewhere but the milk, the one the director's draft doesn't use.)
     const used = new Set(all.flatMap((l) => parseLine(l).flatMap((s) => (s.icon ? [s.icon] : []))));
     expect([...used].sort()).toEqual(["anger", "cowbell", "grass", "heart", "moon", "pawn", "question", "sparkle", "zzz"] satisfies MooIconId[]);
   });
 
-  it("is, with an icon counted as one character, at most 50 long: five run past the 42 Alfil's and Chub & Chirp's own tests cap their lines at", () => {
+  it("is, with an icon counted as one character, at most 50 long, and none past 42 (the boss bar's two rows at 320 px: lines.test.ts)", () => {
     const all = (Object.values(MOO_LINES).flat() as string[]).concat(SELECT_LINES.moo!);
     expect(Math.max(...all.map(lineLength))).toBeLessThanOrEqual(50);
-    expect([...new Set(all.filter((l) => lineLength(l) > 42))].sort()).toEqual(
-      [
-        "Hi! This is Moo. He's my best friend. (Moo! {heart})",
-        "I watched your farm for ages. Let's play! (Moo? {question})",
-        "I'm getting fuller, Moo… I can feel it! (Mooo…)",
-        "Sorry, King. Moo really wants to win! (Moo!)",
-        "That's okay, Moo. We have each other. (…moo. {heart})",
-      ].sort(),
-    );
+    expect(all.filter((l) => lineLength(l) > 42)).toEqual([]);
     // (A screen reader and any plain-text place read them without the icons.)
-    expect(plainLine(MOO_LINES.entrance![0]!)).toBe("Hi! This is Moo. He's my best friend. (Moo!)");
+    expect(plainLine(MOO_LINES.entrance![0]!)).toBe("Hi! I'm Moo, best friend. (Moo!)");
     expect(plainLine(MOO_LINES.hurt![2]!)).toBe("(MOO!)");
   });
 
@@ -108,7 +100,7 @@ describe("the director's lines, as written", () => {
   });
 
   it("has the select screen's three lines and his happy moo", () => {
-    expect(SELECT_LINES.moo).toEqual(["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Best friends make the best moves! (Moo! {heart})"]);
+    expect(SELECT_LINES.moo).toEqual(["Hi! I'm Moo, best friend. (Moo! {heart})", "I watched your farm. Let's play! (Moo? {question})", "Best friends, best moves! (Moo! {heart})"]);
     expect(SELECT_SOUND.moo).toBe("mooHappy");
     // (None twice running: the stage's own rule.)
     expect(selectLine("moo", SELECT_LINES.moo![0]!, 0)).not.toBe(SELECT_LINES.moo![0]);

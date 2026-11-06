@@ -20,7 +20,7 @@ for (const w of [320, 390]) {
     await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=dash`);
     await bossAloneFromHome(page, "Dash");
     await expect(page.locator(".boss-bar")).toBeVisible({ timeout: 60_000 });
-    const text = "Check! That's bussin. Is that the word? That's the word.";
+    const text = "Check! Bussin. Is that the word?";
     const hit = await page.evaluate(async (text) => {
       (globalThis as { sayBoss?: (t: string) => boolean }).sayBoss?.(text);
       await new Promise((r) => setTimeout(r, 2500));

@@ -182,7 +182,7 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   // the stools are there already, so you both walk on straight to your marks beside them and stay. No attack: the splatter is his.)
   smudgy: {
     name: "Smudgy",
-    line: "Smudgy, artist. Don't touch the wet parts.",
+    line: "Artist at work. Wet paint!",
     layout: "across",
     custom: true,
     seated: true,
@@ -193,7 +193,7 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   },
   folio: {
     name: "Folio",
-    line: "Every game is a draft. Shall we write one?",
+    line: "Every game's a draft. Write one?",
     layout: "across",
     custom: true,
     chant: ["It's quiet in here. Stay as long as you like.", "Come back whenever it gets too loud out there.", "Take your time. The page will wait.", "Think as long as you need. I'm in no hurry.", "Quiet helps. So does a clean page."],

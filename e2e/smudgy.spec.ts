@@ -467,9 +467,8 @@ test("Smudgy at 320, 360, 390 and 1280 px: his figure whole in the bar, his long
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  // (His three lines over 42 characters: the entrance lines "Every chameleon blends in. I'd rather stand out." and
-  // "Hold still. I'm painting you into a corner.", and his king attack's "Hold still, your majesty. You need a touch-up.")
-  const LONG = ["Every chameleon blends in. I'd rather stand out.", "Hold still. I'm painting you into a corner.", "Hold still, your majesty. You need a touch-up."];
+  // (His longest lines, all shortened to two rows at 320 px: lines.test.ts.)
+  const LONG = ["Chameleons blend. I stand out.", "Hold still. I'm painting you.", "Hold still. A quick touch-up."];
   const sizes = desktop() ? [[1280, 800]] : [[320, 640], [360, 740], [390, 844]];
   for (const [w, h] of sizes) {
     await page.setViewportSize({ width: w!, height: h! });

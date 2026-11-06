@@ -41,10 +41,10 @@ describe("Alfil is live", () => {
 
   it("says Eric's lines (the sheet's, the fusion's three) and a line for every power's moment", () => {
     expect(ALFIL_LINES.entrance).toContain("Before your bishops, there was me.");
-    expect(ALFIL_LINES.power).toContain("Two little pawns make one big problem.");
+    expect(ALFIL_LINES.power).toContain("Two pawns, one big problem.");
     expect(ALFIL_LINES.ultimateWarn).toContain("Hold on to something.");
     expect(ALFIL_LINES.ultimate).toContain("What goes up…");
-    expect(ALFIL_LINES.powerHit).toEqual(["Worth the wait.", "I'll skip my move. You'll wish I hadn't.", "Patience. Something old is coming back."]);
+    expect(ALFIL_LINES.powerHit).toEqual(["Worth the wait.", "I'll pass. You'll wish I hadn't.", "Patience. Something old is coming back."]);
     for (const beat of ["power", "powerHit", "ultimateWarn", "ultimate", "ultimateHit"] as const) expect(ALFIL_LINES[beat]?.length, beat).toBeGreaterThan(0);
     for (const lines of Object.values(ALFIL_LINES)) for (const l of lines!) expect(l.length, l).toBeLessThanOrEqual(42);
   });
