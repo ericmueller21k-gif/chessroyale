@@ -258,3 +258,25 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   1. controls+minimap (a05e51bee0efe0164: merge main, e2e, PR full-e2e);
   2. tag-fade time easing (render.ts), plus an American-spelling sweep of the comments/docs #511 added (coliseum-ring.ts, coliseum-shape.ts, boxes.ts, decision note, areas doc).
 - Then the Boingo and tutorial resumes.
+
+## Overnight queue (Eric, Nov 6 ~07:40 UTC: "queue up everything for the next eight hours … one at a time")
+Eric OK'd all of these: more CI shards, the item audit trail, the 3D-engine decision (he said: decide it), and cutting bloat ("it shouldn't be this complicated").
+
+Opus, one at a time:
+1. #511 sky-gap fix and account-spec check (a0a05bd6, running) → merge → live.
+2. Controls and minimap (a05e51be): merge #511's new head; revert its "minimap off" workaround in the town-rows sky check (it was #511's bug, not the minimap's) → PR full-e2e → merge → live.
+3. Architecture audit (read-only, ~1h) → decisions doc:
+   - item storage today;
+   - room renderers;
+   - data vs code;
+   - what makes changes slow (dual renderer, stills, docs volume, screenshot specs).
+4. Street town WebGL-only (stop the 2D path and 2D test runs for STREET_TOWN; keep today's town 2D until the street town ships to all), plus tag-fade time easing, plus the American-spelling sweep.
+5. Item ledger (xhigh): an append-only grants/spends record for every item, token, crate and claw prize; additive migration and backfill; tests.
+6. The 3D art kit:
+   - low-poly meshes with pixel textures at the town's texel density, nearest filtering, the town palette and the same light (the N64/PS1 approach);
+   - rebuild Boingo's claw machine with it;
+   - stills for Eric in the morning, no merge until he OKs.
+7. Boingo resume (a0c458c8), if there's time.
+
+Haiku alongside: the tutorial (acf647b0), resumed 07:40.
+Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
