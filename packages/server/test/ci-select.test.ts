@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allWebgl, globToRegExp, MAX_SHARDS, plan, readAreas, readModule, readTimings, select, shardCount, specFiles, traceModule, weigher, WEBGL_JOBS } from "../../../e2e/ci-select.mjs";
+import { globToRegExp, MAX_SHARDS, plan, readAreas, readModule, readTimings, select, shardCount, specFiles, traceModule, weigher } from "../../../e2e/ci-select.mjs";
 
 /**
  * CI's e2e plan (e2e/ci-select.mjs, from e2e/areas.json; docs/areas/ops.md, "CI e2e"): a pull request runs the specs of
@@ -141,40 +141,6 @@ describe("shards", () => {
   });
 });
 
-describe("the town on WebGL (areas.json, `webgl`)", () => {
-  const weight = weigher(readTimings());
-  const gl = [...areas.webgl!.specs].sort();
-
-  it("a town file or one of its drawing specs: those specs again on WebGL; a chat spec, the chat's server, docs or a boss: none", () => {
-    expect(gl).toEqual(["e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts", "e2e/town.spec.ts"]);
-    expect(pick("packages/app/src/town/paint-gl.ts").webgl).toEqual(gl);
-    expect(pick("e2e/town-tags.spec.ts").webgl).toEqual(gl);
-    expect(pick("e2e/town-chat.spec.ts").webgl).toEqual([]);
-    expect(pick("packages/server/src/town-chat.ts").webgl).toEqual([]);
-    expect(pick("docs/areas/town-square.md", "packages/app/src/components/Sawyer.tsx").webgl).toEqual([]);
-  });
-
-  it("a shared foundation with a town file: every spec, and the town's on WebGL too", () => {
-    const r = pick("package.json", "packages/app/src/town/render.ts");
-    expect(r.full).not.toBeNull();
-    expect(r.webgl).toEqual(gl);
-    expect(pick("package.json").webgl).toEqual([]);
-  });
-
-  it("the plan: a WebGL job per project after the numbered shards, with its files, only when picked; a manual run's are the same", () => {
-    const on = plan(pick("packages/app/src/town/paint-gl.ts"), weight, all);
-    const n = Number(on.outputs.total);
-    expect(JSON.parse(on.outputs.shards)).toEqual([...Array.from({ length: n }, (_, i) => i + 1), ...WEBGL_JOBS]);
-    expect(WEBGL_JOBS).toEqual(["webgl-phone", "webgl-desktop"]);
-    expect(on.outputs.webgl.split(" ")).toEqual(gl);
-    expect(on.md).toContain("VITE_TOWN_GL=1");
-    const off = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
-    expect(JSON.parse(off.outputs.shards)).toEqual(Array.from({ length: Number(off.outputs.total) }, (_, i) => i + 1));
-    expect(off.outputs.webgl).toBe("");
-    expect(allWebgl(areas, all)).toEqual(gl);
-  });
-});
-
 describe("traced modules (areas.json, `traced`): a change followed through the code", () => {
   // A small repo in memory: each file's text before and after the pull request (null: not there).
   const repo = (files: Record<string, [string | null, string | null]>) => ({
@@ -245,8 +211,6 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     expect(r.full).toBeNull();
     expect(r.specs).toEqual([...new Set([...smoke, "e2e/town.spec.ts", "e2e/town-chat.spec.ts"])].sort());
     expect(r.specs).not.toContain("e2e/solo.spec.ts");
-    // (town.spec.ts is one of the town's drawing specs: the WebGL jobs run too.)
-    expect(r.webgl.length).toBeGreaterThan(0);
   });
 
   it("a shared module (net.ts): the areas of the files that import what changed; one App.tsx imports runs everything", () => {

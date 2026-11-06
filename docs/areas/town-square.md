@@ -72,10 +72,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
-  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the default: the canvas's own
-  context, the same calls as before) and WebGL 2 (`?gl=1`, `town/paint-gl.ts`; below, "WebGL").
-- **WebGL (`?gl=1`, Oct 30; docs/decisions/2026-10-30-town-webgl.md).** Anyone's `/town?gl=1` (read once as the page opens,
-  `TOWN_ASKED.gl`) draws the same picture with WebGL 2 in about 5 draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
+  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
+  WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
+- **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
+  docs/decisions/2026-11-06-street-webgl-only.md).** It draws the same picture with WebGL 2 in a few draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
   context render.ts uses (state, transforms, save and restore, paths, clips, strokes, shadows, text, images) and batches the
   frame into textured and solid triangles: textures from the canvases render.ts already makes, packed into 2048 px atlas
   pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
@@ -85,10 +85,11 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   modes too), each draw using the least that covers what it holds: the same pixels, much less work for a software
   renderer. 4x multisampling on a GPU; where the browser would render WebGL in software (no GPU, or SwiftShader in the
   headless tests: `failIfMajorPerformanceCaveat` refuses the first context), none, which halves a frame there (Oct 30,
-  later). No WebGL 2, no context, or its shader fails: Canvas 2D, silently. Context lost: nothing
-  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page.
-  Each of those fallbacks is reported once a page with its reason, nothing shown (the health view counts them:
-  docs/areas/ops.md, "Health"). Without `?gl=1`, Canvas 2D exactly as before. The canvas says which (`data-backend`).
+  later). An admin's device without WebGL 2 gets today's town (admin-town.ts `STREET_TOWN`). No context, or its shader fails:
+  the page opens again in today's town (`?street=off`). Context lost: nothing drawn until it's back (textures made again);
+  lost twice within a minute, or not back within 5 s: the page opens again in today's town. Each of those fallbacks is
+  reported once a page with its reason, nothing shown (the health view counts them: docs/areas/ops.md, "Health"). The
+  canvas says which backend (`data-backend`).
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
@@ -194,7 +195,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     always visible but the name tags no"; `town/tags.ts`, `TOWN_FEEL.nameRadius` 5 and `nameFadeSquares` 1): by default (`near`) a figure's
     tag shows only while the figure is within **5 squares of you in both directions** (|dc| ≤ 5 and |dr| ≤ 5, about a 10 × 10 area, from the
     fractional positions the walkers are drawn at), **fading** over the last square at the edge (alpha 1 up to 4.5, linearly to 0 at 5.5:
-    `nameAlpha`; stateless, from positions each frame, nothing allocated). It takes the smaller alpha of that and today's far-distance fade
+    `nameAlpha`, from positions each frame; the drawn alpha eases toward it over about 150 ms, at most half the way a frame, so a slow frame can't pop it: `easeTag`, Nov 6). It takes the smaller alpha of that and today's far-distance fade
     toward the rim (`tagFar`; `tagAlpha`). **Always shown, whatever the distance**: your own tag; a figure whose card is open (`town.hold`);
     one seated at a table with you; one walking to or from a game with you (`town.meet`, `town.leave`). The figures are always drawn; only the
     tags go. **"Everyone"** (Town settings, under Chat: "Names", the choices "Near you" and "Everyone", the line "Near you: names show within 5
@@ -925,10 +926,9 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   heading (`setHeading`, `toCam`, `rel`; `forEachSquare` lays the ground from a turned grid). Taps, the arrow keys (`screenStep`: up is
   up the screen) and the drag go through it; the clouds slide, the sun stays; the far Colosseum shows within 45 degrees of north. Seam
   Avenue's fronts face west. A home's floating name sits over its own roof, dropping toward its eave off the buildings behind. Both
-  renderers draw the same pieces (images through an affine transform); the 2D fallback's walls take coarser strips and its domes fewer
-  faces. Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
+  WebGL draws it (Nov 6: no 2D fallback, so its walls take fine strips and its domes every face). Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
   `heading`, `figures`, `boxes`; `__townHeading(deg | null)` holds the heading (the turn's stills). Tests: `packages/app/test/town-boxes.test.ts`,
-  `e2e/town-street.spec.ts` ("the boxes and the turn", both renderers). Decision:
+  `e2e/town-street.spec.ts` ("the boxes and the turn"; a lost context). Decision:
   [2026-11-05-street-town-boxes.md](../decisions/2026-11-05-street-town-boxes.md). Stills: `docs/street-town-boxes/`.
 - **Round 4 (Nov 5): joined rows, the chase camera, the town wrapping east-west only.**
   - **The plan** (`street-plan.json`, from the art's by `scripts/street-plan-north.py`): its `wrap` switch, `{ ew: true, ns: false }`
@@ -1010,8 +1010,8 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `docs/street-controls-map/`.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
-`?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
+`?fps`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
@@ -1058,24 +1058,10 @@ noted wherever a slice changed one.
   `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
   the talking range and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
   to the server).
-- `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
-  `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
-  compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
-  it reports the largest difference and where. Then a lost context (drawn again when it's back; lost twice, Canvas 2D), and
-  Canvas 2D without `?gl=1`. Measured Oct 30: the largest single difference 33 to 150 (single edge pixels: the GPU's 4x
-  multisampling against the 2D canvas's antialiasing, or a nearest texel picked across a tie), the mean about 1 of 255,
-  under 2.5% of pixels more than 8 apart, at most 0.13% more than 32. `TOWN_GL_STILLS=<dir>` saves full-page stills of both.
-- **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
-  their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
-  `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
-  and read right after the draw). Headless WebGL is software (SwiftShader: about 14 fps on a phone, 15 on a computer since
-  Oct 30, later; the page's thread waits for each frame), so run them with **one worker**: with two, a check takes 300 to
-  400 ms and the chat's and the tags' timing checks miss. `TOWN_GL_BUILD=1` tells `town-webgl.spec.ts` which default to
-  expect. All six pass so (docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later").
-- **CI on WebGL** (Oct 30): a change to the town's area (`webgl` in `e2e/areas.json`) also runs the drawing specs (town,
-  town-desktop, town-tags, town-webgl) on a `VITE_TOWN_GL=1` build, in two more jobs beside the shards, `webgl-phone` and
-  `webgl-desktop` (one project, one worker each; about 10 minutes of tests each). The chat's two specs aren't in it (HTML
-  over the canvas; nothing in them depends on the backend). docs/areas/ops.md, "CI e2e".
+- **The street town's specs run on WebGL** (Nov 6; town-street, town-rows, town-fixed, town-controls, once each): their pixel reads
+  work because a WebGL canvas's `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`).
+  Headless WebGL is software (SwiftShader, about 14 to 20 fps), so their timeouts are longer. Today's town's `?gl=1` and its
+  CI jobs are retired.
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, the chat icon is in the bar's
