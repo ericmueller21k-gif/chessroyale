@@ -94,6 +94,11 @@ interface RoomArt {
   icePool?: { readonly at: readonly [number, number]; readonly rx: number; readonly ry: number; readonly color: string; readonly strength: number };
   /** Ginger's elves at work (his igloo): the walkers' loops and the dispensing pair's, and their sprites. */
   elves?: ElvesArt;
+  /**
+   * A claw machine (Boingo's Funhouse, Nov 6): its square and the square in front where you play it. Standing there, a tap on the
+   * machine calls `openClawMachine()` (claw/index.ts, loaded only then); from anywhere else the tap walks you up to it.
+   */
+  claw?: { readonly at: { readonly col: number; readonly row: number }; readonly spot: Sq };
 }
 /** Ginger's elves, as his art has them (shops/ginger-art.ts, shops/ginger-elves-art.ts). */
 interface ElvesArt {
@@ -147,7 +152,7 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
     import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
   // (Boingo's Funhouse, Nov 6: an arcade, a box room of 24 x 24; the play structure stands up whole at its foot.)
   clown: () =>
-    import("./boingo-art.ts").then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play"], marks: m.SHOP_BOINGO_MARKS })),
+    import("./boingo-art.ts").then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play"], marks: m.SHOP_BOINGO_MARKS, claw: { at: m.SHOP_BOINGO_CLAW_AT, spot: m.SHOP_BOINGO_CLAW_SPOT } })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
   // elves at work.)
   gingerbread: () =>
@@ -3297,6 +3302,14 @@ function startRoom(
     if (!sq) return null;
     return tapTarget(room, here, sq.c, sq.r);
   };
+  /** A tap on the claw machine while you stand still at its spot (Boingo's Funhouse): its coin slot. */
+  const atClaw = (x: number, y: number): boolean => {
+    const cl = art.claw;
+    if (!cl || you.moving()) return false;
+    const h = you.here();
+    const sq = squareAt(x, y);
+    return !!sq && sq.c === cl.at.col && sq.r === cl.at.row && h.c === cl.spot.c && h.r === cl.spot.r;
+  };
   const local = (e: PointerEvent) => {
     const rc = box.getBoundingClientRect();
     return { x: e.clientX - rc.left, y: e.clientY - rc.top };
@@ -3335,6 +3348,10 @@ function startRoom(
     }
     const xy = local(e);
     if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
+    if (art.claw && atClaw(xy.x, xy.y)) {
+      void import("../../claw/index.ts").then((m) => m.openClawMachine());
+      return;
+    }
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
     // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
