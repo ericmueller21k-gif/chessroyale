@@ -20,6 +20,7 @@ import { homeBox, type HomeId as ArtHomeId } from "./home-boxes.ts";
 import { STREET_LOTS, type StreetLot } from "./street.ts";
 import { lookalike } from "./lookalike.ts";
 import { wallArt } from "./wall.ts";
+import { PORTAL_BOX, ringBox } from "./houses/coliseum-ring.ts";
 import type { Facing } from "./rows.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
@@ -28,7 +29,8 @@ import type { HomeId } from "./world.ts";
 const SQ = 37;
 
 /** What a box is: a boss's home, an everyday building on a row, a bigger one behind the rows, a garden's shed or a square of hedge. */
-export type BoxKind = "home" | "house" | "tall" | "wall" | "shed" | "hedge";
+/** (The north edge round: a stretch of the Colosseum's ring, and its portal, the Colosseum's own box.) */
+export type BoxKind = "home" | "house" | "tall" | "wall" | "ring" | "portal" | "shed" | "hedge";
 
 /** A box standing in the town. */
 export interface BoxInst {
@@ -49,8 +51,8 @@ export interface BoxInst {
   /** Its front line's middle (world): where its front sorts, a home's item stands, and every point is measured from. */
   fx: number;
   fy: number;
-  /** A home's id (the game's), an everyday building's lot (its index in STREET_LOTS), a prop's index in PROPS (a shed, a hedge). */
-  home: HomeId | null;
+  /** A home's id (the game's; the Colosseum's portal: "coliseum"), an everyday building's lot (its index in STREET_LOTS), a prop's index in PROPS (a shed, a hedge). */
+  home: HomeId | "coliseum" | null;
   lot: number;
   prop: number;
   /** Its left and right sides, covered by a neighbour at least as tall: never drawn. */
@@ -99,6 +101,8 @@ export function lotArt(l: StreetLot, low = false): TownBox {
   if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)));
   if (l.look) return big(lookalike(l.look));
   if (l.wall) return wallArt(l.wall);
+  if (l.ring !== undefined) return ringBox(l.ring);
+  if (l.kind === "portal") return PORTAL_BOX;
   return big(building(l.id as never, l.w, l.v));
 }
 
@@ -155,8 +159,13 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
   STREET_LOTS.forEach((l, lot) => {
     const box = lotArt(l);
     const low = l.kind === "home" ? lotArt(l, true) : box;
-    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.)
-    if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
+    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.
+    // A stretch of the Colosseum's ring: facing out from the oval, its front's middle where the ring has it.)
+    if (l.dir && l.at) {
+      const h = box.front.w / pxOf(box) / 2;
+      out.push({ i: out.length, kind: l.kind, box, low, facing: l.facing, ox: l.at.x - l.dir.ux * h, oy: l.at.y - l.dir.uy * h, ux: l.dir.ux, uy: l.dir.uy, bx: -l.dir.uy, by: l.dir.ux, fx: 0, fy: 0, home: null, lot, prop: -1, hideL: false, hideR: false, tile: null, props: [] });
+    } else if (l.kind === "portal" && l.at) add(l.kind, box, low, "S", l.at.x, l.at.y, { lot, home: "coliseum" });
+    else if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
     else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
     else add(l.kind, box, low, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
   });

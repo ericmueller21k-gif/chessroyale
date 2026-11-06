@@ -117,6 +117,8 @@ export const GRASS = 2;
 export const GARDEN = 3;
 export const LOT = 4;
 export const ARENA = 5;
+/** (The street town, the north edge round) A wall's or a plinth's square on the plaza: paved, not walked on. */
+export const WALL = 6;
 /** Each square's ground (index r * N + c). */
 export const groundAt = new Uint8Array(N * N);
 
@@ -133,7 +135,7 @@ export interface Table {
  * STREET_BUILDINGS[lot]).
  */
 export interface Prop {
-  kind: "tree" | "bench" | "fountain" | "table" | "lamp" | "hedge" | "bush" | "bed" | "shed" | "front";
+  kind: "tree" | "bench" | "fountain" | "table" | "lamp" | "hedge" | "bush" | "bed" | "shed" | "front" | "piece" | "statue";
   /** Its square (the fountain's: its front left one). */
   c: number;
   r: number;

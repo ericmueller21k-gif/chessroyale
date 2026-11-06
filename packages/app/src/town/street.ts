@@ -15,9 +15,14 @@ import type { LookSpec } from "./lookalike.ts";
 import type { WallSpec } from "./wall.ts";
 import { layRow, ROW_PX, ROW_SIDES, type Facing, type RowHome, type RowSide } from "./rows.ts";
 import type { HomeId } from "./home-boxes.ts";
+import { CAVEA, PORTAL_DEPTH, RING } from "./houses/coliseum-shape.ts";
 
-/** A square's ground in the plan: the streets (the board), paving (sidewalks, the park's walks, the apron), the park's lawns, gardens (and the grove), a lot under a building, the Colosseum. */
-export const STREET_GROUND_KEY = { "#": 0, "=": 1, ",": 2, g: 3, L: 4, A: 5 } as const;
+/**
+ * A square's ground in the plan: the streets (the board), paving (sidewalks, the park's walks, the plaza), the park's lawns, gardens (and
+ * the meadow behind the back wall), a lot under a building, the Colosseum, and (the north edge round) a wall's or a plinth's square on the
+ * plaza: paved, not walked on, and not in the way of a look (seen.ts stops at lots only).
+ */
+export const STREET_GROUND_KEY = { "#": 0, "=": 1, ",": 2, g: 3, L: 4, A: 5, W: 6 } as const;
 
 /** Each square's ground (index r * N + c), as the plan's letters say (STREET_GROUND_KEY's numbers). */
 export const STREET_GROUND = new Uint8Array(N * N);
@@ -40,7 +45,7 @@ export interface SqBox {
  * its front line, the lot's front edge plus `inset` squares, centred on the lot.
  */
 export interface StreetLot {
-  kind: "home" | "house" | "tall" | "wall";
+  kind: "home" | "house" | "tall" | "wall" | "ring" | "portal";
   /** A home's id (the art's: "blitz" is the game's "dash"), or an everyday building's design. */
   id: string;
   /** The colourway (0..2). */
@@ -63,8 +68,11 @@ export interface StreetLot {
   at?: { x: number; y: number };
   /** A home slid along its row to fit (squares east): its lot, door and wander box stay; its picture moves (rows.ts layRow). */
   shift?: number;
-  /** (Round 5) The back wall's and the Colosseum's side walls' recipe (wall.ts). */
+  /** (Round 5) The back wall's and the plaza's walls' recipe (wall.ts). */
   wall?: WallSpec;
+  /** (The north edge round) A stretch of the Colosseum's ring (houses/coliseum-ring.ts RING): its number, its front's way along (world). */
+  ring?: number;
+  dir?: { ux: number; uy: number };
 }
 
 /** Where along a row side square coordinate `a` is: itself, or once round (a row running over the east-west wrap: a1 past N), or null. */
@@ -127,7 +135,25 @@ function withRows(lots: StreetLot[]): StreetLot[] {
   });
   return out;
 }
-export const STREET_LOTS: readonly StreetLot[] = withRows(PLAN.lots as StreetLot[]);
+/**
+ * The Colosseum (the north edge round): its portal on the plaza's back line (its own box, the Colosseum's place's: houses/index.ts), and
+ * the stretches of its ring round the oval, each a box facing out (houses/coliseum-ring.ts). Their squares are the Colosseum's ground.
+ */
+function colosseumLots(): StreetLot[] {
+  const C = PLAN.coliseum;
+  const portal: StreetLot = {
+    kind: "portal", id: "portal", v: 0, c0: C.c0 + C.size / 2 - 2, r0: C.r0, w: 4, d: 1, facing: "S", street: "plaza", name: "The Colosseum",
+    inset: 0, depth: PORTAL_DEPTH, at: { x: C.c0 + (C.size - 1) / 2, y: C.r0 - 0.5 },
+  };
+  return [
+    portal,
+    ...RING.map((s): StreetLot => ({
+      kind: "ring", id: `ring-${s.k}`, v: 0, c0: Math.round(s.mx), r0: Math.round(s.my), w: 1, d: 1, facing: s.facing, street: "plaza",
+      name: "The Colosseum", inset: 0, depth: CAVEA, at: { x: s.mx, y: s.my }, ring: s.k, dir: { ux: s.ux, uy: s.uy },
+    })),
+  ];
+}
+export const STREET_LOTS: readonly StreetLot[] = [...withRows(PLAN.lots as StreetLot[]), ...colosseumLots()];
 /** The squares under a row (1): a lot's (not walked on), drawn paved, the sidewalk running up to the fronts (no lawn before a row). */
 export const ROW_GROUND = new Uint8Array(N * N);
 for (let r = 0; r < N; r++)
@@ -137,13 +163,13 @@ for (let r = 0; r < N; r++)
       ROW_GROUND[r * N + c] = 1;
     }
 /** The everyday buildings (on the rows and behind them), each with its design. */
-export const STREET_BUILDINGS = STREET_LOTS.filter((l) => l.kind !== "home") as readonly (StreetLot & { id: Design })[];
+export const STREET_BUILDINGS = STREET_LOTS.filter((l) => l.kind !== "home" && l.kind !== "portal") as readonly (StreetLot & { id: Design })[];
 /** The homes' lots, by the art's home id. */
 export const STREET_HOMES = STREET_LOTS.filter((l) => l.kind === "home") as readonly (StreetLot & { door: { c: number; r: number }; rest: { c: number; r: number }; wander: SqBox })[];
 
 /** Something standing in the plan: a park thing (tree, bench, lamp, table, the fountain) or a garden's (hedge, bush, bed, shed). */
 export interface StreetProp {
-  kind: "tree" | "bench" | "lamp" | "table" | "fountain" | "hedge" | "bush" | "bed" | "shed";
+  kind: "tree" | "bench" | "lamp" | "table" | "fountain" | "hedge" | "bush" | "bed" | "shed" | "piece" | "statue";
   /** Where its foot stands (a hedge's: the back of its top; the fountain's: the middle of its front edge). */
   x: number;
   y: number;

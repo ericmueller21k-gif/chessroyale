@@ -616,3 +616,35 @@ export const COLISEUM_CHIP: Character = {
   parts: { crown: chipCrown.part },
   anims: { idle: { loop: true, frames: [{ ms: 1000, layers: [{ part: "crown", x: chipCrown.at[0], y: chipCrown.at[1] }] }] } },
 };
+
+// ---- (The street town, the north edge round, Nov 5) What its 3D Colosseum (coliseum-ring.ts) reuses of this picture: the palette, the
+// tablet, the relief, a banner and the flag as parts; and each chess piece on its plinth as a figure of its own, standing on the plaza.
+
+export const COLISEUM_PALETTE: Readonly<Record<string, string>> = PALETTE;
+/** The parts (position-free: each placed where its user wants it) and their sizes (px). */
+export const COLISEUM_PARTS = { tablet: tablet.part, relief: relief.part, banner: parts.banner!, flag, penGold: parts.penGold!, penNavy: parts.penNavy! } as const;
+export const COLISEUM_SIZES = { tablet: [BW, BH], relief: [RELIEF_W, RELIEF_H], banner: [BAN_W, BAN_H], flag: [FLAG_W, FLAG_H], pennant: [PEN_W, PEN_H] } as const;
+/** The chess pieces that stand on the plaza (the plan's props, kind "piece", v its index here). */
+export const PIECE_NAMES = ["queen", "king", "bishop", "rook", "knight", "pawn"] as const;
+/** A piece on its plinth, as a figure: its foot (the plinth's) at the bottom middle, 3 px over its last row, the town's 37 px a square. */
+function pieceArt(name: (typeof PIECE_NAMES)[number]): Character {
+  const pw = Math.max(PLINTH_W, 2 * Math.ceil(14 * PS)) + 4;
+  const ph = Math.ceil(({ queen: QUEEN.h, king: KING.h, bishop: BISHOP.h, rook: ROOK.h, knight: 46, pawn: PAWN.h } as const)[name] * PS);
+  const w = pw;
+  const h = PLINTH_H + ph + 6;
+  const cx = w / 2;
+  const fy = h - 2;
+  const pl = plinth(cx, fy);
+  const pc = name === "knight" ? knight(cx, fy - PLINTH_H, false) : lathe(cx, fy - PLINTH_H, { queen: QUEEN, king: KING, bishop: BISHOP, rook: ROOK, pawn: PAWN }[name], name === "queen" || name === "king" ? BRONZE : MARBLE);
+  return {
+    id: `coliseum-piece-${name}`,
+    name,
+    w,
+    h,
+    foot: [Math.floor(cx), h - 3],
+    palette: PALETTE,
+    parts: { plinth: pl.part, piece: pc.part },
+    anims: { idle: { loop: true, frames: [{ ms: 1000, layers: [{ part: "plinth", x: pl.at[0], y: pl.at[1] }, { part: "piece", x: pc.at[0], y: pc.at[1] }] }] } },
+  };
+}
+export const PIECE_ART: readonly Character[] = PIECE_NAMES.map(pieceArt);
