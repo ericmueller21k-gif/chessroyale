@@ -164,10 +164,11 @@ function Bosses({ beaten }: { beaten: number[] }) {
 }
 
 /** Your name and icon: the name you play under, and the pixel icon you draw. */
-function EditSheet({ onClose }: { onClose: () => void }) {
+function EditSheet({ onClose, drawFirst = false }: { onClose: () => void; drawFirst?: boolean }) {
   const u = account().profile?.user;
   const [name, setName] = useState(u?.name ?? "");
-  const [drawing, setDrawing] = useState(false);
+  // (Home's icon opens the sheet already drawing: straight to the picker.)
+  const [drawing, setDrawing] = useState(drawFirst);
   const [msg, setMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   if (!u) return null;
@@ -295,7 +296,8 @@ function OwnProfileScreen({
   const uid = own ? me?.user.id : target.uid;
   const [p, setP] = useState<PublicProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sheet, setSheet] = useState<null | "edit">(null);
+  // (Home's icon opens your own profile's Edit sheet on the icon picker.)
+  const [sheet, setSheet] = useState<null | "edit">(() => (own && target.section === "icon" ? "edit" : null));
   // Your own reloads when your account changes (a new name, something new to wear).
   const version = own ? `${me?.user.name}|${JSON.stringify(me?.locker?.look ?? {})}` : "";
   useEffect(() => {
@@ -435,7 +437,7 @@ function OwnProfileScreen({
         </>
       ) : null}
       </div>
-      {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} />}
+      {sheet === "edit" && <EditSheet onClose={() => setSheet(null)} drawFirst={target.section === "icon"} />}
     </div>
   );
 }

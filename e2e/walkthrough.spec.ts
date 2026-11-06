@@ -22,11 +22,41 @@ const SLIDES = [
 const dialogOf = (page: Page) => page.getByRole("dialog", { name: "Welcome walkthrough" });
 const box = (page: Page) => dialogOf(page).getByRole("checkbox", { name: /Don't show this tutorial again/ });
 
+/**
+ * A slide's spot is cut out of the dim, not covered by it: no dim layer over a spot, and the lit element sits inside the
+ * cut-out. The bubble is docked at the bottom while the spot's centre is in the top half of the screen, else at the top.
+ * (A slide with no spot, the Handbook, has the full dim and no cut-out.)
+ */
+async function expectSpotAndDock(page: Page) {
+  if ((await page.locator(".wt-spot").count()) === 0) {
+    await expect(page.locator(".wt-dim")).toHaveCount(1);
+    return;
+  }
+  await expect(page.locator(".wt-dim")).toHaveCount(0);
+  await expect(async () => {
+    const r = await page.evaluate(() => {
+      const s = document.querySelector<HTMLElement>(".wt-spot")!.getBoundingClientRect();
+      const b = document.querySelector<HTMLElement>(".wt-bubble")!.getBoundingClientRect();
+      const lit = document.querySelector<HTMLElement>(".wt-lit")?.getBoundingClientRect();
+      const cy = s.top + s.height / 2;
+      return {
+        topHalf: cy < innerHeight / 2,
+        atBottom: Math.abs(innerHeight - b.bottom - 16) <= 1,
+        atTop: Math.abs(b.top - 16) <= 1,
+        litInside: !lit || (lit.left >= s.left && lit.right <= s.right && lit.top >= s.top && lit.bottom <= s.bottom),
+      };
+    });
+    expect(r.litInside).toBe(true);
+    expect(r.topHalf ? r.atBottom : r.atTop).toBe(true);
+  }).toPass({ timeout: 3000 });
+}
+
 /** Taps through to the last slide (the corner is the dimmed screen, so a tap there moves on). */
 async function toLastSlide(page: Page) {
   const dialog = dialogOf(page);
   for (let i = 0; i < SLIDES.length - 1; i++) {
     await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(SLIDES[i]);
+    await expectSpotAndDock(page);
     await dialog.click({ position: { x: 4, y: 4 } });
   }
   await expect(dialog.getByRole("heading", { level: 2 })).toHaveText(SLIDES[SLIDES.length - 1]);
@@ -40,6 +70,7 @@ test("the walkthrough walks all nine slides; the last shows both crates; finishi
 
   await toLastSlide(page);
   await expect(dialog.locator(".wt-count")).toHaveText(`9 of ${SLIDES.length}`);
+  await expectSpotAndDock(page);
   // Both Welcome Crates, each with its picture, its goal and its progress.
   const crates = dialog.locator(".wt-crate");
   await expect(crates).toHaveCount(2);

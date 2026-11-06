@@ -457,6 +457,14 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
   );
 }
 
+/** Enter or space on a tap target (a div with role=button) does what a tap does. */
+const tapKey = (e: KeyboardEvent, go: () => void) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    go();
+  }
+};
+
 /**
  * Home (the approved mockup, docs/mockups/front-door/Main.dc.html; the RANKED row and the Boss raid card, Eric, Oct 16):
  * the top bar (logo, coins, your pawn), the live line, your dressed pawn with your icon, name and rating, the RANKED row
@@ -499,6 +507,7 @@ export function HomeScreen({
   onChessTown,
   onAutoChess,
   onProfile,
+  onInventory,
   onSettings,
   onShop,
   onSignIn,
@@ -546,6 +555,8 @@ export function HomeScreen({
   /** Auto chess's card beside Boss Battle's, under Other modes: the screen, as /autochess opens it. */
   onAutoChess: () => void;
   onProfile: () => void;
+  /** Your pawn on the card: your inventory (the shop's Locker tab). */
+  onInventory: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
   onSettings: () => void;
   /** The phone's shop icon in the top bar. */
@@ -724,14 +735,19 @@ export function HomeScreen({
     if (firstView.current) firstView.current = false;
     else scrollTo(0, 0);
   }, [view]);
+  // Your icon and name open the icon picker (your profile's Edit sheet, straight to the icon).
+  const onIcon = () => openProfile({ you: true, name, section: "icon" });
   const hero = (
     <section class="fd-hero" aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
-      <DressedPawn look={look} size="hero" shadow ride />
+      {/* (Your pawn opens your inventory; your icon, level, name and rating open the icon picker: Eric, Nov 6.) */}
+      <div class="fd-hero-pawn fd-hero-tap" role="button" tabIndex={0} aria-label="Open your inventory" onClick={onInventory} onKeyDown={(e) => tapKey(e, onInventory)}>
+        <DressedPawn look={look} size="hero" shadow ride />
+      </div>
       {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) */}
-      <div class="fd-hero-id">
+      <div class="fd-hero-id fd-hero-tap" role="button" tabIndex={0} aria-label="Change your icon" onClick={onIcon} onKeyDown={(e) => tapKey(e, onIcon)}>
         <span class="fd-hero-icon">
           <UserIcon icon={profile?.user.icon ?? "♟"} />
           {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}

@@ -1689,6 +1689,7 @@ export function App() {
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
         onProfile={() => openProfile({ you: true, name: account().profile?.user.name ?? "" })}
+        onInventory={() => setShowShop("locker")}
         onSettings={() => setShowSettings(true)}
         onShop={() => setShowShop("shop")}
       />
