@@ -31,7 +31,8 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
-import { WELCOME_SCHEMA, grantWelcomeCrate, welcomeMoves } from "./welcome.ts";
+import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
+import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, leg, ledgerAccount, mergeMoves } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -148,6 +149,8 @@ const SCHEMA = [
   ...BOSS_TOKENS_SCHEMA,
   // The Welcome Crate (Nov 6): one row per account that earned it (welcome.ts).
   ...WELCOME_SCHEMA,
+  // The ledger (Nov 6): every change to a balance or an inventory, append-only (ledger.ts).
+  ...LEDGER_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.
@@ -281,7 +284,7 @@ export async function refreshRating(sql: Sql, userId: string): Promise<void> {
 const ready = new WeakSet<object>();
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
 const SCHEMA_VERSION = (() => {
-  const text = JSON.stringify([SCHEMA, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
+  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return `${text.length}-${(h >>> 0).toString(36)}`;
@@ -300,6 +303,8 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     return;
   }
   for (const s of SCHEMA) await sql.run(s);
+  // (The ledger's append-only triggers: a second lock beside ledger.ts's own. A database that refused them would still load.)
+  for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
   // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
   const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
   if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
@@ -532,7 +537,8 @@ export async function signInWithIdentity(
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
         ...tokenMoves(current.id, owner.id),
-        ...welcomeMoves(current.id),
+        // (The balances themselves, with their ledger legs: ledger.ts.)
+        ...mergeMoves(current.id, owner.id, now),
         ...rankedMoves(current.id, owner.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
@@ -1055,31 +1061,24 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   if (state.owned.includes(item.id)) return { ok: true, shop: admin ? await shopState(sql, userId, true) : state };
   const price = SHOP_FREE ? 0 : item.price;
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
-  if (price > 0) {
-    // One transaction (D1's batch: all of it or none), as another buy may have run since the read above
-    // (docs/decisions/2026-10-16-atomic-shop-purchase.md). The item goes in only if the coins are there; a plain
-    // INSERT, so an item owned by then fails it and nothing happens. Then the coins come off, only if they're there
-    // and the item is in. Nothing can change the wallet between the two statements of one transaction, so when the
-    // item went in, the coins come off. Two taps on one item pay once; two items at once can't go below zero.
-    const failed = await sql
-      .batch([
-        stmt("INSERT INTO inventory (user_id, item_id, acquired_at) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, now, userId, price),
-        stmt(
-          "UPDATE wallets SET coins = coins - ? WHERE user_id = ? AND coins >= ? AND EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)",
-          price,
-          userId,
-          price,
-          userId,
-          item.id,
-        ),
-      ])
-      .then(() => null, (e: unknown) => e);
-    // Owned: bought now, or by another buy since (the batch failed and changed nothing): a no-op success, as above.
-    if (!(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) {
-      if (failed) throw failed;
-      return { ok: false, message: "Not enough coins." };
-    }
-  } else await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  // One op in the ledger (`shop:<ledger id>:<item>`; ledger.ts), as one transaction (D1's batch: all of it or none), as another buy
+  // may have run since the read above (docs/decisions/2026-10-16-atomic-shop-purchase.md): it applies only while the item isn't yours
+  // and the coins are there, checked in that same transaction; then the item goes in and the coins come off. Two taps on one item pay
+  // once (the second is the same op); two items at once can't go below zero.
+  const me = await ledgerAccount(sql, userId);
+  const done = me
+    ? await applyOp(sql, me, {
+        id: `shop:${me.account}:${item.id}`,
+        reason: "shop",
+        now,
+        when: price
+          ? cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, userId, price)
+          : cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)", userId, item.id),
+        legs: [leg.shopItem(userId, item.id, now), ...(price ? [leg.coins(userId, -price)] : [])],
+      })
+    : "refused";
+  // Owned: bought now, or by another buy since (this one refused, changing nothing): a no-op success, as above.
+  if (done !== "applied" && !(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) return { ok: false, message: "Not enough coins." };
   // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
   if (item.slot === "chat" && item.look.pack) {
     const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);
@@ -1103,6 +1102,7 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
 
 /**
  * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free).
+ * (Not in the ledger yet: part II moves it there with Squads' reward key, written at least once. ledger.test.ts lists it.)
  */
 export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
   const c = Math.max(0, Math.round(coins));
@@ -1120,23 +1120,14 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
 }
 
 /**
- * A guest's items, equipped choices, coins, crates, crate keys and chat picks join the account they sign in to (the account's own
- * choices win): the statements, for the sign-in's one batch. The wallet is added up, so it must leave the guest in the
- * same transaction.
+ * A guest's equipped choices and chat picks join the account they sign in to (the account's own choices win): the statements, for
+ * the sign-in's one batch. (Its items, coins, crates and crate keys move with their ledger legs: ledger.ts, mergeMoves.)
  */
 function shopMoves(from: string, to: string): Stmt[] {
   return [
-    stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from),
-    stmt(
-      "INSERT INTO wallets (user_id, coins, crates, crate_keys) SELECT ?, coins, crates, crate_keys FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys",
-      to,
-      from,
-    ),
     stmt("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from),
-    stmt("DELETE FROM inventory WHERE user_id = ?", from),
     stmt("DELETE FROM equipped WHERE user_id = ?", from),
-    stmt("DELETE FROM wallets WHERE user_id = ?", from),
     stmt("DELETE FROM chat_picks WHERE user_id = ?", from),
   ];
 }

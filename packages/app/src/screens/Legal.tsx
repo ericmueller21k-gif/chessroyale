@@ -184,11 +184,12 @@ function Privacy() {
         what={
           <p>
             The crate items you own (each with its color, purity and pattern), what you wear, your coins, earned crates and crate keys,
-            your shop items, and the quick-chat lines you picked.
+            your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, tokens and
+            items: what, how many, why (a game, a battle, a crate, a buy) and when.
           </p>
         }
-        why="so what you own is yours on every device."
-        kept="until you delete an item or the account is deleted."
+        why="so what you own is yours on every device, and every coin and item can be accounted for."
+        kept="until you delete an item or the account is deleted; the record of changes until the account is deleted, and then without your account."
       />
       <Item
         title="Boss tokens"
@@ -430,7 +431,8 @@ function Privacy() {
           <strong>Kept, without you:</strong> your match results, moved to one shared "deleted" account and kept without your
           account, name, match code or exact time (only the day), rating, best move or eval-bar setting, so the game's numbers
           stay right. Your 1 v 1 games still kept (usually {RANKED_1V1.gamesKeepDays} days; longer while a player in the game is
-          under review) stay as the shared "deleted" account's, so your opponents' games stay whole. Error records stay counted, without your account. Feedback and ideas never carry your
+          under review) stay as the shared "deleted" account's, so your opponents' games stay whole. The record of changes to your coins
+          and items stays, naming nobody. Error records stay counted, without your account. Feedback and ideas never carry your
           account, so they stay until they expire ({OPS.store.keepDays} days).
         </li>
         <li>

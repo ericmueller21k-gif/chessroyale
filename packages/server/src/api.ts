@@ -442,12 +442,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/locker/grant" && request.method === "POST") {
     if (!admin) return json({ message: "Not found" }, 404);
     const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown };
-    const r = await grantTestItems(sql, current.id, b && typeof b === "object" ? b : {});
+    const r = await grantTestItems(sql, current.id, b && typeof b === "object" ? b : {}, now);
     return r.ok ? json(await lockerState(sql, current.id, admin)) : json({ message: r.message }, 400);
   }
   if (path === "/api/locker/delete" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { items?: unknown };
-    const r = await deleteLockerItems(sql, current.id, b.items, admin);
+    const r = await deleteLockerItems(sql, current.id, b.items, admin, now);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
 

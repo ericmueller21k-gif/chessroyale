@@ -138,6 +138,8 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   inventory: "user_id item_id acquired_at",
   invites: "from_id to_id kind code at expires_at",
   items: "id user_id def color blemish seed crate fischer created_at color2",
+  ledger: "op_id leg account asset_kind asset_id delta reason source_id created_at nonce",
+  ledger_accounts: "user_id account",
   live_lobbies: "code mode kind phase humans alive total boss_elo started_at updated_at",
   meta: "key value",
   ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
