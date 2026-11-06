@@ -63,17 +63,18 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     whether it ran that spec; if it isn't clear, re-run the failed spec locally on each merge in turn (`git checkout
     <merge>`, `npx playwright test <spec>`), oldest first.
   - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
-    plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
-    `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
-    in order, as locally. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
+    plan's list (every spec file on main), spread by the plan (`assign` in `e2e/ci-select.mjs`; `e2e/ci-shard.mjs N
+    TOTAL` shows one locally) so the slowest shard ends soonest: by each file's time per project, from main's last green
+    run's `e2e-summary-N` records (Nov 6; `e2e/ci-timings.json` for files they lack, and a new spec counts as the median),
+    simulating Playwright's order (project by project, files by name, 2 workers). Inside a file the tests run in order. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
     wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
     (`playwright.config.ts`). 2 workers per runner, as locally (half the runner's 4 CPUs). Setup (checkout, npm ci,
-    Chromium from cache, the build) takes about a minute per shard.
+    the build) takes about a minute per shard.
   - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
     record; `e2e/ci-summary-merge.mjs` renders them): the plan's line (what this run tested and why), flaky tests,
     then failed ones, each with its shard, `file:line`, project, the line it failed on and the gist of its error;
-    each shard's counts and time; and the test time by file as a ready-made `ci-timings.json` (refreshed Oct 18 from
-    two full runs). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
+    each shard's counts and time; and the test time by file and project as a ready-made `ci-timings.json` (the fallback;
+    refreshed Nov 6 from run 943). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
     report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
     Each shard's record (`e2e-summary-N`: its failed and flaky tests) is kept 90 days, for a look at which tests
     catch real bugs and which only flake (Eric, Oct 18; the first look about two weeks on).

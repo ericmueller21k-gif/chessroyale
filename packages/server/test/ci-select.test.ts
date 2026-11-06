@@ -1,5 +1,24 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { globToRegExp, MAX_SHARDS, plan, readAreas, readModule, readTimings, select, shardCount, specFiles, traceModule, weigher } from "../../../e2e/ci-select.mjs";
+import {
+  assign,
+  globToRegExp,
+  makespan,
+  MAX_SHARDS,
+  plan,
+  projectWeigher,
+  readAreas,
+  readLiveTimings,
+  readModule,
+  readTimings,
+  select,
+  shardCount,
+  specFiles,
+  traceModule,
+  weigher,
+} from "../../../e2e/ci-select.mjs";
 
 /**
  * CI's e2e plan (e2e/ci-select.mjs, from e2e/areas.json; docs/areas/ops.md, "CI e2e"): a pull request runs the specs of
@@ -116,7 +135,8 @@ describe("the table (e2e/areas.json)", () => {
 });
 
 describe("shards", () => {
-  const weight = weigher(readTimings());
+  const timings = readTimings(undefined, "");
+  const weight = weigher(timings);
 
   it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
     expect(shardCount(smoke, () => 100)).toBe(1);
@@ -126,19 +146,60 @@ describe("shards", () => {
     expect(MAX_SHARDS).toBe(10);
   });
 
-  it("every spec: 10 shards and no file list (each shard spreads every spec file); otherwise the files", () => {
-    const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, weight, all);
+  it("every spec: 10 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
+    const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, timings, all);
     expect(full.outputs).toMatchObject({ specs: "", total: "10", shards: "[1,2,3,4,5,6,7,8,9,10]" });
     expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 10 shards: this is a push run, which tests everything.`);
-    const one = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
+    const filters: string[] = JSON.parse(full.outputs.assignment).flatMap((s: string) => s.split(" "));
+    expect(filters.sort()).toEqual(all.map((f) => `${f.replaceAll(".", "\\.")}$`).sort());
+    const one = plan(pick("packages/app/src/components/Sawyer.tsx"), timings, all);
     expect(one.outputs.specs.split(" ")).toContain("e2e/sawyer.spec.ts");
     expect(JSON.parse(one.outputs.shards)).toEqual(Array.from({ length: Number(one.outputs.total) }, (_, i) => i + 1));
+    expect(JSON.parse(one.outputs.assignment).join(" ").split(" ").length).toBe(one.outputs.specs.split(" ").length);
     expect(one.md).toContain("full-e2e");
   });
 
-  it("a file the timings don't know counts as their median", () => {
-    const w = weigher({ "e2e/a.spec.ts": 10, "e2e/b.spec.ts": 20, "e2e/c.spec.ts": 300 });
-    expect(w("e2e/new.spec.ts")).toBe(20);
+  it("a file the timings don't know counts as each project's median; an old single number splits evenly", () => {
+    const t = projectWeigher({ "e2e/a.spec.ts": { phone: 10, desktop: 0 }, "e2e/b.spec.ts": { phone: 20, desktop: 4 }, "e2e/c.spec.ts": 300 });
+    expect([t("e2e/new.spec.ts", "phone"), t("e2e/new.spec.ts", "desktop")]).toEqual([20, 4]);
+    expect(t("e2e/c.spec.ts", "desktop")).toBe(150);
+    expect(weigher({ "e2e/a.spec.ts": 10, "e2e/b.spec.ts": 20, "e2e/c.spec.ts": 300 })("e2e/new.spec.ts")).toBe(20);
+  });
+
+  it("a shard's clock time follows Playwright's order: project by project, files by name, the next job to the first free worker", () => {
+    const t = projectWeigher({ "e2e/a.spec.ts": { phone: 10, desktop: 10 }, "e2e/b.spec.ts": { phone: 10, desktop: 10 }, "e2e/z.spec.ts": { phone: 60, desktop: 60 } });
+    // Phone: a and b side by side, z after a (70); desktop: a, b and z on the other worker (10 + 10 + 10 + 60 = 90),
+    // not the 80 that half the sum would say.
+    expect(makespan(["e2e/z.spec.ts", "e2e/a.spec.ts", "e2e/b.spec.ts"], t)).toBe(90);
+    expect(makespan(["e2e/a.spec.ts"], t)).toBe(10);
+  });
+
+  it("spreads files so the slowest shard ends soonest: on the measured times, within 3% of a perfect split, every file once", () => {
+    const time = projectWeigher(timings);
+    const shards = assign(all, time, MAX_SHARDS);
+    expect(shards.flatMap((s) => s.files).sort()).toEqual([...all].sort());
+    const ideal = all.reduce((sum, f) => sum + weight(f), 0) / MAX_SHARDS / 2;
+    for (const s of shards) expect(s.seconds).toBeLessThanOrEqual(ideal * 1.03);
+    for (const s of shards) expect(s.seconds).toBe(makespan(s.files, time));
+    expect(assign(all, time, MAX_SHARDS)).toEqual(shards);
+  });
+
+  it("main's last green run's records overlay the committed times, file by file; older records (no projects) are skipped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ci-live-"));
+    try {
+      mkdirSync(join(dir, "e2e-summary-1"));
+      mkdirSync(join(dir, "e2e-summary-2"));
+      writeFileSync(join(dir, "e2e-summary-1", "shard-1.json"), JSON.stringify({ projects: { "e2e/sawyer.spec.ts": { phone: 7, desktop: 3 } } }));
+      writeFileSync(join(dir, "e2e-summary-2", "shard-2.json"), JSON.stringify({ timings: { "e2e/shop.spec.ts": 5 } }));
+      writeFileSync(join(dir, "e2e-summary-2", "shard-2.flaky"), "");
+      expect(readLiveTimings(dir)).toEqual({ "e2e/sawyer.spec.ts": { phone: 7, desktop: 3 } });
+      const merged = readTimings(undefined, dir);
+      expect(merged["e2e/sawyer.spec.ts"]).toEqual({ phone: 7, desktop: 3 });
+      expect(merged["e2e/shop.spec.ts"]).toEqual(timings["e2e/shop.spec.ts"]);
+      expect(readLiveTimings(join(dir, "missing"))).toEqual({});
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
