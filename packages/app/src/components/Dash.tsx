@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
 import { hash, pickLine } from "../characters/boss-beats.ts";
-import { DASH_FIT_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
+import { DASH_FIT_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
 import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
@@ -130,7 +130,7 @@ function fitMoment({ moment }: MomentProps) {
   );
 }
 
-/** His extra move after a failed Scramble Rush: its own moment as it lands (Hollow's "TWICE!" in his colors), and his line. */
+/** His extra move after a failed Scramble Rush: its own moment as it lands (Hollow's "TWICE!" in his colors; his line came as time was up). */
 function rushExtraMoment({ boss, banner }: MomentProps) {
   return <div class="power-moment pm-extra pm-stay">{banner("TWICE!", `${boss.name} moves again`, "dash")}</div>;
 }
@@ -145,7 +145,7 @@ const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "rushExtra", M
   scramble: { order: 3, kit: "ultimate", lineAt: B.scramble.castAt, view: (p) => scrambleMoment(p) },
   // (A quirk, not a power: no banner, nothing for you to do; the dock keeps the turn's line.)
   clockFit: { order: 4, kit: "power", view: fitMoment, line: (_kit, m) => lineOf(DASH_FIT_LINES, m.key) },
-  rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: (_kit, m) => lineOf(DASH_RUSH_LINES.fail, m.key) },
+  rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 
 // ---------------- The countdown over the board ----------------

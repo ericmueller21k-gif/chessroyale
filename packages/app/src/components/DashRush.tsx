@@ -127,11 +127,11 @@ export function rushDock(boss: BossView, view: RushView, now: number): { line: s
   const n = rush.moves.length;
   const need = Math.min(S.needCorrect, n);
   const stage = rushStage(rush, view, now);
-  if (stage === "sweep") return { line: "Scramble Rush! Watch the pieces he moves.", sub: `Put ${need} of the ${n} back or he moves twice.` };
+  if (stage === "sweep") return { line: "Scramble Rush!", sub: `Watch his pieces: ${need} of ${n} back, or he moves twice.` };
   const right = rushJudge(boss.board.fen, rush, view.places).correct;
-  if (stage === "place") return { line: `Put the pieces back: ${right} of ${n} right.`, sub: `${need} needed. Drag or tap them.` };
-  if (rush.correct === undefined) return { line: `Time's up: ${right} of ${n} right.`, sub: "The board as it was." };
-  return rush.extra ? { line: `${right} of ${n} right. Too few back.`, sub: "He moves again." } : { line: `${right} of ${n} right. Well remembered!`, sub: "The board as it was. Your move." };
+  if (stage === "place") return { line: `${right} of ${n} back`, sub: `${need} needed. Drag or tap them home.` };
+  if (rush.correct === undefined) return { line: `Time's up: ${right} of ${n}`, sub: "The board as it was." };
+  return rush.extra ? { line: `${right} of ${n}: too few`, sub: "He moves again." } : { line: `${right} of ${n}: well done!`, sub: "The board as it was. Your move." };
 }
 
 // ---------------- His running copy ----------------
@@ -229,6 +229,8 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
     if (t >= tl.linesAt) once(`${key}:done`, () => bossVoice.say(DASH_RUSH_LINES.done[hash(key) % DASH_RUSH_LINES.done.length], `${key}:done`, CRITICAL));
     if (t >= tl.askAt) once(`${key}:ask`, () => kingSay("rushAsk", `${key}:ask`));
     if (rush.correct !== undefined && !rush.extra) once(`${key}:well`, () => kingSay("rushWell", `${key}:well`));
+    // (Too few back: his word as time's up; his extra move follows at once.)
+    if (rush.extra) once(`${key}:fail`, () => bossVoice.say(DASH_RUSH_LINES.fail[hash(key) % DASH_RUSH_LINES.fail.length], `${key}:fail`, CRITICAL));
   });
   // The clock's tick each second of both countdowns (his "1.00" too: five of them).
   const tick = t < tl.countdownMs ? Math.floor(t / 1000) : t >= tl.placeAt && t < tl.placeUntil ? 100 + Math.floor((t - tl.placeAt) / 1000) : -1;
@@ -277,7 +279,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
           <span key={m.square} class={`rush-edge ${m.right ? "right" : m.placed ? "wrong" : "todo"}${sel && at.get(sel) === m.square ? " sel" : ""}`} data-square={m.square} style={cell(m.square, orientation)} />
         ))}
       {showCount !== null && (
-        <div class={`rush-banner${stage === "sweep" && t < tl.countdownMs ? " big" : ""}`} aria-hidden="true">
+        <div class={`rush-banner${stage === "sweep" ? " big" : ""}`} aria-hidden="true">
           <span class="rb-title">{stage === "sweep" ? "SCRAMBLE RUSH" : stage === "place" ? "PUT THEM BACK" : "TIME'S UP"}</span>
           <b class="rb-count" data-count={showCount}>
             {showCount}
