@@ -48,9 +48,24 @@ Admins only: "Admin: +3 of each token". The machine itself appears only once Boi
   sounds), `e2e/claw.spec.ts` (phone and computer: an admin's test tokens, a forced win opened with Open now, a forced loss, one token
   each). `e2e/areas.json` maps `packages/app/src/claw/**` and the spec to the shop's area.
 
-## Visuals
+## Runs (local, Nov 6)
 
-`docs/claw-machine/` (stills and GIFs, phone).
+- `packages/server/test/claw.test.ts`: 14 passed. `packages/server/test/account-data.test.ts`: 20 passed.
+- `packages/app/test/claw.test.ts`: 9 passed; `boss-sounds-finite.test.ts` and `sounds-source.test.ts` pass with the new sounds.
+- `npm run typecheck`: clean.
+- `e2e/claw.spec.ts`: passed on phone (29.4 s) and desktop (29.2 s).
+
+## Visuals (phone, 390 × 844)
+
+`docs/claw-machine/`: `insert-empty.png` (no tokens yet), `insert-picker.png` (the picker after the admin's grant), `roaming.png`
+(the claw out, STOP), `win.png` and `win.gif` (the crate carried to the chute, "You won Folio's Boss Crate!", Open now), `loss.png` and
+`loss.gif` (it slips at the top, "So close! Try again?").
+
+## Known follow-ups
+
+- The picker's token names clip their descenders by a pixel or two on a phone ("Big Boy", "Puddles"): a CSS touch to finish.
+- Boingo's Funhouse (`claude/boingo-home`) calls `openClawMachine()`; when it merges, main is merged here and the stub resolved (this
+  module wins).
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

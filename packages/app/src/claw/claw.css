@@ -252,6 +252,7 @@
   color: #fff;
   font: inherit;
   font-size: 12px;
+  line-height: 1.3;
   cursor: pointer;
 }
 .claw-token canvas {
@@ -263,6 +264,9 @@
   cursor: default;
 }
 .claw-token-name {
+  display: block;
+  line-height: 1.3;
+  padding-bottom: 1px;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
