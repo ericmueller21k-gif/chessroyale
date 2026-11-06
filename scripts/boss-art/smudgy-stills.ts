@@ -93,3 +93,27 @@ class Img {
   ["idle", "walk", "sit", "wave"].forEach((a, i) => im.draw(K, a, 0, (i * 70 + 30) * 3, 64 * 3, false, 3));
   im.save("keeper.png");
 }
+// The life class at work (SMUDGY_GIF=1): 32 frames 250 ms apart (one painters' loop), the room's middle, each piece at its own `t0`;
+// life-NN.png, for a GIF.
+if (process.env.SMUDGY_GIF) {
+  const [c0, r0, c1, r1] = [4, 3, 16, 13];
+  for (let k = 0; k < 32; k++) {
+    const now = k * 250;
+    const im = new Img((c1 - c0) * T, (r1 - r0) * T + 60);
+    const ox = -c0 * T;
+    const oy = 60 - r0 * T;
+    for (const p of SHOP_SMUDGY_LAYOUT) {
+      if (p.col < c0 - 2 || p.col > c1 + 1 || p.row < r0 || p.row > r1) continue;
+      const ch = SHOP_SMUDGY_PIECES[p.name]!;
+      const fr = ch.anims.idle!.frames;
+      const loop = fr.reduce((a, f) => a + f.ms, 0);
+      let t = (now + (p.t0 ?? 0)) % loop;
+      let fi = 0;
+      while (fi < fr.length - 1 && t >= fr[fi]!.ms) t -= fr[fi++]!.ms;
+      const w = p.w ?? 1;
+      if (/^(floor|circle)/.test(p.name)) im.draw(ch, "idle", 0, ox + p.col * T + 18, oy + p.row * T + 18);
+      else im.draw(ch, "idle", fi, ox + p.col * T + (w * T) / 2, oy + p.row * T + 18, !!p.flip);
+    }
+    im.save(`life-${String(k).padStart(2, "0")}.png`);
+  }
+}
