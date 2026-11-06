@@ -18,7 +18,7 @@ Still an admin's town only (`STREET_TOWN`). Decision note: `docs/decisions/2026-
 
 - **The plan** (`scripts/street-plan-north.py`, its north edge section; `town/street-plan.json` rebuilt): 54 × 54 (was 46).
   - **One back line at y = 43.5:** a solid wall the whole way round, meeting the Colosseum's ring at its flanks; the Colosseum is its
-    centrepiece, about 1.5 squares proud of it. North of it only the Colosseum, a plain meadow (ground) and trees. Nothing walkable there.
+    centerpiece, about 1.5 squares proud of it. North of it only the Colosseum, a plain meadow (ground) and trees. Nothing walkable there.
   - **Two gates** in the back wall, either side of the Colosseum, a little past the statues (columns 13–16 and 29–32): a taller stretch
     with a grand arch, open onto trees, the crown's crest over it. You walk up to one, never through.
   - **The plaza is open to Colosseum Row** (rows 40–43, columns 13–32): no wall in front of the Colosseum. The queen and king flank the
@@ -26,7 +26,7 @@ Still an admin's town only (`STREET_TOWN`). Decision note: `docs/decisions/2026-
   - **Meadow Street:** Upper Street is gone; its four homes (Hopper's, Wrangler's, Moo's, Hollow's) stand on a new street 8 rows south,
     between the closing row and South Street (three wide, so South Street keeps its south sidewalk), backed by a row facing South Street; a
     lane on the promenade's line. The world grows 8 columns east too (it's square); Seam Avenue runs from Meadow Street to Colosseum Row.
-  - **Boss homes are never neighbours:** a whole look-alike between any two in a row, and no look-alike narrower than 1 square
+  - **Boss homes are never neighbors:** a whole look-alike between any two in a row, and no look-alike narrower than 1 square
     (`rows.ts ROW_MIN_W`, the narrowest normal one; the slim fillers went down to 0.6). Lots moved along their rows with their doors, rest
     squares and wander boxes: Hollow +2, Hopper +1, Wrangler +1, G-Rex +1, Timber +1, Sawyer −1, Tiger −1. Lamps that landed on
     a door or rest square step aside.
@@ -39,6 +39,10 @@ Still an admin's town only (`STREET_TOWN`). Decision note: `docs/decisions/2026-
   sight (`colosseumSeen`) and round 5's flat street picture (`HOUSE_COLISEUM_STREET`) removed. Today's town's Colosseum is unchanged.
 - **Walls** (`town/wall.ts`): open arches (seen from both sides) and a crest.
 - **Statues and chess pieces** on the plaza fade out when nearer the camera than you, as trees do (`render.ts`).
+- **The row behind a home with no side walls is never culled** (`boxes.ts openBehind`, `BoxInst.open`; `render.ts`): Ginger's igloo,
+  drawn 1.3x, overhangs its own walls, and looking along Fountain Street the sky showed under its dome's edge where the rows' culling had
+  left out Colosseum Row's back-to-back row behind it (CI, WebGL, computer, Fountain Street west: 0.008). The fronts back to back behind
+  Ginger's, Hollow's, Hopper's and Alfil's homes are drawn whatever the rows hide (15 fronts in the town).
 - **Ported from `claude/street-colosseum-big`:** Moo's paddock and Ginger's dome 1.3x (`TOWN_FEEL.streetHomeScale`, `rows.ts homePx`);
   the tap guard (a tap on a building's front, side, back or roof never opens something behind it).
 - Ground: the board's squares under the oval only (round it, the meadow).
@@ -46,7 +50,7 @@ Still an admin's town only (`STREET_TOWN`). Decision note: `docs/decisions/2026-
 
 ## Player-visible changes (admins' street town only)
 
-- The Colosseum is a big 3D building at the head of the plaza, the centrepiece of a back wall that closes the town, with a grand gate on
+- The Colosseum is a big 3D building at the head of the plaza, the centerpiece of a back wall that closes the town, with a grand gate on
   each side.
 - The plaza opens straight onto Colosseum Row.
 - No street or home behind or beside the Colosseum; Upper Street's four homes are on the new Meadow Street in the south.
@@ -59,10 +63,10 @@ Unit (`packages/app/test`):
 - `town-street.test.ts`: "is 46 x 46 …" → "is 54 x 54 …" (and the `W` ground key); start (22, 17) → (22, 25); a ring lot is checked as
   a ring stretch; the park `r1` 26 → 34.
 - `town-fixed.test.ts`, "the Colosseum against the back wall":
-  - "sits at the top centre" → "sits at the north edge, on the promenade's line" (centred on column 22.5; the line 1.5 past its first row).
+  - "sits at the top center" → "sits at the north edge, on the promenade's line" (centered on column 22.5; the line 1.5 past its first row).
   - "nothing beside or behind it is walkable" → "nothing past the back line is walkable" (every row from 44).
   - "a wall with a closed gate either side … the back wall along the whole edge, the grove behind" → "the back wall along the whole line,
-    the Colosseum its centrepiece, a gate either side of it; the plaza open to Colosseum Row" (every column but 17–28 once; the gates at
+    the Colosseum its centerpiece, a gate either side of it; the plaza open to Colosseum Row" (every column but 17–28 once; the gates at
     13–16 and 29–32 with a crest; row 39 walkable across the plaza; trees ≥ 6, was ≥ 30 grove trees).
   - "nothing stands north of the back wall" → moved to `town-north-edge.test.ts` ("nothing drawn past it").
   - "no second Colosseum (nor any square twice)" → same, over the grown map's columns and rows.
@@ -79,7 +83,7 @@ Unit (`packages/app/test`):
   order counted over boxes but the ring's (its bowl is left out below its rim).
 - New `town-north-edge.test.ts`: nothing walkable or drawn past the line; no street or lot past it; every boss home with door, strip and
   rest square; the plaza open to Colosseum Row; the gates either side, past the statues, walked up to and never through; **boss homes
-  never neighbours and no look-alike under a square, every row**; the Colosseum drawn as faces from 8 headings, a closed silhouette at
+  never neighbors and no look-alike under a square, every row**; the Colosseum drawn as faces from 8 headings, a closed silhouette at
   different depths; Moo's and Ginger's homes 1.3x.
 
 e2e:
@@ -137,12 +141,18 @@ the box again and again at (20, 41)).
 
 ## Test results (local)
 
-- Typecheck (all packages) clean; the town unit tests pass (21 files, 292 tests), main (83ceba92) merged.
-- e2e, phone and computer, Canvas 2D and WebGL, `town-fixed`, `town-street`, `town-rows` and `town.spec.ts`: 89 passed, 6 skipped
-  (stills only), 1 failed: Fountain Street west's "no sky between the fronts" (computer, 2D, 0.012). Its cause: G-Rex's lot moved two
-  squares east sat entirely between the camera and you there, so the near cut left it out and sky showed over Ginger's dome. Fixed in the
-  layout (G-Rex +1, Ginger where it was; the spacing rule still holds), then `town-rows` and `town-street` rerun on phone and computer:
-  16 passed. `town-fixed` and `town.spec.ts` were not rerun after that last one-square move (CI's full run covers them).
+- Typecheck clean; the town unit tests pass (21 files, 292 tests).
+- e2e, phone and computer, Canvas 2D and WebGL, `town-fixed`, `town-street`, `town-rows`, `town.spec.ts`, plus `account.spec.ts` on the
+  phone: 90 passed, 7 skipped (stills only, account's computer run), 1 failed: "the plaza" (WebGL, phone), a bot walking past the box's
+  left edge at 1.2 px past it for one sampled frame while the view turned. That check now waits a moment for a figure crossing the edge to
+  fade (whole on screen at rest, Eric's rule, unchanged); the test then passed 3 of 3 on the phone, 2D and WebGL.
+- **CI's "no sky between the fronts" (286ed215):** fixed (the row behind a home with no side walls is never culled, above). Fountain
+  Street west, WebGL, computer: 0.008 → 0; the check passes on phone and computer, 2D and WebGL, 3 of 3 on the phone, and under 4x CPU
+  throttling every spot is under 0.0005. CI's phone failure at South Street east (WebGL, 0.013) didn't reproduce locally (0 to 0.0003,
+  throttled or not).
+- **`account.spec.ts` (CI shard 1, phone: the solo match stuck "simulating"):** not this branch. Under 4x CPU throttling it passes on both
+  builds, 182 s on main (83ceba92) and 170 s here. Today's town (a guest's) costs the same to draw: `__townBench(60)`, medians of 5, phone
+  9.66 and 10.20 ms on main against 9.45 and 9.86 here, computer 8.30 and 7.64 against 7.79 and 8.64. The guest test never opens the town.
 - The rotation check, "the Colosseum stays put as the view turns", passes on phone and computer, 2D and WebGL.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

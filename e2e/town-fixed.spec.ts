@@ -228,7 +228,8 @@ for (const backend of ["2d", "webgl"] as const) {
       expect(beyond(c.boxes), `nothing past the line at ${Math.round(c.heading)} degrees`).toEqual([]);
       const ring = c.boxes.filter((b) => b.kind === "ring" && b.front).length;
       if (ring >= 2) ringSeen++;
-      await figuresOnScreen(page, `looking round, ${Math.round(c.heading)} degrees`);
+      // (A bot walking past the box's edge fades as it goes: whole on screen once it has, within a moment.)
+      await expect(async () => figuresOnScreen(page, `looking round, ${Math.round(c.heading)} degrees`)).toPass({ timeout: 3000 });
     }
     expect(ringSeen, "its ring's faces drawn as you look round").toBeGreaterThanOrEqual(2);
     // Out: the plaza is open to Colosseum Row (Eric, Nov 6), straight down from it onto the street.
@@ -350,7 +351,7 @@ for (const backend of ["2d", "webgl"] as const)
       const ring = c.boxes.filter((b) => b.kind === "ring" && b.foot);
       expect(ring.length, `its ring drawn at ${deg}`).toBeGreaterThanOrEqual(2);
       for (const b of ring) await onGround(b, b.id);
-      // From step to step, the portal's foot moves across the box exactly as the ground under it does (it never stays centred or slides
+      // From step to step, the portal's foot moves across the box exactly as the ground under it does (it never stays centered or slides
       // with the view): its left end against that world point's own projection, before and after.
       const f = portal!.foot!;
       const ground = (await groundAt(f[6]!, f[7]!))?.x ?? null;

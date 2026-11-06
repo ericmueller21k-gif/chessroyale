@@ -276,7 +276,7 @@ for s in streets:
 
 MOVED = {"hopper", "pig", "moo", "hollow"}
 # Eric, Nov 6: "Moo & Moon Meadow and Hollow Peak right next to each other, with a little building squeezed in … a terrible design.
-# Nothing should be that close … not two bosses." The rule (rows.ts ROW_MIN_W): two boss homes are never neighbours, a whole look-alike
+# Nothing should be that close … not two bosses." The rule (rows.ts ROW_MIN_W): two boss homes are never neighbors, a whole look-alike
 # of a normal width (a square at least) between them, and no look-alike narrower, a row's ends too. So these lots move along their rows
 # (squares east): Hollow's and G-Rex's from beside Moo's and Ginger's; and the homes that left a sliver at a row's end.
 SPACE = {"hollow": 2, "grex": 1, "hopper": 1, "pig": 1, "timber": 1, "sawyer": -1, "tiger": -1}
@@ -322,7 +322,7 @@ def wall2(name, c0, r0, w, inset, h, depth, arches, crest=False):
 SQ = 37
 def arch_at(c, c0, w=30, h=66):
     return {"x": round((c - c0 + 0.5) * SQ), "w": w, "h": h}
-# The back wall on the line (y = 43.5), the whole way round, the Colosseum its centrepiece: a gate either side of it, a little past the
+# The back wall on the line (y = 43.5), the whole way round, the Colosseum its centerpiece: a gate either side of it, a little past the
 # statues (columns 13..16 and 29..32: a grand arch, open onto the trees behind, the crown's crest over it; you walk up to it, never
 # through: the line is the edge), their inner ends against the ring's flanks; from the east gate round the wrap to the west one, plain
 # stretches of six.

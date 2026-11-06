@@ -14,11 +14,11 @@ a little building squeezed in … a terrible design. Nothing should be that clos
 everything looks good… run one quick test… rotate the camera… 15 degrees… Make sure… the Colosseum's not glitching… If that passes, then
 we're good to push it." It passed (below).
 
-## One back line, the Colosseum its centrepiece
+## One back line, the Colosseum its centerpiece
 
 - **The line is y = 43.5** (`street-plan.json coliseum.line`). A solid wall (148 px, half a square deep) stands on it the whole way round
   (the town wraps east–west), in stretches of six squares, and meets the Colosseum's ring at its flanks: the Colosseum is the wall's
-  centrepiece, its front about 1.5 squares proud of the line.
+  centerpiece, its front about 1.5 squares proud of the line.
 - **A gate either side of it,** a little past the statues (columns 13–16 and 29–32): a taller stretch of the wall with a grand arch and
   the crown's crest, open onto the trees behind it. You walk up to a gate; you never walk through it (the line is the town's edge).
 - **North of it:** the Colosseum and a plain meadow, ground as past the old edge was (the call was to draw it rather than leave a hole,
@@ -42,11 +42,15 @@ we're good to push it." It passed (below).
   stands as far from you as every other street's does.
 - Every boss home keeps its card, door, strip and rest square. The start is the same square of the park as before, (22, 25), and the
   park's zoom-out area moves with it.
-- **Boss homes are never neighbours** (Eric's rule, for the whole street town): between any two boss homes in a row stands at least one
+- **Boss homes are never neighbors** (Eric's rule, for the whole street town): between any two boss homes in a row stands at least one
   whole look-alike, and no look-alike is narrower than the narrowest normal one, **1 square** (`rows.ts ROW_MIN_W`; round 4's slim
   fillers went down to 0.6). Lots moved along their rows, door, rest square and wander box with them (squares east): Hollow +2 (off Moo's),
   and to leave no sliver beside a home Hopper +1, Wrangler +1, G-Rex +1, Timber +1, Sawyer −1, Tiger −1. A lamp
   that landed on a door or rest square steps a square aside. `test/town-north-edge.test.ts` checks every row.
+
+- **The row behind a home with no side walls is always drawn** (`boxes.ts openBehind`): a dome or a slope (Ginger's igloo at 1.3x,
+  Hollow's peak, Hopper's grassland, Alfil's) doesn't hide what's behind it the way a box does, so the rows' culling no longer leaves out
+  the fronts back to back behind one. Without it, sky showed under Ginger's dome looking along Fountain Street (WebGL).
 
 ## The Colosseum as a solid
 

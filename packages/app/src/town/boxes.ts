@@ -63,6 +63,12 @@ export interface BoxInst {
   tile: Character | null;
   /** A run of hedge: every prop it stands for (the first, `prop`, draws it). */
   props: number[];
+  /**
+   * (Nov 6) Drawn even where the rows hide it (render.ts's culling): a front of the row back to back behind a home with no side walls (a
+   * dome or a slope to the ground: Ginger's igloo, Hollow's peak). Seen past the home's curve from along its street, it fills what would
+   * otherwise show sky.
+   */
+  open?: boolean;
 }
 
 /**
@@ -161,7 +167,7 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
   STREET_LOTS.forEach((l, lot) => {
     const box = lotArt(l);
     const low = l.kind === "home" ? lotArt(l, true) : box;
-    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.
+    // (Its front line: the lot's front edge plus the box's inset; its picture centered on the lot. A row's look-alike: where the row put it.
     // A stretch of the Colosseum's ring: facing out from the oval, its front's middle where the ring has it.)
     if (l.dir && l.at) {
       const h = box.front.w / pxOf(box) / 2;
@@ -209,7 +215,31 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
     b.fy = b.oy + (b.uy * b.box.front.w) / pxOf(b.box) / 2;
   }
   coverSides(out);
+  openBehind(out);
   return out;
+}
+
+/** Marks the fronts standing back to back behind a home with no side walls (BoxInst.open). */
+function openBehind(boxes: BoxInst[]): void {
+  const a = { x: 0, y: 0 };
+  // (Its front's span east-west, measured from the home's front's middle the short way round the wrap.)
+  const span = (o: BoxInst, from: number): [number, number] => {
+    boxPoint(o, o.box, 0, 0, a);
+    const s0 = wrapF(a.x - from);
+    boxPoint(o, o.box, o.box.front.w, 0, a);
+    const s1 = wrapF(a.x - from);
+    return [Math.min(s0, s1), Math.max(s0, s1)];
+  };
+  for (const h of boxes) {
+    if (h.kind !== "home" || h.box.left || h.box.right || h.facing !== "S") continue;
+    const [h0, h1] = span(h, h.fx);
+    for (const b of boxes) {
+      // (Facing the other way, its front line within the home's block behind it, along the same stretch.)
+      if (b.kind !== "house" || b.facing !== "N" || b.fy <= h.fy || b.fy - h.fy > 3.5 || Math.abs(wrapF(b.fx - h.fx)) > 8) continue;
+      const [b0, b1] = span(b, h.fx);
+      if (Math.min(b1, h1 + 1) > Math.max(b0, h0 - 1)) b.open = true;
+    }
+  }
 }
 
 /** World point of a box's own (u, t): into `out` (squares, not wrapped). */

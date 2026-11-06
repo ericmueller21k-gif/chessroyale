@@ -4,7 +4,7 @@
  * card. This one is a ring of wall faces round its oval (the plan's `coliseum.oval`), each a box the box renderer (boxes.ts) draws from any
  * heading, and a portal standing before its front, the Colosseum's own box (its tablet, "The Colosseum" written by the game).
  *
- * - **The ring:** RING_M straight stretches of equal length round the oval, the first centred on its front. Each is a box: its front the
+ * - **The ring:** RING_M straight stretches of equal length round the oval, the first centered on its front. Each is a box: its front the
  *   outer wall seen square on (three tiers of arches, marble pawns in the middle tier's, a tier of windows, the attic's checkered band
  *   of the board's light and dark squares, as today's picture has them; a long banner on the four either side of the portal; a flag over
  *   the one behind it), and its roof three faces: the rim on top, the seats stepping down inside (the cavea) and the podium's checkered
@@ -166,8 +166,8 @@ function frontOf(k: number): Character {
 
 /**
  * Stretch k as a box: its outer wall, and its roof: the rim on top, the seats stepping down inward to the podium, the podium's wall. Its
- * inner edges are cut to meet its neighbours' (the ring turns at each corner), so the seats run round unbroken. Its own box: px a square
- * W / CHORD, no sides (its neighbours butt against it), no taper (the faces carry the cut).
+ * inner edges are cut to meet its neighbors' (the ring turns at each corner), so the seats run round unbroken. Its own box: px a square
+ * W / CHORD, no sides (its neighbors butt against it), no taper (the faces carry the cut).
  */
 const ringBoxes: TownBox[] = [];
 export function ringBox(k: number): TownBox {

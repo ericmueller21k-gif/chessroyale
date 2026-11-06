@@ -51,7 +51,7 @@ describe("one back line across the whole town", () => {
         expect(STREET_GROUND[r * N + c], at(c, r)).toBe(inOval ? arena : meadow);
       }
     // Its ring stands on the line or past it (its front's southmost point a hair before it, on the plinths' row).
-    // (Its front proud of the line by under two squares, the back wall's centrepiece, Eric, Nov 6.)
+    // (Its front proud of the line by under two squares, the back wall's centerpiece, Eric, Nov 6.)
     for (const s of RING) expect(Math.min(s.y0, s.my), `ring ${s.k}`).toBeGreaterThan(LINE - 2);
   });
   it("no street or lot past it: the back wall stands on it, every other lot and every street before it", () => {
@@ -205,7 +205,7 @@ describe("the Colosseum as a solid (Eric: \"we probably have to actually draw th
   });
 });
 
-describe("boss homes are never neighbours, and no look-alike is a sliver (Eric, Nov 6: \"Nothing should be that close … not two bosses\")", () => {
+describe("boss homes are never neighbors, and no look-alike is a sliver (Eric, Nov 6: \"Nothing should be that close … not two bosses\")", () => {
   it(`every row: a whole look-alike (${ROW_MIN_W} square or more) between any two boss homes, and every look-alike at least ${ROW_MIN_W} wide`, () => {
     let homes = 0;
     for (const side of ROW_SIDES) {
