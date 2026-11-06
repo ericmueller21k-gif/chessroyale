@@ -1,13 +1,16 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, RECLUSE_PHASE2, SPEECH, bossBannerMs } from "@chessroyale/core";
 import { LAST_STAND, legalMoves, phase2Numbers, type MoveScore } from "@chessroyale/chess";
 import { ARC_LIFE, ARC_STRIKES, PHASE_CHANGE, Phase2Game, absorbKing, arcPoints, phase2Follows, phase2Mates, phaseChangeRun, smoothPath } from "../src/recluse-phase2.ts";
 import { ON_BOARD_ANIMS, RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { CRITICAL, NORMAL, Voice, bossVoice, holdMs, typeMs } from "../src/speech.tsx";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { KING_LINES, kingLine, kingSay, resetKingSpeech } from "../src/godKing.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
 import { animLength } from "../src/characters/power-art.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 // The Hidden Boss's phase 2 on this device (recluse-phase2.ts): the phase change's beats, and the four boards driven
 // with pretend engines and a pretend clock. Its rules: packages/chess/test/recluse-phase2.test.ts.

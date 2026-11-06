@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BANNER, BOSS_POWERS, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, isPlayable, menuBosses, type Settings } from "@chessroyale/core";
 import { RECLUSE_FX, legalMoves, type UciEngine } from "@chessroyale/chess";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { RECLUSE, RECLUSE_BUST } from "../src/characters/recluse.ts";
 import { KING_VS_RECLUSE, RECLUSE_LINES } from "../src/characters/recluse-lines.ts";
@@ -17,6 +17,9 @@ import { kingLine, resetKingSpeech, turnCues } from "../src/godKing.ts";
 import { POWER_WORDS, powersLine } from "../src/power-words.ts";
 import { bossVoice } from "../src/speech.tsx";
 import type { BossView } from "../src/game.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 // The Hidden Boss (code id `recluse`), phase 1 on screen: his kit (the bust in a phone's bar, his whole figure on a
 // computer), his animations for each moment, his ultimate's run in place, the God King's help mocked, his fall, his
