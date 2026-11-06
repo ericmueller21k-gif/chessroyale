@@ -7,7 +7,60 @@ import { test as base, expect, type Page } from "@playwright/test";
  * left in a live match keeps playing it (a host's page runs its engines), slowing every later test in that worker.
  * Use this `test` in any file that opens contexts.
  */
-export const test = base.extend<{ closeOwnContexts: void }>({
+/**
+ * The first-time walkthrough's "don't show again" key (packages/app/src/tutorial.ts, TUTORIAL_SEEN_KEY). Every test's
+ * fresh account would otherwise get it over the screen and block its clicks, so each context starts with it set.
+ * A test that tests the walkthrough sets `test.use({ tutorialSeen: false })`.
+ */
+const TUTORIAL_SEEN_KEY = "hunchess.tutorial.dismissed";
+
+/** Sets the walkthrough's "don't show again" flag in every page the context opens, once (a reload keeps what the page saved). */
+async function markSeen(context: import("@playwright/test").BrowserContext) {
+  await context.addInitScript((k: string) => {
+    try {
+      if (!localStorage.getItem(k)) localStorage.setItem(k, "1");
+    } catch {
+      /* no storage: the walkthrough would show over the screen */
+    }
+  }, TUTORIAL_SEEN_KEY);
+}
+
+/** Whether contexts made now start with the walkthrough seen (set per test from the `tutorialSeen` option, below). */
+let seenDefault = true;
+
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void }>({
+  tutorialSeen: [true, { option: true }],
+  // Sets the default for this test's contexts, then puts it back.
+  seenDefaultForTest: [
+    async ({ tutorialSeen }, use) => {
+      seenDefault = tutorialSeen;
+      await use();
+      seenDefault = true;
+    },
+    { auto: true },
+  ],
+  // The page's own context (every page it opens, and every reload, keeps what the page saved).
+  seenWalkthrough: [
+    async ({ context, tutorialSeen }, use) => {
+      if (tutorialSeen) await markSeen(context);
+      await use();
+    },
+    { auto: true },
+  ],
+  // Every context a test makes with `browser.newContext()` (a second player) starts with the flag set too.
+  browser: [
+    async ({ browser }, use) => {
+      const real = browser.newContext.bind(browser);
+      browser.newContext = (async (options?: Parameters<typeof real>[0]) => {
+        const ctx = await real(options);
+        if (seenDefault) await markSeen(ctx);
+        return ctx;
+      }) as typeof browser.newContext;
+      await use(browser);
+      browser.newContext = real as typeof browser.newContext;
+    },
+    { scope: "worker" },
+  ],
   closeOwnContexts: [
     async ({ browser, context }, use) => {
       const before = new Set(browser.contexts());

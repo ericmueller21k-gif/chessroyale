@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { openPlayWithFriends, pickMode } from "./helpers.ts";
 
 // The landing page shows only where sign-in is set up; locally there are no Google or Resend secrets, so the config is faked.

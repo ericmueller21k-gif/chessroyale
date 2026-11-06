@@ -10,6 +10,9 @@ import { test } from "./helpers.ts";
  * With TUTORIAL_STILLS=1 it saves a still of the last slide to docs/first-tutorial/<phone|desktop>/.
  */
 
+// This file tests the walkthrough itself, so it opts out of the shared default that marks it seen (helpers.ts).
+test.use({ tutorialSeen: false });
+
 const here = dirname(fileURLToPath(import.meta.url));
 const STILLS = process.env.TUTORIAL_STILLS === "1";
 const SLIDES = [

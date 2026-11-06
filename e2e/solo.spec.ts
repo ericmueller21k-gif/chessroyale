@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { BOARD_SEL, soloFromHome } from "./helpers.ts";
 
 // (The phone project only, Nov 2: a solo match plays the same on a computer, whose solo screens other specs cover (board-layout,
