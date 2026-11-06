@@ -11,8 +11,8 @@ const topOf = (page: Page, id: string) => page.evaluate((x) => document.getEleme
 
 test("Settings → FAQ: the contents jump to a section and it comes into view; back goes to Settings", async ({ page }) => {
   await page.goto("/settings");
-  await page.getByRole("button", { name: /FAQ · How it works/ }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "FAQ · How it works" })).toBeVisible();
+  await page.getByRole("button", { name: /HunChess Handbook/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "HunChess Handbook" })).toBeVisible();
   await expect(page).toHaveURL(/\/faq$/);
 
   // Every link in the contents points at something on the page.

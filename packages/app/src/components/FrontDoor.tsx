@@ -100,9 +100,9 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
  * Your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). No coins (Eric,
  * Oct 18: "nobody needs to see their coins" there; the shop and your profile show them).
  */
-export function AccountBar({ onProfile }: { onProfile: () => void }) {
+export function AccountBar({ onProfile, tourId }: { onProfile: () => void; tourId?: string }) {
   return (
-    <div class="fd-top-right">
+    <div class="fd-top-right" data-tour={tourId}>
       <MyPawnButton onClick={onProfile} />
     </div>
   );

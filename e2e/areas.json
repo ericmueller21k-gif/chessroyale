@@ -509,7 +509,7 @@
         "packages/app/src/components/FrontMenu.tsx",
         "packages/app/src/home-art/**"
       ],
-      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts"]
+      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts", "e2e/walkthrough.spec.ts"]
     },
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
