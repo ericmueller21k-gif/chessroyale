@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town, round 5 (Nov 5; brief-town-fixed-cam.md): one fixed view. The camera faces north whatever you press (Eric: "There
@@ -111,12 +111,8 @@ async function arrowStep(page: Page, key: string) {
 const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 81) % 54) - 27), Math.sign(b[1]! - a[1]!)];
 /** A drag across the box from its middle, `share` of its width (negative: leftward), by the mouse, in steps. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 
 for (const backend of ["2d", "webgl"] as const) {
@@ -272,11 +268,13 @@ for (const backend of ["2d", "webgl"] as const) {
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
     const seen = await headings(page);
     expect(seen.some((h) => Math.abs(h) > 20 && Math.abs(h) < 160), `eased back through the middle: ${[...new Set(seen.map(Math.round))].join(" ")}`).toBe(true);
-    // A tap while turned walks to the square under the finger, from the turned view, then eases back.
-    await drag(page, 0.5);
+    // A tap while turned walks to the square under the finger, from the turned view, then eases back. (Nov 5: a drag let go within 10°
+    // of a quarter snaps there and a tap then locks it in, e2e/town-controls.spec.ts; this one stops at about 72°, short of the snap.)
+    await drag(page, 0.4);
     await page.waitForTimeout(300);
     c = await cam(page);
-    expect(c.look, "a quarter turn to the right").toBeGreaterThan(60);
+    expect(c.look, "most of a quarter turn to the right").toBeGreaterThan(60);
+    expect(c.look, "not snapped to east").toBeLessThan(80);
     const here = await you(page);
     const sq = [here[0], here[1] - 1] as const;
     const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);

@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town, round 4 (Nov 5; brief-town-rows.md): the rows on every street, the chase camera, the town that wraps east-west
@@ -89,12 +89,8 @@ async function skyAtSides(page: Page): Promise<number> {
 
 /** (Round 5) A drag across the box from its middle, `share` of its width (negative: leftward): a look round, half a turn a width. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 
 // (Round 5: the camera faces north; a drag looks round. Looking along a street both ways is a drag a quarter turn each way, from where
@@ -103,6 +99,9 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   test.setTimeout(400_000);
   for (const gl of [false, true]) {
     await open(page, "day", gl);
+    // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
     for (const [name, sq, look] of [["Fountain Street east", [4, 28], 0.5], ["Fountain Street west", [39, 28], -0.5], ["South Street east", [4, 13], 0.5], ["South Street west", [39, 13], -0.5]] as const) {
       await walkTo(page, sq);
       await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
@@ -115,12 +114,13 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   }
 });
 
-test("the zoom steps: − and + move a step at a time (in, the default, out, the overview); every figure on screen at each", async ({ page }) => {
+test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview); every figure on screen at each", async ({ page }) => {
   test.setTimeout(200_000);
   await open(page, "day", false);
   await walkAlong(page, [1, 28], [4, 28]);
-  expect((await cam(page)).zoomTarget).toBe(1);
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  // (Eric, Nov 5: "we're going with number three for the default": the town opens at step 2.)
+  expect((await cam(page)).zoomTarget).toBe(2);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(0);
   await figuresOnScreen(page, "in");
   for (const step of [1, 2, 3]) {
@@ -140,19 +140,20 @@ test("the park zooms a step out as you come in and back as you leave; a press in
   test.setTimeout(200_000);
   await open(page, "day", false);
   await walkAlong(page, [6, 28], [9, 28]);
-  expect((await cam(page)).zoomTarget).toBe(1);
+  // (The default since Nov 5: step 2, so the park's step out is to the overview, 3.)
+  expect((await cam(page)).zoomTarget).toBe(2);
   // In (fully: a square past its edge), out a step over about 0.6 s; you and every figure on screen.
   await walkTo(page, [16, 28]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
-  expect((await cam(page)).parkBefore).toBe(1);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(3);
+  expect((await cam(page)).parkBefore).toBe(2);
   await figuresOnScreen(page, "in the park");
   // Out again: back to the step you had.
   await walkTo(page, [9, 28]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
-  // In again, and + in the park: your step stays as you leave.
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
+  // In again, and + twice in the park: your step stays as you leave (not the 2 you came in with).
   await walkTo(page, [16, 28]);
-  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(2);
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(3);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await walkTo(page, [9, 28]);
   await page.waitForTimeout(800);
   expect((await cam(page)).zoomTarget, "your press in the park wins").toBe(1);

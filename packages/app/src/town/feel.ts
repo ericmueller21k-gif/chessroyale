@@ -108,8 +108,12 @@ export const TOWN_FEEL = {
       wide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 },
     },
   ] as readonly { tall: CamSet; wide: CamSet }[],
-  /** The step the street town opens at (the default, 1) and how long a press of − or + glides (ms). */
-  streetZoomStart: 1,
+  /**
+   * The step the street town opens at and how long a press of − or + glides (ms). Eric, Nov 5: "If number one is the closest, then we're
+   * going with number three for the default": the third step (index 2, "out"), one further back than round 4's default (1, the mockup's
+   * camera, still the second step). The park's step out goes from there to the overview (3).
+   */
+  streetZoomStart: 2,
   streetZoomMs: 350,
   /**
    * The park zooms out a step (Nov 5, round 4; Eric, a trial he may revert: "make it zoom out one level when you hit the area that's the
@@ -156,6 +160,36 @@ export const TOWN_FEEL = {
    */
   streetLookPerWidth: 180,
   streetLookBackMs: 300,
+  /**
+   * Hold to run (Nov 5, brief-street-controls-map.md; Eric: "if you hold it in the direction … right away … it starts running in that
+   * direction"): a press held still (not past `dragPx`) this many ms is a run, not a tap; one that moves past `dragPx` first is a look
+   * round. Quick taps are about 80 to 150 ms on a phone; much more than 200 ms and a run feels late.
+   */
+  streetHoldMs: 180,
+  /**
+   * The finger's dead zone while running (px): within this of your pawn's middle on screen, a held finger asks for no direction (a run
+   * not yet started waits for the finger to leave it; a run going on keeps its way).
+   */
+  streetRunDeadPx: 14,
+  /**
+   * Locking a new view (Nov 5; Eric: "if it detects that you're … within 10 degrees of a new 90-degree baseline, and then you tap in that
+   * direction, it switches your view"): letting go of a look round within this many degrees of a quarter (north, east, south or west)
+   * eases the camera there over `streetSnapMs`; a tap or a run next locks it in as the base heading.
+   */
+  streetSnapDeg: 10,
+  streetSnapMs: 160,
+  /**
+   * The minimap (Nov 5; Eric: "an overlay on the top right, partially see-through, not super big"): its width a share of the town's
+   * box on a phone, and on a computer (in the frame) a smaller share, never wider than `mapMaxPx`; its opacity; the large view's share
+   * of the box's smaller side (never past `mapBigMaxPx`). The Colosseum's band on its top edge is `mapBandPx` high at the small size.
+   */
+  mapShare: 0.26,
+  mapShareComputer: 0.13,
+  mapMaxPx: 168,
+  mapOpacity: 0.7,
+  mapBigShare: 0.9,
+  mapBigMaxPx: 620,
+  mapBandPx: 3,
   /**
    * The street town's buildings drawn this much bigger than their pictures' 37 px a square (the homes and the rows' fronts together;
    * hedges, sheds, lamps, trees and figures don't grow). 1: as drawn. (Nov 5, round 4: tried at 1.3 after the run-through frames; Eric:
