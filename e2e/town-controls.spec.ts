@@ -162,23 +162,24 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`hold to run (${backend}): a press held still runs you each way the finger is from your pawn, at once; letting go stops you; the camera never turns`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    // (On Fountain Street east of the park (it ends at column 32), with room either way: the park's step out would move your pawn on
-    // screen mid-run.)
-    await walkTo(page, [38, 20]);
     const f = await finger(page);
-    await watchHeadings(page);
-    // Right, up, left, down: in that order you stay on Fountain Street (rows 19 to 22), clear of the park.
-    for (const [dir, w] of [["right", [1, 0]], ["up", [0, 1]], ["left", [-1, 0]], ["down", [0, -1]]] as const) {
+    // Each from a square with a long street that way (a run under a slow machine goes on a few squares before the test lets go):
+    // Fountain Street east and west of the park (row 20; the park, columns 13 to 32, would step the zoom out mid-run), and Seam Avenue
+    // (column 0, rows 4 to 39) north and south.
+    const runs = [["right", [1, 0], [36, 20]], ["left", [-1, 0], [10, 20]], ["up", [0, 1], [0, 12]], ["down", [0, -1], [0, 34]]] as const;
+    for (const [dir, w, start] of runs) {
+      await walkTo(page, start);
+      await page.waitForTimeout(300);
+      await watchHeadings(page);
       const from = await you(page);
       const at = await holdPoint(page, dir);
       const t0 = Date.now();
       await f.down(at.x, at.y);
       await expect.poll(async () => (await cam(page)).run, { message: `${dir}: a run`, timeout: 3000 }).toBe(dir);
-      // Running that way (setting off no later than a step after the hold time).
+      // Running that way (setting off no later than a step after the hold time), two squares on.
       await ranOn(page, from, w[0] ? 0 : 1, 1);
       expect(Date.now() - t0, `${dir}: set off at once`).toBeLessThan(2500);
-      // (Two squares along the street, one across it: you stay on the street's rows, off the sidewalks' lamps.)
-      await ranOn(page, from, w[0] ? 0 : 1, w[0] ? 2 : 1);
+      await ranOn(page, from, w[0] ? 0 : 1, 2);
       await f.up();
       const at0 = await you(page);
       await settle(page);
@@ -186,10 +187,10 @@ for (const backend of ["2d", "webgl"] as const) {
       expect(way(from, end), `${dir} runs you ${w}`).toEqual(w);
       expect(Math.abs(end[0] - at0[0]) + Math.abs(end[1] - at0[1]), `${dir}: stops at the next square`).toBeLessThanOrEqual(1);
       expect((await cam(page)).run, "nothing held after").toBeNull();
+      const seen = await headings(page);
+      expect(seen.length).toBeGreaterThan(5);
+      expect([...new Set(seen.map(([h, l]) => `${h}/${l}`))], `${dir}: the camera never turned`).toEqual(["0/0"]);
     }
-    const seen = await headings(page);
-    expect(seen.length).toBeGreaterThan(10);
-    expect([...new Set(seen.map(([h, l]) => `${h}/${l}`))], "the camera never turned").toEqual(["0/0"]);
   });
 
   test(`a run steers (${backend}): sliding the finger mid-run changes the way, and the camera doesn't turn`, async ({ page }) => {
