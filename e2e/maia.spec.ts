@@ -296,8 +296,9 @@ test("players meet Maia too (forPlayers on): no Brain picker and no debug line; 
 
 test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it and both engines' source to download", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
-  await page.goto("/settings");
-  const credit = page.locator(".maia-credit");
+  // Settings → Handbook → Copyright, credits and licenses (Eric, Nov 6: the notices live in the Handbook now).
+  await page.goto("/faq#faq-credits");
+  const credit = page.locator("section").filter({ has: page.locator("#faq-credits") });
   await expect(credit).toContainText("Maia-3");
   await expect(credit).toContainText("Stockfish");
   await expect(credit).not.toContainText("on request");
