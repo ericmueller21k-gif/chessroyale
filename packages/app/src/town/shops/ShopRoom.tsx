@@ -1777,7 +1777,7 @@ function startRoom(
   const drawClaw = (now: number) => {
     if (!cab) return;
     clawPose(CLAW_PLAY, now, clawNow);
-    drawCabinet(g, p3, camX, cab, clawNow, now, cabHits, clawE > 0.5 && !CLAW_PLAY.open);
+    drawCabinet(g, p3, camX, cab, clawNow, now, cabHits, clawE > 0.5 && !CLAW_PLAY.open, DPR);
   };
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
