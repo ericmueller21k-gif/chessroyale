@@ -33,7 +33,8 @@ No custom intro this round (Eric). Boingo is live, so the room goes to everyone.
 - The price sign's words drawn on its gold face (`POGO_SIGN` is ready; no room draws sign text yet, so it needs a few lines in
   `ShopRoom.tsx`'s static layer).
 - The arcade's own ceiling (the tent's for now).
-- The claw machine's walk-up zoom (as the statue's) and the coin slot's tap calling `openClawMachine()` in `ShopRoom.tsx`.
+- The claw machine's walk-up zoom (as the statue's). Its tap is wired (standing at its spot, a tap on the machine's square calls
+  `openClawMachine()`), but on the whole machine, not yet on the coin slot's own box (`SHOP_BOINGO_COIN_SLOT`).
 - The squirt race's win flash and reset are in its frames (two races, a different winner each); the clowns' squirt is drawn in the
   race piece, not yet its own small character.
 - The unit tests of the claw zoom and of the stub on the slot's tap (the room's, the mat's, the keeper's, the crate's, the race loop's
