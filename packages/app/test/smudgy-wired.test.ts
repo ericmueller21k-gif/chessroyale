@@ -96,7 +96,7 @@ describe("Smudgy is live", () => {
       expect(10 * Math.log10(sum / s.length), name).toBeLessThan(MOVE_MEAN_DB - 2);
       expect(s, `${name} is the same every time`).toEqual(smudgySound(name, 44100));
     }
-    expect([...SMUDGY_SOUNDS].sort()).toEqual(["dab", "drip", "giggle", "oof", "splash", "swish", "thump"]);
+    expect([...SMUDGY_SOUNDS].sort()).toEqual(["dab", "drip", "flop", "giggle", "oof", "splash", "splat", "swipe", "swish", "thump", "whoosh"]);
   });
 
   it("on the select screen: his splash, the draft's three select lines (all of them his own lines), and full size on the stage", () => {

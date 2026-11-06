@@ -20,6 +20,7 @@
 import type { HomeId } from "./home-boxes.ts";
 import type { LookSpec } from "./lookalike.ts";
 import { TOWN_FEEL } from "./feel.ts";
+import PLAN from "./street-plan.json" with { type: "json" };
 
 /**
  * Each home's front picture's width and its body's columns (px; home-boxes.ts homeBox: the row butts its neighbours against the body).
@@ -35,6 +36,8 @@ export const HOME_BODY: Readonly<Record<HomeId, readonly [w: number, x0: number,
 /** The street town's buildings' picture pixels a world square (boxes.ts BUILD_PX: drawn TOWN_FEEL.streetBuildScale bigger than 37). */
 export const ROW_PX = 37 / TOWN_FEEL.streetBuildScale;
 const SQ = ROW_PX;
+/** A home's picture pixels a world square in the street town: the rows', or fewer for one drawn bigger (TOWN_FEEL.streetHomeScale, round 6). */
+export const homePx = (id: HomeId): number => ROW_PX / (TOWN_FEEL.streetHomeScale[id] ?? 1);
 /**
  * The homes with no side walls (a dome or a slope runs to the ground: home-boxes.ts homeBox's left and right are null): one can't turn
  * a row's corner itself, so a slim filler front closes the corner beside it. test/town-rows.test.ts checks it against the art.
@@ -95,7 +98,12 @@ export const ROW_DEPTH = 2.3;
 export const ROW_FLAT = 1.2;
 /** A look-alike's widths (squares) to pick from, and the narrowest one may be (a slim filler front). */
 const WIDTHS = [1, 1.5, 2, 2, 2.5, 3] as const;
-const MIN_W = 0.6;
+/**
+ * The narrowest a look-alike may be: the narrowest normal one, a square (Eric, Nov 6: "Nothing should be that close … not two bosses";
+ * round 4's slim fillers, down to 0.6, read as a sliver squeezed in). Two boss homes in a row always have a whole one between them.
+ */
+export const ROW_MIN_W = WIDTHS[0];
+const MIN_W = ROW_MIN_W;
 /** Each look-alike runs this many px past each of its edges, under its neighbour, so a rounding crack never shows sky. */
 export const ROW_OVERLAP_PX = 1;
 
@@ -107,8 +115,9 @@ export function homeSpan(id: HomeId, a: number, w: number, facing: Facing): [num
   const [fw, x0, x1] = HOME_BODY[id];
   const mid = a + w / 2 - 0.5;
   const sgn = alongSign(facing);
-  const u0 = (x0 - fw / 2) / SQ;
-  const u1 = (x1 + 1 - fw / 2) / SQ;
+  const px = homePx(id);
+  const u0 = (x0 - fw / 2) / px;
+  const u1 = (x1 + 1 - fw / 2) / px;
   return sgn > 0 ? [mid + u0, mid + u1] : [mid - u1, mid - u0];
 }
 
@@ -242,9 +251,11 @@ export function layRow(side: RowSide, homes: readonly RowHome[]): Placed[] {
   return out;
 }
 
+/** The street town's size (camera.ts N: the plan's, 54 since the north edge round; a row over the wrap runs to its far end plus N). */
+const SIZE = (PLAN as { size: number }).size;
 /** Where a row's end meets Seam Avenue's building line (its fronts at the lot's edge plus ROW_INSET_BACK): a corner's end front stands on it. */
 const AVE_W = 2.5 + ROW_INSET_BACK;
-const AVE_E = 42.5 - ROW_INSET_BACK;
+const AVE_E = SIZE - 3.5 - ROW_INSET_BACK;
 /** A street row (its fronts face S or N), corners at both ends unless said: its own inset and depths. */
 const sideOf = (id: string, street: string, facing: Facing, a0: number, a1: number, d0: number, d1: number, seed: number, more: Partial<RowSide> = {}): RowSide => ({
   id, street, facing, a0, a1, d0, d1, corner0: true, corner1: true, seed, inset: ROW_INSET, flat: ROW_FLAT, cornerDepth: ROW_DEPTH, ...more,
@@ -254,36 +265,37 @@ const BACK = { flat: ROW_FLAT, cornerDepth: ROW_FLAT } as const;
 /** A row's corner's box from its front line back (squares): where Seam Avenue's own short rows begin and end. */
 const cornerBack = (d0: number, facing: "S" | "N") => (facing === "S" ? d0 - 0.5 + ROW_INSET + ROW_DEPTH : d0 + 0.5 - ROW_INSET - ROW_DEPTH);
 /**
- * The town's rows (round 4; the plan as it wraps east-west only, scripts/street-plan-north.py): every street's built sides. A row's end
- * onto Seam Avenue, the park, the promenade or the Colosseum's plaza turns the corner. Seam Avenue's own short rows (between the
- * corners' backs) butt against the corners' sides: no corners. The closing row along the south edge and Upper Street's north row run
- * on over the wrap (their a1 past N).
+ * The town's rows (round 4; the plan as it wraps east-west only, scripts/street-plan-north.py; the north edge round: Meadow Street added
+ * south of South Street, Upper Street gone): every street's built sides. A row's end onto Seam Avenue, the park, the promenade, the lane or
+ * the Colosseum's plaza turns the corner. Seam Avenue's own short rows (between the corners' backs) butt against the corners' sides: no
+ * corners. The closing row along the south edge and Colosseum Row's north row run on over the wrap (their a1 past SIZE).
  */
 export const ROW_SIDES: readonly RowSide[] = [
-  // The south edge: one row the whole way round, its fronts facing north onto South Street (Eric: "the south edge is closed by a row of
+  // The south edge: one row the whole way round, its fronts facing north onto Meadow Street (Eric: "the south edge is closed by a row of
   // buildings"). Nothing is behind it.
-  sideOf("south-edge", "south-st", "N", -0.5, 45.5, 2, 0, 1301, { corner0: false, corner1: false, flat: 2.0, landmark: true }),
+  sideOf("south-edge", "meadow-st", "N", -0.5, SIZE - 0.5, 2, 0, 1301, { corner0: false, corner1: false, flat: 2.0, landmark: true }),
+  // Meadow Street's north side (its fronts face south: Hopper's, Wrangler's, Moo's and Hollow's homes), either side of the lane, and
+  // South Street's south side behind it: a 3-deep block, back to back, as Timber's is, a sidewalk before each side.
+  sideOf("meadow-n-west", "meadow-st", "S", AVE_W, 20.5, 8, 9, 1401, BACK),
+  sideOf("meadow-n-east", "meadow-st", "S", 24.5, AVE_E, 8, 9, 1402, { ...BACK, landmark: true }),
+  sideOf("south-s-west", "south-st", "N", AVE_W, 20.5, 10, 10, 1403, { ...BACK, landmark: true }),
+  sideOf("south-s-east", "south-st", "N", 24.5, AVE_E, 10, 10, 1404, BACK),
   // South Street, north side (its fronts face south), either side of the promenade; the deep block's tall blocks behind.
-  sideOf("south-n-west", "south-st", "S", AVE_W, 20.5, 9, 11, 501),
-  sideOf("south-n-east", "south-st", "S", 24.5, AVE_E, 9, 11, 502, { landmark: true }),
+  sideOf("south-n-west", "south-st", "S", AVE_W, 20.5, 17, 19, 501),
+  sideOf("south-n-east", "south-st", "S", 24.5, AVE_E, 17, 19, 502, { landmark: true }),
   // Fountain Street, south side (facing north): the deep block's other street.
-  sideOf("fountain-s-west", "fountain-st", "N", AVE_W, 12.5, 17, 15, 303, { landmark: true }),
-  sideOf("fountain-s-east", "fountain-st", "N", 32.5, AVE_E, 17, 15, 404),
+  sideOf("fountain-s-west", "fountain-st", "N", AVE_W, 12.5, 25, 23, 303, { landmark: true }),
+  sideOf("fountain-s-east", "fountain-st", "N", 32.5, AVE_E, 25, 23, 404),
   // Fountain Street's north side and Colosseum Row's south side: a 3-deep block, back to back.
-  sideOf("fountain-n-west", "fountain-st", "S", AVE_W, 12.5, 24, 25, 101, BACK),
-  sideOf("fountain-n-east", "fountain-st", "S", 32.5, AVE_E, 24, 25, 202, BACK),
-  sideOf("colrow-s-west", "colosseum-row", "N", AVE_W, 12.5, 26, 26, 603, { ...BACK, inset: ROW_INSET_BACK, landmark: true }),
-  sideOf("colrow-s-east", "colosseum-row", "N", 32.5, AVE_E, 26, 26, 604, { ...BACK, inset: ROW_INSET_BACK }),
-  // Colosseum Row's north side and Upper Street's south side: back to back.
-  sideOf("colrow-n-west", "colosseum-row", "S", AVE_W, 12.5, 32, 33, 701, BACK),
-  sideOf("colrow-n-east", "colosseum-row", "S", 32.5, AVE_E, 32, 33, 702, BACK),
-  sideOf("upper-s-west", "upper-st", "N", AVE_W, 12.5, 34, 34, 803, { ...BACK, inset: ROW_INSET_BACK }),
-  sideOf("upper-s-east", "upper-st", "N", 32.5, AVE_E, 34, 34, 804, { ...BACK, inset: ROW_INSET_BACK, landmark: true }),
-  // Upper Street's north side: from the plaza's east side round over the wrap (Seam Avenue ends at Upper Street) to its west side; tall
-  // blocks and gardens behind it, the north edge beyond.
-  sideOf("upper-n", "upper-st", "S", 32.5, 12.5 + 46, 41, 43, 901, { landmark: true }),
+  sideOf("fountain-n-west", "fountain-st", "S", AVE_W, 12.5, 32, 33, 101, BACK),
+  sideOf("fountain-n-east", "fountain-st", "S", 32.5, AVE_E, 32, 33, 202, BACK),
+  sideOf("colrow-s-west", "colosseum-row", "N", AVE_W, 12.5, 34, 34, 603, { ...BACK, inset: ROW_INSET_BACK, landmark: true }),
+  sideOf("colrow-s-east", "colosseum-row", "N", 32.5, AVE_E, 34, 34, 604, { ...BACK, inset: ROW_INSET_BACK }),
+  // Colosseum Row's north side: from the plaza's east side round over the wrap (Seam Avenue ends at Colosseum Row) to its west side, its
+  // backs against the back wall (the north edge round: its corners as deep as the homes, so the plaza's sides are built to the wall).
+  sideOf("colrow-n", "colosseum-row", "S", 32.5, 12.5 + SIZE, 40, 43, 701, { flat: ROW_FLAT, cornerDepth: ROW_DEPTH, landmark: true }),
   // Seam Avenue's own stretch between South Street's and Fountain Street's corners: east of it (fronts face west) and west of it
   // (facing east, one square deep).
-  { id: "ave-e", street: "seam-ave", facing: "W", a0: cornerBack(9, "S"), a1: cornerBack(17, "N"), d0: 3, d1: 5, corner0: false, corner1: false, seed: 1101, inset: ROW_INSET_BACK, flat: ROW_FLAT, cornerDepth: ROW_FLAT },
-  { id: "ave-w", street: "seam-ave", facing: "E", a0: cornerBack(9, "S"), a1: cornerBack(17, "N"), d0: 42, d1: 42, corner0: false, corner1: false, seed: 1201, inset: ROW_INSET_BACK, flat: 0.8, cornerDepth: 0.8 },
+  { id: "ave-e", street: "seam-ave", facing: "W", a0: cornerBack(17, "S"), a1: cornerBack(25, "N"), d0: 3, d1: 5, corner0: false, corner1: false, seed: 1101, inset: ROW_INSET_BACK, flat: ROW_FLAT, cornerDepth: ROW_FLAT },
+  { id: "ave-w", street: "seam-ave", facing: "E", a0: cornerBack(17, "S"), a1: cornerBack(25, "N"), d0: SIZE - 4, d1: SIZE - 4, corner0: false, corner1: false, seed: 1201, inset: ROW_INSET_BACK, flat: 0.8, cornerDepth: 0.8 },
 ];

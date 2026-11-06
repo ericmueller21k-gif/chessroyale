@@ -67,7 +67,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     const ave = LOTS.filter((b) => STREET_LOTS[b.lot]!.street === "seam-ave");
     expect(ave.length).toBeGreaterThanOrEqual(4);
     for (const b of ave) expect([b.ux, b.uy]).toEqual(b.facing === "W" ? [0, -1] : [0, 1]);
-    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBe(1);
+    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBeCloseTo(1, 9);
   });
 
   it("every roof face's normal points out and up (none faces down), and its texture frame holds its corners", () => {
@@ -101,7 +101,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       }
       for (let k = 1; k < p.nOrder; k++) expect(p.faces[p.order[k - 1]!]!.dz).toBeGreaterThanOrEqual(p.faces[p.order[k]!]!.dz);
     }
-    expect(roofs).toBeGreaterThan(LOTS.length - 4);
+    // (The Colosseum's ring stretches, the north edge round: from a camera lower than their rim, their bowl is hidden behind their wall and left out.)
+    expect(roofs).toBeGreaterThan(LOTS.filter((b) => b.kind !== "ring").length - 4);
   });
 
   it("a face turned away from the camera isn't drawn: a gable's far slope, a side wall facing away", () => {

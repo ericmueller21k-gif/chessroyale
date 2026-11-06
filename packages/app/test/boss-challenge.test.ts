@@ -62,9 +62,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash and Folio their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash, Folio and Smudgy their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
@@ -87,10 +87,12 @@ describe("the challenge's flow", () => {
     // (Folio, Nov 5: its own, the folding and the plane, then the crumple; its line its entrance's; a quiet line one of five.)
     expect(introOf("folio")).toMatchObject({ custom: true, name: "Folio", line: "Every game is a draft. Shall we write one?", layout: "across", clear: 2.3 });
     expect(introOf("folio")!.chant).toHaveLength(5);
+    // (Smudgy, Nov 6: his own, the cloth whipped off, then the splatter; his line his entrance's first; his reveal line Eric's idea.)
+    expect(introOf("smudgy")).toMatchObject({ custom: true, name: "Smudgy", line: "Smudgy, artist. Don't touch the wet parts.", layout: "across", seated: true, chant: ["Careful, don't get any paint on the pieces!"] });
   });
 
-  it("the layout: across for all eleven today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex", "gingerbread", "folio"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all twelve today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex", "gingerbread", "folio", "smudgy"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 

@@ -1018,3 +1018,10 @@ export const sidekickSmudgy: Character = {
   parts: PARTS,
   anims: { idle, walk, sit, wave, entrance, thinking, move, capture, hurt, check, smug, rattled, defeat, victory },
 };
+
+// ---- For the art that reuses this rig (Smudgy's studio, Nov 6: the life class's painters and the gallery owner, shops/smudgy-art.ts,
+// sidekicks/smudgykeeper.ts): the pose's layers, the parts, where a placed part lands, and the holds. Nothing here changes Dabble.
+export { layersOf as dabbleLayers, PARTS as DABBLE_PARTS, SIT as DABBLE_SIT, GROUND as DABBLE_GROUND };
+/** Where a painted part of this rig lands on the 64 x 64 frame (its top left), once it has been drawn by a pose; undefined before. */
+export const dabblePartAt = (name: string): Pt | undefined => placedAt.get(name);
+

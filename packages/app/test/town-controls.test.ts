@@ -217,7 +217,7 @@ describe("locking a new view (Eric, Nov 5: \"within 10 degrees of a new 90-degre
     let base = lockIn(turn, look, 500)!;
     expect(base).toBe(90);
     // (Out of the building, on a plain square: baseHeading(c, r, 0) is north.)
-    const [c, r] = [8, 20];
+    const [c, r] = [8, 28];
     base = freshView(turn, look, baseHeading(c, r, 0));
     expect(base).toBe(0);
     expect([turn.from, turn.to, turn.at(500), look.at(500), look.snapped]).toEqual([0, 0, 0, 0, null]);
@@ -230,7 +230,7 @@ describe("locking a new view (Eric, Nov 5: \"within 10 degrees of a new 90-degre
     const q = s.squares[0]!;
     for (const base of [0, 90, 180, 270]) {
       expect(baseHeading(q.c, q.r, base), `on the strip at ${base}`).toBe(s.heading);
-      expect(baseHeading(8, 20, base), `off it at ${base}`).toBe(base);
+      expect(baseHeading(8, 28, base), `off it at ${base}`).toBe(base);
     }
     const t = STRIPS.find((x) => x.heading !== 0 && x.squares.length);
     if (t) expect(baseHeading(t.squares[0]!.c, t.squares[0]!.r, 90)).toBe(t.heading);
@@ -296,8 +296,8 @@ describe("the minimap, built from the plan (street-plan.json): north up, the Col
     expect(p.x, "west of the first column wraps to the last").toBeCloseTo((N - 0.5) * s, 6);
     M.mapPoint(10, N + 5, s, p);
     expect(p.y, "past the top: on the band's edge").toBe(M.MAP_BAND.sq * s);
-    expect(M.mapScale(184)).toBeCloseTo(4, 6);
-    expect(M.mapHeight(184)).toBe(Math.round(4 * M.MAP_H));
+    expect(M.mapScale(4 * N)).toBeCloseTo(4, 6);
+    expect(M.mapHeight(4 * N)).toBe(Math.round(4 * M.MAP_H));
   });
   it("the park and the Colosseum's icons: the park's middle; the band's middle", () => {
     const s = 5;

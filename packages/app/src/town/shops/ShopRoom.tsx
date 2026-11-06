@@ -52,6 +52,7 @@ import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } 
 import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
 import type { CrewKey } from "./intro.ts";
 import { isUp, levelZ, liftAt, makeLevels, squareOf, type LevelsArt } from "./levels.ts";
+import { pressKey, squareUnder } from "./tap.ts";
 import { ElfLoop, elfB, pairLegs, stopJob, walkerLegs, type DispenseStop, type ElfPose } from "./ginger-elves.ts";
 import { HOLLOW, HOLLOW_HEART, hollowBuild } from "../../characters/hollow.ts";
 import { play } from "../../sound.ts";
@@ -140,6 +141,9 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
     })),
   // (Folio's sanctuary, Nov 5: a box room, the clean page its battle spot (its `page-` tiles); its windows' colored pools drift with the
   // sun and lie on the paper as color, not light.)
+  // (Smudgy's studio, Nov 6: a box room, the drop cloth its battle spot (its `circle-` tiles), the painters each `t0` into one loop.)
+  smudgy: () =>
+    import("./smudgy-art.ts").then((m) => ({ layout: m.SHOP_SMUDGY_LAYOUT, pieces: m.SHOP_SMUDGY_PIECES, crateAt: m.SHOP_SMUDGY_CRATE_AT, lights: m.SHOP_SMUDGY_LIGHTS, pools: m.SHOP_SMUDGY_POOLS, marks: m.SHOP_SMUDGY_MARKS })),
   folio: () =>
     import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
@@ -409,6 +413,8 @@ interface Up {
   flip: boolean;
   /** Only this strip of its picture, from its top (a deep piece's part that stands up): its height in pixels; 0 = all. */
   cut: number;
+  /** How far into its loop it stands (ms; ShopPlace `t0`). */
+  t0?: number;
 }
 
 /** Runs the room in `box` on `cv`: the loop, the camera, the input and the cards. Returns its controls and its stop. */
@@ -646,7 +652,7 @@ function startRoom(
     }
     // (Jefferson's board on its crates stands with its foot `standDy` south of its row's middle, on the marks' line.)
     const dr = p.name === "board-stand" && art.standDy ? art.standDy / SQ : 0;
-    ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row + dr, z: p.row + dr, ox: 0, oy: 0, flip: !!p.flip, cut: 0 });
+    ups.push({ name: p.name, col: p.col, i: 0, c: p.col + (w - 1) / 2, r: p.row + dr, z: p.row + dr, ox: 0, oy: 0, flip: !!p.flip, cut: 0, t0: p.t0 });
   }
   ups.sort((a, b) => a.z - b.z);
   ups.forEach((u, i) => (u.i = i));
@@ -984,6 +990,19 @@ function startRoom(
         rg.lineTo(W, y);
         rg.stroke();
       }
+      return;
+    }
+    if (def.roof === "studio") {
+      // A studio's ceiling (Smudgy's): dark beams over a deep teal-gray plaster, a long skylight's pale glow over the room's middle.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.5);
+      sky.addColorStop(0, "#141a20");
+      sky.addColorStop(1, "#1f2a30");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      rg.fillStyle = "rgba(200,220,215,0.10)";
+      rg.fillRect(W * 0.3, 0, W * 0.4, H * 0.5);
+      rg.fillStyle = "#2a1d17";
+      for (let i = -6; i <= 6; i++) rg.fillRect(W / 2 + i * W * 0.12 - 4, 0, 8, H * 0.5);
       return;
     }
     if (def.roof === "paper") {
@@ -1694,13 +1713,15 @@ function startRoom(
     if (introNow?.rope?.bale && u.name === "board-stand") return;
     // (Jefferson's challenge: his intro's crate stack stands in its place from the walk in, the same picture: drawCrewCenter.)
     if (cw && ci?.crew && u.name === "board-stand") return;
+    // (Smudgy's challenge: his intro draws the covered table in its place from the walk in, then whips the cloth off: drawCenter.)
+    if (ci?.cloth && u.name === "table") return;
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
     if (pt.depth <= S.nearGone) return;
     // (Hollow's intro: a lantern going out, bulbs gone dark, the tree draining: its own frame, and its lit pixels for over the dark.)
     // (Ginger's intro: the stockroom door open while the board carriers come out.)
-    const img = darkPiece(u, now) ?? frameAt(iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name, now);
+    const img = darkPiece(u, now) ?? frameAt(iceNow?.door && u.name === "bay-door" ? "bay-door-open" : u.name, now + (u.t0 ?? 0));
     const ch = frames[u.name]!.ch;
     const s = pt.k / SQ;
     const fx = u.flip ? ch.w - 1 - ch.foot[0] : ch.foot[0];
@@ -2414,13 +2435,14 @@ function startRoom(
    */
   const drawCenter = () => {
     const n = introNow;
-    if (!ci || !marks || !(n || ci.wood) || !P(marks.table.c, marks.table.r)) return;
+    if (!ci || !marks || !(n || ci.wood || ci.cloth) || !P(marks.table.c, marks.table.r)) return;
     const s = pt.k / SQ;
     const x = pt.x;
     const y = pt.y;
     const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
     if (ci.wood) return drawWood(x, y, s);
+    if (ci.cloth) return drawClothCenter(n, x, y, s);
     if (!n) return;
     if (ci.dash) return drawBlitzCenter(n, x, y, s);
     if (fo) return drawFolioCenter(x, y, s);
@@ -2460,6 +2482,19 @@ function startRoom(
     if (!py) return;
     if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
     else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
+  };
+  /**
+   * Smudgy's table (his intro), its foot at (x, y), `s` a room pixel: the round table and its stools (there all along), the game's own
+   * board on it once the cloth is off its top (`n.table`), and the cloth over it: covered from the walk in, whipped off, in its heap.
+   */
+  const drawClothCenter = (n: IntroNow | null, x: number, y: number, s: number) => {
+    const T = ci!.table;
+    const C = ci!.cloth!;
+    const put = (img: HTMLCanvasElement, ch: Character) => g.drawImage(img, x - ch.foot[0] * s, y - ch.foot[1] * s, img.width * s, img.height * s);
+    put(T.img, T.ch);
+    if (n?.table) paintTable(g, v, marks!.table.c - camX, camY - marks!.table.r, T.palette, marks!.layout);
+    const z = n?.cloth ?? { anim: "covered" as const, frame: 0 };
+    put(C.frames[z.anim][z.frame]!, C.ch);
   };
   /**
    * Dash's table (his intro), the table's foot at (x, y), `s` a room pixel: the shoe-box stack as it lands (its `land`, then its `idle`:
@@ -3080,7 +3115,7 @@ function startRoom(
           addFig(bucketAt("b").r, 4);
           addFig(bucketAt("w").r, 5);
         }
-      } else if (introNow || ci?.wood || (cw && ci?.crew)) {
+      } else if (introNow || ci?.wood || ci?.cloth || (cw && ci?.crew)) {
         // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. Timber's log
         // lies there from the walk in; his fog over him, as it boils up round where he works.)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
@@ -3277,43 +3312,16 @@ function startRoom(
   const focus = { x: 0, y: 0 };
   let drag: { id: number; x: number; y: number; cx: number; cy: number; k: number } | null = null;
   let closing = false;
-  /** The square under (x, y) in the box, or null: the nearest drawn square whose shape holds the point. */
-  const squareAt = (x: number, y: number): Sq | null => {
-    const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
-    // (Ginger's catwalk and stairs first, each drawn up where its deck or its steps are: a tap on the deck as you see it is the deck's.)
-    if (lv)
-      for (let r = n - 1; r >= 0; r--)
-        for (let c = 0; c < n; c++) {
-          if (!isUp(lv, c, r)) continue;
-          if (!P(c - 0.5, r - 0.5, q[0]) || !P(c + 0.5, r - 0.5, q[1]) || !P(c + 0.5, r + 0.5, q[2]) || !P(c - 0.5, r + 0.5, q[3])) continue;
-          const lift = liftAt(lv, c, r);
-          for (const p of q) p.y -= (lift * p.k) / SQ;
-          if (inQuad(q, x, y)) return { c, r };
-        }
-    for (let r = n - 1; r >= 0; r--)
-      for (let c = 0; c < n; c++) {
-        if (!P(c - 0.5, r - 0.5, q[0]) || !P(c + 0.5, r - 0.5, q[1]) || !P(c + 0.5, r + 0.5, q[2]) || !P(c - 0.5, r + 0.5, q[3])) continue;
-        if (inQuad(q, x, y)) return { c, r };
-      }
-    return null;
-  };
-  /** (x, y) is inside the four points' shape. */
-  const inQuad = (q: readonly { x: number; y: number }[], x: number, y: number): boolean => {
-    let pos = 0;
-    let neg = 0;
-    for (let i = 0; i < 4; i++) {
-      const a = q[i]!;
-      const b = q[(i + 1) % 4]!;
-      const cross = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-      if (cross > 0) pos++;
-      else if (cross < 0) neg++;
-    }
-    return pos === 0 || neg === 0;
-  };
+  /** The square under (x, y) in the box, or null: the nearest drawn square whose shape holds the point (tap.ts). */
+  const squareAt = (x: number, y: number): Sq | null => squareUnder(room, v, camX, camY, SQ, x, y, pq);
+  /** (x, y) is on the Shopkeeper's picture. */
+  const onKid = (x: number, y: number): boolean => kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1;
+  /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
+  const keyAt = (x: number, y: number): string => (onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
-    if (kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1) return tapTarget(room, here, def.keeper[0]!.c, def.keeper[0]!.r);
+    if (onKid(x, y)) return tapTarget(room, here, def.keeper[0]!.c, def.keeper[0]!.r);
     const sq = squareAt(x, y);
     if (!sq) return null;
     return tapTarget(room, here, sq.c, sq.r);
@@ -3329,7 +3337,11 @@ function startRoom(
     P(camX, camY + 0.5, pq[1]);
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, k: Math.max(8, pq[1]!.y - pq[0]!.y) };
     closing = !!card;
-    press.down(e.clientX, e.clientY, "tap");
+    if (closing) return press.down(e.clientX, e.clientY, "");
+    // (What's under the finger now, as you see it: the camera may glide on before the release (it trails your walk), and a release
+    // on anything else lets go without walking, as in the town.)
+    const xy = local(e);
+    press.down(e.clientX, e.clientY, keyAt(xy.x, xy.y));
   };
   const onMove = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -3346,9 +3358,12 @@ function startRoom(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
-    if (press.up("tap") !== "walk") return;
-    if (closing) return close();
+    if (closing) {
+      if (press.up("") !== "drag") close();
+      return;
+    }
     const xy = local(e);
+    if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
     // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
@@ -3440,6 +3455,8 @@ function startRoom(
             crewLine: !!iceNow.line,
           }
         : null,
+      // (Smudgy's own: the cloth (covered, whip, heap).)
+      cloth: introNow?.cloth?.anim ?? null,
       // (Folio's own: its move, the stools' and table's folding (sheet, fold, idle), the plane, the packet, the board on the table, the
       // game's own board.)
       folio: introNow?.folio

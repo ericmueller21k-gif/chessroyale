@@ -176,6 +176,21 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
   // like a map; it bows and says a quiet line (one of five at random: `chant`); then the screen crumples into a ball over black and
   // opens up as the match (the crumple, crumple-gl.ts). docs/decisions/2026-11-05-folio-home.md. It steps back to 2.3 squares from the
   // table's middle (the art's), you to the usual 2.2. No God King attack in it: the crumple is its transition, as Hollow's dark is his.)
+  // (Nov 6: his own, the drop cloth whipped off the table (Eric: "He starts out, he pulls the white tablecloth off … to reveal the
+  // board. And the stools can just already be there. It doesn't need to be fancy."), then his reveal line, then the splatter. His line
+  // is his battle entrance's first (characters/smudgy.ts SMUDGY_LINES); the reveal line Eric's idea in the director's words. Seated:
+  // the stools are there already, so you both walk on straight to your marks beside them and stay. No attack: the splatter is his.)
+  smudgy: {
+    name: "Smudgy",
+    line: "Smudgy, artist. Don't touch the wet parts.",
+    layout: "across",
+    custom: true,
+    seated: true,
+    chant: ["Careful, don't get any paint on the pieces!"],
+    // His own sounds (characters/smudgy-sounds.ts): the cloth's whoosh as he whips it off, its soft flop as it lands in a heap, a wet
+    // splat for each splat of the splatter (a few, faster and faster), and the brush's swipe that wipes it away.
+    cues: { whoosh: "smudgyWhoosh", flop: "smudgyFlop", splat: "smudgySplat", swipe: "smudgySwipe" },
+  },
   folio: {
     name: "Folio",
     line: "Every game is a draft. Shall we write one?",
@@ -542,6 +557,22 @@ export const CHALLENGE_FEEL = {
    * (`openMs`), its creases' shade lingering on the flat match (`lingerMs`). Without WebGL (or if it fails), a cross-fade through black:
    * to black over `fadeMs`, held black while the match loads, up from black over `fadeMs`.
    */
+  /**
+   * Smudgy's intro (Nov 6): on the marks a beat (`faceMs`), his line (`lineMs`), a pause (`grabMs`) and he whips the cloth off (its
+   * art's frames: up, sailing west over him, dropped in a heap); a beat (`revealLeadMs`), his reveal line (`revealMs`), a beat
+   * (`afterMs`), then the splatter: splats land, faster and faster (a gap of `firstGapMs` between the first two down to `lastGapMs`),
+   * `perSplat` at a time, each `minR` to `maxR` of the screen's shorter side, until `coverMs` (the screen is filled under them then,
+   * however many landed); held covered at least `holdMinMs` (longer while the match loads); a brush stroke sweeps it away across the
+   * screen over `wipeMs`, its band of paint `strokeW` of the screen wide. Never stuck: every phase goes by the clock.
+   */
+  smudgy: {
+    lineMs: 2500,
+    grabMs: 300,
+    revealLeadMs: 250,
+    revealMs: 2400,
+    afterMs: 300,
+    splat: { coverMs: 1200, firstGapMs: 150, lastGapMs: 12, perSplat: 2, minR: 0.06, maxR: 0.2, holdMinMs: 250, wipeMs: 500, strokeW: 0.12, splatSounds: 6 },
+  },
   folio: {
     lineMs: 2200,
     backMs: 400,
@@ -1065,8 +1096,23 @@ export function folioAnims(w: { mover: ArtLike; stool: ArtLike; table: ArtLike; 
     route: w.route,
   };
 }
+/**
+ * Smudgy's intro (Nov 6; CHALLENGE_FEEL.smudgy): the cloth's whip, its frames' ms and cues (the art's: INTRO_SMUDGY_CLOTH), and the
+ * whip's frame from which the board shows under it (off the table's top).
+ */
+export interface ClothAnims {
+  cloth: true;
+  whip: readonly number[];
+  cues: readonly (string | undefined)[];
+  boardFrame: number;
+}
+export function clothAnims(w: { cloth: ArtLike; boardFrame: number }): ClothAnims {
+  const f = w.cloth.anims.whip!.frames;
+  return { cloth: true, whip: f.map((x) => x.ms), cues: f.map((x) => x.cue), boardFrame: w.boardFrame };
+}
+export const isCloth = (a: IntroAnims): a is ClothAnims => "cloth" in a;
 /** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's), the icicle (Ginger's) or the dashes (Dash's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims;
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims | ClothAnims;
 export const isFolio = (a: IntroAnims): a is FolioAnims => "folio" in a;
 export const isBlitz = (a: IntroAnims): a is BlitzAnims => "blitz" in a;
 export const isIce = (a: IntroAnims): a is IceAnims => "ice" in a;
@@ -1094,7 +1140,8 @@ export type IntroStep =
   | "call" | "wave" | "walk" | "creak"
   | "blast" | "fall" | "stab" | "toss" | "cast"
   | (typeof BLITZ_DASHES)[number]
-  | "back" | "fold" | "plane" | "unfold" | "bow" | "quiet";
+  | "back" | "fold" | "plane" | "unfold" | "bow" | "quiet"
+  | "whip" | "reveal";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -1103,7 +1150,7 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz" | "folio"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz" | "folio" | "smudgy"
 >;
 /**
  * When things happen in Ginger's intro (ms from the marks; CHALLENGE_FEEL.ice): his charge and blast; the blast flying and bursting;
@@ -1182,6 +1229,17 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isCloth(a)) {
+    // Smudgy's own: his line; a pause; the whip (the cloth up, over him and down in a heap); a beat, his reveal line, a beat; then the
+    // splatter (no attack).
+    const K = feel.smudgy;
+    add("line", K.lineMs);
+    add("pause", K.grabMs);
+    add("whip", sum(a.whip));
+    add("reveal", K.revealLeadMs + K.revealMs + K.afterMs);
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isFolio(a)) {
     // Folio's own: its line; the step back; the stools folding (and the gap to the table); the table folding (and the gap to the
     // plane); the plane in to the packet landing; the board unfolding (and the gap to the bow); the bow's lead; the quiet line (and
@@ -1385,6 +1443,8 @@ export interface IntroNow {
   blitz: BlitzNow | null;
   /** Folio's own intro (the folding, the plane, the board): what it and its props do now; null for every other intro. */
   folio: FolioNow | null;
+  /** Smudgy's own intro: the cloth's animation and frame now (covered, whipped off, in its heap); null for every other intro. */
+  cloth: { anim: "covered" | "whip" | "heap"; frame: number } | null;
 }
 /** A board carrier in Ginger's intro: where (squares), which way, its animation and frame; null: still in the stockroom. */
 export interface CarrierNow {
@@ -2041,7 +2101,7 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
   // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
   // (Dash's: you both walk on to where you stand clear of the stools, and nobody steps after they land.)
-  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a))) return Infinity;
+  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a) || isCloth(a))) return Infinity;
   // (Folio's: you both step back a pace after its line, before the stools fold up: introAt eases it, no hop.)
   if (a && isFolio(a)) return stepAt(beats, "back");
   if (!a || isLog(a)) return stepAt(beats, "pop");
@@ -2088,7 +2148,17 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
 export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null, cloth: null };
+  if (a && isCloth(a)) {
+    // (Smudgy's: the covered table from the walk on; the cloth whipped off, then in its heap; the board on the table from the whip's
+    // `boardFrame` on (its stools are in the table's picture: they were there all along); his reveal line after its lead.)
+    const w = stepAt(beats, "whip");
+    const r = stepAt(beats, "reveal") + CHALLENGE_FEEL.smudgy.revealLeadMs;
+    const u = t - w;
+    const cloth = u < 0 ? { anim: "covered" as const, frame: 0 } : u < sum(a.whip) ? { anim: "whip" as const, frame: frameAt(a.whip, u, false) } : { anim: "heap" as const, frame: 0 };
+    const shown = u >= sum(a.whip.slice(0, a.boardFrame));
+    return { ...base, cloth, table: shown, stools: false, chant: t >= r && t < r + CHALLENGE_FEEL.smudgy.revealMs };
+  }
   if (a && isFolio(a)) {
     // (Folio's: you both step back a pace (no hop) to the clear places; the table (the game's board on it) from the unfold's end, its
     // stools from theirs (each folds up on its own: FolioNow); its quiet line (the `chant`) from `quietLeadMs` into its bow.)
@@ -2172,6 +2242,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (isIce(a)) return iceCues(a);
   if (isBlitz(a)) return blitzCues(a);
   if (isFolio(a)) return folioCues(a);
+  if (isCloth(a)) return clothCues(beats, a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];
@@ -2223,6 +2294,17 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   ];
 }
 
+/** Smudgy's: the whip's frames' own cues (the whoosh as it lifts, the flop as it lands in a heap), at their times. */
+export function clothCues(beats: readonly IntroBeat[], a: ClothAnims): { cue: string; at: number }[] {
+  const out: { cue: string; at: number }[] = [];
+  let t = stepAt(beats, "whip");
+  a.whip.forEach((ms, i) => {
+    const cue = a.cues[i];
+    if (cue) out.push({ cue, at: t });
+    t += ms;
+  });
+  return out;
+}
 /**
  * Wrangler's cues, and when (his intro's beats; CHALLENGE_FEEL.rope): his moves' own on their frames (the spin's whirl each loop, the
  * throw, the yank's heaves each loop, the cross throw's wind-up and its two throws a hair apart, the double yank's heaves, the brag's

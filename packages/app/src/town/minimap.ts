@@ -5,7 +5,7 @@
  *
  * The plan from above, north up, built from the plan's own data (street.ts: `street-plan.json`'s ground, lots, park and Colosseum), so
  * it follows any change to the plan: the streets, the paving, the park's lawns, the gardens, the rows' lots, the homes as soft blocks,
- * the walls as lines, and the Colosseum as a band on the top edge over its columns. Its body runs from the south edge to the last row with
+ * the walls as lines (the Colosseum's own and the plaza's walls, ground `W`, dark), and the Colosseum as a band on the top edge over its columns. Its body runs from the south edge to the last row with
  * anything on it but the grove and the Colosseum; the walls past it (the back wall) are drawn on its top edge.
  *
  * The cost (Eric's frame-rate rule): the static layer is drawn once to a canvas (`drawMap`) when the map's size changes; each frame only
@@ -36,8 +36,8 @@ export const MAP_TOP: number = (() => {
     }
   return top;
 })();
-/** The Colosseum's band on the top edge: its columns, and its height in squares. */
-export const MAP_BAND = { c0: STREET_COLISEUM.c0, w: STREET_COLISEUM.size, sq: 1.4 } as const;
+/** The Colosseum's band on the top edge (a thin line, Eric: "the Colosseum basically outside the map, on the edge"): its columns, and its height in squares. */
+export const MAP_BAND = { c0: STREET_COLISEUM.c0, w: STREET_COLISEUM.size, sq: 1 } as const;
 
 /** The map's size in squares: the town's width, and its body's rows with the band over them. */
 export const MAP_W = N;
@@ -62,7 +62,7 @@ export function mapPoint(x: number, y: number, s: number, out: { x: number; y: n
 
 /** The map's colors: the plan's grounds, the homes' blocks, the walls and the Colosseum's band. */
 export const MAP_COLORS = {
-  ground: { [K["#"]]: "#5c6370", [K["="]]: "#cfc8ba", [K[","]]: "#8fc46c", [K.g]: "#6b9f52", [K.L]: "#d9c7a6", [K.A]: "#c9b48a" } as Record<number, string>,
+  ground: { [K["#"]]: "#5c6370", [K["="]]: "#cfc8ba", [K[","]]: "#8fc46c", [K.g]: "#6b9f52", [K.L]: "#d9c7a6", [K.A]: "#c9b48a", [K.W]: "#4a3f36" } as Record<number, string>,
   home: "#e59a52",
   homeEdge: "#8a4f1c",
   wall: "#4a3f36",
