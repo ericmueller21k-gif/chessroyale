@@ -63,6 +63,8 @@ import { TABLE_BOARD } from "../houses/park.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
+  /** Its size in squares, each way (20 unless the art says: Boingo's Funhouse is 24). */
+  n?: number;
   layout: readonly ShopPlace[];
   pieces: Readonly<Record<string, Character>>;
   /** Where the crate sits on the counter, in the counter's pixels. */
@@ -143,6 +145,9 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
   // sun and lie on the paper as color, not light.)
   folio: () =>
     import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
+  // (Boingo's Funhouse, Nov 6: an arcade, a box room of 24 x 24; the play structure stands up whole at its foot.)
+  clown: () =>
+    import("./boingo-art.ts").then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play"], marks: m.SHOP_BOINGO_MARKS })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
   // elves at work.)
   gingerbread: () =>
@@ -430,8 +435,8 @@ function startRoom(
   const SQ = f.housePxPerSquare;
   const { def, art, frames } = loaded;
   // (Ginger's igloo: its catwalk and staircases, a second walking level: levels.ts.)
-  const lv = art.levels ? makeLevels(art.levels, 20) : null;
-  const room: Room = makeRoom(art.layout, def.keeper, 20, art.floor, def.talk, lv);
+  const lv = art.levels ? makeLevels(art.levels, art.n ?? 20) : null;
+  const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv);
   // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
   // now: crewTakes.)
   if (art.crew) for (const k of ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const) room.blocked[art.crew.places[k].at[1] * room.n + art.crew.places[k].at[0]] = 1;

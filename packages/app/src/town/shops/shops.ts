@@ -22,7 +22,7 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "funkeeper";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -96,6 +96,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // (shop-folio-nov5.md: its squares 9 and 10 of row 2, drawn at 9.5, 2.4). It has no name: "Shopkeeper". A room of pale paper: the
   // day tone. Its Paper Crane first in its crate (its ride).
   folio: { home: "folio", boss: "Folio", crate: "Folio's Boss Crate", kid: "folioturtle", at: [9.5, 2.4], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["folio-crane"], roof: "paper", chatTone: "day" },
+  // Boingo's Funhouse (Nov 6): the clown attendant behind the middle of the glass prize counter (columns 9-12 of row 3, its
+  // squares 10 and 11 of row 2), the pogo on its pedestal beside him. He has no name: "Shopkeeper". A dark arcade full of lights:
+  // the night tone. His pogo first in his crate (his ride). The room is 24 x 24 (boingo-art.ts SHOP_BOINGO_N).
+  clown: { home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", at: [10.5, 2.2], keeper: [{ c: 10, r: 2 }, { c: 11, r: 2 }], prizes: ["boingo-pogo"], roof: "tent", chatTone: "night" },
   grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
 };
 

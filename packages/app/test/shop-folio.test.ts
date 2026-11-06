@@ -149,7 +149,7 @@ describe("the paper turtle keeps the shop", () => {
 describe("Folio's Boss Crate and the Paper Crane", () => {
   it("in BOSS_CRATES with its ride, the Paper Crane, first; sold to everyone (Folio is live); its words as the others'", () => {
     const crate = bossCrateOf("folio")!;
-    expect(BOSS_CRATES.at(-1)).toBe(crate);
+    expect(BOSS_CRATES).toContain(crate);
     expect([crate.id, crate.name, crate.ride]).toEqual(["boss-folio", "Folio's Boss Crate", "folio-crane"]);
     expect(crate.items).toContain("folio-crane");
     expect(adminFirst(bossDef("folio")!)).toBe(false);
