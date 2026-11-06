@@ -1,27 +1,26 @@
 import { render } from "preact";
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { BOSS_CRATES, CLAW, adminFirst, bossCrateDef, bossCrateOf, clawWonLine, tokenBossName, type BossCrateDef } from "@chessroyale/core";
+import { useEffect, useLayoutEffect, useReducer, useState } from "preact/hooks";
+import { BOSS_CRATES, CLAW, adminFirst, bossCrateDef, clawWonLine, tokenBossName, type BossCrateDef } from "@chessroyale/core";
 import { grantTestItems, playClawOnServer } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { BossCrateArt, CrateOpening } from "../screens/Crates.tsx";
+import { CrateOpening } from "../screens/Crates.tsx";
 import { useAccount } from "../screens/Profile.tsx";
 import { play, warmSounds } from "../sound.ts";
 import { testParams } from "../test-switches.ts";
-import { CLAW_START, clawStep, newRequestId, roamX, type ClawStage } from "./flow.ts";
+import { CLAW_START, clawStep, newRequestId, type ClawStage } from "./flow.ts";
+import { CLAW_PLAY, COIN_MS, clawStage } from "./view.ts";
 import "./claw.css";
 
 /**
- * Boingo's claw machine (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md; the flow: flow.ts). The machine's own screen opens
- * over the room's zoomed view: "Insert one boss coin" and your boss tokens; a pick drops the coin in (the server decides the play
- * now), the claw roams on its own until STOP (or CLAW.roamSeconds), drops, grabs and lifts; a win carries the boss's crate to the
- * chute ("You won Folio's Boss Crate!", Open now: the Crates tab's own opening); a loss slips at the top ("So close! Try again?").
- * Closing at any point is safe: the token is spent and any crate is already in your inventory, on the server.
+ * Boingo's claw machine's controls (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md and -boingo-home.md; the flow: flow.ts).
+ * The machine is the cabinet in his Funhouse: its claw is drawn by the room (shops/ShopRoom.tsx) from the play this writes
+ * (view.ts CLAW_PLAY). Eric, Nov 6: "the real claw machine in the room … not a separate 2D overlay screen". So this is only a small
+ * panel docked at the bottom, the cabinet zoomed in above it: "Insert one boss coin" and your boss tokens; a pick drops the coin in
+ * (the server decides the play now); once it has answered, the claw roams on its own until STOP (or CLAW.roamSeconds), drops, grabs
+ * and lifts; a win carries the boss's crate to the chute ("You won Folio's Boss Crate!", Open now: the Crates tab's own opening);
+ * a loss drops it back on the pile, or slips ("So close! Try again?"). Closing at any point is safe: the token is spent and any
+ * crate is already in your inventory, on the server.
  */
-
-/** Where the chute is (0 = the glass's left edge, 1 = its right). */
-const CHUTE_X = 0.1;
-/** How long the coin takes to drop into the slot (ms). */
-const COIN_MS = 700;
 
 /** The boss crates the picker offers (as the Crates tab lists them: one in the game for admins first only to an admin or a holder). */
 const offered = (admin: boolean, tokens: Record<string, number>): BossCrateDef[] =>
@@ -39,10 +38,16 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
   const admin = !!profile?.admin;
   const [s, dispatch] = useReducer(clawStep, CLAW_START);
   const [granting, setGranting] = useState(false);
-  const arm = useRef<HTMLDivElement>(null);
-  const x = useRef(0.5);
 
   useEffect(() => warmSounds(["clawCoin", "clawWhir", "clawGrab", "clawThud"]), []);
+  useEffect(() => {
+    CLAW_PLAY.open = true;
+    return () => {
+      CLAW_PLAY.open = false;
+      // (Closed mid-play: the claw parks at home; the play is already done on the server.)
+      clawStage(CLAW_PLAY, "insert", performance.now(), null, null);
+    };
+  }, []);
   useEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
@@ -52,6 +57,8 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
   // Each stage's sound as it shows (a layout effect: heard with its first frame) and its timer.
   useLayoutEffect(() => {
     const stage: ClawStage = s.stage;
+    // (The room's cabinet draws its claw from this, from this frame on.)
+    clawStage(CLAW_PLAY, stage, performance.now(), s.answer ? s.answer.won === true : null, s.request);
     if (stage === "coin") {
       play("clawCoin");
       const t = setTimeout(() => dispatch({ kind: "coinIn" }), COIN_MS);
@@ -59,27 +66,13 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
     }
     if (stage === "roam") {
       play("clawWhir");
-      const start = performance.now();
-      let raf = requestAnimationFrame(function step(now) {
-        x.current = roamX(now - start);
-        arm.current?.style.setProperty("--claw-x", x.current.toFixed(4));
-        raf = requestAnimationFrame(step);
-      });
       const t = setTimeout(() => dispatch({ kind: "stop" }), CLAW.roamSeconds * 1000);
-      return () => {
-        cancelAnimationFrame(raf);
-        clearTimeout(t);
-      };
+      return () => clearTimeout(t);
     }
     const wait = stage === "drop" ? CLAW.dropMs : stage === "lift" ? CLAW.liftMs : stage === "carry" ? CLAW.carryMs : 0;
     if (stage === "lift") play("clawGrab");
     if (stage === "carry") play("clawWhir");
     if (stage === "won") play("clawThud");
-    if (stage === "carry") {
-      x.current = CHUTE_X;
-      arm.current?.style.setProperty("--claw-x", String(CHUTE_X));
-    }
-    if (stage === "insert") x.current = 0.5;
     if (!wait) return;
     const t = setTimeout(() => dispatch({ kind: "next" }), wait);
     return () => clearTimeout(t);
@@ -95,9 +88,7 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
 
   const list = offered(admin, tokens);
   const total = list.reduce((n, c) => n + (tokens[c.boss] ?? 0), 0);
-  const crate = s.boss ? bossCrateOf(s.boss) : undefined;
   const won = s.answer?.won === true && s.answer.crate ? bossCrateDef(s.answer.crate) : undefined;
-  const held = s.stage === "lift" || s.stage === "carry";
 
   if (s.stage === "opening" && won) {
     return (
@@ -110,7 +101,7 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div class="claw-veil" role="dialog" aria-label="Claw machine" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div class="claw-veil" role="dialog" aria-label="Claw machine">
       <div class={`claw-machine claw-${s.stage}${s.answer?.won ? " claw-win" : ""}`} data-stage={s.stage}>
         <button type="button" class="claw-close" aria-label="Close" onClick={onClose}>
           ✕
@@ -122,35 +113,6 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
           {s.stage === "won" && won && clawWonLine(won.name)}
           {s.stage === "lost" && "So close! Try again?"}
           {s.stage === "refused" && s.message}
-        </div>
-        <div class="claw-glass">
-          <div class="claw-rail" />
-          <div ref={arm} class={`claw-arm${held ? " claw-holding" : ""}`} style={{ "--claw-x": String(x.current) }}>
-            <div class="claw-cable" />
-            <svg class="claw-head" viewBox="0 0 40 30" aria-hidden="true">
-              <rect x="14" y="0" width="12" height="8" rx="2" />
-              <path class="claw-prong claw-prong-l" d="M16 7 L8 20 L13 28" />
-              <path class="claw-prong claw-prong-r" d="M24 7 L32 20 L27 28" />
-            </svg>
-            {crate && held && (
-              <div class={`claw-prize${s.answer?.won ? "" : " claw-slip"}`} data-crate={crate.id}>
-                <BossCrateArt crate={crate} />
-              </div>
-            )}
-          </div>
-          <div class="claw-pile" aria-hidden="true">
-            {list.slice(0, 5).map((c) => (
-              <span key={c.id} class="claw-pile-crate">
-                <BossCrateArt crate={c} />
-              </span>
-            ))}
-          </div>
-          <div class="claw-chute">{s.stage === "won" && won && <div class="claw-chute-crate"><BossCrateArt crate={won} /></div>}</div>
-          {s.stage === "coin" && s.boss && (
-            <div class="claw-coin" aria-hidden="true">
-              <TokenArt boss={s.boss} />
-            </div>
-          )}
         </div>
         <div class="claw-controls">
           {s.stage === "insert" && (
@@ -217,8 +179,8 @@ export function ClawMachine({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** Puts the machine over the page; `gone` when it closes. */
-export function mountClawMachine(gone: () => void): void {
+/** Puts the machine's controls over the page; `gone` when they close. Returns what closes them. */
+export function mountClawMachine(gone: () => void): () => void {
   const root = document.createElement("div");
   root.className = "claw-root";
   document.body.appendChild(root);
@@ -228,4 +190,5 @@ export function mountClawMachine(gone: () => void): void {
     gone();
   };
   render(<ClawMachine onClose={close} />, root);
+  return close;
 }

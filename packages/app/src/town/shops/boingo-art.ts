@@ -306,13 +306,25 @@ export const SHOP_BOINGO_POGO = def("pogo", [2, 1], 2 * T, PG_H, [T, PG_H - 2], 
 /** The sign's words, its price read from the crate settings (so it never drifts): "BOINGO'S POGO: 3 Boingo tokens". */
 export const pogoSign = (tokens: number = BOSS_CRATE_PRICE.tokens): string => `BOINGO'S POGO: ${tokens} Boingo token${tokens === 1 ? "" : "s"}`;
 export const POGO_SIGN = pogoSign();
+/** The price sign: a gold board 2 squares wide on two posts, its face (`SIGN_FACE`, its pixels) where the room writes POGO_SIGN. */
+const SIGN = { w: 2 * T, h: 66 } as const;
+export const SIGN_FACE = { x: 6, y: 6, w: 2 * T - 12, h: 30 } as const;
 {
-  const c = cv(T, 60);
-  rect(c, 4, 6, 29, 22, "w");
-  rect(c, 5, 7, 27, 20, "y");
-  rect(c, 17, 28, 3, 30, "t");
-  def("price-sign", [1, 1], T, 60, [18, 58], [c], 1000, true);
+  const c = cv(SIGN.w, SIGN.h);
+  rect(c, SIGN_FACE.x - 3, SIGN_FACE.y - 3, SIGN_FACE.w + 6, SIGN_FACE.h + 6, "r");
+  rect(c, SIGN_FACE.x - 1, SIGN_FACE.y - 1, SIGN_FACE.w + 2, SIGN_FACE.h + 2, "y");
+  rect(c, SIGN_FACE.x, SIGN_FACE.y, SIGN_FACE.w, SIGN_FACE.h, "w");
+  // (Little bulbs round its red frame.)
+  for (let x = SIGN_FACE.x - 2; x < SIGN_FACE.x + SIGN_FACE.w + 3; x += 5) (put(c, x, SIGN_FACE.y - 2, "a"), put(c, x, SIGN_FACE.y + SIGN_FACE.h + 1, "a"));
+  rect(c, 14, SIGN_FACE.y + SIGN_FACE.h + 3, 3, SIGN.h - SIGN_FACE.h - 11, "t");
+  rect(c, SIGN.w - 17, SIGN_FACE.y + SIGN_FACE.h + 3, 3, SIGN.h - SIGN_FACE.h - 11, "t");
+  def("price-sign", [2, 1], SIGN.w, SIGN.h, [T, SIGN.h - 2], [c], 1000, true);
 }
+/** The sign's words, line by line, as the room writes them on its face: "BOINGO'S POGO" over "3 Boingo tokens". */
+export const SIGN_LINES = (): [string, string] => {
+  const [a, b] = pogoSign().split(": ");
+  return [a!, b!];
+};
 
 // ==== The play structure: three levels of nets and padded platforms, a spiral slide down from the top, a flag waving at the top.
 
@@ -492,40 +504,14 @@ function raceCv(f: number): Cv {
 /** The race's frames: two races (each a different winner) of RACE.frames. */
 export const SHOP_BOINGO_RACE = upright("squirt-race", 6, 1, SQ_H, Array.from({ length: RACE.frames * 2 }, (_, f) => raceCv(f)), RACE.ms);
 
-// ==== The claw machine: a glass cabinet with small crates inside, a claw, a coin slot.
+// ==== The claw machine: a solid cabinet, 2 x 2 squares, drawn by the room in 3D through its camera (shops/claw-cabinet.ts; Eric, Nov 6:
+// "the real claw machine in the room, a big 3D arcade cabinet you walk up to"). Its piece here only holds its place (and its pool of
+// light); its picture is a dot the room never draws.
 
-const CL_H = 120;
-function clawCv(f: number): Cv {
-  const c = cv(T + 10, CL_H);
-  rect(c, 2, 4, T + 6, CL_H - 6, "h");
-  rect(c, 2, 4, T + 6, 10, "y");
-  rect(c, 5, 16, T, 56, "l");
-  // the prizes: small crates in a heap
-  for (let k = 0; k < 7; k++) {
-    const x = 7 + (k % 4) * 8 + (k >= 4 ? 4 : 0);
-    const y = k >= 4 ? 56 : 64;
-    rect(c, x, y, 6, 6, (["r", "u", "g", "y", "p", "o", "i"] as const)[k]!);
-    put(c, x + 2, y, "w");
-  }
-  // the claw on its cable, swaying
-  const cx = 20 + Math.round(Math.sin((f / 8) * Math.PI * 2) * 8);
-  line(c, cx, 16, cx, 30, "S");
-  line(c, cx - 4, 34, cx, 30, "s");
-  line(c, cx + 4, 34, cx, 30, "s");
-  // the cabinet below: the coin slot, the joystick
-  rect(c, 2, 74, T + 6, CL_H - 76, "p");
-  rect(c, 30, 84, 6, 10, "k");
-  rect(c, 32, 86, 2, 6, "y");
-  line(c, 12, 80, 12, 86, "t");
-  ellipse(c, 12, 79, 2, 2, "r");
-  return c;
-}
-export const SHOP_BOINGO_CLAW = def("claw", [1, 1], T + 10, CL_H, [Math.floor((T + 10) / 2), CL_H - 2], Array.from({ length: 8 }, (_, f) => clawCv(f)), 150, true);
-/** The coin slot on the claw machine's picture (its pixels): a tap there calls openClawMachine(). */
-export const SHOP_BOINGO_COIN_SLOT = { x: 28, y: 82, w: 10, h: 14 } as const;
-/** The claw machine's square, and where you stand to play it (just south): walking there zooms the camera in, as the statue's. */
-export const SHOP_BOINGO_CLAW_AT = { col: 18, row: 6 } as const;
-export const SHOP_BOINGO_CLAW_SPOT = { c: 18, r: 7 } as const;
+export const SHOP_BOINGO_CLAW = def("claw", [2, 2], 2 * T, 4, [T, 2], [cv(1, 1).map((r) => r.map(() => "k"))], 1000, false);
+/** The claw machine's place (its west-most column, its south-most row) and where you stand to play it (in front of its coin slot). */
+export const SHOP_BOINGO_CLAW_AT = { col: 18, row: 6, w: 2, d: 2 } as const;
+export const SHOP_BOINGO_CLAW_SPOT = { c: 19, r: 7 } as const;
 
 // ==== The lights: the marquee bulbs, every game's glow, the spotlight on the pogo. Each lights at every place its piece stands.
 
@@ -534,14 +520,13 @@ export const SHOP_BOINGO_LIGHTS: readonly (LightSpot & { piece: string })[] = [
   { piece: "spin-game", x: 6, y: 18, w: SL_W - 12, h: 40, keys: "aAr", color: "#ffd04a", strength: 0.6, halo: 26 },
   ...[0, 1, 2].map((s) => ({ piece: `lane-${s}`, x: 4, y: 6, w: T - 8, h: 12, keys: "gF", color: "#7affc6", strength: 0.5, halo: 14 })),
   { piece: "squirt-race", x: SQ_W / 2 - 8, y: 4, w: 16, h: 8, keys: "aA", color: "#fff3b0", strength: 0.6, halo: 22 },
-  { piece: "claw", x: 5, y: 16, w: T, h: 56, keys: "l", color: "#ff8fe0", strength: 0.45, halo: 20 },
   { piece: "pogo", x: T - 4, y: 4, w: 8, h: 4, keys: "a", color: "#fff6c8", strength: 0.8, halo: 16 },
   { piece: "hem", x: 0, y: 8, w: T, h: 8, keys: "af", color: "#ff8fe0", strength: 0.35, halo: 8 },
 ];
 export const SHOP_BOINGO_POOLS: readonly (LightPool & { piece: string })[] = [
   { piece: "pogo", x: T, y: PG_H + 6, rx: 30, ry: 10, color: "#fff6c8", strength: 0.35 },
   { piece: "spin-game", x: T, y: SL_H + 8, rx: 34, ry: 10, color: "#ffd04a", strength: 0.25 },
-  { piece: "claw", x: 23, y: CL_H + 8, rx: 24, ry: 8, color: "#ff8fe0", strength: 0.25 },
+  { piece: "claw", x: T, y: 20, rx: 54, ry: 14, color: "#ff8fe0", strength: 0.3 },
   { piece: "squirt-race", x: SQ_W / 2, y: SQ_H + 8, rx: 90, ry: 10, color: "#62bdf5", strength: 0.2 },
 ];
 

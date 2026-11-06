@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_CRATES, BOSS_CRATE_PRICE, bossCrateOf, itemDef } from "@chessroyale/core";
-import { RACE, SHOP_BOINGO_CLAW_AT, SHOP_BOINGO_CLAW_SPOT, SHOP_BOINGO_LAYOUT, SHOP_BOINGO_LIGHTS, SHOP_BOINGO_MARKS, SHOP_BOINGO_N, SHOP_BOINGO_PIECES, SHOP_BOINGO_POOLS, POGO_SIGN, pogoSign, raceAt, MAT } from "../src/town/shops/boingo-art.ts";
+import { RACE, SHOP_BOINGO_CLAW_AT, SHOP_BOINGO_CLAW_SPOT, SHOP_BOINGO_LAYOUT, SHOP_BOINGO_LIGHTS, SHOP_BOINGO_MARKS, SHOP_BOINGO_N, SHOP_BOINGO_PIECES, SHOP_BOINGO_POOLS, SIGN_LINES, POGO_SIGN, pogoSign, raceAt, MAT } from "../src/town/shops/boingo-art.ts";
 import { findPath, lightsAt, makeRoom, walkable } from "../src/town/shops/room.ts";
+import { cabinetOf, slotOf } from "../src/town/shops/claw-cabinet.ts";
 import { prizeRows, shopOf } from "../src/town/shops/shops.ts";
 import { introOf } from "../src/town/shops/challenge.ts";
 
@@ -29,16 +30,28 @@ describe("Boingo's Funhouse: the room", () => {
   });
 
   it("the counter and the keeper: the attendant behind the glass counter, 'Shopkeeper', talked to from in front", () => {
-    expect(def).toMatchObject({ home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", roof: "tent", chatTone: "night" });
+    expect(def).toMatchObject({ home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", roof: "arcade", chatTone: "night" });
     expect(room.counter.map((s) => s.c)).toEqual([9, 10, 11, 12]);
     for (const k of def.keeper) expect(k.r).toBeLessThan(room.counter[0]!.r);
     expect(def.keeper.every((k) => k.c >= 9 && k.c <= 12)).toBe(true);
   });
 
-  it("the claw machine: solid, its play spot in front of it open and reachable", () => {
-    expect(walkable(room, SHOP_BOINGO_CLAW_AT.col, SHOP_BOINGO_CLAW_AT.row)).toBe(false);
-    expect(SHOP_BOINGO_CLAW_SPOT).toEqual({ c: SHOP_BOINGO_CLAW_AT.col, r: SHOP_BOINGO_CLAW_AT.row + 1 });
+  it("the claw machine: a solid cabinet of 2 x 2 squares, its play spot in front of its coin slot, open and reachable", () => {
+    const { col, row, w, d } = SHOP_BOINGO_CLAW_AT;
+    for (let r = row - d + 1; r <= row; r++) for (let c = col; c < col + w; c++) expect(walkable(room, c, r), `${c},${r}`).toBe(false);
+    expect(SHOP_BOINGO_CLAW_SPOT.r).toBe(row + 1);
+    expect(SHOP_BOINGO_CLAW_SPOT.c >= col && SHOP_BOINGO_CLAW_SPOT.c < col + w).toBe(true);
+    expect(walkable(room, SHOP_BOINGO_CLAW_SPOT.c, SHOP_BOINGO_CLAW_SPOT.r)).toBe(true);
     expect(findPath(room, room.start, SHOP_BOINGO_CLAW_SPOT)).not.toBeNull();
+    // The coin slot is on the front's half before the spot.
+    const cab = cabinetOf(col, row, w, d);
+    const slot = slotOf(cab);
+    expect(Math.abs(slot.x - SHOP_BOINGO_CLAW_SPOT.c)).toBeLessThan(0.5);
+    expect(cab.z1).toBeLessThan(SHOP_BOINGO_CLAW_SPOT.r);
+  });
+
+  it("the price sign's words: the crate's price, on two lines", () => {
+    expect(SIGN_LINES()).toEqual(["BOINGO'S POGO", `${BOSS_CRATE_PRICE.tokens} Boingo tokens`]);
   });
 
   it("the squirt race: five knights, one wins each race (a different lane next time), and the loop starts again", () => {
@@ -54,7 +67,7 @@ describe("Boingo's Funhouse: the room", () => {
 
   it("lights at every placement: every wall's bulbs, every lane's lights, the games, the pogo's spotlight", () => {
     const lit = lightsAt(SHOP_BOINGO_LIGHTS, SHOP_BOINGO_LAYOUT);
-    for (const p of SHOP_BOINGO_LAYOUT.filter((p) => /^(wall|lane|spin|claw|squirt|pogo)/.test(p.name))) expect(lit.some((x) => x.at === p), `${p.name} at ${p.col},${p.row}`).toBe(true);
+    for (const p of SHOP_BOINGO_LAYOUT.filter((p) => /^(wall|lane|spin|squirt|pogo)/.test(p.name))) expect(lit.some((x) => x.at === p), `${p.name} at ${p.col},${p.row}`).toBe(true);
     for (const l of [...SHOP_BOINGO_LIGHTS, ...SHOP_BOINGO_POOLS]) expect(SHOP_BOINGO_LAYOUT.some((p) => p.name === l.piece), l.piece).toBe(true);
   });
 });

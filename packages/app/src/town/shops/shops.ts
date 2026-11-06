@@ -46,10 +46,11 @@ export interface ShopDef {
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
    * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
    * stalactites, a barn's dark rafters and cross beams, a warehouse's dark steel trusses, an igloo's dome of ice blocks arching overhead, or a
-   * sanctuary's pale folded paper, its pleats running up to a fold overhead (drawn by
+   * sanctuary's pale folded paper, its pleats running up to a fold overhead, or an arcade's night-purple ceiling hung with strings
+   * of bulbs (drawn by
    * the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "arcade";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -99,7 +100,7 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Boingo's Funhouse (Nov 6): the clown attendant behind the middle of the glass prize counter (columns 9-12 of row 3, its
   // squares 10 and 11 of row 2), the pogo on its pedestal beside him. He has no name: "Shopkeeper". A dark arcade full of lights:
   // the night tone. His pogo first in his crate (his ride). The room is 24 x 24 (boingo-art.ts SHOP_BOINGO_N).
-  clown: { home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", at: [10.5, 2.2], keeper: [{ c: 10, r: 2 }, { c: 11, r: 2 }], prizes: ["boingo-pogo"], roof: "tent", chatTone: "night" },
+  clown: { home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", at: [10.5, 2.2], keeper: [{ c: 10, r: 2 }, { c: 11, r: 2 }], prizes: ["boingo-pogo"], roof: "arcade", chatTone: "night" },
   grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
 };
 

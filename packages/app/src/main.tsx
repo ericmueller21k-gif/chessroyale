@@ -16,7 +16,6 @@ import { setBannerPlusSource } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import { account, onAccountChange } from "./account.ts";
 import { loadRide } from "./components/rides/load.ts";
-import { openClawFromAddress } from "./claw/index.ts";
 import "./styles.css";
 // (A computer's board as big as the window's height: after styles.css, whose computer sizes it takes over.)
 import "./board-size.css";
@@ -70,13 +69,3 @@ requestAnimationFrame(() =>
   }),
 );
 
-// The claw machine's test switch `?claw=1` (claw/index.ts): opens it once your account has loaded (the switches need it).
-{
-  const clawAsked = () => {
-    if (!account().profile) return;
-    off();
-    openClawFromAddress();
-  };
-  const off = onAccountChange(clawAsked);
-  clawAsked();
-}
