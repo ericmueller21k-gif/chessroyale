@@ -49,7 +49,7 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
-import { LookAround, Turn, lockIn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { LookAround, Turn, freshView, lockIn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
 import { FingerRun } from "./run.ts";
 import { mapFrame } from "./minimap.ts";
 import { TownMap, type MapFace } from "./TownMap.tsx";
@@ -1791,10 +1791,8 @@ function startTown(
       // (Out of a building: the view is north again, Eric: "It'll always default back to the normal [view] if you go into a building and
       // come out". Under the black, so nothing is seen to turn.)
       if (STREET_TOWN) {
-        base = 0;
-        look.reset();
         const h = town.you.walker.here();
-        turn.set(baseHeading(h.c, h.r, base));
+        base = freshView(turn, look, baseHeading(h.c, h.r, 0));
         heading = turn.to;
       }
       run();

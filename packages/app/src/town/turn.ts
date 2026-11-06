@@ -194,3 +194,14 @@ export function lockIn(turn: Turn, look: LookAround, now: number): number | null
   turn.aim(nearestTurn(base, h), now);
   return base;
 }
+
+/**
+ * The view as the town opens and as you come out of a building (Nov 5, brief-street-controls-map.md; Eric: "It'll always default back to
+ * the normal [view] if you go into a building and come out"): the look round and any snap gone, the camera placed (no easing) at the
+ * normal heading `normal` with the base heading north (`baseHeading(c, r, 0)`: north, or your square's strip's). Answers the base: 0.
+ */
+export function freshView(turn: Turn, look: LookAround, normal: number): 0 {
+  look.reset();
+  turn.set(normal);
+  return 0;
+}
