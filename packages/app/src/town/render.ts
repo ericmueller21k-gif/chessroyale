@@ -50,7 +50,8 @@ import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
-import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
+import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
+import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -234,8 +235,17 @@ export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanv
   return c;
 }
 
+/** Each frame's canvas, by the cache and frame it came from: so a wall in shade finds its own frame one ramp step darker. */
+const frameOf = new WeakMap<HTMLCanvasElement, { fc: FrameCache; i: number }>();
+/** A frame's canvas one step darker along its palette's ramps (kit/bake.ts): a wall turned from the light, every pixel a palette color. */
+function darkFrame(img: HTMLCanvasElement): HTMLCanvasElement {
+  const f = frameOf.get(img);
+  return f ? f.fc.dark(f.i) : img;
+}
+
 /** A character's frames as canvases, drawn the first time each shows (a frame at a time, never all at once). */
 class FrameCache {
+  private darker: FrameCache | null = null;
   readonly frames: (HTMLCanvasElement | null)[];
   /** When each frame ends, from the loop's start; and the loop's length. */
   readonly ends: number[];
@@ -263,7 +273,12 @@ class FrameCache {
     c.height = h;
     c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     this.frames[i] = c;
+    frameOf.set(c, { fc: this, i });
     return c;
+  }
+  /** Frame `i` one ramp step darker. */
+  dark(i: number): HTMLCanvasElement {
+    return (this.darker ??= new FrameCache(stepChar(this.ch, -1))).get(i);
   }
 }
 
@@ -1887,9 +1902,8 @@ export class Renderer {
   private drawWall(w: WallPlan, img: HTMLCanvasElement, ch: Character, alpha: number, glow: Glow | null, tall: boolean, now: number, phase: number): void {
     const n = w.strips;
     const pw = ch.w;
-    // (Its shade: the picture darkened once a shade, the art's two exactly and every twentieth between them while the camera turns.)
-    const shade = restShade(w.shade) || Math.round(w.shade * 20) / 20;
-    const pic = shade > 0.004 ? shadedImg(img, shade) : img;
+    // (Its light: the picture as it is, or its frame one ramp step darker, a side turned from the light: kit/bake.ts.)
+    const pic = w.step < 0 ? darkFrame(img) : img;
     const bb = this.bb;
     bb[0] = bb[1] = Infinity;
     bb[2] = bb[3] = -Infinity;

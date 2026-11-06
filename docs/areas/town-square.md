@@ -926,7 +926,9 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   heading (`setHeading`, `toCam`, `rel`; `forEachSquare` lays the ground from a turned grid). Taps, the arrow keys (`screenStep`: up is
   up the screen) and the drag go through it; the clouds slide, the sun stays; the far Colosseum shows within 45 degrees of north. Seam
   Avenue's fronts face west. A home's floating name sits over its own roof, dropping toward its eave off the buildings behind. Both
-  WebGL draws it (Nov 6: no 2D fallback, so its walls take fine strips and its domes every face). Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
+  WebGL draws it (Nov 6: no 2D fallback, so its walls take fine strips and its domes every face). Nov 6: the box path goes through the 3D art kit (`town/kit/`: prims, bake, draw; models as data): roofs and walls lit as palette
+  ramp steps with a 1-texel ink edge, every pixel a palette color ([2026-11-06-3d-kit.md](../decisions/2026-11-06-3d-kit.md);
+  `packages/app/test/town-kit.test.ts`). Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
   `heading`, `figures`, `boxes`; `__townHeading(deg | null)` holds the heading (the turn's stills). Tests: `packages/app/test/town-boxes.test.ts`,
   `e2e/town-street.spec.ts` ("the boxes and the turn"; a lost context). Decision:
   [2026-11-05-street-town-boxes.md](../decisions/2026-11-05-street-town-boxes.md). Stills: `docs/street-town-boxes/`.
