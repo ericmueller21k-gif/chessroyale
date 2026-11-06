@@ -2949,6 +2949,16 @@ export const RIDES = {
 };
 
 /**
+ * The Welcome Crate (Eric, Nov 6: "you get it for completing 5 games in any mode or any boss … Limit one per account";
+ * docs/decisions/2026-11-06-welcome-crate.md): a signed-in account earns one, once ever, when it has finished `games` games (a
+ * result reached: win, loss or draw; never one abandoned, aborted or never started). The server counts and grants it
+ * (server/welcome.ts); the prize is welcome.ts in core.
+ */
+export const WELCOME_GIFT = {
+  games: 5,
+} as const;
+
+/**
  * A boss's crate, sold by the Shopkeeper inside the boss's home (Eric, Nov 2: "3 Babur tokens, or 1 Babur token + 1 crate key"):
  * its two prices, in that boss's tokens and crate keys. Bought on the server (server/boss-tokens.ts, `buyBossCrate`: one
  * transaction); what each crate holds is BOSS_CRATES in crates.ts.

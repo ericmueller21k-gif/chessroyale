@@ -31,6 +31,7 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
+import { WELCOME_SCHEMA, grantWelcomeCrate, welcomeMoves } from "./welcome.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -145,6 +146,8 @@ const SCHEMA = [
   ...LOCKER_SCHEMA,
   // Boss tokens, the drops that gave them and an open solo boss battle (boss-tokens.ts).
   ...BOSS_TOKENS_SCHEMA,
+  // The Welcome Crate (Nov 6): one row per account that earned it (welcome.ts).
+  ...WELCOME_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.
@@ -221,6 +224,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Whether the player had the eval bar on (Oct 10, 2026: Settings can switch it off): 1 on, 0 off, NULL unknown (older
   // results, older apps). To see later who turns it off and how they do.
   { table: "results", column: "eval_bar", type: "INTEGER" },
+  // A result recorded because its player abandoned the match (Nov 6: gone too long, idle or removed mid-match): 1; NULL otherwise
+  // (and for every result from before). The Welcome Crate's count of finished games leaves these out (welcome.ts).
+  { table: "results", column: "abandoned", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
   // A report of a line in the town square's chat (Oct 28, 2026): the line's text and when it was said, from the server's
@@ -526,6 +532,7 @@ export async function signInWithIdentity(
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
         ...tokenMoves(current.id, owner.id),
+        ...welcomeMoves(current.id),
         ...rankedMoves(current.id, owner.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
@@ -651,6 +658,8 @@ export interface MatchResult {
   held?: boolean;
   /** The player had the eval bar on (Settings), as far as their app said. */
   evalBar?: boolean | null;
+  /** Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). */
+  abandoned?: boolean;
 }
 
 /** A count from a result (0-500), or null. */
@@ -668,8 +677,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const ranked = r.online && r.ranked === true;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -694,6 +703,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
     flag(r.evalBar),
+    // (Only an online match's room says a player abandoned it.)
+    r.online && r.abandoned === true ? 1 : null,
     // (An account deleted mid-match gets nothing new.)
     userId,
   );
@@ -744,6 +755,9 @@ export interface Profile {
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
 export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS): Promise<Profile> {
   const admin = admins(user);
+  // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
+  // once ever (welcome.ts). Never in the way of the profile.
+  await grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
   const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
     "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
     user.id,

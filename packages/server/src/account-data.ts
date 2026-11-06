@@ -53,9 +53,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -76,7 +76,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
       stmt(
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
-           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL
+           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
@@ -117,6 +117,16 @@ export const ACCOUNT_STORES: AccountStore[] = [
       bossCrates: await all(sql, "SELECT crate, bought_at FROM boss_crates WHERE user_id = ? ORDER BY bought_at", u.id),
     }),
     erase: (u) => ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
+  },
+  {
+    // The Welcome Crate (welcome.ts, Nov 6): when the player earned it and the finished games counted then, when they closed its
+    // notice, and when they opened it and the ride it gave (that ride is in their locker's items).
+    name: "welcomeCrate",
+    tables: ["welcome_crates"],
+    export: async (sql, u) => ({
+      welcomeCrate: await sql.first("SELECT granted_at, games, seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ?", u.id),
+    }),
+    erase: (u) => [stmt("DELETE FROM welcome_crates WHERE user_id = ?", u.id)],
   },
   {
     // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those
