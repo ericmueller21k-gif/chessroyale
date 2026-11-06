@@ -1206,3 +1206,69 @@ test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's 
   expect(locker.tokens).toEqual({ [boss!]: 1 });
   expect(errors).toEqual([]);
 });
+
+test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide, the squirt race, the spinning light game, the roll-ball lanes); the clown attendant keeps the prize counter, Boingo's Boss Crate with Boingo's Pogo", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Boingo is live for everyone, so his Funhouse is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
+  await expect.poll(() => homeAt(page, "clown"), { message: "Boingo's Funhouse comes into view" }).not.toBeNull();
+  await goIn(page, "clown", "Boingo's Funhouse");
+  await expect(room(page)).toHaveAttribute("data-room", "clown");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Boingo's Funhouse");
+  // A dark arcade full of lights: the chat's words light. It starts at the further-out camera, as every home.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
+  await expect.poll(async () => (await shopCam(page))?.zoom, { message: "zoomed out" }).toBe(1);
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  const walkTo = async (sq: readonly [number, number]) => {
+    await viewOnYou(page);
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  await still("door");
+  await walkTo([11, 16]);
+  await walkTo([6, 10]);
+  await still("play-structure");
+  await walkTo([10, 7]);
+  await walkTo([18, 4]);
+  await still("squirt-race");
+  await walkTo([18, 12]);
+  await still("spin-game");
+  await walkTo([8, 15]);
+  await walkTo([4, 17]);
+  await still("roll-ball");
+  await walkTo([8, 10]);
+  // The clown attendant behind the counter: a tap on him walks you up to the counter; his card says "Shopkeeper", no name.
+  await viewOnYou(page);
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the Shopkeeper is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading")).toHaveText(["Shopkeeper"]);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Boingo's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Boingo tokens, or 1 Boingo token + 1 crate key");
+  // (His ride first among the prizes.)
+  await expect(crate.locator(".shop-prize-name").first()).toHaveText("Boingo's Pogo");
+  await expect(crate).toContainText("You have 0 Boingo tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Boingo tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
