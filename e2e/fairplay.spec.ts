@@ -82,7 +82,7 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
   await expect(notice).toHaveCount(0);
 });
 
-test("the reviewer's API lists a reported player's case with its evidence", async ({ page, browser }) => {
+test("the reviewer's API lists a reported player's case with its evidence", { tag: "@phone-only" }, async ({ page, browser }) => {
   test.skip(test.info().project.name !== "desktop", "one run covers it");
   await named(page, "Reporter");
   await page.goto("/?debug");

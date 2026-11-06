@@ -64,7 +64,7 @@ async function noSideScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 }
 
-test("the Mode vote: Mercenary chosen (Coming soon can't be), and every squad's coins in the standings", async ({ page }) => {
+test("the Mode vote: Mercenary chosen (Coming soon can't be), and every squad's coins in the standings", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   await named(page, "Eric");
   await page.goto("/squads/test?nolanding&debug&clock=90,0,3,0");
@@ -97,7 +97,7 @@ test("the Mode vote: Mercenary chosen (Coming soon can't be), and every squad's 
   }
 });
 
-test("earning coins: your capture pays your squad's wallet (a knight's worth), shown for both squads", async ({ page }) => {
+test("earning coins: your capture pays your squad's wallet (a knight's worth), shown for both squads", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await named(page, "Tess");
   const q = new URLSearchParams({ nolanding: "", debug: "", clock: "120,0,3,0", fen: BG5, bots: "strong", seat: "white", mode: "mercenary" });
@@ -149,7 +149,7 @@ test("earning coins: your capture pays your squad's wallet (a knight's worth), s
   await noSideScroll(page);
 });
 
-test("the shop between rounds, a Stockfish token, a Time chip and a shield: bought with the squad's wallet, used in the next match", async ({ page }) => {
+test("the shop between rounds, a Stockfish token, a Time chip and a shield: bought with the squad's wallet, used in the next match", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(300_000);
   await named(page, "Tess");
   // Straight at Pairs: every squad still in has a test wallet, and the shop is open until the match starts.

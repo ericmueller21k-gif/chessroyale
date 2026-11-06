@@ -25,7 +25,7 @@ async function bossAlone(page: Page) {
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
 }
 
-test("a thrown error and a rejected promise reach the store, with the screen, the version and the device", async ({ page }) => {
+test("a thrown error and a rejected promise reach the store, with the screen, the version and the device", { tag: "@phone-only" }, async ({ page }) => {
   const tag = `${run}-${project()}`;
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
@@ -64,7 +64,7 @@ test("a thrown error and a rejected promise reach the store, with the screen, th
   expect(again).toEqual([]);
 });
 
-test("a render error shows Something went wrong with Reload (not a blank page), and is reported", async ({ page }) => {
+test("a render error shows Something went wrong with Reload (not a blank page), and is reported", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const tag = `${run}-${project()}`;
   const pageErrors: string[] = [];
@@ -94,7 +94,7 @@ test("a render error shows Something went wrong with Reload (not a blank page), 
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 
-test("the feedback sheet: Report a bug from the match menu gives a short id that /admin/ops finds with its diagnostics; Feedback from Settings is the note alone, listed by kind", async ({ page }) => {
+test("the feedback sheet: Report a bug from the match menu gives a short id that /admin/ops finds with its diagnostics; Feedback from Settings is the note alone, listed by kind", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const tag = `${run}-${project()}`;
   await bossAlone(page);
@@ -171,7 +171,7 @@ test("POST /api/problems: only JSON from this site, 413 past its size cap, 429 p
   expect(await ops.text()).toBe("Not found");
 });
 
-test("the health view: JSON for an admin (deployed version, live numbers, errors, budgets, D1), on /admin/ops too; Not found for a player", async ({ page }) => {
+test("the health view: JSON for an admin (deployed version, live numbers, errors, budgets, D1), on /admin/ops too; Not found for a player", { tag: "@phone-only" }, async ({ page }) => {
   test.skip(project() !== "desktop", "one run is enough");
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();

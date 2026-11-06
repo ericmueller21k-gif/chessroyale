@@ -20,7 +20,7 @@ async function person(browser: Browser, name: string, phone: boolean) {
   return { ctx, page };
 }
 
-test("the stage with a party: invite by link, READY and its check, the leader's crown and START once everyone is ready, the member menu; nothing moves; START takes everyone in", async ({ browser }, info) => {
+test("the stage with a party: invite by link, READY and its check, the leader's crown and START once everyone is ready, the member menu; nothing moves; START takes everyone in", { tag: "@phone-only" }, async ({ browser }, info) => {
   test.setTimeout(4 * 60_000);
   const phone = info.project.name === "phone";
   const eric = await person(browser, "Eric", phone);
@@ -112,7 +112,7 @@ async function intoBattle(browser: Browser, phone: boolean) {
   return { eric, maya, e, m };
 }
 
-test("in the battle: picks live in each one's color and changeable, \"Your pick is in.\", the team's pawns with a check or \"…\", the leader's Kick grey for a minute then live; the one kicked goes home told so", async ({ browser }, info) => {
+test("in the battle: picks live in each one's color and changeable, \"Your pick is in.\", the team's pawns with a check or \"…\", the leader's Kick grey for a minute then live; the one kicked goes home told so", { tag: "@phone-only" }, async ({ browser }, info) => {
   test.setTimeout(5 * 60_000);
   const phone = info.project.name === "phone";
   const { eric, maya, e, m } = await intoBattle(browser, phone);

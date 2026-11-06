@@ -1,5 +1,7 @@
 # Runs on every pull request (and on main): the typecheck and the unit tests. A red check means don't merge.
 # The e2e suite (Playwright on emulated phones and computers) runs in its own workflow: e2e.yml.
+# Three jobs side by side (Nov 6): `unit` (the typecheck and every test outside packages/chess/test), `chess` (packages/chess's
+# tests: the boss simulations, 61% of the test time) and `check`, green when both are: the one to read, as before.
 name: check
 on:
   pull_request:
@@ -12,7 +14,7 @@ concurrency:
   group: ${{ github.event_name == 'push' && 'check-main' || format('check-{0}', github.event.pull_request.number || github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  check:
+  unit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -40,4 +42,30 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm test
+      - name: Unit tests (all but packages/chess, which `chess` runs)
+        run: npx vitest run --exclude "packages/chess/test/**"
+
+  chess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: packages/chess's tests
+        run: npx vitest run packages/chess/test
+
+  # (The name every reader and rule knows: green only when both jobs are.)
+  check:
+    if: ${{ !cancelled() }}
+    needs: [unit, chess]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: The typecheck and every unit test green
+        if: ${{ needs.unit.result != 'success' || needs.chess.result != 'success' }}
+        run: exit 1
+      - run: echo "unit and chess passed"

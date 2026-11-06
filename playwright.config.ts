@@ -1,4 +1,4 @@
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig, devices } from "@playwright/test";
@@ -10,12 +10,18 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const PORT = Number(process.env.E2E_PORT || 8788);
 /**
- * Where that server keeps its D1 and Durable Objects: a fresh temp folder each run, as the schema is made at run time
+ * Where that server keeps its D1 and Durable Objects: a fresh temp folder each run (removed when it ends), as the schema is made at run time
  * and an old `.wrangler` keeps old rows and columns. E2E_KEEP_STATE=1 keeps `.wrangler/state` across runs instead; with
  * E2E_REUSE, set E2E_STATE_DIR to the reused server's folder for the specs that read D1. Set here once, in the main
  * process, so its workers (which load this file again) inherit the same folder (e2e/helpers.ts, `E2E_STATE`).
  */
-process.env.E2E_STATE_DIR ||= process.env.E2E_KEEP_STATE === "1" ? ".wrangler/state" : mkdtempSync(join(tmpdir(), "hunchess-e2e-"));
+if (!process.env.E2E_STATE_DIR && process.env.E2E_KEEP_STATE !== "1") {
+  const dir = mkdtempSync(join(tmpdir(), "hunchess-e2e-"));
+  process.env.E2E_STATE_DIR = dir;
+  // (Removed when the run ends, the server stopped: about 6 MB a run, and the disk is shared. Only the process that made it.)
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
+}
+process.env.E2E_STATE_DIR ||= ".wrangler/state";
 
 /** The local Worker's admins (asServerAdmin, e2e/helpers.ts): one address per lane, spec file and project, as files run side by side. */
 const ADMINS = [["ops", "problems"], ["ops", "profile"], ["chat", "chat-mod"], ["chat", "town-chat"], ["chat", "town-chat-history"], ["ops", "shop"], ["ops", "claw"]]
@@ -38,6 +44,8 @@ export default defineConfig({
   },
   projects: [
     { name: "phone", use: { ...devices["iPhone 13"], browserName: "chromium" } },
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
+    // `@phone-only` (Nov 6): a test whose subject is game logic, the server or a flow (powers, whole matches, chat,
+    // lobbies) runs on the phone alone; layout, the board, home and every guard test of docs/rules/eric.md run on both.
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } }, grepInvert: /@phone-only/ },
   ],
 });

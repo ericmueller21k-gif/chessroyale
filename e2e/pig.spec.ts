@@ -271,7 +271,7 @@ test("Wrangler's long pull as his first move, then a lasso drag (?power=drag)", 
   expect(errors).toEqual([]);
 });
 
-test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, only the duels can be played, and his reply is the engine's best", async ({ page }) => {
+test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle, DRAW!, only the duels can be played, and his reply is the engine's best", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(7 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -332,7 +332,7 @@ test("Wrangler's SHOWDOWN! (?power=showdown): the line-up yanked into the middle
   expect(errors).toEqual([]);
 });
 
-test("Wrangler online: the host's engine lines up the showdown, the server checks it, the duel is forced, and his reply is the engine's best", async ({ page }) => {
+test("Wrangler online: the host's engine lines up the showdown, the server checks it, the duel is forced, and his reply is the engine's best", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const errors: string[] = [];

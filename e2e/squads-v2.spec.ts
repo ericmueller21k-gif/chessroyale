@@ -82,7 +82,7 @@ async function testLobby(page: Page, start: "relay" | "pairs" | "final", mode: "
   await page.getByRole("button", { name: "Skip votes" }).click();
 }
 
-test("a same-move token: you and your partner take back with the queen, it plays without a coin, and the judge gives the token back", async ({ page }) => {
+test("a same-move token: you and your partner take back with the queen, it plays without a coin, and the judge gives the token back", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "pairs");
   const s = await nextDuty(page, null);
@@ -111,7 +111,7 @@ test("a same-move token: you and your partner take back with the queen, it plays
   await expect(page.locator(".sq-tokens li.ours").first()).toContainText(/Qxd4: refunded, every other move lost at least \d+\.\d pawns/, { timeout: 30_000 });
 });
 
-test("a block: tap Block, their queen, where it would go; the arrow keeps drawing itself with its lock until they've moved, and they don't play it", async ({ page }) => {
+test("a block: tap Block, their queen, where it would go; the arrow keeps drawing itself with its lock until they've moved, and they don't play it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   // (You stay on your board after your move, to watch the block through their half: Jump to my next board off.)
   await page.addInitScript(() => localStorage.setItem("brc.squads.jumpNext", "0"));
@@ -163,7 +163,7 @@ test("a block: tap Block, their queen, where it would go; the arrow keeps drawin
   await expect(arrow).toHaveCount(0);
 });
 
-test("Cheat lines while blocking: the other squad's best moves (after yours, or as things stand)", async ({ page }) => {
+test("Cheat lines while blocking: the other squad's best moves (after yours, or as things stand)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "relay", "mercenary");
   const s = await nextDuty(page, null);

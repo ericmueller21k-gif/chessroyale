@@ -100,7 +100,7 @@ async function fits(page: Page) {
   expect(cut).toEqual([]);
 }
 
-test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens and block points show, lock in a different pick, then the coin-flip reveal; Next round moves on", async ({ page }) => {
+test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens and block points show, lock in a different pick, then the coin-flip reveal; Next round moves on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "pairs");
   // Every squad's clock is on screen (the strip on a phone, the side panel on a computer). The side panel has your own squad
@@ -147,7 +147,7 @@ test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens 
   await fits(page);
 });
 
-test("the final (a test lobby): the whole squad votes, teammates' picks named on the board, copy one, lock in, the most picked plays", async ({ page }) => {
+test("the final (a test lobby): the whole squad votes, teammates' picks named on the board, copy one, lock in, the most picked plays", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(300_000);
   await testLobby(page, "final");
   const reveal = await watchFor(page, {
@@ -188,7 +188,7 @@ test("the final (a test lobby): the whole squad votes, teammates' picks named on
   await expect(page.getByRole("button", { name: /Play again|Back to your party/ })).toBeVisible();
 });
 
-test("Relay (a test lobby): your move on your board shows at once, then the tiny boards open; watch one, back to your board", async ({ page }) => {
+test("Relay (a test lobby): your move on your board shows at once, then the tiny boards open; watch one, back to your board", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await testLobby(page, "relay");
   const s = await nextDuty(page, null);
@@ -224,7 +224,7 @@ test("Relay (a test lobby): your move on your board shows at once, then the tiny
   await expect.poll(() => page.evaluate(() => (window as any).squads.botAnswers), { timeout: 30_000 }).toBeGreaterThan(0);
 });
 
-test("the party: one makes it, a friend joins by link, the leader presses PLAY, both sit in one squad", async ({ page, browser }) => {
+test("the party: one makes it, a friend joins by link, the leader presses PLAY, both sit in one squad", { tag: "@phone-only" }, async ({ page, browser }) => {
   test.setTimeout(180_000);
   const pool = `sqp-${run}-${test.info().project.name}`;
   await named(page, "Ann");
@@ -259,7 +259,7 @@ test("the party: one makes it, a friend joins by link, the leader presses PLAY, 
   await fits(page);
 });
 
-test("sounds: ticks in the last free seconds, a sting at sudden death, quieter than a move, and silent when muted", async ({ page }) => {
+test("sounds: ticks in the last free seconds, a sting at sudden death, quieter than a move, and silent when muted", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   // A tiny team clock (3 s bank, 3 free seconds): sudden death within a turn or two.
   await testLobby(page, "pairs", "3,0,3,0");

@@ -195,7 +195,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
 });
 
-test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): no row in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", async ({ page }) => {
+test("shelved (Eric, Oct 19; home's card came on Oct 24, home-ranked.spec.ts): no row in a player's Settings; an admin opens it from Settings' Testing; its back button goes home", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
@@ -280,7 +280,7 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   expect(errors).toEqual([]);
 });
 
-test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four offers (the same for the same seed), and is refused without the gold", async ({ page }) => {
+test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four offers (the same for the same seed), and is refused without the gold", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -325,7 +325,7 @@ test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four 
   expect(errors).toEqual([]);
 });
 
-test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button shows it, each one charged at that price, and is back to 2 in the next round", async ({ page }) => {
+test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button shows it, each one charged at that price, and is back to 2 in the next round", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   // (Gold enough for the whole climb: 2 + 3 + 4 + 5 + 5 + 5 + 5 = 29.)
@@ -355,7 +355,7 @@ test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button s
   expect(errors).toEqual([]);
 });
 
-test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys, no two offers share a square, none is on your king or a piece of yours (but a star-up, v8, which is on the piece it merges into), and each other square shows one silhouette", async ({ page }) => {
+test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys, no two offers share a square, none is on your king or a piece of yours (but a star-up, v8, which is on the piece it merges into), and each other square shows one silhouette", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   const check = async (where: string) => {
@@ -396,7 +396,7 @@ test("one offer to a square (Eric, Oct 21): over several seeds, rerolls and buys
   expect(errors).toEqual([]);
 });
 
-test("buying: tap an offer's silhouette or its shop card, and it lands on its square; a new offer rolls into the slot, on a square no piece or other offer is on", async ({ page }) => {
+test("buying: tap an offer's silhouette or its shop card, and it lands on its square; a new offer rolls into the slot, on a square no piece or other offer is on", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -447,7 +447,7 @@ test("buying: tap an offer's silhouette or its shop card, and it lands on its sq
   expect(errors).toEqual([]);
 });
 
-test("buying: a greyed offer says why (gold, the one-queen limit), in a few words when it is tapped; selling by tap and by drag; the lock", async ({ page }) => {
+test("buying: a greyed offer says why (gold, the one-queen limit), in a few words when it is tapped; selling by tap and by drag; the lock", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(TWOQ);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -614,7 +614,7 @@ test("while you drag an offer, your whole bench row lights up (gold ring), and o
   expect(errors).toEqual([]);
 });
 
-test("the bench holds 4: a fifth is refused with the reason; the shop's offers stay holdable when the board has no room", async ({ page }) => {
+test("the bench holds 4: a fifth is refused with the reason; the shop's offers stay holdable when the board has no room", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&gold=30&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -640,7 +640,7 @@ test("the bench holds 4: a fifth is refused with the reason; the shop's offers s
   expect(errors).toEqual([]);
 });
 
-test("levels: you start at level 4 (4 pieces on the board), the 5th is refused with the reason, Buy XP (4 XP for 4 gold) makes room, and the number pops", async ({ page }) => {
+test("levels: you start at level 4 (4 pieces on the board), the 5th is refused with the reason, Buy XP (4 XP for 4 gold) makes room, and the number pops", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&gold=100&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1075,7 +1075,7 @@ test("a sale floats its gold up from the square the piece stood on (+7 for a que
   expect(errors).toEqual([]);
 });
 
-test("mute is respected: with sound off every one of these sounds is asked for muted", async ({ page }) => {
+test("mute is respected: with sound off every one of these sounds is asked for muted", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
   // (Lock-in is off since v7; `?lockin=1` turns it back on, for its sound.)
@@ -1095,7 +1095,7 @@ test("mute is respected: with sound off every one of these sounds is asked for m
   expect(errors).toEqual([]);
 });
 
-test("lock-in is off (v7): no button, no bonus for anyone (the bot never locks), and the buy step runs its whole 30 s, only the last 3 locked", async ({ page }) => {
+test("lock-in is off (v7): no button, no bonus for anyone (the bot never locks), and the buy step runs its whole 30 s, only the last 3 locked", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   // (Seed 5: with lock-in on, the bot would lock in at about 21 s of the 30's open 26. The real step, not the quick one.)
@@ -1131,7 +1131,7 @@ test("lock-in is off (v7): no button, no bonus for anyone (the bot never locks),
   expect(errors).toEqual([]);
 });
 
-test("lock in (behind `?lockin=1`): the first side to lock gets 3 gold at once, and your board, bench and shop freeze", async ({ page }) => {
+test("lock in (behind `?lockin=1`): the first side to lock gets 3 gold at once, and your board, bench and shop freeze", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(`${NEVER}&lockin=1`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1173,7 +1173,7 @@ test("lock in (behind `?lockin=1`): the first side to lock gets 3 gold at once, 
   expect(errors).toEqual([]);
 });
 
-test("lock in (behind `?lockin=1`): when the opponent locks first you see it, get no bonus, and both locked ends the step at once", async ({ page }) => {
+test("lock in (behind `?lockin=1`): when the opponent locks first you see it, get no bonus, and both locked ends the step at once", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto(`${EARLY}&lockin=1`);
@@ -1198,7 +1198,7 @@ test("lock in (behind `?lockin=1`): when the opponent locks first you see it, ge
   expect(errors).toEqual([]);
 });
 
-test("lock in (behind `?lockin=1`): you lock before the opponent, and when it locks too the step ends at once", async ({ page }) => {
+test("lock in (behind `?lockin=1`): you lock before the opponent, and when it locks too the step ends at once", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(`${LATE}&lockin=1`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1215,44 +1215,71 @@ test("lock in (behind `?lockin=1`): you lock before the opponent, and when it lo
 });
 
 /** Samples the board every 80 ms while you buy: their real pieces (revealed), their circles, your grayed pieces (unseen by them) and the yellow-bordered one (your next). */
-const watchReveals = (page: Page, ms: number) =>
-  page.evaluate(
-    (ms) =>
-      new Promise<{ t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[]>((resolve) => {
-        const out: { t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean }[] = [];
-        const t0 = performance.now();
-        const sqs = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getAttribute("data-square")!).sort();
-        const look = () => {
-          if (document.querySelector(".ac-root")?.getAttribute("data-phase") !== "buy" || performance.now() - t0 > ms) return resolve(out);
-          const black = sqs(".hb-board piece.black:not(.king)");
-          const circles = sqs(".ac-circle");
-          const unseen = sqs(".hb-board piece.white.ac-unseen");
-          const next = document.querySelector(".ac-next")?.getAttribute("data-square") ?? null;
-          out.push({
-            t: (performance.now() - t0) / 1000,
-            black,
-            circles,
-            unseen,
-            next,
-            // (A revealed piece has its gold ring and no circle; the yellow border is only ever on a grayed piece of yours.)
-            pinged: black.every((sq) => !!document.querySelector(`.ac-ping[data-square="${sq}"]`)),
-            clash: black.some((sq) => circles.includes(sq)),
-            nextOk: next === null || unseen.includes(next),
-          });
-          setTimeout(look, 80);
-        };
-        look();
-      }),
+type RevealSample = { t: number; black: string[]; circles: string[]; unseen: string[]; next: string | null; pinged: boolean; clash: boolean; nextOk: boolean };
+/**
+ * The board while the first buy step runs, sampled in the page from the moment the step begins (`data-phase` turns "buy", seen by an
+ * observer set up before the page loads, `recordReveals`): at every change on the screen and every 80 ms, `t` in seconds from the
+ * step's start, up to `ms` or the step's end. (Nov 6: timed from when the test first saw the step, a busy runner's late look moved
+ * every reveal that much early: 4 of 15 runs under load saw "theirs at 6 s" at 4.7 to 5.5 s.)
+ */
+const watchReveals = async (page: Page, ms: number): Promise<RevealSample[]> => {
+  await page.waitForFunction(
+    (ms) => {
+      const w = window as unknown as { __acBuyAt?: number; __acBuyEnded?: boolean };
+      return w.__acBuyEnded || (w.__acBuyAt !== undefined && performance.now() - w.__acBuyAt > ms);
+    },
     ms,
+    { timeout: ms + 30_000 },
   );
-/** The first sample (seconds from the watch's start) where `test` holds. */
+  return page.evaluate((ms) => ((window as unknown as { __acReveals: RevealSample[] }).__acReveals ?? []).filter((x) => x.t <= ms / 1000), ms);
+};
+/** Sets up `watchReveals`' record: call before the page loads. */
+const recordReveals = (page: Page) =>
+  page.addInitScript(() => {
+    const w = window as unknown as { __acBuyAt?: number; __acBuyEnded?: boolean; __acReveals: unknown[] };
+    w.__acReveals = [];
+    const sqs = (sel: string) => [...document.querySelectorAll<HTMLElement>(sel)].map((e) => e.getAttribute("data-square")!).sort();
+    let timer = 0;
+    const look = () => {
+      const phase = document.querySelector(".ac-root")?.getAttribute("data-phase");
+      if (w.__acBuyAt === undefined) {
+        if (phase !== "buy") return;
+        w.__acBuyAt = performance.now();
+        timer = window.setInterval(look, 80);
+      }
+      if (w.__acBuyEnded) return;
+      if (phase !== "buy") {
+        w.__acBuyEnded = true;
+        clearInterval(timer);
+        return;
+      }
+      const black = sqs(".hb-board piece.black:not(.king)");
+      const circles = sqs(".ac-circle");
+      const unseen = sqs(".hb-board piece.white.ac-unseen");
+      const next = document.querySelector(".ac-next")?.getAttribute("data-square") ?? null;
+      w.__acReveals.push({
+        t: (performance.now() - w.__acBuyAt) / 1000,
+        black,
+        circles,
+        unseen,
+        next,
+        // (A revealed piece has its gold ring and no circle; the yellow border is only ever on a grayed piece of yours.)
+        pinged: black.every((sq) => !!document.querySelector(`.ac-ping[data-square="${sq}"]`)),
+        clash: black.some((sq) => circles.includes(sq)),
+        nextOk: next === null || unseen.includes(next),
+      });
+    };
+    new MutationObserver(look).observe(document, { subtree: true, childList: true, attributes: true });
+  });
+/** The first sample (seconds from the step's start) where `test` holds. */
 const firstWhen = <T,>(samples: T[], test: (s: T) => boolean) => (samples.find(test) as { t: number } | undefined)?.t ?? null;
 
-test("while you buy their pieces are live circles (pawns too); every 1.5 s (quick) a piece is revealed piece for piece by kind: the later placed of a pair first; yours grayed until seen, the next one with a yellow border", async ({ page }) => {
+test("while you buy their pieces are live circles (pawns too); every 1.5 s (quick) a piece is revealed piece for piece by kind: the later placed of a pair first; yours grayed until seen, the next one with a yellow border", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // Seed 1: you (king b2) start with a knight on c2 and a bishop on d2 (put down as the step begins: placed first). The bot puts a pawn on a6 at 1.21 s, bishops on d8
   // at 1.65 s and a5 at 2.16 s, and a knight on h8 at 2.53 s. The reveals (every 1.5 s): 1.5 nothing (no pawn of yours to match a6); 3 their d8 (placed after your
   // c2: theirs first); 4.5 your c2; 6 their a5 (paired with your d2, which would answer at 7.5: past the step). a6 and h8 have no match: circles to the end.
+  await recordReveals(page);
   await page.goto("/autochess?quick=1&seed=1&stars=n@c2:1,b@d2:1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const s = await watchReveals(page, 6800);
@@ -1287,8 +1314,9 @@ test("while you buy their pieces are live circles (pawns too); every 1.5 s (quic
   await expect(page.locator('.ac-next[data-square="c2"]')).toHaveCount(1, { timeout: 4000 });
   expect(await page.locator(".ac-next").evaluate((el) => getComputedStyle(el).boxShadow)).toMatch(/^rgb\(255, 214, 10\) 0px 0px 0px 2px inset$/);
   expect(await page.locator(`${BOARD_SEL.piece}.white.ac-unseen`).first().evaluate((el) => getComputedStyle(el).filter)).toContain("grayscale");
-  // A ping as each of theirs turns into its piece: one for each reveal of theirs.
-  await expect(page.locator(`${BOARD_SEL.piece}.black:not(.king)`)).toHaveCount(2, { timeout: 8000 });
+  // A ping as each of theirs turns into its piece: one for each reveal of theirs. (Read from this load's record, at the step's end: the
+  // two show for the last second and a half of the quick step only, which a poll on a busy runner can miss, Nov 6.)
+  expect((await watchReveals(page, 8000)).at(-1)!.black).toHaveLength(2);
   expect(await soundCount(page, "acReveal")).toBe(2);
   // The move step shows everything for real: no circle, nothing grayed or bordered.
   await expect(root(page)).toHaveAttribute("data-phase", "adjust", { timeout: 15_000 });
@@ -1298,9 +1326,10 @@ test("while you buy their pieces are live circles (pawns too); every 1.5 s (quic
   expect(errors).toEqual([]);
 });
 
-test("the reveals come every 3 seconds of the 30: theirs at 6 s, your matching piece at 9 s; nothing of theirs shows while you have no match", async ({ page }) => {
+test("the reveals come every 3 seconds of the 30: theirs at 6 s, your matching piece at 9 s; nothing of theirs shows while you have no match", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // Seed 11 (the full 30 s): the bot (king h8) puts a bishop on c8 at 3.40 s, then pawns at 6.96, 12.17 and 15.98 s. You start with a knight on c2 (king h1).
+  await recordReveals(page);
   await page.goto("/autochess?seed=11&stars=n@c2:1&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const s = await watchReveals(page, 13_000);
@@ -1317,7 +1346,7 @@ test("the reveals come every 3 seconds of the 30: theirs at 6 s, your matching p
   expect(errors).toEqual([]);
 });
 
-test("tap one of their bench pieces: a red ring on it and its landing square lights red on their half; a second tap or another piece clears it; their bench never drags", async ({ page }) => {
+test("tap one of their bench pieces: a red ring on it and its landing square lights red on their half; a second tap or another piece clears it; their bench never drags", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(HELD);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1473,7 +1502,7 @@ test("the phase banners on the board: ACTION PHASE as buying begins, the big 3-2
   expect(errors).toEqual([]);
 });
 
-test("the v7 move step (behind `?adjustmode=legal` since v8): one piece of yours is lit at random and you get 7 seconds for one legal chess move with it that stays on your half; the refusals say why; it can be taken back", async ({ page }) => {
+test("the v7 move step (behind `?adjustmode=legal` since v8): one piece of yours is lit at random and you get 7 seconds for one legal chess move with it that stays on your half; the refusals say why; it can be taken back", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto(`${MOVE}&adjustmode=legal`);
@@ -1564,7 +1593,7 @@ test("the v7 move step (behind `?adjustmode=legal` since v8): one piece of yours
   expect(errors).toEqual([]);
 });
 
-test("the v7 move step (`?adjustmode=legal`) with no piece of yours able to move: a short line says so, nothing is lit, and the step still runs (the bot may move) before the fight", async ({ page }) => {
+test("the v7 move step (`?adjustmode=legal`) with no piece of yours able to move: a short line says so, nothing is lit, and the step still runs (the bot may move) before the fight", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await page.goto(`${NEVER}&adjustmode=legal`);
@@ -1580,7 +1609,7 @@ test("the v7 move step (`?adjustmode=legal`) with no piece of yours able to move
   expect(errors).toEqual([]);
 });
 
-test("the move step off (?adjust=0): the buy step goes straight to the fight, with both boards in full from the first move", async ({ page }) => {
+test("the move step off (?adjust=0): the buy step goes straight to the fight, with both boards in full from the first move", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/autochess?quick=1&seed=11&adjust=0&intro=0");
@@ -1605,7 +1634,7 @@ test("the move step off (?adjust=0): the buy step goes straight to the fight, wi
   expect(errors).toEqual([]);
 });
 
-test("the old adjust step stays in code behind `adjustMode: teleport` (`?adjustmode=teleport`): any piece to any empty square of your half, the refusals say why, it can be taken back, the king stays", async ({ page }) => {
+test("the old adjust step stays in code behind `adjustMode: teleport` (`?adjustmode=teleport`): any piece to any empty square of your half, the refusals say why, it can be taken back, the king stays", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await page.goto(`${LATE}&adjustmode=teleport`);
@@ -1647,7 +1676,7 @@ test("the old adjust step stays in code behind `adjustMode: teleport` (`?adjustm
   expect(errors).toEqual([]);
 });
 
-test("a fight plays to a result, HP changes by the rule, and the next round starts empty but for the new kings, with the colors turned", async ({ page }) => {
+test("a fight plays to a result, HP changes by the rule, and the next round starts empty but for the new kings, with the colors turned", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto(FIGHT);
@@ -1755,7 +1784,7 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(errors).toEqual([]);
 });
 
-test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+2\" floats up from its square, it leaves, and the 2 gold is in the next round's line", async ({ page }) => {
+test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+2\" floats up from its square, it leaves, and the 2 gold is in the next round's line", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   // (A test switch, `?fightfen=`: the fight starts from this position. White's king on h1 is shut in and its h-pawn blocked, so its one
@@ -1793,7 +1822,7 @@ test("a pawn reaching the far end cashes in: it lands, a coin sounds, \"+2\" flo
   expect(errors).toEqual([]);
 });
 
-test("a fight always ends even if the engine never answers (?stall=1): its looks time out to stand-in moves", async ({ page }) => {
+test("a fight always ends even if the engine never answers (?stall=1): its looks time out to stand-in moves", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/autochess?quick=1&seed=3&adjust=0&stall=1&intro=0");
@@ -2617,7 +2646,7 @@ test("a star-up offer (v8): a gold card for a second star, a prismatic one for a
   expect(errors).toEqual([]);
 });
 
-test("a star-up card is only tapped, never dragged to the bench, and with too little gold it says what is missing", async ({ page }) => {
+test("a star-up card is only tapped, never dragged to the bench, and with too little gold it says what is missing", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(STARS);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2652,7 +2681,7 @@ test("a star-up card is only tapped, never dragged to the bench, and with too li
   expect(errors).toEqual([]);
 });
 
-test("a star-up for a held piece merges on the bench (1 gold, no piece added, its tile then shows its stars and outline, never a ring), and the stars stay through the round turn (Eric: stars up on the bench too)", async ({ page }) => {
+test("a star-up for a held piece merges on the bench (1 gold, no piece added, its tile then shows its stars and outline, never a ring), and the stars stay through the round turn (Eric: stars up on the bench too)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto(STARBENCH);
@@ -2705,7 +2734,7 @@ test("a star-up for a held piece merges on the bench (1 gold, no piece added, it
   expect(errors).toEqual([]);
 });
 
-test("the move step (v8): every starred piece carries its outline (no pulsing box) and may move once, a 2-star one legal move and a 3-star to any empty square of your half; any other piece says 'Not starred'; a moved piece is taken back by a tap; 5 s and 3 s for each starred piece", async ({ page }) => {
+test("the move step (v8): every starred piece carries its outline (no pulsing box) and may move once, a 2-star one legal move and a 3-star to any empty square of your half; any other piece says 'Not starred'; a moved piece is taken back by a tap; 5 s and 3 s for each starred piece", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto(STARMOVE);
@@ -2784,7 +2813,7 @@ test("the move step (v8): every starred piece carries its outline (no pulsing bo
   expect(errors).toEqual([]);
 });
 
-test("the move step with nobody starred (v8): a flat 5 seconds to look at the board, nothing glows, any piece of yours says 'Not starred', then the fight", async ({ page }) => {
+test("the move step with nobody starred (v8): a flat 5 seconds to look at the board, nothing glows, any piece of yours says 'Not starred', then the fight", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await page.goto(MOVE);
@@ -2816,7 +2845,7 @@ test("the move step with nobody starred (v8): a flat 5 seconds to look at the bo
   expect(errors).toEqual([]);
 });
 
-test("the bot's stars (v8): a starred piece of theirs shows its stars once it is revealed (a circle shows none), all of them show in the move step, and the step runs 5 s plus 3 s for each", async ({ page }) => {
+test("the bot's stars (v8): a starred piece of theirs shows its stars once it is revealed (a circle shows none), all of them show in the move step, and the step runs 5 s plus 3 s for each", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await page.goto(BOTSTARS);
@@ -2848,7 +2877,7 @@ test("the bot's stars (v8): a starred piece of theirs shows its stars once it is
   expect(errors).toEqual([]);
 });
 
-test("stars follow their pieces through the fight, and the survivors' refund counts what was paid for them (the price and 1 for each star above the first)", async ({ page }) => {
+test("stars follow their pieces through the fight, and the survivors' refund counts what was paid for them (the price and 1 for each star above the first)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watchErrors(page);
   // (The move step off: the fight starts from the board as bought.)
@@ -3084,7 +3113,7 @@ test("the prismatic outline of the shop card shifts its colors slowly (and only 
   expect(errors).toEqual([]);
 });
 
-test("a star-up's sound is asked for muted when sound is off, and unmuted when it is on", async ({ page }) => {
+test("a star-up's sound is asked for muted when sound is off, and unmuted when it is on", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => localStorage.setItem("brc.muted", "1"));
   await page.goto(STARS);
@@ -3147,7 +3176,7 @@ test("the meeting before round 1 (Eric, Oct 24): both custom pawns stand in the 
   expect(errors).toEqual([]);
 });
 
-test("the quick chat (v9): a tap shows its line in a bubble over your pawn; the bot answers once with a line from the same list; the next tap replaces the bubble; the shop can't be used in the meeting", async ({ page }) => {
+test("the quick chat (v9): a tap shows its line in a bubble over your pawn; the bot answers once with a line from the same list; the next tap replaces the bubble; the shop can't be used in the meeting", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?quick=1&seed=9");
   await expect(root(page)).toHaveAttribute("data-phase", "meet");

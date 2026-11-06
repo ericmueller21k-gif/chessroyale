@@ -119,7 +119,7 @@ async function record(page: Page) {
 }
 const recorded = (page: Page) => page.evaluate(() => (window as any).__tg as Rec[]);
 
-test("Babur: his move, then the hoops (HOOPS! with nothing under it, the throw), then your turn; the walls for exactly two of your moves: three rings burning, a move through one refused, dying, then out", async ({ page }) => {
+test("Babur: his move, then the hoops (HOOPS! with nothing under it, the throw), then your turn; the walls for exactly two of your moves: three rings burning, a move through one refused, dying, then out", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -212,7 +212,7 @@ test("Babur: his move, then the hoops (HOOPS! with nothing under it, the throw),
   expect(errors).toEqual([]);
 });
 
-test("Babur: a forced balloon lands at the end of his turn as his pawn: released from the pump, flown to its square, his piece there only from the landing's puff, then his cheer", async ({ page }) => {
+test("Babur: a forced balloon lands at the end of his turn as his pawn: released from the pump, flown to its square, his piece there only from the landing's puff, then his cheer", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -278,7 +278,7 @@ test("Babur: a forced balloon lands at the end of his turn as his pawn: released
   expect(errors).toEqual([]);
 });
 
-test("Babur: a fake queen pops on the pump at the end of his turn, and he winces", async ({ page }) => {
+test("Babur: a fake queen pops on the pump at the end of his turn, and he winces", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -396,7 +396,7 @@ test("Babur's pump at 320 in the bar's free room, at its right end, clear of the
   expect(errors).toEqual([]);
 });
 
-test("Babur online: a reload mid-hoops draws the rings as they are, without the cast again", async ({ page }) => {
+test("Babur online: a reload mid-hoops draws the rings as they are, without the cast again", { tag: "@phone-only" }, async ({ page }) => {
   test.skip(!desktop(), "one run is enough: a computer");
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];

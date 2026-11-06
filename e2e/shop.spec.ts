@@ -1140,7 +1140,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   expect(errors).toEqual([]);
 });
 
-test("boss tokens: an admin gives himself Babur tokens and a crate key in the Crates tab, buys Babur's crate both ways (into the inventory, Nov 2), then opens both there with the usual strip; the counts follow", async ({ page }) => {
+test("boss tokens: an admin gives himself Babur tokens and a crate key in the Crates tab, buys Babur's crate both ways (into the inventory, Nov 2), then opens both there with the usual strip; the counts follow", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1243,7 +1243,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
   expect(errors).toEqual([]);
 });
 
-test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", async ({ page }) => {
+test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's clock) drops one: the result screen's square box, OK, and it's in the inventory", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // Hollow mates you at once (?mate=1). The server times a solo battle itself: its finish waits while the battle's start is pushed

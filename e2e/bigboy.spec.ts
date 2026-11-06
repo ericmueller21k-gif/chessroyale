@@ -57,7 +57,7 @@ const covered = (page: Page, square: string, canvas: string) =>
       }, [q.x, q.y]),
   );
 
-test("Big Boy's snack before move 1, your move's knock, and his toy block (no dots onto it, gone after its turns)", async ({ page }) => {
+test("Big Boy's snack before move 1, your move's knock, and his toy block (no dots onto it, gone after its turns)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -137,7 +137,7 @@ async function asAdmin(page: Page) {
   });
 }
 
-test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, the new position, then his move; his sounds through mute", async ({ page }) => {
+test("Big Boy's Big Bounce (the admins' trigger): pieces knocked up, the crash, the new position, then his move; his sounds through mute", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

@@ -16,7 +16,7 @@ const busyAnswer = (waitSeconds: number) => ({
   message: `Servers are busy, you're in line: about ${waitSeconds} s`,
 });
 
-test("servers busy: you're told you're in line and about how long, then the queue takes you in", async ({ page }) => {
+test("servers busy: you're told you're in line and about how long, then the queue takes you in", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Ann");
   const asked: string[] = [];
   let n = 0;
@@ -45,7 +45,7 @@ test("servers busy: you're told you're in line and about how long, then the queu
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
-test("servers busy: Cancel while in line goes home and stops asking", async ({ page }) => {
+test("servers busy: Cancel while in line goes home and stops asking", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Bo");
   let asked = 0;
   await page.route("**/api/play*", (route) => {

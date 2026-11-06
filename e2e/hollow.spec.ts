@@ -331,7 +331,7 @@ async function asAdmin(page: Page) {
   });
 }
 
-test("Hollow's Lights out (the admins' trigger): the night over every square, a piece found, a wrong square, 10 a miss, the lights back", async ({ page }) => {
+test("Hollow's Lights out (the admins' trigger): the night over every square, a piece found, a wrong square, 10 a miss, the lights back", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -425,7 +425,7 @@ test("Hollow's Lights out (the admins' trigger): the night over every square, a 
   expect(errors).toEqual([]);
 });
 
-test("Hollow online: the server judges an attempt into the dark (-5, only for you) and runs Lights out", async ({ page }) => {
+test("Hollow online: the server judges an attempt into the dark (-5, only for you) and runs Lights out", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const errors: string[] = [];

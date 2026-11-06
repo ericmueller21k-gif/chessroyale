@@ -1,6 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, MATCHMAKING, RAID_SETTINGS, modeSettings, type Settings } from "@chessroyale/core";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 /**
  * Solo (Matchmaking → Solo): the queue screen fills with the match's own bots, a few at a time, then the match begins.

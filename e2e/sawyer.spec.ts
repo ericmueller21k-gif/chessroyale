@@ -110,7 +110,7 @@ async function roomMove(page: Page): Promise<string> {
   return top.find((m) => takes.includes(m.move) && m.expected >= top[0]!.expected - 0.2)?.move ?? top[0]!.move;
 }
 
-test("Sawyer: his first move a pawn's, then the split (two small whole pawns that grow; or halves) once there's room; your move's knock; his saw cuts", async ({ page }) => {
+test("Sawyer: his first move a pawn's, then the split (two small whole pawns that grow; or halves) once there's room; your move's knock; his saw cuts", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -190,7 +190,7 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   expect(errors).toEqual([]);
 });
 
-test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board splits with a gap, nothing crosses it; the cut waits a turn; his sounds through mute", async ({ page }) => {
+test("Sawyer's board saw (?power=boardsaw): he saws up the middle, the board splits with a gap, nothing crosses it; the cut waits a turn; his sounds through mute", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -276,7 +276,7 @@ async function asAdmin(page: Page) {
   });
 }
 
-test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while it's up; a move of yours across it stays put and the dock says why", async ({ page }) => {
+test("Sawyer's board saw on Maia (Eric, Oct 17): his moves never cross it while it's up; a move of yours across it stays put and the dock says why", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -379,7 +379,7 @@ const mirror = (fen: string) => {
 };
 const mirrorMove = (m: string) => m[0]! + (9 - Number(m[1])) + m[2]! + (9 - Number(m[3])) + m.slice(4);
 
-test("Sawyer's board saw lifted for his only move (Eric's position, Oct 17): Qxf6 across it, and the dock says so through your whole turn, whole at 320 px", async ({ page }) => {
+test("Sawyer's board saw lifted for his only move (Eric's position, Oct 17): Qxf6 across it, and the dock says so through your whole turn, whole at 320 px", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -471,7 +471,7 @@ test("Sawyer's board saw lifted for his only move (Eric's position, Oct 17): Qxf
   expect(errors).toEqual([]);
 });
 
-test("Sawyer: the board saw from the admins' trigger, a cut taped over and healing, the halves rejoining", async ({ page }) => {
+test("Sawyer: the board saw from the admins' trigger, a cut taped over and healing, the halves rejoining", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

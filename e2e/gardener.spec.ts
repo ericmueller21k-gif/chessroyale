@@ -162,7 +162,7 @@ const soundsFromPlay = (page: Page) =>
 const BASE = "/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=gardener";
 const ALL_SQUARES = [..."abcdefgh"].flatMap((f) => [1, 2, 3, 4, 5, 6, 7, 8].map((r) => `${f}${r}`));
 
-test("the hippo gardener: his seeds, then a watering of ten seeds within the band", async ({ page }) => {
+test("the hippo gardener: his seeds, then a watering of ten seeds within the band", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -434,7 +434,7 @@ test("his watering on the board: the sweep, a sprout per seed, each outcome at i
   expect(errors).toEqual([]);
 });
 
-test("online: the meter counts by the server's clock, and a reload mid-battle keeps it and shows the plants as they are, without the watering again", async ({ page }) => {
+test("online: the meter counts by the server's clock, and a reload mid-battle keeps it and shows the plants as they are, without the watering again", { tag: "@phone-only" }, async ({ page }) => {
   test.skip(!desktop(), "one run is enough: a computer");
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];

@@ -275,8 +275,10 @@ test(`looking round: a drag turns the camera about your pawn, which doesn't move
   // this drag, about 72 degrees, snaps to west; the tap then locks it in, e2e/town-controls.spec.ts.)
   await drag(page, 0.4);
   await expect.poll(async () => (await cam(page)).snapped, { timeout: 3000 }).toBe(270);
+  // (`snapped` is set the moment the drag lets go; the view then eases there over streetSnapMs, turn.ts `release`: wait for the ease to
+  // end, or a busy runner reads it mid-way, 89.2 degrees on Nov 6.)
+  await expect.poll(async () => (await cam(page)).look, { message: "eased to a quarter turn to the right of south (west)", timeout: 3000 }).toBeCloseTo(90, 0);
   c = await cam(page);
-  expect(c.look, "eased to a quarter turn to the right of south (west)").toBeCloseTo(90, 0);
   const here = await you(page);
   // (The square back the way you came: walked through a moment ago, so it's street, not a lamp or a home's front.)
   const sq = [here[0], here[1] + 1] as const;

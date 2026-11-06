@@ -273,7 +273,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
 
 // (The boss final's two battles, solo and online, are crowd-hidden.spec.ts's: their checks merged there, Nov 2.)
 
-test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", async ({ browser }) => {
+test("Play now: players land in the same lobby, the count climbs, bots fill it and the votes begin", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const pages = await Promise.all([0, 1].map(async () => (await browser.newContext({ viewport: { width: 420, height: 860 } })).newPage()));

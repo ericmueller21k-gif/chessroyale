@@ -186,7 +186,7 @@ function pawnName(fen: string, hidden: string, move: string): string {
 
 // ---------------- The tests ----------------
 
-test("Smudgy: his tile picks him, his two forced moves, then the splash covers his pawn row, the swap happens under it and the rook hides as a pawn", async ({ page }) => {
+test("Smudgy: his tile picks him, his two forced moves, then the splash covers his pawn row, the swap happens under it and the rook hides as a pawn", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

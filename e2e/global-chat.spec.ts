@@ -9,7 +9,7 @@ import { named, test } from "./helpers.ts";
 
 const run = Date.now().toString(36).slice(-4);
 
-test("global chat: post a line, everyone on the home page sees it, then the 30 s limit", async ({ page, browser }, info) => {
+test("global chat: post a line, everyone on the home page sees it, then the 30 s limit", { tag: "@phone-only" }, async ({ page, browser }, info) => {
   if (info.project.name !== "desktop") {
     // A phone has no right column: the chat is the computer's for now.
     await named(page, "Phone");
