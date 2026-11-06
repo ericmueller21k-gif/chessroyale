@@ -99,6 +99,9 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   test.setTimeout(400_000);
   for (const gl of [false, true]) {
     await open(page, "day", gl);
+    // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
     for (const [name, sq, look] of [["Fountain Street east", [4, 20], 0.5], ["Fountain Street west", [39, 20], -0.5], ["South Street east", [4, 5], 0.5], ["South Street west", [39, 5], -0.5]] as const) {
       await walkTo(page, sq);
       await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
