@@ -464,10 +464,6 @@ export async function backfillLedger(sql: Sql, now: number): Promise<number> {
   return (await count()) - before;
 }
 
-/**
- * The daily check (index.ts, the schedule): accounts whose balances and ledger disagree, found for every account at once (two
- * statements a table), then up to `limit` of them read in full (ledgerMismatches). Empty: they all agree.
- */
 /** The schedule's run at `t` (every 15 minutes) is the daily check's: the first in OPS.ledgerCheck.hourUtc. */
 export function ledgerCheckDue(t: number): boolean {
   const d = new Date(t);
@@ -480,6 +476,10 @@ export interface Disagreement {
   account: string | null;
   mismatches: { kind: string; asset: string; diff: number }[];
 }
+/**
+ * The daily check (index.ts, the schedule): accounts whose balances and ledger disagree, found for every account at once (two
+ * statements a table), then up to `limit` of them read in full (ledgerMismatches). Empty: they all agree.
+ */
 export async function ledgerCheck(sql: Sql, limit: number): Promise<Disagreement[]> {
   const users = new Map<string, string | null>();
   for (const h of HOLDINGS) {
