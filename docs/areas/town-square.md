@@ -625,6 +625,19 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `room.ts`: 9 and 4 px either way over 40 s). Its Shopkeeper, the paper turtle (`characters/sidekicks/folioturtle.ts`, baked as the
   others; not a town bot: Pleat, the frog, stays Folio's kid), behind the low (19 px) counter on (9, 2) and (10, 2), drawn at (9.5, 2.4).
   "Folio's Boss Crate" with the Paper Crane. The chat's day tone. docs/decisions/2026-11-05-folio-home.md.
+- **Smudgy's studio (Nov 6).** Smudgy is live, so his Art Gallery has an inside in everyone's town. Its art (`shops/smudgy-art.ts`, drawn
+  by hand in code with `shops/paint-kit.ts`; a copy on `claude/boss-art` under `scripts/boss-art/out/house-shop-smudgy`): a box room, a
+  paint studio in a moody, deep palette (dark teal, deep blue, oxblood, plum, a few warm highlights), dark plank floors with drips and drop
+  cloths, every wall hung with layered abstract canvases, easels, paint pots and brush jars, the Colosseum's pixel pieces
+  (`colosseum/pieces-gba.ts`'s models) as sculptures on plinths. **The life class**: the Colosseum's knight turning on a round platform
+  (16 frames, 6 s a turn) at (9.5, 8), eight art-student chameleons (Dabble's rig in smocks, four colors) on stools round it at easels,
+  one 32-frame loop (8 s: the canvas blank, outline, blocked colors, finished; a brush dip each stage) shared by all, each painter
+  `ShopPlace.t0` into it (an eighth apart; ShopRoom draws a piece's frame at `now + t0`). Its battle spot is a drop cloth (24 flat
+  `circle-<col>-<row>` tiles, columns 6-13, rows 13-15), its marks `SHOP_SMUDGY_MARKS` (7, 14) and (12, 14), the round table under its
+  white cloth (`table`, solid) between them with its stools. Its roof: dark beams over a skylight (`roof: "studio"`). Its Shopkeeper, the
+  gallery owner (`characters/sidekicks/smudgykeeper.ts`: Dabble's rig, gray-green, an oxblood smock and gold half-moon glasses; baked;
+  not a town bot: Dabble stays Smudgy's kid), behind the counter on (9, 2) and (10, 2). "Smudgy's Boss Crate" with the Brush Ride. The
+  chat's night tone. docs/decisions/2026-11-06-smudgy-home.md.
 - **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo") and Folio's Folded House (`folio`, Nov 5, everyone's town: above, "Folio's sanctuary"): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
@@ -728,6 +741,14 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   before his brag. The room's own elves keep working. Every beat is `CHALLENGE_FEEL.ice` or the art's frames (`iceTimes`, `iceAt`,
   `iceCues`); about 13.2 s from the marks to the wipe. Twelve new sounds (`gingerCharge`, `gingerBlast`, `gingerBurst`, `gingerWhoosh`,
   `gingerStab`, `gingerStep`, `gingerHeave`, `gingerClack`, `gingerCast`, `gingerSparkle`, `gingerThump`, `gingerGust`), every cue his own.
+- **Smudgy's challenge (Nov 6, his own):** seated (the stools are already there): you both walk on to the drop cloth's marks beside the
+  covered table; his line "Smudgy, artist. Don't touch the wet parts." (his entrance's first); he whips the cloth off (`smudgy.grabMs`
+  after it; the cloth's frames, `INTRO_SMUDGY_CLOTH` in `shops/smudgy-intro-art.ts`: up, sailing west over him, dropped in a heap by his
+  stool), the game's board on the table from its second frame; his reveal line "Careful, don't get any paint on the pieces!"
+  (`BossIntro.chant`); then **the splatter** (`shops/smudgy-splatter.ts`, `canvas.boss-splatter`): splats in the room's deep paints land
+  faster and faster until the screen is covered (1.2 s), held while the battle loads (at least 0.25 s), and a brush stroke sweeps it away
+  onto the match (0.5 s); every phase by the clock. No attack. Every beat in `CHALLENGE_FEEL.smudgy`; `clothAnims`, `clothCues`. Four new
+  sounds (`smudgyWhoosh`, `smudgyFlop`, `smudgySplat`, `smudgySwipe`).
 - **Folio's challenge (Nov 5, its own; the art's timeline, intro-folio-nov5.md):** you both walk on to the clean page's marks (it glides,
   its intro's own frames, `BOSS_FOLIO_INTRO` in `characters/folio-intro.ts`, mirrored to face east; its shadow the art's warm see-through
   brown, not the town figure's near-black, in this room only); its line "Every game is a draft. Shall we write one?"; you both step back
