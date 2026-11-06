@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BOSS_CRATES, adminFirst, bossCrateOf, bossDef, itemDef } from "@chessroyale/core";
-import { KNIGHT_TURN, LIFE_CLASS, PAINTERS, PAINTER_LOOP, SHOP_SMUDGY_CRATE_AT, SHOP_SMUDGY_LAYOUT, SHOP_SMUDGY_MARKS, SHOP_SMUDGY_PIECES, SHOP_SMUDGY_TABLE_AT, painterPose, stageOf } from "../src/town/shops/smudgy-art.ts";
+import { KNIGHT_TURN, LIFE_CLASS, PICTURE_LIGHT, SHOP_SMUDGY_LIGHTS, SHOP_SMUDGY_POOLS, WALL_PANELS, PAINTERS, PAINTER_LOOP, SHOP_SMUDGY_CRATE_AT, SHOP_SMUDGY_LAYOUT, SHOP_SMUDGY_MARKS, SHOP_SMUDGY_PIECES, SHOP_SMUDGY_TABLE_AT, painterPose, stageOf } from "../src/town/shops/smudgy-art.ts";
 import { INTRO_SMUDGY_CLOTH, INTRO_SMUDGY_TABLE, WHIP_BOARD_FRAME } from "../src/town/shops/smudgy-intro-art.ts";
 import { sidekickSmudgyKeeper } from "../src/characters/sidekicks/smudgykeeper.ts";
 import { SMUDGY_LINES } from "../src/characters/smudgy.ts";
 import { SMUDGY_SOUNDS, smudgySound } from "../src/characters/smudgy-sounds.ts";
-import { findPath, inTalkRange, isFloor, makeRoom, tapTarget, walkable } from "../src/town/shops/room.ts";
+import { findPath, inTalkRange, isFloor, lightsAt, makeRoom, tapTarget, walkable } from "../src/town/shops/room.ts";
 import { SHOPS, holdLine, priceLine, prizeRows } from "../src/town/shops/shops.ts";
 import { CHALLENGE_FEEL, chantOf, clothAnims, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, seatedMarks, type IntroStep } from "../src/town/shops/challenge.ts";
 import { splatTimes, strokeAt } from "../src/town/shops/smudgy-splatter.ts";
@@ -85,6 +85,31 @@ describe("Smudgy's studio", () => {
     expect(BOTS.find((b) => b.boss === "smudgy")).toMatchObject({ name: "Dabble", look: { sprite: SIDEKICK_SHEETS.smudgy } });
     // (Its smock and glasses on every frame.)
     for (const a of ["idle", "walk", "sit", "wave"]) for (const f of sidekickSmudgyKeeper.anims[a]!.frames) expect(f.layers.map((l) => l.part)).toEqual(expect.arrayContaining(["smock", "glasses"]));
+  });
+});
+
+describe("the gallery's picture lights (Eric, Nov 6: \"lighting that comes down on the walls like in an art gallery\")", () => {
+  it("every wall panel has its picture light at the top and its wash down the wall, lit at every placement (the back wall's and both side walls', the east mirrored); none over the floor", () => {
+    const panels = SHOP_SMUDGY_LAYOUT.filter((p) => WALL_PANELS.includes(p.name));
+    expect(panels.length).toBe(16 + 36);
+    const halos = lightsAt(SHOP_SMUDGY_LIGHTS, panels, (l) => !!l.halo);
+    const pools = lightsAt(SHOP_SMUDGY_POOLS, panels);
+    expect(halos).toHaveLength(panels.length);
+    expect(pools).toHaveLength(panels.length);
+    for (const { l } of pools) {
+      // On the wall (above the panel's foot, 129), under the lamp, over the canvases: not on the floor.
+      expect(l.y + l.ry).toBeLessThan(PICTURE_LIGHT.bottom);
+      expect(l.y - l.ry).toBeGreaterThan(PICTURE_LIGHT.bulbY);
+    }
+    // Every other light or pool is the backdrop's lamp, the platform's skylight pool and the counter's: the floor's light is as it was.
+    expect(SHOP_SMUDGY_LIGHTS.filter((l) => !WALL_PANELS.includes(l.piece)).map((l) => l.piece)).toEqual(["backdrop"]);
+    expect(SHOP_SMUDGY_POOLS.filter((l) => !WALL_PANELS.includes(l.piece)).map((l) => l.piece)).toEqual(["platform", "backdrop"]);
+    // The lamp's bulb strip is drawn on every panel, where its light says.
+    for (const name of WALL_PANELS) {
+      const ch = SHOP_SMUDGY_PIECES[name]!;
+      const grid = ch.parts[ch.anims.idle!.frames[0]!.layers[0]!.part]!.grid;
+      expect(grid[PICTURE_LIGHT.bulbY - 1]!.slice(PICTURE_LIGHT.x - 6, PICTURE_LIGHT.x + 6), name).toBe("L".repeat(12));
+    }
   });
 });
 

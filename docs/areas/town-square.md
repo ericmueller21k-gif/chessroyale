@@ -634,7 +634,7 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   one 32-frame loop (8 s: the canvas blank, outline, blocked colors, finished; a brush dip each stage) shared by all, each painter
   `ShopPlace.t0` into it (an eighth apart; ShopRoom draws a piece's frame at `now + t0`). Its battle spot is a drop cloth (24 flat
   `circle-<col>-<row>` tiles, columns 6-13, rows 13-15), its marks `SHOP_SMUDGY_MARKS` (7, 14) and (12, 14), the round table under its
-  white cloth (`table`, solid) between them with its stools. Its roof: dark beams over a skylight (`roof: "studio"`). Its Shopkeeper, the
+  white cloth (`table`, solid) between them with its stools. Its roof: dark beams over a skylight (`roof: "studio"`). Gallery picture lights (Eric: "lighting that comes down on the walls like in an art gallery"): a brass lamp atop every wall panel, its warm cone baked into the panel and lit at every placement (`SHOP_SMUDGY_LIGHTS`, `SHOP_SMUDGY_POOLS` on the wall). Its Shopkeeper, the
   gallery owner (`characters/sidekicks/smudgykeeper.ts`: Dabble's rig, gray-green, an oxblood smock and gold half-moon glasses; baked;
   not a town bot: Dabble stays Smudgy's kid), behind the counter on (9, 2) and (10, 2). "Smudgy's Boss Crate" with the Brush Ride. The
   chat's night tone. docs/decisions/2026-11-06-smudgy-home.md.

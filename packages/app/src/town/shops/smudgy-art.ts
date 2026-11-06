@@ -190,6 +190,34 @@ function hang(c: Cv, x: number, y: number, w: number, h: number, seed: number, g
   abstract(c, x, y, w, h, seed, ground ?? ["B", "P", "T", "R", "9"][seed % 5]);
   frame(c, x, y, w, h);
 }
+/**
+ * A gallery picture light at the top of a panel (Eric, Nov 6: "lighting that comes down on the walls like in an art gallery"): a small
+ * brass hood on a short arm, its bulb strip under it (`L`, the light's keys), and its warm wash baked into the panel below it: a cone
+ * widening down the wall in which the plaster and the canvases' paints go a shade lighter (dithered at its edge), so the canvases glow
+ * where it falls. The room's light (SHOP_SMUDGY_LIGHTS) and the wash's soft glow (SHOP_SMUDGY_POOLS) are at every placement.
+ */
+export const PICTURE_LIGHT = { x: 18, bulbY: 15, top: 16, bottom: 104, w0: 5, w1: 15 } as const;
+const LIGHTER: Record<string, string> = { "9": "0", "0": "!", T: "t", B: "b", R: "r", P: "p", Y: "y", O: "y", V: "W", v: "V", g: "G" };
+function pictureLight(c: Cv) {
+  const L = PICTURE_LIGHT;
+  for (let y = L.top; y < L.bottom; y++) {
+    const u = (y - L.top) / (L.bottom - L.top);
+    const half = L.w0 + (L.w1 - L.w0) * u;
+    for (let x = 0; x < T; x++) {
+      const d = Math.abs(x + 0.5 - L.x) / half;
+      if (d > 1) continue;
+      // (Strongest near the lamp and the cone's middle; its edge and its far end dithered off.)
+      const keep = 1 - d * d * 0.7 - u * 0.5;
+      if (keep < 0.5 && hash(x, y, 99) > keep * 1.6) continue;
+      const k = c[y]![x]!;
+      if (LIGHTER[k]) c[y]![x] = LIGHTER[k]!;
+    }
+  }
+  rect(c, L.x - 1, 9, 2, 3, "M");
+  rect(c, L.x - 7, 11, 14, 3, "g");
+  rect(c, L.x - 7, 11, 14, 1, "G");
+  rect(c, L.x - 6, 14, 12, 1, "L");
+}
 const wallDef = (name: string, c: Cv) => def(name, [1, 1], T, WALL_H, WF, [[whole(c)]]);
 for (let i = 0; i < 6; i++) {
   const c = plaster(10 + i);
@@ -198,6 +226,7 @@ for (let i = 0; i < 6; i++) {
   hang(c, big[0]!, big[1]!, big[2]!, big[3]!, 30 + i * 7);
   hang(c, (i * 7) % 12 + 2, 72 + (i % 3) * 4, 20 + (i % 3) * 4, 22, 50 + i * 5);
   if (i % 3 !== 1) hang(c, 18 - (i % 2) * 12, 100 - (i % 2) * 6, 14, 14, 70 + i);
+  pictureLight(c);
   wallDef(`wall-${i}`, c);
 }
 /** One canvas so big it runs across two panels (the back wall's centerpieces): the west half and the east. */
@@ -213,6 +242,7 @@ for (const [n, seed] of [["wall-wide", 91], ["wall-wide-b", 92]] as const) {
   for (let half = 0; half < 2; half++) {
     const p = cv(T, WALL_H);
     for (let y = 0; y < WALL_H; y++) for (let x = 0; x < T; x++) p[y]![x] = c[y]![x + half * T]!;
+    pictureLight(p);
     wallDef(`${n}-${half}`, p);
   }
 }
@@ -593,11 +623,21 @@ for (const [v, colors] of PAINTER_COLORS.entries()) {
 /** The battle spot's table under its cloth (the room's own; in the intro the cloth is whipped off it: smudgy-intro-art.ts). */
 def("table", [2, 1], 3 * T, 60, [TCX, TFOOT], [[whole(coveredTableCv(), true)]]);
 
-// ==== Lights: the lamp over the backdrop's best piece; a warm pool on the life class's platform (a skylight's), one by the counter.
+// ==== Lights: the lamp over the backdrop's best piece; every wall panel's picture light and its wash; a warm pool on the life class's
+// platform (a skylight's), one by the counter.
 
 const WARM = "#ffd38a";
-export const SHOP_SMUDGY_LIGHTS: readonly (LightSpot & { piece: string })[] = [{ piece: "backdrop", x: LAMP.x - 8, y: LAMP.y + 2, w: 17, h: 3, keys: "GL", color: WARM, strength: 0.6, halo: 26 }];
+/** Every wall panel (the back wall's and the side walls'), each with its picture light. */
+export const WALL_PANELS: readonly string[] = [...[0, 1, 2, 3, 4, 5].map((i) => `wall-${i}`), "wall-wide-0", "wall-wide-1", "wall-wide-b-0", "wall-wide-b-1"];
+const PL = PICTURE_LIGHT;
+export const SHOP_SMUDGY_LIGHTS: readonly (LightSpot & { piece: string })[] = [
+  { piece: "backdrop", x: LAMP.x - 8, y: LAMP.y + 2, w: 17, h: 3, keys: "GL", color: WARM, strength: 0.6, halo: 26 },
+  // (Each panel's picture light: its bulb strip, a small halo round it.)
+  ...WALL_PANELS.map((piece) => ({ piece, x: PL.x - 6, y: PL.bulbY - 1, w: 12, h: 1, keys: "L", color: WARM, strength: 0.5, halo: 9 })),
+];
 export const SHOP_SMUDGY_POOLS: readonly (LightPool & { piece: string })[] = [
+  // (Each picture light's wash down its panel: a tall soft glow over the lit cone, on the wall.)
+  ...WALL_PANELS.map((piece) => ({ piece, x: PL.x, y: Math.round((PL.top + PL.bottom) / 2) - 8, rx: 11, ry: 30, color: "#ffd9a0", strength: 0.22 })),
   { piece: "platform", x: PLW / 2, y: PLF - 4, rx: 70, ry: 34, color: "#ffe2b0", strength: 0.28 },
   { piece: "backdrop", x: BDW / 2, y: BDH + 10, rx: 46, ry: 10, color: WARM, strength: 0.16 },
 ];

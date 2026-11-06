@@ -53,6 +53,18 @@ to everyone.
   splats, not every one, `smudgySwipe` the stroke).
 - **The room's ceiling:** dark beams over a skylight's pale glow (`roof: "studio"`); the chat's night tone (a dark room).
 
+## The gallery's lights (after the first look)
+Eric, looking at the room: "Can you add lights, it's kinda depressing in there, some overhead lighting." Then: "Never mind, I see the
+one on the chess piece, that's probably enough." His final call, a compromise: **"lighting that comes down on the walls like in an art
+gallery"**. So, and only this:
+- Every wall panel (the back wall's 16 and both side walls' 36) has a small brass picture light at its top. Its warm wash is baked into
+  the panel's pixels (a cone widening down the wall, `PICTURE_LIGHT`, where the plaster and the canvases' paints go a shade lighter,
+  dithered at its edge), so the canvases glow where it falls, at no cost a frame.
+- On top of that, the room's own lights at every placement (`SHOP_SMUDGY_LIGHTS`: each bulb strip with a small halo) and a soft
+  tall glow over each cone (`SHOP_SMUDGY_POOLS`, on the wall, not the floor), drawn as Folio's and Hollow's are; off screen, skipped.
+- No lamps over the floor and no change to the room's brightness: the floor, the life class (its platform's skylight pool, the one
+  Eric saw) and the table are as they were.
+
 ## Numbers
 `CHALLENGE_FEEL.smudgy`: line 2.5 s, grab 0.3 s, the whip 0.75 s (its frames), the reveal's lead 0.25 s, the reveal 2.4 s, a beat
 0.3 s; the splatter: cover 1.2 s (gaps from 150 ms down to 12 ms, two splats at a time), hold at least 0.25 s, wipe 0.5 s.
