@@ -14,7 +14,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const [out = "versus-frames", base = "http://localhost:8788"] = process.argv.slice(2);
+const [out = "versus-frames", base = `http://localhost:${process.env.E2E_PORT ?? 8788}`] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch();
 const lines = [];

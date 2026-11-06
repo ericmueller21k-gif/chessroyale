@@ -11,7 +11,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { RANKED_1V1, rankView, type RankView } from "../packages/core/src/index.ts";
 
-const [out = "ranked-tiers-frames", base = "http://localhost:8788"] = process.argv.slice(2);
+const [out = "ranked-tiers-frames", base = `http://localhost:${process.env.E2E_PORT ?? 8788}`] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const browser: Browser = await chromium.launch();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

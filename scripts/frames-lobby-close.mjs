@@ -13,7 +13,7 @@ import { chromium, devices } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 
-const [out = "close-frames", scheme = "dark", base = "http://localhost:8788"] = process.argv.slice(2);
+const [out = "close-frames", scheme = "dark", base = `http://localhost:${process.env.E2E_PORT ?? 8788}`] = process.argv.slice(2);
 mkdirSync(`${out}/frames`, { recursive: true });
 const b = await chromium.launch();
 const ctx = await b.newContext({ ...devices["iPhone 13"], colorScheme: scheme });
