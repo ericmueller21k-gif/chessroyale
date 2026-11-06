@@ -230,3 +230,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   ?claw=1 test switch until Boingo's room merges; Eric's test tokens via the existing admin grant + "Admin: +3 of each token"
   button). Waiting to merge: #509 Welcome Crates (CI running), Squads (Eric's OK), Smudgy deploying (83ceba92).
   Resume order to propose: Squads (needs only Eric's OK) → north edge → controls → Boingo room → claw → tutorial.
+- Nov 6 ~03:05: usage reset; ONE OPUS AT A TIME now. Eric: the claw machine must be the real 3D cabinet in Boingo's room (walk up,
+  zoom, the in-room claw grabs and usually drops), not a 2D overlay. Resumed Boingo room helper: merge claude/claw-machine (keep the
+  server as reviewed), retire the 2D screen, in-room 3D cabinet + claw play, then finish its list. Eric loves the confetti floor.
