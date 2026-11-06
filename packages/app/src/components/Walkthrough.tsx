@@ -64,8 +64,12 @@ function saveSeen(): void {
 /** The spotlight's box for a slide, or null for a slide with no spot (the Handbook and crates slides). */
 function spotBox(slide: TutorialSlide): DOMRect | null {
   if (slide.kind !== "spot") return null;
-  const el = document.querySelector<HTMLElement>(`[data-tour="${slide.spot.id}"]`);
-  return el ? el.getBoundingClientRect() : null;
+  // The first one on screen: a computer has some spots twice (the top bar and the side menu), one of them hidden.
+  for (const el of document.querySelectorAll<HTMLElement>(`[data-tour="${slide.spot.id}"]`)) {
+    const r = el.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0) return r;
+  }
+  return null;
 }
 
 export function Walkthrough({ startOpen }: { startOpen?: boolean }) {

@@ -23821,7 +23821,7 @@ button.sq-tiny {
 .wt-body { margin: 0 0 10px; font-size: 15px; }
 .wt-bars { list-style: none; margin: 0 0 10px; padding: 0; display: grid; gap: 8px; font-size: 14px; }
 .wt-bars li { display: grid; gap: 4px; }
-.wt-bar { display: block; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.wt-bar { display: block; height: 8px; border-radius: 4px; background: #e2e2e8; overflow: hidden; }
 .wt-bar > span { display: block; height: 100%; background: #f5c542; transition: width 260ms ease; }
 .wt-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0 10px; }
 .wt-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }

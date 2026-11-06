@@ -18,9 +18,9 @@ describe("tutorial slides", () => {
 });
 
 describe("crate progress", () => {
-  it("shows only the 5-game crate while the 25-game one is held back", () => {
-    expect(TUTORIAL_CRATE_GOALS).toEqual([5]);
-    expect(crateBars(0).map((b) => b.goal)).toEqual([5]);
+  it("shows both Welcome Crates, 5 games and 25", () => {
+    expect(TUTORIAL_CRATE_GOALS).toEqual([5, 25]);
+    expect(crateBars(0).map((b) => b.goal)).toEqual([5, 25]);
   });
 
   it("counts games, caps at the goal, and marks it reached", () => {
@@ -33,8 +33,8 @@ describe("crate progress", () => {
     expect(crateBars(Number.NaN)[0].done).toBe(0);
   });
 
-  it("builds two bars when given the 25-game goal too", () => {
-    const bars = crateBars(7, [5, 25]);
+  it("shows 7 of 25 once the first crate is earned", () => {
+    const bars = crateBars(7);
     expect(bars.map((b) => [b.done, b.reached])).toEqual([[5, true], [7, false]]);
   });
 });

@@ -1,8 +1,10 @@
+import { WELCOME_GIFT } from "@chessroyale/core";
+
 /**
  * The first-time walkthrough's words and order, as pure data (no UI, no storage in here).
  *
  * Slides run in this order: the seven home-screen spots, then the Handbook, then the crates slide with the
- * welcome progress (5 games now; 25 is held behind TUTORIAL_CRATE_25 until that crate exists).
+ * welcome progress (the 5-game and 25-game Welcome Crates).
  */
 
 export interface TutorialSpot {
@@ -28,10 +30,8 @@ export const TUTORIAL_HANDBOOK_SLIDE = {
   body: "Every rule and number, in one place. Open it any time from Settings.",
 };
 
-/** Turn on to show the 25-game crate on the crates slide. Off until that crate is in the game. */
-export const TUTORIAL_CRATE_25 = false;
-
-export const TUTORIAL_CRATE_GOALS = TUTORIAL_CRATE_25 ? [5, 25] : [5];
+/** The Welcome Crates' goals (5 games, then 25): the crates slide shows both, as the Crates tab does. */
+export const TUTORIAL_CRATE_GOALS: readonly number[] = WELCOME_GIFT.milestones;
 
 export interface TutorialCrateBar {
   goal: number;
