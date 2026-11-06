@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("../src/town/admin-town.ts", () => ({ ADMIN_TOWN: true, STREET_TOWN: true }));
 
 const { area, facesOf, lightStep } = await import("../src/town/kit/prims.ts");
-const { bakeFace, gridTexel, rampColors, rampOf, rampsOf, stepChar, toHex, rgba } = await import("../src/town/kit/bake.ts");
+const { bakeFace, gridOf, gridTexel, rampColors, rampOf, rampsOf, stepChar, toHex, rgba } = await import("../src/town/kit/bake.ts");
 const { geomOf, streetBoxes, faceStep } = await import("../src/town/boxes.ts");
 const { tileOf, tileTexel, RIM_KEY } = await import("../src/town/box-draw.ts");
 const { PROPS } = await import("../src/town/world.ts");
@@ -210,6 +210,10 @@ describe("the kit's faces", () => {
     expect(pixels(bakeFace(poly(thin), gridTexel(["y"]), ramps, 0)).every((p) => p.c !== "#150c11")).toBe(true);
     const dome = facesOf(shape("dome", { size: [40, 40, 20] }))[0]!;
     expect(pixels(bakeFace(poly(dome), gridTexel(["r"]), ramps, 0, { soft: dome.soft })).every((p) => p.c !== "#150c11")).toBe(true);
+  });
+
+  it("a texture as data: a fill with rectangles painted over it in order", () => {
+    expect(gridOf(4, 3, "r", [[1, 0, 2, 2, "y"], [2, 1, 9, 9, "k"]])).toEqual(["ryyr", "rykk", "rrkk"]);
   });
 
   it("a texture tiles from the face's top left, rows down the face", () => {

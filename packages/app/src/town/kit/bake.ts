@@ -195,6 +195,14 @@ export function bakeFace(p: Poly, texel: (X: number, Y: number) => string | null
   return { w, h, data, mask };
 }
 
+/** A texture `w` x `h` texels of `fill`, with rectangles painted over it in order: [x, y, w, h, key] (a model's textures as data). */
+export function gridOf(w: number, h: number, fill: string, marks: readonly (readonly [x: number, y: number, w: number, h: number, key: string])[] = []): string[] {
+  const rows = Array.from({ length: h }, () => Array<string>(w).fill(fill));
+  for (const [x, y, mw, mh, k] of marks)
+    for (let j = Math.max(0, y); j < Math.min(h, y + mh); j++) for (let i = Math.max(0, x); i < Math.min(w, x + mw); i++) rows[j]![i] = k;
+  return rows.map((r) => r.join(""));
+}
+
 /** A grid's key at texture point (X, Y), tiled from its top left ("." and " ": nothing). */
 export function gridTexel(grid: readonly string[]): (X: number, Y: number) => string | null {
   const gh = grid.length;
