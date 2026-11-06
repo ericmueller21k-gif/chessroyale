@@ -327,7 +327,9 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   (`pruneProblems`).
 - **The 15-minute cron's jobs**, in order, each failing apart (`scheduled()` in `index.ts`): old errors and reports
   (`pruneProblems`), sign-in code records an hour old (`purgeEmailCodes`), chat moderators' decisions past keeping
-  (`pruneChatMod`, [chat.md](chat.md)), then fair play's deep re-check.
+  (`pruneChatMod`, [chat.md](chat.md)), once a day at `OPS.ledgerCheck.hourUtc` the item ledger's check (`ledgerCheck`: each account whose
+  balances and ledger disagree logged, one error on /admin/ops), then fair play's deep re-check. The ledger's one-off backfill:
+  an admin's `POST /api/admin/ledger/backfill` from the site (re-runnable: it adds nothing the second time).
 - The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
 
 ## Health

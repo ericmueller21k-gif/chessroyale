@@ -3,7 +3,8 @@
  * frequent errors (the app's and the server's, last 24 hours and 7 days, with their versions) and players' reports
  * (bugs with their full diagnostics, feedback, ideas) by id or by kind. The health view as JSON for scripts
  * (`/api/admin/health`: `npm run ops:report`): admins, or a request that came through Cloudflare Access for its
- * application (access.ts). Anyone else gets "Not found". See docs/areas/ops.md, "Errors and player reports", "Health".
+ * application (access.ts). Anyone else gets "Not found". See docs/areas/ops.md, "Errors and player reports", "Health". Also the
+ * item ledger's backfill (POST /api/admin/ledger/backfill: ledgerBackfill below).
  */
 import { OPS } from "@chessroyale/core";
 import { d1Sql, ensureSchema, userFromToken } from "./accounts.ts";
@@ -12,6 +13,7 @@ import { adminPage, esc, isAdmin, when, type AdminEnv } from "./admin.ts";
 import { REPORT_KINDS, latestReports, reportById, topErrors, type ErrorRow, type ProblemsEnv, type ReportKind, type ReportRow } from "./problems.ts";
 import { viaAccess, type AccessEnv } from "./access.ts";
 import { health, type Health } from "./health.ts";
+import { backfillLedger, ledgerCheck } from "./ledger.ts";
 import type { EngineEnv } from "./engine.ts";
 import type { Env } from "./index.ts";
 
@@ -37,6 +39,7 @@ type OpsEnv = AdminEnv & ProblemsEnv & AccessEnv & EngineEnv & Pick<Env, "LIVE">
  */
 export async function handleOpsAdmin(request: Request, env: OpsEnv): Promise<Response | null> {
   const url = new URL(request.url);
+  if (url.pathname === "/api/admin/ledger/backfill") return ledgerBackfill(request, env);
   const api = url.pathname === "/api/admin/health";
   if (url.pathname !== "/admin/ops" && !api) return null;
   if (!env.DB || request.method !== "GET") return notFound();
@@ -61,6 +64,22 @@ export async function handleOpsAdmin(request: Request, env: OpsEnv): Promise<Res
   const found = /^[A-Z2-9]{6}$/.test(id) ? await reportById(sql, id) : null;
   const [errors, reports, h] = await Promise.all([topErrors(sql, now, 30, q), latestReports(sql, 50, kind), health(env, sql, now)]);
   return adminPage("Ops", page(user!.email!, h, { id, q, kind }, found, errors, reports));
+}
+
+/**
+ * POST /api/admin/ledger/backfill (an admin's session, from the site itself: the origin is checked): the item ledger's backfill
+ * (ledger.ts, backfillLedger), run once after the ledger's part II is live; running it again adds nothing. Answers {legs}: how many it
+ * wrote, and {disagree}: the accounts the daily check still finds (none, unless a balance changed outside the ledger meanwhile).
+ */
+async function ledgerBackfill(request: Request, env: OpsEnv): Promise<Response> {
+  if (!env.DB || request.method !== "POST" || request.headers.get("origin") !== new URL(request.url).origin) return notFound();
+  const sql = d1Sql(env.DB);
+  const now = Date.now();
+  await ensureSchema(sql, env.DB);
+  if (!isAdmin(env, await userFromToken(sql, readCookie(request, SESSION_COOKIE), now))) return notFound();
+  const legs = await backfillLedger(sql, now);
+  const disagree = (await ledgerCheck(sql, OPS.ledgerCheck.accounts)).length;
+  return new Response(JSON.stringify({ legs, disagree }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
 }
 
 function reportCard(r: ReportRow): string {

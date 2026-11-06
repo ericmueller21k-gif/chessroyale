@@ -319,7 +319,7 @@ export interface SquadsRecord {
   devices: Record<string, { nps: number; strikes: number; jobs: number }>;
   /** Squads whose placement is decided (and rewarded). */
   placed: Record<number, SquadsPlacement>;
-  /** Rewards for the Durable Object to write (it empties this). */
+  /** Rewards for the Durable Object to write (each stays here until it's written: squads-do.ts, writeRewards). */
   rewardQueue: SquadsReward[];
   /**
    * A test lobby: where it starts, its own clock, the position its first round's boards start from (`fen`), its bots
@@ -1833,7 +1833,7 @@ export class SquadsCore {
     return { coins: playing && !testing ? r.coins : 0, crates: playing && !testing ? r.crates : 0, recorded: !testing && !!this.r.accounts[id] };
   }
 
-  /** The Durable Object writes these (results and rewards) and they're gone from the record. */
+  /** Takes the rewards out of the record (tests, and a lobby with no D1 to write them to: squads-do.ts writes each in place). */
   takeRewards(): SquadsReward[] {
     return this.r.rewardQueue.splice(0);
   }

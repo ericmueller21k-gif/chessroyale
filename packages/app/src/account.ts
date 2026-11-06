@@ -93,6 +93,30 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
+/** One action's id (a boss crate's buy, an open, an admin's grant): the server applies an action once per id (server/ledger.ts). */
+export function newRequestId(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * One action, POSTed with its own request id and asked a second time after a moment, with the same id, when the first try fails on
+ * the way (no answer, or the server's own error): the server applies it once and answers the retry with what the first try did. A
+ * refusal (a 4xx) or a resting switch (503) isn't asked again.
+ */
+async function postOnce<T>(path: string, body: object): Promise<T> {
+  const init = { method: "POST", body: JSON.stringify({ ...body, request: newRequestId() }) };
+  try {
+    return await api<T>(path, init);
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && (status < 500 || status === 503)) throw e;
+    await new Promise((r) => setTimeout(r, ACTION_RETRY_MS));
+    return api<T>(path, init);
+  }
+}
+const ACTION_RETRY_MS = 800;
+
 /**
  * Your profile, asked a second time after a moment when the first try fails on the way (no answer, or the server's own
  * error): one hiccup shouldn't cost the page its account. A refusal (the age gate, a 4xx) isn't asked again.
@@ -296,20 +320,20 @@ export const tokenCount = (boss: string): { tokens: number; keys: number } => {
 
 /**
  * Buys a boss's crate inside its shop (`way`: 3 of its tokens, or a token and a crate key) into your inventory, unopened (Nov 2: the
- * Crates tab opens it, `openCrate`), on the server, in one transaction (server/boss-tokens.ts). Your locker comes back with it. Throws
- * the server's message (not enough, the shop resting).
+ * Crates tab opens it, `openCrate`), on the server, in one transaction (server/boss-tokens.ts), once (postOnce). Your locker comes back
+ * with it. Throws the server's message (not enough, the shop resting).
  */
 export async function buyBossCrateOnServer(crate: string, way: "tokens" | "key"): Promise<void> {
-  const r = await api<{ crate: string; locker: Locker }>("/api/shop/boss-crate", { method: "POST", body: JSON.stringify({ crate, way }) });
+  const r = await postOnce<{ crate: string; locker: Locker }>("/api/shop/boss-crate", { crate, way });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
 }
 
 /** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
 export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 
-/** An admin's test grant to themselves: crate keys, and a boss's tokens. Your locker comes back with it. */
+/** An admin's test grant to themselves: crate keys, and a boss's tokens (once: postOnce). Your locker comes back with it. */
 export async function grantTestItems(body: { keys?: number; boss?: string; tokens?: number }): Promise<void> {
-  const locker = await api<Locker>("/api/locker/grant", { method: "POST", body: JSON.stringify(body) });
+  const locker = await postOnce<Locker>("/api/locker/grant", body);
   if (state.profile) set({ profile: { ...state.profile, locker } });
 }
 
@@ -351,11 +375,11 @@ export async function refreshProfile(): Promise<void> {
 }
 
 /**
- * Opens a crate on the server. `force`: the test switches (?fischer=1, ?shiny=1), honored only for those allowed them
- * (test-switches.ts; the server checks too) and while crates are free.
+ * Opens a crate on the server, once (postOnce: a retry answers the same item). `force`: the test switches (?fischer=1, ?shiny=1),
+ * honored only for those allowed them (test-switches.ts; the server checks too) and while crates are free.
  */
 export async function openCrate(crate: string, force: { fischer?: boolean; shiny?: boolean } = {}): Promise<{ roll: CrateRoll; item: ItemInstance }> {
-  const r = await api<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { method: "POST", body: JSON.stringify({ crate, ...force }) });
+  const r = await postOnce<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { crate, ...force });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
   return { roll: r.roll, item: r.item };
 }
