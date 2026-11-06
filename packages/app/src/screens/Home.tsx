@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
@@ -777,6 +778,8 @@ export function HomeScreen({
       )}
       {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
       <ChatNotice />
+      {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
+      <WelcomeNotice />
     </>
   );
   if (queueing)

@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { aboveHat, behindPiece, isShiny, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import type { RiderDraft } from "./rides/kit.ts";
@@ -1175,7 +1175,7 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
+    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
       <svg viewBox={vb} aria-hidden="true">
         {ride ? (
           <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
@@ -1503,6 +1503,71 @@ export function BetaCrateArt() {
           <path d="M4 30 V20 H16 V24 H8 V30 Z" />
           <path d="M96 30 V20 H84 V24 H92 V30 Z" />
         </g>
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * The HunChess Welcome Crate (Eric, Nov 6: "a HunChess-theme gold and black crate"): a deep black chest with the logo's gold
+ * (#f2c14e) trim, banding and corners, a gold pawn on its front and "HC" under it, and an idle glint that sweeps across it now and
+ * then (CSS: `.hc-crate-glint`; still under reduced motion).
+ */
+export function HunchessCrateArt() {
+  return (
+    <span class="item-art crate-art hc-crate-art">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <defs>
+          <linearGradient id="hc-crate-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2a2318" />
+            <stop offset="1" stop-color="#0b0906" />
+          </linearGradient>
+          <linearGradient id="hc-crate-gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#fff0b8" />
+            <stop offset="0.45" stop-color="#f2c14e" />
+            <stop offset="1" stop-color="#a87a14" />
+          </linearGradient>
+          <clipPath id="hc-crate-clip">
+            <rect x="4" y="20" width="92" height="68" rx="4" />
+          </clipPath>
+        </defs>
+        <rect x="8" y="30" width="84" height="58" rx="4" fill="url(#hc-crate-body)" {...LINE} />
+        <rect x="4" y="20" width="92" height="14" rx="4" fill="#1c1710" {...LINE} />
+        <g fill="none" stroke="url(#hc-crate-gold)" {...lw(2.4)}>
+          <path d="M6 27 H94" />
+          <rect x="12" y="36" width="76" height="47" rx="3" />
+        </g>
+        <g fill="url(#hc-crate-gold)" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1.4)}>
+          <path d="M44 66 L46.5 55 H53.5 L56 66 Z" />
+          <rect x="40" y="65" width="20" height="5" rx="1.5" />
+          <rect x="44.5" y="52.5" width="11" height="3.5" rx="1.5" />
+          <circle cx="50" cy="47" r="6" />
+        </g>
+        <text x="50" y="80" text-anchor="middle" font-size="9" font-weight="900" letter-spacing="2.5" fill="#f2c14e" font-family="ui-monospace, Menlo, Consolas, monospace">
+          HUNCHESS
+        </text>
+        <g fill="url(#hc-crate-gold)" stroke="#1d1d1f" {...lw(1.4)}>
+          <path d="M8 76 V88 H20 V84 H12 V76 Z" />
+          <path d="M92 76 V88 H80 V84 H88 V76 Z" />
+          <path d="M4 30 V20 H16 V24 H8 V30 Z" />
+          <path d="M96 30 V20 H84 V24 H92 V30 Z" />
+        </g>
+        <g clip-path="url(#hc-crate-clip)">
+          <path class="hc-crate-glint" d="M-30 100 L0 100 L40 10 L10 10 Z" fill="#fff8dc" opacity="0" />
+        </g>
+      </svg>
+    </span>
+  );
+}
+
+/** The Welcome Crate's box on the strip (a small black box with a gold band): it only ever shows Fischer Random, so this is a stand-in for the type. */
+export function HunchessBoxArt({ color }: { color: string }) {
+  return (
+    <span class="item-art present-art">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <rect x="14" y="34" width="72" height="52" rx="3" fill="#14100a" {...LINE} />
+        <rect x="45" y="34" width="10" height="52" fill={color} stroke="#1d1d1f" {...lw(1.6)} />
+        <rect x="10" y="26" width="80" height="12" rx="3" fill="#f2c14e" {...LINE} />
       </svg>
     </span>
   );

@@ -671,9 +671,11 @@
         "packages/app/src/boss-tokens.ts",
         "packages/app/src/components/TokenArt.tsx",
         "packages/app/src/components/TokenBox.tsx",
-        "packages/app/src/components/tokens/**"
+        "packages/app/src/components/tokens/**",
+        "packages/app/src/components/WelcomeNotice.tsx",
+        "packages/server/src/welcome.ts"
       ],
-      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts"]
+      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts"]
     },
     "chat": {
       "paths": [

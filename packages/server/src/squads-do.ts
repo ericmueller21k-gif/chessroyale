@@ -9,6 +9,7 @@ import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
+import { grantWelcomeCrate } from "./welcome.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
@@ -153,6 +154,8 @@ export class SquadsLobby extends DurableObject<Env> {
         if (!r.userId) continue;
         if (r.recorded) {
           await recordResult(sql, r.userId, { mode: "squads", online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code }, Date.now());
+          // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
+          await grantWelcomeCrate(sql, r.userId, Date.now()).catch(() => false);
         }
         await grantReward(sql, r.userId, r.coins, r.crates);
       }

@@ -1,4 +1,5 @@
 import { applyMove } from "@chessroyale/chess";
+import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { MiniBoard } from "../components/MiniBoard.tsx";
 import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.ts";
 import { useState } from "preact/hooks";
@@ -249,6 +250,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
       )}
       {/* A boss battle that dropped you a token: its box, over the screen (Eric, Nov 2). */}
       {match.settings.raid && <TokenBox match={match} />}
+      {/* (A finished game may have earned the Welcome Crate, Nov 6: its one-time notice, asked for again as the result is saved.) */}
+      <WelcomeNotice refresh />
     </div>
   );
 }

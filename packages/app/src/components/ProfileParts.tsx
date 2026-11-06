@@ -1,6 +1,7 @@
 import { Fragment } from "preact";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
-import { FAIRPLAY, SLOT_NAMES, bossInfo, isShiny, itemColor, itemDef, purity, secondColor, tierInfo, type ItemLook } from "@chessroyale/core";
+import { FAIRPLAY, bossInfo, itemDef, tierInfo, type ItemLook } from "@chessroyale/core";
+import { wornDetails } from "../item-details.ts";
 import { FdButton, WORN_ORDER } from "./FrontDoor.tsx";
 import { ItemArt } from "./Items.tsx";
 import { reportPlayer, type PublicProfile } from "../account.ts";
@@ -35,9 +36,6 @@ export function WearingRows({ look }: { look: ItemLook }) {
   return (
     <>
       {wornRows(look).map(({ slot, it, d }) => {
-        const c = itemColor(it.color);
-        const second = secondColor(it);
-        const c2 = second ? itemColor(second) : null;
         const tier = tierInfo(d.tier);
         return (
           <div key={slot} class="fd-item">
@@ -48,7 +46,8 @@ export function WearingRows({ look }: { look: ItemLook }) {
               <strong>{d.name}</strong>
               <span>
                 {/* Each detail stays whole; a narrow row breaks between them. */}
-                {[SLOT_NAMES[slot], c2 ? `${c.name} & ${c2.name}` : c.name, `${purity(it.blemish)}% pure`, ...(isShiny(it.blemish) ? ["Shiny"] : [])].map((t, i) => (
+                {/* (A HunChess ride: no purity or shine, and "Not tradeable": item-details.ts.) */}
+                {wornDetails(slot, it).map((t, i) => (
                   <Fragment key={i}>
                     {i > 0 && " · "}
                     <span class="fd-nowrap">{t}</span>
