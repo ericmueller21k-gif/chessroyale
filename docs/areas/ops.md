@@ -58,23 +58,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     **One main run at a time** (Nov 1; `check` too): a push while main's run is going waits (the run going is never
     cancelled), and a newer push replaces the one waiting. A merge whose own run was skipped is tested by the next run,
     which runs every spec on main with every merge since the last run; its summary starts with "The merges this run
-    covers" (and the WebGL jobs go by all of them). **When that run is red,** the culprit is one of those merges: the
+    covers". **When that run is red,** the culprit is one of those merges: the
     failed test's `file:line` and error usually name its area, and the plan table of each merge's own PR run says
     whether it ran that spec; if it isn't clear, re-run the failed spec locally on each merge in turn (`git checkout
     <merge>`, `npx playwright test <spec>`), oldest first.
-  - **The town on WebGL** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): a change to the town's
-    area (`webgl` in `areas.json`: a path of the town square's area, or one of the specs below) also runs the town's
-    drawing specs (`town`, `town-desktop`, `town-tags`, `town-webgl`) again on a `VITE_TOWN_GL=1` build, WebGL the town's
-    default (software WebGL: the runners have no GPU). Two more jobs beside the shards, `webgl-phone` and `webgl-desktop`
-    in the shard matrix ("the town on WebGL, webgl-phone"): one project each, one worker (two software-WebGL pages on a
-    runner's 4 CPUs make every check slow enough to miss the chat's and the tags' timings), `TOWN_GL_BUILD=1` for the
-    one check that reads the default. About 10 minutes of tests each (measured locally: 9 for the phone, 10.5 for the
-    computer) plus setup, side by side with the shards, so a town PR's run is about as long as before (its town-chat
-    shard is the longer one); about 25 runner minutes more per run. Their records are in `result`'s summary as shards
-    `webgl-phone` and `webgl-desktop` (their times kept out of the timings table). On a pull request, a push to main that
-    merged such a change (the plan diffs `HEAD^1`) and the full-e2e label; a manual run always. The chat's two specs
-    aren't in it: HTML over the canvas, nothing in them depends on the backend, and on software WebGL they'd need about
-    four more such jobs.
   - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
     plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
     `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
@@ -105,8 +92,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
-    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7, and the town's
-    WebGL jobs two more when they run: the account's
+    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7: the account's
     limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
@@ -342,8 +328,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
     Squads included (`LiveBoard.health`);
   - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10
     (the town's WebGL fallbacks left out: they have their own count, next);
-  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): page loads whose
-    town asked for WebGL and drew with Canvas 2D instead, in the last 24 hours and 7 days, in all and by reason
+  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"; Nov 6: the street town's): page
+    loads whose street town couldn't draw with WebGL and went to today's town instead, in the last 24 hours and 7 days, in all and by reason
     (`townFallbacks`). The page reports one at most (`reportTownFallback` in the app's problems.ts, never on the frame
     loop, nothing shown to the player) through the error reporting, as the kind `town-gl-fallback` with its reason as the
     message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice`, `not-back`):
