@@ -221,7 +221,8 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`locking a new view (${backend}): a drag let go near east snaps there; a tap locks it in and the up arrow goes east; not snapped, a tap eases back; a building's in and out resets north`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 500_000 : 200_000);
     await open(page, backend);
-    await walkTo(page, [4, 28]);
+    // (Fountain Street east of the park: room to walk and run east, round the world's wrap, before the park.)
+    await walkTo(page, [38, 28]);
     // A bit past a quarter to the right (about 95°): let go, it eases to east exactly; snapped, not yet the base.
     await drag(page, 0.53);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(90);
@@ -230,10 +231,12 @@ for (const backend of ["2d", "webgl"] as const) {
     // A tap (a walk): east becomes the base heading; the camera stays there through the walk.
     await watchHeadings(page);
     const here = await you(page);
-    await tapSquare(page, [here[0] + 2, here[1]]);
+    // (Two ahead and one to the right, the street's south lane: clear of the homes north of it, whose fronts stand over the street's
+    // squares on screen as you face east.)
+    await tapSquare(page, [here[0] + 2, here[1] - 1]);
     await expect.poll(async () => (await cam(page)).base, { timeout: 3000 }).toBe(90);
     await settle(page);
-    expect(await you(page), "walked to the square tapped").toEqual([here[0] + 2, here[1]]);
+    expect(await you(page), "walked to the square tapped").toEqual([here[0] + 2, here[1] - 1]);
     expect([...new Set((await headings(page)).map(([h]) => Math.round(h)))], "the camera stayed east").toEqual([90]);
     c = await cam(page);
     expect([c.heading, c.headingBase, c.look, c.snapped]).toEqual([90, 90, 0, null]);
