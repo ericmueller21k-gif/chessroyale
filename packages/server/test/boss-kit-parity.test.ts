@@ -201,6 +201,8 @@ async function solo(start: MatchRunner): Promise<Trace> {
       if (r.bossToMove()) await r.playBoss(engines[0]);
       continue;
     }
+    // (Dash's Scramble Rush: nobody's placements, as online.)
+    if (r.rushDue()) r.finishRush({});
     if (r.extraMoveDue()) {
       await r.playExtraMove(engines[0]);
       continue;

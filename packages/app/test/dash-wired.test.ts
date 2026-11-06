@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DASH_ANIM } from "@chessroyale/chess";
+import { DASH_ANIM, DASH_FX } from "@chessroyale/chess";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { BOSS_BLITZ } from "../src/characters/boss-blitz.ts";
@@ -34,9 +34,27 @@ const cue = (anim: string, name: string) => {
 const length = (anim: string) => BOSS_BLITZ.anims[anim]!.frames.reduce((s, f) => s + f.ms, 0);
 
 describe("Dash's wiring", () => {
+  it("one smack a move (Eric, Nov 6): his move and his check slap the clock once, his capture not (his Clock Slap's slam is its smack); his rest loops never", () => {
+    const smacks = (a: string) => DASH_FIGURE.anims[a]!.frames.filter((f) => f.cue === "click" || f.cue === "slam").length;
+    expect([smacks("move"), smacks("check"), smacks("capture"), smacks("clockSlap")]).toEqual([1, 1, 0, 1]);
+    for (const a of ["idle", "thinking", "rattled", "smug"]) {
+      expect(DASH_FIGURE.anims[a]!.frames.some((f) => f.cue === "click" || f.cue === "tick" || f.cue === "tap" || f.cue === "slam"), a).toBe(false);
+      // (Never his paw on the button: the right button never pressed in a rest loop.)
+      expect(DASH_FIGURE.anims[a]!.frames.some((f) => f.layers.some((l) => l.part === "btnR:true")), a).toBe(false);
+      expect(DASH_FIGURE.anims[a]!.frames.reduce((s, f) => s + f.ms, 0), a).toBe(BOSS_BLITZ.anims[a]!.frames.reduce((s, f) => s + f.ms, 0));
+    }
+    // His clock fits: 3, 4 and 5 quick smacks, each short enough for its moment.
+    for (const n of [3, 4, 5]) {
+      expect(smacks(`fit${n}`)).toBe(n);
+      expect(DASH_FIGURE.anims[`fit${n}`]!.frames.reduce((s, f) => s + f.ms, 0)).toBeLessThanOrEqual(DASH_FX.clockFit);
+    }
+  });
+
   it("his figure is the art's as drawn, in a frame with room on its right (his feet where they were); his name says Dash everywhere a player sees", () => {
     expect(kit.ch).toBe(DASH_FIGURE);
-    expect(DASH_FIGURE.anims).toBe(BOSS_BLITZ.anims);
+    // (Every animation as drawn but his quiet rest loops and his capture (Dash v2, below), and his clock fits added.)
+    for (const [name, a] of Object.entries(BOSS_BLITZ.anims)) if (!["idle", "thinking", "rattled", "capture"].includes(name)) expect(DASH_FIGURE.anims[name], name).toBe(a);
+    expect(Object.keys(DASH_FIGURE.anims).sort()).toEqual([...Object.keys(BOSS_BLITZ.anims), "fit3", "fit4", "fit5"].sort());
     expect(DASH_FIGURE.w).toBe(BOSS_BLITZ.w + DASH_ROOM);
     expect(DASH_FIGURE.foot).toEqual(BOSS_BLITZ.foot);
     expect([DASH_FIGURE.name, sidekickBlitz.name, TOKEN_ART.dash!.name]).toEqual(["Dash", "Tick", "Dash token"]);
@@ -146,8 +164,8 @@ describe("Dash's intro", () => {
     const fromLine = introLength(beats) - F.faceMs;
     expect(fromLine).toBeGreaterThanOrEqual(9_000);
     expect(fromLine).toBeLessThanOrEqual(10_500);
-    // (No God King attack was drawn for him: he stands through its beat.)
-    expect(bossKit("Dash")!.kingAttack).toBeUndefined();
+    // (His intro has no God King attack in it (his attack on a king came after it, Nov 6): he stands through its beat.)
+    expect(readFileSync("packages/app/src/town/shops/intro.ts", "utf8")).toMatch(/def\.id === "dash" \? null : \(kit\?\.kingAttack/);
   });
 
   it("each dash: he bolts off his spot (his dust trail from the launch), is out of sight, races back and skids onto it, tosses; he stands between", () => {
