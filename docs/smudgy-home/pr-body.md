@@ -60,6 +60,9 @@ spec anyway). Smudgy is live: this goes to everyone.
 - `packages/app/test/town-bots.test.ts`, the baked sheets: `files` 21 → 22; `artId` gains `smudgykeeper: "sidekick-smudgy-keeper"`.
 - `packages/app/test/shop-folio.test.ts`, Folio's crate: `expect(BOSS_CRATES.at(-1)).toBe(crate)` → `expect(BOSS_CRATES).toContain(crate)`
   (Smudgy's crate is the last now; every other check kept).
+- `packages/app/test/smudgy-wired.test.ts`, his sound pack's names: `["dab", "drip", "giggle", "oof", "splash", "swish", "thump"]` (7) →
+  `["dab", "drip", "flop", "giggle", "oof", "splash", "splat", "swipe", "swish", "thump", "whoosh"]` (11: the four new ones); its
+  loudness checks, run on every sound of the pack, kept and passing for the new four.
 - `packages/server/test/boss-tokens.test.ts`, the crates and their rides: gains `["smudgy", "smudgy-brush"]`.
 - (`packages/core/test/crates.test.ts`'s `NO_CRATE_YET` keeps `smudgy-brush`: "in no regular crate", as the others' rides.)
 - New, nothing removed: `packages/app/test/shop-smudgy.test.ts` (16: the room's walkable squares, the drop cloth and the table, the marks,
