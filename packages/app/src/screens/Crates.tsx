@@ -57,6 +57,7 @@ import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
 const colorIndex = (c: string) => ITEM_COLORS.findIndex((x) => x.id === c);
@@ -153,9 +154,21 @@ export function CratesPanel() {
     if (!u || !anyCrate(u.crate) || (locker && !locker.items.some((i) => i.id === u.item.id))) return null;
     return u;
   });
-  const [open, setOpen] = useState<CrateDef | null>(() => (resume ? anyCrate(resume.crate)! : null));
+  const [open, setOpen] = useState<CrateDef | null>(() => (resume && !isWelcomeCrate(resume.crate) ? anyCrate(resume.crate)! : null));
+  // The Welcome Crate row open (1 or 2); an unseen one's reveal resumes on its own row.
+  const [resumeRow] = useState<number | null>(() => (resume && isWelcomeCrate(resume.crate) ? welcomeResumeRow(welcomeRowsNow(profile)) : null));
+  const [welcomeOpen, setWelcomeOpen] = useState<number | null>(resumeRow);
+  const welcome = welcomeRowsNow(profile);
+  // A crate's page opens at its top (you may have scrolled the list down to its row: its hero and the gambling ring show first).
+  useEffect(() => {
+    if (open || welcomeOpen !== null) window.scrollTo(0, 0);
+  }, [open, welcomeOpen]);
   const count = (n: number | null | undefined) => (n === null || n === undefined ? "∞" : String(n));
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
+  if (welcomeOpen !== null) {
+    const row = welcome.find((r) => r.n === welcomeOpen)!;
+    return <WelcomePage row={row} resume={resumeRow !== null && welcomeOpen === resumeRow ? (resume ?? undefined) : undefined} onBack={() => setWelcomeOpen(null)} />;
+  }
   return (
     <div class="crates">
       <GamblingWarning />
@@ -168,7 +181,9 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
-      <WelcomeRow onOpen={() => setOpen(WELCOME_CRATE)} />
+      {welcome.map((row) => (
+        <WelcomeRow key={row.n} row={row} onOpen={() => setWelcomeOpen(row.n)} />
+      ))}
       <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
       {profile?.admin && <AdminGrants />}
       {CRATES.map((c) => {
@@ -222,39 +237,59 @@ export function CratesPanel() {
   );
 }
 
-/** Where your Welcome Crate is: "ready" (yours to open), "opened", or not earned yet ("locked"; a guest's always is). */
+/** Where the Welcome Crates are (the locker's `welcome`; none earned yet for a guest or before the locker loads). */
 const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) =>
   profile?.locker?.welcome ?? { games: 0, next: WELCOME_GIFT.milestones[0] as number | null, unopened: 0, status: "locked" as const, notice: false };
-/**
- * The line under the crate saying where yours are (Eric: "the first one you get after 5 games, the next one you get after 25"): one
- * waiting ("You have 1. Open it!"), else the next milestone's progress ("Finish 25 games for your second Welcome Crate: 7/25"), else
- * both opened.
- */
-function welcomeLine(w: { games: number; next?: number | null; unopened?: number; status: string }, signedIn: boolean): string {
-  const waiting = w.unopened ?? (w.status === "ready" ? 1 : 0);
-  if (waiting > 0) return `You have ${waiting}. Open ${waiting === 1 ? "it" : "them"}!`;
-  const next = w.next === undefined ? (w.status === "locked" ? WELCOME_GIFT.milestones[0] : null) : w.next;
-  if (next === null) return "Both opened. Their rides are in your locker.";
-  const line = WELCOME_TEXT.progress(w.games, next);
-  return signedIn ? line : `${line}. Sign in to earn it.`;
+/** Both Welcome Crate rows (Eric, Nov 6), from the account's locker: the rides in it are the HunChess ones (welcome-rows.ts). */
+const welcomeRowsNow = (profile: ReturnType<typeof useAccount>["profile"]): WelcomeRowView[] => {
+  const rides = (profile?.locker?.items ?? []).filter((i) => isHunchess(i.def)).map((i) => ({ id: i.id, def: i.def }));
+  return welcomeRows(welcomeOf(profile), !!profile?.user.signedIn, rides);
+};
+
+/** A Welcome Crate's meter: its bar filling, and "3/5" beside it (full at ready and opened). */
+function WelcomeMeter({ row }: { row: WelcomeRowView }) {
+  return (
+    <span class="welcome-meter" role="progressbar" aria-label={`Welcome Crate ${row.n} progress`} aria-valuemin={0} aria-valuemax={row.milestone} aria-valuenow={row.done}>
+      <span class="welcome-bar">
+        <span class="welcome-bar-fill" style={{ width: `${Math.round(row.fill * 100)}%` }} />
+      </span>
+      <span class="welcome-meter-text">{row.meter}</span>
+    </span>
+  );
+}
+
+/** The padlock on a locked crate (drawn in a 24-unit box). */
+function Padlock() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" class="welcome-lock-icon">
+      <path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+      <rect x="4" y="10" width="16" height="11" rx="2.5" fill="currentColor" />
+    </svg>
+  );
 }
 
 /**
- * The HunChess Welcome Crate's row (Eric, Nov 6), first in the Crates tab: the gold-and-black crate, its name, "Thank you for being an
- * early tester!", "Not tradeable", and where yours is (the progress hint until it's earned: shown, greyed, not hidden).
+ * One of the two Welcome Crate rows in the Crates tab (Eric, Nov 6), both there from the start for every player (shown, not hidden):
+ * the gold-and-black crate, its name, "Thank you for being an early tester!", "Not tradeable", its own meter and its state: locked (a
+ * padlock, greyed a little: "Finish 5 games to unlock"; a guest's "Sign in to earn"), ready ("Ready"), or opened ("Opened" and its ride).
  */
-function WelcomeRow({ onOpen }: { onOpen: () => void }) {
-  const { profile } = useAccount();
-  const w = welcomeOf(profile);
+function WelcomeRow({ row, onOpen }: { row: WelcomeRowView; onOpen: () => void }) {
   return (
-    <button type="button" class={`ff-window crate-row welcome-crate-row${w.status === "ready" ? "" : " none"}`} data-crate={WELCOME_CRATE.id} data-welcome={w.status} onClick={onOpen}>
+    <button type="button" class={`ff-window crate-row welcome-crate-row ${row.state}`} data-crate={WELCOME_CRATE.id} data-welcome={row.state} data-welcome-n={row.n} onClick={onOpen}>
       <span class="crate-row-art">
         <HunchessCrateArt />
+        {row.state === "locked" && (
+          <span class="welcome-lock">
+            <Padlock />
+          </span>
+        )}
       </span>
       <span class="crate-row-text">
-        <strong>{WELCOME_TEXT.name}</strong>
+        <strong>Welcome Crate {row.n}</strong>
         <span class="crate-row-blurb welcome-thanks">{WELCOME_TEXT.thanks}</span>
-        <span class="crate-row-held welcome-progress">{welcomeLine(w, !!profile?.user.signedIn)}</span>
+        <WelcomeMeter row={row} />
+        <span class="crate-row-held welcome-progress">{row.line}</span>
+        {row.ride && <span class="small">{itemDef(row.ride.def)?.name}</span>}
         <span>
           <NotTradeable />
         </span>
@@ -333,7 +368,6 @@ function AdminGrants() {
 }
 
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
-  if (crate.id === WELCOME_CRATE.id) return <WelcomePage resume={resume} onBack={onBack} />;
   // A boss crate opens only one you hold (the server's, once each), never with a test switch.
   const boss = isBossCrate(crate) ? crate : null;
   const held = heldOf(useAccount().profile?.locker, crate);
@@ -478,13 +512,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
 }
 
 /**
- * The Welcome Crate's page (Eric, Nov 6): the crate, its name, "Thank you for being an early tester!", "Not tradeable", where yours is,
- * and every ride it can give (each as likely), in the HunChess colorway, with no purity anywhere. "▶ Open" opens yours (once: greyed
- * until it's earned and once it's opened), with the Crates tab's own strip and reveal.
+ * A Welcome Crate's page (Eric, Nov 6): the crate, its name, "Thank you for being an early tester!", "Not tradeable", its meter and state
+ * ("Finish 5 games to unlock", "Ready", "Opened" with its ride), and every ride it can give (each as likely), in the HunChess colorway,
+ * with no purity anywhere. "▶ Open" opens a ready one (greyed until then, and once it's opened), with the Crates tab's own strip and reveal.
  */
-function WelcomePage({ resume, onBack }: { resume?: Unseen; onBack: () => void }) {
-  const { profile } = useAccount();
-  const w = welcomeOf(profile);
+function WelcomePage({ row, resume, onBack }: { row: WelcomeRowView; resume?: Unseen; onBack: () => void }) {
   const [opening, setOpening] = useState(!!resume);
   if (opening) return <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />;
   return (
@@ -492,21 +524,28 @@ function WelcomePage({ resume, onBack }: { resume?: Unseen; onBack: () => void }
       <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
         ‹ Crates
       </button>
-      <div class="ff-window crate-hero welcome-crate-hero">
+      <div class={`ff-window crate-hero welcome-crate-hero ${row.state}`}>
         <span class="crate-hero-art">
           <HunchessCrateArt />
+          {row.state === "locked" && (
+            <span class="welcome-lock">
+              <Padlock />
+            </span>
+          )}
         </span>
-        <strong>{WELCOME_TEXT.name}</strong>
+        <strong>Welcome Crate {row.n}</strong>
         <span class="small welcome-thanks">{WELCOME_TEXT.thanks}</span>
         <NotTradeable />
-        <span class="small crate-held welcome-progress" data-welcome={w.status}>
-          {welcomeLine(w, !!profile?.user.signedIn)}
+        <WelcomeMeter row={row} />
+        <span class="small crate-held welcome-progress" data-welcome={row.state}>
+          {row.line}
         </span>
+        {row.ride && <span class="small">{itemDef(row.ride.def)?.name}</span>}
       </div>
       <p class="small muted">
-        Two per account: one for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, another at {WELCOME_GIFT.milestones[1]}. Each holds
-        one ride, any of the game's rides, each as likely (the second never the first's), in HunChess gold and black. They and their
-        rides can't be traded.
+        Two per account: Welcome Crate 1 for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, Welcome Crate 2 at{" "}
+        {WELCOME_GIFT.milestones[1]}. Each holds one ride, any of the game's rides, each as likely (the second never the first's), in HunChess
+        gold and black. They and their rides can't be traded.
       </p>
       <h3 class="ff-title">Possible rides</h3>
       <div class="odds-list">
@@ -529,7 +568,7 @@ function WelcomePage({ resume, onBack }: { resume?: Unseen; onBack: () => void }
       <button
         type="button"
         class="ff-button"
-        disabled={w.status !== "ready"}
+        disabled={row.state !== "ready"}
         onClick={() => {
           unlockAudio();
           play("menuSelect");
