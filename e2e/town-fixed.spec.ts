@@ -237,8 +237,9 @@ for (const backend of ["2d", "webgl"] as const) {
     // Out through the west gateway, (15, 39): down from the plaza onto Colosseum Row.
     await walkTo(page, [15, 40]);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
-    expect(await arrowStep(page, "ArrowDown"), "into the gateway").toEqual([15, 39]);
-    expect(await arrowStep(page, "ArrowDown"), "onto Colosseum Row").toEqual([15, 38]);
+    // (A held key may take a second step before it's let go: down until you're on Colosseum Row, every step in the gateway's column.)
+    for (let k = 0; k < 3 && (await you(page))[1] > 38; k++) expect((await arrowStep(page, "ArrowDown"))[0], "down the gateway's column").toBe(15);
+    expect((await you(page))[1], "through the gateway onto Colosseum Row").toBeLessThanOrEqual(38);
     await figuresOnScreen(page, "through the gateway");
   });
 

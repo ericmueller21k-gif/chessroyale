@@ -169,8 +169,8 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   const errors = watchErrors(page);
   await openStreet(page);
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
-  // The park's fourth table, (19, 23), ahead on your left past the fountain: its stools (18, 23) and (20, 23). (The one on your row,
-  // (19, 18), has a home's edge chip over it on a phone.)
+  // The park's fourth table, (19, 31), ahead on your left past the fountain: its stools (18, 31) and (20, 31). (The one on your row,
+  // (19, 26), has a home's edge chip over it on a phone.)
   const at = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("table", 3) ?? null);
   expect(at, "the table is drawn at the start").not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
@@ -178,7 +178,7 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
   for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),23$/);
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),31$/);
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   const stool = (await you(page)).join(",");
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
