@@ -278,17 +278,20 @@ export async function deleteItems(sql: Sql, a: LedgerAccount, ids: readonly stri
 }
 
 /**
- * Every balance an account holds, as rows (kind, asset, n), in SQL: `?1` is the account's id. What the ledger's sums must equal.
- * (A boss crate counts by its kind; a Welcome Crate while it's unopened.)
+ * Every balance an account holds, each table's as rows (kind, asset, n), in SQL: `?1` is the account's id. What the ledger's sums must
+ * equal. (A boss crate counts by its kind; a Welcome Crate while it's unopened.) One SELECT each: D1 refuses a compound SELECT of
+ * more than a few terms, so a statement reads one of these at a time.
  */
-const BALANCES = `SELECT 'coins' AS kind, '' AS asset, coins AS n FROM wallets WHERE user_id = ?1
-  UNION ALL SELECT 'crates', '', crates FROM wallets WHERE user_id = ?1
-  UNION ALL SELECT 'keys', '', crate_keys FROM wallets WHERE user_id = ?1
-  UNION ALL SELECT 'token', boss, n FROM boss_tokens WHERE user_id = ?1
-  UNION ALL SELECT 'shop', item_id, 1 FROM inventory WHERE user_id = ?1
-  UNION ALL SELECT 'item', id, 1 FROM items WHERE user_id = ?1
-  UNION ALL SELECT 'boss_crate', crate, COUNT(*) FROM boss_crates WHERE user_id = ?1 GROUP BY crate
-  UNION ALL SELECT 'welcome', CAST(milestone AS TEXT), 1 FROM welcome_crates WHERE user_id = ?1 AND opened_at IS NULL`;
+const BALANCES = [
+  "SELECT 'coins' AS kind, '' AS asset, coins AS n FROM wallets WHERE user_id = ?1",
+  "SELECT 'crates' AS kind, '' AS asset, crates AS n FROM wallets WHERE user_id = ?1",
+  "SELECT 'keys' AS kind, '' AS asset, crate_keys AS n FROM wallets WHERE user_id = ?1",
+  "SELECT 'token' AS kind, boss AS asset, n FROM boss_tokens WHERE user_id = ?1",
+  "SELECT 'shop' AS kind, item_id AS asset, 1 AS n FROM inventory WHERE user_id = ?1",
+  "SELECT 'item' AS kind, id AS asset, 1 AS n FROM items WHERE user_id = ?1",
+  "SELECT 'boss_crate' AS kind, crate AS asset, COUNT(*) AS n FROM boss_crates WHERE user_id = ?1 GROUP BY crate",
+  "SELECT 'welcome' AS kind, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE user_id = ?1 AND opened_at IS NULL",
+];
 
 /** Gives an account its ledger id in a batch, if it has none (only an account that exists). */
 const ensureAccount = (userId: string) =>
@@ -301,23 +304,26 @@ const ensureAccount = (userId: string) =>
  * crates, keys and tokens are added up; items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
  */
 export function mergeMoves(from: string, to: string, now: number): Stmt[] {
+  const nonce = newId(9);
   return [
     ensureAccount(from),
     ensureAccount(to),
-    stmt(
-      `INSERT INTO ledger (${COLS})
-       SELECT 'merge:' || g.account || ':' || b.kind || ':' || b.asset, l.leg, CASE l.leg WHEN 0 THEN g.account ELSE o.account END, b.kind, b.asset,
-         CASE l.leg WHEN 0 THEN -b.n ELSE b.gets END, 'merge', NULL, ?3, ?4
-       FROM (SELECT kind, asset, n, CASE WHEN kind = 'welcome' OR (kind = 'shop' AND EXISTS (SELECT 1 FROM inventory WHERE user_id = ?2 AND item_id = asset)) THEN 0 ELSE n END AS gets
-             FROM (${BALANCES})) b,
-         (SELECT 0 AS leg UNION ALL SELECT 1) l,
-         (SELECT account FROM ledger_accounts WHERE user_id = ?1) g,
-         (SELECT account FROM ledger_accounts WHERE user_id = ?2) o
-       WHERE b.n <> 0 AND (l.leg = 0 OR b.gets <> 0)`,
-      from,
-      to,
-      now,
-      newId(9),
+    ...BALANCES.map((balance) =>
+      stmt(
+        `INSERT INTO ledger (${COLS})
+         SELECT 'merge:' || g.account || ':' || b.kind || ':' || b.asset, l.leg, CASE l.leg WHEN 0 THEN g.account ELSE o.account END, b.kind, b.asset,
+           CASE l.leg WHEN 0 THEN -b.n ELSE b.gets END, 'merge', NULL, ?3, ?4
+         FROM (SELECT kind, asset, n, CASE WHEN kind = 'welcome' OR (kind = 'shop' AND EXISTS (SELECT 1 FROM inventory WHERE user_id = ?2 AND item_id = asset)) THEN 0 ELSE n END AS gets
+               FROM (${balance})) b,
+           (SELECT 0 AS leg UNION ALL SELECT 1) l,
+           (SELECT account FROM ledger_accounts WHERE user_id = ?1) g,
+           (SELECT account FROM ledger_accounts WHERE user_id = ?2) o
+         WHERE b.n <> 0 AND (l.leg = 0 OR b.gets <> 0)`,
+        from,
+        to,
+        now,
+        nonce,
+      ),
     ),
     stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt(
@@ -341,15 +347,18 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
  * and its rows go; then its ledger id goes, so its ledger rows stay naming nobody.
  */
 export function eraseMoves(userId: string, now: number): Stmt[] {
+  const nonce = newId(9);
   return [
     ensureAccount(userId),
-    stmt(
-      `INSERT INTO ledger (${COLS})
-       SELECT 'erase:' || k.account || ':' || b.kind || ':' || b.asset, 0, k.account, b.kind, b.asset, -b.n, 'erase', NULL, ?2, ?3
-       FROM (${BALANCES}) b, (SELECT account FROM ledger_accounts WHERE user_id = ?1) k WHERE b.n <> 0`,
-      userId,
-      now,
-      newId(9),
+    ...BALANCES.map((balance) =>
+      stmt(
+        `INSERT INTO ledger (${COLS})
+         SELECT 'erase:' || k.account || ':' || b.kind || ':' || b.asset, 0, k.account, b.kind, b.asset, -b.n, 'erase', NULL, ?2, ?3
+         FROM (${balance}) b, (SELECT account FROM ledger_accounts WHERE user_id = ?1) k WHERE b.n <> 0`,
+        userId,
+        now,
+        nonce,
+      ),
     ),
     ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   ];
@@ -370,11 +379,17 @@ export const ledgerDownload = async (sql: Sql, userId: string) => ({
  * until part II's backfill.)
  */
 export async function ledgerMismatches(sql: Sql, userId: string): Promise<{ kind: string; asset: string; diff: number }[]> {
-  return sql.all(
-    `SELECT kind, asset, SUM(n) AS diff FROM (
-       ${BALANCES}
-       UNION ALL SELECT l.asset_kind, l.asset_id, -l.delta FROM ledger l JOIN ledger_accounts a ON a.account = l.account WHERE a.user_id = ?1
-     ) GROUP BY kind, asset HAVING SUM(n) <> 0 ORDER BY kind, asset`,
+  const sums = new Map<string, { kind: string; asset: string; diff: number }>();
+  const add = (r: { kind: string; asset: string; n: number }) => {
+    const k = `${r.kind}\u0000${r.asset}`;
+    sums.set(k, { kind: r.kind, asset: r.asset, diff: (sums.get(k)?.diff ?? 0) + r.n });
+  };
+  for (const balance of BALANCES) for (const r of await sql.all<{ kind: string; asset: string; n: number }>(balance, userId)) add(r);
+  const legs = await sql.all<{ kind: string; asset: string; n: number }>(
+    `SELECT l.asset_kind AS kind, l.asset_id AS asset, -SUM(l.delta) AS n FROM ledger l JOIN ledger_accounts a ON a.account = l.account
+     WHERE a.user_id = ? GROUP BY l.asset_kind, l.asset_id`,
     userId,
   );
+  for (const r of legs) add(r);
+  return [...sums.values()].filter((s) => s.diff !== 0).sort((a, b) => a.kind.localeCompare(b.kind) || a.asset.localeCompare(b.asset));
 }
