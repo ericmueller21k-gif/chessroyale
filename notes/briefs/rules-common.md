@@ -29,3 +29,10 @@
 ## Spelling (Eric, Nov 5)
 American English everywhere: player-visible text, docs, notes, PR bodies and reports. So: color, center, gray, favorite, honor,
 realize, organize, meter, canceled, traveled. Don't rename existing code identifiers just for spelling.
+
+## Keep it lean (Eric, Nov 6: "it shouldn't be this complicated … something has gotten bloated"; the audit of Nov 6 §4)
+- **Stills and GIFs stay out of the repo.** Save them untracked (for example `<worktree>/stills/`, never `git add`) and report their paths to the director, who sends them to Eric. Commit an image only when a test reads it as a fixture.
+- **The PR body:** at most 40 lines. What changed for players, the changed checks (old → new) and the test results. No restating the brief.
+- **The decision note:** at most 10 lines. Eric's words, the call, and why.
+- **Area pages (docs/areas):** add at most 5 lines per PR. Edit in place instead of appending history.
+- **Prefer number checks to pixel checks** in new e2e tests: read positions and state through the test hooks (`__townCam` and similar) instead of sampling the canvas. Use pixels only when the pixels are the point, such as a sky gap.

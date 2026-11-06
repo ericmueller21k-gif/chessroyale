@@ -100,3 +100,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 
 - **Street town spacing (Eric, Nov 6).** Two boss homes are never neighbors: at least one full, normal-width look-alike building
   between any two boss homes in a row. No sliver look-alikes. Rows stay continuous (no sky between fronts).
+
+- **Lean docs and stills (Eric, Nov 6; the audit §4):** stills out of the repo, sent to Eric directly; PR bodies of at most 40 lines; decision notes of at most 10 lines; area pages grow by at most 5 lines a PR. In rules-common.md.
+- **Overnight order (Nov 6):** ledger I (xhigh) → ledger II → street town WebGL-only → the 3D kit → the claw on the kit → intros as data. The audit is at notes/audit-2026-11-06.md.
