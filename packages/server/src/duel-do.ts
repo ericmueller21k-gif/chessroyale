@@ -7,6 +7,7 @@ import { d1Sql, ensureSchema, shopState } from "./accounts.ts";
 import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
 import { recordDuel } from "./ranked.ts";
+import { grantWelcomeCrate } from "./welcome.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
 import type { Env } from "./index.ts";
@@ -100,6 +101,8 @@ export class DuelGame extends DurableObject<Env> {
         await ensureSchema(sql, this.env.DB);
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
         outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
+        // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
+        if (outcomes) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
       if (!this.record) return;
       const core = this.core();

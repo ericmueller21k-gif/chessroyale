@@ -1212,12 +1212,14 @@ export class LobbyCore {
   }
 
   /** Results of people who left mid-match (a loss), not yet on their profiles: the Durable Object writes them now. */
-  takeLeftResults(): HumanResult[] {
-    const out: HumanResult[] = [];
+  takeLeftResults(): (HumanResult & { abandoned?: true })[] {
+    const out: (HumanResult & { abandoned?: true })[] = [];
     for (const l of this.r.left ?? []) {
       if (l.saved || !l.result) continue;
       l.saved = true;
-      out.push(l.result);
+      // (Gone too long, idle or removed mid-match: an abandoned match, which the Welcome Crate doesn't count; a resignation is a
+      // result, a loss, and does. Nov 6, server/welcome.ts.)
+      out.push(l.how === "away" || l.how === "afk" || l.how === "kicked" ? { ...l.result, abandoned: true } : l.result);
     }
     return out;
   }
