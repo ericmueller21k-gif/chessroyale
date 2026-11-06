@@ -33,7 +33,7 @@ Decision note: `docs/decisions/2026-11-05-street-controls-map.md`. Area page: `d
   - **Large:** a tap opens it in the middle with every boss home's portrait (the chips' faces), the park and Colosseum icons, and your
     dot. A tap anywhere closes it, and it never walks you.
   - **The map button** sits in the town's icon row and turns it off and on. The choice is stored per device and on by default, and the
-    button is greyed inside a building.
+    button is grayed inside a building.
 - **The default zoom:** Eric answered the director's question ("we're going with number three for the default"), so the town opens at
   the third step (`streetZoomStart` 2). The park's step out goes from there to the overview. The rows' culling stays at the steps it was
   built for (`zoom <= 1`).

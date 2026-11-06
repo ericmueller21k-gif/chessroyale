@@ -65,7 +65,7 @@ Colosseum, the park … tap it again or tap away, back to normal size."
 - **Call made:** where the chat takes the box's whole top (a narrow computer frame, 1024 × 700), the map sits just under the chat on the
   same right edge. It never covers the chat, the arrows, the zoom pair or the focus button.
 - **The button** (`TownChatTools`, with the chat and settings buttons): a folded map, lit while the map shows. It's stored per device
-  (`brc.townMap`) and on by default. Greyed inside a building, never hidden.
+  (`brc.townMap`) and on by default. Grayed inside a building, never hidden.
 - **Large** (a tap on the small map): the whole town in the middle of the box. Every boss home has its chip's portrait, with no names.
   The park and the Colosseum are small icons, and you're the dot. A tap on it or anywhere outside closes it, and it never walks you.
 - **Cost:** the static layer is drawn once a size to the map's canvas. Each frame only the dot's CSS transform is set, and only when it

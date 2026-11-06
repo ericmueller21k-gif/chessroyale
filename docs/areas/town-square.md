@@ -1001,7 +1001,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     Colosseum): small at the box's top right (`mapShare` 26% on a phone, `mapShareComputer` 13% in a computer's frame, at most
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
     canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
-    stored per device (`brc.townMap`, on by default), greyed inside a building. A tap opens it large in the middle (every boss home's
+    stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
     chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
     (`MAP_BOX`).
   - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).

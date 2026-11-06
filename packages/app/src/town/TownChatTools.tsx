@@ -68,7 +68,7 @@ function ChatIcon({ mode }: { mode: ChatMode }) {
 
 /**
  * The map button (the street town, Nov 5; Eric: "Another icon [with our other icons] … click it, it turns it off"): a folded map, lit (green)
- * while the minimap shows, gray while it's off; a tap turns it. Remembered per device (minimap.ts), on by default. Greyed inside a building
+ * while the minimap shows, gray while it's off; a tap turns it. Remembered per device (minimap.ts), on by default. Grayed inside a building
  * (the map is the town's), never hidden.
  */
 function MapIcon({ on }: { on: boolean }) {
