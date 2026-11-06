@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asServerAdmin, test, bossAloneFromHome } from "./helpers.ts";
+import { asAdmin, asServerAdmin, test, bossAloneFromHome } from "./helpers.ts";
 
 /**
  * Error capture and the feedback sheet (docs/areas/ops.md, "Errors and player reports"): errors on a device reach the
@@ -195,7 +195,7 @@ test("the health view: JSON for an admin (deployed version, live numbers, errors
   expect(await opsPage(page)).toContain("<h2>Health</h2>");
 });
 
-test("a town that asked for WebGL and drew with Canvas 2D says so once, as its own kind with its reason (here no WebGL 2), and nothing shows; the health view counts it by reason, apart from the errors", async ({ page }) => {
+test("an admin's town on a device without WebGL 2 is today's town (Canvas 2D, not the street town) and says so once, as its own kind with its reason, and nothing shows; the health view counts it by reason, apart from the errors", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const desktop = project() === "desktop";
@@ -208,11 +208,14 @@ test("a town that asked for WebGL and drew with Canvas 2D says so once, as its o
     before = (await healthNow()).townFallbacks.byReason["no-webgl2"]!.day;
   }
   await page.addInitScript(() => delete (window as { WebGL2RenderingContext?: unknown }).WebGL2RenderingContext);
+  // (An admin's town is the street town, which needs WebGL 2: admin-town.ts.)
+  await asAdmin(page);
   const sent = page.waitForRequest((r) => r.url().endsWith("/api/problems") && r.method() === "POST");
-  await page.goto("/town?gl=1&sky=day");
+  await page.goto("/town?sky=day");
   const cv = page.locator("canvas.town-canvas");
   await expect(cv).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await expect(cv, "drawn with Canvas 2D").toHaveAttribute("data-backend", "2d");
+  expect(await cv.getAttribute("data-you"), "today's town: where a player's opens").toBe("22,17");
   // What every error request carries, nothing more: its kind, the reason as its message, no stack.
   const body = (await sent).postDataJSON() as { kind: string; errors: { kind: string; message: string; stack: string }[] };
   expect(body.kind).toBe("errors");

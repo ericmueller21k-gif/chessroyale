@@ -163,7 +163,7 @@ describe("the Colosseum as a solid (Eric: \"we probably have to actually draw th
       const drawn: { x0: number; x1: number; dz: number }[] = [];
       for (const b of ring) {
         const p = newPlan(b.box);
-        planBox(p, b, b.box, v, camX, camY, true, -Infinity);
+        planBox(p, b, b.box, v, camX, camY, -Infinity);
         const s = RING[STREET_LOTS[b.lot]!.ring!]!;
         // (Out of its front, toward the camera's eye: facing it squarely enough.)
         const ox = s.uy;
@@ -194,7 +194,7 @@ describe("the Colosseum as a solid (Eric: \"we probably have to actually draw th
       let fronts = 0;
       for (const b of [...ring, portal]) {
         const p = newPlan(b.box);
-        planBox(p, b, b.box, v, 22, 40.5, true, -Infinity);
+        planBox(p, b, b.box, v, 22, 40.5, -Infinity);
         if (p.front.on) fronts++;
       }
       expect(fronts, `from heading ${h}`).toBeGreaterThanOrEqual(2);
