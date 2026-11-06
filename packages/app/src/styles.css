@@ -5862,6 +5862,9 @@ button.history-label {
   border-radius: 2px;
   box-shadow: 4px 4px 0 rgba(26, 20, 6, 0.85);
   image-rendering: pixelated;
+  /* (The speech font is this size, always: a phone's browser must not inflate a wrapped line, Nov 6.) */
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
   pointer-events: none;
   transition: opacity 240ms ease-in;
 }
@@ -13860,22 +13863,38 @@ img.qicon {
   }
 }
 /* His words: a pixel text box beside him (above him by the board), like the God King's. */
+/* (Eric, Nov 6: every boss's words are the God King's bubble, the same font, size, padding, outline, corners and tail.) */
 .bc-bubble {
   position: absolute;
   z-index: 12;
   width: max-content;
   max-width: min(220px, 60vw);
-  padding: 8px 9px 7px;
+  padding: 9px 10px 8px;
   font-family: "Press Start 2P", ui-monospace, monospace;
   font-size: 9px;
   line-height: 1.6;
-  color: #2b0d13;
-  background: #fff4f4;
-  border: 3px solid #2b0d13;
+  color: #1a1406;
+  background: #fffbea;
+  border: 3px solid #1a1406;
   border-radius: 2px;
-  box-shadow: 4px 4px 0 rgba(43, 13, 19, 0.85);
+  box-shadow: 4px 4px 0 rgba(26, 20, 6, 0.85);
+  image-rendering: pixelated;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
   pointer-events: none;
   transition: opacity 240ms ease-in;
+}
+.bc-bubble::after {
+  content: "";
+  position: absolute;
+  right: 26px;
+  bottom: -11px;
+  width: 12px;
+  height: 12px;
+  background: #fffbea;
+  border-right: 3px solid #1a1406;
+  border-bottom: 3px solid #1a1406;
+  transform: rotate(45deg);
 }
 .bc-bubble.fresh {
   animation: gk-bubble-in 160ms steps(3, end) both;
@@ -13896,12 +13915,24 @@ img.qicon {
   top: auto;
   bottom: -4px;
   max-width: 100%;
-  padding: 1px 6px;
-  border-width: 2px;
-  font-size: 9px;
-  line-height: 1.2;
   text-wrap: balance;
-  box-shadow: 2px 2px 0 rgba(43, 13, 19, 0.85);
+}
+/* Its tail points at the portrait, at the bar's left (the God King's tail, turned): the same square, its left and bottom edges. */
+.bc-bar-bubble::after {
+  right: auto;
+  bottom: auto;
+  left: -11px;
+  top: calc(50% - 6px);
+  border-right: 0;
+  border-bottom: 3px solid #1a1406;
+  border-left: 3px solid #1a1406;
+}
+/* Three rows at most: a longer line ends in an ellipsis (the clip is inside the bubble, so the tail is not cut). */
+.bc-bar-bubble .speech-clip {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 /* Three rows (a line too long for two at the room's width): the text wraps to fill the box, not balanced into narrow rows. */
 .bc-bar-bubble.wide3 {
@@ -13916,10 +13947,9 @@ img.qicon {
    under a status that wraps to two lines), and the bar's column gap and status font let "58 moves left" keep its one line beside
    the name column (the figure's box 58 px, the name column 130 px: docs/decisions/2026-10-24-boss-bar-same.md). */
 @media (max-width: 359px) {
+  /* (The status wraps to two lines here: three rows of the bubble's line take the room under it, 5 px clear, at the tighter pitch.) */
   .bc-bar-bubble {
-    font-size: 8px;
-    line-height: 1.35;
-    padding: 1px 5px;
+    line-height: 1.4;
   }
   .boss-bar.has-char {
     padding-right: 6px;

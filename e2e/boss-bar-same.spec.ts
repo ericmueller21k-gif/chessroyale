@@ -189,7 +189,9 @@ const sayLine = (page: Page, text: string, typed = false): Promise<LineRes> =>
         const rg = document.createRange();
         rg.selectNodeContents(el);
         // (A row: the text's boxes whose tops lie within 3 px of each other; the rows' pitch is the closest two rows.)
-        const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => q.top).sort((a, b) => a - b);
+        // (Only the rows shown: a line longer than three rows clamps to three, with an ellipsis, Nov 6; the clamped rows aren't drawn.)
+        const clipBottom = (el.querySelector(".speech-clip") as HTMLElement | null)?.getBoundingClientRect().bottom ?? Infinity;
+        const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5 && q.top < clipBottom - 1).map((q) => q.top).sort((a, b) => a - b);
         const rowTops: number[] = [];
         for (const t of tops) if (!rowTops.length || t - rowTops[rowTops.length - 1]! > 3) rowTops.push(t);
         const pitch = rowTops.length > 1 ? Math.min(...rowTops.slice(1).map((t, i) => t - rowTops[i]!)) : 0;
