@@ -937,6 +937,10 @@ export type SoundName =
   | "smudgyDab"
   | "smudgyThump"
   | "smudgyOof"
+  | "smudgyWhoosh"
+  | "smudgyFlop"
+  | "smudgySplat"
+  | "smudgySwipe"
   // Moo & Moon (a raid boss, a cow and his friend the Moon): synthesized, see characters/moo-sounds.ts.
   | "mooSoft"
   | "mooHappy"
@@ -1287,6 +1291,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   smudgyDab: smudgy("dab"),
   smudgyThump: smudgy("thump"),
   smudgyOof: smudgy("oof"),
+  smudgyWhoosh: smudgy("whoosh"),
+  smudgyFlop: smudgy("flop"),
+  smudgySplat: smudgy("splat"),
+  smudgySwipe: smudgy("swipe"),
   mooSoft: mooBoss("mooSoft"),
   mooHappy: mooBoss("mooHappy"),
   mooBig: mooBoss("mooBig"),
@@ -1577,6 +1585,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   smudgyDab: [["smudgy", "dab"]],
   smudgyThump: [["smudgy", "thump"]],
   smudgyOof: [["smudgy", "oof"]],
+  smudgyWhoosh: [["smudgy", "whoosh"]],
+  smudgyFlop: [["smudgy", "flop"]],
+  smudgySplat: [["smudgy", "splat"]],
+  smudgySwipe: [["smudgy", "swipe"]],
   mooSoft: [["moo", "mooSoft"]],
   mooHappy: [["moo", "mooHappy"]],
   mooBig: [["moo", "mooBig"]],

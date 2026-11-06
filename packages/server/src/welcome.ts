@@ -1,30 +1,36 @@
-import { WELCOME_CRATE_ID, WELCOME_GIFT, mulberry32, rollWelcome, type CrateRoll, type ItemInstance } from "@chessroyale/core";
+import { WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, mulberry32, nextWelcomeMilestone, rollWelcome, type CrateRoll, type ItemInstance } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
- * The HunChess Welcome Crate on the server (Eric, Nov 6; core's welcome.ts; docs/decisions/2026-11-06-welcome-crate.md). Everything
- * that counts is decided here, never by the app: whether an account has finished enough games, the grant (once per account, ever),
- * the prize's roll (the server's own randomness) and the opening (once).
+ * The HunChess Welcome Crates on the server (Eric, Nov 6; core's welcome.ts; docs/decisions/2026-11-06-welcome-crate.md): "the first
+ * one you get after 5 games, the next one you get after 25". Everything that counts is decided here, never by the app: whether an
+ * account has finished enough games, each grant (once per account and milestone, ever), the prize's roll (the server's own
+ * randomness, a different ride from the first's) and each opening (once).
  *
- * One table, `welcome_crates`: one row per account that has earned it, keyed by the account (PRIMARY KEY user_id), so a second row
- * for an account can't exist: the grant is one statement that inserts the row only while the account is signed in and has finished
- * WELCOME_GIFT.games games (counted in that same statement), and does nothing if the row is there. So retries, races, two tabs and
- * two Workers grant it once. Opening is one transaction (D1's batch): the ride goes in only while the row is unopened, and the row is
- * marked opened with that ride only if the ride went in; a second open (a double tap, two devices, a retry) finds it opened and
- * answers the ride it already gave. Nothing older reads or writes the table: an account without a row reads as not earned yet.
- * (Only types come from accounts.ts: it imports this file's schema while it loads.)
+ * One table, `welcome_crates`: one row per account and milestone it earned, keyed by both (PRIMARY KEY (user_id, milestone)), so a
+ * second row for one can't exist: the grant is one statement that inserts each earned milestone's row only while the account is
+ * signed in and its finished games (counted in that same statement) reach it, and does nothing for a row that's there. So retries,
+ * races, two tabs and two Workers grant each once. Opening is one transaction (D1's batch): the ride goes in only while a crate is
+ * unopened, and the earliest unopened crate is marked opened with that ride only if it went in. Nothing older reads or writes the
+ * table: an account without rows reads as none earned yet. (Only types come from accounts.ts: it imports this file's schema while it
+ * loads.)
  */
 export const WELCOME_SCHEMA = [
-  // `granted_at`: when it was earned; `games`: the finished games counted then; `seen_at`: when its owner closed the "You earned a
-  // Welcome Crate!" notice (NULL: not yet: it shows); `opened_at` and `item_id`: when it was opened and the ride it gave (NULL: not
-  // opened). The ride itself is an `items` row like any other (crate 'welcome-hunchess').
+  // One row per account and milestone it earned (Eric: "the first one you get after 5 games, the next one you get after 25"):
+  // `milestone` (WELCOME_GIFT.milestones: 5, 25), `granted_at`: when it was earned; `games`: the finished games counted then;
+  // `seen_at`: when its owner closed its "You earned a Welcome Crate!" notice (NULL: not yet: it shows); `opened_at`, `item_id` and
+  // `def`: when it was opened, the ride it gave (an `items` row, crate 'welcome-hunchess') and that ride's item (kept here too, so
+  // the next crate gives a different one even if the ride is deleted). NULL: not opened.
   `CREATE TABLE IF NOT EXISTS welcome_crates (
-    user_id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    milestone INTEGER NOT NULL,
     granted_at INTEGER NOT NULL,
     games INTEGER NOT NULL,
     seen_at INTEGER,
     opened_at INTEGER,
-    item_id TEXT
+    item_id TEXT,
+    def TEXT,
+    PRIMARY KEY (user_id, milestone)
   )`,
 ];
 
@@ -49,58 +55,72 @@ export async function finishedGames(sql: Sql, userId: string): Promise<number> {
   return (await sql.first<{ n: number }>(`SELECT ${FINISHED_GAMES_SQL} AS n`, userId, userId))?.n ?? 0;
 }
 
+/** The milestones, as SQL rows (5, 25). */
+const MILESTONES_SQL = WELCOME_GIFT.milestones.map((m) => `SELECT ${Number(m)} AS milestone`).join(" UNION ALL ");
+
 /**
- * Grants the Welcome Crate if this account has earned it and hasn't got it: one statement, so it's checked and set at once. Only a
- * signed-in account (an email or a Google account: never a guest; bots have no account) with WELCOME_GIFT.games finished games.
- * Answers whether this call granted it (false: not earned yet, or granted before). Called where an account's games are counted (a
- * result saved, a ranked game recorded) and on every sign-in and profile load (`/api/me`), which is the backfill: an account that
- * had finished 5 games before Nov 6 gets it the next time it opens the app or finishes a game.
+ * Grants every Welcome Crate this account has earned and hasn't got (WELCOME_GIFT.milestones: at 5 finished games, then 25): one
+ * statement, so it's checked and set at once. Each is a row keyed by (account, milestone): a second grant of one does nothing, so
+ * retries, races, two tabs and two Workers grant each once. Only a signed-in account (an email or a Google account: never a guest;
+ * bots have no account). Answers the milestones this call granted (none: not earned yet, or granted before). Called where an
+ * account's games are counted (a result saved, a ranked game recorded) and on every sign-in and profile load (`/api/me`), which is the
+ * backfill: an account that had finished 5 or 25 games before gets them the next time it opens the app or finishes a game.
  */
-export async function grantWelcomeCrate(sql: Sql, userId: string, now: number): Promise<boolean> {
-  if (await sql.first("SELECT 1 FROM welcome_crates WHERE user_id = ?", userId)) return false;
-  const row = await sql.first<{ user_id: string }>(
-    `INSERT INTO welcome_crates (user_id, granted_at, games)
-     SELECT u.id, ?, g.n FROM users u, (SELECT ${FINISHED_GAMES_SQL} AS n) g
-     WHERE u.id = ? AND (u.email IS NOT NULL OR u.google_sub IS NOT NULL) AND g.n >= ?
-     ON CONFLICT (user_id) DO NOTHING
-     RETURNING user_id`,
+export async function grantWelcomeCrate(sql: Sql, userId: string, now: number): Promise<number[]> {
+  const have = await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM welcome_crates WHERE user_id = ?", userId);
+  if ((have?.n ?? 0) >= WELCOME_GIFT.milestones.length) return [];
+  const rows = await sql.all<{ milestone: number }>(
+    `INSERT INTO welcome_crates (user_id, milestone, granted_at, games)
+     SELECT u.id, m.milestone, ?, g.n FROM users u, (${MILESTONES_SQL}) m, (SELECT ${FINISHED_GAMES_SQL} AS n) g
+     WHERE u.id = ? AND (u.email IS NOT NULL OR u.google_sub IS NOT NULL) AND g.n >= m.milestone
+     ON CONFLICT (user_id, milestone) DO NOTHING
+     RETURNING milestone`,
     now,
     userId,
     userId,
     userId,
-    WELCOME_GIFT.games,
   );
-  return !!row;
+  return rows.map((r) => r.milestone).sort((a, b) => a - b);
 }
 
-/** What the app hears about the Welcome Crate (the locker's `welcome`). */
+/** What the app hears about the Welcome Crates (the locker's `welcome`). */
 export interface WelcomeState {
-  /** Finished games so far (for "Finish 5 games to earn your Welcome Crate: 3/5"). */
+  /** Finished games so far (for "Finish 25 games for your second Welcome Crate: 7/25"). */
   games: number;
-  /** Earned and not opened ("ready"), opened ("opened"), or not earned yet ("locked"). */
+  /** The next milestone not earned yet (5, then 25), or null once both are. */
+  next: number | null;
+  /** How many are earned and not opened yet. */
+  unopened: number;
+  /** One is waiting to be opened ("ready"), all earned are opened ("opened"), or none is earned yet ("locked"). */
   status: "locked" | "ready" | "opened";
-  /** The one-time "You earned a Welcome Crate!" notice is due (earned, and its notice not closed yet). */
+  /** A "You earned a Welcome Crate!" notice is due (one earned whose notice isn't closed yet). */
   notice: boolean;
-  /** Opened: the ride it gave (an `items` id). */
+  /** The ride the latest opened crate gave (an `items` id). */
   item?: string;
 }
 
-/** An account's Welcome Crate, read only (an account with no row: not earned yet, as every account before Nov 6). */
+/** An account's Welcome Crates, read only (an account with no rows: none earned yet, as every account before Nov 6). */
 export async function welcomeState(sql: Sql, userId: string): Promise<WelcomeState> {
-  const row = await sql.first<{ seen_at: number | null; opened_at: number | null; item_id: string | null }>(
-    "SELECT seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ?",
-    userId,
-  ).catch(() => null);
-  if (!row) return { games: await finishedGames(sql, userId).catch(() => 0), status: "locked", notice: false };
+  const rows = await sql
+    .all<{ milestone: number; seen_at: number | null; opened_at: number | null; item_id: string | null }>(
+      "SELECT milestone, seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ? ORDER BY milestone",
+      userId,
+    )
+    .catch(() => []);
+  const games = await finishedGames(sql, userId).catch(() => 0);
+  const unopened = rows.filter((r) => r.opened_at === null).length;
+  const latest = rows.filter((r) => r.opened_at !== null && r.item_id).sort((a, b) => b.opened_at! - a.opened_at! || b.milestone - a.milestone)[0];
   return {
-    games: WELCOME_GIFT.games,
-    status: row.opened_at === null ? "ready" : "opened",
-    notice: row.seen_at === null,
-    ...(row.item_id ? { item: row.item_id } : {}),
+    games,
+    next: nextWelcomeMilestone(rows.map((r) => r.milestone)),
+    unopened,
+    status: unopened ? "ready" : rows.length ? "opened" : "locked",
+    notice: rows.some((r) => r.seen_at === null),
+    ...(latest?.item_id ? { item: latest.item_id } : {}),
   };
 }
 
-/** Closes the "You earned a Welcome Crate!" notice for good (it shows once). */
+/** Closes the "You earned a Welcome Crate!" notice for good (once for each crate: every earned one's is closed). */
 export async function seenWelcomeNotice(sql: Sql, userId: string, now: number): Promise<void> {
   await sql.run("UPDATE welcome_crates SET seen_at = ? WHERE user_id = ? AND seen_at IS NULL", now, userId);
 }
@@ -111,10 +131,13 @@ const randomHex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(b
 export const NO_WELCOME_CRATE = "You have no Welcome Crate to open.";
 
 /**
- * Opens your Welcome Crate: one ride from every ride's HunChess colorway, each as likely (rollWelcome), with the server's own
- * randomness (never a test switch), into your locker. One transaction: the ride goes in only while your crate is earned and
- * unopened, then the crate is marked opened with it, only if it went in. A second open (a double tap, two devices at once, a retry
- * after a lost answer) gives nothing new: it answers the ride the first gave (`again`). An account that hasn't earned one is refused.
+ * Opens your next Welcome Crate (the earliest earned and unopened): one ride from every ride's HunChess colorway, each as likely, never
+ * one an earlier Welcome Crate gave while another is left (rollWelcome), with the server's own randomness (never a test switch), into
+ * your locker. One transaction: the ride goes in only while a crate of yours is unopened and (while another is left) no Welcome Crate
+ * of yours gave that ride; then that crate is marked opened with it, only if it went in. Two opens at once with two crates waiting open
+ * both, with different rides (the second sees the first's ride in its own transaction's check, and rolls again); with one waiting, one
+ * ride. An open with none waiting gives nothing new: it answers the ride the latest gave (`again`). An account that hasn't earned one
+ * is refused.
  */
 export async function openWelcomeCrate(
   sql: Sql,
@@ -122,41 +145,61 @@ export async function openWelcomeCrate(
   now: number,
   rng: () => number = mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!),
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; again: boolean } | { ok: false; message: string }> {
-  const roll = rollWelcome(rng);
-  const id = randomHex(9);
-  const unopened = "EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND opened_at IS NULL)";
-  await sql.batch([
-    stmt(
-      `INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${unopened}`,
-      id,
-      userId,
-      roll.def,
-      roll.color,
-      roll.color2 ?? null,
-      roll.blemish,
-      roll.seed,
-      WELCOME_CRATE_ID,
-      now,
-      userId,
-    ),
-    stmt(
-      `UPDATE welcome_crates SET opened_at = ?, item_id = ? WHERE user_id = ? AND opened_at IS NULL AND EXISTS (SELECT 1 FROM items WHERE id = ? AND user_id = ?)`,
-      now,
-      id,
-      userId,
-      id,
-      userId,
-    ),
-  ]);
-  const row = await sql.first<{ item_id: string | null }>("SELECT item_id FROM welcome_crates WHERE user_id = ?", userId);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const won = (await sql.all<{ def: string }>("SELECT def FROM welcome_crates WHERE user_id = ? AND def IS NOT NULL", userId)).map((r) => r.def);
+    const roll = rollWelcome(rng, won);
+    const fresh = won.length < WELCOME_CRATE.items.length ? 1 : 0;
+    const id = randomHex(9);
+    const unopened = "EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND opened_at IS NULL)";
+    await sql.batch([
+      stmt(
+        `INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at)
+         SELECT ?, ?, ?, ?, ?, ?, ?, ?, 1, ? WHERE ${unopened}
+           AND (? = 0 OR NOT EXISTS (SELECT 1 FROM welcome_crates WHERE user_id = ? AND def = ?))`,
+        id,
+        userId,
+        roll.def,
+        roll.color,
+        roll.color2 ?? null,
+        roll.blemish,
+        roll.seed,
+        WELCOME_CRATE_ID,
+        now,
+        userId,
+        fresh,
+        userId,
+        roll.def,
+      ),
+      stmt(
+        `UPDATE welcome_crates SET opened_at = ?, item_id = ?, def = ?
+         WHERE user_id = ? AND milestone = (SELECT MIN(milestone) FROM welcome_crates WHERE user_id = ? AND opened_at IS NULL)
+           AND EXISTS (SELECT 1 FROM items WHERE id = ? AND user_id = ?)`,
+        now,
+        id,
+        roll.def,
+        userId,
+        userId,
+        id,
+        userId,
+      ),
+    ]);
+    if (await sql.first("SELECT 1 FROM items WHERE id = ? AND user_id = ?", id, userId)) {
+      const item: ItemInstance = { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed };
+      return { ok: true, roll, item, again: false };
+    }
+    // Not in: none waiting (then answer the latest's ride), or another open took that ride first (then roll again).
+    if (!(await sql.first("SELECT 1 FROM welcome_crates WHERE user_id = ? AND opened_at IS NULL", userId))) break;
+  }
+  const row = await sql.first<{ item_id: string | null }>(
+    "SELECT item_id FROM welcome_crates WHERE user_id = ? AND opened_at IS NOT NULL ORDER BY opened_at DESC, milestone DESC LIMIT 1",
+    userId,
+  );
   if (!row?.item_id) return { ok: false, message: NO_WELCOME_CRATE };
   const it = await sql.first<ItemInstance & { color2: string | null }>("SELECT id, def, color, color2, blemish, seed FROM items WHERE id = ? AND user_id = ?", row.item_id, userId);
   // (Opened, and its ride since deleted from the locker: nothing to show again.)
   if (!it) return { ok: false, message: NO_WELCOME_CRATE };
   const item: ItemInstance = { id: it.id, def: it.def, color: it.color, ...(it.color2 ? { color2: it.color2 } : {}), blemish: it.blemish, seed: it.seed };
-  const again = row.item_id !== id;
-  return { ok: true, roll: again ? { fischer: true, def: item.def, color: item.color, ...(item.color2 ? { color2: item.color2 } : {}), blemish: item.blemish, seed: item.seed } : roll, item, again };
+  return { ok: true, roll: { fischer: true, def: item.def, color: item.color, ...(item.color2 ? { color2: item.color2 } : {}), blemish: item.blemish, seed: item.seed }, item, again: true };
 }
 
 /**

@@ -119,12 +119,12 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => ["boss_tokens", "boss_token_drops", "solo_battles", "boss_crates"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
   },
   {
-    // The Welcome Crate (welcome.ts, Nov 6): when the player earned it and the finished games counted then, when they closed its
-    // notice, and when they opened it and the ride it gave (that ride is in their locker's items).
+    // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished
+    // games counted then, when they closed its notice, and when they opened it and the ride it gave (that ride is in their items).
     name: "welcomeCrate",
     tables: ["welcome_crates"],
     export: async (sql, u) => ({
-      welcomeCrate: await sql.first("SELECT granted_at, games, seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ?", u.id),
+      welcomeCrates: await all(sql, "SELECT milestone, granted_at, games, seen_at, opened_at, item_id, def FROM welcome_crates WHERE user_id = ? ORDER BY milestone", u.id),
     }),
     erase: (u) => [stmt("DELETE FROM welcome_crates WHERE user_id = ?", u.id)],
   },

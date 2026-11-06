@@ -28,6 +28,8 @@ export interface ShopPlace {
   d?: number;
   /** The way out. */
   exit?: boolean;
+  /** How far into its loop it stands (ms): Smudgy's painters, the same frames each starting at its own time. */
+  t0?: number;
 }
 
 /**

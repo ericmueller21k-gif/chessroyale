@@ -23716,8 +23716,60 @@ button.sq-tiny {
   border-color: #f2c14e;
   box-shadow: inset 0 0 0 1px #f2c14e;
 }
-.welcome-crate-row.none {
-  opacity: 0.55;
+/* A locked Welcome Crate: greyed a little, with its padlock over the crate (shown, not hidden: its page still opens). */
+.welcome-crate-row.locked {
+  opacity: 0.7;
+}
+.welcome-crate-hero .crate-hero-art {
+  position: relative;
+}
+.welcome-lock {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #14100a;
+  color: #f2c14e;
+  border: 1px solid #f2c14e;
+}
+.welcome-lock-icon {
+  width: 16px;
+  height: 16px;
+}
+/* A Welcome Crate's meter: its bar (the gold of the crate) and "3/5" beside it. */
+.welcome-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.welcome-bar {
+  flex: 1;
+  height: 8px;
+  min-width: 80px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.welcome-bar-fill {
+  display: block;
+  height: 100%;
+  background: #f2c14e;
+  transition: width 0.3s ease-out;
+}
+.welcome-meter-text {
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .welcome-bar-fill {
+    transition: none;
+  }
 }
 .welcome-thanks {
   color: var(--fd-gold-text, #9a6a06);

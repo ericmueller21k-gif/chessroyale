@@ -535,6 +535,8 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   };
   /** Taps a square and waits until you stand on it. */
   const walkTo = async (sq: readonly [number, number]) => {
+    // (Aim once the view rests on you: a square read while the camera glides moves before the tap lands. viewOnYou, above.)
+    await viewOnYou(page);
     await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
     const at = (await shopAt(page, "square", sq))!;
     await page.mouse.click(at.x, at.y);
@@ -570,6 +572,67 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   await walkTo([6, 8]);
   await walkTo([3, 6]);
   await still("edge");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Smudgy is live for everyone, so his studio is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("smudgy"));
+  await expect.poll(() => homeAt(page, "smudgy"), { message: "Smudgy's Art Gallery comes into view" }).not.toBeNull();
+  await goIn(page, "smudgy", "Smudgy's Art Gallery");
+  await expect(room(page)).toHaveAttribute("data-room", "smudgy");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Smudgy's Art Gallery");
+  // A dark room of deep paint: the chat's words light.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  const walkTo = async (sq: readonly [number, number]) => {
+    // (Aim once the view rests on you: a square read while the camera glides moves before the tap lands. viewOnYou, above.)
+    await viewOnYou(page);
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  // (Just inside the door: the drop cloth and its covered table ahead, the life class behind it, the shop at the back.)
+  await still("door");
+  await walkTo([11, 16]);
+  await still("table");
+  await walkTo([9, 11]);
+  await still("life-class");
+  // The gallery owner behind the counter: a tap on it walks you up to the counter; its card says "Shopkeeper", no name.
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the gallery owner is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading")).toHaveText(["Shopkeeper"]);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Smudgy's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Smudgy tokens, or 1 Smudgy token + 1 crate key");
+  await expect(crate.locator(".shop-prize-name").first()).toHaveText("Brush Ride");
+  await expect(crate).toContainText("You have 0 Smudgy tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Smudgy tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  // The sculptures: the rook on its plinth in the west-back corner, a canvas stack and the easel by it.
+  await walkTo([6, 6]);
+  await walkTo([3, 5]);
+  await still("sculptures");
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();

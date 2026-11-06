@@ -257,10 +257,22 @@ export interface Locker {
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
   bossCrates?: Record<string, number>;
   /**
-   * The HunChess Welcome Crate (Nov 6; server/welcome.ts): earned ("ready") or opened, or not yet ("locked", with the finished games so
-   * far), and whether its one-time notice is due. Missing from an older server.
+   * The HunChess Welcome Crates (Nov 6, at 5 and 25 finished games; server/welcome.ts): the finished games so far, the next milestone
+   * not earned yet (null: both are), how many wait to be opened, "ready" (one waits), "opened" (all earned are) or "locked" (none
+   * earned yet), whether a one-time notice is due, and the latest one's ride. Missing from an older server.
    */
-  welcome?: { games: number; status: "locked" | "ready" | "opened"; notice: boolean; item?: string };
+  welcome?: { games: number; next?: number | null; unopened?: number; status: "locked" | "ready" | "opened"; notice: boolean; item?: string };
+}
+
+/**
+ * Your Welcome Crate progress, as your account has it now (read only; e.g. a tutorial's hint): `next`, the next milestone you haven't
+ * earned (5, then 25; null once you have both), and `done`, your finished games so far. Before your account has loaded: the first
+ * milestone and 0.
+ */
+export function welcomeProgress(): { next: 5 | 25 | null; done: number } {
+  const w = state.profile?.locker?.welcome;
+  const next = w ? (w.next === undefined ? (w.status === "locked" ? 5 : null) : w.next) : 5;
+  return { next: next === 5 || next === 25 ? next : null, done: w?.games ?? 0 };
 }
 
 /** Closes the "You earned a Welcome Crate!" notice for good (the server keeps that it was seen). */

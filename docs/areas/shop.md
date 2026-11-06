@@ -65,7 +65,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   queue's and Squads' cards, the boss stage, the town's person card, and the public profile's Equipped Cosmetics row (four tiles at
   most; its View all lists the ride). Changing a ride's drawing or the paint (`item-paint.tsx`): `npx tsx scripts/measure-rides.ts`
   (the town's cells for it; a test fails until it's run).
-- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Jefferson's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; town-square.md, "Inside a shop"): the
+- **A boss's crate, sold inside the boss's home** (Nov 2, round 1: Babur's and Puddles'; since, Alfil's, Big Boy's, Timber's, Dash's and, Nov 3, Hollow's with Hollow's Bulb, shown to everyone; Nov 4, Wrangler's with Pen Pony and Jefferson's with Giraffe Gallop, everyone's; Nov 5, Ginger's with the Candy Cane Sled, everyone's (its id `boss-gingerbread`: his boss id is also the Gingerbread Man skin's item id, and nothing confuses the two), and Folio's with the Paper Crane, everyone's; Nov 6, Smudgy's with the Brush Ride, everyone's; town-square.md, "Inside a shop"): the
   Shopkeeper's card shows the crate, its prizes (the boss's ride first), its price (`BOSS_CRATE_PRICE` in core's settings: 3 of the boss's
   tokens, or 1 token and 1 crate key) and what you have. Since round 2 (below) buying is real.
 - **Boss tokens, crate keys and buying a boss crate** (Nov 2, round 2; [2026-11-02-boss-tokens.md](../decisions/2026-11-02-boss-tokens.md);
@@ -127,9 +127,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts the drops).
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
-  - **Earned** once per account, ever, at 5 finished games in any mode or against any boss (a `results` row not marked `abandoned`, or
-    a ranked 1 v 1 game), by the server only: one statement inserts the account's `welcome_crates` row (keyed by the account) only while
-    it's signed in and the count reaches 5, and does nothing if it's there. Checked on every `/api/me` (the backfill) and after every
+  - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
+    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (a `results` row not marked `abandoned`, or a
+    ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
+    milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
+    `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
     removed mid-match as `abandoned` (not counted); a resignation counts.
   - **The notice** (`components/WelcomeNotice.tsx`): **"You earned a Welcome Crate!"**, "Thank you for being an early tester!", "It's in
@@ -146,7 +148,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     cream, with a gold trim; `HUNCHESS_LEVELS` lifts a ride whose remap fails: the Rodeo Bull). No purity shown, no shine.
   - **Never tradeable or listable:** `tradeable()` in core says no for the crate and its rides (there's no trading or listing yet: any
     path that comes asks it on the server). The locker's tile shows "HunChess" and "Not tradeable" in place of its color and purity.
-  - **Stored:** `welcome_crates` (`user_id`, `granted_at`, `games`, `seen_at`, `opened_at`, `item_id`), `results.abandoned`; the ride is
+  - **Stored:** `welcome_crates` (`user_id`, `milestone`, `granted_at`, `games`, `seen_at`, `opened_at`, `item_id`, `def`), `results.abandoned`; the ride is
     an `items` row (crate `welcome-hunchess`). Older data reads as not earned yet. In the account's download ("welcomeCrate") and erased
     with it.
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly

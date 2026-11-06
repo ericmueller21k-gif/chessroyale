@@ -28,7 +28,7 @@ async function play(sql: Sql, id: string, n: number, r: Partial<MatchResult> = {
   const granted: boolean[] = [];
   for (let i = 0; i < n; i++) {
     await recordResult(sql, id, { ...GAME, ...r }, T0 + i);
-    granted.push(await grantWelcomeCrate(sql, id, T0 + i));
+    granted.push((await grantWelcomeCrate(sql, id, T0 + i)).length > 0);
   }
   return granted;
 }
@@ -38,7 +38,7 @@ const hunchessItems = (db: ReturnType<typeof memoryDb>["db"], id: string) =>
 
 describe("earning it", () => {
   it("at exactly 5 finished games, not at 4; once", async () => {
-    expect(WELCOME_GIFT.games).toBe(5);
+    expect(WELCOME_GIFT.milestones).toEqual([5, 25]);
     const { sql, db, id } = await account();
     expect(await play(sql, id, 4)).toEqual([false, false, false, false]);
     expect((await welcomeState(sql, id)).status).toBe("locked");
@@ -57,11 +57,11 @@ describe("earning it", () => {
     await recordResult(sql, id, { mode: "boss", online: false, placement: 1, players: 1 }, T0);
     await recordResult(sql, id, { mode: "classic", online: false, placement: 5, players: 8 }, T0);
     expect(await finishedGames(sql, id)).toBe(4);
-    expect(await grantWelcomeCrate(sql, id, T0)).toBe(false);
+    expect(await grantWelcomeCrate(sql, id, T0)).toEqual([]);
     // One ranked 1 v 1 game (its record's count: aborted games are never recorded).
     await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws) VALUES (?, 1500, 300, 1, 0, 0, 1)", id);
     expect(await finishedGames(sql, id)).toBe(5);
-    expect(await grantWelcomeCrate(sql, id, T0)).toBe(true);
+    expect(await grantWelcomeCrate(sql, id, T0)).toEqual([5]);
   });
 
   it("abandoned games don't count: gone too long, idle or removed mid-match (the match room's word); a resignation does", async () => {
@@ -73,7 +73,7 @@ describe("earning it", () => {
     await recordResult(sql, id, { mode: "classic", online: false, placement: 8, players: 8, abandoned: true }, T0);
     expect(await finishedGames(sql, id)).toBe(1);
     await play(sql, id, 3);
-    expect(await grantWelcomeCrate(sql, id, T0)).toBe(false);
+    expect(await grantWelcomeCrate(sql, id, T0)).toEqual([]);
     await play(sql, id, 1);
     expect((await welcomeState(sql, id)).status).toBe("ready");
   });
@@ -104,14 +104,14 @@ describe("earning it", () => {
     // Signing in on that guest (an email attached to it): its games count, and it's granted.
     const user = (await sql.first("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id)) as never;
     await signInWithIdentity(sql, user, "email", "late@example.com", {}, T0);
-    expect(await grantWelcomeCrate(sql, id, T0)).toBe(true);
+    expect(await grantWelcomeCrate(sql, id, T0)).toEqual([5]);
   });
 
   it("one per account under concurrent grants (two tabs, two match rooms, retries): one row, one notice", async () => {
     const { sql, db, id } = await account();
     for (let i = 0; i < 5; i++) await recordResult(sql, id, GAME, T0 + i);
     const all = await Promise.all(Array.from({ length: 12 }, (_, i) => grantWelcomeCrate(sql, id, T0 + i)));
-    expect(all.filter(Boolean)).toHaveLength(1);
+    expect(all.filter((g) => g.length)).toHaveLength(1);
     expect(rows(db, id)).toBe(1);
     // And a grant whose quick check is passed by another's write between its two statements: the insert's own conflict guard.
     const racing: Sql = {
@@ -121,7 +121,7 @@ describe("earning it", () => {
         return sql.first(q, ...p);
       },
     };
-    expect(await grantWelcomeCrate(racing, id, T0 + 99)).toBe(false);
+    expect(await grantWelcomeCrate(racing, id, T0 + 99)).toEqual([]);
     expect(rows(db, id)).toBe(1);
     // Every profile load grants nothing more.
     const user = (await sql.first("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id)) as never;
@@ -153,7 +153,7 @@ describe("earning it", () => {
     const back = await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 10);
     expect(back.id).toBe(owner.id);
     expect(await finishedGames(sql, owner.id)).toBe(5);
-    expect(await grantWelcomeCrate(sql, owner.id, T0 + 11)).toBe(true);
+    expect(await grantWelcomeCrate(sql, owner.id, T0 + 11)).toEqual([5]);
     expect(rows(db, owner.id)).toBe(1);
   });
 
@@ -258,7 +258,7 @@ describe("the prize: a HunChess colorway of every ride, never tradeable, no puri
     expect(await openWelcomeCrate(sql, id, T0)).toMatchObject({ ok: false });
     expect(hunchessItems(db, id)).toHaveLength(0);
     // (Even a row put under a guest by hand is dropped at its sign-in, never moved onto the account.)
-    db.prepare("INSERT INTO welcome_crates (user_id, granted_at, games) VALUES (?, 0, 5)").run(id);
+    db.prepare("INSERT INTO welcome_crates (user_id, milestone, granted_at, games) VALUES (?, 5, 0, 5)").run(id);
     const owner = await signInWithIdentity(sql, (await createGuest(sql, T0, "O")).user, "email", "o@example.com", {}, T0);
     const guest = (await sql.first("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id)) as never;
     await signInWithIdentity(sql, guest, "email", "o@example.com", {}, T0 + 1);
@@ -273,6 +273,71 @@ describe("the prize: a HunChess colorway of every ride, never tradeable, no puri
   });
 });
 
+describe("the second Welcome Crate, at 25 (Eric: \"the first one you get after 5 games, the next one you get after 25\")", () => {
+  it("at exactly 25 finished games, not at 24; once; the progress names the next milestone", async () => {
+    const { sql, db, id } = await account();
+    await play(sql, id, 5);
+    expect(await welcomeState(sql, id)).toMatchObject({ next: 25, unopened: 1, status: "ready" });
+    expect(WELCOME_TEXT.progress(7, 25)).toBe("Finish 25 games for your second Welcome Crate: 7/25");
+    expect((await play(sql, id, 19)).some(Boolean)).toBe(false);
+    expect(rows(db, id)).toBe(1);
+    expect(await play(sql, id, 1)).toEqual([true]);
+    expect(rows(db, id)).toBe(2);
+    expect(await welcomeState(sql, id)).toMatchObject({ next: null, unopened: 2, notice: true, games: 25 });
+    expect(await play(sql, id, 5)).toEqual(Array(5).fill(false));
+    expect(rows(db, id)).toBe(2);
+  });
+
+  it("concurrent grants at 25: one row for each milestone, never two", async () => {
+    const { sql, db, id } = await account();
+    for (let i = 0; i < 25; i++) await recordResult(sql, id, GAME, T0 + i);
+    const all = await Promise.all(Array.from({ length: 10 }, (_, i) => grantWelcomeCrate(sql, id, T0 + i)));
+    expect(all.flat().sort((a, b) => a - b)).toEqual([5, 25]);
+    expect(rows(db, id)).toBe(2);
+    const milestones = db.prepare("SELECT milestone FROM welcome_crates WHERE user_id = ? ORDER BY milestone").all(id) as { milestone: number }[];
+    expect(milestones.map((m) => m.milestone)).toEqual([5, 25]);
+  });
+
+  it("the backfill covers both: an account with 30 past games gets both on its next app load", async () => {
+    const { sql, db, id } = await account();
+    for (let i = 0; i < 30; i++) await recordResult(sql, id, GAME, T0 - 86_400_000 + i);
+    const user = (await sql.first("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id)) as never;
+    expect((await profile(sql, user)).locker.welcome).toMatchObject({ next: null, unopened: 2, status: "ready", notice: true });
+    expect(rows(db, id)).toBe(2);
+  });
+
+  it("the second gives a different ride from the first's (even with randomness that would land on the same one, or the first deleted)", async () => {
+    const { sql, db, id } = await account();
+    await play(sql, id, 25);
+    const first = await openWelcomeCrate(sql, id, T0, () => 0);
+    if (!first.ok) throw new Error(first.message);
+    // (The first's ride deleted from the locker: the crate still remembers which it was.)
+    db.prepare("DELETE FROM items WHERE id = ?").run(first.item.id);
+    const second = await openWelcomeCrate(sql, id, T0 + 1, () => 0);
+    if (!second.ok) throw new Error(second.message);
+    expect(second.again).toBe(false);
+    expect(second.item.def).not.toBe(first.item.def);
+    expect(await welcomeState(sql, id)).toMatchObject({ unopened: 0, status: "opened", item: second.item.id });
+    // A third open: nothing new.
+    expect(await openWelcomeCrate(sql, id, T0 + 2)).toMatchObject({ ok: true, again: true, item: { id: second.item.id } });
+    expect(hunchessItems(db, id)).toHaveLength(1);
+  });
+
+  it("two opens at once with both waiting: both open, with different rides; three at once: still two", async () => {
+    for (let round = 0; round < 5; round++) {
+      const { sql, db, id } = await account();
+      await play(sql, id, 25);
+      const all = await Promise.all([0, 1, 2].map(() => openWelcomeCrate(sql, id, T0, () => 0.3)));
+      const fresh = all.filter((r) => r.ok && !r.again);
+      expect(fresh).toHaveLength(2);
+      const defs = hunchessItems(db, id).map((r) => r.def);
+      expect(defs).toHaveLength(2);
+      expect(new Set(defs).size).toBe(2);
+      expect((await welcomeState(sql, id)).unopened).toBe(0);
+    }
+  });
+});
+
 describe("stored data", () => {
   it("old lockers load: an account with items from before (no welcome row, no `abandoned` on its results) reads as not earned yet", async () => {
     const { sql, db, id } = await account();
@@ -280,7 +345,7 @@ describe("stored data", () => {
     db.prepare("INSERT INTO results (user_id, mode, online, placement, players, played_at) VALUES (?, 'classic', 0, 1, 8, 1)").run(id);
     const locker = await lockerState(sql, id);
     expect(locker.items.map((i) => i.def)).toEqual(["pirate-hat"]);
-    expect(locker.welcome).toEqual({ games: 1, status: "locked", notice: false });
+    expect(locker.welcome).toEqual({ games: 1, next: 5, unopened: 0, status: "locked", notice: false });
   });
 
   it("a database from before the crate (no welcome_crates table yet) still answers a locker", async () => {

@@ -7,7 +7,8 @@ import { asSignedIn, named, test } from "./helpers.ts";
  * account finishes 5 games (through the app's own result path, POST /api/results, as a solo result screen saves one: the fastest
  * real path), sees the one-time "You earned a Welcome Crate!" notice, opens the crate in the Crates tab (the usual strip, Fischer
  * Random, the reveal) to a HunChess ride, rides it in the town, finds "Not tradeable" and no trade or listing anywhere, and a sixth
- * game grants nothing more. WELCOME_SHOTS=<dir>: the stills for the PR (docs/welcome-crate/).
+ * game grants nothing more. Both Welcome Crate rows show from the start (Eric, Nov 6: "1 out of 5 … 1 out of 25"), each with its
+ * own meter; crate 1 opens at 5 games, crate 2 at 25. WELCOME_SHOTS=<dir>: the stills for the PR (docs/welcome-meters/).
  */
 
 test.use({ actionTimeout: 15_000 });
@@ -16,13 +17,13 @@ const shot = async (page: Page, name: string) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${test.info().project.name}.png` });
 };
 
-type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcome: { games: number; status: string; notice: boolean; item?: string } };
+type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcome: { games: number; next: number | null; unopened: number; status: string; notice: boolean; item?: string } };
 const lockerNow = (page: Page) => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
 /** One finished game, saved as a solo result screen saves it (the app's own path). */
 const finishGame = (page: Page) =>
   page.evaluate(async () => (await fetch("/api/results", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true }) })).ok);
 
-test("the Welcome Crate: 5 finished games earn it once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing", async ({ page }) => {
+test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await named(page, "Tess");
@@ -30,16 +31,41 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await asSignedIn(page, "welcome");
   await page.reload();
 
-  // Four games: not yet. The Crates tab shows how far along you are (greyed, not hidden).
-  for (let i = 0; i < 4; i++) expect(await finishGame(page)).toBe(true);
+  // No games yet: both Welcome Crates are in the Crates tab from the start, locked, each with its own meter (greyed, not hidden).
+  await page.goto("/shop?crates");
+  const rowOf = (n: number) => page.locator(`.welcome-crate-row[data-welcome-n="${n}"]`);
+  const row1 = rowOf(1);
+  const row2 = rowOf(2);
+  await expect(page.locator(`.welcome-crate-row[data-crate="${WELCOME_CRATE_ID}"]`)).toHaveCount(2);
+  await expect(row1).toContainText("Welcome Crate 1");
+  await expect(row2).toContainText("Welcome Crate 2");
+  for (const row of [row1, row2]) {
+    await expect(row).toContainText("Thank you for being an early tester!");
+    await expect(row.locator(".not-tradeable")).toHaveText("Not tradeable");
+    await expect(row).toHaveClass(/locked/);
+    await expect(row.locator(".welcome-lock")).toHaveCount(1);
+  }
+  await expect(row1).toContainText("0/5");
+  await expect(row1).toContainText("Finish 5 games to unlock");
+  await expect(row2).toContainText("0/25");
+  await expect(row2).toContainText("Finish 25 games to unlock");
+
+  // Three games: each meter counts them.
+  for (let i = 0; i < 3; i++) expect(await finishGame(page)).toBe(true);
+  expect((await lockerNow(page)).welcome).toMatchObject({ status: "locked", games: 3, notice: false });
+  await page.goto("/shop?crates");
+  await expect(row1).toContainText("3/5");
+  await expect(row2).toContainText("3/25");
+  await expect(row1).toHaveClass(/locked/);
+  await shot(page, "locked-3");
+
+  // Four games: 4/5 (crate 2 still 4/25).
+  expect(await finishGame(page)).toBe(true);
   expect((await lockerNow(page)).welcome).toMatchObject({ status: "locked", games: 4, notice: false });
   await page.goto("/shop?crates");
-  const row = page.locator(`.welcome-crate-row[data-crate="${WELCOME_CRATE_ID}"]`);
-  await expect(row).toContainText("HunChess Welcome Crate");
-  await expect(row).toContainText("Thank you for being an early tester!");
-  await expect(row).toContainText("Finish 5 games to earn your Welcome Crate: 4/5");
-  await expect(row.locator(".not-tradeable")).toHaveText("Not tradeable");
-  await expect(row).toHaveClass(/none/);
+  await expect(row1).toContainText("4/5");
+  await expect(row2).toContainText("4/25");
+  await expect(row1).toHaveClass(/locked/);
 
   // The fifth: earned. Home shows the one-time notice.
   expect(await finishGame(page)).toBe(true);
@@ -57,20 +83,31 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await expect(page.locator(".welcome-notice")).toHaveCount(0);
   expect((await lockerNow(page)).welcome).toMatchObject({ status: "ready", notice: false });
 
-  // The inventory: the crate, yours to open; its card.
+  // The inventory: crate 1 ready (a full bar, Open); crate 2 still locked at 5/25.
   await page.goto("/shop?crates");
-  await expect(row).toContainText("You have 1. Open it!");
-  await expect(row).not.toHaveClass(/none/);
-  await shot(page, "crate-row");
-  await row.click();
+  await expect(row1).toContainText("Ready");
+  await expect(row1).toContainText("5/5");
+  await expect(row1).not.toHaveClass(/locked/);
+  await expect(row2).toContainText("5/25");
+  await expect(row2).toHaveClass(/locked/);
+  await shot(page, "one-ready");
+  await row1.click();
   const hero = page.locator(".welcome-crate-hero");
-  await expect(hero).toContainText("HunChess Welcome Crate");
+  await expect(hero).toContainText("Welcome Crate 1");
   await expect(hero).toContainText("Thank you for being an early tester!");
   await expect(hero.locator(".not-tradeable")).toHaveText("Not tradeable");
   // No purity anywhere on its page (Eric: "Purity isn't listed for these").
   await expect(page.locator(".welcome-page")).not.toContainText(/purity/i);
   await expect(page.locator(".welcome-page .odds-row")).toHaveCount(HUNCHESS_RIDES.length);
   await shot(page, "crate-card");
+  // (Locked, not ready, its Open greyed; the second crate's page says what it needs.)
+  await page.goto("/shop?crates");
+  await row2.click();
+  await expect(page.locator(".welcome-crate-hero")).toContainText("Welcome Crate 2");
+  await expect(page.locator(".welcome-progress")).toHaveText("Finish 25 games to unlock");
+  await expect(page.getByRole("button", { name: /^▶ Open$/ })).toBeDisabled();
+  await page.locator(".welcome-page").getByRole("button", { name: "‹ Crates" }).click();
+  await row1.click();
 
   // Open it: the strip, Fischer Random, then the reveal: a HunChess ride, "Not tradeable", no purity, no "Open another".
   await page.getByRole("button", { name: /^▶ Open$/ }).click();
@@ -93,8 +130,14 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await reveal.getByRole("button", { name: "▶ Wear" }).click();
   await expect(reveal.getByRole("button", { name: "Wearing it" })).toBeVisible();
   await reveal.getByRole("button", { name: "▶ Done" }).click();
-  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened. Its ride is in your locker.");
+  // Crate 1 now reads Opened, with its ride; crate 2 is still locked at 5/25 (Eric: "the first one you get after 5 games, the next one
+  // you get after 25").
+  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened");
   await expect(page.getByRole("button", { name: /^▶ Open$/ })).toBeDisabled();
+  await page.goto("/shop?crates");
+  await expect(row1).toContainText("Opened");
+  await expect(row2).toContainText("5/25");
+  await expect(row2).toHaveClass(/locked/);
 
   // Opening again (a second tap, another device): nothing new, the same ride.
   const again = await page.evaluate(async (crate) => {
@@ -135,10 +178,38 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await page.waitForTimeout(800);
   await shot(page, "town");
 
-  // A sixth game grants nothing: still one crate, opened, one ride, no notice.
+  // A sixth game grants nothing: still one crate, opened, one ride, no notice; the next is at 25.
   expect(await finishGame(page)).toBe(true);
   locker = await lockerNow(page);
-  expect(locker.welcome).toMatchObject({ status: "opened", notice: false });
+  expect(locker.welcome).toMatchObject({ status: "opened", notice: false, next: 25, games: 6 });
   expect(locker.items.filter((i) => i.def.endsWith("-hunchess"))).toHaveLength(1);
+
+  // The second at 25: its notice, then it opens to a different HunChess ride.
+  for (let i = 6; i < 24; i++) expect(await finishGame(page)).toBe(true);
+  expect((await lockerNow(page)).welcome).toMatchObject({ status: "opened", next: 25, games: 24, notice: false });
+  expect(await finishGame(page)).toBe(true);
+  await page.goto("/");
+  await expect(page.locator(".welcome-notice")).toContainText("You earned a Welcome Crate!", { timeout: 20_000 });
+  await page.locator(".welcome-notice").getByRole("button", { name: "▶ OK" }).click();
+  await page.goto("/shop?crates");
+  await expect(row2).toContainText("Ready");
+  await expect(row2).toContainText("25/25");
+  await row2.click();
+  await page.getByRole("button", { name: /^▶ Open$/ }).click();
+  await expect(reveal).toBeVisible({ timeout: 40_000 });
+  await expect(reveal.locator(".reveal-name")).toHaveText(/^HunChess /);
+  await reveal.getByRole("button", { name: "▶ Done" }).click();
+  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened");
+  await page.goto("/shop?crates");
+  await expect(row1).toContainText("Opened");
+  await expect(row2).toContainText("Opened");
+  await expect(row1).not.toHaveClass(/locked/);
+  await expect(row2).not.toHaveClass(/locked/);
+  await shot(page, "both-opened");
+  locker = await lockerNow(page);
+  const both = locker.items.filter((i) => i.def.endsWith("-hunchess"));
+  expect(both).toHaveLength(2);
+  expect(new Set(both.map((i) => i.def)).size).toBe(2);
+  expect(locker.welcome).toMatchObject({ status: "opened", next: null, unopened: 0, notice: false });
   expect(errors).toEqual([]);
 });
