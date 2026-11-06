@@ -97,3 +97,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 
 - **American English (Eric, Nov 5, second reminder).** Every message to Eric, every brief, doc, PR body and player-visible text:
   color, center, gray, favorite, honor, realize. Never colour, centre, grey, favourite.
+
+- **Street town spacing (Eric, Nov 6).** Two boss homes are never neighbors: at least one full, normal-width look-alike building
+  between any two boss homes in a row. No sliver look-alikes. Rows stay continuous (no sky between fronts).

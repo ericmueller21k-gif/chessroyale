@@ -241,3 +241,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   "up is up" (desktop, goIn "drawn" null x2), which passed on #509's full run on the same base and 6/6 locally, so it's intermittent
   and not #510's; merged main into #510 (5b9990b1) to rerun. If it recurs, root-cause goIn (likely: after the tap walks you to the
   door, your pawn or ride covers the home's tap point and the card hasn't opened within 1.5 s on a slow runner).
+- Nov 6 ~04:50: Eric saw the Meadow Street still: Moo's and Hollow's homes nearly touching with a sliver building and sky between.
+  New rule (RULES.md). #511 HELD: north edge helper re-spaces Meadow Street, checks every street, adds a unit test, re-runs, pushes.
+  #510 merged c570f6dc; Welcome Crates live. Haiku helper: Welcome Crate meters (claude/welcome-meters).
