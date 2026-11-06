@@ -14,7 +14,7 @@ Decision note: `docs/decisions/2026-11-05-street-north-edge.md`. Area page: `doc
   - One back line at y = 42.5: a solid wall the whole way round but for the Colosseum, its ends running on under the ring. North of it
     only the Colosseum, a plain meadow (ground) and a few treetops over the plaza's stretches of wall. Nothing walkable there.
   - Upper Street is gone. Its four homes (Hopper's, Wrangler's, Moo's, Hollow's) stand on **Meadow Street**, a new street 8 rows south,
-    between the closing row and South Street, at their old columns, backed by a row facing South Street; a lane on the promenade's line.
+    between the closing row and South Street (three wide, so South Street keeps its south sidewalk), at their old columns, backed by a row facing South Street; a lane on the promenade's line.
     The world grows 8 columns east too (it's square); Seam Avenue runs from Meadow Street to Colosseum Row.
   - The plaza (rows 40–41) is walled along row 39 with three open **gateways** onto Colosseum Row (columns 15, 21–24 with a crest, 30).
     Its statues and chess pieces stand on row 42 as figures. The apron is its two walkable rows.
@@ -70,18 +70,29 @@ e2e:
 
 ## Frame rate
 
-Not measured yet (see "Left" below).
+Not measured yet: see "Left".
+
+## Stills
+
+`docs/street-north-edge/`, phone and computer (Canvas 2D): `1-plaza-close`, `2-looking-west`, `3-looking-east`, `4-turned-away`, a look
+round beside the Colosseum (`4b-beside-looking-north-west`, `4c-beside-looking-north-east`, `4d-beside-looking-west`),
+`5-from-the-park`, `6-grand-gateway`, `6-west-gateway`, `7-meadow-street`, `8-overview` (the top zoom step).
+
+## Test results (local)
+
+- Typecheck clean; the town unit tests (21 files, 290 tests) pass, after merging main (83ceba92).
+- e2e on phone and computer, Canvas 2D and WebGL: `town-fixed`, `town-street` and `town-rows` pass. The gateway walk and the park
+  table checks were fixed and rerun on the computer. The South Street "no sky between the fronts" check was fixed (below) and rerun on
+  both. `town.spec.ts` (a player's town) was not run locally.
+- The South Street fix: Meadow Street is three squares wide (the others four), so South Street keeps its south sidewalk. Without it,
+  its south row stood at the street's edge, where the near cut ("nothing between the camera and you") left out the fronts beside the
+  camera and sky showed beside Hollow Peak's roof (0.126 against 0.005).
 
 ## Left
 
-- Frame rate (plaza and Fountain Street routes, a look round at the plaza; 2D and WebGL; phone and computer) against main: not run
-  (the shared e2e lock was busy; a scratch measuring spec is ready).
-- `town-rows.spec.ts` "no sky between the fronts", South Street west, computer, 2D: fails (0.126 > 0.005). The moved homes back onto
-  South Street now; Hollow Peak's slope beside the camera leaves sky where the near cut leaves out the row past your pawn. Needs a look.
-- Stills in `docs/street-north-edge/`: not taken yet; the test is ready (`STILLS=docs/street-north-edge npx playwright test
-  e2e/town-fixed.spec.ts -g "stills: the north edge"`).
-- The e2e above passed locally on phone and computer, both renderers, except the South Street sky check; the gateway and park table
-  fixes were rerun on the computer only.
+- Frame rate against main (plaza, Fountain Street, a look round; 2D and WebGL; phone and computer): not measured. My local Worker on
+  8987 is stuck (a respawning runtime holds the port and doesn't answer), so no server to measure on.
+- The full town e2e area rerun after the last layout change (Meadow Street three wide): only the sky check was rerun.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
