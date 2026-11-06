@@ -317,3 +317,36 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
   await drag(page, -0.9);
   await shot("7-looking-round");
 });
+
+/** The north edge's stills (brief: the plaza up close; looking round from it west, east and away; from the park; a gateway; Meadow Street; the overview). */
+test("stills: the north edge", async ({ page }) => {
+  test.skip(!STILLS || !STILLS.includes("north-edge"), "stills only (STILLS=docs/street-north-edge)");
+  test.setTimeout(600_000);
+  mkdirSync(STILLS!, { recursive: true });
+  const project = test.info().project.name;
+  const shot = async (name: string) => {
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
+  };
+  const turn = async (deg: number | null) => page.evaluate((d) => (window as unknown as W).__townHeading(d), deg);
+  await open(page, "2d");
+  await walkTo(page, [22, 40]);
+  await shot("1-plaza-close");
+  await walkTo(page, [20, 41]);
+  for (const [name, deg] of [["2-looking-west", -90], ["3-looking-east", 90], ["4-turned-away", 180]] as const) {
+    await turn(deg);
+    await shot(name);
+  }
+  await turn(null);
+  await walkTo(page, [22, 32]);
+  await shot("5-from-the-park");
+  await walkTo(page, [22, 37]);
+  await shot("6-grand-gateway");
+  await walkTo(page, [15, 38]);
+  await shot("6-west-gateway");
+  await walkTo(page, [36, 6]);
+  await shot("7-meadow-street");
+  await walkTo(page, [22, 41]);
+  for (let k = 0; k < 3; k++) await page.getByRole("button", { name: "Zoom out" }).click();
+  await shot("8-overview");
+});
