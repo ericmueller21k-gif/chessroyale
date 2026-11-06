@@ -215,3 +215,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   claude/boingo-home, 8984; no intro this round; claw stub), claw machine (xhigh, claude/claw-machine, 8983; 25% for that boss's
   crate, server-decided, idempotent; admin test tokens). Still running: street north edge (8987), controls + minimap (8988).
   Eric: around 9 o'clock, pause all but one Opus helper and go back to one thing at a time.
+- Nov 6 ~02:40: disk full ~02:20 (allowance spent): removed 9 merged/pushed clean worktrees via `git worktree remove` (8.4 GB free).
+  Leftover non-git dirs cr-bannerev, cr-result2, cr-roomkeys need a forced delete; the safety check blocked it, so they're left.
+  #507 LIVE (de7933db, main green). North edge PAUSED at 03b47ef5: left = frame rate vs main, South Street west sky e2e failing
+  (0.126 vs 0.005: Hollow's roof slope beside the camera after the move; needs a design fix), stills. Stuck wrangler on 8987
+  killed (Eric's OK). Tutorial (Haiku): Handbook rename + slide module pushed; overlay in progress until 02:59.
