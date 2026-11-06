@@ -400,3 +400,32 @@
   font: 600 13px/1.35 Archivo, sans-serif;
   color: #4a4438;
 }
+/* The map button (the street town; TownChatTools.tsx): a folded map, its sheet green while the minimap shows, gray while it's off; greyed
+   inside a building. */
+.tm-btn-icon {
+  display: block;
+}
+.tm-btn-sheet {
+  fill: var(--bub-off);
+  stroke: var(--text);
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+}
+.tm-btn-fold {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.1;
+}
+.tm-btn-dot {
+  fill: var(--text);
+}
+.tm-btn-icon.lit .tm-btn-sheet {
+  fill: var(--good);
+}
+.tm-btn-icon.lit .tm-btn-dot {
+  fill: #ff3b30;
+}
+.town-tool.tm-toggle:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

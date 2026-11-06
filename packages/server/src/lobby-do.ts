@@ -4,6 +4,7 @@ import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
+import { grantWelcomeCrate } from "./welcome.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
 import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
@@ -17,6 +18,7 @@ import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
 import { pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
+import { opKeys } from "./ledger.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -177,11 +179,15 @@ export class Lobby extends DurableObject<Env> {
       // …then a player in review (or banned) has their results held off ranking until they're cleared.
       const held = !(await eligibleForRanked(sql, userId).catch(() => true));
       await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
+      // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
+      await grantWelcomeCrate(sql, userId, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${rec.code}: ${String(e)}`));
       // Boss tokens: a boss battle counts once it reached 10 of their own moves or 5 minutes (this room's count and clock), win
-      // or lose; then maybe a token (boss-tokens.ts). Once: a result is saved once (resultsSaved, a left player's `saved`).
+      // or lose; then maybe a token (boss-tokens.ts). Once: keyed by this match (its code and start) and the account, so a room that
+      // stops after writing it and before storing that it did (resultsSaved, a left player's `saved`) drops nothing more next time.
       const span = core.bossBattleSpan(r.playerId);
       if (span && battleCounts(span)) {
-        await countBossBattle(sql, userId, Date.now(), { battle: rec.code, off: pausedBosses(this.env), signedInOnly: signInRequired(env) }).catch((e: unknown) =>
+        const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
+        await countBossBattle(sql, userId, Date.now(), { battle: rec.code, op, off: pausedBosses(this.env), signedInOnly: signInRequired(env) }).catch((e: unknown) =>
           console.log(`boss token for ${rec.code}: ${String(e)}`),
         );
       }

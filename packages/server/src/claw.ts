@@ -1,6 +1,7 @@
 import { bossCrateOf, clawWins, isTokenBoss, mulberry32, tokenBossName } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import { serverRandom } from "./boss-tokens.ts";
+import { applyOp, clawOp, ledgerAccount, requestId } from "./ledger.ts";
 import { lockerState, type LockerState } from "./locker.ts";
 
 /**
@@ -11,11 +12,11 @@ import { lockerState, type LockerState } from "./locker.ts";
  * the roll is the server's own (crypto), never the device's; the claw on screen only shows the answer (the stop tap is for show).
  *
  * Safe to retry and to race: the app sends its own id for each play (`request`, made once per coin), and
- *   - one transaction (D1's batch: all of it or none) writes the play's row only if the token is there, then takes the token off
- *     only if that row went in, then puts the crate in only if that row went in and won. Nothing can change between the statements
- *     of one transaction, so the token is spent exactly when the play is logged, and the crate given exactly when it won;
- *   - the play's row is unique per account and request id: a retry of the same play (a lost answer, a double tap) writes nothing,
- *     spends nothing and gives nothing, and answers the first play's outcome;
+ *   - the token and the crate move through the ledger (ledger.ts, clawOp: op `claw:<ledger id>:<request>`), in one transaction with
+ *     the play's row: the op applies only if the token is there, and the play's row goes in only if it applied, so the token is spent
+ *     exactly when the play is logged, and the crate given exactly when it won;
+ *   - the op is keyed by the request id: a retry of the same play (a lost answer, a double tap) writes nothing, spends nothing and
+ *     gives nothing, and answers the first play's outcome;
  *   - two plays at once (two taps with different ids, two devices) are two transactions, one after the other: each finds the token
  *     there or not, and a count can't go below zero (boss_tokens' CHECK).
  *
@@ -39,8 +40,6 @@ export const CLAW_SCHEMA = [
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 const randomHex = (bytes: number) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
-/** The app's id for one play: 8 to 64 letters, digits, "-" or "_". */
-const REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** A play's answer: the outcome, the crate it won (its BOSS_CRATES id), the boss, and your locker after it. */
 export interface ClawPlay {
@@ -82,7 +81,8 @@ export async function playClaw(
   now: number,
   opts: ClawOptions = {},
 ): Promise<ClawPlay | { ok: false; message: string }> {
-  if (typeof request !== "string" || !REQUEST_ID.test(request)) return { ok: false, message: "No play to make." };
+  // (The app's id for one play: 8 to 64 letters, digits, "-" or "_": ledger.ts, requestId.)
+  if (requestId(request) === null || typeof request !== "string") return { ok: false, message: "No play to make." };
   const answer = async (row: { id: string; boss: string; won: number; crate: string | null }, again: boolean): Promise<ClawPlay> => ({
     ok: true,
     won: row.won === 1,
@@ -100,38 +100,46 @@ export async function playClaw(
   if (first) return answer(first, true);
   const crate = isTokenBoss(boss) ? bossCrateOf(boss) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return { ok: false, message: clawNeedsToken(crate.boss) };
   const roll = opts.seed !== undefined ? mulberry32(opts.seed >>> 0)() : (opts.rng ?? serverRandom)();
   const won = clawWins(roll);
   const id = randomHex(12);
-  const crateRow = randomHex(9);
-  const played = "EXISTS (SELECT 1 FROM claw_plays WHERE id = ? AND user_id = ?)";
-  await sql.batch([
-    // The play goes in only if a token is there (and only once per request id: a retry racing this one writes nothing).
-    stmt(
-      `INSERT INTO claw_plays (id, user_id, request, boss, won, crate, at)
-       SELECT ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= 1)
-       ON CONFLICT (user_id, request) DO NOTHING`,
-      id,
-      userId,
+  // The token and the crate through the ledger (ledger.ts, clawOp: op `claw:<ledger id>:<request>`, applied once), the play's own row
+  // with them in the same transaction, only if the op applies.
+  const outcome = await applyOp(
+    sql,
+    me,
+    clawOp(me, {
       request,
-      crate.boss,
-      won ? 1 : 0,
-      won ? crate.id : null,
+      boss: crate.boss,
+      crate: crate.id,
+      won,
+      crateRow: randomHex(9),
       now,
-      userId,
-      crate.boss,
-    ),
-    // The token comes off only if that play went in.
-    stmt(`UPDATE boss_tokens SET n = n - 1 WHERE user_id = ? AND boss = ? AND ${played}`, userId, crate.boss, id, userId),
-    // The crate goes in only if that play went in and won: unopened, as a bought one (openBossCrate opens it).
-    stmt(`INSERT INTO boss_crates (id, user_id, crate, bought_at) SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM claw_plays WHERE id = ? AND user_id = ? AND won = 1)`, crateRow, userId, crate.id, now, id, userId),
-  ]);
+      log: (ours) => [
+        stmt(
+          `INSERT INTO claw_plays (id, user_id, request, boss, won, crate, at) SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${ours.sql}
+           ON CONFLICT (user_id, request) DO NOTHING`,
+          id,
+          userId,
+          request,
+          crate.boss,
+          won ? 1 : 0,
+          won ? crate.id : null,
+          now,
+          ...ours.params,
+        ),
+      ],
+    }),
+  );
+  if (outcome === "refused") return { ok: false, message: clawNeedsToken(crate.boss) };
   const row = await sql.first<{ id: string; boss: string; won: number; crate: string | null }>(
     "SELECT id, boss, won, crate FROM claw_plays WHERE user_id = ? AND request = ?",
     userId,
     request,
   );
   if (!row) return { ok: false, message: clawNeedsToken(crate.boss) };
-  if (row.id === id) console.log(`claw: ${userId} played a ${crate.boss} token at ${new Date(now).toISOString()}: ${won ? `won ${crate.id}` : "lost"}`);
-  return answer(row, row.id !== id);
+  if (outcome === "applied") console.log(`claw: ${userId} played a ${crate.boss} token at ${new Date(now).toISOString()}: ${won ? `won ${crate.id}` : "lost"}`);
+  return answer(row, outcome === "replay");
 }

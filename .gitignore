@@ -12,3 +12,7 @@ packages/sim/data/fairplay-bank/
 
 # Crowd spread probe output (crowd-spread-probe.ts): the summary is reports/crowd-spread.md
 reports/crowd-spread/*.jsonl
+
+# Stills and GIF frames: never committed (send their paths); check.yml refuses new images under docs/
+stills/
+frames/

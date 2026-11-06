@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town, round 4 (Nov 5; brief-town-rows.md): the rows on every street, the chase camera, the town that wraps east-west
@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 const STILLS = process.env.STILLS;
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const you = async (p: Page) => (await canvas(p).getAttribute("data-you"))!.split(",").map(Number) as [number, number];
-type Cam = { heading: number; headingTo: number; zoom: number; zoomTarget: number; parkBefore: number | null };
+type Cam = { heading: number; headingTo: number; zoom: number; zoomTarget: number; parkBefore: number | null; speech: string | null };
 type W = { __townWalk: (s: readonly [number, number]) => boolean; __townHeading: (h: number | null) => void; __townCam: () => Cam };
 const cam = (page: Page) => page.evaluate(() => (window as unknown as W).__townCam());
 const walkTo = async (page: Page, sq: readonly [number, number]) => {
@@ -35,10 +35,11 @@ const walkAlong = async (page: Page, from: readonly [number, number], to: readon
   await walkTo(page, to);
   await expect.poll(async () => { const c = await cam(page); return c.heading === c.headingTo; }, { timeout: 5000 }).toBe(true);
 };
-async function open(page: Page, sky: string, gl: boolean) {
+async function open(page: Page, sky: string) {
   await asAdmin(page);
-  await page.goto(`/town?sky=${sky}${gl ? "&gl=1" : ""}`);
+  await page.goto(`/town?sky=${sky}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
 
 /** Every figure drawn (a boss, a bot, you) whole inside the world's box (Eric, Nov 4), its foot on screen; a faded one may be off. */
@@ -89,38 +90,43 @@ async function skyAtSides(page: Page): Promise<number> {
 
 /** (Round 5) A drag across the box from its middle, `share` of its width (negative: leftward): a look round, half a turn a width. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 
 // (Round 5: the camera faces north; a drag looks round. Looking along a street both ways is a drag a quarter turn each way, from where
 // round 4 walked along it.)
-test("no sky between the fronts at street level: Fountain Street and South Street, looking both ways along each (Canvas 2D and WebGL)", async ({ page }) => {
+test("no sky between the fronts at street level: Fountain Street and South Street, looking both ways along each", async ({ page }) => {
   test.setTimeout(400_000);
-  for (const gl of [false, true]) {
-    await open(page, "day", gl);
-    for (const [name, sq, look] of [["Fountain Street east", [4, 20], 0.5], ["Fountain Street west", [39, 20], -0.5], ["South Street east", [4, 5], 0.5], ["South Street west", [39, 5], -0.5]] as const) {
-      await walkTo(page, sq);
-      await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
-      await drag(page, look);
-      await page.waitForTimeout(800);
-      expect(Math.abs((await cam(page)).heading), `${name}: looking a quarter round`).toBeGreaterThan(80);
-      const share = await skyAtSides(page);
-      expect(share, `${name} (${gl ? "WebGL" : "2D"}): sky at the sides at street level`).toBeLessThan(0.005);
-    }
+  await open(page, "day");
+  // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
+  // (The bosses' speech bubbles off: a bubble is drawn over the world, and its white across the band's middle, where each row's sky color
+  // is taken, read as sky at the sides (Smudgy's on South Street east: 0.010 to 0.013, Nov 6). Hushed, the band is the world alone.)
+  await page.evaluate(() => (window as unknown as { __townHush: (on: boolean) => void }).__townHush(true));
+  for (const [name, sq, look] of [["Fountain Street east", [4, 28], 0.5], ["Fountain Street west", [39, 28], -0.5], ["South Street east", [4, 13], 0.5], ["South Street west", [39, 13], -0.5]] as const) {
+    await walkTo(page, sq);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
+    await drag(page, look);
+    await page.waitForTimeout(800);
+    expect(Math.abs((await cam(page)).heading), `${name}: looking a quarter round`).toBeGreaterThan(80);
+    expect((await cam(page)).speech, `${name}: no speech bubble over the band`).toBeNull();
+    const share = await skyAtSides(page);
+    expect(share, `${name}: sky at the sides at street level`).toBeLessThan(0.005);
+    // (Back to north before the next walk: a look round let go snaps to the nearest quarter, and a walk locks it in as the base.)
+    await drag(page, -look);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
   }
 });
 
-test("the zoom steps: − and + move a step at a time (in, the default, out, the overview); every figure on screen at each", async ({ page }) => {
-  test.setTimeout(200_000);
-  await open(page, "day", false);
-  await walkAlong(page, [1, 20], [4, 20]);
-  expect((await cam(page)).zoomTarget).toBe(1);
-  await page.getByRole("button", { name: "Zoom in" }).click();
+test("the zoom steps: − and + move a step at a time (in, the mockup's, out (the default since Nov 5), the overview); every figure on screen at each", async ({ page }) => {
+  test.setTimeout(400_000);
+  await open(page, "day");
+  await walkAlong(page, [1, 28], [4, 28]);
+  // (Eric, Nov 5: "we're going with number three for the default": the town opens at step 2.)
+  expect((await cam(page)).zoomTarget).toBe(2);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(0);
   await figuresOnScreen(page, "in");
   for (const step of [1, 2, 3]) {
@@ -137,23 +143,24 @@ test("the zoom steps: − and + move a step at a time (in, the default, out, the
 });
 
 test("the park zooms a step out as you come in and back as you leave; a press in it wins", async ({ page }) => {
-  test.setTimeout(200_000);
-  await open(page, "day", false);
-  await walkAlong(page, [6, 20], [9, 20]);
-  expect((await cam(page)).zoomTarget).toBe(1);
+  test.setTimeout(400_000);
+  await open(page, "day");
+  await walkAlong(page, [6, 28], [9, 28]);
+  // (The default since Nov 5: step 2, so the park's step out is to the overview, 3.)
+  expect((await cam(page)).zoomTarget).toBe(2);
   // In (fully: a square past its edge), out a step over about 0.6 s; you and every figure on screen.
-  await walkTo(page, [16, 20]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
-  expect((await cam(page)).parkBefore).toBe(1);
+  await walkTo(page, [16, 28]);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(3);
+  expect((await cam(page)).parkBefore).toBe(2);
   await figuresOnScreen(page, "in the park");
   // Out again: back to the step you had.
-  await walkTo(page, [9, 20]);
-  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
-  // In again, and + in the park: your step stays as you leave.
-  await walkTo(page, [16, 20]);
-  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(2);
-  await page.getByRole("button", { name: "Zoom in" }).click();
-  await walkTo(page, [9, 20]);
+  await walkTo(page, [9, 28]);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(2);
+  // In again, and + twice in the park: your step stays as you leave (not the 2 you came in with).
+  await walkTo(page, [16, 28]);
+  await expect.poll(async () => (await cam(page)).zoomTarget, { timeout: 3000 }).toBe(3);
+  for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
+  await walkTo(page, [9, 28]);
   await page.waitForTimeout(800);
   expect((await cam(page)).zoomTarget, "your press in the park wins").toBe(1);
 });
@@ -173,16 +180,14 @@ test("stills: the rows (round 4)", async ({ page }) => {
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
   };
-  // (The default renderer, Canvas 2D, as Eric sees it; STILLS_GL=1 for WebGL, as the mockup's.)
-  const gl = process.env.STILLS_GL === "1";
-  await open(page, "day", gl);
+  await open(page, "day");
   // Each street by day, walking along it (the chase camera behind you).
   const streets: [string, readonly [number, number], readonly [number, number]][] = [
-    ["1-south-street", [1, 5], [4, 5]],
-    ["2-fountain-street", [1, 20], [4, 20]],
-    ["3-colosseum-row", [1, 28], [4, 28]],
-    ["4-upper-street", [40, 37], [36, 37]],
-    ["5-seam-avenue", [0, 9], [0, 12]],
+    ["1-south-street", [1, 13], [4, 13]],
+    ["2-fountain-street", [1, 28], [4, 28]],
+    ["3-colosseum-row", [1, 36], [4, 36]],
+    ["4-meadow-street", [40, 5], [36, 5]],
+    ["5-seam-avenue", [0, 17], [0, 20]],
   ];
   for (const [name, a, b] of streets) {
     if (!want(name)) continue;
@@ -191,30 +196,30 @@ test("stills: the rows (round 4)", async ({ page }) => {
   }
   if (want("6-boss-home")) {
     // Sawyer's woodshed in Fountain Street's north row, walking up to it.
-    await walkAlong(page, [10, 19], [10, 23]);
+    await walkAlong(page, [10, 27], [10, 31]);
     await shot("6-boss-home-in-its-row");
   }
   if (want("7-corner")) {
     // The corner of Seam Avenue and Fountain Street, the camera midway through the turn east (held).
-    await walkAlong(page, [0, 26], [0, 21]);
+    await walkAlong(page, [0, 34], [0, 29]);
     await page.evaluate(() => (window as unknown as W).__townHeading(135));
     await shot("7-corner-mid-turn");
     await page.evaluate(() => (window as unknown as W).__townHeading(null));
   }
   if (want("8-plaza")) {
     // Up the promenade into the Colosseum's plaza at the north edge.
-    await walkAlong(page, [22, 27], [22, 31]);
+    await walkAlong(page, [22, 35], [22, 40]);
     await shot("8-colosseum-plaza");
   }
   if (want("9-park")) {
     // Into the park from Fountain Street: the camera eases a step out as you arrive.
-    await walkAlong(page, [6, 20], [10, 20]);
-    await walkTo(page, [16, 20]);
+    await walkAlong(page, [6, 28], [10, 28]);
+    await walkTo(page, [16, 28]);
     await expect.poll(async () => (await cam(page)).zoom, { timeout: 5000 }).toBe(2);
     await shot("9-park-on-arrival");
   }
   if (want("10-zoom")) {
-    await walkAlong(page, [1, 20], [4, 20]);
+    await walkAlong(page, [1, 28], [4, 28]);
     const steps = ["in", "default", "out", "overview"];
     await page.getByRole("button", { name: "Zoom in" }).click();
     await shot("10-zoom-0-in");
@@ -225,8 +230,8 @@ test("stills: the rows (round 4)", async ({ page }) => {
     for (let k = 0; k < 2; k++) await page.getByRole("button", { name: "Zoom in" }).click();
   }
   if (want("11-dusk")) {
-    await open(page, "dusk", gl);
-    await walkAlong(page, [1, 20], [4, 20]);
+    await open(page, "dusk");
+    await walkAlong(page, [1, 28], [4, 28]);
     await shot("11-fountain-street-dusk");
   }
 });

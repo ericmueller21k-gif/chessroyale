@@ -10,12 +10,12 @@
  */
 import { bandpass, lowpass, noise, osc, render, rng, sine, soft, soundCache, type Voice } from "./synth.ts";
 
-export type SmudgySound = "splash" | "drip" | "swish" | "giggle" | "dab" | "thump" | "oof";
+export type SmudgySound = "splash" | "drip" | "swish" | "giggle" | "dab" | "thump" | "oof" | "whoosh" | "flop" | "splat" | "swipe";
 
 /** Noise with its highs rolled off twice: a soft puff or breath, never a hiss. */
 const murk = (rate: number, cut: number, seed: number): Voice => lowpass(rate, cut, lowpass(rate, cut, noise(seed)));
 
-const SOUNDS: Record<SmudgySound, (rate: number) => Float32Array> = {
+const SOUNDS = {
   // A glob of paint slapping a wall: a wet smack, a squelch under it, a few drops pattering after.
   splash: (rate) => {
     const slap = bandpass(rate, (t) => 1500 - 900 * Math.min(1, t / 0.08), 1.3, noise(901));
@@ -82,10 +82,43 @@ const SOUNDS: Record<SmudgySound, (rate: number) => Float32Array> = {
     const breath = murk(rate, 1600, 953);
     return render(rate, 0.2, (t) => Math.sin(Math.PI * Math.min(1, t / 0.2)) ** 0.7 * (1.5 * v(t) + 0.5 * breath(t)));
   },
-};
+} as Record<SmudgySound, (rate: number) => Float32Array>;
 
 /** Trims each to sit a little under a move's loudness, as the other bosses' do; a soft ceiling keeps the peaks well under its. */
+// (Nov 6, his studio's intro and splatter: the cloth whipped off, its landing, the splats, the brush's swipe.)
+const STUDIO: Record<"whoosh" | "flop" | "splat" | "swipe", (rate: number) => Float32Array> = {
+  // A big cloth whipped off a table: a deep rush of air rising and falling, a flap of fabric snapping in it.
+  whoosh: (rate) => {
+    const air = bandpass(rate, (t) => 280 + 1500 * Math.sin(Math.PI * Math.min(1, t / 0.45)), 1.1, murk(rate, 4000, 961));
+    const flap = bandpass(rate, () => 900, 1.6, noise(967));
+    return render(rate, 0.5, (t) => Math.sin(Math.PI * Math.min(1, t / 0.5)) ** 1.2 * (2.4 * air(t)) + (t > 0.05 && t < 0.11 ? 0.9 * Math.exp(-(t - 0.05) / 0.02) * flap(t) : 0));
+  },
+  // The cloth landing in a heap: a soft, muffled flump, a little settle after.
+  flop: (rate) => {
+    const body = murk(rate, 500, 971);
+    const settle = murk(rate, 1200, 977);
+    return render(rate, 0.32, (t) => Math.exp(-t / 0.06) * 2.2 * body(t) + (t > 0.12 ? 0.5 * Math.exp(-(t - 0.12) / 0.05) * settle(t) : 0));
+  },
+  // A splat of paint on the screen: a short wet smack, bright, no drops after.
+  splat: (rate) => {
+    const smack = bandpass(rate, (t) => 1900 - 1200 * Math.min(1, t / 0.05), 1.2, noise(983));
+    const wet = osc(rate, (t) => 300 - 150 * Math.min(1, t / 0.06), sine);
+    return render(rate, 0.16, (t) => Math.exp(-t / 0.035) * (1.6 * smack(t) + 0.7 * wet(t)));
+  },
+  // A broad brush swiped across: a long bristly rasp sweeping up, wet under it.
+  swipe: (rate) => {
+    const rasp = bandpass(rate, (t) => 1200 + 3000 * Math.min(1, t / 0.4), 1.8, noise(991));
+    const wet = murk(rate, 900, 997);
+    return render(rate, 0.46, (t) => Math.sin(Math.PI * Math.min(1, t / 0.46)) ** 0.8 * (1.4 * rasp(t) + 0.8 * wet(t)));
+  },
+};
+Object.assign(SOUNDS, STUDIO);
+
 const LEVEL: Record<SmudgySound, number> = {
+  whoosh: 0.14,
+  flop: 0.2,
+  splat: 0.15,
+  swipe: 0.13,
   splash: 0.16,
   drip: 0.2,
   swish: 0.15,

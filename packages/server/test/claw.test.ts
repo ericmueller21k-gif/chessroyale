@@ -4,6 +4,7 @@ import { createGuest, createSession, ensureSchema, signInWithIdentity, type Sql 
 import { handleAccountApi } from "../src/api.ts";
 import { bossCrateHoldings, grantTestItems, openBossCrate, tokenHoldings } from "../src/boss-tokens.ts";
 import { playClaw } from "../src/claw.ts";
+import { ledgerMismatches } from "../src/ledger.ts";
 import { memoryDb } from "./memory-db.ts";
 
 /**
@@ -64,6 +65,24 @@ describe("the claw machine: one play", () => {
     expect(opened.ok).toBe(true);
     expect(folio.items).toContain(opened.ok ? opened.item.def : "");
     expect(await bossCrateHoldings(sql, id)).toEqual({});
+  });
+
+  it("goes through the ledger (ledger.ts, clawOp): a token out each play, a crate in on a win, keyed by the request; balances and ledger agree", async () => {
+    const { sql, db, id } = await holding(0);
+    expect(await grantTestItems(sql, id, { boss: "folio", tokens: 3, request: "grant-0000001" }, T0)).toEqual({ ok: true });
+    const lose = rid();
+    await playClaw(sql, id, "folio", lose, T0 + 1, { rng: LOSE });
+    await playClaw(sql, id, "folio", lose, T0 + 2, { rng: WIN });
+    await playClaw(sql, id, "folio", rid(), T0 + 3, { rng: WIN });
+    const legs = db.prepare("SELECT op_id, asset_kind, asset_id, delta, reason FROM ledger WHERE reason = 'claw' ORDER BY created_at, leg").all() as { op_id: string; asset_kind: string; asset_id: string; delta: number }[];
+    expect(legs.map((l) => [l.asset_kind, l.asset_id, l.delta])).toEqual([
+      ["token", "folio", -1],
+      ["token", "folio", -1],
+      ["boss_crate", folio.id, 1],
+    ]);
+    expect(legs[0]!.op_id).toMatch(new RegExp(`^claw:[0-9a-f]+:${lose}$`));
+    expect(await folioTokens(sql, id)).toBe(1);
+    expect(await ledgerMismatches(sql, id)).toEqual([]);
   });
 
   it("refuses with none: nothing spent, nothing given, nothing logged (another boss's tokens don't count)", async () => {

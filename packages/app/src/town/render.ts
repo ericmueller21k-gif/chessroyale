@@ -28,8 +28,9 @@ import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
+import { MAP_BOX } from "./minimap.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { statueSpot } from "./houses/coliseum.ts";
+import { PIECE_ART, statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
 import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
@@ -44,14 +45,15 @@ import { STREET_TOWN } from "./admin-town.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
+import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
-import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
-import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
+import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
+import { stepChar } from "./kit/bake.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -233,8 +235,17 @@ export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanv
   return c;
 }
 
+/** Each frame's canvas, by the cache and frame it came from: so a wall in shade finds its own frame one ramp step darker. */
+const frameOf = new WeakMap<HTMLCanvasElement, { fc: FrameCache; i: number }>();
+/** A frame's canvas one step darker along its palette's ramps (kit/bake.ts): a wall turned from the light, every pixel a palette color. */
+function darkFrame(img: HTMLCanvasElement): HTMLCanvasElement {
+  const f = frameOf.get(img);
+  return f ? f.fc.dark(f.i) : img;
+}
+
 /** A character's frames as canvases, drawn the first time each shows (a frame at a time, never all at once). */
 class FrameCache {
+  private darker: FrameCache | null = null;
   readonly frames: (HTMLCanvasElement | null)[];
   /** When each frame ends, from the loop's start; and the loop's length. */
   readonly ends: number[];
@@ -262,7 +273,12 @@ class FrameCache {
     c.height = h;
     c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     this.frames[i] = c;
+    frameOf.set(c, { fc: this, i });
     return c;
+  }
+  /** Frame `i` one ramp step darker. */
+  dark(i: number): HTMLCanvasElement {
+    return (this.darker ??= new FrameCache(stepChar(this.ch, -1))).get(i);
   }
 }
 
@@ -785,13 +801,11 @@ export class Renderer {
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
   /** The camera's heading this frame (degrees from north: the street town's turn). */
   heading = 0;
-  /** (The street town) Whether the Colosseum shows from where you stand this frame (street.ts colosseumSeen). */
-  colSeen = true;
 
-  /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
-  private ctx: Ctx;
+  /** What it draws with (paint.ts: Canvas 2D in today's town, WebGL 2 in the street town), and that one's context. */
+  private readonly ctx: Ctx;
   constructor(
-    private paint: Painter,
+    private readonly paint: Painter,
     private readonly town: Town,
     private readonly homes: readonly Home[],
   ) {
@@ -837,6 +851,9 @@ export class Renderer {
     const street = new Map<string, FrameCache>();
     const art = (key: string, ch: () => Character) => street.get(key) ?? street.set(key, new FrameCache(ch())).get(key)!;
     this.propFrames = PROPS.map((p) => {
+      // (The street town's plaza, the north edge round: the chess pieces on their plinths and the statues stand on it as figures.)
+      if (p.kind === "piece") return art(`piece${p.v}`, () => PIECE_ART[p.v]!);
+      if (p.kind === "statue") return art(`statue${p.v}`, () => statueArt(STATUES[p.v]!.id, 1));
       if (p.kind === "hedge") return art(`hedge${p.v}`, () => hedgeFront(p.v));
       if (p.kind === "bush") return art(`bush${p.v}`, () => bush(p.v));
       if (p.kind === "bed") return art(`bed${p.v}`, () => bed(p.v));
@@ -844,7 +861,8 @@ export class Renderer {
       if (p.kind === "front") {
         const b = STREET_BUILDINGS[p.lot!]!;
         const box = lotArt(b);
-        return art(box.id, () => box.front);
+        // (One cache a picture: the Colosseum's stretches share theirs.)
+        return art(box.front.id, () => box.front);
       }
       return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
     });
@@ -869,7 +887,9 @@ export class Renderer {
         this.sqKey[n] = sqKeyOf(m, 4, (cu + ru) & 1);
       } else {
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      // (The street town's Colosseum, the north edge round: the board's squares under its oval only; round it, behind the back wall, the
+      // meadow, as past the edge.)
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING || gk === WALL || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || (!STREET_TOWN && onColiseum(c, r)) ? 1 : 0, (c + r) & 1);
       }
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
@@ -890,17 +910,6 @@ export class Renderer {
       }
       this.nSq = n + 1;
     };
-  }
-
-  /** Draws with another backend from now on (Town.tsx: the WebGL context lost for good, or a test's switch); its light layers are its own. */
-  setPainter(p: Painter): void {
-    this.paint = p;
-    this.ctx = p.ctx;
-    this.layers.length = 0;
-    this.layer = null;
-    this.nLit = 0;
-    this.sky.forget();
-    this.bandGrad = null;
   }
 
   /** The canvas's box changed (CSS pixels) or the device's pixel ratio did. */
@@ -942,8 +951,10 @@ export class Renderer {
     setView(this.view, W, H, z, 1, 0, 0, STREET_TOWN ? STREET_CAMS : undefined);
     setHeading(this.view, heading);
     this.lens(z);
-    // (What the rows let you see, round 4: from your square and the camera's, at the in and default steps.)
-    this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= TOWN_FEEL.streetZoomStart + 0.01;
+    // (What the rows let you see, round 4: from your square and the camera's, at the in step and the mockup's (1, round 4's default). Not
+    // from the higher steps, which see over the rows: the default since Nov 5 (2, Eric: "number three") draws everything in reach, as
+    // round 4's "out" did.)
+    this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= 1.01;
     if (this.cull) {
       // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
       // glide to a home's middle), nothing is left out.)
@@ -1014,16 +1025,18 @@ export class Renderer {
     this.statueDz = Infinity;
     if (c.i < 0 || c.e <= 0) return;
     const pl = COLISEUM_PLACE;
-    rel(v, this.camX, this.camY, pl.cx, pl.cy - pl.foot, this.rq);
+    const id = STATUES[c.i]!.id;
+    // (Today's statues stand in the Colosseum's picture; the street town's on the plaza, figures of their own: the north edge round.)
+    const sp = STREET_TOWN ? PROPS.find((q) => q.kind === "statue" && q.v === c.i) : undefined;
+    rel(v, this.camX, this.camY, sp ? sp.x : pl.cx, sp ? sp.y : pl.cy - pl.foot, this.rq);
     const dx = this.rq.dx;
     const dz = this.rq.dz;
     if (!proj(v, dx, dz, 0, p)) return;
-    const id = STATUES[c.i]!.id;
     const ch = artOf(pl).ch;
     const at = statueSpot(id);
     const px = p.k / f.housePxPerSquare;
-    const x0 = p.x + (at[0] - ch.foot[0]) * px;
-    const y0 = p.y + (at[1] - ch.foot[1]) * px;
+    const x0 = sp ? p.x - (STATUE_W / 2) * px : p.x + (at[0] - ch.foot[0]) * px;
+    const y0 = sp ? p.y - statueH(id) * px : p.y + (at[1] - ch.foot[1]) * px;
     const w = STATUE_W * px;
     const h = statueH(id) * px;
     const T = H * f.closeTop;
@@ -1095,13 +1108,19 @@ export class Renderer {
    * covers it, so the wall never shows through), and its quote once the camera has arrived.
    */
   private drawStatues(x0: number, y0: number, px: number, alpha: number, soft: number, now: number): void {
+    const { ctx } = this;
+    for (let i = 0; i < STATUES.length; i++) {
+      const at = statueSpot(STATUES[i]!.id);
+      this.drawStatueAt(i, x0 + at[0] * px, y0 + at[1] * px, px, alpha, soft, now);
+    }
+    ctx.globalAlpha = alpha;
+  }
+  /** Statue i, its top left at (sx, sy), `px` screen pixels a picture pixel (today's over the Colosseum's picture; the street town's on the plaza). */
+  private drawStatueAt(i: number, sx: number, sy: number, px: number, alpha: number, soft: number, now: number): void {
     const { ctx, close: c } = this;
     const f = TOWN_FEEL;
-    for (let i = 0; i < STATUES.length; i++) {
+    {
       const id = STATUES[i]!.id;
-      const at = statueSpot(id);
-      const sx = x0 + at[0] * px;
-      const sy = y0 + at[1] * px;
       const sw = STATUE_W * px;
       const sh = statueH(id) * px;
       const b = this.statueBox[i]!;
@@ -1231,6 +1250,9 @@ export class Renderer {
     // The chat log's box (chat.ts), always: shown or faded, wherever it has been put, so a chip never jumps when it comes or goes.
     const cb = CHAT_BOX;
     if (cb.w > 0 && x + r > cb.x && x - r < cb.x + cb.w && y + r > cb.y && y - r < cb.y + cb.h) return true;
+    // The street town's minimap (TownMap.tsx), while it shows.
+    const mb = MAP_BOX;
+    if (mb.w > 0 && x + r > mb.x && x - r < mb.x + mb.w && y + r > mb.y && y - r < mb.y + mb.h) return true;
     for (let m = 0; m < n; m++) {
       const o = this.chips[m]!;
       if (Math.abs(o.x - x) < g && Math.abs(o.y - y) < g) return true;
@@ -1252,6 +1274,19 @@ export class Renderer {
       out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h });
     }
     return out;
+  }
+
+  /** Each figure's tag as last drawn: its alpha and that frame's time (made once a figure). */
+  private readonly tagEase = new WeakMap<object, { a: number; at: number }>();
+  private tagPrev = NaN;
+  private tagNow = NaN;
+  /** A figure's tag alpha eased toward `to` (tags.ts easeTag) from where the last frame drew it; `to` if the last frame didn't. */
+  private easedTag(key: object, to: number, now: number): number {
+    let e = this.tagEase.get(key);
+    if (!e) this.tagEase.set(key, (e = { a: to, at: now }));
+    e.a = e.at === this.tagPrev ? easeTag(e.a, to, now - e.at) : to;
+    e.at = now;
+    return e.a;
   }
 
   /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
@@ -1423,6 +1458,8 @@ export class Renderer {
     // One item per person in the square (the list can change: people come and go).
     const people = town.people;
     this.tagNames = namesMode();
+    this.tagPrev = this.tagNow;
+    this.tagNow = now;
     this.youTable = seated(town.you);
     let np = 0;
     for (const it of this.items) if (it.kind === "person") np++;
@@ -1496,13 +1533,9 @@ export class Renderer {
     // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
-    // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
-    if (STREET_TOWN) {
-      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round.)
-      this.colSeen = colosseumSeen(this.camX, this.camY);
-      if (!this.colSeen) col.on = false;
-      else if (!col.on) this.drawFarColiseum(col, now);
-    } else if (!col.on) this.drawFarColiseum(col, now);
+    // (The street town's, the north edge round, is a solid: its ring's and portal's boxes, drawn where they stand like any other, its
+    // walls over the rows' roofs from near enough; past the rim, nothing, as for every building.)
+    if (!STREET_TOWN && !col.on) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") {
@@ -1590,7 +1623,8 @@ export class Renderer {
           if (it.on && far < f.tagFar && this.fade > 0.02) {
             const always = person === town.hold || person === town.meet?.bot || person === town.leave?.bot || (!!table && table === this.youTable);
             const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
-            const a = tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1));
+            // (Eased toward it over about 150 ms, so a slow frame doesn't pop it: tags.ts easeTag.)
+            const a = this.easedTag(person, tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1)), now);
             if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade);
           }
         }
@@ -1606,7 +1640,6 @@ export class Renderer {
   /** Plans every box near enough to show, and gets the roofs near the camera painted ahead (a little a frame, nearest first). */
   private planBoxes(): void {
     const v = this.view;
-    const fine = this.paint.kind === "webgl";
     const cut = -TOWN_FEEL.streetNearCut;
     const ahead = this.ahead;
     let na = 0;
@@ -1619,13 +1652,17 @@ export class Renderer {
         this.aheadD[na++] = R;
       }
       // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
-      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
+      // (The Colosseum's ring and portal, the north edge round: never left out by the rows; its walls rise over their roofs.)
+      const big = b.kind === "ring" || b.kind === "portal";
+      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !big && !b.open && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
         p.on = p.front.on = p.left.on = p.right.on = p.back.on = false;
         p.nOrder = 0;
         continue;
       }
       // (A hedge is low: drawn between the camera and you too, as the art says.)
-      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" ? -Infinity : cut);
+      // (The Colosseum's ring and portal too, the north edge round: you're always before it, on the plaza, so it never stands between the
+      // camera and you; left out, a drag round beside it would look into its bowl.)
+      planBox(p, b, b.box, v, this.camX, this.camY, b.kind === "hedge" || big ? -Infinity : cut);
     }
     // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
     // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)
@@ -1640,12 +1677,12 @@ export class Renderer {
         let best = -1;
         for (let j = 0; j < na; j++) {
           const b = this.boxes[ahead[j]!]!;
-          if (this.instArt[(fine ? 4 : 0) + q]![b.i]) continue;
+          if (this.instArt[q]![b.i]) continue;
           if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
         }
         if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
         const b = this.boxes[ahead[best]!]!;
-        this.roofArt(b, fine, q);
+        this.roofArt(b, q);
       }
     }
   }
@@ -1658,10 +1695,9 @@ export class Renderer {
   private readonly ahead = new Int32Array(512);
   private readonly aheadD = new Float64Array(512);
   /** A box's roof painted for the camera facing north or east (box-draw.ts), made the first time it's asked for (shared by every box of that art facing that way). */
-  private roofArt(b: BoxInst, fine: boolean, q: number): RoofArt {
-    const box = fine ? b.box : b.low;
-    const slot = (fine ? 4 : 0) + q;
-    const had = this.instArt[slot]![b.i];
+  private roofArt(b: BoxInst, q: number): RoofArt {
+    const box = b.box;
+    const had = this.instArt[q]![b.i];
     if (had) return had;
     let m = this.roofs.get(box);
     if (!m) this.roofs.set(box, (m = new Map()));
@@ -1670,11 +1706,11 @@ export class Renderer {
     const key = flat ? "flat" : `${b.facing}${q}`;
     let a = m.get(key);
     if (!a) m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
-    this.instArt[slot]![b.i] = a;
+    this.instArt[q]![b.i] = a;
     return a;
   }
-  /** Each box's roof paintings as it last asked for them, by low or full art and heading (no lookup a frame). */
-  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], [], [], [], [], []];
+  /** Each box's roof paintings as it last asked for them, by heading (no lookup a frame). */
+  private readonly instArt: (RoofArt | undefined)[][] = [[], [], [], []];
 
   /** A box-backed item's place (its front's; a shed or hedge: the whole box's), from its plan. */
   private frontPos(it: Item, b: BoxInst): void {
@@ -1774,8 +1810,7 @@ export class Renderer {
   /** A shed or a square of hedge: its sides, its roof (a hedge's top) and its front, together. */
   private drawBoxWhole(it: Item, b: BoxInst, now: number): void {
     const p = this.plans[b.i]!;
-    const fine = this.paint.kind === "webgl";
-    const B = fine ? b.box : b.low;
+    const B = b.box;
     const w = p.front;
     const alpha = this.partAlpha(w.dx, w.dz);
     if (alpha <= 0.004) return;
@@ -1791,7 +1826,7 @@ export class Renderer {
   private drawPart(it: Item, now: number): void {
     const b = this.boxes[it.i >> 2]!;
     const p = this.plans[b.i]!;
-    const B = this.paint.kind === "webgl" ? b.box : b.low;
+    const B = b.box;
     const k = it.i & 3;
     if (k === 3) {
       this.drawRoof(b, B, p, this.partAlpha(p.roofDx, p.roofDz));
@@ -1867,13 +1902,12 @@ export class Renderer {
   private drawWall(w: WallPlan, img: HTMLCanvasElement, ch: Character, alpha: number, glow: Glow | null, tall: boolean, now: number, phase: number): void {
     const n = w.strips;
     const pw = ch.w;
-    // (Its shade: the picture darkened once a shade, the art's two exactly and every twentieth between them while the camera turns.)
-    const shade = restShade(w.shade) || Math.round(w.shade * 20) / 20;
-    const pic = shade > 0.004 ? shadedImg(img, shade) : img;
+    // (Its light: the picture as it is, or its frame one ramp step darker, a side turned from the light: kit/bake.ts.)
+    const pic = w.step < 0 ? darkFrame(img) : img;
     const bb = this.bb;
     bb[0] = bb[1] = Infinity;
     bb[2] = bb[3] = -Infinity;
-    this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < (this.paint.kind === "webgl" ? 1.5 : TOWN_FEEL.wallSmooth2D);
+    this.ctx.imageSmoothingEnabled = Math.max(w.k0, w.k1) / TOWN_FEEL.housePxPerSquare < 1.5;
     const p0 = w.s0 * pw;
     const pr = (w.s1 - w.s0) * pw;
     for (let j = 0; j < n; j++) {
@@ -1915,9 +1949,8 @@ export class Renderer {
     const hq = ((this.heading % 360) + 360) % 360;
     const q0 = Math.floor(hq / 90) % 4;
     const east = clamp((hq - q0 * 90 - 38) / 14, 0, 1);
-    const fine = B === b.box && this.paint.kind === "webgl";
-    const artN = east < 0.996 ? this.roofArt(b, fine, q0) : null;
-    const artE = east > 0.004 ? this.roofArt(b, fine, (q0 + 1) % 4) : null;
+    const artN = east < 0.996 ? this.roofArt(b, q0) : null;
+    const artE = east > 0.004 ? this.roofArt(b, (q0 + 1) % 4) : null;
     for (let o = 0; o < p.nOrder; o++) {
       const i = p.order[o]!;
       const fg = g.faces[i]!;
@@ -2188,8 +2221,19 @@ export class Renderer {
     const y0 = p.y - ch.foot[1] * px;
     const s = bandOf(v, it.dx, it.dz);
     const prop = PROPS[it.i]!;
-    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" ? this.nearFade(it) : 1);
+    // (A tree, and the plaza's statues and chess pieces (the north edge round), nearer the camera than you fade out: never between.)
+    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" || prop.kind === "statue" || prop.kind === "piece" ? this.nearFade(it) : 1);
     if (alpha <= 0.004) return;
+    // A statue on the street town's plaza (the north edge round): its figure (or its close-up) and its quote, as today's over the
+    // Colosseum's picture.
+    if (prop.kind === "statue") {
+      const sh = statueH(STATUES[prop.v]!.id) * px;
+      const sx = p.x - (STATUE_W / 2) * px;
+      this.drawStatueAt(prop.v, sx, p.y - sh, px, alpha, s, now);
+      ctx.globalAlpha = 1;
+      this.box(it, p.depth, sx, p.y - sh, sx + STATUE_W * px, p.y, p.x, p.y, p.y - sh);
+      return;
+    }
     const img = fc.at(now, it.i * 211);
     // A hedge running north to south (along Seam Avenue): its top and the side the camera sees, laid along the ground.
     if (prop.kind === "hedge" && prop.x !== Math.round(prop.x)) return this.sideHedge(it, img, prop.v, alpha, now);
@@ -3620,10 +3664,10 @@ export class Renderer {
     return out;
   }
   /**
-   * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
-   * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
+   * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, whether its front was drawn and faced you,
+   * and how many of its sides were drawn.
    */
-  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number }[] {
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; front: boolean; facesYou: boolean; sides: number; x: number; y: number; foot: number[] | null }[] {
     return this.boxes
       .filter((b) => this.plans[b.i]!.on)
       .map((b) => {
@@ -3631,8 +3675,19 @@ export class Renderer {
         const f = p.front;
         // (Its front faces you: turned neither way from the camera, so unshaded.)
         // (Its front line's middle in the world, round 5: what stands where.)
-        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy };
+        // (The north edge round: its front's foot on screen as drawn, its ends' x and y (s0..s1 of it if cut): where it stands as you turn.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy, foot: f.on ? this.footOf(b, f) : null };
       });
+  }
+  /** (Tests) A box's front's drawn ends on screen and the world points they stand for: [x0, y0, x1, y1, s0, s1, wx0, wy0, wx1, wy1]. */
+  private footOf(b: BoxInst, f: WallPlan): number[] {
+    const pt = { x: 0, y: 0 };
+    const out = [f.x0, f.y0, f.x1, f.y1, f.s0, f.s1];
+    for (const s of [f.s0, f.s1]) {
+      boxPoint(b, b.box, s * b.box.front.w, 0, pt);
+      out.push(((pt.x % N) + N) % N, pt.y);
+    }
+    return out;
   }
   private readonly bossAlpha: number[] = [];
   private readonly personAlpha: number[] = [];
@@ -3650,9 +3705,16 @@ export class Renderer {
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
   pick(x: number, y: number): Hit | null {
+    // (Nothing under the street town's minimap: a tap there is the map's. The test hooks' tap points keep off it this way too.)
+    const mb = MAP_BOX;
+    if (mb.w > 0 && x >= mb.x && x <= mb.x + mb.w && y >= mb.y && y <= mb.y + mb.h) return null;
+    // (A tap on a row's front, or on any building's side, back or roof, never opens something drawn behind it: the street town's
+    // Colosseum rises over the rows' roofs (the paused round's guard, the north edge round). Only the ground under the tap is left.)
+    let overFront = false;
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
       if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
+      if (overFront) continue;
       if (it.kind === "house") {
         // A home's picture is wide: only its drawn part (not the sky around its roof) counts.
         if (it.i >= this.homes.length) {
@@ -3666,15 +3728,29 @@ export class Renderer {
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
       // (A street-town home's side, back or roof: the home. An everyday building's: the ground behind, as its front.)
       if (it.kind === "part") {
-        const h = this.boxes[it.i >> 2]!.home;
-        const home = h ? this.homes.find((o) => o.id === h) : null;
+        const b = this.boxes[it.i >> 2]!;
+        // (The Colosseum's ring and portal: the Colosseum.)
+        if (b.kind === "ring" || b.kind === "portal") return { kind: "coliseum" };
+        const home = b.home ? this.homes.find((o) => o.id === b.home) : null;
         if (home) return { kind: "house", home };
+        overFront = true;
         continue;
       }
       if (it.kind === "prop") {
-        // A chess table (its stools too): its table. A tree, a bench or the fountain: the square under the tap.
+        // A chess table (its stools too): its table. A statue: the statue; a chess piece before the Colosseum, or its ring: the Colosseum.
+        // A tree, a bench or the fountain: the square under the tap. A building's front: nothing behind it.
         const pr = PROPS[it.i]!;
         if (pr.kind === "table" && this.propHit(it, x, y)) return { kind: "table", table: TABLES[pr.table]! };
+        if (pr.kind === "statue") {
+          const st = this.statueHit(x, y);
+          if (st) return { kind: "statue", statue: st };
+          continue;
+        }
+        if (pr.kind === "piece" && this.propHit(it, x, y)) return { kind: "coliseum" };
+        if (pr.kind === "front" && this.propHit(it, x, y)) {
+          if (this.propBox[it.i]?.kind === "ring") return { kind: "coliseum" };
+          overFront = true;
+        }
         continue;
       }
       return { kind: "person", person: this.town.people[it.i]! };

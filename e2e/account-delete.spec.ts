@@ -1,7 +1,8 @@
 import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { D1_DIR, test } from "./helpers.ts";
 
 /**
  * Settings → Download my data and Delete account (docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md):
@@ -11,7 +12,6 @@ import { expect, test } from "@playwright/test";
 
 // node:sqlite through require, to read the local D1 that wrangler dev keeps (read only).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
-const D1_DIR = join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
 
 /** Runs a query on the local D1 (the file with the users table). */
 function d1<T>(query: string, ...params: string[]): T[] {

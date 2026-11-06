@@ -304,11 +304,16 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
   const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
   return (
     <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}${fitted?.three ? " wide3" : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
-      <span aria-hidden="true">
-        <LineText segs={shown} />
-      </span>
-      <span class="speech-rest" aria-hidden="true">
-        <LineText segs={rest} />
+      {/* (One block inside the box, the line's words in it: a bar's bubble clamps it to three rows, styles.css.) */}
+      <span class="speech-clip">
+        <span class="speech-line" aria-hidden="true">
+          <span>
+            <LineText segs={shown} />
+          </span>
+          <span class="speech-rest">
+            <LineText segs={rest} />
+          </span>
+        </span>
       </span>
       {children}
     </div>

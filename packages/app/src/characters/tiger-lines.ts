@@ -20,16 +20,16 @@ export const TIGER_LINES: Partial<Record<Beat, readonly string[]>> = {
   strike: ["Swat!", "Claws out. Just this once."],
   thinking: ["Thinking. Please hold your applause.", "Don't rush the artist."],
   check: ["Check. Ta-da.", "Check. The crowd goes mild."],
-  smug: ["Now that's showmanship.", "Balloon artist. Chess genius. Same paws."],
+  smug: ["Now that's showmanship.", "Balloon artist. Chess genius."],
   rattled: ["This was not in the act!", "Somebody get the ringmaster!"],
   ultimateWarn: ["Oh no. Not the hoops.", "I swore I'd never do this again…"],
   ultimate: ["Fine! The hoops! Happy now?", "One last show. Burning hoops!", "Through the hoops, everybody!"],
   cheer: ["Ta-da! Fresh from the pump.", "Balloon art. Very serious.", "Another masterpiece."],
   bigCheer: ["A queen! My finest work!", "Look at her! She's perfect!"],
   wince: ["…I meant to do that.", "Too much air. Again.", "That one was a rough draft."],
-  victory: ["Show's over. Exit through the gift shop.", "Bow. Curtain. Nap."],
+  victory: ["Show's over. Gift shop exit.", "Bow. Curtain. Nap."],
   defeat: ["Back to the circus, I guess…", "My balloons… all of them…"],
-  kingAttack: ["A balloon for your majesty. And another.", "Bonk! Bonk! Bonk!", "Hold still. This one's a crown."],
+  kingAttack: ["A balloon for you, majesty!", "Bonk! Bonk! Bonk!", "Hold still. This one's a crown."],
 };
 
 /**

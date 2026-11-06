@@ -22,9 +22,9 @@ const boxGap = (a: Box, b: Box) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - 
 // (Each boss's lines on the stage: characters/boss-select.ts.)
 const BOINGO = ["Honk honk! Showtime!", "Step right up!", "Who ordered a clown?"];
 const HOLLOW = ["Hollow is here.", "Did you leave a light on?", "I was always here.", "Hush now."];
-const SMUDGY = ["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."];
+const SMUDGY = ["Chameleons blend. I stand out.", "Artist at work. Wet paint!", "A masterpiece, if I say so myself."];
 // (Moo & Moon's, as a screen reader reads them: the plain words, with his pixel icons left out.)
-const MOO = ["Hi! This is Moo. He's my best friend. (Moo!)", "I watched your farm for ages. Let's play! (Moo?)", "Best friends make the best moves! (Moo!)"];
+const MOO = ["Hi! I'm Moo, best friend. (Moo!)", "I watched your farm. Let's play! (Moo?)", "Best friends, best moves! (Moo!)"];
 const PUDDLES = ["Mind the flower beds.", "Good soil here. Very good soil.", "Everything's coming up roses."];
 const BABUR = ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."];
 const HIDDEN = ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."];
@@ -113,7 +113,7 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await expect(page.locator(".bs-name")).toHaveText("Folio");
   await expect(page.locator(".bs-level")).toHaveText("Medium");
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("folioHello")).length).toBe(1);
-  await expect.poll(() => bubble(page).getAttribute("aria-label")).toBe("Every game is a draft. Shall we write one?");
+  await expect.poll(() => bubble(page).getAttribute("aria-label")).toBe("Every game's a draft. Write one?");
   // (Its select line is said in the select's own voice: its whisper is the battle's, never heard here.)
   expect((await sounds(page)).filter((s) => s.startsWith("folioVoice"))).toEqual([]);
 

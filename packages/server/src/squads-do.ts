@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { SQUADS, pausedLine } from "@chessroyale/core";
+import { SQUADS, SQUADS_LOBBY, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
@@ -8,7 +8,9 @@ import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squ
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
-import { d1Sql, ensureSchema, grantReward, recordResult } from "./accounts.ts";
+import { d1Sql, ensureSchema, grantReward, recordResult, type Sql } from "./accounts.ts";
+import { opKeys } from "./ledger.ts";
+import { grantWelcomeCrate } from "./welcome.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
@@ -48,8 +50,9 @@ async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<un
 /**
  * One Squads lobby (squads-lobby.ts is its logic): 32 seats, the votes, the bracket and every match, over hibernating
  * WebSockets. The record is stored under "lobby" and each match under "m:<key>" (only the ones that changed), and
- * timing uses alarms. Results and rewards go to D1 as placements are decided. It closes itself as Crowd's lobbies do
- * (squadsClosing): everything it stored is deleted and its code is free again.
+ * timing uses alarms. Results and rewards go to D1 as placements are decided, at least once: each stays in the stored record until
+ * it's written (writeRewards), and a write again pays nothing more (its ledger key, its result's once). It closes itself as Crowd's
+ * lobbies do (squadsClosing): everything it stored is deleted and its code is free again.
  */
 export class SquadsLobby extends DurableObject<Env> {
   private record: SquadsRecord | null = null;
@@ -57,6 +60,9 @@ export class SquadsLobby extends DurableObject<Env> {
   private serverQueue: SquadsServerRequest[] = [];
   /** When this lobby last told the live hub about itself (live.ts). */
   private live = new LiveReporter();
+  /** The rewards being written now (one write at a time), and whether more came meanwhile. */
+  private writing: Promise<boolean> | null = null;
+  private writeAgain = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -112,14 +118,18 @@ export class SquadsLobby extends DurableObject<Env> {
     const { record, matches } = core.save();
     this.record = record;
     Object.assign(this.matches, matches);
-    const rewards = core.takeRewards();
+    // (Nowhere to write them without D1: they go, as nothing would ever take them.)
+    if (!this.env.DB) core.takeRewards();
+    // The rewards due are stored with the record before they're written, and taken out only once they are.
     await this.ctx.storage.put({ lobby: record, ...Object.fromEntries(Object.entries(matches).map(([k, v]) => [`m:${k}`, v])) });
     countCall("squads.persist");
     const close = squadsClosing(record, this.connectedNow(closing));
-    const times = [core.nextAlarm, close?.at].filter((t): t is number => typeof t === "number");
+    // (Rewards waiting: a wake to try again if this write fails.)
+    const retry = record.rewardQueue.length ? Date.now() + SQUADS_LOBBY.rewardRetrySeconds * 1000 : null;
+    const times = [core.nextAlarm, close?.at, retry].filter((t): t is number => typeof t === "number");
     if (times.length) await this.ctx.storage.setAlarm(Math.min(...times));
     else await this.ctx.storage.deleteAlarm();
-    if (rewards.length) this.ctx.waitUntil(this.writeRewards(record.code, rewards));
+    if (record.rewardQueue.length) this.ctx.waitUntil(this.writeRewards());
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
     // The live hub hears about it in the background (it never holds up the match).
     void this.reportLive().catch(() => undefined);
@@ -143,22 +153,48 @@ export class SquadsLobby extends DurableObject<Env> {
     await liveHub(this.env).report(s);
   }
 
-  /** Placements on profiles (unranked) and rewards in wallets. */
-  private async writeRewards(code: string, rewards: SquadsReward[]) {
-    if (!this.env.DB) return;
+  /**
+   * Placements on profiles (unranked) and rewards in wallets: each reward waiting in the record, in order, taken out (and the record
+   * stored) only once it's written; a failed one and those after it wait for the next try (the next alarm or wake). One write at a
+   * time. True: none left waiting.
+   */
+  private writeRewards(): Promise<boolean> {
+    if (this.writing) {
+      this.writeAgain = true;
+      return this.writing;
+    }
+    this.writing = (async () => {
+      let ok = true;
+      do {
+        this.writeAgain = false;
+        ok = await this.writePending();
+      } while (ok && this.writeAgain);
+      return ok;
+    })().finally(() => (this.writing = null));
+    return this.writing;
+  }
+
+  private async writePending(): Promise<boolean> {
+    const rec = this.record;
+    if (!rec?.rewardQueue.length || !this.env.DB) return true;
     const sql = d1Sql(this.env.DB);
+    let written = 0;
+    let ok = true;
     try {
       await ensureSchema(sql, this.env.DB);
-      for (const r of rewards) {
-        if (!r.userId) continue;
-        if (r.recorded) {
-          await recordResult(sql, r.userId, { mode: "squads", online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code }, Date.now());
-        }
-        await grantReward(sql, r.userId, r.coins, r.crates);
+      for (const r of [...rec.rewardQueue]) {
+        await writeReward(sql, rec.code, rec.createdAt, r, Date.now());
+        const i = rec.rewardQueue.indexOf(r);
+        if (i >= 0) rec.rewardQueue.splice(i, 1);
+        written++;
       }
     } catch (e) {
-      console.log(`squads ${code}: rewards not written (${String(e)})`);
+      ok = false;
+      console.log(`squads ${rec.code}: ${rec.rewardQueue.length} rewards not written yet, kept to try again (${String(e)})`);
     }
+    // (Not once the lobby has closed, or a new one has its code. A store that fails: written again next time, paying nothing more.)
+    if (written && this.record === rec) await this.ctx.storage.put("lobby", rec).catch(() => undefined);
+    return ok;
   }
 
   /** The engine server's verdict on bot work two devices disagreed about. */
@@ -176,6 +212,11 @@ export class SquadsLobby extends DurableObject<Env> {
     if (!this.record) return false;
     const close = squadsClosing(this.record, this.connectedNow());
     if (!close || close.at > Date.now()) return false;
+    // Rewards not written yet (D1 failing): it stays until they are, trying again, up to SQUADS_LOBBY.rewardRetryHours.
+    if (!(await this.writeRewards()) && Date.now() < close.at + SQUADS_LOBBY.rewardRetryHours * 3_600_000) {
+      await this.ctx.storage.setAlarm(Date.now() + SQUADS_LOBBY.rewardRetrySeconds * 1000);
+      return false;
+    }
     await this.close(close.reason);
     return true;
   }
@@ -184,6 +225,7 @@ export class SquadsLobby extends DurableObject<Env> {
     await this.ctx.blockConcurrencyWhile(async () => {
       const rec = this.record;
       if (!rec) return;
+      if (rec.rewardQueue.length) console.error(`squads ${rec.code}: closing with ${rec.rewardQueue.length} rewards never written (D1 failed for ${SQUADS_LOBBY.rewardRetryHours} hours)`);
       const text = JSON.stringify({ t: "closed", reason, now: Date.now() });
       for (const ws of this.ctx.getWebSockets()) {
         try {
@@ -558,4 +600,20 @@ export class SquadsParty extends DurableObject<Env> {
       this.asking = false;
     }
   }
+}
+
+/**
+ * One reward, written so that writing it again changes nothing: its results row only if this account has none from this lobby yet
+ * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
+ * id>`. Throws if D1 fails, so the lobby keeps it to try again.
+ */
+async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number): Promise<void> {
+  if (!r.userId) return;
+  if (r.recorded) {
+    const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code };
+    await recordResult(sql, r.userId, result, now, { since: created });
+    // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
+    await grantWelcomeCrate(sql, r.userId, now).catch(() => false);
+  }
+  await grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now);
 }

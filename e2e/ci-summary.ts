@@ -6,7 +6,9 @@ import type { FullConfig, FullResult, Reporter, Suite, TestCase } from "@playwri
  * CI's record of one e2e shard (.github/workflows/e2e.yml), as JSON in the file E2E_SUMMARY_FILE names (nothing without
  * it): its label (E2E_SHARD_LABEL), result, counts and time; each failed and each flaky test (failed, then passed on
  * the retry): its `file:line`, project, title, the gist of its error and the line it failed on; and the test time by
- * file (seconds), for rebalancing the shards (e2e/ci-shard.mjs). A shard with flaky tests also gets `<name>.flaky`, so
+ * file (seconds): `timings` summed over both projects and every attempt, and `projects` by project, each test's last
+ * attempt only (a retry's stall isn't its usual time). The next runs' plans spread their shards by main's last green
+ * run's `projects` (e2e/ci-select.mjs, `readTimings`). A shard with flaky tests also gets `<name>.flaky`, so
  * the workflow keeps its report. The `result` job renders every shard's record on the run's page
  * (e2e/ci-summary-merge.mjs).
  */
@@ -38,6 +40,13 @@ export default class CiSummary implements Reporter {
     const timings: Record<string, number> = {};
     for (const t of ran) timings[file(t)] = (timings[file(t)] ?? 0) + t.results.reduce((ms, r) => ms + r.duration, 0) / 1000;
     for (const f in timings) timings[f] = Math.round(timings[f]!);
+    const projects: Record<string, Record<string, number>> = {};
+    for (const t of ran) {
+      const p = (projects[file(t)] ??= {});
+      const project = t.parent.project()?.name ?? "";
+      p[project] = (p[project] ?? 0) + t.results[t.results.length - 1]!.duration / 1000;
+    }
+    for (const f in projects) for (const p in projects[f]) projects[f]![p] = Math.round(projects[f]![p]!);
     const failed = of("unexpected").map(entry);
     const flaky = of("flaky").map(entry);
     const record = {
@@ -48,6 +57,7 @@ export default class CiSummary implements Reporter {
       failed,
       flaky,
       timings,
+      projects,
     };
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(record, null, 1));

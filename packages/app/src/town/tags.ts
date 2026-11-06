@@ -1,8 +1,8 @@
 /**
  * The name tags over the people in the town square (Eric, Oct 28, after trying 50 bots): who shows one, how strongly, and in what color.
  * "The people are always visible but the name tags no": by default (`near`) a tag shows only while its figure is within
- * `TOWN_FEEL.nameRadius` squares of you, and fades in and out over the last `nameFadeSquares` as you or it walk (`nameAlpha`: stateless,
- * from positions each frame, nothing allocated); "Everyone" in Town settings shows them all, exactly as before. Your own tag, a figure whose
+ * `TOWN_FEEL.nameRadius` squares of you, and fades in and out over the last `nameFadeSquares` as you or it walk (`nameAlpha`, from positions each frame,
+ * nothing allocated; the drawn alpha eased toward it over about 150 ms, `easeTag`); "Everyone" in Town settings shows them all, exactly as before. Your own tag, a figure whose
  * card is open and one at a table with you (or walking to or from a game with you) always show. A boss's sidekick wears a blue tag
  * with white text (`TAG_STYLE`), a pawn a white one with dark text, you gold. Pure (the setting's memory aside: localStorage, in a
  * try/catch); the drawing is render.ts'. docs/areas/town-square.md, "Name tags".
@@ -92,6 +92,15 @@ export function nameAlpha(dist: number, radius: number = TOWN_FEEL.nameRadius, f
 export function tagAlpha(names: NamesMode, dist: number, always: boolean, far: number): number {
   const near = names === "everyone" || always ? 1 : nameAlpha(dist);
   return near < far ? near : far;
+}
+
+/**
+ * A tag's drawn alpha `shown`, eased toward its target `to` after `dt` ms: a straight line from 0 to 1 in `ms` (150), but never more than
+ * `step` (0.5) a frame, so even a slow frame shows a step between shown and gone. A frame that didn't draw the tag before starts at `to`.
+ */
+export function easeTag(shown: number, to: number, dt: number, ms: number = TOWN_FEEL.nameEaseMs, step: number = TOWN_FEEL.nameEaseStep): number {
+  const d = dt > 0 ? Math.min(dt / ms, step) : 0;
+  return shown < to ? Math.min(to, shown + d) : Math.max(to, shown - d);
 }
 
 /** The names setting's two choices (Town settings, under Chat): "Near you" (the default) and "Everyone" (every tag, as before). */

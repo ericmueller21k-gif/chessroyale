@@ -408,10 +408,10 @@ const crumpleNow = (p: Page) =>
  * Folio's challenge (Nov 5; everyone's): in with it to the clean page's marks; its line; you both step back a pace; the stools fold up
  * from their sheets (west, then east), then the table; the plane comes in, the packet falls onto the table and unfolds, and the game's own
  * board is there; it bows and says one of its five quiet lines; the crumple (`canvas.boss-crumple`) takes the screen, crumples it into a
- * ball, holds, and opens onto the match screen; gone, the battle; the gear's Leave back to where you stood. `gl`: the town drawn with
- * WebGL 2 too (`?gl=1`), as its own e2e runs it. `noGl`: WebGL off (the page can't get a WebGL context): the fade through black.
+ * ball, holds, and opens onto the match screen; gone, the battle; the gear's Leave back to where you stood. `noGl`: WebGL off (the page
+ * can't get a WebGL context): the fade through black.
  */
-async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gif: boolean }) {
+async function folioChallenge(page: Page, opts: { noGl: boolean; gif: boolean }) {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const project = test.info().project.name;
@@ -425,7 +425,7 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
         return (get as (...a: unknown[]) => RenderingContext | null).call(this, kind, ...rest);
       } as typeof get;
     });
-  await page.goto(`/town?sky=day${opts.gl ? "&gl=1" : ""}`);
+  await page.goto("/town?sky=day");
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   const { confirm, stood } = await toConfirm(page, "folio", "Folio");
   // (The phone's GIF: the page's own frames as Chrome draws them (its screencast), each with its time, from the Fight tap to the match:
@@ -524,13 +524,13 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
     const js = log.filter((f) => f.phase === ph).map((f) => f.js).sort((a, b) => a - b);
     return g.length ? `${ph} ${(1000 / g[g.length >> 1]!).toFixed(0)} fps (${g.length}; its own work ${js[js.length >> 1]!.toFixed(1)} ms)` : `${ph} -`;
   };
-  if (log.length > 2) console.log(`crumple by phase (${project}${opts.gl ? ", town gl" : ""}${cpu > 1 ? `, CPU ${cpu}x` : ""}): ${["crumple", "hold", "open", "linger"].map(byPhase).join(", ")}`);
+  if (log.length > 2) console.log(`crumple by phase (${project}${cpu > 1 ? `, CPU ${cpu}x` : ""}): ${["crumple", "hold", "open", "linger"].map(byPhase).join(", ")}`);
   const times = log.map((f) => f.t);
   if (times.length > 2) {
     const gaps = times.slice(1).map((t, i) => t - times[i]!).sort((a, b) => a - b);
     const med = gaps[gaps.length >> 1]!;
     test.info().annotations.push({ type: "crumple frames", description: `${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}` });
-    console.log(`crumple frames (${project}${opts.gl ? ", town gl" : ""}): ${`${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}`}`);
+    console.log(`crumple frames (${project}): ${`${gaps.length} frames, median ${med.toFixed(1)} ms (${(1000 / med).toFixed(1)} fps), slowest ${gaps.at(-1)!.toFixed(1)} ms, over 33 ms: ${gaps.filter((g) => g > 33.4).length}${cpu > 1 ? `, CPU ${cpu}x` : ""}`}`);
   }
   // (Every phase it went through, as it says; and every look's.)
   const phases = [...new Set([...seen.map((c) => c.phase), ...seen.flatMap((c) => c.phases.split(" "))])];
@@ -554,14 +554,109 @@ async function folioChallenge(page: Page, opts: { gl: boolean; noGl: boolean; gi
   await backAt(page, stood);
   expect(errors).toEqual([]);
 }
-for (const gl of [false, true])
-  test(`challenging Folio in the town${gl ? " (the town drawn with WebGL)" : ""}: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood`, async ({ page }) => {
-    test.setTimeout(240_000);
-    await folioChallenge(page, { gl, noGl: false, gif: !gl });
+/**
+ * Smudgy's challenge (Nov 6; everyone's): in with him to the drop cloth's marks beside the covered table's stools; his line; he whips the
+ * cloth off (the board under it, the cloth in a heap); his reveal line; the splatter (`canvas.boss-splatter`) covers the screen and a
+ * brush stroke wipes it onto the match; the gear's Leave back to where you stood.
+ */
+async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "smudgy", "Smudgy");
+  const gif = !!SHOTS && opts.gif && project === "phone";
+  const cast: { at: number; jpg: Buffer }[] = [];
+  const caster = gif ? await page.context().newCDPSession(page) : null;
+  caster?.on("Page.screencastFrame", (f: { data: string; sessionId: number; metadata: { timestamp?: number } }) => {
+    cast.push({ at: (f.metadata.timestamp ?? Date.now() / 1000) * 1000, jpg: Buffer.from(f.data, "base64") });
+    void caster.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
   });
+  await caster?.send("Page.startScreencast", { format: "jpeg", quality: 85, everyNthFrame: 1 });
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  await expect(room(page)).toHaveAttribute("data-room", "smudgy", { timeout: 20_000 });
+  type Look = Intro & { cloth: string | null };
+  const looks: Look[] = [];
+  const look = async () => {
+    const i = (await intro(page)) as Look | null;
+    if (i) looks.push(i);
+    return i;
+  };
+  const where = (i: Intro) => [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+  // On the marks beside the stools (seated: you at 12, he at his clear place, on row 14), facing each other; his line; the cloth on.
+  await expect.poll(async () => (await look())?.step, { message: "his line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = (await look())!;
+  expect(atLine.layout).toBe("across");
+  expect(where(atLine)).toEqual([12, 14, Math.round((9.5 - CHALLENGE_FEEL.clear.boss) * 100) / 100, 14]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(atLine.line).toBe(true);
+  expect(atLine.cloth).toBe("covered");
+  await shot("smudgy-line");
+  await expect.poll(async () => (await look())?.cloth, { message: "the cloth whipped off", intervals: [20] }).toBe("whip");
+  await shot("smudgy-whip");
+  await expect.poll(async () => (await look())?.cloth, { message: "the cloth in its heap", intervals: [30] }).toBe("heap");
+  await expect.poll(async () => (await look())?.chant ?? null, { message: "his reveal line", intervals: [30] }).toBe("Careful, don't get any paint on the pieces!");
+  await shot("smudgy-reveal");
+  // The order, from every look: covered, then whipped, then the heap; the reveal line only once the cloth is down; nobody moved; no attack.
+  const firstOf = (f: (i: Look) => boolean) => looks.findIndex(f);
+  expect(firstOf((i) => i.cloth === "whip")).toBeGreaterThan(firstOf((i) => i.cloth === "covered"));
+  expect(firstOf((i) => i.cloth === "heap")).toBeGreaterThan(firstOf((i) => i.cloth === "whip"));
+  expect(firstOf((i) => !!i.chant)).toBeGreaterThan(firstOf((i) => i.cloth === "heap"));
+  for (const i of looks.slice(looks.indexOf(atLine))) {
+    expect(where(i), `at ${i.step}: in their places`).toEqual(where(atLine));
+    expect(i.attack, `at ${i.step}: no attack`).toBe(false);
+  }
+  // The splatter: in, covered, out (the stroke), gone; the match there.
+  const phases = new Set<string>();
+  const now = () => page.evaluate(() => (document.querySelector("canvas.boss-splatter") as HTMLCanvasElement | null)?.dataset.phase ?? null);
+  await expect.poll(async () => { const p = await now(); if (p) phases.add(p); return !!p; }, { message: "the splatter takes the screen", timeout: 15_000, intervals: [20] }).toBe(true);
+  await expect(page.locator("canvas.boss-storm, canvas.boss-wipe, canvas.boss-dark, canvas.boss-crumple")).toHaveCount(0);
+  let shotCovered = false;
+  await expect
+    .poll(
+      async () => {
+        const p = await now();
+        if (p) phases.add(p);
+        if (p === "covered" && !shotCovered) {
+          shotCovered = true;
+          await shot("smudgy-splatter");
+        }
+        return p === null;
+      },
+      { message: "the splatter is gone, the match there", timeout: 60_000, intervals: [20] },
+    )
+    .toBe(true);
+  expect([...phases]).toEqual(expect.arrayContaining(["in", "out"]));
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 10_000 });
+  if (caster) {
+    await page.waitForTimeout(1500);
+    await caster.send("Page.stopScreencast");
+    const t0 = cast[0]?.at ?? 0;
+    for (const [i, f] of cast.entries()) writeFileSync(`${SHOTS}/smudgy-cast-${String(i).padStart(4, "0")}-${String(Math.round(f.at - t0)).padStart(6, "0")}.jpg`, f.jpg);
+  }
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+}
+test("challenging Smudgy in the town: his own intro (to the marks by the covered table, his line, the cloth whipped off, the board, his reveal line), the splatter into the match; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  await smudgyChallenge(page, { gif: true });
+});
+test("challenging Folio in the town: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  await folioChallenge(page, { noGl: false, gif: true });
+});
 test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", async ({ page }) => {
   test.setTimeout(240_000);
-  await folioChallenge(page, { gl: false, noGl: true, gif: false });
+  await folioChallenge(page, { noGl: true, gif: false });
 });
 
 test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", async ({ page }) => {

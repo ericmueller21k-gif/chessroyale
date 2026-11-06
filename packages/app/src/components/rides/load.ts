@@ -1,6 +1,8 @@
 import { useEffect, useState } from "preact/hooks";
 import type { RiderDraft } from "./kit.ts";
+import { hunchessBase } from "@chessroyale/core";
 import { RIDE_CELLS, type RideCells } from "../../town/ride-cells.ts";
+import { hunchessDraft } from "./hunchess.tsx";
 
 /**
  * Each ride's drawing in its own chunk, loaded only when a ride is drawn (Nov 1, docs/decisions/2026-11-01-rides-lazy.md): worn by
@@ -35,8 +37,17 @@ const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
 /** Every ride's item id. */
 export const RIDE_IDS: readonly string[] = Object.keys(DRAWINGS);
 
-/** A ride's measured numbers (ride-cells.ts), or undefined for any other item. */
-export const rideCells = (def: string | undefined): RideCells | undefined => (def && Object.hasOwn(RIDE_CELLS, def) ? RIDE_CELLS[def] : undefined);
+/**
+ * The ride whose drawing an item is: a ride's own id, or (a HunChess colorway, Nov 6: "balloon-pup-hunchess") the ride it's made
+ * from. Its cells, size and drawing are that ride's; only the colorway's drawing is remapped (hunchess.tsx).
+ */
+export const rideBase = (def: string | undefined): string | undefined => (def ? (hunchessBase(def) ?? def) : undefined);
+
+/** A ride's measured numbers (ride-cells.ts), or undefined for any other item (a HunChess colorway: its ride's). */
+export const rideCells = (def: string | undefined): RideCells | undefined => {
+  const base = rideBase(def);
+  return base && Object.hasOwn(RIDE_CELLS, base) ? RIDE_CELLS[base] : undefined;
+};
 
 const drawn = new Map<string, RiderDraft>();
 const coming = new Map<string, Promise<RiderDraft | undefined>>();
@@ -49,6 +60,18 @@ export const rideDrawing = (def: string | undefined): RiderDraft | undefined => 
  * its chunk didn't come (then the next ask tries again).
  */
 export function loadRide(def: string | undefined): Promise<RiderDraft | undefined> {
+  // (A HunChess colorway: its ride's drawing, remapped once it has come; kept under the colorway's own id.)
+  const base = rideBase(def);
+  if (def && base !== def && base) {
+    const d = drawn.get(def);
+    if (d) return Promise.resolve(d);
+    return loadRide(base).then((x) => {
+      if (!x) return undefined;
+      const c = drawn.get(def) ?? hunchessDraft(x, base);
+      drawn.set(def, c);
+      return c;
+    });
+  }
   if (!def || !Object.hasOwn(DRAWINGS, def)) return Promise.resolve(undefined);
   const d = drawn.get(def);
   if (d) return Promise.resolve(d);

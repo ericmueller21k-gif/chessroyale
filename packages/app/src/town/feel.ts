@@ -108,8 +108,12 @@ export const TOWN_FEEL = {
       wide: { h: 7.8, th: 36, back: 6.7, R: 30, kx: 0.4, fW: 0.72, cy: 0.39, rim: 11.5, rimX: 2.3 },
     },
   ] as readonly { tall: CamSet; wide: CamSet }[],
-  /** The step the street town opens at (the default, 1) and how long a press of − or + glides (ms). */
-  streetZoomStart: 1,
+  /**
+   * The step the street town opens at and how long a press of − or + glides (ms). Eric, Nov 5: "If number one is the closest, then we're
+   * going with number three for the default": the third step (index 2, "out"), one further back than round 4's default (1, the mockup's
+   * camera, still the second step). The park's step out goes from there to the overview (3).
+   */
+  streetZoomStart: 2,
   streetZoomMs: 350,
   /**
    * The park zooms out a step (Nov 5, round 4; Eric, a trial he may revert: "make it zoom out one level when you hit the area that's the
@@ -138,12 +142,6 @@ export const TOWN_FEEL = {
   streetCull: true,
   /** A skyline tower no ray from you reaches still shows over the rows out to this far (squares); past it, it's in the haze. */
   streetTowerReach: 8,
-  /**
-   * The 2D fallback smooths a wall's picture only drawn smaller than its own pixels (under this many screen pixels a picture pixel);
-   * bigger, its pixels stay crisp (WebGL: under 1.5). Round 4: the rows put more wall on screen than round 3's lots, and an unsmoothed
-   * wall is cheaper there; between 1 and 1.5 a picture pixel the difference doesn't show.
-   */
-  wallSmooth2D: 1,
   streetTreeFade: 1.5,
   /**
    * The street town's camera turn (Nov 5, round 5: the camera faces north, but for a boss home's strip, strips.ts): stepping onto or
@@ -157,12 +155,50 @@ export const TOWN_FEEL = {
   streetLookPerWidth: 180,
   streetLookBackMs: 300,
   /**
+   * Hold to run (Nov 5, brief-street-controls-map.md; Eric: "if you hold it in the direction … right away … it starts running in that
+   * direction"): a press held still (not past `dragPx`) this many ms is a run, not a tap; one that moves past `dragPx` first is a look
+   * round. Quick taps are about 80 to 150 ms on a phone; much more than 200 ms and a run feels late.
+   */
+  streetHoldMs: 180,
+  /**
+   * The finger's dead zone while running (px): within this of your pawn's middle on screen, a held finger asks for no direction (a run
+   * not yet started waits for the finger to leave it; a run going on keeps its way).
+   */
+  streetRunDeadPx: 14,
+  /**
+   * Locking a new view (Nov 5; Nov 6, Eric: "about like 45 degrees … everything should be split … 45 degrees … if you hit like negative 50
+   * degrees and then run in that new direction, it should snap to the new direction"): letting go of a look round eases the camera to the
+   * nearest quarter (north, east, south or west) over `streetSnapMs`: the split is 45 degrees either side of each quarter, so this is 45
+   * and every let-go snaps. Any way of setting off (a tap, a run, an arrow) locks it in as the base heading.
+   */
+  streetSnapDeg: 45,
+  streetSnapMs: 160,
+  /**
+   * The minimap (Nov 5; Eric: "an overlay on the top right, partially see-through, not super big"): its width a share of the town's
+   * box on a phone, and on a computer (in the frame) a smaller share, never wider than `mapMaxPx`; its opacity; the large view's share
+   * of the box's smaller side (never past `mapBigMaxPx`). The Colosseum's band on its top edge is `mapBandPx` high at the small size.
+   */
+  mapShare: 0.26,
+  mapShareComputer: 0.13,
+  mapMaxPx: 168,
+  mapOpacity: 0.7,
+  mapBigShare: 0.9,
+  mapBigMaxPx: 620,
+  mapBandPx: 3,
+  /**
    * The street town's buildings drawn this much bigger than their pictures' 37 px a square (the homes and the rows' fronts together;
    * hedges, sheds, lamps, trees and figures don't grow). 1: as drawn. (Nov 5, round 4: tried at 1.3 after the run-through frames; Eric:
    * "don't scale the whole town up", so it stays 1 and the low fronts step up instead, rows.ts.) A home too wide for its row's end
    * slides inward along it, whatever the scale; 1.3 is the most the rows hold.
    */
   streetBuildScale: 1,
+  /**
+   * (Nov 5, round 6, ported in the north edge round; the brief: "Moo's paddock and Ginger's dome sit low in their rows … look sunk or short
+   * beside their neighbors") These homes are drawn this much bigger again in the street town, their foot on their row's front line where it
+   * was, so their height sits with their neighbors' (a paddock's fence and post, an igloo's dome, beside fronts of three and four floors).
+   * A home this makes too wide for its row's end slides inward along it, as any does (rows.ts).
+   */
+  streetHomeScale: { moo: 1.3, gingerbread: 1.3 } as Readonly<Record<string, number>>,
   /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
   streetTurnClouds: 1.3,
   /**
@@ -172,19 +208,12 @@ export const TOWN_FEEL = {
    */
   boxTinyPx: 3,
   boxWholePxFine: 0.75,
-  /** (The 2D fallback's: a triangle costs it as much as a whole face, so it takes a little more error for one draw.) */
-  boxWholePx: 2,
   /**
    * A wall (a side, or a front seen at a slant) is drawn in upright strips, so its far end stands shorter than its near one: enough that
-   * its top steps at most this many pixels a strip, up to this many strips. WebGL's are fine (a strip costs it a few vertices), the 2D
-   * fallback's coarser (each is a draw there; the step stays under the roof's eave, drawn over it).
+   * its top steps at most this many pixels a strip, up to this many strips (fine: a strip costs WebGL a few vertices).
    */
   boxStripFine: 1.5,
   boxStripsFine: 24,
-  // (Round 4: 4 and 8 before. The rows put more building on screen than round 3's lots; the 2D fallback's strips are coarser to keep
-  // the phone's frame rate, the steps still under the eaves.)
-  boxStrip: 8,
-  boxStrips: 5,
   /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). (Round 4: 2.5 before.) */
   boxBakeMs: 1.5,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
@@ -531,6 +560,12 @@ export const TOWN_FEEL = {
    */
   nameRadius: 5,
   nameFadeSquares: 1,
+  /**
+   * A tag's drawn alpha eases toward that target over about this long (ms) rather than following it frame by frame (Nov 6: a slow frame
+   * walks you a square at once, and the fade popped), but never more than `nameEaseStep` of the way from 0 to 1 in one frame.
+   */
+  nameEaseMs: 150,
+  nameEaseStep: 0.5,
 
   // ---- The homes' names (two styles, for Eric to compare: either can be turned off here).
   /** Each home's name floats over it, white with a dark outline, as you come near. */

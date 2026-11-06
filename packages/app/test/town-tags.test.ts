@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TOWN_FEEL } from "../src/town/feel.ts";
-import { NAMES_CHOICE, NAMES_KEY, NAMES_LABEL, NAMES_MODES, TAG_STYLE, TagCache, loadNamesMode, nameAlpha, namesMode, namesNote, onNamesMode, saveNamesMode, setNamesMode, tagAlpha, type TagKind } from "../src/town/tags.ts";
+import { NAMES_CHOICE, NAMES_KEY, NAMES_LABEL, NAMES_MODES, TAG_STYLE, TagCache, easeTag, loadNamesMode, nameAlpha, namesMode, namesNote, onNamesMode, saveNamesMode, setNamesMode, tagAlpha, type TagKind } from "../src/town/tags.ts";
 
 /**
  * The people's name tags (Eric, Oct 28, after trying 50 bots; docs/areas/town-square.md, "Name tags"): tags show only near you by default
@@ -43,6 +43,30 @@ describe("the near rule: a tag's alpha by its figure's distance from you (square
     expect(nameAlpha(7, 8, 2)).toBe(1); // (full to radius − fade / 2)
     expect(nameAlpha(8, 8, 2)).toBeCloseTo(0.5, 10);
     expect(nameAlpha(9, 8, 2)).toBe(0); // (gone at radius + fade / 2)
+  });
+});
+
+describe("a tag's drawn alpha eases toward its target over about 150 ms (Nov 6: a slow frame popped the fade)", () => {
+  it("goes from 1 to 0 in a straight line over 150 ms at 60 fps, and back; it never passes its target", () => {
+    expect(TOWN_FEEL.nameEaseMs).toBe(150);
+    let a = 1;
+    const seen: number[] = [];
+    for (let t = 0; t < 300; t += 1000 / 60) seen.push((a = easeTag(a, 0, 1000 / 60)));
+    expect(seen[0]).toBeCloseTo(1 - 1000 / 60 / 150, 10);
+    expect(seen.findIndex((x) => x === 0), "gone after about 150 ms (9 frames)").toBe(8);
+    expect(easeTag(0.2, 1, 75)).toBeCloseTo(0.7, 10);
+    expect(easeTag(0.9, 1, 75), "never past it").toBe(1);
+    expect(easeTag(0.4, 0.4, 500)).toBe(0.4);
+    expect(easeTag(0.4, 0, 0), "no time, no change").toBe(0.4);
+  });
+
+  it("a slow frame (a square walked at once: the distance target from 1 to 0) still shows a step between, never a pop", () => {
+    for (const dt of [100, 250, 1000]) {
+      const mid = easeTag(1, 0, dt);
+      expect(mid, `${dt} ms`).toBeGreaterThan(0.02);
+      expect(mid, `${dt} ms`).toBeLessThan(0.98);
+      expect(easeTag(mid, 0, dt)).toBe(0);
+    }
   });
 });
 

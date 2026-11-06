@@ -1,23 +1,19 @@
 // CI's e2e plan (.github/workflows/e2e.yml, the `plan` job): which spec files a run tests, and on how many shards.
 // A pull request runs the specs of the areas it changes (e2e/areas.json says which paths belong to which specs) plus
 // the smoke set; a shared foundation, or any path the table doesn't know, runs every spec. A push to main, a manual run
-// and a pull request with the `full-e2e` label run every spec too. A change to an area named in `webgl` (the town's), or to
-// one of its specs, also runs those specs again on a VITE_TOWN_GL=1 build, WebGL the town's default: two more jobs beside
-// the shards, one per project (`webgl-phone` and `webgl-desktop` in the shard matrix). A `traced` module (settings.ts,
+// and a pull request with the `full-e2e` label run every spec too. A `traced` module (settings.ts,
 // e2e/helpers.ts, the app's shared modules) is followed through the code instead: what its diff changes, then the files
 // that use that, each counted as changed (traceChanges, below). Docs: docs/areas/ops.md, "CI e2e".
 //
 // Usage:
-//   node e2e/ci-select.mjs full "<why>" [base]   every spec on 5 shards (a push to main, a manual run, the full-e2e
-//                                           label); the WebGL job if what changed from <base> to HEAD touches its
-//                                           areas, and always without a base (a manual run tests everything)
+//   node e2e/ci-select.mjs full "<why>"     every spec on 10 shards (a push to main, a manual run, the full-e2e
+//                                           label)
 //   node e2e/ci-select.mjs diff <base>       the specs for what changed from <base> to HEAD (a pull request: HEAD^1,
 //                                           its merge commit's first parent, which is main as it is now)
 //   node e2e/ci-select.mjs files <path>...   the same for these paths (to try the table out; a traced module's change
 //                                           is read from where your branch left origin/main to your working tree)
 // It writes `specs` (the spec files, space-separated; empty for every spec), `total` (how many shards), `shards` (their
-// numbers, then "webgl-phone" and "webgl-desktop" when the WebGL jobs run, as JSON), `webgl` (their spec files; empty:
-// none) and `note` (one line) to $GITHUB_OUTPUT, and why each changed path runs what it runs to $GITHUB_STEP_SUMMARY; to
+// numbers, as JSON) and `note` (one line) to $GITHUB_OUTPUT, and why each changed path runs what it runs to $GITHUB_STEP_SUMMARY; to
 // stdout when they aren't set.
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
@@ -25,7 +21,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Shards for every spec (a push to main), as before; a pull request uses as few as its specs need, up to this. */
-export const MAX_SHARDS = 5;
+export const MAX_SHARDS = 10;
 /**
  * The test time a pull request's shard aims at: seconds, summed over both projects (ci-timings.json's unit), so about
  * half of it on the clock with 2 workers. With setup, a shard then takes about 5 minutes.
@@ -63,16 +59,126 @@ export function specFiles(dir = DIR) {
     .sort();
 }
 
-/** Each spec file's measured test time (ci-timings.json, seconds, both projects); one it doesn't know counts as the median. */
-export function weigher(timings) {
-  const known = Object.values(timings).sort((a, b) => a - b);
-  const median = known.length ? known[Math.floor(known.length / 2)] : 60;
-  return (file) => timings[file] ?? median;
+/** Playwright's projects, in playwright.config.ts's order. */
+export const PROJECTS = ["phone", "desktop"];
+/** Workers per shard: Playwright's default, half the runner's 4 cores. */
+export const WORKERS = 2;
+
+/** One file's entry as { phone, desktop } seconds (an older table's single number, both projects, split evenly). */
+const perProject = (v) => (typeof v === "number" ? Object.fromEntries(PROJECTS.map((p) => [p, v / PROJECTS.length])) : v);
+
+/**
+ * Each spec file's measured test time in one project (ci-timings.json: seconds, by file and project); a file it doesn't
+ * know counts as the project's median.
+ */
+export function projectWeigher(timings) {
+  const median = {};
+  for (const p of PROJECTS) {
+    const known = Object.values(timings).map((v) => perProject(v)[p] ?? 0).sort((a, b) => a - b);
+    median[p] = known.length ? known[Math.floor(known.length / 2)] : 30;
+  }
+  return (file, project) => (timings[file] === undefined ? median[project] : (perProject(timings[file])[project] ?? 0));
 }
 
-export function readTimings(dir = DIR) {
-  return JSON.parse(readFileSync(join(dir, "ci-timings.json"), "utf8"));
+/** Each spec file's measured test time, both projects; one it doesn't know counts as the median. */
+export function weigher(timings) {
+  const time = projectWeigher(timings);
+  return (file) => PROJECTS.reduce((sum, p) => sum + time(file, p), 0);
 }
+
+/**
+ * The test times: e2e/ci-timings.json, overlaid with the times in `live` (a folder of e2e-summary records, shard-N.json
+ * at any depth: main's last green run, which the plan job downloads) for every file they measured. Records from before
+ * the per-project times (no `projects`) are skipped.
+ */
+export function readTimings(dir = DIR, live = process.env.E2E_LIVE_TIMINGS) {
+  const timings = JSON.parse(readFileSync(join(dir, "ci-timings.json"), "utf8"));
+  if (live) Object.assign(timings, readLiveTimings(live));
+  return timings;
+}
+
+/** The per-project test times in a folder of e2e-summary records (empty when there are none). */
+export function readLiveTimings(live) {
+  const out = {};
+  let entries = [];
+  try {
+    entries = readdirSync(live, { recursive: true }).map(String).filter((f) => /(^|\/)shard-\d+\.json$/.test(f));
+  } catch {
+    return out;
+  }
+  for (const f of entries.sort()) {
+    try {
+      Object.assign(out, JSON.parse(readFileSync(join(live, f), "utf8")).projects ?? {});
+    } catch {}
+  }
+  return out;
+}
+
+/**
+ * How long one shard's tests take on the clock, as Playwright runs them: each file in each project is one job; jobs
+ * queue project by project (config order), each project's files in name order; a free worker takes the next job.
+ * So two long files that sort last share no worker time: what spreading by sums alone missed (Nov 6, run 943's shard 3:
+ * 45 test-minutes took 25.4 on the clock, as shop's desktop half ran alone at the end).
+ */
+export function makespan(files, time, workers = WORKERS) {
+  const sorted = [...files].sort((a, b) => a.localeCompare(b));
+  const busy = Array(workers).fill(0);
+  for (const p of PROJECTS)
+    for (const f of sorted) {
+      const i = busy.indexOf(Math.min(...busy));
+      busy[i] += time(f, p);
+    }
+  return Math.max(...busy);
+}
+
+/**
+ * Spread `files` over `total` shards so the slowest shard ends soonest (by `makespan`): longest files first, each to the
+ * shard it delays least; then, while it helps, move a file off the slowest shard, or swap one with another shard.
+ * Deterministic: the same files and times give the same shards. Returns each shard's files and its makespan (seconds).
+ */
+export function assign(files, time, total, workers = WORKERS) {
+  const sum = (f) => PROJECTS.reduce((s, p) => s + time(f, p), 0);
+  const shards = Array.from({ length: total }, () => []);
+  const span = Array(total).fill(0);
+  const load = Array(total).fill(0);
+  for (const f of [...files].sort((a, b) => sum(b) - sum(a) || a.localeCompare(b))) {
+    let best = 0;
+    let bestSpan = Infinity;
+    for (let i = 0; i < total; i++) {
+      const s = makespan([...shards[i], f], time, workers);
+      if (s < bestSpan || (s === bestSpan && load[i] < load[best])) [best, bestSpan] = [i, s];
+    }
+    shards[best].push(f);
+    span[best] = bestSpan;
+    load[best] += sum(f);
+  }
+  for (let round = 0; round < 500; round++) {
+    const w = span.indexOf(Math.max(...span));
+    let move = null;
+    let gain = 0;
+    for (let j = 0; j < total; j++) {
+      if (j === w) continue;
+      for (const f of shards[w]) {
+        const rest = shards[w].filter((x) => x !== f);
+        // Move f to j, or swap it with one of j's files (g).
+        for (const g of [null, ...shards[j]]) {
+          const a = g ? [...rest, g] : rest;
+          const b = g ? [...shards[j].filter((x) => x !== g), f] : [...shards[j], f];
+          const sa = makespan(a, time, workers);
+          const sb = makespan(b, time, workers);
+          const d = span[w] - Math.max(sa, sb);
+          if (d > gain + 1e-9) [move, gain] = [{ j, a, b, sa, sb }, d];
+        }
+      }
+    }
+    if (!move) break;
+    [shards[w], shards[move.j], span[w], span[move.j]] = [move.a, move.b, move.sa, move.sb];
+  }
+  return shards.map((f, i) => ({ files: [...f].sort(), seconds: span[i] }));
+}
+
+/** A spec file as a Playwright file filter: a regular expression, dots escaped and the end anchored. */
+export const fileFilter = (f) => `${f.replaceAll(".", "\\.")}$`;
 
 export function readAreas(dir = DIR) {
   return JSON.parse(readFileSync(join(dir, "areas.json"), "utf8"));
@@ -83,9 +189,7 @@ const SPEC = /^e2e\/[^/]+\.spec\.ts$/;
 /**
  * What a pull request that changes `changed` (paths from the repo's root) runs, by the table `areas` (e2e/areas.json),
  * given the spec files there are (`existing`). `full` is why every spec runs (null when it doesn't); `specs` are the
- * spec files to run otherwise (smoke set included, sorted); `webgl` the specs to run again on the town's WebGL build
- * (`webgl.specs`, when a path of a `webgl` area or one of those specs changed, whatever `full` says; sorted); `why` says,
- * for each changed path, what it adds.
+ * spec files to run otherwise (smoke set included, sorted); `why` says, for each changed path, what it adds.
  *
  * A `traced` module (areas.json; settings.ts, e2e/helpers.ts, the app's shared modules), when `repo` can read the change
  * (`repoAt`, `gitRepo`): what its diff changes (`traceModule`) is followed to the files that use it (`usersOf`), and each
@@ -102,9 +206,6 @@ export function select(changed, areas, existing, repo = null) {
   const traced = new Set(repo ? areas.traced?.modules ?? [] : []);
   const hubs = new Set(areas.traced?.hubs ?? []);
   const list = Object.entries(areas.areas).map(([name, a]) => ({ name, test: matcher(a.paths), specs: a.specs }));
-  const glAreas = list.filter((a) => (areas.webgl?.areas ?? []).includes(a.name));
-  const glSpecs = areas.webgl?.specs ?? [];
-  let gl = false;
   const have = new Set(existing);
   const leftOut = new Set(areas.leftOut ?? []);
   const picked = new Set(areas.smoke);
@@ -112,8 +213,6 @@ export function select(changed, areas, existing, repo = null) {
   let full = null;
   // What one path adds, as a changed path or as a user of a traced change: { full, runs } (runs: a few words, or null).
   const place = (path) => {
-    // (The WebGL jobs: a path of the area's, or one of their specs.)
-    if (glAreas.some((a) => a.test(path)) || glSpecs.includes(path)) gl = true;
     if (isFull(path)) return { full: "a shared foundation", runs: "every spec: a shared foundation (areas.json, `full`)" };
     const hit = list.filter((a) => a.test(path));
     for (const a of hit) for (const s of a.specs) picked.add(s);
@@ -163,14 +262,7 @@ export function select(changed, areas, existing, repo = null) {
   }
   const specs = [...picked].filter((s) => have.has(s) && !leftOut.has(s)).sort();
   if (!full && !specs.length) full = "no spec was picked";
-  const webgl = gl ? allWebgl(areas, existing) : [];
-  return { full, specs: full ? [] : specs, webgl, why };
-}
-
-/** The WebGL jobs' specs (`webgl.specs` that exist), sorted: what they run whenever they run. */
-export function allWebgl(areas, existing) {
-  const have = new Set(existing);
-  return [...new Set(areas.webgl?.specs ?? [])].filter((s) => have.has(s)).sort();
+  return { full, specs: full ? [] : specs, why };
 }
 
 /** How many shards `specs` need at SHARD_SECONDS each: at least 1, at most MAX_SHARDS, never more than the files. */
@@ -179,19 +271,27 @@ export function shardCount(specs, weight) {
   return Math.max(1, Math.min(MAX_SHARDS, specs.length, Math.ceil(seconds / SHARD_SECONDS)));
 }
 
-/** The WebGL jobs: one per Playwright project (playwright.config.ts), each the `webgl` specs on one worker. */
-export const WEBGL_JOBS = ["webgl-phone", "webgl-desktop"];
-
-/** The plan as the workflow's outputs, and the note for the run's page (Markdown). */
-export function plan({ full, specs, webgl = [], why }, weight, all) {
+/**
+ * The plan as the workflow's outputs, and the note for the run's page (Markdown). `timings` are the test times
+ * (readTimings); `source` says where they came from. `assignment` is each shard's spec files as Playwright filters
+ * (a JSON list, shard 1 first), so every shard runs exactly what the plan spread.
+ */
+export function plan({ full, specs, why }, timings, all, source = "e2e/ci-timings.json") {
+  const weight = weigher(timings);
   const total = full ? MAX_SHARDS : shardCount(specs, weight);
   const minutes = (s) => Math.round(s / 60);
-  const seconds = (full ? all : specs).reduce((sum, f) => sum + weight(f), 0);
+  const files = full ? all : specs;
+  const seconds = files.reduce((sum, f) => sum + weight(f), 0);
+  const shards = assign(files, projectWeigher(timings), total);
   const note = full
     ? `Every spec file (${all.length}) on ${total} shards: ${full.replaceAll("`", "")}.`
     : `${specs.length} of ${all.length} spec files on ${total} shard${total > 1 ? "s" : ""}: the areas this pull request changes, plus the smoke set.`;
   const md = [`## e2e plan: ${note}`, ""];
-  md.push(`Test time: about ${minutes(seconds)} minutes in all (both projects, by e2e/ci-timings.json), so about ${minutes(seconds / total / 2)} on the clock per shard (2 workers each), plus about a minute of setup.`, "");
+  md.push(
+    `Test time: about ${minutes(seconds)} minutes in all (both projects, by ${source}). On the clock, with ${WORKERS} workers a shard: ` +
+      `${shards.map((s) => minutes(s.seconds)).join(", ")} minutes (shard 1 first), plus about a minute of setup.`,
+    "",
+  );
   if (!full) md.push("To run every spec on this pull request, add the `full-e2e` label (docs/areas/ops.md, \"CI e2e\").", "");
   if (why.length) {
     md.push("| Changed | Runs |", "| --- | --- |");
@@ -200,9 +300,13 @@ export function plan({ full, specs, webgl = [], why }, weight, all) {
     md.push("");
   }
   if (!full) md.push(`Specs: ${specs.map((s) => `\`${s}\``).join(", ")}`, "");
-  if (webgl.length) md.push(`The town on WebGL too: ${webgl.map((s) => `\`${s}\``).join(", ")} again on a \`VITE_TOWN_GL=1\` build, two more jobs beside the shards, the phone's and the computer's (the town's area changed).`, "");
-  const shards = [...Array.from({ length: total }, (_, i) => i + 1), ...(webgl.length ? WEBGL_JOBS : [])];
-  const outputs = { specs: specs.join(" "), total: String(total), shards: JSON.stringify(shards), webgl: webgl.join(" "), note };
+  const outputs = {
+    specs: specs.join(" "),
+    total: String(total),
+    shards: JSON.stringify(shards.map((_, i) => i + 1)),
+    assignment: JSON.stringify(shards.map((s) => s.files.map(fileFilter).join(" "))),
+    note,
+  };
   return { outputs, md: md.join("\n") };
 }
 
@@ -709,16 +813,15 @@ function main(argv) {
   const [mode, ...rest] = argv;
   const all = specFiles();
   let picked;
-  if (mode === "full" && (rest.length === 1 || rest.length === 2)) {
-    // (The WebGL job by what changed from the base; without one, a manual run: everything.)
-    const webgl = rest[1] ? select(diffFrom(rest[1]), readAreas(), all, gitRepo(rest[1])).webgl : allWebgl(readAreas(), all);
-    picked = { full: rest[0], specs: [], webgl, why: [] };
-  }
+  if (mode === "full" && rest.length === 1) picked = { full: rest[0], specs: [], why: [] };
   // (A traced module's change is read from git at the base and from the working tree: the checkout.)
   else if (mode === "diff" && rest.length === 1) picked = select(diffFrom(rest[0]), readAreas(), all, gitRepo(rest[0]));
   else if (mode === "files" && rest.length) picked = select(rest, readAreas(), all, gitRepo(localBase()));
-  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" [base] | diff <base> | files <path>...');
-  const { outputs, md } = plan(picked, weigher(readTimings()), all);
+  else throw new Error('usage: node e2e/ci-select.mjs full "<why>" | diff <base> | files <path>...');
+  // (E2E_LIVE_TIMINGS: main's last green run's records, downloaded by the plan job; E2E_LIVE_RUN: that run's number.)
+  const live = process.env.E2E_LIVE_TIMINGS ? Object.keys(readLiveTimings(process.env.E2E_LIVE_TIMINGS)).length : 0;
+  const source = live ? `main's last green run (#${process.env.E2E_LIVE_RUN ?? "?"}, ${live} file${live === 1 ? "" : "s"}), the rest e2e/ci-timings.json` : "e2e/ci-timings.json";
+  const { outputs, md } = plan(picked, readTimings(), all, source);
   const lines = Object.entries(outputs).map(([k, v]) => `${k}=${v.replace(/\n/g, " ")}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");

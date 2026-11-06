@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, bossThinkMs, dashMoveClock, flagMove, legalMoves, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, fitSmacks, fitTurns, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -147,5 +147,205 @@ describe("Dash: in a battle", () => {
     expect(clocks.slice(0, 2)).toEqual([base, base]);
     expect(clocks.slice(2, 7)).toEqual(Array(S.scrambleMoves).fill(S.scrambleSeconds));
     expect(clocks[7]).toBe(base);
+  });
+});
+
+/**
+ * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle, a clock fit at most twice, and
+ * once a battle his Scramble Rush: 3 of your pieces and 3 of his swept to the middle ranks (on screen only), ten seconds to put them
+ * back, under needCorrect back and he moves again at once.
+ */
+describe("Dash v2: his numbers", () => {
+  it("Eric's: Time Scramble at most twice, the Rush's 4 of 6, its 1.00 over five seconds and its ten seconds; a fit at most twice, 3 to 5 smacks", () => {
+    expect(S.maxUltimates["dash"]).toBe(2);
+    expect(S.dashScramble).toMatchObject({ needCorrect: 4, pieces: 3, ranks: [3, 6], countdownMs: 5000, placeMs: 10000, from: 7 });
+    const tl = rushTimeline();
+    // (His copies' sweep, 3 to 4 seconds, inside the countdown.)
+    expect(tl.scatterUntil - tl.scatterAt).toBeGreaterThanOrEqual(3000);
+    expect(tl.scatterUntil - tl.scatterAt).toBeLessThanOrEqual(4000);
+    expect(tl.scatterUntil).toBeLessThanOrEqual(tl.countdownMs);
+    expect(tl.placeUntil - tl.placeAt).toBe(10000);
+    expect(S.dashClockFit).toMatchObject({ max: 2, smacks: [3, 5] });
+    for (let seed = 0; seed < 300; seed++) {
+      const turns = fitTurns(seed);
+      expect(turns).toHaveLength(2);
+      expect(new Set(turns).size).toBe(2);
+      for (const t of turns) {
+        expect(t).toBeGreaterThanOrEqual(S.dashClockFit.from);
+        expect(t).toBeLessThanOrEqual(S.dashClockFit.to);
+        expect(fitSmacks(seed, t)).toBeGreaterThanOrEqual(3);
+        expect(fitSmacks(seed, t)).toBeLessThanOrEqual(5);
+      }
+    }
+    expect(POWER_FX.clockFit).toBe(DASH_FX.clockFit);
+    expect(POWER_FX.rushExtra).toBe(DASH_FX.rushExtra);
+  });
+});
+
+describe("Dash v2: the Scramble Rush's sweep", () => {
+  const FENS = [
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r1bq1rk1/pp2bppp/2n1pn2/2pp4/3P4/2PBPN2/PP1N1PPP/R1BQK2R w KQ - 4 8",
+    "4k3/8/3p4/8/8/2N5/8/4K3 w - - 0 40",
+    "6k1/5ppp/8/8/8/8/5PPP/6K1 b - - 0 30",
+  ];
+  it("3 of yours and 3 of his (fewer only when a side has fewer), never a king, each to its own empty square of ranks 3 to 6; seeded", () => {
+    for (const fen of FENS)
+      for (const crowd of ["w", "b"] as const)
+        for (let seed = 0; seed < 60; seed++) {
+          const moves = chooseRush(fen, crowd, seed, 9);
+          expect(chooseRush(fen, crowd, seed, 9)).toEqual(moves);
+          const pieces = boardPieces(fen);
+          const mine = [...pieces.values()].filter((p) => p[0] === crowd && p[1] !== "k").length;
+          const his = [...pieces.values()].filter((p) => p[0] !== crowd && p[1] !== "k").length;
+          expect(moves.filter((m) => m.piece[0] === crowd)).toHaveLength(Math.min(3, mine));
+          expect(moves.filter((m) => m.piece[0] !== crowd)).toHaveLength(Math.min(3, his));
+          // (The crowd's first.)
+          expect(moves.findIndex((m) => m.piece[0] !== crowd)).toBe(moves.some((m) => m.piece[0] !== crowd) ? Math.min(3, mine) : -1);
+          for (const m of moves) {
+            expect(pieces.get(m.from)).toBe(m.piece);
+            expect(m.piece[1]).not.toBe("k");
+            expect(pieces.has(m.to)).toBe(false);
+            expect(Number(m.to[1])).toBeGreaterThanOrEqual(3);
+            expect(Number(m.to[1])).toBeLessThanOrEqual(6);
+          }
+          // (No two from one square, none onto another's: no overlaps.)
+          expect(new Set(moves.map((m) => m.from)).size).toBe(moves.length);
+          expect(new Set(moves.map((m) => m.to)).size).toBe(moves.length);
+          // (The screens' board: the same pieces, the swept ones moved.)
+          const shown = boardPieces(rushFen(fen, { moves }));
+          expect(shown.size).toBe(pieces.size);
+          for (const m of moves) expect(shown.get(m.to)).toBe(m.piece);
+        }
+  });
+});
+
+describe("Dash v2: the Scramble Rush's scoring", () => {
+  const fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+  const rush = {
+    moves: [
+      { from: "b1", to: "c4", piece: "wn" },
+      { from: "a2", to: "e5", piece: "wp" },
+      { from: "b2", to: "h3", piece: "wp" },
+      { from: "g8", to: "d6", piece: "bn" },
+      { from: "c7", to: "a4", piece: "bp" },
+      { from: "d8", to: "f5", piece: "bq" },
+    ],
+  };
+  it("untouched, none right; every piece back, all six right (green), the board the game's again", () => {
+    expect(rushJudge(fen, rush).correct).toBe(0);
+    expect(rushJudge(fen, rush).marks.every((m) => !m.right && !m.placed)).toBe(true);
+    const back = Object.fromEntries(rush.moves.map((m) => [m.from, m.from]));
+    expect(rushJudge(fen, rush, back).correct).toBe(6);
+    expect(rushFen(fen, rush, back)).toBe(fen);
+  });
+  it("a wrong square (red), a square off or more (king's steps); two like pieces swapped count as both right", () => {
+    const j = rushJudge(fen, rush, { b1: "a3", g8: "g6", a2: "b2", b2: "a2" });
+    const at = (sq: string) => j.marks.find((m) => m.square === sq)!;
+    expect(at("a3")).toMatchObject({ right: false, placed: true, off: 2 });
+    expect(at("g6")).toMatchObject({ right: false, placed: true, off: 2 });
+    expect(rushJudge(fen, rush, { b1: "a2" }).marks.find((m) => m.square === "a2")).toMatchObject({ right: false, off: 1 });
+    // (Your two pawns swapped: the board is right, so both are.)
+    expect(at("a2").right && at("b2").right).toBe(true);
+    expect(j.correct).toBe(2);
+  });
+  it("never onto a piece he didn't sweep, nor two onto one square; junk ignored (the piece stays where he dropped it)", () => {
+    const j = rushJudge(fen, rush, { b1: "e2", a2: "c3", b2: "c3", g8: "zz", c7: 7 as unknown as string });
+    expect(j.marks.map((m) => m.square).sort()).toEqual(["a4", "c3", "c4", "d6", "f5", "h3"].sort());
+    expect(j.correct).toBe(0);
+  });
+  it("the crowd holds at needCorrect back on average (people's and bots'); bots each piece with botHit's chance, seeded", () => {
+    expect(rushHeld([4], 6)).toBe(true);
+    expect(rushHeld([3], 6)).toBe(false);
+    expect(rushHeld([0], 6)).toBe(false);
+    expect(rushHeld([6, 2], 6)).toBe(true);
+    expect(rushHeld([5, 2], 6)).toBe(false);
+    // (Fewer swept than needCorrect: all of them.)
+    expect(rushHeld([2], 2)).toBe(true);
+    let sum = 0;
+    for (let i = 0; i < 400; i++) {
+      const n = botRushCorrect(11, `b${i}`, { at: 8, moves: rush.moves });
+      expect(botRushCorrect(11, `b${i}`, { at: 8, moves: rush.moves })).toBe(n);
+      sum += n;
+    }
+    expect(sum / 400).toBeCloseTo(6 * S.dashScramble.botHit, 0);
+  });
+});
+
+describe("Dash v2: the Scramble Rush in a battle", () => {
+  /** Plays to the Rush (the test switch: as the second turn begins); returns the position it froze. */
+  async function toRush(seed: number) {
+    const r = battle(seed, { test: "rush" });
+    await crowdMove(r);
+    await r.playBoss(fakeEngine());
+    expect(r.rushDue()).toBe(true);
+    return { r, fen: fenOf(r), plies: r.boards.get(r.state.boards[0]!)!.history.length };
+  }
+  const placesFor = (r: MatchRunner, right: number) => Object.fromEntries(r.boss!.powers!.dash!.rush!.moves.slice(0, right).map((m) => [m.from, m.from]));
+
+  for (const [right, held] of [
+    [4, true],
+    [3, false],
+    [0, false],
+  ] as const)
+    it(`${right} of 6 back: ${held ? "held, your turn as ever" : "he moves again at once (his quiet extra move, unscored)"}; the board the game's own throughout`, async () => {
+      const { r, fen, plies } = await toRush(21 + right);
+      const rush = r.boss!.powers!.dash!.rush!;
+      expect(rush.moves).toHaveLength(6);
+      expect(rush.at).toBe(r.boss!.crowdMoves);
+      const out = r.finishRush({ h0: placesFor(r, right) });
+      expect(out.correct.h0).toBe(right);
+      expect(out.held).toBe(held);
+      // (Restored: the game's position never changed.)
+      expect(fenOf(r)).toBe(fen);
+      expect(r.rushDue()).toBe(false);
+      // (Judged once: a second answer changes nothing.)
+      expect(r.finishRush({ h0: placesFor(r, 6) }).held).toBe(held);
+      expect(r.extraMoveDue()).toBe(!held);
+      if (!held) {
+        const move = await r.playExtraMove(fakeEngine());
+        expect(move).toBeTruthy();
+        expect(r.boards.get(r.state.boards[0]!)!.history.length).toBe(plies + 1);
+        expect(r.boss!.powers!.dash!.rush!.extra).toBe("played");
+        expect(r.boss!.powers!.events.some((e) => e.kind === "rushExtra")).toBe(true);
+        expect(r.extraMoveDue()).toBe(false);
+        // (Still the crowd's turn, with the boss's move logged: the side to move is the crowd's.)
+        expect(fenOf(r).split(" ")[1]).toBe(fen.split(" ")[1]);
+      } else expect(fenOf(r)).toBe(fen);
+      // On with the crowd's turn as usual.
+      await crowdMove(r);
+      expect(r.isOver()).toBe(false);
+    });
+
+  it("in a battle without the switch: never before turn 7, at most once; Time Scramble at most twice; a clock fit at most twice", async () => {
+    let came = 0;
+    for (const seed of [2, 5]) {
+      const r = battle(seed);
+      const rushes: number[] = [];
+      let scrambles = 0;
+      let fits = 0;
+      for (let i = 0; i < 45 && !r.isOver(); i++) {
+        if (r.rushDue()) {
+          rushes.push(r.boss!.crowdMoves + 1);
+          r.finishRush({});
+          if (r.extraMoveDue()) await r.playExtraMove(fakeEngine());
+        }
+        r.deal();
+        scrambles += r.boss!.powers!.events.filter((e) => e.kind === "scramble").length;
+        fits += r.boss!.powers!.events.filter((e) => e.kind === "clockFit").length;
+        const f = fenOf(r);
+        const allowed = r.crowdAllowed() ?? legalMoves(f);
+        await r.score(new Map([["h0", { move: crowdPick(f, allowed, mulberry32(i + seed)), thinkMs: 500 }]]));
+        if (r.isOver() || r.stageComplete() || !r.bossToMove()) break;
+        await r.playBoss(fakeEngine());
+      }
+      expect(rushes.length).toBeLessThanOrEqual(1);
+      came += rushes.length;
+      for (const t of rushes) expect(t).toBeGreaterThanOrEqual(S.dashScramble.from);
+      expect(scrambles).toBeLessThanOrEqual(2);
+      expect(fits).toBeLessThanOrEqual(2);
+    }
+    // (It came in these battles: his meter half full by about turn 13.)
+    expect(came).toBeGreaterThan(0);
   });
 });

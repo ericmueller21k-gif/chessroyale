@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { Chess } from "chess.js";
 import { soloFromHome, soundOff } from "./helpers.ts";
 

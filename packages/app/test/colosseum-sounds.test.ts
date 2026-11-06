@@ -52,9 +52,8 @@ describe("the Colosseum's sounds", () => {
     expect(read("src/colosseum/ambient.ts")).toContain('AMBIENT_URL = "/sounds/colosseum/ambient.mp3"');
   });
 
-  it("the cheer (CC BY 4.0) is credited in Settings, the FAQ, the notice and its CREDITS.md", () => {
+  it("the cheer (CC BY 4.0) is credited in the FAQ's Copyright, credits and licenses, the notice and its CREDITS.md", () => {
     const q = "https://opengameart.org/content/free-crowd-cheering-sounds";
-    expect(read("src/screens/Settings.tsx")).toContain(`The Colosseum's crowd cheer: <a href="${q}">Free Crowd Cheering Sounds</a> by Gregor Quendel`);
     expect(read("src/faq/content.ts")).toContain(`- **The Colosseum's crowd cheer**: [Free Crowd Cheering Sounds](${q}) by Gregor Quendel, under [CC BY 4.0]`);
     expect(read("public/licenses/third-party.txt")).toContain(q);
     const credits = read("public/sounds/colosseum/CREDITS.md");

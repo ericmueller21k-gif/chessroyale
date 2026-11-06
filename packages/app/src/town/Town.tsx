@@ -39,7 +39,7 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, colI, fromCam, proj, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
+import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
@@ -49,7 +49,10 @@ import { TownChat } from "./TownChat.tsx";
 import { TownChatTools } from "./TownChatTools.tsx";
 import { Press } from "./press.ts";
 import { anyHeld, hold, isHeld, keyWalk, listenKeys, onHeld, type Dir } from "./arrows.ts";
-import { LookAround, Turn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { LookAround, Turn, freshView, lockIn, nearestTurn, quarterOf, screenStep } from "./turn.ts";
+import { FingerRun } from "./run.ts";
+import { mapFrame } from "./minimap.ts";
+import { TownMap, type MapFace } from "./TownMap.tsx";
 import { baseHeading, stripAt } from "./strips.ts";
 import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
@@ -62,7 +65,7 @@ import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
-import { STREET_TOWN } from "./admin-town.ts";
+import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -299,7 +302,7 @@ export function TownScreen({
           <h1>Town square</h1>
         )}
         {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
-        <TownChatTools />
+        <TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />
       </header>
       <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
@@ -483,6 +486,9 @@ export function TownScreen({
             </div>
           ))}
         </div>
+        {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
+            inside a building (it's the town's). */}
+        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} />}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -553,17 +559,21 @@ function startTown(
   onChallengeOff: () => void = () => {},
 ) {
   const f = TOWN_FEEL;
-  /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
+  /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
   let cv = cv0;
-  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, no
-  // context, or its shader fails: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a
-  // minute, or not back within LOST_WAIT_MS, Canvas 2D for the rest of the page. Each of these falls back once and is
-  // reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the frame loop).
+  // The drawing (paint.ts): today's town with Canvas 2D; the street town with WebGL 2 only (Nov 6; admin-town.ts: a device without
+  // WebGL 2 gets today's town). The street's WebGL failing as it starts (no context, or its shader fails), or its context lost twice
+  // within a minute or not back within LOST_WAIT_MS: the page opens again in today's town (`?street=off`). A lost context: nothing is
+  // drawn until it's back. Each is reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the
+  // frame loop; what's waiting goes as the page is hidden).
   const losses: number[] = [];
   let lostWait = 0;
-  const fallBack = (why: TownGlFallback) => {
+  const leaveStreet = (why: TownGlFallback) => {
     reportTownFallback(why);
-    useBackend("2d");
+    const u = new URL(location.href);
+    u.pathname = "/town";
+    u.searchParams.set("street", "off");
+    location.replace(u.href);
   };
   const onLost = (lost: boolean) => {
     clearTimeout(lostWait);
@@ -571,31 +581,18 @@ function startTown(
     const now = performance.now();
     losses.push(now);
     // (And one that isn't back within a few seconds: the browser isn't giving it back.)
-    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && fallBack("lost-twice"));
-    else lostWait = window.setTimeout(() => alive && painter.lost && fallBack("not-back"), LOST_WAIT_MS);
+    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && leaveStreet("lost-twice"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && leaveStreet("not-back"), LOST_WAIT_MS);
   };
-  let attached = false;
-  /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
-  const swapCanvas = () => {
-    const n = document.createElement("canvas");
-    n.className = cv.className;
-    n.setAttribute("aria-label", cv.getAttribute("aria-label") ?? "");
-    Object.assign(n.dataset, cv.dataset);
-    n.width = cv.width;
-    n.height = cv.height;
-    n.style.cssText = cv.style.cssText;
-    if (attached) detach();
+  const makePainter = (): Painter => {
+    if (!STREET_TOWN) return painter2d(cv);
+    const p = painterGL(cv, onLost);
+    if (typeof p !== "string") return shim(p);
+    leaveStreet(p);
+    // (Until the page goes: Canvas 2D on a new canvas, as this one may have given a WebGL context before failing.)
+    const n = cv.cloneNode() as HTMLCanvasElement;
     cv.replaceWith(n);
     cv = n;
-    if (attached) attach();
-  };
-  const makePainter = (kind: Backend): Painter => {
-    if (kind === "webgl") {
-      const p = painterGL(cv, onLost);
-      if (typeof p !== "string") return shim(p);
-      reportTownFallback(p);
-      swapCanvas(); // (in case it gave a WebGL context before failing)
-    }
     return painter2d(cv);
   };
   /**
@@ -615,18 +612,10 @@ function startTown(
       return painter.pixels(x, y, w, h);
     },
   };
-  let painter: Painter = makePainter(TOWN_ASKED.gl ? "webgl" : "2d");
+  // (An admin's device without WebGL 2 is in today's town: said once a page, as a fallback is.)
+  if (NO_WEBGL_STREET) reportTownFallback("no-webgl2");
+  const painter: Painter = makePainter();
   cv.dataset.backend = painter.kind;
-  /** Draws with `kind` from now on (on a new canvas), the frame drawn again at once. */
-  const useBackend = (kind: Backend) => {
-    painter.dispose();
-    swapCanvas();
-    painter = makePainter(kind);
-    r.setPainter(painter);
-    cv.dataset.backend = painter.kind;
-    if (fpsEl) fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
-    draw(drawnAt);
-  };
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
   const r = new Renderer(painter, town, HOMES);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
@@ -652,7 +641,12 @@ function startTown(
   };
   const stopKeys = listenKeys();
   const offHeld = onHeld(paintKeys);
-  const offQuarter = onHeld(() => (keyQuarter = quarterOf(turn.to)));
+  // (An arrow's press locks a snapped look round in first, so its step goes by the new base heading, not the old one's.)
+  const offQuarter = onHeld(() => {
+    const b = lockIn(turn, look, performance.now());
+    if (b !== null) base = b;
+    keyQuarter = quarterOf(turn.to);
+  });
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -673,6 +667,12 @@ function startTown(
   let keyQuarter = 0;
   /** (Round 5) A drag's look round, on top of the normal heading (north, or a home's strip's). */
   const look = new LookAround();
+  /**
+   * The base heading (Nov 5, brief-street-controls-map.md): the normal heading off a home's strip, north, east, south or west. A look round
+   * snapped to a quarter and locked in by any way of setting off (a tap, a run, an arrow: turn.ts lockIn) sets it. North as the town
+   * opens and as you come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
+   */
+  let base = 0;
   /** (Tests) The heading held (the turn's stills), or null. */
   let pinHeading: number | null = null;
   let follow = true;
@@ -960,8 +960,13 @@ function startTown(
     // (LookAround), eased back as you set off.
     if (STREET_TOWN) {
       const h = town.you.walker.here();
-      turn.aim(nearestTurn(baseHeading(h.c, h.r), turn.to), now);
-      if (town.you.walker.moving()) look.back(now);
+      turn.aim(nearestTurn(baseHeading(h.c, h.r, base), turn.to), now);
+      // (Any way of setting off locks a snapped quarter in, the base heading; with nothing snapped, your first step eases the view back.)
+      if (town.you.walker.moving()) {
+        const b = lockIn(turn, look, now);
+        if (b !== null) base = b;
+        else look.back(now);
+      }
       heading = pinHeading ?? turn.at(now) + look.at(now);
     }
   };
@@ -1000,6 +1005,8 @@ function startTown(
       const w = clock();
       if (!sameWeights(w, sky)) r.setSky((sky = w));
     }
+    // (A press held still past the hold time: a run, street town only.)
+    if (press.hold(performance.now())) startRun(performance.now());
     keysWalk();
     tick(town, now);
     // A bot's card: whether a table is free for you both, to grey its Play (checked only while one is open: no search).
@@ -1026,6 +1033,11 @@ function startTown(
     stepClose(dt);
     updateCamera(dt, now);
     draw(now, dt);
+    // (The minimap's dots: you and the way the camera faces; a transform only when they move. minimap.ts.)
+    if (STREET_TOWN) {
+      const y = town.you.walker.pose(now, POSE);
+      mapFrame(y.x, y.y, heading);
+    }
     if (fpsEl) {
       fpsN++;
       if (!fpsAt) fpsAt = fpsPrevAt = now;
@@ -1168,8 +1180,49 @@ function startTown(
   };
   addEventListener("keydown", onKey);
 
-  // ---- Input: a finger presses the square you'd walk to (press.ts); one that moves is a drag (look around).
-  const press = new Press(f.dragPx);
+  // ---- Input: a finger presses the square you'd walk to (press.ts); one that moves is a drag (look around); in the street town, one
+  // held still past `streetHoldMs` is a run (run.ts), steered by the finger, which never turns the camera.
+  const press = new Press(f.dragPx, STREET_TOWN ? f.streetHoldMs : Infinity);
+  /** The finger's run (the street town): the arrows' direction it holds. */
+  const finger = new FingerRun();
+  /** Where the press's finger is now (client px). */
+  const fingerAt = { x: 0, y: 0 };
+  const steerPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
+  const steerQ = { dx: 0, dz: 0 };
+  const steerAt = newPt();
+  const steerRest = newPt();
+  /**
+   * The finger steers the run: the way from your pawn's middle on screen to the finger, snapped to up, down, left or right of the normal
+   * view (the arrows'), held as an arrow is. Within `streetRunDeadPx` of your pawn, the way it had. Your pawn as it stands still: where
+   * the last frame drew it, less its lead on the camera (running, the camera's follow lets it get up to about a square ahead on screen;
+   * steering from there would feed the run's own lead back into its way, and a finger near it would flip it back and forth).
+   */
+  const steer = () => {
+    const rc = box.getBoundingClientRect();
+    const b = r.drawnBox(0);
+    let x = b ? (b.x0 + b.x1) / 2 : r.W / 2;
+    let y = b ? (b.y0 + b.fy) / 2 : r.H * 0.6;
+    // (Your pose as the last frame drew it, with that frame's camera: on a slow frame the walk has gone on since.)
+    const pose = town.you.walker.pose(drawnAt, steerPose);
+    rel(r.view, camX, camY, pose.x, pose.y, steerQ);
+    if (proj(r.view, steerQ.dx, steerQ.dz, 0, steerAt) && proj(r.view, 0, 0, 0, steerRest)) {
+      x -= steerAt.x - steerRest.x;
+      y -= steerAt.y - steerRest.y;
+    }
+    finger.steer(fingerAt.x - rc.left - x, fingerAt.y - rc.top - y, f.streetRunDeadPx);
+  };
+  /**
+   * A press held still became a run (Eric, Nov 5: "if you hold it in the direction … right away … it starts running"): the pressed square
+   * lets go, a snapped look round is locked in (the new base heading: the camera stays), and you run the way the finger is.
+   */
+  const startRun = (now: number) => {
+    if (closing) return;
+    r.release(now, false);
+    leaveClose();
+    const b = lockIn(turn, look, now);
+    if (b !== null) base = b;
+    steer();
+  };
   /** The drag's start: the pointer, the camera, and pixels per square across and along. */
   let drag: { id: number; x: number; y: number; cx: number; cy: number; kx: number; ky: number } | null = null;
   /** This press only closes the open card (a tap anywhere else closes it, as in the prototype). */
@@ -1279,24 +1332,49 @@ function startTown(
     keys.start();
     keysAsk();
   };
+  /**
+   * When the pointer's event happened (its timeStamp, on performance.now()'s clock), not when it's handled: a slow frame holds a move back,
+   * and the hold time must not turn a drag that started at once into a run (or a quick tap into one).
+   */
+  const evAt = (e: PointerEvent) => {
+    const t = performance.now();
+    return e.timeStamp > 0 && e.timeStamp <= t ? e.timeStamp : t;
+  };
   const onDown = (e: PointerEvent) => {
+    // (The street town: a mouse's left button only, for a tap, a look round and a run alike.)
+    if (STREET_TOWN && e.pointerType === "mouse" && e.button !== 0) return;
+    // (A new press ends a run a finger left going.)
+    finger.stop();
     cv.setPointerCapture?.(e.pointerId);
+    fingerAt.x = e.clientX;
+    fingerAt.y = e.clientY;
     // Pixels per square at the focus point, across and along (for the drag).
     const v = r.view;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, kx: v.kf, ky: Math.max(8, rowSpan(r)) };
     closing = !!card;
-    if (closing) return press.down(e.clientX, e.clientY, "");
+    const now = evAt(e);
+    if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
     const p = plan(r.pick(xy.x, xy.y));
     if (p?.dest) r.pressSquare(p.dest.c, p.dest.r);
-    press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "");
+    press.down(e.clientX, e.clientY, p?.dest || p?.card ? p.key : "", now);
   };
   const dragTo = { dx: 0, dz: 0 };
   const onMove = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
-    const was = press.dragged();
-    if (!press.move(e.clientX, e.clientY)) return;
-    if (!was) {
+    fingerAt.x = e.clientX;
+    fingerAt.y = e.clientY;
+    const was = press.gesture();
+    if (!press.move(e.clientX, e.clientY, evAt(e))) {
+      const now = performance.now();
+      // A run (held still past the hold time; a move that comes in late starts it too): the finger steers, the camera never turns.
+      if (press.running()) {
+        if (was !== "run") startRun(now);
+        else if (!closing) steer();
+      }
+      return;
+    }
+    if (was === "press") {
       // Past the threshold: the square lets go (no pulse, no walk) and you look around.
       r.release(performance.now(), false);
       leaveClose();
@@ -1314,8 +1392,11 @@ function startTown(
   const onUp = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
-    look.release();
     const now = performance.now();
+    // (Letting go of a look round: in the street town, within `streetSnapDeg` of a quarter it eases there and is snapped, LookAround.)
+    look.release(now, STREET_TOWN ? turn.to : null);
+    // (Letting go of a run: you stop at the next square.)
+    finger.stop();
     if (closing) {
       if (press.up("") !== "drag") setCard(null);
       return;
@@ -1329,6 +1410,11 @@ function startTown(
     }
     // Released on the same thing: the border pulses once and you set off (no sound, no vibration: Eric).
     r.release(now, true);
+    // (A tap's walk after a look round snapped to a quarter locks it in: the new base heading, the camera staying where it is.)
+    if (STREET_TOWN && p.dest) {
+      const b = lockIn(turn, look, now);
+      if (b !== null) base = b;
+    }
     // A tap on anything but the statue you're looking at walks you away from it: the camera glides back out.
     if (p.statue < 0 || p.statue !== closeOn) leaveClose();
     // You sit when a tap on a table sent you to its stool; any other walk stands you up (walkOff).
@@ -1346,7 +1432,8 @@ function startTown(
   };
   const onCancel = () => {
     drag = null;
-    look.release();
+    look.release(performance.now(), STREET_TOWN ? turn.to : null);
+    finger.stop();
     press.cancel();
     r.release(performance.now(), false);
   };
@@ -1369,7 +1456,6 @@ function startTown(
     cv.removeEventListener("wheel", onWheel);
   }
   attach();
-  attached = true;
 
   function setZoom(out: boolean) {
     leaveClose();
@@ -1412,6 +1498,13 @@ function startTown(
           headingBase: turn.to,
           strip: STREET_TOWN ? (stripAt(town.you.walker.hereC(), town.you.walker.hereR())?.home ?? null) : null,
           look: look.at(performance.now()),
+          // (Nov 5: the base heading, a quarter a let-go snapped to (null: none), the press's gesture and the run's held way.)
+          base,
+          snapped: look.snapped,
+          gesture: press.gesture(),
+          run: finger.dir,
+          // (Your pawn as the last frame drew it: the finger's run is steered from its middle.)
+          you: r.drawnBox(0),
           // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
           parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
@@ -1431,8 +1524,10 @@ function startTown(
           figures: r.figureBoxes(),
           // (Round 4: the horizon's height in the box, px; the sky over it, the street below.)
           horizon: r.view.hy,
-          // The street town's boxes drawn in the last frame and their draws (the 2D fallback's cost; WebGL batches them).
+          // The street town's boxes drawn in the last frame.
           boxes: r.boxDraws(),
+          // The boss whose speech bubble is up (null: none): drawn over the world, so a pixel check of the world quiets it (`__townHush`).
+          speech: town.speech.boss?.home.id ?? null,
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -1571,19 +1666,13 @@ function startTown(
       held: ridersHeld(),
     };
   };
-  // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
-  // the drawing's backend from now on (on a new canvas; the held frame drawn again), answering the one it got; `__townPaint()`:
-  // the backend and the last frame's draw calls (WebGL's; 0 for Canvas 2D). For the comparison of the two (e2e/town-webgl.spec.ts).
+  // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townPaint()`: the backend, the last
+  // frame's draw calls (WebGL's; 0 for Canvas 2D) and whether its context is lost.
   const hookHold = (on: boolean) => {
     if (!testSwitchesAllowed()) return;
     held = on;
     if (on) halt();
     else run();
-  };
-  const hookBackend = (kind: Backend) => {
-    if (!testSwitchesAllowed()) return null;
-    useBackend(kind);
-    return painter.kind;
   };
   // ... `__townBench(n)`: the held frame drawn again n times in a row, in ms a draw (the drawing's own cost, the same frame for
   // either backend: nothing moves, nothing new to make).
@@ -1594,12 +1683,18 @@ function startTown(
     for (let i = 0; i < n; i++) r.draw(drawnAt, camX, camY, zoomCur, 0);
     return (performance.now() - t0) / n;
   };
+  // ... `__townHush(on)`: the bosses' speech bubbles stop (the one up goes at once) or start again, so a pixel check sees the world alone.
+  const hookHush = (on: boolean) => {
+    if (!testSwitchesAllowed()) return;
+    town.speech.boss = null;
+    town.speech.next = on ? Infinity : 0;
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1614,11 +1709,11 @@ function startTown(
   hooks.__townBossBack = hookBossBack;
   hooks.__townTags = hookTags;
   hooks.__townHold = hookHold;
-  hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townWalk = hookWalk;
   hooks.__townHeading = hookHeading;
+  hooks.__townHush = hookHush;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
 
@@ -1703,12 +1798,26 @@ function startTown(
     pause: () => {
       away = true;
       goingIn = -1;
+      finger.stop();
       halt();
     },
     resume: () => {
       away = false;
+      // (Out of a building: the view is north again, Eric: "It'll always default back to the normal [view] if you go into a building and
+      // come out". Under the black, so nothing is seen to turn.)
+      if (STREET_TOWN) {
+        const h = town.you.walker.here();
+        base = freshView(turn, look, baseHeading(h.c, h.r, 0));
+        heading = turn.to;
+      }
       run();
     },
+    /** The large map's portraits (TownMap.tsx): each boss home's place and its boss's face, as its chip shows it. */
+    mapFaces: (): MapFace[] =>
+      HOMES.map((h) => {
+        const { img, box } = r.chipFace(h);
+        return { id: h.id, x: h.cx, y: h.cy, color: h.color, img, box };
+      }),
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
     /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */
@@ -1754,11 +1863,11 @@ function startTown(
       delete hooks.__townBossBack;
       delete hooks.__townTags;
       delete hooks.__townHold;
-      delete hooks.__townBackend;
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townWalk;
       delete hooks.__townHeading;
+      delete hooks.__townHush;
       delete hooks.__townRide;
       delete hooks.__townYou;
       painter.dispose();
@@ -1769,7 +1878,7 @@ function startTown(
 }
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
-/** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
+/** How long the street town's lost WebGL context may stay lost before the page opens in today's town (it's usually back within a second). */
 const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */
 const BACKEND_LABEL: Record<Backend, string> = { "2d": "2D", webgl: "WebGL" };

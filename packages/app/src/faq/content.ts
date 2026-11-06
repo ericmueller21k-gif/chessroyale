@@ -693,7 +693,7 @@ ${fixed ? `**${bossInText(fixed.name, true, src.roster)}** has a brain of his ow
 | Full | ${guard(M.full)} |
 | Strict | ${guard(M.strict)} |
 
-Maia runs in your browser as its own program, under the AGPL-3.0, and [its source code](/engine/maia/maia-box-source.tar.gz) is free to download.
+Maia runs in your browser as its own program. Its license and source code are in [Copyright, credits and licenses](#credits).
 
 ### The handover: from Maia to Stockfish {#handover}
 
@@ -865,7 +865,8 @@ Plays from the game so far. A lanky, cocky cheetah in a backwards orange cap and
 
 Your time is the clock at the right of the box under the board: alone or in a party it's your time bank for the battle (the team's one bank in a party); in a raid it's each move's timer.
 - **Clock Slap** (passive): every time he takes one of your pieces he slaps his clock and steals your time: ${n(p.slapBankSeconds, "second")} off your bank, or in a raid your next move's timer ${n(p.slapMoveSeconds, "second")} shorter (never under ${n(p.slapMoveMin, "second")}). Tick, in his bar, keeps count of what he's stolen.
-- **Time Scramble** (ultimate): after the warning, your next ${n(p.scrambleMoves, "move")} get ${n(p.scrambleSeconds, "second")} each, counted down over the board. They still come out of your bank, which still gets its extra seconds.
+- **Time Scramble** (ultimate, at most ${n(p.maxUltimates["dash"] ?? 0, "time")} a battle): after the warning, your next ${n(p.scrambleMoves, "move")} get ${n(p.scrambleSeconds, "second")} each, counted down over the board. They still come out of your bank, which still gets its extra seconds.
+- **Scramble Rush** (once a battle, never before move ${num(p.dashScramble.from)}): "1.00" counts down to "0.00" over ${n(p.dashScramble.countdownMs / 1000, "second")} while his copies race across the board, moving ${n(p.dashScramble.pieces, "piece")} of yours and ${num(p.dashScramble.pieces)} of his (never a king). Then you have ${n(p.dashScramble.placeMs / 1000, "second")} to drag or tap them back: a green edge where one is right, a red edge where it isn't. Fewer than ${num(p.dashScramble.needCorrect)} of the ${num(p.dashScramble.pieces * 2)} back (in a raid, on average) and he plays an extra move at once. Either way the board goes back exactly as it was: only the screen showed them moved.
 - **Out of time** against him is never a loss: a move is played for you instead, picked at random from the ${n(p.flagTop, "best move")} (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
 };
 
@@ -1105,10 +1106,14 @@ function fairPlay(): FaqSection {
   };
 }
 
+/**
+ * The last section (Eric, Nov 6): every credit, attribution and license notice in the app. The Settings page used to
+ * carry these too; they live here now, linked from the contents.
+ */
 function credits(src: FaqSources): FaqSection {
   return {
     id: "credits",
-    title: "Credits and licenses",
+    title: "Copyright, credits and licenses",
     body: `
 - **Stockfish**, the chess engine behind the judge, the bosses and the bots: free software under the GPL-3.0 ([stockfishchess.org](https://stockfishchess.org), [source](https://github.com/official-stockfish/Stockfish), this build: [stockfish.js](https://github.com/nmrugg/stockfish.js) 19, [its source](/engine/stockfish-source.tar.gz), [license](/engine/COPYING.txt)). It runs as a separate program in your browser.
 - **Maia-3**, the human-like model ${src.brain.forPlayers ? "behind [the bosses](#maia-brain)" : "[being tested](#maia-brain) for bosses"}: by the CSSLab, University of Toronto, under the AGPL-3.0 ([Maia-3](https://github.com/CSSLab/maia3)). It runs as its own separate program in your browser; our Maia box's [source code](/engine/maia/maia-box-source.tar.gz) is free to download ([notice](/engine/maia/NOTICE.txt), [license](/engine/maia/LICENSE.txt)).
@@ -1116,7 +1121,6 @@ function credits(src: FaqSources): FaqSection {
 - **Classic piece sounds** and their variations: [PyChess](https://github.com/pychess/pychess/tree/master/sounds) (GPL-3.0). The variations are made from PyChess's sounds by our own script ([license](/engine/COPYING.txt), [how each was made](/sounds/SOURCES.md), [their source](/sounds/pychess-sounds-source.tar.gz)). Like the engines, they're separate files the game plays, not part of its code.
 - **The Colosseum's crowd cheer**: [Free Crowd Cheering Sounds](https://opengameart.org/content/free-crowd-cheering-sounds) by Gregor Quendel, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), trimmed, layered and leveled by HunChess ([credits](/sounds/colosseum/CREDITS.md)).
 - **The app** is built with Preact (MIT) and chess.js (BSD), in the Archivo, Archivo Black and Press Start 2P fonts (SIL Open Font License) ([licenses](/licenses/third-party.txt)). Its other sounds are free of rights (CC0), royalty free or the game's own.
-- The same credits are at the foot of Settings.
 `,
   };
 }
@@ -1137,7 +1141,7 @@ function privacyAndTerms(): FaqSection {
 
 /** The FAQ's sections, in order, built from `src` (the game's settings unless a test says otherwise). */
 export function faqSections(src: FaqSources = FAQ_DEFAULTS): FaqSection[] {
-  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), credits(src), privacyAndTerms()];
+  return [modes(src), scoring(src), bossBrain(src), bossPowers(src), godKing(src), crates(src), fairPlay(), privacyAndTerms(), credits(src)];
 }
 
 /** The line under the title. */

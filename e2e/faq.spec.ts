@@ -11,8 +11,8 @@ const topOf = (page: Page, id: string) => page.evaluate((x) => document.getEleme
 
 test("Settings → FAQ: the contents jump to a section and it comes into view; back goes to Settings", async ({ page }) => {
   await page.goto("/settings");
-  await page.getByRole("button", { name: /FAQ · How it works/ }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "FAQ · How it works" })).toBeVisible();
+  await page.getByRole("button", { name: /HunChess Handbook/ }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "HunChess Handbook" })).toBeVisible();
   await expect(page).toHaveURL(/\/faq$/);
 
   // Every link in the contents points at something on the page.
@@ -42,6 +42,23 @@ test("Settings → FAQ: the contents jump to a section and it comes into view; b
   await page.getByRole("button", { name: "Back to Settings" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
   await expect(page).toHaveURL(/\/settings$/);
+});
+
+test("Settings → Handbook → contents: Copyright, credits and licenses comes into view, with the Stockfish and Maia links", async ({ page }) => {
+  await page.goto("/settings");
+  await page.getByRole("button", { name: /HunChess Handbook/ }).click();
+  const toc = page.getByRole("navigation", { name: "Contents" });
+  await toc.getByRole("link", { name: "Copyright, credits and licenses", exact: true }).click();
+  await expect(page.getByRole("heading", { level: 2, name: "Copyright, credits and licenses" })).toBeInViewport();
+  // (The Handbook is long: the last section is a long smooth scroll away, so this waits longer than the others do.)
+  await expect.poll(() => topOf(page, "faq-credits"), { timeout: 15_000 }).toBeLessThan(80);
+  await expect(page).toHaveURL(/#faq-credits$/);
+  // The section's notices, with their links.
+  const section = page.locator("section").filter({ has: page.locator("#faq-credits") });
+  await expect(section.getByRole("link", { name: "stockfishchess.org", exact: true })).toHaveAttribute("href", "https://stockfishchess.org");
+  await expect(section.getByRole("link", { name: "Maia-3", exact: true })).toHaveAttribute("href", "https://github.com/CSSLab/maia3");
+  await expect(section.getByRole("link", { name: "source code", exact: true })).toHaveAttribute("href", "/engine/maia/maia-box-source.tar.gz");
+  await expect(section.getByRole("link", { name: "its source", exact: true }).first()).toHaveAttribute("href", "/engine/stockfish-source.tar.gz");
 });
 
 test("a link to a heading in the FAQ opens at that heading", async ({ page }) => {

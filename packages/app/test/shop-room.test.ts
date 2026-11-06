@@ -216,8 +216,8 @@ describe("the rooms' own pieces", () => {
 });
 
 describe("the shops", () => {
-  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Jefferson's, Ginger's, Folio's and Boingo's homes have an inside", () => {
-    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "tiger", "timber"]);
+  it("only Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's, Wrangler's, Jefferson's, Ginger's, Folio's, Smudgy's and Boingo's homes have an inside", () => {
+    expect(ALL_HOMES.filter((h) => shopOf(h.id)).map((h) => h.id).sort()).toEqual(["alfil", "bigboy", "clown", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber"]);
   });
 
   it("the crates' words: names, the price line, what you have; the boss's ride is a prize", () => {
@@ -310,9 +310,22 @@ describe("the shops", () => {
       next = answer(200, { crate: "boss-gardener", locker: { bossCrates: { "boss-gardener": 1 } } });
       expect(await buyBossCrate("gardener", "key")).toEqual({ ok: true, message: "Puddles' Boss Crate is in your inventory." });
       expect(asked).toEqual([
-        { url: "/api/shop/boss-crate", body: { crate: "boss-tiger", way: "tokens" } },
-        { url: "/api/shop/boss-crate", body: { crate: "boss-gardener", way: "key" } },
+        { url: "/api/shop/boss-crate", body: { crate: "boss-tiger", way: "tokens", request: expect.any(String) } },
+        { url: "/api/shop/boss-crate", body: { crate: "boss-gardener", way: "key", request: expect.any(String) } },
       ]);
+      // Each buy its own request id (the server buys once per id: server/ledger.ts)…
+      const ids = asked.map((a) => (a.body as { request: string }).request);
+      expect(new Set(ids).size).toBe(2);
+      // …and a buy whose first try fails on the way is asked again with the same one, so it can't buy twice.
+      asked.length = 0;
+      const answers = [answer(500, { message: "Something went wrong. Try again." }), answer(200, { crate: "boss-tiger", locker: {} })];
+      globalThis.fetch = (async (url: string, init?: RequestInit) => {
+        asked.push({ url, body: JSON.parse(String(init?.body)) });
+        return answers.shift()!;
+      }) as typeof fetch;
+      expect(await buyBossCrate("tiger", "tokens")).toEqual({ ok: true, message: "Babur's Boss Crate is in your inventory." });
+      expect(asked).toHaveLength(2);
+      expect(asked[1]).toEqual(asked[0]);
     } finally {
       globalThis.fetch = real;
     }

@@ -14,7 +14,7 @@ const { TOWN_FEEL } = await import("../src/town/feel.ts");
 /**
  * The street town, round 3: the buildings as boxes and the turning camera (Nov 5; docs/decisions/2026-11-05-street-town-boxes.md). The
  * boxes' faces and their drawing order; the sides a neighbour at least as tall covers, never drawn; the turn's easing; taps and the
- * arrow keys through the heading; each building's draws within the art's budget. Round 4 (the rows, the chase camera, the town wrapping
+ * arrow keys through the heading. Round 4 (the rows, the chase camera, the town wrapping
  * east-west only): fronts face all four ways, so "before a front" is on its own street whichever way it faces; the heading on every
  * square (round 3's `camAt`) and the far Colosseum's 45 degrees went with the chase camera (town-rows.test.ts has their successors).
  */
@@ -67,19 +67,17 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     const ave = LOTS.filter((b) => STREET_LOTS[b.lot]!.street === "seam-ave");
     expect(ave.length).toBeGreaterThanOrEqual(4);
     for (const b of ave) expect([b.ux, b.uy]).toEqual(b.facing === "W" ? [0, -1] : [0, 1]);
-    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBe(1);
+    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBeCloseTo(1, 9);
   });
 
   it("every roof face's normal points out and up (none faces down), and its texture frame holds its corners", () => {
-    for (const b of BOXES)
-      for (const box of [b.box, b.low]) {
-        for (const fg of geomOf(box).faces) {
-          expect(fg.nz, `${box.id}`).toBeGreaterThan(-0.01);
-          expect(Math.hypot(fg.nx, fg.ny, fg.nz)).toBeCloseTo(1, 6);
-          for (let k = 0; k < fg.n; k++) {
-            expect(fg.tx[k]!).toBeGreaterThanOrEqual(fg.tx0 - 1e-9);
-            expect(fg.ty[k]!).toBeLessThanOrEqual(fg.ty0 + fg.th + 1e-9);
-          }
+    for (const { box } of BOXES)
+      for (const fg of geomOf(box).faces) {
+        expect(fg.nz, `${box.id}`).toBeGreaterThan(-0.01);
+        expect(Math.hypot(fg.nx, fg.ny, fg.nz)).toBeCloseTo(1, 6);
+        for (let k = 0; k < fg.n; k++) {
+          expect(fg.tx[k]!).toBeGreaterThanOrEqual(fg.tx0 - 1e-9);
+          expect(fg.ty[k]!).toBeLessThanOrEqual(fg.ty0 + fg.th + 1e-9);
         }
       }
   });
@@ -91,7 +89,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       // (Off to the left a little, so a side shows.)
       const [x, y] = before(b, 5, 3);
       const p = newPlan(b.box);
-      planBox(p, b, b.box, v, x, y, true, -Infinity);
+      planBox(p, b, b.box, v, x, y, -Infinity);
       expect(p.front.on, b.box.id).toBe(true);
       if (p.back.on) expect(p.back.dz).toBeGreaterThan(p.roofDz);
       for (const w of [p.left, p.right]) if (w.on) expect(w.dz).toBeGreaterThan(p.roofDz);
@@ -101,7 +99,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       }
       for (let k = 1; k < p.nOrder; k++) expect(p.faces[p.order[k - 1]!]!.dz).toBeGreaterThanOrEqual(p.faces[p.order[k]!]!.dz);
     }
-    expect(roofs).toBeGreaterThan(LOTS.length - 4);
+    // (The Colosseum's ring stretches, the north edge round: from a camera lower than their rim, their bowl is hidden behind their wall and left out.)
+    expect(roofs).toBeGreaterThan(LOTS.filter((b) => b.kind !== "ring").length - 4);
   });
 
   it("a face turned away from the camera isn't drawn: a gable's far slope, a side wall facing away", () => {
@@ -110,7 +109,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     const v = view(0);
     const p = newPlan(b.box);
     // From well off to the right: the right side shows, the left faces away.
-    planBox(p, b, b.box, v, b.fx + 6, b.fy - 5, true, -Infinity);
+    planBox(p, b, b.box, v, b.fx + 6, b.fy - 5, -Infinity);
     expect(p.left.on).toBe(false);
     expect(p.right.on || b.hideR).toBe(true);
     const g = geomOf(b.box);
@@ -150,7 +149,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       for (const dx of [-6, 6]) {
         const p = newPlan(b.box);
         const [sx, sy] = before(b, 5, dx);
-        planBox(p, b, b.box, view(facingHeading(b.facing)), sx, sy, true, -Infinity);
+        planBox(p, b, b.box, view(facingHeading(b.facing)), sx, sy, -Infinity);
         expect(right ? p.right.on : p.left.on).toBe(false);
       }
     }
@@ -172,31 +171,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     expect(wallShade(0, -1, 0, 1)).toBeCloseTo(0.3, 6);
   });
 
-  it("draws each building in about 12 to 20 draws (the art's budget, the 2D fallback's count: strips and faces), twice that mid-turn", () => {
-    const counts: number[] = [];
-    for (const b of LOTS) {
-      const h = facingHeading(b.facing);
-      for (const [dx, heading, limit] of [[0, h, 20], [-4, h, 20], [4, h, 20], [-3, h + 45, 40]] as const) {
-        const p = newPlan(b.low);
-        const [x, y] = before(b, 4, dx);
-        planBox(p, b, b.low, view(heading), x, y, false, -Infinity);
-        expect(p.draws, `${b.box.id} from ${dx} at ${heading}`).toBeLessThanOrEqual(limit);
-        if (heading === h && dx === 0) counts.push(p.draws);
-      }
-    }
-    // (Seen straight on, most are a front and a few roof faces.)
-    expect(Math.max(...counts)).toBeLessThanOrEqual(20);
-  });
-
-  it("a dome is one mesh's many faces in WebGL and cut down (6 x 3) on the 2D fallback", () => {
-    for (const id of ["gingerbread", "hopper"]) {
-      const b = LOTS.find((o) => o.home === id)!;
-      expect(geomOf(b.box).faces.length).toBe(50);
-      expect(geomOf(b.low).faces.length).toBe(18);
-    }
-    // (And Boingo's barrel vault: eight faces round, four on the 2D fallback.)
-    const clown = LOTS.find((o) => o.home === "clown")!;
-    expect(geomOf(clown.box).faces.length - geomOf(clown.low).faces.length).toBe(4);
+  it("a dome is one mesh's many faces, whole (no cut-down copy)", () => {
+    for (const id of ["gingerbread", "hopper"]) expect(geomOf(LOTS.find((o) => o.home === id)!.box).faces.length).toBe(50);
   });
 
   it("leaves out what's nearer the camera than the cut (nothing between the camera and you), hedges aside", () => {
@@ -204,9 +180,9 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     const b = LOTS.find((o) => o.facing === "S" && STREET_LOTS[o.lot]!.street === "south-st" && STREET_LOTS[o.lot]!.look)!;
     const p = newPlan(b.box);
     // The camera's focus 3 squares beyond the bakery's front, the cut 0.9 squares nearer than the focus: the front isn't drawn.
-    planBox(p, b, b.box, view(0), b.fx, b.fy + 3, true, -TOWN_FEEL.streetNearCut);
+    planBox(p, b, b.box, view(0), b.fx, b.fy + 3, -TOWN_FEEL.streetNearCut);
     expect(p.front.on).toBe(false);
-    planBox(p, b, b.box, view(0), b.fx, b.fy - 4, true, -TOWN_FEEL.streetNearCut);
+    planBox(p, b, b.box, view(0), b.fx, b.fy - 4, -TOWN_FEEL.streetNearCut);
     expect(p.front.on).toBe(true);
   });
 });

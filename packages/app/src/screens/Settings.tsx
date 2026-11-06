@@ -1,3 +1,4 @@
+import { replayWalkthrough } from "../components/Walkthrough.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { InstallCard } from "../components/InstallCard.tsx";
@@ -325,7 +326,10 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
             📖 How each mode works ›
           </button>
           <button type="button" class="fd-row-link" onClick={() => onFaq()}>
-            📖 FAQ · How it works ›
+            📖 HunChess Handbook ›
+          </button>
+          <button type="button" class="fd-row-link" onClick={() => { replayWalkthrough(); onBack(); }}>
+            👋 Show the walkthrough again ›
           </button>
         </section>
       )}
@@ -405,32 +409,6 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           )}
         </section>
       )}
-
-      <p class="fd-note maia-credit">
-        Bosses and bots use <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0,{" "}
-        <a href="https://github.com/official-stockfish/Stockfish">source</a>, <a href="https://github.com/nmrugg/stockfish.js">this build</a> and{" "}
-        <a href="/engine/stockfish-source.tar.gz" download>its source</a>) and <a href="https://github.com/CSSLab/maia3">Maia-3</a> by
-        CSSLab, University of Toronto (AGPL-3.0), each a separate program running in your browser. Our Maia box's{" "}
-        <a href="/engine/maia/maia-box-source.tar.gz" download>source code</a> is free to download (<a href="/engine/maia/NOTICE.txt">notice</a>,{" "}
-        <a href="/engine/maia/LICENSE.txt">license</a>).
-      </p>
-      <p class="fd-note pieces-credit">
-        Chess pieces by Colin M.L. Burnett (<a href="https://commons.wikimedia.org/wiki/Category:SVG_chess_pieces">Wikimedia Commons</a>), used
-        under the BSD license (<a href="/licenses/pieces.txt">license</a>).
-      </p>
-      <p class="fd-note sounds-credit">
-        Classic piece sounds and their variations: <a href="https://github.com/pychess/pychess/tree/master/sounds">PyChess</a> (GPL-3.0). The
-        variations are made from PyChess's sounds by our own script (<a href="/engine/COPYING.txt">license</a>,{" "}
-        <a href="/sounds/SOURCES.md">how each was made</a>, <a href="/sounds/pychess-sounds-source.tar.gz" download>their source</a>).
-      </p>
-      <p class="fd-note colosseum-credit">
-        The Colosseum's crowd cheer: <a href="https://opengameart.org/content/free-crowd-cheering-sounds">Free Crowd Cheering Sounds</a> by Gregor Quendel (<a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>),
-        trimmed, layered and leveled by HunChess (<a href="/sounds/colosseum/CREDITS.md">credits</a>).
-      </p>
-      <p class="fd-note licences-credit">
-        Built with Preact (MIT) and chess.js (BSD), in the Archivo and Press Start 2P fonts (SIL Open Font License):{" "}
-        <a href="/licenses/third-party.txt">licenses</a>.
-      </p>
     </div>
   );
 }

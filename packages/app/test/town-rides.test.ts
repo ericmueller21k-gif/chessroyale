@@ -29,7 +29,8 @@ const RIDES: Record<string, RiderDraft> = Object.fromEntries(await Promise.all(R
 
 describe("the rides", () => {
   it("every ride item has a drawing and its measured views, and every drawing is a ride item, with the drawing's own name and line (Nov 1: every boss's)", () => {
-    const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
+    // (Nov 6: each ride's HunChess colorway is drawn from its ride's drawing and cells: "the HunChess colorway" below.)
+    const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
     expect(rides.map((d) => d.id).sort()).toEqual(
       ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony"].sort(),
     );

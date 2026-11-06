@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { soloFromHome } from "./helpers.ts";
 
 test("a guest profile: icon and name stick, a solo match goes on it", async ({ page }) => {
@@ -40,8 +41,9 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   // It's still there after a reload (the session cookie).
   await page.reload();
   await expect(page.locator(".fd-hero-name")).toHaveText("Hunter");
-  // A quick solo match (missing every move) lands on the profile.
-  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&augments=0");
+  // A quick solo match (missing every move) lands on the profile. (The final as short as crowd.spec.ts's, finalTurns=12: else it's
+  // played out to mate or 160 turns, each scored by the engine, about 2 a second: over a minute after up to six stages at the clock.)
+  await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&augments=0&finalTurns=12");
   await soloFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase.kind), { timeout: 3 * 60_000 }).toBe("results");
   await expect

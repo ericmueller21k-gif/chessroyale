@@ -6,17 +6,35 @@ on:
   push:
     branches: [main]
 # Main runs one at a time (Nov 1): a push while main's check is going waits, never cancelling it, and a newer push
-# replaces the one waiting (it checks every merge since). Pull requests: a run each, as before.
+# replaces the one waiting (it checks every merge since). A pull request (Nov 6): a new push cancels its run still
+# going, as e2e.yml does, so superseded runs don't hold runner slots.
 concurrency:
-  group: ${{ github.event_name == 'push' && 'check-main' || format('check-{0}', github.run_id) }}
-  cancel-in-progress: false
+  group: ${{ github.event_name == 'push' && 'check-main' || format('check-{0}', github.event.pull_request.number || github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+        with:
+          # (A pull request's checkout is its merge commit; HEAD^1 is main as it is now.)
+          fetch-depth: 2
+      # Stills and GIFs stay out of the repo (Nov 6: history already holds 420 MB of images). A pull request may add an
+      # image under docs/ only if a test reads it: list it in FIXTURES (none today; no test reads an image in docs/).
+      - name: No new images under docs/
+        if: ${{ github.event_name == 'pull_request' }}
+        env:
+          FIXTURES: ""
+        run: |
+          added=$(git -c core.quotepath=off diff --name-only --diff-filter=A HEAD^1 HEAD -- docs | grep -iE '\.(png|gif|jpe?g)$' || true)
+          bad=$(printf '%s\n' "$added" | while IFS= read -r f; do case " $FIXTURES " in *" $f "*) ;; *) [ -z "$f" ] || echo "$f";; esac; done)
+          if [ -n "$bad" ]; then
+            echo "::error::This pull request adds images under docs/. Keep stills and GIFs untracked (stills/, frames/) and send their paths instead; an image a test reads goes in FIXTURES (check.yml)."
+            echo "$bad"
+            exit 1
+          fi
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm

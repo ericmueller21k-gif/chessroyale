@@ -44,7 +44,8 @@ describe("crates", () => {
       expect(ITEM_DEFS.reduce((s, d) => s + itemChance(c, d.id), 0)).toBeCloseTo(1);
       expect(new Set(c.items).size).toBe(c.items.length);
     }
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) ? 0 : 1);
+    // (A HunChess colorway, Nov 6: in none of these, only the Welcome Crate: welcome.test.ts.)
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess ? 0 : 1);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
@@ -364,7 +365,8 @@ describe("rides (Oct 31)", () => {
   it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
     expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride"]);
     expect(SLOT_NAMES.ride).toBe("Ride");
-    const rides = ITEM_DEFS.filter((d) => d.slot === "ride");
+    // (Nov 6: each ride's HunChess colorway is a ride too, made from it: welcome.test.ts. These are the rides themselves.)
+    const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
     // (Nov 1, every boss's: the drawings' names.)
     expect(rides.map((d) => [d.id, d.name, d.tier])).toEqual([
       ["riding-chirp", "Riding Chirp", "mythic"],

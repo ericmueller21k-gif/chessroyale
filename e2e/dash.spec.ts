@@ -170,3 +170,140 @@ test.describe("Dash", () => {
     expect(board!.x + board!.width).toBeLessThanOrEqual(320);
   });
 });
+
+/**
+ * Dash v2's Scramble Rush (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md), Boss alone on a phone and a computer with real taps
+ * and a drag (`&power=rush`: it comes as your second turn begins): "1.00" counting down while his five copies sweep the board, then
+ * ten seconds to put the six swept pieces back: green edges where right, a red one and his word where wrong. 4 back: the God King's
+ * word and your turn on the board as it was; 3 or none: his extra move at once. Read from the page: the board's own pieces (the DOM)
+ * against the game's position.
+ */
+type RushSeen = { stages: string[]; copies: number; counts: string[]; doneBoards: string[]; said: string[] };
+async function watchRush(page: Page) {
+  await page.evaluate((pieceSel) => {
+    const w = window as any;
+    w.__rush = { stages: [], copies: 0, counts: [], doneBoards: [], said: [] } as RushSeen;
+    const add = (a: string[], v: string | null | undefined) => v && !a.includes(v) && a.push(v);
+    const look = () => {
+      const r = w.__rush as RushSeen;
+      const layer = document.querySelector(".rush-layer") as HTMLElement | null;
+      add(r.stages, layer?.dataset.stage);
+      r.copies = Math.max(r.copies, document.querySelectorAll(".rush-copy:not(.ghost)").length);
+      add(r.counts, document.querySelector(".rb-count")?.textContent?.slice(0, 3));
+      add(r.said, document.querySelector(".bc-bubble")?.textContent?.trim());
+      if (layer?.dataset.stage === "done") {
+        // The board as drawn: each piece's square (by its box in the squares' box, either way up) and kind.
+        const box = document.querySelector(".hb-board")!.getBoundingClientRect();
+        const white = !!document.querySelector(".hb.orientation-white");
+        const list = [...document.querySelectorAll(pieceSel)]
+          .filter((p) => !p.classList.contains("fading"))
+          .map((p) => {
+            const b = p.getBoundingClientRect();
+            const col = Math.round(((b.left + b.width / 2 - box.left) / box.width) * 8 - 0.5);
+            const row = Math.round(((b.top + b.height / 2 - box.top) / box.height) * 8 - 0.5);
+            const sq = white ? `${"abcdefgh"[col]}${8 - row}` : `${"abcdefgh"[7 - col]}${row + 1}`;
+            const role = ["pawn", "knight", "bishop", "rook", "queen", "king"].find((k) => p.classList.contains(k))!;
+            return `${sq}:${p.classList.contains("white") ? "w" : "b"}${role === "knight" ? "n" : role[0]}`;
+          })
+          .sort()
+          .join(" ");
+        add(r.doneBoards, list);
+      }
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  }, BOARD_SEL.piece);
+}
+/** The position's pieces as the watcher lists them. */
+const piecesOf = (fen: string) =>
+  new Chess(fen)
+    .board()
+    .flat()
+    .filter((p): p is NonNullable<typeof p> => !!p)
+    .map((p) => `${p.square}:${p.color}${p.type}`)
+    .sort()
+    .join(" ");
+
+for (const [right, held] of [
+  [4, true],
+  [3, false],
+  [0, false],
+] as const)
+  test(`Scramble Rush: ${right} of 6 put back (${right === 0 ? "none" : "taps and a drag"}): ${held ? "held, your turn on the board as it was" : "his extra move at once"}`, async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=rush&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    await watchRush(page);
+    await playOne(page);
+    // His move, then the Rush: the game's position frozen as it began.
+    await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.rush), { timeout: 60_000 }).toBe(true);
+    const start = await page.evaluate(() => {
+      const m = (window as any).match;
+      return { fen: m.boss.board.fen as string, plies: m.boss.board.history.length as number, moves: m.boss.powers.dash.rush.moves as { from: string; to: string; piece: string }[], side: m.boss.crowdSide as "w" | "b" };
+    });
+    expect(start.moves).toHaveLength(6);
+    // Your ten seconds.
+    await expect(page.locator('.rush-layer[data-stage="place"]')).toBeVisible({ timeout: 15_000 });
+    const box = (await page.locator(BOARD_SEL.squares).first().boundingBox())!;
+    const white = (await page.locator(".hb.orientation-white").count()) > 0;
+    const at = (sq: string) => {
+      const col = white ? sq.charCodeAt(0) - 97 : 104 - sq.charCodeAt(0);
+      const row = white ? 8 - Number(sq[1]) : Number(sq[1]) - 1;
+      return { x: box.x + (col + 0.5) * (box.width / 8), y: box.y + (row + 0.5) * (box.height / 8) };
+    };
+    for (const [i, m] of start.moves.slice(0, right).entries()) {
+      const a = at(m.to);
+      const b = at(m.from);
+      if (i === 0) {
+        // (A drag: the piece picked up and dropped on its square.)
+        await page.mouse.move(a.x, a.y);
+        await page.mouse.down();
+        await page.mouse.move(b.x, b.y, { steps: 8 });
+        await page.mouse.up();
+      } else {
+        await page.mouse.click(a.x, a.y);
+        await page.mouse.click(b.x, b.y);
+      }
+    }
+    await expect(page.locator(".rush-edge.right")).toHaveCount(right);
+    if (right === 3) {
+      // One more, put down on a wrong square (a free one of the middle ranks): a red edge, and his word.
+      const m = start.moves[3]!;
+      const taken = new Set([...new Chess(start.fen).board().flat().filter(Boolean).map((p) => p!.square), ...start.moves.map((x) => x.to)]);
+      const free = ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6"].find((s) => !taken.has(s) && s !== m.from)!;
+      await page.mouse.click(at(m.to).x, at(m.to).y);
+      await page.mouse.click(at(free).x, at(free).y);
+      await expect(page.locator(".rush-edge.wrong")).toHaveCount(1);
+      await expect(page.locator(".rush-edge.right")).toHaveCount(3);
+    }
+    // Time's up: the verdict, the board as it was.
+    await expect.poll(() => page.evaluate(() => (window as any).match.boss.powers.dash.rush.correct ?? null), { timeout: 30_000 }).toBe(right);
+    expect(!(await page.evaluate(() => (window as any).match.boss.powers.dash.rush.extra))).toBe(held);
+    await yourMove(page);
+    const rush = await page.evaluate(() => (window as any).match.boss.powers.dash.rush);
+    const after = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, plies: (window as any).match.boss.board.history.length as number }));
+    if (held) expect(after.fen).toBe(start.fen);
+    else {
+      // (He moved again: one move more on the board, his, from the position the Rush froze; the crowd to move again.)
+      expect(rush.extra).toBe("played");
+      expect(after.plies).toBe(start.plies + 1);
+      expect(after.fen.split(" ")[1]).toBe(start.fen.split(" ")[1]);
+      const hist = await page.evaluate(() => (window as any).match.boss.board.history.at(-1) as string);
+      expect(new Chess(start.fen).get(hist.slice(0, 2) as any)?.color).toBe(start.side === "w" ? "b" : "w");
+    }
+    const seen = (await page.evaluate(() => (window as any).__rush)) as RushSeen;
+    expect(seen.stages).toEqual(expect.arrayContaining(["sweep", "place", "done"]));
+    // (Five copies of him running, the countdown from "1.0" or "0.9…" down; the board drawn as the game's, piece for piece, once time's up.)
+    expect(seen.copies).toBeGreaterThanOrEqual(3);
+    expect(seen.copies).toBeLessThanOrEqual(5);
+    expect(seen.counts.some((c) => c === "1.0" || c === "0.9")).toBe(true);
+    expect(seen.doneBoards.length).toBeGreaterThan(0);
+    for (const b of seen.doneBoards) expect(b).toBe(piecesOf(start.fen));
+    if (right === 3) expect(seen.said.some((s) => /Close, but not quite!|Not even close\./.test(s))).toBe(true);
+    expect(errors).toEqual([]);
+  });

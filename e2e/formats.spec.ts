@@ -277,13 +277,19 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   test.setTimeout(3 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   const pages = await Promise.all([0, 1].map(async () => (await browser.newContext({ viewport: { width: 420, height: 860 } })).newPage()));
+  // A pool of this run's own: the "late" player below leaves a lobby open in its pool, and a retry (or a repeat on another
+  // worker) on the same server would otherwise join it (main's e2e, Nov 6: the retry's two players split across lobbies).
+  const pool = `formats-${test.info().retry}-${test.info().repeatEachIndex}-${Date.now().toString(36)}`;
+  // Both get ready first, then press PLAY together: the lobby fills with bots MATCH_FILL_SECONDS (8 s locally) after its first
+  // player, so on a loaded runner a second player still signing in and picking the mode could arrive after the first lobby had
+  // filled and started, and land in a new one (main's e2e, Nov 6: two lobby codes on both tries).
   for (const [i, p] of pages.entries()) {
     await named(p, `P${i}`);
-    await p.goto("/?debug&pool=formats");
+    await p.goto(`/?debug&pool=${pool}`);
     await pickMode(p);
-    await p.getByRole("button", { name: "PLAY", exact: true }).click();
-    await expect(p.locator(".fd-seats")).toBeVisible();
   }
+  await Promise.all(pages.map((p) => p.getByRole("button", { name: "PLAY", exact: true }).click()));
+  for (const p of pages) await expect(p.locator(".fd-seats")).toBeVisible();
   const codes = await Promise.all(pages.map((p) => p.evaluate(() => (window as any).match.code)));
   expect(codes[0]).toBe(codes[1]);
   await expect(pages[0]!.locator(".fd-count-n")).toHaveText("2");
@@ -306,7 +312,7 @@ test("Play now: players land in the same lobby, the count climbs, bots fill it a
   }
   // A new player now gets a new lobby.
   const late = await (await browser.newContext()).newPage();
-  await late.goto("/?debug&pool=formats");
+  await late.goto(`/?debug&pool=${pool}`);
   await pickMode(late);
   await late.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(late.locator(".fd-seats")).toBeVisible();

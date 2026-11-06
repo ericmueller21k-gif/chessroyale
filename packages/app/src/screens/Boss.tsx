@@ -27,8 +27,9 @@ import { EvalBar } from "../components/EvalBar.tsx";
 import { UnderBoard } from "../components/QuickChat.tsx";
 import { BossPanel, besideBoard, useBossLayout } from "../components/MovePanel.tsx";
 import { SquareRing } from "../components/ShadeMoves.tsx";
-import type { BossView, GameView, LightsView } from "../game.ts";
+import type { BossView, GameView, LightsView, RushView } from "../game.ts";
 import { LightsDock, LightsOutLayer, lightsStatus } from "../components/LightsOut.tsx";
+import { RushLayer, rushBoard, rushDock } from "../components/DashRush.tsx";
 import { seenKey, useStillKey } from "../hooks.ts";
 import { Hud } from "./Hud.tsx";
 import { BossDock, Dots } from "../components/BossDock.tsx";
@@ -214,11 +215,12 @@ function ClaimDark({ boss, since, now }: { boss: BossView; since: number; now: n
  * the boss striking down the crowd's worst recent mover, with a flash and the
  * victim's name crossed out.
  */
-export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; fall?: boolean }) {
+export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, loading, afterLoading, lights, rush, fall }: { match: GameView; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean }) {
   const now = useFrameNow();
   const layout = useBossLayout();
-  // (Hollow's Lights out comes before his move: as far as the rest of the screen goes, he hasn't moved yet.)
-  const thinking = thinkingNow || !!lights;
+  // (Hollow's Lights out comes before his move, Dash's Scramble Rush after it: as far as the rest of the screen goes, nothing new
+  // has moved and no moment plays.)
+  const thinking = thinkingNow || !!lights || !!rush;
   const [mountedAt] = useState(Date.now());
   const victim = boss.justKilled ?? null;
   // The intro: the boss's card over the starting position, the game so far replayed quickly from the start,
@@ -267,7 +269,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const moments = useMemo(() => {
     if (intro || victim || fall) return [];
     if (mating) return mateMomentsOf(boss, until);
-    if (thinking) return lights ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss)].filter((m) => m !== null);
+    if (thinking) return lights || rush ? [] : [earlyLanding(boss), ...yourPulls(boss), ...rookTakenMoment(boss), ...fullMoonMoment(boss), ...folioMoments(boss)].filter((m) => m !== null);
     return momentsOf(boss, until);
   }, [boss.board.fen, boss.powers?.events.length, until, thinking, intro, victim, mating, fall]);
   // (Moo's daze: he's drawn powered up until its `calm`, noted from the moment's start.)
@@ -387,7 +389,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   const revised = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener ? null : revisionFen(boss, moments, now);
   // Timber's: a piece he dropped off its square until his plank lands; a pawn he gnaws on its square until his last chomp.
   const timber = bounceShown || splitShown || pig || alfil || hopper || smudgy || gardener || revised ? null : timberFen(boss, moments, now, fenShown);
-  const boardFen = bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? fenShown;
+  // (Dash's Scramble Rush: his sweep, your placements, then the position as it was: the game's never changed.)
+  const boardFen = rush ? rushBoard(boss, rush, now) : (bounceShown ?? splitShown ?? pig?.fen ?? alfil ?? hopper ?? smudgy?.fen ?? gardener?.fen ?? revised?.fen ?? timber?.fen ?? fenShown);
+  const rushLines = rush ? rushDock(boss, rush, now) : null;
   const evalFen = bounceShown && bounceShown !== boss.board.fen ? (boss.powers?.bounce?.before ?? fenShown) : (pig?.evalFen ?? fenShown);
   const jolt = bounceJolt(bounce && now >= bounce.at ? bounce : null, now) ?? boardSawJolt(moment, now) ?? alfilJolt(moment, now);
   // (One or two pieces by name; more, how many: the dock's line stays one line.)
@@ -431,7 +435,11 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               {/* (Nothing his bubble or a banner says at the same moment: Hollow's claim and Big Boy's snack line are
                   his bubble's; the dock says what the snack means for you. A power's moment: its banner names it, so
                   the dock keeps the turn's own line, unless the moment has words of its own for you, dockLine.) */}
-              {lightsStart ? (
+              {rushLines ? (
+                <>
+                  <BossTag boss={boss} />: <strong>{rushLines.line}</strong>
+                </>
+              ) : lightsStart ? (
                 <strong>Remember where his pieces are.</strong>
               ) : snacking ? (
                 <>
@@ -478,7 +486,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
               ) : null}
             </span>
             <span class="dock-line muted">
-              {lightsStart
+              {rushLines
+                ? rushLines.sub
+                : lightsStart
                 ? "Clocks stopped."
                 : intro
                 ? // (A boss that never strikes, the Hidden Boss, and Boss Battle alone or in a party: nothing about strikes.)
@@ -504,7 +514,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         }
       />
     ),
-    [match, still, kingCues, lights, lights ? now : 0, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip],
+    [match, still, kingCues, lights, lights ? now : 0, rushLines?.line, rushLines?.sub, snacking, funPlayed, momentLine, burnLine, left, noMove, hush, layout.strip],
   );
   return (
     <div class={`screen game boss-screen${victim ? " striking" : ""}`}>
@@ -515,8 +525,9 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} decor={gardener?.decor} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!loading }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} decor={gardener?.decor} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
+            {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}
             {wipPower() && <WipPreview fen={fenShown} orientation={orientation} crowd={boss.crowdSide} />}
             {!thinking && !victim && !alone && !funhouse && !bounce && !pig && boss.lastMove && <SquareRing square={boss.lastMove.move.slice(2, 4)} orientation={orientation} />}

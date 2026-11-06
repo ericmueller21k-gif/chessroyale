@@ -629,7 +629,9 @@ export type ClientMessage =
    */
   | { t: "darkTry"; key: string; move: string; away?: number }
   /** Hollow's Lights out: this player taps a square in round `round` (0-based). */
-  | { t: "lightsTap"; key: string; round: number; square: string };
+  | { t: "lightsTap"; key: string; round: number; square: string }
+  /** Dash's Scramble Rush: this player's placements so far (each swept piece's square before the sweep → the square put on). */
+  | { t: "rushPlace"; key: string; places: Record<string, string> };
 
 /** Why a lobby closed (see LOBBY_LIFE in settings.ts). */
 export type LobbyCloseReason = "ended" | "idle" | "abandoned";
@@ -823,7 +825,7 @@ export type ServerMessage = { now: number } & (
    * (the Hidden Boss, BossRules.fallMs) collapses on the board until `until`, then the results come (an older app shows
    * the board with the result in it meanwhile).
    */
-  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean }
+  | { t: "boss"; boss: NetBoss; standings: NetStanding[]; until: number; thinking?: boolean; intro?: boolean; fall?: boolean; rush?: NetRush }
   /**
    * Hollow's dark, to the player who tried: `ok` the attempt was legal and is their pick (`move`, as played); else it
    * cost darkTryCost (`tries` wrong so far this turn) and they pick again, or (`out`) their turn is over, as a miss.
@@ -993,3 +995,12 @@ export type ServerMessage = { now: number } & (
       ranked?: boolean;
     }
 );
+
+/**
+ * Dash's Scramble Rush on the server's clock (the crowd's turn waits for it): its key and when it began (server time; every beat
+ * follows from it: rushTimeline). The swept pieces and the verdict are in the boss's view (`powers.dash.rush`).
+ */
+export interface NetRush {
+  key: string;
+  at: number;
+}

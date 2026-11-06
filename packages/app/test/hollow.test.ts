@@ -198,7 +198,7 @@ describe("Hollow, the Darkness boss", () => {
       }
     }
     for (const m of ["move", "thinking"] as Beat[]) expect(kit.chance[m]!).toBeLessThanOrEqual(0.15);
-    expect(pickLine(kit, "darkFirst", "dark:1")).toBe("Don't forget what's there. Forgetting costs.");
+    expect(pickLine(kit, "darkFirst", "dark:1")).toBe("Forget, and it costs you.");
     expect(pickLine(kit, "ultimate", "ult:9")).toBe("It's time.");
     expect(findLine([{ type: "q" }])).toBe("Find my queen.");
     expect(findLine([{ type: "r", several: true }])).toBe("Find one of my rooks.");

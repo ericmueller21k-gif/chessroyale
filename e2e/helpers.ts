@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { join, resolve } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
+
+/** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
+export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
+/** Its local D1 databases (sqlite files), for the specs that read them. */
+export const D1_DIR = join(E2E_STATE, "v3/d1/miniflare-D1DatabaseObject");
 
 /**
  * Playwright's `test`, plus: every browser context a test opens itself (`browser.newContext()`, e.g. a second
@@ -7,7 +13,60 @@ import { test as base, expect, type Page } from "@playwright/test";
  * left in a live match keeps playing it (a host's page runs its engines), slowing every later test in that worker.
  * Use this `test` in any file that opens contexts.
  */
-export const test = base.extend<{ closeOwnContexts: void }>({
+/**
+ * The first-time walkthrough's "don't show again" key (packages/app/src/tutorial.ts, TUTORIAL_SEEN_KEY). Every test's
+ * fresh account would otherwise get it over the screen and block its clicks, so each context starts with it set.
+ * A test that tests the walkthrough sets `test.use({ tutorialSeen: false })`.
+ */
+const TUTORIAL_SEEN_KEY = "hunchess.tutorial.dismissed";
+
+/** Sets the walkthrough's "don't show again" flag in every page the context opens, once (a reload keeps what the page saved). */
+async function markSeen(context: import("@playwright/test").BrowserContext) {
+  await context.addInitScript((k: string) => {
+    try {
+      if (!localStorage.getItem(k)) localStorage.setItem(k, "1");
+    } catch {
+      /* no storage: the walkthrough would show over the screen */
+    }
+  }, TUTORIAL_SEEN_KEY);
+}
+
+/** Whether contexts made now start with the walkthrough seen (set per test from the `tutorialSeen` option, below). */
+let seenDefault = true;
+
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void }>({
+  tutorialSeen: [true, { option: true }],
+  // Sets the default for this test's contexts, then puts it back.
+  seenDefaultForTest: [
+    async ({ tutorialSeen }, use) => {
+      seenDefault = tutorialSeen;
+      await use();
+      seenDefault = true;
+    },
+    { auto: true },
+  ],
+  // The page's own context (every page it opens, and every reload, keeps what the page saved).
+  seenWalkthrough: [
+    async ({ context, tutorialSeen }, use) => {
+      if (tutorialSeen) await markSeen(context);
+      await use();
+    },
+    { auto: true },
+  ],
+  // Every context a test makes with `browser.newContext()` (a second player) starts with the flag set too.
+  browser: [
+    async ({ browser }, use) => {
+      const real = browser.newContext.bind(browser);
+      browser.newContext = (async (options?: Parameters<typeof real>[0]) => {
+        const ctx = await real(options);
+        if (seenDefault) await markSeen(ctx);
+        return ctx;
+      }) as typeof browser.newContext;
+      await use(browser);
+      browser.newContext = real as typeof browser.newContext;
+    },
+    { scope: "worker" },
+  ],
   closeOwnContexts: [
     async ({ browser, context }, use) => {
       const before = new Set(browser.contexts());
@@ -378,7 +437,7 @@ async function withEmail(page: Page, email: string) {
 async function localSql(page: Page, sql: string) {
   for (let attempt = 1; ; attempt++) {
     try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
+      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
       return;
     } catch (e) {
       const why = String((e as { stderr?: unknown }).stderr ?? e);
@@ -444,4 +503,43 @@ export async function bossAloneFromHome(page: Page, boss?: string) {
   await openSoloBoss(page);
   if (boss) await page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: boss, exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "START" }).click();
+}
+
+/**
+ * The street town's look round: a drag by the mouse's left button across `box` from its middle, `share` of its width (negative:
+ * leftward), at `yShare` of its height, in `steps` moves. The press and its first move go to the browser together (the DevTools
+ * protocol's own mouse events), so no frame comes between them: on a slow software-WebGL runner a frame can take longer than the
+ * street town's hold time (`streetHoldMs`, brief-street-controls-map.md), and a press held that long before it moves is a run.
+ */
+export async function lookDrag(page: Page, box: { x: number; y: number; width: number; height: number }, share: number, steps = 12, yShare = 0.35, pauseMs = 0) {
+  const cdp = await page.context().newCDPSession(page);
+  const y = Math.round(box.y + box.height * yShare);
+  const x0 = box.x + box.width / 2;
+  // (Positive `share` looks right: the finger moves left, pulling the world; Eric, Nov 6.)
+  const at = (i: number) => Math.round(x0 - (share * box.width * i) / steps);
+  const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", x: number, buttons: number) =>
+    cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
+  await ev("mouseMoved", at(0), 0);
+  // (The first move well past the town's drag threshold, `dragPx` 8, however short the steps: a drag from its first move.)
+  const first = Math.abs(at(1) - at(0)) >= 16 || share === 0 ? at(1) : at(0) - Math.sign(share) * 16;
+  await Promise.all([ev("mousePressed", at(0), 1), ev("mouseMoved", first, 1)]);
+  for (let i = 2; i <= steps; i++) {
+    await ev("mouseMoved", at(i), 1);
+    if (pauseMs) await page.waitForTimeout(pauseMs);
+  }
+  await ev("mouseReleased", at(steps), 0);
+  await cdp.detach();
+}
+
+/**
+ * A quick tap by the mouse's left button at (x, y) in the street town: the press and the release go to the browser together, so no frame
+ * comes between them (on a slow software-WebGL runner one frame can outlast the hold time, `streetHoldMs`, and the press would be a run).
+ */
+export async function quickTap(page: Page, x: number, y: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", buttons: number) =>
+    cdp.send("Input.dispatchMouseEvent", { type, x: Math.round(x), y: Math.round(y), button: type === "mouseMoved" ? "none" : "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
+  await ev("mouseMoved", 0);
+  await Promise.all([ev("mousePressed", 1), ev("mouseReleased", 0)]);
+  await cdp.detach();
 }

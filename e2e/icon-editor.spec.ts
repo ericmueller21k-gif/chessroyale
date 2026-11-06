@@ -1,4 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 
 /** The color of one icon pixel, read from the editor's canvas (r, g, b, a). */
 const pixel = (page: Page, x: number, y: number) =>

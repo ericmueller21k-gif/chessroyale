@@ -22,6 +22,14 @@ import "./board-size.css";
 // (A computer's game screens: the side menu beside them, and a boss battle's top, Nov 1: after board-size.css.)
 import "./game-frame.css";
 
+// No pinch zoom on a phone (Eric, Nov 6): the viewport meta says user-scalable=no, which iOS Safari ignores, so its pinch
+// gesture is stopped here, and any two-finger move (a pinch) is too. Single-finger scrolling and taps are left alone; the
+// game's own pointer handlers are on their own elements.
+document.addEventListener("gesturestart", (e) => e.preventDefault());
+document.addEventListener("touchmove", (e) => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();
 // A chunk of an older version gone after a deploy (opening the town square): the page loads again (stale.ts).
