@@ -293,12 +293,13 @@ export async function openBossCrate(
   if (!crate) return { ok: false, message: "No such crate." };
   let me: LedgerAccount | null = request ? await ledgerAccount(sql, userId) : null;
   const keyed = me && request ? keyFor(opKeys.request("open", request), me) : null;
-  // A retry of an open made already (perhaps of your last crate): its item.
-  const again = async () => {
-    const first = keyed ? await openedItem(sql, userId, keyed) : null;
+  // An open's item as stored. Every attempt answers this, never its own roll, so every answer to one request is the same.
+  const opened = async (op: string | null) => {
+    const first = op ? await openedItem(sql, userId, op) : null;
     return first ? { ok: true as const, ...first, locker: await lockerState(sql, userId, admin) } : null;
   };
-  const first = await again();
+  // A retry of an open made already (perhaps of your last crate): its item.
+  const first = await opened(keyed);
   if (first) return first;
   // The oldest one you hold. Another open that took it first or since: the next one, if you hold another.
   for (let attempt = 0; attempt < 4; attempt++) {
@@ -306,17 +307,16 @@ export async function openBossCrate(
     me ??= held ? await ledgerAccount(sql, userId) : null;
     if (!held || !me) break;
     const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
-    const item: ItemInstance = { id: randomHex(9), def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed };
+    const op = keyed ?? `open:${held.id}`;
     const done = await applyOp(sql, me, {
-      id: keyed ?? `open:${held.id}`,
+      id: op,
       reason: "boss crate open",
       now,
       when: cond("EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)", held.id, userId),
-      legs: [leg.bossCrateOut(userId, held.id, crate.id), leg.item(userId, { ...roll, id: item.id }, crate.id, now)],
+      legs: [leg.bossCrateOut(userId, held.id, crate.id), leg.item(userId, { ...roll, id: randomHex(9) }, crate.id, now)],
     });
-    if (done === "applied") return { ok: true, roll, item, locker: await lockerState(sql, userId, admin) };
-    // (The same open, sent twice at once: the other one's item.)
-    if (done === "replay" && keyed) return (await again()) ?? { ok: false, message: noneToOpen(crate.name) };
+    // This open's item, or (the same open sent twice at once) the other one's.
+    if (done === "applied" || (done === "replay" && keyed)) return (await opened(op)) ?? { ok: false, message: noneToOpen(crate.name) };
   }
   return { ok: false, message: noneToOpen(crate.name) };
 }

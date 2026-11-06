@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
-import { OPS, SHOP_ITEMS, bossCrateOf, mulberry32, tokenBosses } from "@chessroyale/core";
+import { OPS, SHOP_ITEMS, bossCrateOf, crateDef, itemDef, mulberry32, rollCrate, tokenBosses, type CrateDef } from "@chessroyale/core";
 import { buyItem, createGuest, createSession, ensureSchema, grantReward, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { buyBossCrate, countBossBattle, grantTestItems, openBossCrate } from "../src/boss-tokens.ts";
@@ -236,6 +236,81 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
     await openCrate(sql, a.id, "beta-001", {}, T0 + 7);
     await openCrate(sql, a.id, "beta-001", {}, T0 + 7);
     expect(items()).toBe(6);
+    expect(await ledgerMismatches(sql, a.id)).toEqual([]);
+  });
+
+  it("an open raced at each step (A held just before, or just after, its transaction while B runs whole): one grant, and every answer is the stored item, byte for byte", async () => {
+    const { sql, db } = await world();
+    const a = await signedIn(sql, "a@example.com", T0);
+    const me = (await ledgerAccount(sql, a.id))!;
+    await grantTestItems(sql, a.id, { boss: "tiger", tokens: 6 }, T0);
+    for (const n of [1, 2]) expect((await buyBossCrate(sql, a.id, tiger.id, "tokens", T0 + n, false, R(80 + n))).ok).toBe(true);
+    // Each attempt rolls from its own seed, each a two-color item (whose roll once came back in another key order), so an answer that
+    // is an attempt's own roll, or the stored item in another shape, shows.
+    const twoColor = (crate: CrateDef, n: number) => {
+      const out: number[] = [];
+      for (let s = 1; out.length < n; s++) if (itemDef(rollCrate(mulberry32(s), crate).def)?.colors === 2) out.push(s);
+      return out;
+    };
+    const freeSeeds = twoColor(crateDef("beta-001")!, 3);
+    const bossSeeds = twoColor(tiger, 3);
+    let seeds: number[] = [];
+    const real = crypto.getRandomValues.bind(crypto);
+    const spy = vi.spyOn(crypto, "getRandomValues").mockImplementation(<T extends ArrayBufferView | null>(arr: T): T => {
+      if (arr instanceof Uint32Array && arr.length === 1 && seeds.length) arr[0] = seeds.shift()!;
+      else real(arr as never);
+      return arr;
+    });
+    /** `sql` with A's transaction held, just before it runs or just after it commits, until released. */
+    const holding = (at: "before" | "after") => {
+      let reached!: () => void;
+      let release!: () => void;
+      const there = new Promise<void>((r) => (reached = r));
+      const go = new Promise<void>((r) => (release = r));
+      const held: Sql = {
+        ...sql,
+        async batch(list) {
+          if (at === "after") await sql.batch(list);
+          reached();
+          await go;
+          if (at === "before") await sql.batch(list);
+        },
+      };
+      return { held, there, release };
+    };
+    type Open = { ok: true; roll: unknown; item: { id: string } } | { ok: false; message: string };
+    const race = async (open: (s: Sql) => Promise<Open>, at: "before" | "after") => {
+      const h = holding(at);
+      const first = open(h.held);
+      await h.there;
+      const second = await open(sql);
+      h.release();
+      return [await first, second, await open(sql)];
+    };
+    const stored = (op: string) =>
+      db.prepare("SELECT i.id, i.def FROM ledger l JOIN items i ON i.id = l.asset_id WHERE l.op_id = ? AND l.asset_kind = 'item'").all(op) as { id: string; def: string }[];
+    try {
+      let n = 90;
+      for (const at of ["before", "after"] as const) {
+        for (const boss of [false, true]) {
+          const req = R(++n);
+          seeds = [...(boss ? bossSeeds : freeSeeds)];
+          const op = `open:${me.account}:${req}`;
+          const what = `${boss ? "boss" : "free"} crate, A held ${at} its transaction`;
+          const open = (s: Sql) => (boss ? openBossCrate(s, a.id, tiger.id, T0 + n, false, req) : openCrate(s, a.id, "beta-001", {}, T0 + n, false, req));
+          const answers = await race(open, at);
+          const [item, ...more] = stored(op);
+          expect([itemDef(item!.def)?.colors, more.length], what).toEqual([2, 0]);
+          expect(answers.map((o) => o.ok && o.item.id), what).toEqual([item!.id, item!.id, item!.id]);
+          expect(new Set(answers.map((o) => o.ok && JSON.stringify([o.item, o.roll]))).size, what).toBe(1);
+          expect(count(db, "SELECT COUNT(DISTINCT nonce) AS n FROM ledger WHERE op_id = ?", op), what).toBe(1);
+          expect(legsOf(db, op).map((l) => [l.asset_kind, l.delta]), what).toEqual(boss ? [["boss_crate", -1], ["item", 1]] : [["item", 1]]);
+        }
+      }
+    } finally {
+      spy.mockRestore();
+    }
+    expect([count(db, "SELECT COUNT(*) AS n FROM items WHERE user_id = ?", a.id), count(db, "SELECT COUNT(*) AS n FROM boss_crates WHERE user_id = ?", a.id)]).toEqual([4, 0]);
     expect(await ledgerMismatches(sql, a.id)).toEqual([]);
   });
 
