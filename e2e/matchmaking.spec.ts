@@ -68,7 +68,7 @@ test("home: Default, Bots off and Solo, each its title only; the line above PLAY
   expect(await page.evaluate(() => (window as any).match.standings().length)).toBe(100);
 });
 
-test("Bots off: people only, it waits; one tap switches to Default, keeping your place; then bots fill: Unranked", async ({ page, browser }) => {
+test("Bots off: people only, it waits; one tap switches to Default, keeping your place; then bots fill: Unranked", { tag: "@phone-only" }, async ({ page, browser }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Patient");
   const q = pool("mm-off");
@@ -159,7 +159,7 @@ test("Boss raid: its screen has the three types too (and Boss alone); a Solo rai
   await expect(page.locator(".results-unranked")).toHaveText("Unranked: solo games don't count for ranking.");
 });
 
-test("opening the app from scratch during a live match puts you back in it; leaving on purpose doesn't", async ({ browser }) => {
+test("opening the app from scratch during a live match puts you back in it; leaving on purpose doesn't", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   // (One device, its storage shared by every page: the app closed and opened again.)
   const ctx = await browser.newContext(test.info().project.name === "phone" ? ({ ...devices["iPhone 13"], browserName: undefined } as any) : {});

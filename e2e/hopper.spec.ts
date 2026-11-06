@@ -61,7 +61,7 @@ const openCarrots = (c: { squares: string[]; by: (string | null)[] }) => c.squar
 /** A prize's key, its pieces sorted ("-": nothing), as the reel's cards carry it. */
 const key = (p: readonly string[]) => [...p].sort().join("") || "-";
 
-test("Chub & Chirp's Leapfrog (the test switch): his pawn stays on its square until it takes off, arcs over yours and lands beyond it, then he moves", async ({ page }) => {
+test("Chub & Chirp's Leapfrog (the test switch): his pawn stays on its square until it takes off, arcs over yours and lands beyond it, then he moves", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -123,7 +123,7 @@ test("Chub & Chirp's Leapfrog (the test switch): his pawn stays on its square un
   expect(errors).toEqual([]);
 });
 
-test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, the dock's count, pulls by both sides, the reel stopping on his roll, the prize on the board", async ({ page }) => {
+test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, the dock's count, pulls by both sides, the reel stopping on his roll, the prize on the board", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -209,7 +209,7 @@ test("Chub & Chirp's Carrot Patch (the test switches): the cast and its ladder, 
   expect(errors).toEqual([]);
 });
 
-test("his fifth carrot (?carrots=5): you leave them, he pulls them one by one, counted in the dock; the fifth wins the battle, no spin", async ({ page }) => {
+test("his fifth carrot (?carrots=5): you leave them, he pulls them one by one, counted in the dock; the fifth wins the battle, no spin", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

@@ -25,7 +25,7 @@ const queueBoxes = async (p: Page) => ({
 });
 const run = Date.now().toString(36).slice(-5);
 
-test("two players in a Default queue chat before the match starts: each sees the other's lines, the bots say hello, and the lines carry into the match", async ({ browser }) => {
+test("two players in a Default queue chat before the match starts: each sees the other's lines, the bots say hello, and the lines carry into the match", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const opts = test.info().project.use;
   const pool = `lchat-${test.info().project.name[0]}${run}`;
@@ -101,7 +101,7 @@ test("two players in a Default queue chat before the match starts: each sees the
   expect(await ann.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
-test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", async ({ page }) => {
+test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat carries on into the match, with teams", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Solo Sam");
   // Solo's queue is up about 3.1 s (MATCHMAKING.soloFillMs + soloHoldMs, all in the page). On a busy runner one or two of the
   // test's steps outlasted it: the chat was gone before it was looked at, or the tap waited on a button already gone until the
@@ -143,7 +143,7 @@ test("Solo's queue: the bots say hello, your line shows, and a 50 v 50's chat ca
   expect(await page.evaluate(() => [(window as any).match.chat.enabled, (window as any).match.chat.hasTeams()])).toEqual([true, true]);
 });
 
-test("a private lobby: chat while you wait for the host", async ({ page }) => {
+test("a private lobby: chat while you wait for the host", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Host Hal");
   await page.goto("/?debug");
   await createLobbyFromHome(page);

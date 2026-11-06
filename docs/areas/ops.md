@@ -67,7 +67,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
     in order, as locally. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
     wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
-    (`playwright.config.ts`). 2 workers per runner, as locally (half the runner's 4 CPUs). Setup (checkout, npm ci,
+    (`playwright.config.ts`). A test tagged `@phone-only` (logic, server and flow; Nov 6) skips the desktop project;
+    layout, the board, home and every guard test of `docs/rules/eric.md` run on both. 2 workers per runner, as locally (half the runner's 4 CPUs). Setup (checkout, npm ci,
     Chromium from cache, the build) takes about a minute per shard.
   - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
     record; `e2e/ci-summary-merge.mjs` renders them): the plan's line (what this run tested and why), flaky tests,

@@ -109,7 +109,7 @@ test("a player never sees him: not in the boss menu, and ?boss=recluse meets ano
   expect((await bossNow(page)).id).not.toBe("recluse");
 });
 
-test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes, the God King's help mocked and spent, the bullet clock on the trigger, then its increment", async ({ page }) => {
+test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes, the God King's help mocked and spent, the bullet clock on the trigger, then its increment", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -301,7 +301,7 @@ test("an admin fights him in Boss alone: the stare, Maia at its top, no strikes,
   expect(errors).toEqual([]);
 });
 
-test("Engine move (admins, Boss alone): one tap plays Stockfish's best move as yours; a player never sees it", async ({ page }) => {
+test("Engine move (admins, Boss alone): one tap plays Stockfish's best move as yours; a player never sees it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -446,7 +446,7 @@ test("his chatter all through phase 1 (Eric, Oct 15: he went quiet after move 10
   expect(errors).toEqual([]);
 });
 
-test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he says he'll take the God King's power and absorbs it, holds it, up in a rage, his leap onto the board, the book thrown down, the chant and its light held, the split, the book back, the leap back, the shuffle), a countdown on four boards, then their clocks; all four won: Victory!", async ({ page }) => {
+test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase change (he says he'll take the God King's power and absorbs it, holds it, up in a rage, his leap onto the board, the book thrown down, the chant and its light held, the split, the book back, the leap back, the shuffle), a countdown on four boards, then their clocks; all four won: Victory!", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -649,7 +649,7 @@ test("beaten in phase 1 (?win=1): he collapses and mumbles, then the phase chang
   expect(errors).toEqual([]);
 });
 
-test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; no God King (absorbed), the boss's half-engine look on", async ({ page }) => {
+test("phase 2 (?phase=2): four boards, each its own Chess960 start; Stockfish 2750 answers your move; Engine move on your board; no God King (absorbed), the boss's half-engine look on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -777,7 +777,7 @@ test("the board keeps its size from the mate until the split (Eric, Oct 18: it s
   expect(off.slice(0, 3), `the board's size (${w0} x ${h0}, squares ${s0}) changed in ${off.length} of ${frames.length} frames`).toEqual([]);
 });
 
-test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", async ({ page }) => {
+test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defeated, 3 of 4 won", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -792,7 +792,7 @@ test("a loss (?win=1&phase=2): you resign your board, the bots win theirs: defea
   expect(errors).toEqual([]);
 });
 
-test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spellbook; then 5 s a move, and out of time a random move is played for you, never a loss", async ({ page }) => {
+test("phase 2's ultimate (the admins' trigger): \"5 SECONDS!\", his line and spellbook; then 5 s a move, and out of time a random move is played for you, never a loss", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

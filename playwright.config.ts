@@ -38,6 +38,8 @@ export default defineConfig({
   },
   projects: [
     { name: "phone", use: { ...devices["iPhone 13"], browserName: "chromium" } },
-    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
+    // `@phone-only` (Nov 6): a test whose subject is game logic, the server or a flow (powers, whole matches, chat,
+    // lobbies) runs on the phone alone; layout, the board, home and every guard test of docs/rules/eric.md run on both.
+    { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } }, grepInvert: /@phone-only/ },
   ],
 });

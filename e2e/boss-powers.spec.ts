@@ -378,7 +378,7 @@ async function playByHand(page: Page, how: "tap" | "drag", phone: boolean, lasti
   return move;
 }
 
-test("Boingo: pies nobody can move onto (up to two, on their squares), the warning, then the funhouse turns the board upside down and plays your move (unscored)", async ({ page }) => {
+test("Boingo: pies nobody can move onto (up to two, on their squares), the warning, then the funhouse turns the board upside down and plays your move (unscored)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=8&boss=clown&power=funhouse&laststand=0");
   await bossAloneFromHome(page);
@@ -468,7 +468,7 @@ test("Boingo's funhouse at every angle (a computer: upside down): a move by tap 
   expect(errors).toEqual([]);
 });
 
-test("Boingo online: the funhouse turns the board for everyone and the host plays your move (unscored)", async ({ page }) => {
+test("Boingo online: the funhouse turns the board for everyone and the host plays your move (unscored)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough");
   await page.goto("/?debug&pace=quick&mode=raid&boss=clown&power=funhouse&bossMoves=4&clock=30");

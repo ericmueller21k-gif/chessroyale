@@ -56,7 +56,7 @@ async function underBar(page: Page) {
   });
 }
 
-test("Home from the search keeps you queued: the bar on home and in the shop, back to the stage from it, Cancel from it", async ({ browser }) => {
+test("Home from the search keeps you queued: the bar on home and in the shop, back to the stage from it, Cancel from it", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Browse");
   const seen = asks(a);
@@ -98,7 +98,7 @@ test("Home from the search keeps you queued: the bar on home and in the shop, ba
   expect(seen.play).toBe(after);
 });
 
-test("an opponent found while you browse: a sound and a buzz, straight to the stage, the versus moment, then the board", async ({ browser }) => {
+test("an opponent found while you browse: a sound and a buzz, straight to the stage, the versus moment, then the board", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Away");
   const b = await player(browser, "Bo Away");
@@ -130,7 +130,7 @@ test("an opponent found while you browse: a sound and a buzz, straight to the st
   await expect(b.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
 });
 
-test("another mode while queued asks first (Stay keeps the search; Leave queue ends it and starts that mode); 1 v 1's PLAY goes back to the stage", async ({ browser }) => {
+test("another mode while queued asks first (Stay keeps the search; Leave queue ends it and starts that mode); 1 v 1's PLAY goes back to the stage", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Modes");
   const seen = asks(a);
@@ -167,7 +167,7 @@ test("another mode while queued asks first (Stay keeps the search; Leave queue e
   await expect(play).toBeVisible();
 });
 
-test("a reload while queued carries on with the search: on the stage from /1v1, with the bar from home; found after it, and no buzz with sound off", async ({ browser }) => {
+test("a reload while queued carries on with the search: on the stage from /1v1, with the bar from home; found after it, and no buzz with sound off", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Reload");
   const b = await player(browser, "Bo Reload");

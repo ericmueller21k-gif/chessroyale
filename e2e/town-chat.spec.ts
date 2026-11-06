@@ -377,7 +377,7 @@ test("the stream takes touches itself and scrolls back, by finger on a phone and
   }
 });
 
-test("at most 100 lines are kept, the oldest first (and the box still scrolls to the newest)", async ({ page }) => {
+test("at most 100 lines are kept, the oldest first (and the box still scrolls to the newest)", { tag: "@phone-only" }, async ({ page }) => {
   await open(page);
   await page.evaluate(() => { for (let i = 1; i <= 105; i++) (window as any).__townSay(i % 2 ? "Sparky" : "Tex", `cap line ${i}`, "kid"); });
   const lines = page.locator(".tc-line");
@@ -957,7 +957,7 @@ test("the text's tone flips with the clock when the sky does: ink before 19:30 a
   expect(await colorOf(page, ".tc-boss")).toBe(INK.day);
 });
 
-test("the typing line (a signed-in player's): no placeholder, 80 characters, a count near the end shown whole, one message per 15 seconds: a try inside the wait gets a gray line only you see and nothing goes to the server, no \"Wait N s\"; your line in the log as a player in a palette color", async ({ page }) => {
+test("the typing line (a signed-in player's): no placeholder, 80 characters, a count near the end shown whole, one message per 15 seconds: a try inside the wait gets a gray line only you see and nothing goes to the server, no \"Wait N s\"; your line in the log as a player in a palette color", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   await openSignedIn(page);
   const field = page.locator(".tc-form input");
@@ -1265,7 +1265,7 @@ test("the keyboard opening doesn't resize or move the town: while the typing lin
 const rot13 = (t: string) => t.replace(/[a-z]/gi, (c) => String.fromCharCode(((c.charCodeAt(0) - (c <= "Z" ? 65 : 97) + 13) % 26) + (c <= "Z" ? 65 : 97)));
 const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasText: text });
 
-test("two signed-in players see each other's lines within a few seconds; a guest sees none, its typing line greyed, and never asks for them", async ({ page, browser }, info) => {
+test("two signed-in players see each other's lines within a few seconds; a guest sees none, its typing line greyed, and never asks for them", { tag: "@phone-only" }, async ({ page, browser }, info) => {
   test.setTimeout(150_000);
   const phone = info.project.name === "phone";
   await openSignedIn(page);
@@ -1317,7 +1317,7 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   await expect(guest.locator(".tc-boss")).toHaveCount(1);
 });
 
-test("signing in a page whose own first /api/me answers after the town shows: the email goes on the page's account, not a second guest (main 356dc03's red: Bo greyed)", async ({ page, baseURL }) => {
+test("signing in a page whose own first /api/me answers after the town shows: the email goes on the page's account, not a second guest (main 356dc03's red: Bo greyed)", { tag: "@phone-only" }, async ({ page, baseURL }) => {
   // (The page's first /api/me, which makes its guest, held 1.5 s and answered from outside its cookies: it lands after the helper
   // has asked. asSignedIn waits for the page's own session first: e2e/helpers.ts pageAccountId.)
   const api = await apiRequest.newContext({ baseURL });
@@ -1332,7 +1332,7 @@ test("signing in a page whose own first /api/me answers after the town shows: th
   await api.dispose();
 });
 
-test("the server decides: a refused message says why in a gray line only you see, in the stream (one at a time) and keeps your words; 80 characters; the 15 s wait is the server's too", async ({ page }) => {
+test("the server decides: a refused message says why in a gray line only you see, in the stream (one at a time) and keeps your words; 80 characters; the 15 s wait is the server's too", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   await openSignedIn(page);
   const field = page.locator(".tc-form input");
@@ -1375,7 +1375,7 @@ test("the server decides: a refused message says why in a gray line only you see
   expect(((await again.json()) as { message: string }).message).toBe("One message every 15 s.");
 });
 
-test("a tap on a player's name: Profile, Mute and Report (a moderator also Remove); Report reaches fair play with the line; Remove takes it from everyone's log; Mute hides the player", async ({ page, browser }, info) => {
+test("a tap on a player's name: Profile, Mute and Report (a moderator also Remove); Report reaches fair play with the line; Remove takes it from everyone's log; Mute hides the player", { tag: "@phone-only" }, async ({ page, browser }, info) => {
   test.setTimeout(180_000);
   const phone = info.project.name === "phone";
   // The moderator (a chat admin's address), and two players.
@@ -1443,7 +1443,7 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await expect(lineOf(page, `Cy again ${run}`), "muted here").toHaveCount(0);
 });
 
-test("the switch off (PAUSE_TOWN_CHAT): the typing line, greyed on a tap, says \"Chat is paused.\" and can't send; the bosses' chatter goes on", async ({ page }) => {
+test("the switch off (PAUSE_TOWN_CHAT): the typing line, greyed on a tap, says \"Chat is paused.\" and can't send; the bosses' chatter goes on", { tag: "@phone-only" }, async ({ page }) => {
   await openSignedIn(page);
   // (The Worker's variable can't change under a running test: the server's answers say it's off, as they would.)
   await page.route("**/api/status", (route) => route.fulfill({ json: { paused: ["town-chat"], banner: null } }));

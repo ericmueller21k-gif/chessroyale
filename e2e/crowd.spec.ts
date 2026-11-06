@@ -311,7 +311,7 @@ test("the board's coordinates sit in their own squares, either way up (Crowd 50 
   expect([...seen].sort()).toEqual(["black", "white"]);
 });
 
-test("a device that chose the old options (Everyone moves, Relaxed pace off) plays 50 v 50 at the mode's own pace", async ({ page }) => {
+test("a device that chose the old options (Everyone moves, Relaxed pace off) plays 50 v 50 at the mode's own pace", { tag: "@phone-only" }, async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("brc.crowdTurns", "all");
     localStorage.setItem("brc.pace", "quick");

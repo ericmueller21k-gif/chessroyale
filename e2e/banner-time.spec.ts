@@ -104,7 +104,7 @@ async function check(page: Page, what: string) {
   expect(s.motion!, `${what}: nothing after it while it's up`).toBeGreaterThan(s.banner!.last);
 }
 
-test("the toy block: TOY BLOCK! up its length, the block thrown after it", async ({ page }) => {
+test("the toy block: TOY BLOCK! up its length, the block thrown after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.goto(`/?debug&clock=60&boss=bigboy&laststand=0${plusParam}`);
   await bossAloneFromHome(page);
@@ -114,7 +114,7 @@ test("the toy block: TOY BLOCK! up its length, the block thrown after it", async
   await check(page, "TOY BLOCK! (Big Boy) → the throw");
 });
 
-test("the Big Bounce: BIG BOUNCE! up its length, his leap after it", async ({ page }) => {
+test("the Big Bounce: BIG BOUNCE! up its length, his leap after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto(`/?debug&clock=60&boss=bigboy&laststand=0${plusParam}`);
@@ -127,7 +127,7 @@ test("the Big Bounce: BIG BOUNCE! up its length, his leap after it", async ({ pa
   await check(page, "BIG BOUNCE! (Big Boy) → his leap");
 });
 
-test("Lights out: LIGHTS OUT! up its length, Hollow's drop after it", async ({ page }) => {
+test("Lights out: LIGHTS OUT! up its length, Hollow's drop after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto(`/?debug&clock=60&boss=hollow&laststand=0${plusParam}`);
@@ -140,7 +140,7 @@ test("Lights out: LIGHTS OUT! up its length, Hollow's drop after it", async ({ p
   await check(page, "LIGHTS OUT! (Hollow) → his drop");
 });
 
-test("Leapfrog: LEAPFROG! up its length (was 0.72 s), the hop after it", async ({ page }) => {
+test("Leapfrog: LEAPFROG! up its length (was 0.72 s), the hop after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.goto(`/?debug&clock=60&boss=hopper&power=leapfrog&laststand=0${plusParam}`);
   await bossAloneFromHome(page);
@@ -151,7 +151,7 @@ test("Leapfrog: LEAPFROG! up its length (was 0.72 s), the hop after it", async (
   await check(page, "LEAPFROG! (Chub & Chirp) → the hop");
 });
 
-test("Babur's hoops: his warning, RAGE!, up its length, your turn after it (the cast's own HOOPS! after his move: tiger.spec.ts)", async ({ page }) => {
+test("Babur's hoops: his warning, RAGE!, up its length, your turn after it (the cast's own HOOPS! after his move: tiger.spec.ts)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await page.goto(`/?debug&pace=quick&clock=60&laststand=0&brain=stockfish&boss=tiger&power=hoops${plusParam}`);
   await bossAloneFromHome(page);
@@ -161,7 +161,7 @@ test("Babur's hoops: his warning, RAGE!, up its length, your turn after it (the 
   await check(page, "RAGE! (Babur's hoops warning) → your turn");
 });
 
-test("QUEEN DOWN!: up its length as the boss takes your queen, your turn after it", async ({ page }) => {
+test("QUEEN DOWN!: up its length as the boss takes your queen, your turn after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await page.goto(`/?debug&clock=60&boss=bigboy&laststand=0&brain=stockfish${plusParam}`);
   await bossAloneFromHome(page);
