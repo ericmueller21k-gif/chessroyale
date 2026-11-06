@@ -17,7 +17,7 @@ describe("the FAQ's contents", () => {
   const anchors = faqAnchors(page);
 
   it("has every section the brief lists, in order", () => {
-    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "credits", "privacy"]);
+    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "privacy", "credits"]);
   });
 
   it("every table-of-contents entry has a matching section, and every sub-entry a heading in it", () => {
@@ -286,8 +286,9 @@ describe("the FAQ's numbers come from the settings", () => {
     const line = plainText(maia.blocks)
       .split("\n")
       .filter((l) => l.includes("source code"));
-    expect(line).toEqual(["Maia runs in your browser as its own program, under the AGPL-3.0, and its source code is free to download."]);
-    expect(linksOf(maia.blocks)).toContain("/engine/maia/maia-box-source.tar.gz");
+    expect(line).toEqual(["Maia runs in your browser as its own program. Its license and source code are in Copyright, credits and licenses."]);
+    expect(linksOf(maia.blocks)).toContain("#credits");
+    expect(linksOf(maia.blocks)).not.toContain("/engine/maia/maia-box-source.tar.gz");
     const credits = faqPage().sections.find((s) => s.id === "credits")!;
     expect(linksOf(credits.blocks)).toEqual(expect.arrayContaining(["/engine/maia/maia-box-source.tar.gz", "/engine/stockfish-source.tar.gz", "/engine/COPYING.txt", "/engine/maia/LICENSE.txt"]));
     expect(text()).not.toMatch(/on request/i);

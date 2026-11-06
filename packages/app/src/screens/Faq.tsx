@@ -16,7 +16,9 @@ const anchor = (id: string) => `faq-${id}`;
 function jump(id: string, smooth = true) {
   const el = document.getElementById(anchor(id));
   if (!el) return;
-  el.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "start" });
+  // Reduced motion: no slide, the page just moves.
+  const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ behavior: smooth && !reduce ? "smooth" : "auto", block: "start" });
   history.replaceState(null, "", `${location.pathname}${location.search}#${anchor(id)}`);
 }
 
@@ -36,8 +38,9 @@ function Link({ href, children }: { href: string; children: ComponentChildren })
     );
   }
   // The game's own pages (the privacy policy, the terms) open here, and their Back comes back to the FAQ; files and
-  // other sites open in a new tab.
+  // other sites open in a new tab. A source archive (.tar.gz) downloads when tapped, as it did in Settings.
   if (/^\/[a-z-]+$/.test(href)) return <a href={href}>{children}</a>;
+  if (/\.tar\.gz$/.test(href)) return <a href={href} download>{children}</a>;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer">
       {children}
@@ -149,9 +152,10 @@ export function FaqScreen({ onBack }: { onBack: () => void }) {
       </header>
       <p class="faq-intro">{FAQ_INTRO}</p>
 
+      {/* Plain text links, no boxes: one per section, the sub-headings of the three boss sections under theirs. */}
       <nav class="faq-toc" id={anchor("contents")} aria-label="Contents">
-        <h2 class="fd-label">CONTENTS</h2>
-        <ol>
+        <p class="faq-toc-label">Contents</p>
+        <ul>
           {page.toc.map((t) => (
             <li key={t.id}>
               <Link href={`#${t.id}`}>{t.title}</Link>
@@ -166,7 +170,7 @@ export function FaqScreen({ onBack }: { onBack: () => void }) {
               )}
             </li>
           ))}
-        </ol>
+        </ul>
       </nav>
 
       {page.sections.map((s, i) => (
