@@ -37,12 +37,12 @@ Decision note: `docs/decisions/2026-11-05-street-controls-map.md`. Area page: `d
 - **The default zoom:** Eric answered the director's question ("we're going with number three for the default"), so the town opens at
   the third step (`streetZoomStart` 2). The park's step out goes from there to the overview. The rows' culling stays at the steps it was
   built for (`zoom <= 1`).
-- **Merged with the north edge (#511, head f5a3bfe8) and main (#512, #513).** The street-level sky check runs with the minimap on and
-  passes. Its earlier failure was #511's (fixed there), not the minimap's.
-- **Merged with the north edge (#511):** the minimap follows its plan (54 × 54, the start at (22, 25) in the park, the back wall with
-  its two gates as lines on the top edge). The Colosseum is a thin band on that edge over its columns, and its walls and the plaza's
-  (ground `W`) are dark. The boss portraits sit where the homes now stand. `pick()` keeps both the minimap's box and the north edge's
-  guard for fronts.
+- **Merged with the north edge (#511, head f5a3bfe8) and main (#512, #513):**
+  - The minimap follows #511's plan: 54 × 54, the start at (22, 25) in the park, and the back wall with its two gates as lines on the top
+    edge. The Colosseum is a thin band on that edge over its columns, its walls and the plaza's (ground `W`) are dark, and the boss
+    portraits sit where the homes now stand.
+  - `pick()` keeps both the minimap's box and the north edge's guard for fronts.
+  - The street-level sky check runs with the minimap on and passes. Its earlier failure was #511's (fixed there), not the minimap's.
 - **Test hooks:** `__townCam()` gains `base`, `snapped`, `gesture`, `run` and `you`.
 
 ## Player-visible changes (admins' street town only)
@@ -57,10 +57,9 @@ Decision note: `docs/decisions/2026-11-05-street-controls-map.md`. Area page: `d
 ## Changed checks (old → new)
 
 No check that guards a rule in `docs/rules/eric.md` changed.
-- `e2e/town-fixed.spec.ts`, `e2e/town-rows.spec.ts` (and the new spec): the look-round `drag` helper (its first move at least 16 px,
-  past the 8 px drag threshold) used `page.mouse` down then moves →
-  `lookDrag` (`e2e/helpers.ts`), which sends the press and its first move to the browser together. On a slow software-WebGL frame, a
-  press that waited longer than the hold time for its first move became a run.
+- `e2e/town-fixed.spec.ts`, `e2e/town-rows.spec.ts` (and the new spec): the look-round `drag` helper used `page.mouse` down, then
+  moves → `lookDrag` (`e2e/helpers.ts`). It sends the press and its first move (at least 16 px, past the 8 px drag threshold) to the
+  browser together. On a slow software-WebGL frame, a press that waited longer than the hold time for its first move became a run.
 - `e2e/town-fixed.spec.ts` "a tap while turned": `drag(page, 0.5)`, look > 60 ("a quarter turn") → `drag(page, 0.4)`, look > 60 and
   < 80 ("most of a quarter turn", "not snapped to east"). A half-width drag is exactly 90°, which now snaps.
 - `e2e/town-rows.spec.ts` "the zoom steps": opens at `zoomTarget` 1 and one "Zoom in" → opens at 2 and two "Zoom in"s.
@@ -80,7 +79,8 @@ No check that guards a rule in `docs/rules/eric.md` changed.
 ## Frame rate
 
 The same build, minimap on vs off (the stored choice), Canvas 2D, headless. Phone (iPhone 13) and computer (1440 × 900), 5 s walking
-east along Fountain Street from (3, 20) into the park, 2 runs each, interleaved. The machine was shared and loaded, so the numbers are
+east along Fountain Street from (3, 20) into the park, 2 runs each, interleaved. This was measured before the merge with #511, on the
+old plan. The machine was shared and loaded, so the numbers are
 rough: one pass, cut short by the pause.
 
 | | Map on | Map off |
