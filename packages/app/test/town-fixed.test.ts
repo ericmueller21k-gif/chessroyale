@@ -154,7 +154,7 @@ describe("the Colosseum against the back wall (round 5; Eric: \"you can't go pas
     expect(C.r0 + C.size - 1).toBe(N - 1);
     expect(C.c0 + C.size / 2 - 0.5).toBe(22.5);
     // (Its first two rows before the line: the queen, king and statues stand on the first, before its flanks; its ring stands proud of
-    // the line, the centrepiece of the back wall.)
+    // the line, the centerpiece of the back wall.)
     expect(C.r0 + 1.5).toBe(LINE);
   });
   it("nothing past the back line is walkable: you only come at it from the front, through the plaza", () => {
@@ -163,7 +163,7 @@ describe("the Colosseum against the back wall (round 5; Eric: \"you can't go pas
     expect(walkable(22, C.r0 - 1)).toBe(true);
     expect(findPath({ c: 22, r: C.r0 - 1 }, (c, r) => c === 22 && r === 25, walkable)).not.toBeNull();
   });
-  it("the back wall along the whole line, the Colosseum its centrepiece, a gate either side of it; the plaza open to Colosseum Row", () => {
+  it("the back wall along the whole line, the Colosseum its centerpiece, a gate either side of it; the plaza open to Colosseum Row", () => {
     const walls = STREET_LOTS.filter((l) => l.kind === "wall");
     // On the line: every column once but those the ring stands across (17..28), its two ends against the ring's flanks.
     const back = walls.filter((l) => l.at!.y === LINE);

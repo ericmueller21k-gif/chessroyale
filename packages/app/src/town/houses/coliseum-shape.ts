@@ -19,7 +19,7 @@ const angleOf = (x: number, y: number) => Math.atan2((y - OVAL.cy) / OVAL.b, (x 
 
 /**
  * The ring's corners: RING_M points on the oval, counterclockwise (seen from above), every stretch between two the same length `chord`,
- * the first stretch centred on the front (its corners either side of the oval's southmost point). Found by bisection on the length.
+ * the first stretch centered on the front (its corners either side of the oval's southmost point). Found by bisection on the length.
  */
 function corners(): { pts: { x: number; y: number }[]; chord: number } {
   const walk = (c: number) => {

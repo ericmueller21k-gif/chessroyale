@@ -75,7 +75,7 @@ function wallFront(key: string, spec: WallSpec, W: number, mirror: boolean) {
   const arches = (spec.arches ?? []).map((a) => (mirror ? { ...a, x: W - a.x } : a));
   const open = (x: number, y: number, pad = 0) => arches.some((a) => inArch(a, x, F - 1 - y, pad));
   const P: Piece[] = [];
-  // The wall, every column (a neighbour segment butts against it), its stones; a coping under the crenels; a plinth. The arches open.
+  // The wall, every column (a neighbor segment butts against it), its stones; a coping under the crenels; a plinth. The arches open.
   P.push(box(0, top + CREN, W, spec.h - CREN, (_i, _j, x, y) => (open(x, y) ? null : MAT.stone(x, y - top))));
   P.push(box(0, top, W, CREN + 1, (i, j) => (j < 4 && i % 12 >= 6 ? null : j === 0 || (j === 4 && i % 12 >= 6) ? "c" : j < 7 ? "c" : j === CREN ? "a" : "b")));
   P.push(box(0, top + CREN, W, 4, (_i, j) => (j < 2 ? "c" : "a"), false));

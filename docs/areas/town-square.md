@@ -966,7 +966,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `__townAt("tap-square", …)`.
   - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
   - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
-- **The north edge (Nov 5–6): one back line, Meadow Street, the Colosseum as a solid, the centrepiece of the back wall.**
+- **The north edge (Nov 5–6): one back line, Meadow Street, the Colosseum as a solid, the centerpiece of the back wall.**
   - **The plan** (`scripts/street-plan-north.py`, its north edge section): 54 × 54. A back wall on the line y = 43.5 the whole way round,
     meeting the Colosseum's flanks, a gate either side of it (columns 13–16 and 29–32: an open arch with the crown's crest, not walked
     through); nothing walks or stands north of it but the ring and the trees behind the gates (the meadow, ground only). Upper Street is
@@ -974,7 +974,7 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     Street.
   - **The plaza** (rows 40–43, columns 13–32) is open to Colosseum Row; its statues and chess pieces stand on it as figures (props
     `statue`, `piece`), fading out when nearer the camera than you.
-  - **Boss homes are never neighbours:** a whole look-alike between any two, none narrower than `rows.ts ROW_MIN_W` (1 square).
+  - **Boss homes are never neighbors:** a whole look-alike between any two, none narrower than `rows.ts ROW_MIN_W` (1 square).
   - **The Colosseum** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`): 18 ring boxes (kind `ring`) round its oval and a portal
     (kind `portal`, the Colosseum's place's picture), drawn 1.2x (`COL_SCALE`) from any heading; never cut by `streetNearCut`; its bowl
     left out below its rim; no line of sight.

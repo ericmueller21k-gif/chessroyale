@@ -1629,7 +1629,7 @@ export class Renderer {
       // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
       // (The Colosseum's ring and portal, the north edge round: never left out by the rows; its walls rise over their roofs.)
       const big = b.kind === "ring" || b.kind === "portal";
-      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !big && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
+      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !big && !b.open && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
         p.on = p.front.on = p.left.on = p.right.on = p.back.on = false;
         p.nOrder = 0;
         continue;
