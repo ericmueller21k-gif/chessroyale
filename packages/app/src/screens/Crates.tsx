@@ -155,11 +155,14 @@ export function CratesPanel() {
     return u;
   });
   const [open, setOpen] = useState<CrateDef | null>(() => (resume && !isWelcomeCrate(resume.crate) ? anyCrate(resume.crate)! : null));
-  // The Welcome Crate row open (1 or 2), an unseen one's reveal resuming on its row.
-  // (An unseen Welcome Crate's reveal resumes on its own row.)
+  // The Welcome Crate row open (1 or 2); an unseen one's reveal resumes on its own row.
   const [resumeRow] = useState<number | null>(() => (resume && isWelcomeCrate(resume.crate) ? welcomeResumeRow(welcomeRowsNow(profile)) : null));
   const [welcomeOpen, setWelcomeOpen] = useState<number | null>(resumeRow);
   const welcome = welcomeRowsNow(profile);
+  // A crate's page opens at its top (you may have scrolled the list down to its row: its hero and the gambling ring show first).
+  useEffect(() => {
+    if (open || welcomeOpen !== null) window.scrollTo(0, 0);
+  }, [open, welcomeOpen]);
   const count = (n: number | null | undefined) => (n === null || n === undefined ? "∞" : String(n));
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   if (welcomeOpen !== null) {
