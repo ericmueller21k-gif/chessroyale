@@ -241,7 +241,7 @@ test(`the plaza: a drag all the way round shows nothing past the back line, the 
   await figuresOnScreen(page, "onto Colosseum Row");
 });
 
-test(`looking round: a drag turns the camera about your pawn, which doesn't move or turn; the up arrow eases it back and walks you north`, async ({ page }) => {
+test(`looking round: a drag turns the camera about your pawn, which doesn't move or turn; it lets go to the nearest quarter, and the up arrow locks it in and walks you that way`, async ({ page }) => {
   test.setTimeout(400_000);
   await open(page);
   await walkTo(page, [8, 28]);
@@ -260,29 +260,33 @@ test(`looking round: a drag turns the camera about your pawn, which doesn't move
   // It stays turned until you move.
   await page.waitForTimeout(1000);
   expect((await cam(page)).look).toBeLessThan(-150);
-  // Up: the normal view's up, north; the view eases back as you set off (about 0.3 s).
-  await watchHeadings(page);
+  // Let go half a turn: the drag snaps to the nearest quarter, south (the view stays there, exactly: the look round is -180 degrees).
+  // Up: the arrow locks south in as the base (Nov 6: any way of setting off does), so up walks you south, and the view stays south.
+  const mod = (h: number) => ((h % 360) + 360) % 360;
+  expect(c.snapped, "snapped to south").toBe(180);
   const from = await you(page);
   const to = await arrowStep(page, "ArrowUp");
-  expect(way(from, to), "up walks you north").toEqual([0, 1]);
-  await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
-  const seen = await headings(page);
-  expect(seen.some((h) => Math.abs(h) > 20 && Math.abs(h) < 160), `eased back through the middle: ${[...new Set(seen.map(Math.round))].join(" ")}`).toBe(true);
-  // A tap while turned walks to the square under the finger, from the turned view, then eases back. (Nov 5: a drag let go within 10°
-  // of a quarter snaps there and a tap then locks it in, e2e/town-controls.spec.ts; this one stops at about 72°, short of the snap.)
-  await drag(page, 0.4);
-  await page.waitForTimeout(300);
+  expect(way(from, to), "up walks you the snapped way, south").toEqual([0, -1]);
+  await expect.poll(async () => mod((await cam(page)).headingBase), { timeout: 3000 }).toBe(180);
   c = await cam(page);
-  expect(c.look, "most of a quarter turn to the right").toBeGreaterThan(60);
-  expect(c.look, "not snapped to east").toBeLessThan(80);
+  expect([c.look, c.snapped], "locked in: nothing snapped, no look round").toEqual([0, null]);
+  expect(mod(c.heading), "still facing south").toBe(180);
+  // A tap while turned walks to the square under the finger, from the turned view. (Nov 6: a drag let go snaps to the nearest quarter, so
+  // this drag, about 72 degrees, snaps to west; the tap then locks it in, e2e/town-controls.spec.ts.)
+  await drag(page, 0.4);
+  await expect.poll(async () => (await cam(page)).snapped, { timeout: 3000 }).toBe(270);
+  c = await cam(page);
+  expect(c.look, "eased to a quarter turn to the right of south (west)").toBeCloseTo(90, 0);
   const here = await you(page);
-  const sq = [here[0], here[1] - 1] as const;
+  // (The square back the way you came: walked through a moment ago, so it's street, not a lamp or a home's front.)
+  const sq = [here[0], here[1] + 1] as const;
   const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);
   expect(xy, `${sq} drawn in the turned view`).not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
   await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
   await expect.poll(async () => (await you(page)).join(","), { timeout: 15_000 }).toBe(sq.join(","));
-  await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
+  // (The tap locked west in: the base heading, the camera where it was.)
+  await expect.poll(async () => mod((await cam(page)).headingBase), { timeout: 3000 }).toBe(270);
   await figuresOnScreen(page, "after the tap");
 });
 

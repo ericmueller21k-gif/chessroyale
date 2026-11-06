@@ -22,7 +22,7 @@ test.beforeEach(async ({ page }) => {
 const STILLS = process.env.STILLS;
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const you = async (p: Page) => (await canvas(p).getAttribute("data-you"))!.split(",").map(Number) as [number, number];
-type Cam = { heading: number; headingTo: number; zoom: number; zoomTarget: number; parkBefore: number | null };
+type Cam = { heading: number; headingTo: number; zoom: number; zoomTarget: number; parkBefore: number | null; speech: string | null };
 type W = { __townWalk: (s: readonly [number, number]) => boolean; __townHeading: (h: number | null) => void; __townCam: () => Cam };
 const cam = (page: Page) => page.evaluate(() => (window as unknown as W).__townCam());
 const walkTo = async (page: Page, sq: readonly [number, number]) => {
@@ -102,14 +102,21 @@ test("no sky between the fronts at street level: Fountain Street and South Stree
   // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
   await page.getByRole("button", { name: "Zoom in" }).click();
   await expect.poll(async () => (await cam(page)).zoom, { timeout: 3000 }).toBe(1);
+  // (The bosses' speech bubbles off: a bubble is drawn over the world, and its white across the band's middle, where each row's sky color
+  // is taken, read as sky at the sides (Smudgy's on South Street east: 0.010 to 0.013, Nov 6). Hushed, the band is the world alone.)
+  await page.evaluate(() => (window as unknown as { __townHush: (on: boolean) => void }).__townHush(true));
   for (const [name, sq, look] of [["Fountain Street east", [4, 28], 0.5], ["Fountain Street west", [39, 28], -0.5], ["South Street east", [4, 13], 0.5], ["South Street west", [39, 13], -0.5]] as const) {
     await walkTo(page, sq);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
     await drag(page, look);
     await page.waitForTimeout(800);
     expect(Math.abs((await cam(page)).heading), `${name}: looking a quarter round`).toBeGreaterThan(80);
+    expect((await cam(page)).speech, `${name}: no speech bubble over the band`).toBeNull();
     const share = await skyAtSides(page);
     expect(share, `${name}: sky at the sides at street level`).toBeLessThan(0.005);
+    // (Back to north before the next walk: a look round let go snaps to the nearest quarter, and a walk locks it in as the base.)
+    await drag(page, -look);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 5000 }).toBe(0);
   }
 });
 

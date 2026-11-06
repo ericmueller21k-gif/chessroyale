@@ -193,8 +193,11 @@ test("the gear's Pieces (Pixel by default): a tap steps Pixel, 3D, 2D and back, 
   await row().click();
   await expect(row()).toContainText("3D");
   await page.keyboard.press("Escape");
-  await expect.poll(async () => (await state(page)).plies, { message: "the bots play", timeout: 90_000 }).toBeGreaterThanOrEqual(4);
-  expect((await state(page)).drawCalls, JSON.stringify(await state(page))).toBeGreaterThanOrEqual(5);
+  // (Moves played since the switch: the game is often past 4 plies by now. And the draw calls are the last frame's, which on a
+  // software-WebGL computer can still be the Pixel frame from a second before: wait for a 3D frame, as the steps above do.)
+  const at3d = await state(page);
+  await expect.poll(async () => { const s = await state(page); return s.game !== at3d.game || s.plies >= at3d.plies + 2; }, { message: "the bots play on in 3D", timeout: 90_000 }).toBe(true);
+  await expect.poll(async () => (await state(page)).drawCalls, { message: "the arena's, the crowd's and a draw call a piece kind" }).toBeGreaterThanOrEqual(5);
 
   // Remembered on this device: a reload comes back in 3D.
   await page.reload();

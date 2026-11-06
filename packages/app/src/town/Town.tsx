@@ -641,7 +641,12 @@ function startTown(
   };
   const stopKeys = listenKeys();
   const offHeld = onHeld(paintKeys);
-  const offQuarter = onHeld(() => (keyQuarter = quarterOf(turn.to)));
+  // (An arrow's press locks a snapped look round in first, so its step goes by the new base heading, not the old one's.)
+  const offQuarter = onHeld(() => {
+    const b = lockIn(turn, look, performance.now());
+    if (b !== null) base = b;
+    keyQuarter = quarterOf(turn.to);
+  });
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -664,8 +669,8 @@ function startTown(
   const look = new LookAround();
   /**
    * The base heading (Nov 5, brief-street-controls-map.md): the normal heading off a home's strip, north, east, south or west. A look round
-   * snapped to a quarter and locked in by a tap or a run sets it (turn.ts lockIn); the arrows never do. North as the town opens and as you
-   * come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
+   * snapped to a quarter and locked in by any way of setting off (a tap, a run, an arrow: turn.ts lockIn) sets it. North as the town
+   * opens and as you come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
    */
   let base = 0;
   /** (Tests) The heading held (the turn's stills), or null. */
@@ -956,7 +961,12 @@ function startTown(
     if (STREET_TOWN) {
       const h = town.you.walker.here();
       turn.aim(nearestTurn(baseHeading(h.c, h.r, base), turn.to), now);
-      if (town.you.walker.moving()) look.back(now);
+      // (Any way of setting off locks a snapped quarter in, the base heading; with nothing snapped, your first step eases the view back.)
+      if (town.you.walker.moving()) {
+        const b = lockIn(turn, look, now);
+        if (b !== null) base = b;
+        else look.back(now);
+      }
       heading = pinHeading ?? turn.at(now) + look.at(now);
     }
   };
@@ -1516,6 +1526,8 @@ function startTown(
           horizon: r.view.hy,
           // The street town's boxes drawn in the last frame.
           boxes: r.boxDraws(),
+          // The boss whose speech bubble is up (null: none): drawn over the world, so a pixel check of the world quiets it (`__townHush`).
+          speech: town.speech.boss?.home.id ?? null,
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).
@@ -1671,12 +1683,18 @@ function startTown(
     for (let i = 0; i < n; i++) r.draw(drawnAt, camX, camY, zoomCur, 0);
     return (performance.now() - t0) / n;
   };
+  // ... `__townHush(on)`: the bosses' speech bubbles stop (the one up goes at once) or start again, so a pixel check sees the world alone.
+  const hookHush = (on: boolean) => {
+    if (!testSwitchesAllowed()) return;
+    town.speech.boss = null;
+    town.speech.next = on ? Infinity : 0;
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1695,6 +1713,7 @@ function startTown(
   hooks.__townBench = hookBench;
   hooks.__townWalk = hookWalk;
   hooks.__townHeading = hookHeading;
+  hooks.__townHush = hookHush;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
 
@@ -1848,6 +1867,7 @@ function startTown(
       delete hooks.__townBench;
       delete hooks.__townWalk;
       delete hooks.__townHeading;
+      delete hooks.__townHush;
       delete hooks.__townRide;
       delete hooks.__townYou;
       painter.dispose();
