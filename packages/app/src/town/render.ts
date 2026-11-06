@@ -29,7 +29,7 @@ import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { TOWN_FEEL } from "./feel.ts";
-import { statueSpot } from "./houses/coliseum.ts";
+import { PIECE_ART, statueSpot } from "./houses/coliseum.ts";
 import { COLISEUM_CHIP, artOf } from "./houses/index.ts";
 import { CLOSE, QUOTE_INK, STATUE_W, quoteFace, statueArt, statueFrame, statueH, statueSteps } from "./houses/statues.ts";
 import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
@@ -44,13 +44,13 @@ import { STREET_TOWN } from "./admin-town.ts";
 import { building } from "./buildings.ts";
 import type { TownBox } from "./town-kit.ts";
 import { HEDGE, bed, bush, hedgeFront, hedgeTop, shed } from "./dressing.ts";
-import { colosseumSeen, ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
+import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_LOTS } from "./street.ts";
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
@@ -785,8 +785,6 @@ export class Renderer {
   private readonly roofs = new Map<TownBox, Map<string, RoofArt>>();
   /** The camera's heading this frame (degrees from north: the street town's turn). */
   heading = 0;
-  /** (The street town) Whether the Colosseum shows from where you stand this frame (street.ts colosseumSeen). */
-  colSeen = true;
 
   /** What it draws with (paint.ts: Canvas 2D, or WebGL 2 with `?gl=1`), and that one's context. */
   private ctx: Ctx;
@@ -837,6 +835,9 @@ export class Renderer {
     const street = new Map<string, FrameCache>();
     const art = (key: string, ch: () => Character) => street.get(key) ?? street.set(key, new FrameCache(ch())).get(key)!;
     this.propFrames = PROPS.map((p) => {
+      // (The street town's plaza, the north edge round: the chess pieces on their plinths and the statues stand on it as figures.)
+      if (p.kind === "piece") return art(`piece${p.v}`, () => PIECE_ART[p.v]!);
+      if (p.kind === "statue") return art(`statue${p.v}`, () => statueArt(STATUES[p.v]!.id, 1));
       if (p.kind === "hedge") return art(`hedge${p.v}`, () => hedgeFront(p.v));
       if (p.kind === "bush") return art(`bush${p.v}`, () => bush(p.v));
       if (p.kind === "bed") return art(`bed${p.v}`, () => bed(p.v));
@@ -844,7 +845,8 @@ export class Renderer {
       if (p.kind === "front") {
         const b = STREET_BUILDINGS[p.lot!]!;
         const box = lotArt(b);
-        return art(box.id, () => box.front);
+        // (One cache a picture: the Colosseum's stretches share theirs.)
+        return art(box.front.id, () => box.front);
       }
       return p.kind === "tree" ? trees[p.v]! : p.kind === "bench" ? bench : p.kind === "table" ? table : p.kind === "lamp" ? lamp : fountain;
     });
@@ -869,7 +871,9 @@ export class Renderer {
         this.sqKey[n] = sqKeyOf(m, 4, (cu + ru) & 1);
       } else {
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      // (The street town's Colosseum, the north edge round: the board's squares under its oval only; round it, behind the back wall, the
+      // meadow, as past the edge.)
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING || gk === WALL || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || (!STREET_TOWN && onColiseum(c, r)) ? 1 : 0, (c + r) & 1);
       }
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;
@@ -1014,16 +1018,18 @@ export class Renderer {
     this.statueDz = Infinity;
     if (c.i < 0 || c.e <= 0) return;
     const pl = COLISEUM_PLACE;
-    rel(v, this.camX, this.camY, pl.cx, pl.cy - pl.foot, this.rq);
+    const id = STATUES[c.i]!.id;
+    // (Today's statues stand in the Colosseum's picture; the street town's on the plaza, figures of their own: the north edge round.)
+    const sp = STREET_TOWN ? PROPS.find((q) => q.kind === "statue" && q.v === c.i) : undefined;
+    rel(v, this.camX, this.camY, sp ? sp.x : pl.cx, sp ? sp.y : pl.cy - pl.foot, this.rq);
     const dx = this.rq.dx;
     const dz = this.rq.dz;
     if (!proj(v, dx, dz, 0, p)) return;
-    const id = STATUES[c.i]!.id;
     const ch = artOf(pl).ch;
     const at = statueSpot(id);
     const px = p.k / f.housePxPerSquare;
-    const x0 = p.x + (at[0] - ch.foot[0]) * px;
-    const y0 = p.y + (at[1] - ch.foot[1]) * px;
+    const x0 = sp ? p.x - (STATUE_W / 2) * px : p.x + (at[0] - ch.foot[0]) * px;
+    const y0 = sp ? p.y - statueH(id) * px : p.y + (at[1] - ch.foot[1]) * px;
     const w = STATUE_W * px;
     const h = statueH(id) * px;
     const T = H * f.closeTop;
@@ -1095,13 +1101,19 @@ export class Renderer {
    * covers it, so the wall never shows through), and its quote once the camera has arrived.
    */
   private drawStatues(x0: number, y0: number, px: number, alpha: number, soft: number, now: number): void {
+    const { ctx } = this;
+    for (let i = 0; i < STATUES.length; i++) {
+      const at = statueSpot(STATUES[i]!.id);
+      this.drawStatueAt(i, x0 + at[0] * px, y0 + at[1] * px, px, alpha, soft, now);
+    }
+    ctx.globalAlpha = alpha;
+  }
+  /** Statue i, its top left at (sx, sy), `px` screen pixels a picture pixel (today's over the Colosseum's picture; the street town's on the plaza). */
+  private drawStatueAt(i: number, sx: number, sy: number, px: number, alpha: number, soft: number, now: number): void {
     const { ctx, close: c } = this;
     const f = TOWN_FEEL;
-    for (let i = 0; i < STATUES.length; i++) {
+    {
       const id = STATUES[i]!.id;
-      const at = statueSpot(id);
-      const sx = x0 + at[0] * px;
-      const sy = y0 + at[1] * px;
       const sw = STATUE_W * px;
       const sh = statueH(id) * px;
       const b = this.statueBox[i]!;
@@ -1496,13 +1508,9 @@ export class Renderer {
     // The Colosseum past the rim, its top over the horizon (slice 6: the landmark from anywhere), behind everything.
     const col = this.houseItems[this.homes.length]!;
     this.farOn = false;
-    // (The street town, round 4: only where the rows let you see it, down a street or across a square that opens onto it; near too.)
-    if (STREET_TOWN) {
-      // (From where the camera looks: you, as it follows you; wherever it glides to as you look round.)
-      this.colSeen = colosseumSeen(this.camX, this.camY);
-      if (!this.colSeen) col.on = false;
-      else if (!col.on) this.drawFarColiseum(col, now);
-    } else if (!col.on) this.drawFarColiseum(col, now);
+    // (The street town's, the north edge round, is a solid: its ring's and portal's boxes, drawn where they stand like any other, its
+    // walls over the rows' roofs from near enough; past the rim, nothing, as for every building.)
+    if (!STREET_TOWN && !col.on) this.drawFarColiseum(col, now);
     for (const it of items) {
       if (!it.on) continue;
       if (it.kind === "house") {
@@ -1619,13 +1627,17 @@ export class Renderer {
         this.aheadD[na++] = R;
       }
       // (What the rows hide is left out; a skyline tower no ray reaches shows over them out to `streetTowerReach`, past it in the haze.)
-      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
+      // (The Colosseum's ring and portal, the north edge round: never left out by the rows; its walls rise over their roofs.)
+      const big = b.kind === "ring" || b.kind === "portal";
+      if (R > v.rim + 4 || this.rq.dz < -v.back - 4 || (this.cull && !big && !b.open && !this.boxSeen(b.i) && (b.kind !== "tall" || R > TOWN_FEEL.streetTowerReach))) {
         p.on = p.front.on = p.left.on = p.right.on = p.back.on = false;
         p.nOrder = 0;
         continue;
       }
       // (A hedge is low: drawn between the camera and you too, as the art says.)
-      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" ? -Infinity : cut);
+      // (The Colosseum's ring and portal too, the north edge round: you're always before it, on the plaza, so it never stands between the
+      // camera and you; left out, a drag round beside it would look into its bowl.)
+      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" || big ? -Infinity : cut);
     }
     // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
     // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)
@@ -2188,8 +2200,19 @@ export class Renderer {
     const y0 = p.y - ch.foot[1] * px;
     const s = bandOf(v, it.dx, it.dz);
     const prop = PROPS[it.i]!;
-    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" ? this.nearFade(it) : 1);
+    // (A tree, and the plaza's statues and chess pieces (the north edge round), nearer the camera than you fade out: never between.)
+    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" || prop.kind === "statue" || prop.kind === "piece" ? this.nearFade(it) : 1);
     if (alpha <= 0.004) return;
+    // A statue on the street town's plaza (the north edge round): its figure (or its close-up) and its quote, as today's over the
+    // Colosseum's picture.
+    if (prop.kind === "statue") {
+      const sh = statueH(STATUES[prop.v]!.id) * px;
+      const sx = p.x - (STATUE_W / 2) * px;
+      this.drawStatueAt(prop.v, sx, p.y - sh, px, alpha, s, now);
+      ctx.globalAlpha = 1;
+      this.box(it, p.depth, sx, p.y - sh, sx + STATUE_W * px, p.y, p.x, p.y, p.y - sh);
+      return;
+    }
     const img = fc.at(now, it.i * 211);
     // A hedge running north to south (along Seam Avenue): its top and the side the camera sees, laid along the ground.
     if (prop.kind === "hedge" && prop.x !== Math.round(prop.x)) return this.sideHedge(it, img, prop.v, alpha, now);
@@ -3623,7 +3646,7 @@ export class Renderer {
    * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
    * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
    */
-  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number }[] {
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number; foot: number[] | null }[] {
     return this.boxes
       .filter((b) => this.plans[b.i]!.on)
       .map((b) => {
@@ -3631,8 +3654,19 @@ export class Renderer {
         const f = p.front;
         // (Its front faces you: turned neither way from the camera, so unshaded.)
         // (Its front line's middle in the world, round 5: what stands where.)
-        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy };
+        // (The north edge round: its front's foot on screen as drawn, its ends' x and y (s0..s1 of it if cut): where it stands as you turn.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy, foot: f.on ? this.footOf(b, f) : null };
       });
+  }
+  /** (Tests) A box's front's drawn ends on screen and the world points they stand for: [x0, y0, x1, y1, s0, s1, wx0, wy0, wx1, wy1]. */
+  private footOf(b: BoxInst, f: WallPlan): number[] {
+    const pt = { x: 0, y: 0 };
+    const out = [f.x0, f.y0, f.x1, f.y1, f.s0, f.s1];
+    for (const s of [f.s0, f.s1]) {
+      boxPoint(b, b.box, s * b.box.front.w, 0, pt);
+      out.push(((pt.x % N) + N) % N, pt.y);
+    }
+    return out;
   }
   private readonly bossAlpha: number[] = [];
   private readonly personAlpha: number[] = [];
@@ -3650,9 +3684,13 @@ export class Renderer {
 
   /** What's under (x, y) in the box: a home, a boss or a person (nearest first), else a square, else null (the sky). */
   pick(x: number, y: number): Hit | null {
+    // (A tap on a row's front, or on any building's side, back or roof, never opens something drawn behind it: the street town's
+    // Colosseum rises over the rows' roofs (the paused round's guard, the north edge round). Only the ground under the tap is left.)
+    let overFront = false;
     for (let i = this.items.length - 1; i >= 0; i--) {
       const it = this.items[i]!;
       if (!it.on || it.faded || x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
+      if (overFront) continue;
       if (it.kind === "house") {
         // A home's picture is wide: only its drawn part (not the sky around its roof) counts.
         if (it.i >= this.homes.length) {
@@ -3666,15 +3704,29 @@ export class Renderer {
       if (it.kind === "boss") return { kind: "boss", boss: this.town.bosses[it.i]! };
       // (A street-town home's side, back or roof: the home. An everyday building's: the ground behind, as its front.)
       if (it.kind === "part") {
-        const h = this.boxes[it.i >> 2]!.home;
-        const home = h ? this.homes.find((o) => o.id === h) : null;
+        const b = this.boxes[it.i >> 2]!;
+        // (The Colosseum's ring and portal: the Colosseum.)
+        if (b.kind === "ring" || b.kind === "portal") return { kind: "coliseum" };
+        const home = b.home ? this.homes.find((o) => o.id === b.home) : null;
         if (home) return { kind: "house", home };
+        overFront = true;
         continue;
       }
       if (it.kind === "prop") {
-        // A chess table (its stools too): its table. A tree, a bench or the fountain: the square under the tap.
+        // A chess table (its stools too): its table. A statue: the statue; a chess piece before the Colosseum, or its ring: the Colosseum.
+        // A tree, a bench or the fountain: the square under the tap. A building's front: nothing behind it.
         const pr = PROPS[it.i]!;
         if (pr.kind === "table" && this.propHit(it, x, y)) return { kind: "table", table: TABLES[pr.table]! };
+        if (pr.kind === "statue") {
+          const st = this.statueHit(x, y);
+          if (st) return { kind: "statue", statue: st };
+          continue;
+        }
+        if (pr.kind === "piece" && this.propHit(it, x, y)) return { kind: "coliseum" };
+        if (pr.kind === "front" && this.propHit(it, x, y)) {
+          if (this.propBox[it.i]?.kind === "ring") return { kind: "coliseum" };
+          overFront = true;
+        }
         continue;
       }
       return { kind: "person", person: this.town.people[it.i]! };
