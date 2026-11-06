@@ -223,3 +223,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 6 ~02:45: controls + minimap PAUSED at 1c6d7420 (claude/street-controls-map): built; local e2e unproven (disk-full run), the
   WebGL look-round e2e not rerun, WebGL fps not measured; merges main after north edge. Street town ships as north edge then
   controls. #508 Smudgy merged 83ceba92 (deploying). #509 Welcome Crates open, full e2e running.
+- Nov 6 ~02:50: Boingo room PAUSED at 70167f81 (left: claw walk-up zoom + slot box, sign text, arcade ceiling, an e2e hop blocked
+  by the claw machine, remaining e2e, fps, stills, PR body). Tutorial (Haiku) PAUSED at 94079042 (left: computer side-menu
+  data-tour + desktop e2e, stills, PR body, decision note; merge welcome-crate 8dac548a and turn TUTORIAL_CRATE_25 on).
