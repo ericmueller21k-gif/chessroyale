@@ -36,3 +36,8 @@ realize, organize, meter, canceled, traveled. Don't rename existing code identif
 - **The decision note:** at most 10 lines. Eric's words, the call, and why.
 - **Area pages (docs/areas):** add at most 5 lines per PR. Edit in place instead of appending history.
 - **Prefer number checks to pixel checks** in new e2e tests: read positions and state through the test hooks (`__townCam` and similar) instead of sampling the canvas. Use pixels only when the pixels are the point, such as a sky gap.
+
+## Local servers (Nov 6: a standalone `wrangler dev` respawns after `fuser -k` and has blocked ports for hours)
+- Never start `wrangler dev` by hand or in the background. Let Playwright start it (its `webServer`, in an untracked copy of playwright.config.ts with your own port), so it stops when the run ends.
+- For stills or measurements that need a live server, run them as a Playwright spec or script under that same webServer.
+- If a port still won't free after one `fuser -k`, stop and tell the director the port. Don't retry in a loop or hold /tmp/claude-0/e2e.lock while waiting.
