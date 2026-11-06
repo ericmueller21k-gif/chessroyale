@@ -12,7 +12,7 @@
 import type { Pt } from "../camera.ts";
 import type { Ctx } from "../paint.ts";
 import { bakeFace, gridTexel, rampsOf, triPixels, type Cut, type Poly, type Ramps } from "./bake.ts";
-import { affine, area, facesOf, lightStep, texOf, type Model, type PFace, type Step, type V3 } from "./prims.ts";
+import { affine, area, facesOf, lightStep, texOf, type Model, type PFace, type Shape, type Step, type V3 } from "./prims.ts";
 
 /** A piece of a sheet: its canvas, its rectangle there, and where its texture's (0, 0) lies on the sheet (`ox`, `oy`). */
 export interface Piece {
@@ -120,6 +120,8 @@ export interface DrawOpts {
   /** Moving parts' offsets (texels), by part name; a part `hide` says yes to isn't drawn. */
   move?: Readonly<Record<string, V3>>;
   hide?: (part: string) => boolean;
+  /** Only the faces this says yes to (a shape, and the layer the face is drawn in): a caller drawing a model in passes (a still part cached). */
+  pick?: (s: Shape, layer: number) => boolean;
   alpha?: number;
 }
 
@@ -238,7 +240,9 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
     const ex = sg * (at.ux * f.n[0] + at.bx * f.n[1]);
     const ey = sg * (at.uy * f.n[0] + at.by * f.n[1]);
     const step = lightStep(ex * hc - ey * hs, ex * hs + ey * hc, sg * f.n[2]);
-    list.push({ i, layer: glass && !facing ? far : layer, depth, step });
+    const ly = glass && !facing ? far : layer;
+    if (o.pick && !o.pick(m.shapes[si]!, ly)) continue;
+    list.push({ i, layer: ly, depth, step });
   }
   list.sort((a, b) => a.layer - b.layer || b.depth - a.depth || a.i - b.i);
   ctx.save();
@@ -247,13 +251,14 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
     const F = A.faces[e.i]!;
     const st = e.step;
     const arts = (A.steps[st + 1] ??= packFaces(A.faces.map((G) => faceCuts(G.poly, G.texel, A.ramps, st, { soft: G.f.soft }))));
-    drawFace(ctx, dpr, F.poly, F.xs, F.ys, arts[e.i]!, F.ws, p3);
+    drawFace(ctx, dpr, F.poly, F.xs, F.ys, arts[e.i]!, F.ws, p3, !m.shapes[F.shape]!.glass);
   }
   ctx.restore();
 }
 
-/** Strips a face may be cut into, at most, where its perspective is too strong for one affine. */
-const MAX_STRIPS = 12;
+/** Strips a face may be cut into, at most, where its perspective is too strong for one affine; how far (screen px) an affine may be off. */
+const MAX_STRIPS = 8;
+const OFF_PX = 1.5;
 const S0: Pt = { x: 0, y: 0, k: 0, depth: 0 };
 const S1: Pt = { x: 0, y: 0, k: 0, depth: 0 };
 const S2: Pt = { x: 0, y: 0, k: 0, depth: 0 };
@@ -262,11 +267,11 @@ function along(ws: Float64Array, a: number, b: number, s: number, p3: P3, out: P
   return p3(ws[a * 3]! + (ws[b * 3]! - ws[a * 3]!) * s, ws[a * 3 + 1]! + (ws[b * 3 + 1]! - ws[a * 3 + 1]!) * s, ws[a * 3 + 2]! + (ws[b * 3 + 2]! - ws[a * 3 + 2]!) * s, out);
 }
 /**
- * A face's art on screen at its corners (`xs`, `ys`): whole when an affine puts its every corner within a pixel; a rectangle (a box's
+ * A face's art on screen at its corners (`xs`, `ys`): whole when an affine puts its every corner within OFF_PX; a rectangle (a box's
  * face) too foreshortened for that in strips of whole texels across the way it recedes (its world corners `ws` and the camera `p3`
  * give each strip's own corners, as the town's walls are drawn); anything else as its triangles.
  */
-export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, ys: ArrayLike<number>, art: FaceArt, ws?: Float64Array, p3?: P3): void {
+export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, ys: ArrayLike<number>, art: FaceArt, ws?: Float64Array, p3?: P3, seam = true): void {
   const n = p.n;
   const l = n - 1;
   let err = n === 3 ? 0 : Infinity;
@@ -275,7 +280,7 @@ export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, 
     const Y = M[1]! * p.tx[2]! + M[3]! * p.ty[2]! + M[5]!;
     err = Math.hypot(X - xs[2]!, Y - ys[2]!);
   }
-  if (err < 0.75) {
+  if (err < OFF_PX) {
     if (affine(p.tx[0]!, p.ty[0]!, xs[0]!, ys[0]!, p.tx[1]!, p.ty[1]!, xs[1]!, ys[1]!, p.tx[l]!, p.ty[l]!, xs[l]!, ys[l]!, M)) put(ctx, dpr, art.whole);
     return;
   }
@@ -288,7 +293,7 @@ export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, 
     const tb = Math.abs(Math.hypot(xs[1]! - xs[0]!, ys[1]! - ys[0]!) - Math.hypot(xs[2]! - xs[3]!, ys[2]! - ys[3]!));
     const cols = lr >= tb;
     const len = cols ? w : h;
-    const k = Math.min(MAX_STRIPS, Math.ceil(len), Math.ceil(err / 0.75) + 1);
+    const k = Math.min(MAX_STRIPS, Math.ceil(len), Math.ceil(err / OFF_PX) + 1);
     const pc = art.whole;
     for (let i = 0; i < k; i++) {
       const a = Math.round((i * len) / k), b = Math.round(((i + 1) * len) / k);
@@ -300,8 +305,9 @@ export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, 
       if (!ok) continue;
       const [u0, v0, u1, v1, u2, v2] = cols ? [a, 0, b, 0, a, h] : [0, a, w, a, 0, b];
       if (!affine(u0, v0, S0.x, S0.y, u1, v1, S1.x, S1.y, u2, v2, S2.x, S2.y, M)) continue;
-      // (Each strip a texel wider than its share, under the next, so no seam opens between them.)
-      const more = i < k - 1 ? 1 : 0;
+      // (Each strip 0.6 screen pixels wider than its share, under the next, so no seam opens between them: as the town's walls. A
+      // see-through face's don't overlap, or the overlap would show twice as strong.)
+      const more = i < k - 1 && seam ? 0.6 / Math.max(0.01, cols ? Math.hypot(M[0]!, M[1]!) : Math.hypot(M[2]!, M[3]!)) : 0;
       const sx = cols ? a : -1, sy = cols ? -1 : a;
       const sw = cols ? b - a + more : w + 2, sh = cols ? h + 2 : b - a + more;
       put(ctx, dpr, pc, sx, sy, sw, sh);
