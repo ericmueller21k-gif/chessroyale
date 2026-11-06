@@ -333,3 +333,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **Eric, Nov 6 ~20:15:**
   - The claw on the kit is APPROVED ("fine with new design … update it later"). Merge claude/kit-claw into claude/boingo-home, then finish Boingo's room (the resume list: fps, computer stills, GIFs, areas.json, docs, PR) and send Eric the room stills before live.
   - Settings: I design the mockup myself and SEND IT FIRST for his OK (Sounds and Gameplay pages, plus the move-confirm style picker), then build after his OK.
+- **Sprite kit pilot = SMUDGY (Eric, Nov 6):** "use Smudgy to test because in the battle intro he's facing the wrong way when the match starts". Convert Smudgy to the sprite kit AND fix his facing at the battle intro's start (he must face the board/player as the match begins). Before/after stills and a GIF of the intro to Eric before the pilot merges.
