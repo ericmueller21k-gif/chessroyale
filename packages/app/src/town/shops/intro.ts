@@ -539,7 +539,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     // (Hollow's own intro has none: the dark is his transition.)
     // (Folio's neither: the crumple is its.)
     // (Smudgy's neither: the splatter is his.)
-    const ka = dark || folio || cloth ? null : (kit?.kingAttack ?? null);
+    // (Dash's neither: his attack on a king came after his intro, Nov 6; in it he stands through its beat, as drawn.)
+    const ka = dark || folio || cloth || def.name === "Dash" ? null : (kit?.kingAttack ?? null);
     const attack = ka
       ? {
           ch: ka.ch,

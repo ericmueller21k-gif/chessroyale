@@ -56,6 +56,8 @@ import {
   judgeTaps,
   lightsDeadline,
   lightsOutTimeline,
+  rushSquares,
+  rushTimeline,
   brainLine as brainWords,
   GUARD_WORDS,
   type BrainNote,
@@ -70,7 +72,7 @@ import {
   ShowdownScout,
   kingHelpBlocked,
 } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, Standing, VoteView } from "./game.ts";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, RushView, Standing, VoteView } from "./game.ts";
 import { hintsFrom, whiteExpected } from "./hints.ts";
 import { account } from "./account.ts";
 import { crumb } from "./problems.ts";
@@ -731,8 +733,10 @@ export class NetMatch implements GameView {
         this.standingsList = m.standings;
         this.currentBoard = m.boss.board;
         this.lights = null;
+        // (Dash's Scramble Rush: its beats on this device's clock, your placements kept through the server's verdict.)
+        this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), places: this.rush?.key === m.rush.key ? this.rush.places : {} } : null;
         // (`fall`: beaten, the Hidden Boss collapses on the board until the results come.)
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}) });
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places } } } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -1229,6 +1233,23 @@ export class NetMatch implements GameView {
     taps.push(square);
     this.send({ t: "lightsTap", key: l.key, round: i, square });
     this.showLights();
+  }
+
+  /** Dash's Scramble Rush: the server's as last heard, and your placements (sent whole as each is made; the server judges them). */
+  private rush: RushView | null = null;
+  rushPlace(from: string, to: string) {
+    const r = this.rush;
+    const rush = this.boss?.powers?.dash?.rush;
+    if (!r || !rush || rush.correct !== undefined || this.phase.kind !== "boss" || !this.phase.rush || !this.boss) return;
+    // (Your ten seconds, as the server counts them: it checks the same.)
+    const t = Date.now() - r.at;
+    const tl = rushTimeline();
+    if (t < tl.placeAt - 300 || t > tl.placeUntil) return;
+    const places = { ...r.places, [from]: to };
+    if (rushSquares(this.boss.board.fen, rush, places).get(from) !== to) return;
+    r.places = places;
+    this.send({ t: "rushPlace", key: r.key, places });
+    this.setPhase({ kind: "boss", boss: this.boss, until: 0, rush: { ...r, places: { ...places } } });
   }
 
   submit(move: string | null, premove = false) {

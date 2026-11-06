@@ -58,7 +58,9 @@ export type KingCue =
   | "foeIntro"
   | "foeBlocked"
   | "foeTriumph"
-  | "foeDrained";
+  | "foeDrained"
+  | "rushAsk"
+  | "rushWell";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -142,6 +144,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
     "Hot ground! Step off before it flares up.",
     "Mind the fire underfoot. Move on soon!",
   ],
+  // Dash's Scramble Rush (Eric, Nov 6): after his sweep, and the crowd putting enough of the pieces back. Said whether he has
+  // fallen or not (his Last Stand spent): the test needs his word.
+  rushAsk: ["Put the pieces back where they came from. Hurry!", "Every piece to its own square. Quickly now!", "You saw the board. Set it right, fast!"],
+  rushWell: ["Well remembered!", "Every piece home. Well done!", "Sharp eyes! The board is ours again."],
 };
 
 /**
@@ -187,6 +193,8 @@ const KIND: Record<KingCue, Kind> = {
   foeBlocked: "critical",
   foeTriumph: "lead",
   foeDrained: "critical",
+  rushAsk: "critical",
+  rushWell: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */
@@ -229,7 +237,8 @@ const spoken = new Set<string>();
  */
 export function kingSay(cue: KingCue, key: string, now = Date.now(), rng: () => number = Math.random): string | null {
   // Fallen, he stays silent (Eric, Oct 9: the blizzard's word too), but for his last words and his return.
-  if (fallen && cue !== "lastWords" && cue !== "rise") return null;
+  // (Dash's Scramble Rush: his word with it, fallen or not.)
+  if (fallen && cue !== "lastWords" && cue !== "rise" && cue !== "rushAsk" && cue !== "rushWell") return null;
   if (spoken.has(key)) return null;
   spoken.add(key);
   if (spoken.size > 300) spoken.clear();

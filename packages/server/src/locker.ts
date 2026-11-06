@@ -130,15 +130,14 @@ export async function openCrate(
   const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const op = request ? keyFor(opKeys.request("open", request), me) : `open:${id}`;
   const done = await applyOp(sql, me, { id: op, reason: "crate open", now, legs: [leg.item(userId, { ...roll, id }, crate.id, now)] });
-  if (done === "replay") {
-    const first = await openedItem(sql, userId, op);
-    if (first) return { ok: true, ...first, locker: await lockerState(sql, userId, admin) };
-  }
-  if (done !== "applied") return { ok: false, message: "No such crate." };
-  return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId, admin) };
+  // Every attempt answers the item as stored (this one's, or on a replay the first's), never its own roll, so every answer to one
+  // request is the same whichever attempt applied it.
+  const opened = done === "refused" ? null : await openedItem(sql, userId, op);
+  if (!opened) return { ok: false, message: "No such crate." };
+  return { ok: true, ...opened, locker: await lockerState(sql, userId, admin) };
 }
 
-/** The item an open (op `opId`) put in your locker, as its answer was: a retry of the open answers it again. Null: none, or gone since. */
+/** The item an open (op `opId`) put in your locker, as stored: every attempt at the open answers this. Null: none, or gone since. */
 export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance } | null> {
   const r = await sql.first<ItemInstance & { fischer: number }>(
     `SELECT i.id, i.def, i.color, i.color2, i.blemish, i.seed, i.fischer FROM ledger l JOIN items i ON i.id = l.asset_id AND i.user_id = ?

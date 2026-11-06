@@ -168,6 +168,9 @@ const ASSAULTS = [
   // (Timber, Nov 2: his hammer's whacks and knocks, then his plank's bat and smash; his attack's own sounds.)
   // (Admins first, BOSS_ADMIN_FIRST: an admin's battle, or `boss=timber` falls back to another boss.)
   { id: "timber", name: "Timber", facesLeft: true, sounds: ["timberWhack", "timberKnock"], admin: true },
+  // (Dash, Nov 6: "when you blunder, all bosses are supposed to jump on the board and attack; he never had that built": his dash in,
+  // ten claw swipes, his whoosh and snap. Admins first, as Timber.)
+  { id: "dash", name: "Dash", facesLeft: true, sounds: ["dashWhoosh", "dashSnap"], admin: true },
 ];
 /** How many squares wide a boss's attack figure is drawn (its kit's: before the shrink near the board's top). */
 const attackWidth = (id: string) => {

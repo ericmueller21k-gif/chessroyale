@@ -1,4 +1,5 @@
 import { hollowLobby } from "./bosses/hollow.ts";
+import { dashLobby } from "./bosses/dash.ts";
 import type { BossLobby } from "./bosses/base.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
@@ -34,6 +35,7 @@ import {
   type ClientMessage,
   type NetFinal,
   type NetStanding,
+  type NetRush,
   type Opening,
   type RoundReport,
   type RunnerSnapshot,
@@ -218,6 +220,7 @@ export type Timer =
   | "autoGo"
   | "judgeTick"
   | "lights"
+  | "rush"
   | "partyStart";
 
 /**
@@ -338,6 +341,8 @@ export interface LobbyRecord {
    * taps round by round, with their times (ms from `at`: each gives its player a second more, lightsDeadline).
    */
   lights?: { key: string; at: number; ended: number; endedAt?: number[]; taps: Record<string, string[][]>; tapAt?: Record<string, number[][]> };
+  /** Dash's Scramble Rush in progress (the crowd's turn waits; the phase "boss"): when it began, each person's placements, and once judged, its verdict's end. */
+  rush?: { key: string; at: number; places: Record<string, Record<string, string>>; judged?: boolean };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:
@@ -613,6 +618,8 @@ export class LobbyCore {
       setTimer: (kind, at) => lobby.setTimer(kind, at),
       standings: () => lobby.standings(),
       requestBoss: () => lobby.requestBoss(),
+      nextRound: () => lobby.nextRound(),
+      broadcastBoss: (until, opts) => lobby.broadcast(lobby.bossMessage(until, opts)),
       doneThisRound: (playerId) => lobby.doneThisRound(playerId),
       thinkTime: (round, upTo) => lobby.thinkTime(round, upTo),
       pick: (playerId, key, move, away) => lobby.pick(playerId, key, move, away),
@@ -1325,6 +1332,8 @@ export class LobbyCore {
         return hollowLobby.darkTry(this.bossLobby, playerId, msg.key, msg.move, msg.away);
       case "lightsTap":
         return hollowLobby.lightsTap(this.bossLobby, playerId, msg.key, msg.round, msg.square);
+      case "rushPlace":
+        return dashLobby.rushPlace(this.bossLobby, playerId, msg.key, msg.places);
       case "kick":
         return this.partyKick(playerId, msg.playerId);
       case "hello":
@@ -1465,6 +1474,8 @@ export class LobbyCore {
         return this.judgeTick();
       case "lights":
         return hollowLobby.lightsStep(this.bossLobby);
+      case "rush":
+        return dashLobby.rushStep(this.bossLobby);
       case "partyStart":
         // A party's battle: the members who came by now begin it. Nobody here just now: it waits again, and the first to
         // (re)connect begins it (connect's dueToStart), so it never strands.
@@ -1568,8 +1579,8 @@ export class LobbyCore {
 
   // ---------------- Boss battle ----------------
 
-  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean } = {}): Outgoing {
-    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}) };
+  private bossMessage(until: number, opts: { thinking?: boolean; justKilled?: string | null; fall?: boolean; rush?: NetRush } = {}): Outgoing {
+    return { t: "boss", boss: this.runner!.bossView(opts.justKilled ?? null)!, standings: this.standings(), until, ...(opts.thinking ? { thinking: true } : {}), ...(opts.fall ? { fall: true } : {}), ...(opts.rush ? { rush: opts.rush } : {}) };
   }
 
   /** The boss's turn: everyone sees it thinking while the host's engine plays its move. */
@@ -1925,7 +1936,7 @@ export class LobbyCore {
       // His extra move: not the crowd's, so nothing is scored; its banner plays out, then the crowd's turn.
       this.r.bossKind = undefined;
       const played = this.runner!.applyExtraMove(move || null);
-      const until = this.io.now() + (played ? powerMomentMs([{ kind: "extra" }]) : 0);
+      const until = this.io.now() + (played ? powerMomentMs([{ kind: this.runner!.boss?.id === "dash" ? "rushExtra" : "extra" }]) : 0);
       if (played) this.broadcast(this.bossMessage(until));
       return this.setTimer("nextRound", until);
     }
@@ -2007,7 +2018,9 @@ export class LobbyCore {
       // hop, Smudgy's Repaint and the hippo gardener's watering (each his whole turn) come at the start of his turn, before
       // his move. The circus tiger's hoops come after his move, with it: requestBoss.)
       if (runner.bossToMove()) return runner.lightsOutDue() ? hollowLobby.startLights(this.bossLobby) : runner.bounceDue() ? this.requestBounce() : runner.alfilStep() ? this.requestAlfil() : runner.carrotDue() ? this.requestCarrots() : runner.repaintDue() ? this.requestRepaint() : runner.waterDue() ? this.requestWater() : runner.hopDue() ? this.requestHop() : this.requestBoss();
-      // (A failed Lights out: his extra move, after his own and before the crowd's turn.)
+      // (Dash's Scramble Rush, as the crowd's turn begins: the turn waits for it.)
+      if (runner.rushDue()) return dashLobby.startRush(this.bossLobby);
+      // (A failed Lights out or Scramble Rush: his extra move, after his own and before the crowd's turn.)
       if (runner.extraMoveDue()) return this.requestExtra();
       // (Boingo's funhouse: his move for the crowd, as its turn begins.)
       if (runner.funhouseDue()) return this.requestFunhouse();
