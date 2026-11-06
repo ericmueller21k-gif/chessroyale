@@ -1048,7 +1048,7 @@ export function HomeScreen({
        * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
        * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
-      <Walkthrough />
+      <Walkthrough onShop={onShop} />
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">

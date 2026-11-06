@@ -3,8 +3,11 @@ import {
   TUTORIAL_CRATE_GOALS,
   TUTORIAL_SPOTS,
   crateBars,
+  shouldSaveSeen,
   shouldShowTutorial,
+  slideSpotId,
   tutorialSlides,
+  TUTORIAL_CRATE_LABEL,
 } from "../src/tutorial.ts";
 
 describe("tutorial slides", () => {
@@ -45,5 +48,25 @@ describe("stored dismissal", () => {
     expect(shouldShowTutorial(undefined)).toBe(true);
     expect(shouldShowTutorial("0")).toBe(true);
     expect(shouldShowTutorial("1")).toBe(false);
+  });
+});
+
+describe("the crates slide and finishing", () => {
+  it("lights up the shop on the crates slide, its own spot on a spot slide, and nothing on the Handbook slide", () => {
+    const slides = tutorialSlides();
+    expect(slideSpotId(slides[0])).toBe("play");
+    expect(slideSpotId(slides[7])).toBeNull();
+    expect(slideSpotId(slides[8])).toBe("shop");
+  });
+
+  it("saves the flag when all nine are finished, and on Skip only if the box is ticked", () => {
+    expect(shouldSaveSeen(true, false)).toBe(true);
+    expect(shouldSaveSeen(false, true)).toBe(true);
+    expect(shouldSaveSeen(false, false)).toBe(false);
+  });
+
+  it("labels each crate by its goal", () => {
+    expect(TUTORIAL_CRATE_LABEL(5)).toBe("5 games");
+    expect(TUTORIAL_CRATE_LABEL(25)).toBe("25 games");
   });
 });

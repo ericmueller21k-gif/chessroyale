@@ -72,3 +72,21 @@ export const TUTORIAL_SEEN_KEY = "hunchess.tutorial.dismissed";
 export function shouldShowTutorial(stored: string | null | undefined): boolean {
   return stored !== "1";
 }
+
+/** The `data-tour` spot a slide lights up: its own spot, the shop on the crates slide, none on the Handbook slide. */
+export function slideSpotId(slide: TutorialSlide): TutorialSpot["id"] | null {
+  if (slide.kind === "spot") return slide.spot.id;
+  if (slide.kind === "crates") return "shop";
+  return null;
+}
+
+/**
+ * Whether ending the walkthrough saves "don't show again". Finishing every slide always does (the player has seen it all);
+ * Skip saves only when the box is ticked. Unticked, a tap-through that stops early shows again next visit.
+ */
+export function shouldSaveSeen(completed: boolean, dontShowAgain: boolean): boolean {
+  return completed || dontShowAgain;
+}
+
+/** The crate rows on the last slide: each Welcome Crate's goal, with its label. */
+export const TUTORIAL_CRATE_LABEL = (goal: number) => `${goal} games`;
