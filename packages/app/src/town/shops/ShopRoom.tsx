@@ -3126,9 +3126,11 @@ function startRoom(
   };
   const draw = (now: number) => {
     emN = 0;
+    // (Closing in on the claw machine, the camera comes down to the Close camera too, so you look at the cabinet, not down into it.)
+    const zoomNow = cab ? zoomCur * (1 - clawE) : zoomCur;
     for (const k of CAM_KEYS) {
-      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomCur;
-      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomCur;
+      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomNow;
+      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomNow;
     }
     setView(v, W, H, 0, 1, 0, 0, sets);
     if (cab && clawE > 0) clawLens();

@@ -1242,8 +1242,8 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   // (Clear of the Shopkeeper's talking range, whose card would take the next tap, and of the claw machine standing in front of the
   // race's east end.)
   await walkTo([10, 8]);
-  await walkTo([15, 8]);
-  await walkTo([16, 3]);
+  await walkTo([13, 8]);
+  await walkTo([16, 4]);
   await still("squirt-race");
   await walkTo([16, 9]);
   await walkTo([17, 13]);

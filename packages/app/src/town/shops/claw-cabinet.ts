@@ -113,17 +113,6 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
     hits.slot.y1 = Q[3]!.y;
     hits.slot.on = true;
   }
-  // A gold arrow bobbing over the slot while the controls are shut: put a coin in here.
-  if (arrow && p3(sl.x, z1 + 0.02, sl.y + sl.hh + 0.1 + 0.04 * Math.sin(now / 180), Q[4]!)) {
-    const k = Math.max(6, 0.09 * Q[4]!.k);
-    g.fillStyle = "#ffd04a";
-    g.beginPath();
-    g.moveTo(Q[4]!.x - k, Q[4]!.y - k);
-    g.lineTo(Q[4]!.x + k, Q[4]!.y - k);
-    g.lineTo(Q[4]!.x, Q[4]!.y);
-    g.closePath();
-    g.fill();
-  }
   if (pose.coin >= 0 && pose.coin < 1 && p3(sl.x, z1 + 0.02, sl.y + sl.hh + 0.35 * (1 - pose.coin), Q[4]!)) {
     g.fillStyle = "#ffd04a";
     g.beginPath();
@@ -144,6 +133,18 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
     g.fillStyle = "#ffd04a";
     g.beginPath();
     g.ellipse(Q[6]!.x, Q[6]!.y, Math.max(3, 0.09 * Q[6]!.k), Math.max(2, 0.04 * Q[6]!.k), 0, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // A gold arrow bobbing over the slot while the controls are shut: put a coin in here.
+  if (arrow && p3(sl.x, z1 + 0.01, sl.y + sl.hh + 0.03 + 0.03 * Math.sin(now / 180), Q[4]!)) {
+    const k = Math.max(6, 0.07 * Q[4]!.k);
+    g.fillStyle = "#ffd04a";
+    g.beginPath();
+    g.moveTo(Q[4]!.x - k, Q[4]!.y - k);
+    g.lineTo(Q[4]!.x + k, Q[4]!.y - k);
+    g.lineTo(Q[4]!.x, Q[4]!.y);
+    g.closePath();
     g.fill();
   }
 
