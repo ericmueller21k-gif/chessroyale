@@ -14,8 +14,8 @@ export interface ProfileTarget {
   /** With `you`: your public profile, the page others see ("View public profile" on yours), not your own page. */
   public?: boolean;
   bot?: boolean;
-  /** Your own profile, opened at a section (the shop's "Pick these in your profile": Quick chat and emoji). */
-  section?: "chat";
+  /** Your own profile, opened at a section (the shop's "Pick these in your profile": Quick chat and emoji; "icon": the icon picker, from home). */
+  section?: "chat" | "icon";
   /** Your own profile, opened at one of your recent matches (when it was played): "See your result" for a closed lobby. */
   match?: number;
 }

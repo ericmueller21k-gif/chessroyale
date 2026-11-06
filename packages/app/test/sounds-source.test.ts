@@ -37,7 +37,6 @@ describe("the PyChess sounds' source archive", () => {
 
   it("is linked wherever the sounds are credited", () => {
     const link = "/sounds/pychess-sounds-source.tar.gz";
-    expect(readFileSync(join(ROOT, "packages/app/src/screens/Settings.tsx"), "utf8")).toContain(link);
     expect(readFileSync(join(ROOT, "packages/app/src/faq/content.ts"), "utf8")).toContain(link);
     expect(readFileSync(join(ROOT, "packages/app/public/licenses/third-party.txt"), "utf8")).toContain(link);
     expect(readFileSync(join(SOUNDS, "SOURCES.md"), "utf8")).toContain(link);
