@@ -24,6 +24,35 @@ function readSeen(): string | null {
   }
 }
 
+/** Settings' "Show the walkthrough again": a one-shot session flag (for when Home mounts) and an event (when it's mounted). */
+export const WALKTHROUGH_REPLAY_KEY = "hunchess.tutorial.replay";
+export const WALKTHROUGH_REPLAY_EVENT = "hunchess:walkthrough";
+
+/** Clears the "don't show again" flag and asks for the walkthrough to start over. */
+export function replayWalkthrough(): void {
+  try {
+    localStorage.removeItem(TUTORIAL_SEEN_KEY);
+  } catch {
+    /* no storage */
+  }
+  try {
+    sessionStorage.setItem(WALKTHROUGH_REPLAY_KEY, "1");
+  } catch {
+    /* no storage */
+  }
+  dispatchEvent(new Event(WALKTHROUGH_REPLAY_EVENT));
+}
+
+function takeReplay(): boolean {
+  try {
+    const on = sessionStorage.getItem(WALKTHROUGH_REPLAY_KEY) === "1";
+    sessionStorage.removeItem(WALKTHROUGH_REPLAY_KEY);
+    return on;
+  } catch {
+    return false;
+  }
+}
+
 function saveSeen(): void {
   try {
     localStorage.setItem(TUTORIAL_SEEN_KEY, "1");
@@ -40,8 +69,18 @@ function spotBox(slide: TutorialSlide): DOMRect | null {
 }
 
 export function Walkthrough({ startOpen }: { startOpen?: boolean }) {
-  const [open, setOpen] = useState<boolean>(() => startOpen ?? shouldShowTutorial(readSeen()));
+  const [open, setOpen] = useState<boolean>(() => startOpen ?? (takeReplay() || shouldShowTutorial(readSeen())));
   const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const again = () => {
+      takeReplay();
+      setStep(0);
+      setOpen(true);
+    };
+    addEventListener(WALKTHROUGH_REPLAY_EVENT, again);
+    return () => removeEventListener(WALKTHROUGH_REPLAY_EVENT, again);
+  }, []);
   const [dontShow, setDontShow] = useState(true);
   const [box, setBox] = useState<DOMRect | null>(null);
   const slides = tutorialSlides();

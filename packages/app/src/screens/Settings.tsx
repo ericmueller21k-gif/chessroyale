@@ -1,3 +1,4 @@
+import { replayWalkthrough } from "../components/Walkthrough.tsx";
 import { useEffect, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { InstallCard } from "../components/InstallCard.tsx";
@@ -326,6 +327,9 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           </button>
           <button type="button" class="fd-row-link" onClick={() => onFaq()}>
             📖 HunChess Handbook ›
+          </button>
+          <button type="button" class="fd-row-link" onClick={() => { replayWalkthrough(); onBack(); }}>
+            👋 Show the walkthrough again ›
           </button>
         </section>
       )}
