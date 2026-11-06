@@ -330,3 +330,6 @@ One Opus at a time, in order:
 3. Sprite kit: the infrastructure, plus one pilot boss. The pilot's look needs Eric's OK before its merge (I promised that); the infrastructure merges on green.
 4. Intros as data (architecture audit row 8).
 BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the claw machine on the kit (stills sent, no answer), and the move-confirm GIFs (part of the settings work).
+- **Eric, Nov 6 ~20:15:**
+  - The claw on the kit is APPROVED ("fine with new design … update it later"). Merge claude/kit-claw into claude/boingo-home, then finish Boingo's room (the resume list: fps, computer stills, GIFs, areas.json, docs, PR) and send Eric the room stills before live.
+  - Settings: I design the mockup myself and SEND IT FIRST for his OK (Sounds and Gameplay pages, plus the move-confirm style picker), then build after his OK.
