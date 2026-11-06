@@ -32,6 +32,13 @@ import {
   adminFirst,
   tokenBossName,
   tokenBosses,
+  HUNCHESS_FINISH,
+  WELCOME_CRATE,
+  WELCOME_GIFT,
+  WELCOME_TEXT,
+  isHunchess,
+  isWelcomeCrate,
+  showsPurity,
   type BossCrateDef,
   type CrateDef,
   type CrateLook,
@@ -43,7 +50,7 @@ import {
 } from "@chessroyale/core";
 import { deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, openCrate } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
-import { Avatar, BetaCrateArt, FischerArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
+import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
 import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -65,7 +72,14 @@ export const colorName = (it: Colored) => {
   const c2 = secondColor(it);
   return itemColor(it.color).name + (c2 ? ` & ${itemColor(c2).name}` : "");
 };
-export const finishLine = (it: Colored & { blemish: number }) => `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%`;
+export const finishLine = (it: Colored & { blemish: number }) => (showsPurity(it.def) ? `${colorName(it)} · Purity ${purity(it.blemish).toFixed(1)}%` : HUNCHESS_FINISH_NAME);
+/** A HunChess ride's finish, in place of its color and purity (Eric, Nov 6: "Purity isn't listed for these"). */
+const HUNCHESS_FINISH_NAME = "HunChess gold & black";
+
+/** "Not tradeable" (Eric, Nov 6): on the Welcome Crate and its rides, wherever they show. */
+export function NotTradeable() {
+  return <span class="not-tradeable">{WELCOME_TEXT.notTradeable}</span>;
+}
 
 // ---------------- Crates ----------------
 
@@ -76,6 +90,7 @@ export const finishLine = (it: Colored & { blemish: number }) => `${colorName(it
 const CRATE_LOOKS: Record<CrateLook, { Crate: () => JSX.Element; Box: (p: { color: string }) => JSX.Element; box: string; boxes: string }> = {
   winter: { Crate: WinterCrateArt, Box: PresentArt, box: "present", boxes: "Presents" },
   beta: { Crate: BetaCrateArt, Box: SupplyBoxArt, box: "supply box", boxes: "Supply boxes" },
+  hunchess: { Crate: HunchessCrateArt, Box: HunchessBoxArt, box: "box", boxes: "Boxes" },
 };
 
 /**
@@ -105,7 +120,7 @@ function getUnseen(): Unseen | null {
 }
 
 /** A crate by its id: the Crates tab's own (free while testing), or a boss's (bought in its shop, held until you open it: Nov 2). */
-const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id);
+const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id) ?? (isWelcomeCrate(id) ? WELCOME_CRATE : undefined);
 const isBossCrate = (c: CrateDef): c is BossCrateDef => "boss" in c;
 /** "Babur's", "Puddles'" (as his home's and his crate's names have it). */
 const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
@@ -153,6 +168,7 @@ export function CratesPanel() {
         </span>
         <span class="stock">Crates × {count(locker?.crates)}</span>
       </div>
+      <WelcomeRow onOpen={() => setOpen(WELCOME_CRATE)} />
       <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
       {profile?.admin && <AdminGrants />}
       {CRATES.map((c) => {
@@ -203,6 +219,42 @@ export function CratesPanel() {
         );
       })}
     </div>
+  );
+}
+
+/** Where your Welcome Crate is: "ready" (yours to open), "opened", or not earned yet ("locked"; a guest's always is). */
+const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) => profile?.locker?.welcome ?? { games: 0, status: "locked" as const, notice: false };
+/** The line under the crate saying where yours is. */
+function welcomeLine(w: { games: number; status: string }, signedIn: boolean): string {
+  if (w.status === "ready") return "You have 1. Open it!";
+  if (w.status === "opened") return "Opened. Its ride is in your locker.";
+  return signedIn ? WELCOME_TEXT.progress(w.games) : `${WELCOME_TEXT.progress(w.games)}. Sign in to earn it.`;
+}
+
+/**
+ * The HunChess Welcome Crate's row (Eric, Nov 6), first in the Crates tab: the gold-and-black crate, its name, "Thank you for being an
+ * early tester!", "Not tradeable", and where yours is (the progress hint until it's earned: shown, greyed, not hidden).
+ */
+function WelcomeRow({ onOpen }: { onOpen: () => void }) {
+  const { profile } = useAccount();
+  const w = welcomeOf(profile);
+  return (
+    <button type="button" class={`ff-window crate-row welcome-crate-row${w.status === "ready" ? "" : " none"}`} data-crate={WELCOME_CRATE.id} data-welcome={w.status} onClick={onOpen}>
+      <span class="crate-row-art">
+        <HunchessCrateArt />
+      </span>
+      <span class="crate-row-text">
+        <strong>{WELCOME_TEXT.name}</strong>
+        <span class="crate-row-blurb welcome-thanks">{WELCOME_TEXT.thanks}</span>
+        <span class="crate-row-held welcome-progress">{welcomeLine(w, !!profile?.user.signedIn)}</span>
+        <span>
+          <NotTradeable />
+        </span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
   );
 }
 
@@ -273,6 +325,7 @@ function AdminGrants() {
 }
 
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
+  if (crate.id === WELCOME_CRATE.id) return <WelcomePage resume={resume} onBack={onBack} />;
   // A boss crate opens only one you hold (the server's, once each), never with a test switch.
   const boss = isBossCrate(crate) ? crate : null;
   const held = heldOf(useAccount().profile?.locker, crate);
@@ -416,6 +469,70 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
   );
 }
 
+/**
+ * The Welcome Crate's page (Eric, Nov 6): the crate, its name, "Thank you for being an early tester!", "Not tradeable", where yours is,
+ * and every ride it can give (each as likely), in the HunChess colorway, with no purity anywhere. "▶ Open" opens yours (once: greyed
+ * until it's earned and once it's opened), with the Crates tab's own strip and reveal.
+ */
+function WelcomePage({ resume, onBack }: { resume?: Unseen; onBack: () => void }) {
+  const { profile } = useAccount();
+  const w = welcomeOf(profile);
+  const [opening, setOpening] = useState(!!resume);
+  if (opening) return <CrateOpening crate={WELCOME_CRATE} force={{}} resume={resume} onClose={() => setOpening(false)} />;
+  return (
+    <div class="crate-page welcome-page">
+      <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
+        ‹ Crates
+      </button>
+      <div class="ff-window crate-hero welcome-crate-hero">
+        <span class="crate-hero-art">
+          <HunchessCrateArt />
+        </span>
+        <strong>{WELCOME_TEXT.name}</strong>
+        <span class="small welcome-thanks">{WELCOME_TEXT.thanks}</span>
+        <NotTradeable />
+        <span class="small crate-held welcome-progress" data-welcome={w.status}>
+          {welcomeLine(w, !!profile?.user.signedIn)}
+        </span>
+      </div>
+      <p class="small muted">
+        One per account, for finishing {WELCOME_GIFT.games} games in any mode or against any boss. It holds one ride, any of the game's
+        rides, each as likely, in HunChess gold and black. It and its ride can't be traded.
+      </p>
+      <h3 class="ff-title">Possible rides</h3>
+      <div class="odds-list">
+        {WELCOME_CRATE.items.map((def) => {
+          const d = itemDef(def)!;
+          return (
+            <div key={def} class="odds-row" style={{ "--tier": "#f2c14e" }}>
+              <span class="odds-art">
+                <ItemArt def={def} finish={{ ...HUNCHESS_FINISH, seed: 1 }} />
+              </span>
+              <span class="odds-text">
+                <strong>{d.name}</strong>
+                <span class="odds-tier">Ride · HunChess gold & black</span>
+              </span>
+              <span class="odds-pct">{pct(1 / WELCOME_CRATE.items.length)}</span>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        class="ff-button"
+        disabled={w.status !== "ready"}
+        onClick={() => {
+          unlockAudio();
+          play("menuSelect");
+          setOpening(true);
+        }}
+      >
+        ▶ Open
+      </button>
+    </div>
+  );
+}
+
 // ---------------- Opening ----------------
 
 type Tile =
@@ -443,7 +560,11 @@ const presentTile = (crate: CrateDef) => (): Tile => {
   return tier === FISCHER ? { kind: "fischer" } : { kind: "present", tier };
 };
 /** A second spin's decoys: items by their odds. */
-const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile => ({ kind: "item", def: pickWeighted(list).item, finish: decoyFinish() });
+const itemTile = (list: readonly { item: string; weight: number }[]) => (): Tile => {
+  const def = pickWeighted(list).item;
+  // (A HunChess ride's decoy in its own finish: no blotches, no other colors.)
+  return { kind: "item", def, finish: isHunchess(def) ? { ...HUNCHESS_FINISH, seed: 1 } : decoyFinish() };
+};
 
 function TileView({ tile, look }: { tile: Tile; look: CrateLook }) {
   if (tile.kind === "fischer") {
@@ -535,7 +656,7 @@ function CrateOpening({
 }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
   // "Open another": a boss crate only while you hold one more (greyed at none); the Crates tab's own, always.
-  const more = !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
+  const more = isWelcomeCrate(crate.id) ? false : !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
   const [round, setRound] = useState(0);
@@ -588,7 +709,7 @@ function CrateOpening({
       {strips && stage === "spin" && <Spin key={`a${round}`} tiles={strips.one} land={38} ms={6200} look={crate.look} onDone={afterFirst} />}
       {strips && stage === "fischer" && (
         <div class="fischer-stage">
-          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub="Legendary or Mythic" sound="bannerStart" ms={fischerBannerMs()} />
+          <FightBanner tone="hero" face={<FischerArt />} text="FISCHER RANDOM!" sub={isWelcomeCrate(crate.id) ? "A HunChess ride" : "Legendary or Mythic"} sound="bannerStart" ms={fischerBannerMs()} />
         </div>
       )}
       {strips && stage === "unwrap" && <Unwrap tier={strips.tier} look={crate.look} />}
@@ -630,7 +751,9 @@ function Unwrap({ tier, look }: { tier: PresentTier; look: CrateLook }) {
 function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; again?: boolean; onAgain: () => void; onClose: () => void }) {
   const d = itemDef(item.def)!;
   const t = tierInfo(d.tier);
-  const shiny = isShiny(item.blemish);
+  // (A HunChess ride: no purity, so no shine named either; Eric, Nov 6.)
+  const hc = isHunchess(item.def);
+  const shiny = !hc && isShiny(item.blemish);
   const special = d.tier === "legendary" || d.tier === "mythic";
   const [worn, setWorn] = useState(false);
   useEffect(() => {
@@ -649,6 +772,7 @@ function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; 
         {shiny ? " ✨" : ""}
       </span>
       {shiny && <span class="reveal-shiny">Shiny!</span>}
+      {hc && <NotTradeable />}
       <span class="reveal-desc">{d.description}</span>
       <div class="reveal-actions">
         <button
@@ -732,12 +856,14 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
             const worn = wornIn(s);
             // (An admin copy is never stacked: it's there only for an item you don't own.)
             const admin = isAdminCopy(it.id);
+            // (A HunChess ride, the Welcome Crate's: no purity, and "Not tradeable"; Eric, Nov 6.)
+            const hc = isHunchess(it.def);
             return (
               <HoldButton
                 key={s.key}
-                class={`locker-item${worn ? " worn" : ""}${isShiny(it.blemish) ? " shiny" : ""}`}
+                class={`locker-item${worn ? " worn" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
-                label={`${d.name}, ${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
+                label={`${d.name}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {
                   play("menuSelect");
                   void equipLockerItem(d.slot, worn ? null : it.id);
@@ -753,10 +879,19 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
               >
                 <ItemArt def={it.def} finish={it} />
                 <strong>{d.name}</strong>
-                <span class="small">{colorName(it)}</span>
-                <span class="small muted">
-                  {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
-                </span>
+                {hc ? (
+                  <>
+                    <span class="small">HunChess</span>
+                    <NotTradeable />
+                  </>
+                ) : (
+                  <>
+                    <span class="small">{colorName(it)}</span>
+                    <span class="small muted">
+                      {purity(it.blemish).toFixed(1)}%{isShiny(it.blemish) ? " ✨" : ""}
+                    </span>
+                  </>
+                )}
                 {worn && <span class="locker-worn">Worn</span>}
                 {s.items.length > 1 && <span class="locker-count">×{s.items.length}</span>}
                 {admin && <span class="locker-admin">Admin</span>}

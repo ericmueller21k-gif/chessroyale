@@ -1,4 +1,4 @@
-import { RIDES } from "@chessroyale/core";
+import { RIDES, hunchessBase } from "@chessroyale/core";
 import { rideScaleAsked } from "../../test-switches.ts";
 
 /**
@@ -8,7 +8,7 @@ import { rideScaleAsked } from "../../test-switches.ts";
  */
 
 /** A ride's size now: this page's `?rideScale=` (an admin's), else its own (RIDES.scale), else every ride's (RIDES.defaultScale). */
-export const rideScale = (id: string): number => rideScaleAsked() ?? RIDES.scale[id] ?? RIDES.defaultScale;
+export const rideScale = (id: string): number => rideScaleAsked() ?? RIDES.scale[hunchessBase(id) ?? id] ?? RIDES.defaultScale;
 
 /** How much faster than on foot a pawn walks the town on this ride (RIDES.speed; 1: no faster). */
 export const rideSpeed = (id: string | undefined): number => (id ? (RIDES.speed[id] ?? 1) : 1);

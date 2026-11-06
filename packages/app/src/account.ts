@@ -256,6 +256,24 @@ export interface Locker {
   tokens?: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
   bossCrates?: Record<string, number>;
+  /**
+   * The HunChess Welcome Crate (Nov 6; server/welcome.ts): earned ("ready") or opened, or not yet ("locked", with the finished games so
+   * far), and whether its one-time notice is due. Missing from an older server.
+   */
+  welcome?: { games: number; status: "locked" | "ready" | "opened"; notice: boolean; item?: string };
+}
+
+/** Closes the "You earned a Welcome Crate!" notice for good (the server keeps that it was seen). */
+export async function welcomeNoticeSeen(): Promise<void> {
+  const l = state.profile?.locker;
+  // (Closed here at once; the server's answer follows.)
+  if (state.profile && l?.welcome) set({ profile: { ...state.profile, locker: { ...l, welcome: { ...l.welcome, notice: false } } } });
+  try {
+    const locker = await api<Locker>("/api/locker/welcome/seen", { method: "POST", body: "{}" });
+    if (state.profile) set({ profile: { ...state.profile, locker } });
+  } catch {
+    // Not important enough to bother the player: it shows again next time.
+  }
 }
 
 /** Your crate keys and one boss's tokens, as your locker has them now. */
