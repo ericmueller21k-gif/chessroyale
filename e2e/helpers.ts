@@ -460,7 +460,9 @@ export async function lookDrag(page: Page, box: { x: number; y: number; width: n
   const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", x: number, buttons: number) =>
     cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
   await ev("mouseMoved", at(0), 0);
-  await Promise.all([ev("mousePressed", at(0), 1), ev("mouseMoved", at(1), 1)]);
+  // (The first move well past the town's drag threshold, `dragPx` 8, however short the steps: a drag from its first move.)
+  const first = Math.abs(at(1) - at(0)) >= 16 || share === 0 ? at(1) : at(0) + Math.sign(share) * 16;
+  await Promise.all([ev("mousePressed", at(0), 1), ev("mouseMoved", first, 1)]);
   for (let i = 2; i <= steps; i++) {
     await ev("mouseMoved", at(i), 1);
     if (pauseMs) await page.waitForTimeout(pauseMs);

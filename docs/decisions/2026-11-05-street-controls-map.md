@@ -56,6 +56,9 @@ Colosseum, the park … tap it again or tap away, back to normal size."
 - **Built from the plan's data** (`town/minimap.ts`): `street.ts`'s ground (streets, paving, lawns, gardens, lots), the homes' lots as
   soft blocks, the walls (lots of kind `wall`) as lines, and the Colosseum as a band on the top edge over its columns. It follows any
   change to `street-plan.json`. Its body runs from the south edge to the last row with anything on it but the grove and the Colosseum.
+- **After the north edge (#511):** the map follows its plan with no change to the code that reads it. The back wall and its gates are
+  lines on the top edge. The Colosseum is a thin band (one square high) over its columns, and its walls and the plaza's (ground `W`) are
+  dark.
 - **Small:** top right, partly see-through (`mapOpacity` 0.7), with rounded corners. It's `mapShare` (26%) of the box's width on a
   phone and `mapShareComputer` (13%) in a computer's frame, at most `mapMaxPx`. No labels. Your dot is bright, with a small arrow the way
   the camera faces, so the base heading shows at a glance.

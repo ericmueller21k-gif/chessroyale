@@ -97,6 +97,9 @@ async function drag(page: Page, share: number) {
 // round 4 walked along it.)
 test("no sky between the fronts at street level: Fountain Street and South Street, looking both ways along each (Canvas 2D and WebGL)", async ({ page }) => {
   test.setTimeout(400_000);
+  // (The minimap off: it's HTML over the world, and with it on the edge chips that keep off its corner move into the sides' strip this
+  // reads, on WebGL. This check is about the world's fronts.)
+  await page.addInitScript(() => localStorage.setItem("brc.townMap", "0"));
   for (const gl of [false, true]) {
     await open(page, "day", gl);
     // (Street level: the mockup's step, 1. The town opens a step further out since Nov 5, which sees over the rows.)
