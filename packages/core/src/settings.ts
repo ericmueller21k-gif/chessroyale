@@ -1656,9 +1656,10 @@ export const BOSS_POWERS = {
    * The most ultimates a boss has in one battle, by BOSS_ROSTER id (one not listed: no cap). Timber's Gnaw at most twice (Eric,
    * Nov 2: "make it so this beaver only ults up to 2 times a game. After 2 times, his meter just stops charging. Otherwise, it's
    * too strong."): after his second his meter stays empty and dimmed for the rest of the battle, and the admins' trigger is gone.
-   * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md.
+   * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
+   * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
    */
-  maxUltimates: { timber: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1673,7 +1674,7 @@ export const BOSS_POWERS = {
   /**
    * Dash's Time Scramble (his ultimate, the rage meter's: rageSpeed.dash; Eric's design): after the usual warning, your next
    * `scrambleMoves` moves get `scrambleSeconds` each (a raid's move timer and a bank alike; a bank still pays for them and still
-   * gets its increment). Eric's 5 and 3.
+   * gets its increment). Eric's 5 and 3. At most maxUltimates.dash a battle.
    */
   scrambleMoves: 5,
   scrambleSeconds: 3,
@@ -1688,6 +1689,35 @@ export const BOSS_POWERS = {
    * other boss waits 1200 (bossThinkMs). A queen taken still waits for QUEEN SLAIN!.
    */
   dashThinkMs: 350,
+  /**
+   * Dash's clock (Eric, Nov 6: "He smacks the clock too much… Just have him smack it every time he moves"): one smack a move of
+   * his, none in his rest loops, and a **clock fit** at most `max` times a battle: `smacks` (3 to 5) quick smacks in a row and a
+   * line about his clock, on crowd turns drawn from the battle's seed between `from` and `to`.
+   */
+  dashClockFit: { max: 2, from: 3, to: 30, smacks: [3, 5] as readonly [number, number] },
+  /**
+   * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
+   * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A
+   * countdown of `countdownMs` ("1.00" to "0.00"); inside it his copies sweep the board from `scatterAt` for `scatterMs`, moving
+   * `pieces` of yours and `pieces` of his (never a king) to empty squares of ranks `ranks`. His line and the God King's
+   * (`linesMs`), then `placeMs` to put them back; then the board as it was, and `resultMs` for the verdict. Under `needCorrect`
+   * of the six back (the crowd's people's mean, its bots' too: each bot puts each back with `botHit`), he moves again at once
+   * (Hollow's quiet extra move). The game's position never changes: only what the screens show.
+   */
+  dashScramble: {
+    from: 7,
+    atMeter: 0.5,
+    pieces: 3,
+    ranks: [3, 6] as readonly [number, number],
+    countdownMs: 5000,
+    scatterAt: 700,
+    scatterMs: 3500,
+    linesMs: 4000,
+    placeMs: 10000,
+    resultMs: 2400,
+    needCorrect: 4,
+    botHit: 0.6,
+  },
 } as const;
 
 /**

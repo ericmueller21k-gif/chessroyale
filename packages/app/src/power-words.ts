@@ -42,6 +42,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   gnaw: "Gnaw",
   clockslap: "steals your time when he takes a piece, Clock Slap",
   scramble: "Time Scramble",
+  rush: "Scramble Rush",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */
