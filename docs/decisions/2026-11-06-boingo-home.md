@@ -28,18 +28,37 @@ No custom intro this round (Eric). Boingo is live, so the room goes to everyone.
 - **The chat's tone** is night (a dark arcade of lights: white words).
 - **The claw machine** stub: `packages/app/src/claw/index.ts`, `openClawMachine(): void`, a small "Coming soon" card closed by a tap.
 
-## Left when paused (02:59 UTC)
+## Eric's correction on the claw machine (Nov 6, relayed by the director)
 
-- The price sign's words drawn on its gold face (`POGO_SIGN` is ready; no room draws sign text yet, so it needs a few lines in
-  `ShopRoom.tsx`'s static layer).
-- The arcade's own ceiling (the tent's for now).
-- The claw machine's walk-up zoom (as the statue's). Its tap is wired (standing at its spot, a tap on the machine's square calls
-  `openClawMachine()`), but on the whole machine, not yet on the coin slot's own box (`SHOP_BOINGO_COIN_SLOT`).
-- The squirt race's win flash and reset are in its frames (two races, a different winner each); the clowns' squirt is drawn in the
-  race piece, not yet its own small character.
-- The unit tests of the claw zoom and of the stub on the slot's tap (the room's, the mat's, the keeper's, the crate's, the race loop's
-  and the lights' are in `packages/app/test/shop-boingo.test.ts`); the e2e of the claw zoom and the challenge; the frame rate against Folio's room; the
-  stills and GIFs on both platforms; the area page; the PR body.
-- The shop e2e (`e2e/shop.spec.ts`, "Boingo's Funhouse") on a phone: Go in, the heading, the night chat tone, the zoomed-out start
-  and the walk to the play structure pass; the hop from (14, 5) to (18, 4) for the race's still doesn't walk (the claw machine stands in
-  front of that square on screen: aim at a square clear of it). The keeper's card and the crate checks after it haven't run yet.
+The claw machine must be "the real claw machine in the room, a big 3D arcade cabinet you walk up to. You watch the cabinet's own claw
+move over the crates inside, grab one, lift it and usually drop it. Not a separate 2D overlay screen." So `claude/claw-machine`
+(e7a50ec0) is merged in with its server, rules, token picker and result texts as built; its 2D roaming-claw screen is retired.
+
+- **The cabinet** (`town/shops/claw-cabinet.ts`): a solid box of 2 x 2 squares drawn in true 3D through the room's camera (`proj` with
+  a lift): base with the coin slot, joystick, button and prize door; glass sides and a glass ceiling; crates piled on felt; the chute;
+  the gantry, trolley and the claw on its cable; a lit header with chasing bulbs. Paths and fills only, no pictures.
+- **The play as the room draws it** (`claw/view.ts`): the controls write the stage and its time (`CLAW_PLAY`); `clawPose` poses the
+  cabinet's claw from them and from the server's answer only. A win: grab, lift, carry to the chute, out into the tray. A loss: usually
+  grabbed and dropped back on the pile partway up, a quarter of the time a slip (cosmetic, from the play's id). STOP only changes where
+  it drops. Unit tests: `packages/app/test/claw-view.test.ts`.
+- **Walking up** to its spot (19, 7) glides the camera in (the statue's way: `SHOP_FEEL.claw`): it comes down to the Close camera and
+  frames the whole cabinet through a longer lens, above the controls. A tap on the cabinet walks you to the spot; a gold arrow bobs
+  over the coin slot; a tap there opens the controls, now a small panel docked at the bottom (196 px), the cabinet in view above.
+- **Kept:** the admins' "Admin: +3 of each token" button and the e2e seed hook (`?clawSeed=`). Retired: the `?claw=1` page-load switch.
+
+## Where it stands (paused at the director's word, Nov 6, ~04:10 UTC: the Colosseum first)
+
+Done and pushed: the room (the arcade ceiling, the price sign's words, the clown attendant), the in-room claw machine above, the unit
+tests (`shop-boingo.test.ts`, `claw-view.test.ts`), and three e2e passing on phone and computer: `e2e/shop.spec.ts` "Boingo's
+Funhouse" (rerouted in short northward hops: a hop toward the camera or more than about four squares away can be off a phone's screen,
+and the keeper's talk range opens his card, which takes the next tap), `e2e/claw.spec.ts` (walk up, the zoom, the slot, the grant, a
+forced win into the tray with Open now, a forced loss that never reaches the chute) and `e2e/boss-challenge.spec.ts` "challenging
+Boingo" (the default intro on his mat, the battle, back where you stood). Stills so far in `docs/boingo-home/` (phone).
+
+Left:
+- The frame rate against Folio's room on a slowed phone (a local measurement spec was written; its run was cut by the pause).
+- Stills on a computer; the GIFs (a squirt race, an in-room claw play: the frames come from `CLAW_SHOTS`).
+- `e2e/areas.json`: Boingo's room and the cabinet's paths (`town/shops/boingo-art.ts`, `claw-cabinet.ts`, `claw/view.ts`) to the shop,
+  claw and challenge specs.
+- The area pages (`docs/areas/town-square.md`, `shop.md`), the claw branch's note and PR body brought in line with the in-room machine,
+  and `docs/boingo-home/pr-body.md` (lane: full e2e, covering the claw).
