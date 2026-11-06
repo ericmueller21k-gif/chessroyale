@@ -140,7 +140,9 @@ async function tapSquare(page: Page, sq: readonly [number, number]) {
 async function arrowStep(page: Page, key: string) {
   const from = await you(page);
   await page.keyboard.down(key);
-  await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).not.toBe(from.join(","));
+  // (Let go the frame you've left your square, not at expect.poll's growing gaps: on a slow runner those let a held key run on for
+  // squares, off the street and onto a sidewalk's lamp.)
+  await page.waitForFunction((f) => document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!.dataset.you !== f, from.join(","), { polling: "raf", timeout: 5000 });
   await page.keyboard.up(key);
   await settle(page);
   return way(from, await you(page));
@@ -246,7 +248,9 @@ for (const backend of ["2d", "webgl"] as const) {
     expect(await arrowStep(page, "ArrowLeft"), "left goes north").toEqual([0, 1]);
     expect(await arrowStep(page, "ArrowRight"), "right goes south").toEqual([0, -1]);
     expect((await cam(page)).base, "the arrows never change it").toBe(90);
-    // A hold to run goes through it too: the finger above your pawn runs you east.
+    // A hold to run goes through it too: the finger above your pawn runs you east. (From the street's middle: a held arrow on a slow
+    // runner can take extra steps, onto a sidewalk with a lamp ahead.)
+    await walkTo(page, [40, 28]);
     const f = await finger(page);
     const from = await you(page);
     const up = await holdPoint(page, "up");
@@ -255,18 +259,24 @@ for (const backend of ["2d", "webgl"] as const) {
     await f.up();
     await settle(page);
     expect(way(from, await you(page)), "a run up goes east").toEqual([1, 0]);
-    // Not snapped (about 54° left of east): a tap eases back to the base heading (east), which stays.
+    // Not snapped (about 54° left of east): a tap eases back to the base heading (east), which stays. (From (6, 28), west of the park, the
+    // zoom at rest: a run on a slow WebGL runner can carry you into the park, whose step out glides the zoom, and a tap point read during
+    // a glide is a square off by the time it lands.)
+    await walkTo(page, [6, 28]);
+    await expect.poll(async () => (await cam(page)).zoom, { timeout: 5000 }).toBe(2);
     await drag(page, -0.3);
     await page.waitForTimeout(300);
     c = await cam(page);
     expect(c.snapped, "not snapped").toBeNull();
     expect(Math.abs(c.heading - 36), "left where it was let go").toBeLessThan(6);
-    const here2 = await you(page);
-    await tapSquare(page, [here2[0] + 2, here2[1]]);
+    // (Two squares east on Fountain Street's middle row: all street, no lamps. Aiming two east of wherever you stood once landed on the
+    // south sidewalk's lamp at (4, 26), after a held arrow's extra step put you on that sidewalk; a tap on a lamp's square walks you
+    // beside it, to (3, 26).)
+    const sq2 = [8, 28] as const;
+    await tapSquare(page, sq2);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(90);
     await settle(page);
-    // (A walk, wherever the turned view's tap point lands: a square either side of it is the same check.)
-    expect(await you(page), "a tap's walk").not.toEqual(here2);
+    expect(await you(page), "walked to the square tapped").toEqual([...sq2]);
     expect((await cam(page)).base, "no lock").toBe(90);
     // Puddles' Botanical Garden: its door's square is on its strip (the camera faces its front, north; the base stays east). A run
     // toward it opens its card, as the arrows do; in and out, the view is north again.

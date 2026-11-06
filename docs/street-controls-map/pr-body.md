@@ -71,6 +71,12 @@ No check that guards a rule in `docs/rules/eric.md` changed.
   opens at step 2 since Nov 5, which sees over the rows, so the check failed there.
 - `e2e/town-controls.spec.ts` "hold to run": its "set off at once" wall-time bound is 2.5 s on 2D and 8 s on software WebGL (the test's
   own round trips on slow frames, not the hold time).
+- `e2e/town-controls.spec.ts` "locking a new view": both taps check the exact square walked to. The second aims at (8, 28) from (6, 28),
+  the zoom at rest. A WebGL miss (one square over) came from the test, not the pick, for two reasons:
+  - It aimed at the south sidewalk's lamp at (4, 26) after a held arrow's extra step put you on that sidewalk, and a tap on a lamp's
+    square walks you beside it, to (3, 26).
+  - A run carried you into the park, where the tap point was read during the zoom's step-out glide.
+  The held arrows now let go the frame you leave your square.
 - `e2e/town-rows.spec.ts`, after the merge: the north edge's rows (Fountain Street at 28, South Street at 13) with this branch's
   zoom steps (opening at 2).
 - New: `packages/app/test/town-controls.test.ts` (28 tests) and `e2e/town-controls.spec.ts` (phone and computer, 2D and WebGL), added
