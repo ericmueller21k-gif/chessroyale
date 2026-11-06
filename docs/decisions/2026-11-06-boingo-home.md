@@ -40,3 +40,6 @@ No custom intro this round (Eric). Boingo is live, so the room goes to everyone.
 - The unit tests of the claw zoom and of the stub on the slot's tap (the room's, the mat's, the keeper's, the crate's, the race loop's
   and the lights' are in `packages/app/test/shop-boingo.test.ts`); the e2e of the claw zoom and the challenge; the frame rate against Folio's room; the
   stills and GIFs on both platforms; the area page; the PR body.
+- The shop e2e (`e2e/shop.spec.ts`, "Boingo's Funhouse") on a phone: Go in, the heading, the night chat tone, the zoomed-out start
+  and the walk to the play structure pass; the hop from (14, 5) to (18, 4) for the race's still doesn't walk (the claw machine stands in
+  front of that square on screen: aim at a square clear of it). The keeper's card and the crate checks after it haven't run yet.
