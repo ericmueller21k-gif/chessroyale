@@ -10,7 +10,9 @@
 #   the full run after each merge. One main run at a time: a push waits for the run going, and only the newest
 #   waiting push runs (it covers the others).
 #
-# Each shard runs whole spec files, spread by their measured time (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result`
+# Each shard runs whole spec files, spread by the plan so the slowest shard ends soonest: by each file's time in each
+# project, as main's last green run measured it (e2e/ci-timings.json for files it didn't), and the order Playwright's 2
+# workers take them in (e2e/ci-select.mjs, `assign`; e2e/ci-shard.mjs shows a shard locally). The `result`
 # job puts one summary on the run's page (flaky tests first, then failed ones, each with its shard and error;
 # e2e/ci-summary.ts, ci-summary-merge.mjs) and is red if the plan or any shard is.
 #
@@ -69,6 +71,7 @@ jobs:
       specs: ${{ steps.plan.outputs.specs }}
       total: ${{ steps.plan.outputs.total }}
       shards: ${{ steps.plan.outputs.shards }}
+      assignment: ${{ steps.plan.outputs.assignment }}
       note: ${{ steps.plan.outputs.note }}
     steps:
       - uses: actions/checkout@v7
@@ -80,6 +83,13 @@ jobs:
           FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          # The test times the shards are spread by: main's last green run's records (each shard's e2e-summary, by file
+          # and project), for every file it measured; e2e/ci-timings.json for the rest, or when they can't be had.
+          last=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/e2e.yml/runs?branch=main&event=push&status=success&per_page=1" \
+            --jq '.workflow_runs[0] | "\(.id) \(.run_number)"' || true)
+          if [ -n "$last" ] && gh run download "${last% *}" -R "$GITHUB_REPOSITORY" -p 'e2e-summary-*' -D e2e-last; then
+            export E2E_LIVE_TIMINGS=e2e-last E2E_LIVE_RUN="${last#* }"
+          fi
           # (HEAD^1: for a pull request, main as it is now. A manual run has no base: everything.)
           if [ "$EVENT" = workflow_dispatch ]; then node e2e/ci-select.mjs full "this is a $EVENT run, which tests everything"
           elif [ "$EVENT" != pull_request ]; then
@@ -119,9 +129,8 @@ jobs:
       # (Relative: in a container job, github.workspace is the runner's path, not the container's.)
       E2E_SUMMARY_FILE: e2e-summary/shard-${{ matrix.shard }}.json
       SHARD: ${{ matrix.shard }}
-      # The plan's spec files (empty: every spec file).
-      SPECS: ${{ needs.plan.outputs.specs }}
-      TOTAL: ${{ needs.plan.outputs.total }}
+      # Each shard's spec files, as the plan spread them (a JSON list of Playwright filters, shard 1 first).
+      ASSIGNMENT: ${{ needs.plan.outputs.assignment }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -138,7 +147,7 @@ jobs:
         run: npm run build -w maia-worker && (cd packages/app && npx vite build)
       - name: Run ${{ format('shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
         run: |
-          files=$(node e2e/ci-shard.mjs "$SHARD" "$TOTAL" $SPECS)
+          files=$(node -p 'JSON.parse(process.env.ASSIGNMENT)[process.env.SHARD - 1] ?? ""')
           echo "Files: $files"
           # (No files would run the whole suite here: never expected, as the plan has a file for every shard.)
           [ -n "$files" ] || { echo "No spec files for this shard"; exit 1; }

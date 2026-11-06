@@ -31,8 +31,22 @@ export declare const MAX_SHARDS: number;
 export declare const SHARD_SECONDS: number;
 export declare function globToRegExp(glob: string): RegExp;
 export declare function specFiles(dir?: string): string[];
-export declare function weigher(timings: Record<string, number>): (file: string) => number;
-export declare function readTimings(dir?: string): Record<string, number>;
+/** Test times by spec file: { phone, desktop } seconds (or an older single number, both projects). */
+export type Timings = Record<string, number | Record<string, number>>;
+export declare const PROJECTS: string[];
+export declare const WORKERS: number;
+export declare function projectWeigher(timings: Timings): (file: string, project: string) => number;
+export declare function weigher(timings: Timings): (file: string) => number;
+export declare function readTimings(dir?: string, live?: string): Timings;
+export declare function readLiveTimings(live: string): Timings;
+export declare function makespan(files: string[], time: (file: string, project: string) => number, workers?: number): number;
+export declare function assign(
+  files: string[],
+  time: (file: string, project: string) => number,
+  total: number,
+  workers?: number,
+): { files: string[]; seconds: number }[];
+export declare function fileFilter(file: string): string;
 export declare function readAreas(dir?: string): Areas;
 export declare function select(changed: string[], areas: Areas, existing: string[], repo?: Repo | null): Picked & { webgl: string[] };
 export declare function readModule(src: string, path?: string): Statement[] | null;
@@ -50,7 +64,8 @@ export declare function allWebgl(areas: Areas, existing: string[]): string[];
 export declare function shardCount(specs: string[], weight: (file: string) => number): number;
 export declare function plan(
   picked: Picked,
-  weight: (file: string) => number,
+  timings: Timings,
   all: string[],
-): { outputs: { specs: string; total: string; shards: string; webgl: string; note: string }; md: string };
+  source?: string,
+): { outputs: { specs: string; total: string; shards: string; assignment: string; note: string }; md: string };
 export declare const WEBGL_JOBS: string[];
