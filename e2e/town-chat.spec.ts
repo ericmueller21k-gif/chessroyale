@@ -441,6 +441,12 @@ test("a tap on the box anywhere but a player's name opens typing: the blur behin
   await expect(lines).toHaveCount(3);
   const box = page.locator(".town-chat");
   const field = page.locator(".tc-form input");
+  // (The lines' web font first: it swaps in when it has loaded, widening the lines, which isn't the typing line moving them. Nov 6, CI:
+  // two lines 154 and 184 px wide before the tap, 162 and 191 after, in the same places.)
+  await page.evaluate(async () => {
+    document.body.getBoundingClientRect();
+    await document.fonts.ready;
+  });
   const b0 = await rectOf(page, ".town-chat");
   const rects = () => page.locator(".tc-line").evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.width, r.height]; }));
   const before = await rects();
