@@ -18,6 +18,7 @@ import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
+import { Walkthrough } from "../components/Walkthrough.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
@@ -1047,6 +1048,7 @@ export function HomeScreen({
        * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
        * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
+      <Walkthrough />
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
