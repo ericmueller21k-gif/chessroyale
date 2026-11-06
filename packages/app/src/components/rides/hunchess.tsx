@@ -7,9 +7,8 @@ import type { RiderDraft, RiderProps, RiderViewDraft, TrailProps } from "./kit.t
  * round it, as an SVG filter on its layers (never on the pawn riding it). One remap for every ride, so a new ride has its colorway
  * with no drawing: its light (luminance) picks the palette's color, darkest to lightest: black, soft black, gold, light gold, cream.
  *
- * Where the remap alone fails, a ride's own levels lift it (`HUNCHESS_LEVELS`): a mostly dark ride (Hollow's Bulb, the Rodeo Bull,
- * the Log Roller) would come out all black, its shapes lost, so its light is stretched up into the golds; the gold trim keeps
- * every ride's outline on a dark page.
+ * Where the remap alone fails, a ride's own levels lift it (`HUNCHESS_LEVELS`: the Rodeo Bull, nearly all dark, would be a black
+ * shape); the gold trim keeps every ride's outline on a dark page. No shine (a HunChess ride shows no purity, so no shiny glint).
  */
 
 /** The palette, darkest to lightest (sRGB, 0 to 1): the stops of the remap, evenly spread over the ride's light. */
@@ -27,20 +26,12 @@ const table = (i: number) => STOPS.map((s) => channel(s, i)).join(" ");
 
 /**
  * A ride's levels before the remap: its light times `gain` plus `lift` (0 to 1). The default (1, 0) is the plain remap. Set by hand
- * from the sheet of every ride (docs/welcome-crate/hunchess-rides.png), for each whose remap read badly.
+ * from the sheet of every ride (docs/welcome-crate/hunchess-rides.png): the plain remap reads well on every ride (its darks go black,
+ * its colored parts gold, its lights cream, the gold trim round it on a dark page). Only the Rodeo Bull, nearly all dark brown, came
+ * out a black shape, so it's lifted a little (lifting the others washed them out to cream: tried and dropped, Nov 6).
  */
 export const HUNCHESS_LEVELS: Readonly<Record<string, { gain: number; lift: number }>> = {
-  // Dark glass and a dark cord: lifted so the bulb reads gold, its glow cream.
-  "hollow-bulb": { gain: 1.25, lift: 0.18 },
-  // A dark brown bull: lifted, or it's a black shape.
-  "rodeo-bull": { gain: 1.2, lift: 0.16 },
-  // Dark bark: lifted into the golds.
-  "log-roller": { gain: 1.2, lift: 0.14 },
-  // The night-blue moon: lifted to gold.
-  "moon-ride": { gain: 1.15, lift: 0.12 },
-  // Dark iron and tires.
-  "sawyer-dozer": { gain: 1.1, lift: 0.08 },
-  "bigboy-buggy": { gain: 1.1, lift: 0.06 },
+  "rodeo-bull": { gain: 1.12, lift: 0.07 },
 };
 
 /** A ride's filter's id (one a ride: its levels are its own). */

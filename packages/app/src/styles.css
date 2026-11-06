@@ -23749,3 +23749,7 @@ button.sq-tiny {
   height: 96px;
   margin: 0 auto;
 }
+/* A HunChess ride shows no purity (Eric, Nov 6), so no shiny glint over it either. */
+.hunchess .item-shine {
+  display: none;
+}
