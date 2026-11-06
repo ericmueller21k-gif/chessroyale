@@ -69,7 +69,7 @@ async function tapHome(page: Page, id: string, name: string) {
   return card;
 }
 
-test("an admin's street town opens at its default zoom step, at the start (22, 17), the camera facing north; a player's opens as today (zoomed out, at (22, 17))", async ({ page }) => {
+test("an admin's street town opens at its default zoom step, at the start (22, 25; the north edge round: 8 rows on), the camera facing north; a player's opens as today (zoomed out, at (22, 17))", async ({ page }) => {
   const errors = watchErrors(page);
   // A player's town: today's.
   await page.goto("/town?sky=day");
@@ -78,7 +78,7 @@ test("an admin's street town opens at its default zoom step, at the start (22, 1
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
   // An admin's: the street town.
   await openStreet(page);
-  expect(await you(page)).toEqual([22, 17]);
+  expect(await you(page)).toEqual([22, 25]);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "false");
   const cam = (await page.evaluate(() => (window as unknown as Hooks).__townCam?.()))!;
@@ -87,7 +87,7 @@ test("an admin's street town opens at its default zoom step, at the start (22, 1
   expect(cam.zoomTarget).toBe(1);
   // Facing north: the camera looks up the board from behind you, its focus on your column, ahead of you (rows rising).
   expect(Math.abs(cam.focus[0]! - 22)).toBeLessThan(0.01);
-  expect(cam.focus[1]!).toBeGreaterThanOrEqual(17);
+  expect(cam.focus[1]!).toBeGreaterThanOrEqual(25);
   // The sky over the rooftops: the top of the world's box is sky (its blue), not a building.
   const top = await canvas(page).evaluate((cv: HTMLCanvasElement) => {
     const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, 4).data;
@@ -104,7 +104,7 @@ test("an admin's street town opens at its default zoom step, at the start (22, 1
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you there, along the street, to its door square (34, 23), and its card opens", async ({ page }) => {
+test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you there, along the street, to its door square (34, 31), and its card opens", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
   await page.waitForTimeout(600);
@@ -118,11 +118,11 @@ test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you
     }
   })();
   const card = await tapHome(page, "gingerbread", "Ginger Igloo");
-  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("34,23");
+  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("34,31");
   watching = false;
   await watch;
-  // (Out of the park east, along Fountain Street: columns 33 to 36, rows 19 to 22.)
-  expect(seen.some((s) => /^3[3-6],(19|2[0-2])$/.test(s)), `along Fountain Street: ${[...new Set(seen)].join(" ")}`).toBe(true);
+  // (Out of the park east, along Fountain Street: columns 33 to 36, rows 27 to 30.)
+  expect(seen.some((s) => /^3[3-6],(2[7-9]|30)$/.test(s)), `along Fountain Street: ${[...new Set(seen)].join(" ")}`).toBe(true);
   await expect(card).toBeVisible();
   if (STILLS) {
     await page.waitForTimeout(1200);
@@ -131,12 +131,26 @@ test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("Smudgy's Art Gallery: a tap walks you to its door square (19, 8); from there the arrow toward it opens its card and you stay put", async ({ page }) => {
+test("Meadow Street (the north edge round: Upper Street's homes moved south): each moved home's card opens on a tap", async ({ page }) => {
+  test.setTimeout(200_000);
+  const errors = watchErrors(page);
+  await openStreet(page);
+  await page.waitForTimeout(600);
+  for (const [id, name] of [["hopper", "Chub & Chirp's Grassland"], ["pig", "Wrangler's Stall"], ["moo", "Moo & Moon Meadow"], ["hollow", "Hollow Peak"]] as const) {
+    const card = await tapHome(page, id, name);
+    await expect(card, name).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+  }
+  expect(errors, "no page or console errors").toEqual([]);
+});
+
+test("Smudgy's Art Gallery: a tap walks you to its door square (19, 16); from there the arrow toward it opens its card and you stay put", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
   await page.waitForTimeout(600);
   const card = await tapHome(page, "smudgy", "Smudgy's Art Gallery");
-  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("19,8");
+  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("19,16");
   await page.waitForTimeout(600);
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();

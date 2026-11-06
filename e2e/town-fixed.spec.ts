@@ -59,6 +59,8 @@ async function figuresOnScreen(page: Page, what: string) {
     expect(f.fy, `${what}: ${f.name}'s foot on screen`).toBeLessThanOrEqual(cv.height + 1);
   }
 }
+/** The boxes drawn past the back line (y 42.5): none but the Colosseum's ring and the back wall standing on it (the north edge round). */
+const beyond = (boxes: Box[]) => boxes.filter((b) => b.y > 42.5 + 1e-6 && b.kind !== "ring").map((b) => `${b.kind} ${b.id} ${b.x.toFixed(1)},${b.y.toFixed(1)}`);
 /** Records the camera's heading every frame from now (read with `headings`). */
 const watchHeadings = (page: Page) =>
   page.evaluate(() => {
@@ -106,7 +108,7 @@ async function arrowStep(page: Page, key: string) {
   return you(page);
 }
 /** The way from a to b on the world's squares (east, north), the short way round east-west. */
-const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 69) % 46) - 23), Math.sign(b[1]! - a[1]!)];
+const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 81) % 54) - 27), Math.sign(b[1]! - a[1]!)];
 /** A drag across the box from its middle, `share` of its width (negative: leftward), by the mouse, in steps. */
 async function drag(page: Page, share: number) {
   const b = (await canvas(page).boundingBox())!;
@@ -122,11 +124,11 @@ for (const backend of ["2d", "webgl"] as const) {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
     // On Fountain Street, clear of the homes' strips.
-    await walkTo(page, [8, 20]);
+    await walkTo(page, [8, 28]);
     expect((await cam(page)).heading).toBe(0);
     await watchHeadings(page);
     // Right, up, left, down: each its screen direction (east, north, west, south). (A held key may take a second step before it's let
-    // go: in this order you stay on the street's board, rows 19 to 22, clear of the sidewalks' lamps.)
+    // go: in this order you stay on the street's board, rows 27 to 30, clear of the sidewalks' lamps.)
     for (const [key, w] of [["ArrowRight", [1, 0]], ["ArrowUp", [0, 1]], ["ArrowLeft", [-1, 0]], ["ArrowDown", [0, -1]]] as const) {
       const from = await you(page);
       const to = await arrowStep(page, key);
@@ -138,21 +140,21 @@ for (const backend of ["2d", "webgl"] as const) {
     await figuresOnScreen(page, "after the arrows");
     // A tap on Timber's Lumber Lodge's front strip (a square of it beside its door): you walk there and the camera faces the home's
     // front (it faces south: north, head on); the arrow toward it (up) opens its card; down steps you off the strip.
-    // (Its door square, (4, 23): Timber wanders his strip, so he's held at his rest square first, clear of it.)
+    // (Its door square, (4, 31): Timber wanders his strip, so he's held at his rest square first, clear of it.)
     await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("timber")), { timeout: 30_000 }).toBe(true);
-    await walkTo(page, [5, 21]);
+    await walkTo(page, [5, 29]);
     // (A tap on its door square, or the next of its squares drawn clear; up to three tries, as someone passing can take the tap.)
     const cv = (await canvas(page).boundingBox())!;
     for (let tries = 0; tries < 3 && (await cam(page)).strip !== "timber"; tries++) {
       if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
       let xy: { x: number; y: number } | null = null;
-      for (const sq of [[4, 23], [5, 23], [3, 23]] as const) if ((xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq))) break;
+      for (const sq of [[4, 31], [5, 31], [3, 31]] as const) if ((xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq))) break;
       expect(xy, "a square of the strip drawn").not.toBeNull();
       await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
       await page.waitForTimeout(300);
       await expect.poll(async () => (await me(page)).moving, { timeout: 15_000 }).toBe(false);
     }
-    expect((await you(page))[1], "on the strip's row").toBe(23);
+    expect((await you(page))[1], "on the strip's row").toBe(31);
     await expect.poll(async () => (await me(page)).moving, { timeout: 15_000 }).toBe(false);
     await expect.poll(async () => (await cam(page)).strip, { timeout: 5000 }).toBe("timber");
     expect((await cam(page)).headingBase).toBe(0);
@@ -162,7 +164,7 @@ for (const backend of ["2d", "webgl"] as const) {
     await expect(card, "the arrow toward the home opens its card").toBeVisible({ timeout: 5000 });
     await page.keyboard.up("ArrowUp");
     const target = await you(page);
-    expect(target[1], "you didn't walk into it").toBe(23);
+    expect(target[1], "you didn't walk into it").toBe(31);
     await page.keyboard.press("Escape");
     await expect(card).toBeHidden();
     await arrowStep(page, "ArrowDown");
@@ -171,57 +173,79 @@ for (const backend of ["2d", "webgl"] as const) {
     await figuresOnScreen(page, "off the strip");
   });
 
-  test(`the Colosseum against the back wall (${backend}): ahead up the promenade, walls and gates either side, only sky over it; you can't walk beside or behind it`, async ({ page }) => {
+  test(`the Colosseum against the back wall (${backend}): ahead up the promenade, the plaza's walls before it, nothing past the back line; you can't go north past it`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    // From the park, up the promenade: the Colosseum ahead in the middle of the view, a wall either side of it drawn, sky over all.
-    await walkTo(page, [22, 24]);
+    // From the park, up the promenade: the Colosseum ahead in the middle of the view, the plaza's three front walls before it.
+    await walkTo(page, [22, 32]);
     const cv = (await canvas(page).boundingBox())!;
     const col = await page.evaluate(() => (window as unknown as W).__townAt("coliseum"));
     expect(col, "the Colosseum drawn").not.toBeNull();
     expect(Math.abs(col!.x - cv.width / 2), "ahead, in the middle").toBeLessThan(cv.width * 0.15);
     const boxes = (await cam(page)).boxes;
-    const walls = boxes.filter((b) => b.kind === "wall" && b.front && b.y < 34.5);
-    expect(walls.map((b) => Math.round(b.x)).sort(), "a wall either side").toEqual([15, 31]);
-    // Nothing drawn behind it or its walls but the back wall itself (the grove's trees aside): no house, no tower.
-    const behind = boxes.filter((b) => b.front && b.y > 34.5 && b.x > 12.5 && b.x < 32.5 && b.kind !== "wall");
-    expect(behind.map((b) => b.id), "nothing behind it").toEqual([]);
+    const front = boxes.filter((b) => b.kind === "wall" && b.front && b.y < 40);
+    expect(front.map((b) => Math.round(b.x)).sort(), "the plaza's walls").toEqual([17, 23, 29]);
+    // Nothing drawn past the back line but its ring (and the back wall on it): no house, no tower.
+    expect(beyond(boxes), "nothing past the line").toEqual([]);
+    expect(boxes.filter((b) => b.front && b.kind === "ring").length, "its ring drawn").toBeGreaterThanOrEqual(3);
     expect(boxes.filter((b) => b.front && b.kind === "tall"), "no skyline tower in view").toEqual([]);
     await figuresOnScreen(page, "from the park");
     // Up to it: at the gate's square, the up arrow opens its card; you stay put.
-    await walkTo(page, [22, 33]);
+    await walkTo(page, [22, 41]);
     expect((await cam(page)).heading).toBe(0);
     const card = page.getByRole("dialog", { name: "The Colosseum", exact: true });
     await page.keyboard.down("ArrowUp");
     await expect(card).toBeVisible({ timeout: 5000 });
     await page.keyboard.up("ArrowUp");
-    expect(await you(page)).toEqual([22, 33]);
+    expect(await you(page)).toEqual([22, 41]);
     await page.keyboard.press("Escape");
     await expect(card).toBeHidden();
-    // Beside it: the plaza's corners. Up (into the wall and the grove behind it) goes nowhere; a walk beside or behind it finds no way.
+    // North past the back line: at the plaza's corners up goes nowhere, and a walk asked for past the line ends before it.
     for (const c of [14, 31]) {
-      await walkTo(page, [c, 33]);
+      await walkTo(page, [c, 41]);
       await page.keyboard.down("ArrowUp");
       await page.waitForTimeout(1200);
       await page.keyboard.up("ArrowUp");
-      expect(await you(page), `up at column ${c}: stopped by the wall`).toEqual([c, 33]);
-      // (A walk asked for a square beside it or behind it ends on the nearest square you can stand on: never there.)
-      for (const sq of [[c, 38], [c, 45]] as const) {
+      expect(await you(page), `up at column ${c}: stopped by the back wall`).toEqual([c, 41]);
+      for (const sq of [[c, 45], [c, 52]] as const) {
         await page.evaluate((s) => (window as unknown as W).__townWalk(s), sq);
         await page.waitForTimeout(300);
         await expect.poll(async () => (await me(page)).moving, { timeout: 30_000 }).toBe(false);
-        const [x, y] = await you(page);
-        expect(y >= 34 && ((x >= 13 && x <= 16) || (x >= 29 && x <= 32)), `asked for ${sq}, stood at ${x},${y}`).toBe(false);
-        await walkTo(page, [c, 33]);
+        const [, y] = await you(page);
+        expect(y, `asked for ${sq}: stopped before the line`).toBeLessThanOrEqual(41);
       }
     }
     await figuresOnScreen(page, "at the wall");
   });
 
+  test(`the plaza (${backend}): a drag all the way round shows nothing past the back line, the Colosseum as faces; out through a gateway`, async ({ page }) => {
+    test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
+    await open(page, backend);
+    await walkTo(page, [20, 41]);
+    // Eight eighths of a turn, a drag each: at every one, nothing past the line drawn; facing it, its ring's faces.
+    let ringSeen = 0;
+    for (let k = 1; k <= 8; k++) {
+      await drag(page, 0.25);
+      await page.waitForTimeout(500);
+      const c = await cam(page);
+      expect(beyond(c.boxes), `nothing past the line at ${Math.round(c.heading)} degrees`).toEqual([]);
+      const ring = c.boxes.filter((b) => b.kind === "ring" && b.front).length;
+      if (ring >= 2) ringSeen++;
+      await figuresOnScreen(page, `looking round, ${Math.round(c.heading)} degrees`);
+    }
+    expect(ringSeen, "its ring's faces drawn as you look round").toBeGreaterThanOrEqual(2);
+    // Out through the west gateway, (15, 39): down from the plaza onto Colosseum Row.
+    await walkTo(page, [15, 40]);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
+    expect(await arrowStep(page, "ArrowDown"), "into the gateway").toEqual([15, 39]);
+    expect(await arrowStep(page, "ArrowDown"), "onto Colosseum Row").toEqual([15, 38]);
+    await figuresOnScreen(page, "through the gateway");
+  });
+
   test(`looking round (${backend}): a drag turns the camera about your pawn, which doesn't move or turn; the up arrow eases it back and walks you north`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    await walkTo(page, [8, 20]);
+    await walkTo(page, [8, 28]);
     const before = await me(page);
     // Half a turn: dragging left across the box's width.
     await drag(page, -1);
@@ -273,22 +297,22 @@ test("stills: the fixed view (round 5)", async ({ page }) => {
     await page.screenshot({ path: `${STILLS}/${name}-${project}.png` });
   };
   await open(page, "2d");
-  await walkTo(page, [7, 21]);
+  await walkTo(page, [7, 29]);
   await shot("1-street-looking-north");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townBossBack: (id: string) => boolean }).__townBossBack("timber")), { timeout: 30_000 }).toBe(true);
-  await walkTo(page, [4, 23]);
+  await walkTo(page, [4, 31]);
   await shot("2-home-strip-timber");
-  await walkTo(page, [22, 25]);
+  await walkTo(page, [22, 33]);
   await shot("3-colosseum-from-the-park");
-  await walkTo(page, [22, 31]);
+  await walkTo(page, [22, 40]);
   await shot("4-colosseum-plaza-close");
-  await walkTo(page, [18, 32]);
+  await walkTo(page, [18, 41]);
   await shot("5-statues");
-  await walkTo(page, [14, 32]);
+  await walkTo(page, [14, 41]);
   await shot("6-wall-corner-west");
-  await walkTo(page, [31, 32]);
+  await walkTo(page, [31, 41]);
   await shot("6-wall-corner-east");
-  await walkTo(page, [8, 20]);
+  await walkTo(page, [8, 28]);
   await drag(page, -0.9);
   await shot("7-looking-round");
 });
