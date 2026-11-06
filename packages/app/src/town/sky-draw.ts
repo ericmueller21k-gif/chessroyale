@@ -124,11 +124,6 @@ export class SkyPainter {
     this.grad = null;
   }
 
-  /** The drawing's backend changed: its gradient is made again by the new one. */
-  forget(): void {
-    this.grad = null;
-  }
-
   private layoutClouds(): void {
     const f = TOWN_FEEL;
     const r = rng(20261026);

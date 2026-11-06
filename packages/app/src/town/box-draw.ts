@@ -223,7 +223,7 @@ function pack(items: { w: number; h: number; data: Uint8ClampedArray; ox: number
 }
 
 /**
- * Box `b`'s roof (its art `box`: `b.box` or `b.low`), painted for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west): every face, whole and
+ * Box `b`'s roof (its art `box`), painted for the camera facing quarter `q` (0 north, 1 east, 2 south, 3 west): every face, whole and
  * in triangles, packed into sheets.
  */
 export function bakeRoof(b: BoxInst, box: TownBox, q: number): RoofArt {

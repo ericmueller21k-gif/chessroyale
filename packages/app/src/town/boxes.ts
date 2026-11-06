@@ -37,9 +37,8 @@ export type BoxKind = "home" | "house" | "tall" | "wall" | "ring" | "portal" | "
 export interface BoxInst {
   i: number;
   kind: BoxKind;
-  /** Its art, and (a home with a dome) the same with fewer faces for the 2D fallback. */
+  /** Its art. */
   box: TownBox;
-  low: TownBox;
   /** Which way its front faces: south or north (onto an east-west street), west or east (onto Seam Avenue). */
   facing: Facing;
   /** Its front picture's left edge on its front line (world squares), the way along its front (left to right) and the way back. */
@@ -104,9 +103,9 @@ function withRear(box: TownBox): TownBox {
   return b;
 }
 /** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4), drawn the street town's bigger size. */
-export function lotArt(l: StreetLot, low = false): TownBox {
+export function lotArt(l: StreetLot): TownBox {
   // (A home: drawn bigger again where the street town asks, round 6: rows.ts homePx.)
-  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)), homePx(l.id as ArtHomeId));
+  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId)), homePx(l.id as ArtHomeId));
   if (l.look) return big(lookalike(l.look));
   if (l.wall) return wallArt(l.wall);
   if (l.ring !== undefined) return ringBox(l.ring);
@@ -160,27 +159,26 @@ const gameHome = (id: string): HomeId => (id === "blitz" ? "dash" : id) as HomeI
  */
 export function streetBoxes(props: readonly { kind: string; x: number; y: number; v: number }[]): BoxInst[] {
   const out: BoxInst[] = [];
-  const add = (kind: BoxKind, box: TownBox, low: TownBox, facing: Facing, cx: number, cy: number, extra: Partial<BoxInst>) => {
+  const add = (kind: BoxKind, box: TownBox, facing: Facing, cx: number, cy: number, extra: Partial<BoxInst>) => {
     const p = place(facing, cx, cy, box.front.w, pxOf(box));
-    out.push({ i: out.length, kind, box, low, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, props: [], ...extra });
+    out.push({ i: out.length, kind, box, facing, ...p, fx: 0, fy: 0, home: null, lot: -1, prop: -1, hideL: false, hideR: false, tile: null, props: [], ...extra });
   };
   STREET_LOTS.forEach((l, lot) => {
     const box = lotArt(l);
-    const low = l.kind === "home" ? lotArt(l, true) : box;
     // (Its front line: the lot's front edge plus the box's inset; its picture centered on the lot. A row's look-alike: where the row put it.
     // A stretch of the Colosseum's ring: facing out from the oval, its front's middle where the ring has it.)
     if (l.dir && l.at) {
       const h = box.front.w / pxOf(box) / 2;
-      out.push({ i: out.length, kind: l.kind, box, low, facing: l.facing, ox: l.at.x - l.dir.ux * h, oy: l.at.y - l.dir.uy * h, ux: l.dir.ux, uy: l.dir.uy, bx: -l.dir.uy, by: l.dir.ux, fx: 0, fy: 0, home: null, lot, prop: -1, hideL: false, hideR: false, tile: null, props: [] });
-    } else if (l.kind === "portal" && l.at) add(l.kind, box, low, "S", l.at.x, l.at.y, { lot, home: "coliseum" });
-    else if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
-    else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
-    else add(l.kind, box, low, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
+      out.push({ i: out.length, kind: l.kind, box, facing: l.facing, ox: l.at.x - l.dir.ux * h, oy: l.at.y - l.dir.uy * h, ux: l.dir.ux, uy: l.dir.uy, bx: -l.dir.uy, by: l.dir.ux, fx: 0, fy: 0, home: null, lot, prop: -1, hideL: false, hideR: false, tile: null, props: [] });
+    } else if (l.kind === "portal" && l.at) add(l.kind, box, "S", l.at.x, l.at.y, { lot, home: "coliseum" });
+    else if (l.at) add(l.kind, box, l.facing, l.at.x, l.at.y, { lot, home: null });
+    else if (l.facing === "S") add(l.kind, box, "S", l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
+    else add(l.kind, box, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
   });
   props.forEach((pr, prop) => {
     if (pr.kind === "shed") {
       const b = shed(pr.v);
-      add("shed", b, b, "S", pr.x, pr.y - 0.4, { prop });
+      add("shed", b, "S", pr.x, pr.y - 0.4, { prop });
     }
   });
   // The hedges, in runs along their lines (a hedge's x, y is the back of its top; one running east to west faces the street south of
@@ -201,13 +199,13 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
     const { box, tile } = hedgeRun(run.map((h) => h.pr.v));
     const a = run[0]!.pr;
     const z = run[run.length - 1]!.pr;
-    add("hedge", box, box, "S", (a.x + z.x) / 2, a.y - HEDGE.deep, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
+    add("hedge", box, "S", (a.x + z.x) / 2, a.y - HEDGE.deep, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
   }
   for (const run of runs(ns, (a, b) => a.x === b.x && b.y === a.y - 1)) {
     const { box, tile } = hedgeRun(run.map((h) => h.pr.v));
     const a = run[0]!.pr;
     const z = run[run.length - 1]!.pr;
-    add("hedge", box, box, "W", a.x - HEDGE.deep, (a.y + z.y) / 2, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
+    add("hedge", box, "W", a.x - HEDGE.deep, (a.y + z.y) / 2, { prop: run[0]!.i, props: run.map((h) => h.i), tile });
   }
   for (const b of out) {
     // (W-facing: the front's middle is the line's middle too.)
@@ -479,8 +477,6 @@ export interface BoxPlan {
   maxX: number;
   minY: number;
   maxY: number;
-  /** Draws this frame (strips and faces: what the 2D fallback costs). */
-  draws: number;
 }
 const newWall = (): WallPlan => ({ on: false, x0: 0, y0: 0, k0: 0, x1: 0, y1: 0, k1: 0, dx: 0, dz: 0, strips: 1, shade: 0, s0: 0, s1: 1 });
 /** A wall is cut this far (squares) in front of the camera: what's nearer (or behind it) isn't drawn. */
@@ -491,7 +487,7 @@ export function newPlan(box: TownBox): BoxPlan {
     on: false, front: newWall(), left: newWall(), right: newWall(), back: newWall(),
     faces: Array.from({ length: n }, () => ({ on: false, x: new Float64Array(4), y: new Float64Array(4), dz: 0, whole: false })),
     order: new Int16Array(n), nOrder: 0, roofDx: 0, roofDz: 0, light: new Float64Array(n),
-    topY: 0, eaveY: 0, minX: 0, maxX: 0, minY: 0, maxY: 0, draws: 0,
+    topY: 0, eaveY: 0, minX: 0, maxX: 0, minY: 0, maxY: 0,
   };
 }
 
@@ -508,7 +504,6 @@ let BX: TownBox;
 let V: View;
 let offX = 0;
 let offY = 0;
-let FINE = false;
 let CUT = 0;
 /** A world point of the box being planned into the camera's frame (`cq`). */
 const atCam = (x: number, y: number) => toCam(V, x + offX, y + offY, cq);
@@ -571,16 +566,14 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   w.x1 = pb.x;
   w.y1 = pb.y;
   w.k1 = pb.k;
-  // Strips: each a step in its top of about `boxStrip` px at most (fine: WebGL's; else the 2D fallback's), and at least 2 px wide.
+  // Strips: each a step in its top of about `boxStripFine` px at most, and at least 2 px wide.
   const f = TOWN_FEEL;
   const dh = Math.abs(h1 - h0);
-  // (The Colosseum's: the fine count on the 2D fallback too, so a stretch close by steps smoothly; far off it needs few.)
-  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE || (solid && Math.max(pa.k, pb.k) > 90) ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
+  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(f.boxStripsFine, Math.ceil(dh / f.boxStripFine), Math.ceil((pb.x - pa.x) / 2)));
   worldNormal(BI, nbx, nby, nw);
   w.shade = Math.min(0.6, wallShade(nw.x, nw.y, v.hc, v.hs) + extraShade);
   w.on = true;
   P.on = true;
-  P.draws += w.strips;
   grow(pa.x, pa.y);
   grow(pb.x, pb.y);
   grow(pa.x, pa.y - h0);
@@ -588,24 +581,21 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
 }
 
 /**
- * What of box `b` (its art `box`: `b.box`, or `b.low` on the 2D fallback) shows this frame from the camera `v` focused on (camX, camY),
- * and how, into `p`. `fine`: walls in fine strips (WebGL, where a strip costs a few vertices) or coarse ones (the 2D fallback, where
- * each is a draw). `cut`: nothing nearer than this (camera-frame squares ahead) is drawn (the near side: nothing between the camera
- * and you). Allocates nothing.
+ * What of box `b` (its art `box`) shows this frame from the camera `v` focused on (camX, camY), and how, into `p`: walls in fine strips
+ * (WebGL, where a strip costs a few vertices). `cut`: nothing nearer than this (camera-frame squares ahead) is drawn (the near side:
+ * nothing between the camera and you). Allocates nothing.
  */
-export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: number, camY: number, fine: boolean, cut: number): void {
+export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: number, camY: number, cut: number): void {
   const g = geomOf(box);
   P = p;
   BI = b;
   BX = box;
   V = v;
-  FINE = fine;
   CUT = cut;
   // Every point from the camera, the nearest way round the wrap from the box's front line's middle.
   offX = wrapFX(b.fx - camX) - b.fx;
   offY = wrapFY(b.fy - camY) - b.fy;
   p.on = false;
-  p.draws = 0;
   p.minX = p.minY = Infinity;
   p.maxX = p.maxY = -Infinity;
   p.topY = Infinity;
@@ -676,12 +666,11 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
     fp.dz = cq.dz;
     // In one piece when the affine through its first, second and last corners puts a quad's third within a pixel of where it is.
     // (A hedge's top is thin: always one piece.)
-    fp.whole = fg.n === 3 || b.kind === "hedge" || wholeFits(fg, fp) < (FINE ? f.boxWholePxFine : f.boxWholePx);
+    fp.whole = fg.n === 3 || b.kind === "hedge" || wholeFits(fg, fp) < f.boxWholePxFine;
     fp.on = true;
     p.light[i] = faceLight(nw.x, nw.y, fg.nz, v.hc, v.hs);
     fdz[nOrd] = fp.dz;
     p.order[nOrd++] = i;
-    p.draws += fp.whole ? 1 : fg.n - 2;
     grow(x0s, y0s);
     grow(x1s, y1s);
     if (y0s < p.topY) p.topY = y0s;

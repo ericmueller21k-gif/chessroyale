@@ -65,7 +65,7 @@ import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
-import { STREET_TOWN } from "./admin-town.ts";
+import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -559,17 +559,20 @@ function startTown(
   onChallengeOff: () => void = () => {},
 ) {
   const f = TOWN_FEEL;
-  /** The world's canvas: a new one if the drawing changes backend (a canvas keeps the first kind of context it gave). */
+  /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
   let cv = cv0;
-  // The drawing (paint.ts): Canvas 2D, or WebGL 2 with `?gl=1` (anyone; read once as the page opened). No WebGL 2, no
-  // context, or its shader fails: Canvas 2D, silently. A lost context: nothing is drawn until it's back; lost twice within a
-  // minute, or not back within LOST_WAIT_MS, Canvas 2D for the rest of the page. Each of these falls back once and is
-  // reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the frame loop).
+  // The drawing (paint.ts): today's town with Canvas 2D; the street town with WebGL 2 only (Nov 6; admin-town.ts: a device without
+  // WebGL 2 gets today's town). The street's WebGL failing as it starts (no context, or its shader fails), or its context lost twice
+  // within a minute or not back within LOST_WAIT_MS: the page opens again in today's town (`?street=off`). A lost context: nothing is
+  // drawn until it's back. Each is reported once a page with its reason (problems.ts, `reportTownFallback`: nothing shows; never on the
+  // frame loop; what's waiting goes as the page is hidden).
   const losses: number[] = [];
   let lostWait = 0;
-  const fallBack = (why: TownGlFallback) => {
+  const leaveStreet = (why: TownGlFallback) => {
     reportTownFallback(why);
-    useBackend("2d");
+    const u = new URL(location.href);
+    u.searchParams.set("street", "off");
+    location.replace(u.href);
   };
   const onLost = (lost: boolean) => {
     clearTimeout(lostWait);
@@ -577,31 +580,18 @@ function startTown(
     const now = performance.now();
     losses.push(now);
     // (And one that isn't back within a few seconds: the browser isn't giving it back.)
-    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && fallBack("lost-twice"));
-    else lostWait = window.setTimeout(() => alive && painter.lost && fallBack("not-back"), LOST_WAIT_MS);
+    if (losses.length >= 2 && now - losses[losses.length - 2]! < 60_000) setTimeout(() => alive && leaveStreet("lost-twice"));
+    else lostWait = window.setTimeout(() => alive && painter.lost && leaveStreet("not-back"), LOST_WAIT_MS);
   };
-  let attached = false;
-  /** A new canvas in the old one's place (its class, label, size and data), the input moved over. */
-  const swapCanvas = () => {
-    const n = document.createElement("canvas");
-    n.className = cv.className;
-    n.setAttribute("aria-label", cv.getAttribute("aria-label") ?? "");
-    Object.assign(n.dataset, cv.dataset);
-    n.width = cv.width;
-    n.height = cv.height;
-    n.style.cssText = cv.style.cssText;
-    if (attached) detach();
+  const makePainter = (): Painter => {
+    if (!STREET_TOWN) return painter2d(cv);
+    const p = painterGL(cv, onLost);
+    if (typeof p !== "string") return shim(p);
+    leaveStreet(p);
+    // (Until the page goes: Canvas 2D on a new canvas, as this one may have given a WebGL context before failing.)
+    const n = cv.cloneNode() as HTMLCanvasElement;
     cv.replaceWith(n);
     cv = n;
-    if (attached) attach();
-  };
-  const makePainter = (kind: Backend): Painter => {
-    if (kind === "webgl") {
-      const p = painterGL(cv, onLost);
-      if (typeof p !== "string") return shim(p);
-      reportTownFallback(p);
-      swapCanvas(); // (in case it gave a WebGL context before failing)
-    }
     return painter2d(cv);
   };
   /**
@@ -621,18 +611,10 @@ function startTown(
       return painter.pixels(x, y, w, h);
     },
   };
-  let painter: Painter = makePainter(TOWN_ASKED.gl ? "webgl" : "2d");
+  // (An admin's device without WebGL 2 is in today's town: said once a page, as a fallback is.)
+  if (NO_WEBGL_STREET) reportTownFallback("no-webgl2");
+  const painter: Painter = makePainter();
   cv.dataset.backend = painter.kind;
-  /** Draws with `kind` from now on (on a new canvas), the frame drawn again at once. */
-  const useBackend = (kind: Backend) => {
-    painter.dispose();
-    swapCanvas();
-    painter = makePainter(kind);
-    r.setPainter(painter);
-    cv.dataset.backend = painter.kind;
-    if (fpsEl) fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
-    draw(drawnAt);
-  };
   const town = createTown(performance.now(), undefined, seat, undefined, stand);
   const r = new Renderer(painter, town, HOMES);
   // The arrow keys (arrows.ts): hold one and you walk that way, on squares you can stand on and nobody's (the walker's own check).
@@ -1463,7 +1445,6 @@ function startTown(
     cv.removeEventListener("wheel", onWheel);
   }
   attach();
-  attached = true;
 
   function setZoom(out: boolean) {
     leaveClose();
@@ -1532,7 +1513,7 @@ function startTown(
           figures: r.figureBoxes(),
           // (Round 4: the horizon's height in the box, px; the sky over it, the street below.)
           horizon: r.view.hy,
-          // The street town's boxes drawn in the last frame and their draws (the 2D fallback's cost; WebGL batches them).
+          // The street town's boxes drawn in the last frame.
           boxes: r.boxDraws(),
         }
       : null;
@@ -1672,19 +1653,13 @@ function startTown(
       held: ridersHeld(),
     };
   };
-  // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townBackend("2d" | "webgl")`:
-  // the drawing's backend from now on (on a new canvas; the held frame drawn again), answering the one it got; `__townPaint()`:
-  // the backend and the last frame's draw calls (WebGL's; 0 for Canvas 2D). For the comparison of the two (e2e/town-webgl.spec.ts).
+  // ... `__townHold(on)`: the frame loop stops (the last frame stays, nothing moves) or goes on; `__townPaint()`: the backend, the last
+  // frame's draw calls (WebGL's; 0 for Canvas 2D) and whether its context is lost.
   const hookHold = (on: boolean) => {
     if (!testSwitchesAllowed()) return;
     held = on;
     if (on) halt();
     else run();
-  };
-  const hookBackend = (kind: Backend) => {
-    if (!testSwitchesAllowed()) return null;
-    useBackend(kind);
-    return painter.kind;
   };
   // ... `__townBench(n)`: the held frame drawn again n times in a row, in ms a draw (the drawing's own cost, the same frame for
   // either backend: nothing moves, nothing new to make).
@@ -1700,7 +1675,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townBackend?: typeof hookBackend; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1715,7 +1690,6 @@ function startTown(
   hooks.__townBossBack = hookBossBack;
   hooks.__townTags = hookTags;
   hooks.__townHold = hookHold;
-  hooks.__townBackend = hookBackend;
   hooks.__townPaint = hookPaint;
   hooks.__townBench = hookBench;
   hooks.__townWalk = hookWalk;
@@ -1869,7 +1843,6 @@ function startTown(
       delete hooks.__townBossBack;
       delete hooks.__townTags;
       delete hooks.__townHold;
-      delete hooks.__townBackend;
       delete hooks.__townPaint;
       delete hooks.__townBench;
       delete hooks.__townWalk;
@@ -1884,7 +1857,7 @@ function startTown(
 }
 
 const POSE = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
-/** How long a lost WebGL context may stay lost before the town goes back to Canvas 2D (it's usually back within a second). */
+/** How long the street town's lost WebGL context may stay lost before the page opens in today's town (it's usually back within a second). */
 const LOST_WAIT_MS = 5000;
 /** The frame-rate pill's name for each backend. */
 const BACKEND_LABEL: Record<Backend, string> = { "2d": "2D", webgl: "WebGL" };
