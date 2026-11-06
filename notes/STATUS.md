@@ -280,3 +280,17 @@ Opus, one at a time:
 
 Haiku alongside: the tutorial (acf647b0), resumed 07:40.
 Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
+
+## Nov 6 ~12:00 UTC
+- **Live, main green (9e5e826f):**
+  - #511 the north edge (Colosseum);
+  - #513 CI on 10 shards;
+  - #515 minimap and controls;
+  - #516 ledger I;
+  - #514 the first-login walkthrough.
+- **Running:** ledger II (Opus xhigh).
+- **Next Opus:**
+  1. the street town WebGL-only (and today's town's ?gl=1 retired, per the audit row 4);
+  2. the 3D kit;
+  3. the claw on the kit;
+  4. intros as data.
