@@ -303,3 +303,5 @@ Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
 - **Next Opus after the red-tests helper (a7703b27):** the pipeline audit (brief-pipeline-audit.md, read-only) → I fix the quick wins myself → helper PRs for the rest.
 - **Queued after the intros as data:** the SPRITE KIT. Bosses stay 2D sprites (Eric agreed, Nov 6). Shared rules: texel size per figure class, palette ramps, a 1-px outline, sprites as data (grids, palette, frames), frame templates and kit tests. One existing boss is moved as the pilot, with before/after stills for Eric. Others move only when next touched.
 - **Recurring bloat sweep (Eric, Nov 6, every 3.5 days):** scheduled tasks trig_01QYRT1Nz1yWJmwpQbeReECs (Mon 05:47 UTC) and trig_01KQ78iK67ZGbG2ehHoZWC7u (Thu 17:47 UTC). Each fires into this session: run the pipeline audit with a Trend table against the last one, fix the quick wins, queue the rest, and send Eric a short summary.
+- **Dash v2 (Eric, Nov 6):** brief-dash-v2.md, the next Opus after the red-tests helper, then the pipeline audit.
+- **Haiku running:** claude/boss-bubbles (all boss speech in the God King's bubble design, plus the huge-text bug).
