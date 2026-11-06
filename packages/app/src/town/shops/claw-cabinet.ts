@@ -19,7 +19,7 @@ export interface Cabinet {
   z1: number;
 }
 /** Heights (squares up): the base's top (the glass's floor), the glass's top, the marquee's top; the gantry under the glass's top. */
-export const CAB_H = { base: 1.05, glass: 2.35, top: 2.85, gantry: 2.2, crate: 0.3, coinY: 0.78 } as const;
+export const CAB_H = { base: 1.05, glass: 2.35, top: 2.8, gantry: 2.2, crate: 0.3, coinY: 0.66 } as const;
 
 /** The cabinet over a piece covering `w` x `d` squares from (col, row) (row its south-most). */
 export function cabinetOf(col: number, row: number, w: number, d: number): Cabinet {
@@ -32,7 +32,7 @@ const gx = (c: Cabinet, f: number) => c.x0 + IN + (c.x1 - c.x0 - 2 * IN) * f;
 const gz = (c: Cabinet, f: number) => c.z0 + IN + (c.z1 - c.z0 - 2 * IN) * f;
 
 /** The coin slot on the base's front (the right half), in room units: its middle across, and half its width and height. */
-export const slotOf = (c: Cabinet) => ({ x: c.x0 + (c.x1 - c.x0) * 0.78, hw: 0.07, y: CAB_H.coinY, hh: 0.1 });
+export const slotOf = (c: Cabinet) => ({ x: c.x0 + (c.x1 - c.x0) * 0.52, hw: 0.08, y: CAB_H.coinY, hh: 0.11 });
 
 /** A point projector the room gives: (x, z, lift) to the screen, false if it's behind the camera. */
 export type P3 = (x: number, z: number, y: number, out: Pt) => boolean;
@@ -88,7 +88,7 @@ export const newHits = (): CabinetHits => ({ slot: { x0: 0, y0: 0, x1: 0, y1: 0,
  * Painter's order for a see-through box: the far inside first (the back glass, the far side, the felt), then what's inside back to
  * front, then the near glass, its frame and the marquee.
  */
-export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c: Cabinet, pose: ClawPose, now: number, hits: CabinetHits): void {
+export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c: Cabinet, pose: ClawPose, now: number, hits: CabinetHits, arrow = false): void {
   const { x0, x1, z0, z1 } = c;
   const { base, glass, top, gantry } = CAB_H;
   // -- Its shadow on the carpet.
@@ -113,6 +113,17 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
     hits.slot.y1 = Q[3]!.y;
     hits.slot.on = true;
   }
+  // A gold arrow bobbing over the slot while the controls are shut: put a coin in here.
+  if (arrow && p3(sl.x, z1 + 0.02, sl.y + sl.hh + 0.1 + 0.04 * Math.sin(now / 180), Q[4]!)) {
+    const k = Math.max(6, 0.09 * Q[4]!.k);
+    g.fillStyle = "#ffd04a";
+    g.beginPath();
+    g.moveTo(Q[4]!.x - k, Q[4]!.y - k);
+    g.lineTo(Q[4]!.x + k, Q[4]!.y - k);
+    g.lineTo(Q[4]!.x, Q[4]!.y);
+    g.closePath();
+    g.fill();
+  }
   if (pose.coin >= 0 && pose.coin < 1 && p3(sl.x, z1 + 0.02, sl.y + sl.hh + 0.35 * (1 - pose.coin), Q[4]!)) {
     g.fillStyle = "#ffd04a";
     g.beginPath();
@@ -120,7 +131,7 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
     g.fill();
   }
   // The control ledge: the joystick and the big button.
-  const ledge = { x: c.x0 + (c.x1 - c.x0) * 0.5 };
+  const ledge = { x: c.x0 + (c.x1 - c.x0) * 0.42 };
   box(g, p3, camX, x0 + 0.1, x1 - 0.1, z1, z1 + 0.16, base - 0.12, base - 0.04, "#3e3150", "#2c2238", "#2c2238");
   seg(g, p3, [ledge.x - 0.12, z1 + 0.08, base - 0.04], [ledge.x - 0.12, z1 + 0.08, base + 0.14], "#565b67", 0.03);
   if (p3(ledge.x - 0.12, z1 + 0.08, base + 0.15, Q[5]!)) {
@@ -129,7 +140,7 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
     g.arc(Q[5]!.x, Q[5]!.y, Math.max(2, 0.05 * Q[5]!.k), 0, Math.PI * 2);
     g.fill();
   }
-  if (p3(ledge.x + 0.16, z1 + 0.08, base - 0.03, Q[6]!)) {
+  if (p3(ledge.x + 0.1, z1 + 0.08, base - 0.03, Q[6]!)) {
     g.fillStyle = "#ffd04a";
     g.beginPath();
     g.ellipse(Q[6]!.x, Q[6]!.y, Math.max(3, 0.09 * Q[6]!.k), Math.max(2, 0.04 * Q[6]!.k), 0, 0, Math.PI * 2);
@@ -199,8 +210,13 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, camX: number, c
   const gl = x0 + (x1 - x0) * 0.62;
   face(g, p3, [[gl, z1, base + 0.2], [gl + 0.12, z1, base + 0.2], [gl + 0.32, z1, glass - 0.15], [gl + 0.2, z1, glass - 0.15]], "rgba(255,255,255,0.16)");
   for (const [px, pz] of [[x0, z0], [x1, z0], [x0, z1], [x1, z1]] as const) seg(g, p3, [px, pz, base], [px, pz, glass], "#f2c14e", 0.05);
-  box(g, p3, camX, x0 - 0.04, x1 + 0.04, z0 - 0.04, z1 + 0.04, glass, top, "#c43a7f", "#ff5aa8", "#c43a7f");
-  // Its bulbs along the marquee's front, chasing (one lit in three, stepping every 260 ms as the walls' do).
+  // The glass ceiling (you see the claw through it from above), its gold rim; the lit header panel standing on the front.
+  face(g, p3, [[x0, z0, glass], [x1, z0, glass], [x1, z1, glass], [x0, z1, glass]], "rgba(190,235,255,0.1)");
+  seg(g, p3, [x0, z0, glass], [x1, z0, glass], "#f2c14e", 0.05);
+  seg(g, p3, [x0, z0, glass], [x0, z1, glass], "#f2c14e", 0.05);
+  seg(g, p3, [x1, z0, glass], [x1, z1, glass], "#f2c14e", 0.05);
+  box(g, p3, camX, x0 - 0.04, x1 + 0.04, z1 - 0.06, z1 + 0.04, glass, top, "#c43a7f", "#ff5aa8", "#c43a7f");
+  // Its bulbs along the header, chasing (one lit in three, stepping every 260 ms as the walls' do).
   const step = Math.floor(now / 260);
   const n = 9;
   for (let i = 0; i < n; i++) {

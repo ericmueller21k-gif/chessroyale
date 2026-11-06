@@ -1759,7 +1759,7 @@ function startRoom(
   const drawClaw = (now: number) => {
     if (!cab) return;
     clawPose(CLAW_PLAY, now, clawNow);
-    drawCabinet(g, p3, camX, cab, clawNow, now, cabHits);
+    drawCabinet(g, p3, camX, cab, clawNow, now, cabHits, clawE > 0.5 && !CLAW_PLAY.open);
   };
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
@@ -3114,14 +3114,15 @@ function startRoom(
   const clawLens = () => {
     const c = cab!;
     const mx = (c.x0 + c.x1) / 2;
-    if (!p3(mx, c.z1, 0, lensA) || !p3(mx, c.z1, CAB_H.top, lensB)) return;
+    // (Its whole extent on screen: from the front's foot up to the back of its glass ceiling.)
+    if (!p3(mx, c.z1 + 0.2, 0, lensA) || !p3(mx, c.z0, CAB_H.top, lensB)) return;
     const tall = Math.max(1, lensA.y - lensB.y);
     const wide = Math.max(1, (c.x1 - c.x0) * lensA.k);
     const magT = Math.max(1, Math.min(S.claw.maxMag, (S.claw.tall * H) / tall, (S.claw.wide * W) / wide));
     const mag = 1 + (magT - 1) * clawE;
     setView(v, W, H, 0, mag, 0, 0, sets);
-    if (!p3(mx, c.z1, CAB_H.top / 2, lensA)) return;
-    setView(v, W, H, 0, mag, (S.claw.atY * H - lensA.y) * clawE, 0, sets);
+    if (!p3(mx, c.z1 + 0.2, 0, lensA) || !p3(mx, c.z0, CAB_H.top, lensB)) return;
+    setView(v, W, H, 0, mag, (S.claw.atY * H - (lensA.y + lensB.y) / 2) * clawE, 0, sets);
   };
   const draw = (now: number) => {
     emN = 0;

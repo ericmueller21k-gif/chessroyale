@@ -754,8 +754,9 @@ export const SHOP_FEEL = {
   },
   /**
    * Boingo's claw machine (Nov 6): standing still at its spot, the camera glides in on the cabinet over `glideMs` (the statue's
-   * close-up, TOWN_FEEL.closeGlideMs), through a longer lens: the cabinet `tall` of the screen's height (at most `wide` of its width,
-   * the lens at most `maxMag`), its middle `atY` down the screen, above the machine's controls docked at the bottom.
+   * close-up, TOWN_FEEL.closeGlideMs), through a longer lens: the cabinet (its front's foot to its glass ceiling's back) `tall` of the
+   * screen's height (at most `wide` of its width, the lens at most `maxMag`), its middle `atY` down the screen, above the machine's
+   * controls docked at the bottom.
    */
-  claw: { glideMs: 900, tall: 0.5, wide: 0.8, maxMag: 3, atY: 0.36 },
+  claw: { glideMs: 900, tall: 0.56, wide: 0.86, maxMag: 3, atY: 0.4 },
 } as const;
