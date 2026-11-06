@@ -210,3 +210,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 6 ~00:30: CONTAINER RESTART stopped 4 helpers; worktrees survived on disk. Relaunched all 4 to resume from their worktrees
   (commit WIP first, push often): ginger steps (app fix pushed f0a6fc42), north edge (all WIP was uncommitted), controls + minimap
   (2 commits pushed), Smudgy (barely started). Folio LIVE (0fd7944d, main green). Squads waiting on Eric's OK.
+- Nov 6 ~02:00: #507 shop tap fix merged de7933db (deploy+main CI watcher). #508 Smudgy: gallery lights + sound-list test fix at
+  45a9ed55, CI watcher; merge on green. Started: Welcome Crate (xhigh, claude/welcome-crate, 8985), Boingo Funhouse room (high,
+  claude/boingo-home, 8984; no intro this round; claw stub), claw machine (xhigh, claude/claw-machine, 8983; 25% for that boss's
+  crate, server-decided, idempotent; admin test tokens). Still running: street north edge (8987), controls + minimap (8988).
+  Eric: around 9 o'clock, pause all but one Opus helper and go back to one thing at a time.
