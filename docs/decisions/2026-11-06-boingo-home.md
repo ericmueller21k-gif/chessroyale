@@ -46,7 +46,7 @@ move over the crates inside, grab one, lift it and usually drop it. Not a separa
   over the coin slot; a tap there opens the controls, now a small panel docked at the bottom (196 px), the cabinet in view above.
 - **Kept:** the admins' "Admin: +3 of each token" button and the e2e seed hook (`?clawSeed=`). Retired: the `?claw=1` page-load switch.
 
-## Where it stands (paused at the director's word, Nov 6, ~04:10 UTC: the Colosseum first)
+## Where it stands (paused at the director's word, Nov 6, about 04:00 UTC: the Colosseum first)
 
 Done and pushed: the room (the arcade ceiling, the price sign's words, the clown attendant), the in-room claw machine above, the unit
 tests (`shop-boingo.test.ts`, `claw-view.test.ts`), and three e2e passing on phone and computer: `e2e/shop.spec.ts` "Boingo's
