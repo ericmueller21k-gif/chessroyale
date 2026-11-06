@@ -72,8 +72,8 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     areas the PR changes plus a smoke set (the app boots, a solo battle plays, a lobby works, and every boss's smoke
     once the boss kit lands): about 15 to 20 minutes for a targeted PR, and as long as main's run for one that runs
     everything (most did on Nov 6: PR median 33.6 minutes before that day's speed-ups). `e2e/areas.json` maps paths
-    to specs; a shared foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the protocol, the board,
-    …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts` and
+    to specs; a shared foundation (package.json, the lockfile, the Playwright config, `packages/core`, the runner, the
+    protocol, the board, …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts` and
     a few shared app modules are traced instead (Nov 1): the specs of whatever uses what the diff changes. Every push to
     `main` runs the whole suite, both projects, on 10 runners (about 28 minutes: measured Nov 6, the slowest shard's
     tests 26 and a minute of setup, plus any wait for runners), one run at a time (a newer push
