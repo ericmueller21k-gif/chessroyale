@@ -18,6 +18,7 @@
  * its saddle as its frames are composed, the pawn at its own size on the scaled saddle; nothing of it is worked out per frame.
  */
 import { h } from "preact";
+import { hunchessBase } from "@chessroyale/core";
 import { RIDE_PX, type RideCell, type RideCells } from "./ride-cells.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { rideScale, scaledAt, scaledSeat, seatAnchor } from "../components/rides/scale.ts";
@@ -164,7 +165,8 @@ export class Rider {
   ) {
     const { id, cells } = art;
     const k = scale;
-    const feel = TOWN_FEEL.rides[id] ?? { foot: 96, shadow: 1 };
+    // (A HunChess colorway, Nov 6: its ride's feel.)
+    const feel = TOWN_FEEL.rides[hunchessBase(id) ?? id] ?? { foot: 96, shadow: 1 };
     const side = new RiderView("side", cells.side, pawn, k, feel.foot);
     const back = cells.back ? new RiderView("back", cells.back, pawnBack, k, feel.foot) : side;
     const front = cells.front ? new RiderView("front", cells.front, pawn, k, feel.foot) : side;

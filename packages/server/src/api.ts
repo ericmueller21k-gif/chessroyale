@@ -8,10 +8,11 @@ import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
 import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate, startSoloBattle } from "./boss-tokens.ts";
+import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, tokenBossName } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -418,8 +419,18 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown };
     const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    // (The Welcome Crate, Nov 6: yours once you've earned it, opened once, the server's roll only: welcome.ts.)
+    if (isWelcomeCrate(b.crate)) {
+      const w = await openWelcomeCrate(sql, current.id, now);
+      return w.ok ? json({ ...w, locker: await lockerState(sql, current.id, admin) }) : json({ message: w.message }, 400);
+    }
     const r = typeof b.crate === "string" && bossCrateDef(b.crate) ? await openBossCrate(sql, current.id, b.crate, now, admin) : await openCrate(sql, current.id, b.crate, force, now, admin);
     return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
+  // POST /api/locker/welcome/seen: the "You earned a Welcome Crate!" notice closed, for good (it shows once). Answers the locker.
+  if (path === "/api/locker/welcome/seen" && request.method === "POST") {
+    await seenWelcomeNotice(sql, current.id, now);
+    return json(await lockerState(sql, current.id, admin));
   }
   if (path === "/api/locker/equip" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { slot?: unknown; item?: unknown };
@@ -516,6 +527,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const b = (await request.json().catch(() => null)) as Partial<MatchResult> | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
     await recordResult(sql, current.id, { ...b, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic" } as MatchResult, now);
+    // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
+    await grantWelcomeCrate(sql, current.id, now).catch(() => false);
     return json({ ok: true });
   }
 

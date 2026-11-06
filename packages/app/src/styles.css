@@ -23682,3 +23682,78 @@ button.sq-tiny {
 .rp-tip-ok {
   min-width: 88px;
 }
+
+/* ---------------- The HunChess Welcome Crate (Nov 6: docs/decisions/2026-11-06-welcome-crate.md) ---------------- */
+/* Its idle glint: a pale band sweeps across the gold-and-black crate every few seconds (still under reduced motion). */
+.hc-crate-glint {
+  animation: hc-crate-glint 4.2s ease-in-out infinite;
+}
+@keyframes hc-crate-glint {
+  0%,
+  70% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  74% {
+    opacity: 0.55;
+  }
+  92% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translateX(130px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hc-crate-glint {
+    animation: none;
+  }
+}
+/* The crate's row and page, in its gold and black (the same in light and dark: it's the crate's own look). */
+.welcome-crate-row,
+.welcome-crate-hero {
+  border-color: #f2c14e;
+  box-shadow: inset 0 0 0 1px #f2c14e;
+}
+.welcome-crate-row.none {
+  opacity: 0.55;
+}
+.welcome-thanks {
+  color: var(--fd-gold-text, #9a6a06);
+  font-weight: 800;
+}
+/* "Not tradeable": a small black tag with gold letters, on the crate's row and page, the reveal, and each HunChess ride's tile. */
+.not-tradeable {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: #14100a;
+  color: #f2c14e;
+  border: 1px solid #f2c14e;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.locker-item .not-tradeable {
+  font-size: 10px;
+  padding: 0 4px;
+}
+.welcome-progress {
+  margin: 6px 0;
+}
+/* The one-time "You earned a Welcome Crate!" notice: the token box's dialog look (TokenBox), the crate turning in it. */
+.welcome-notice .welcome-notice-art {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto;
+}
+/* A HunChess ride shows no purity (Eric, Nov 6), so no shiny glint over it either. */
+.hunchess .item-shine {
+  display: none;
+}
+/* On the blue windows (the crate's row and page, the notice, the reveal): the logo's own gold, readable on the blue. */
+.ff-window .welcome-thanks {
+  color: #f2c14e;
+}

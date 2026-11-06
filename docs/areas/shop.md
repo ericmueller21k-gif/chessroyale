@@ -125,6 +125,32 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
     `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops and the crates too, so the window
     counts the drops).
+- **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
+  `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
+  - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
+    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (a `results` row not marked `abandoned`, or a
+    ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
+    milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
+    `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
+    saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
+    removed mid-match as `abandoned` (not counted); a resignation counts.
+  - **The notice** (`components/WelcomeNotice.tsx`): **"You earned a Welcome Crate!"**, "Thank you for being an early tester!", "It's in
+    your inventory's Crates. Not tradeable." and OK, once (`POST /api/locker/welcome/seen`), on home and the result screen.
+  - **In the Crates tab**, first: its art (`HunchessCrateArt`: black and the logo's gold, an idle glint), **"HunChess Welcome Crate"**,
+    "Thank you for being an early tester!", a **"Not tradeable"** tag and where yours is: "Finish 5 games to earn your Welcome Crate:
+    3/5" (greyed until earned; a guest's adds "Sign in to earn it."), "You have 1. Open it!", "Opened. Its ride is in your locker.".
+    Its page lists every ride it can give (each as likely), no purity; "▶ Open" (greyed unless yours is waiting) opens it with the
+    usual strip, Fischer Random ("A HunChess ride") and the reveal ("Not tradeable", no purity, no "Open another").
+  - **The prize:** one ride, any of the game's rides, each as likely, in the **HunChess colorway** (`<ride>-hunchess`, its own item:
+    `HUNCHESS_RIDES` in crates.ts, made from every ride; "HunChess Balloon Pup"), rolled and stored by the server
+    (`POST /api/locker/open {crate: "welcome-hunchess"}`: one transaction, opened once; again answers the same ride). Drawn from its
+    ride's drawing, cells, size and pace (`components/rides/hunchess.tsx`: an SVG filter remapping each ride layer to black, gold and
+    cream, with a gold trim; `HUNCHESS_LEVELS` lifts a ride whose remap fails: the Rodeo Bull). No purity shown, no shine.
+  - **Never tradeable or listable:** `tradeable()` in core says no for the crate and its rides (there's no trading or listing yet: any
+    path that comes asks it on the server). The locker's tile shows "HunChess" and "Not tradeable" in place of its color and purity.
+  - **Stored:** `welcome_crates` (`user_id`, `milestone`, `granted_at`, `games`, `seen_at`, `opened_at`, `item_id`, `def`), `results.abandoned`; the ride is
+    an `items` row (crate `welcome-hunchess`). Older data reads as not earned yet. In the account's download ("welcomeCrate") and erased
+    with it.
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
@@ -148,6 +174,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | What | Where |
 | --- | --- |
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
+| The Welcome Crate: the crate, its roll, `tradeable`, its text; the grant, opening and notice | `packages/core/src/welcome.ts`; `packages/server/src/welcome.ts`; `components/WelcomeNotice.tsx`; the colorway `components/rides/hunchess.tsx` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
 | Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
@@ -173,7 +200,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   window's first place, which boss, guests where sign-in is set up, 10 moves / 5 minutes, solo timed by the server and counted once,
   the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
+- Unit (Nov 6): `packages/server/test/welcome.test.ts` (the Welcome Crate: 5 not 4, abandoned games, races, the backfill, opening once, never tradeable, no purity, old lockers), `packages/app/test/hunchess-rides.test.ts` (every ride's colorway draws).
+- e2e: `e2e/welcome-crate.spec.ts` (the Welcome Crate end to end, Nov 6); `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
   its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
   straight in the local database).
