@@ -17,7 +17,7 @@ const M = await import("../src/town/minimap.ts");
 /**
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md): three
  * gestures told apart by the drag threshold and a hold time; a run steered by the finger, which never turns the camera; a look round let
- * go within 10° of a quarter snaps there and a tap or a run locks it in as the base heading, which the arrows follow; a building's in and
+ * go snaps to the nearest quarter (split at 45°) and a tap, a run or an arrow locks it in as the base heading, which the arrows follow; a building's in and
  * out resets it to north; the minimap built from the plan.
  */
 const F = TOWN_FEEL;
@@ -146,26 +146,29 @@ const looked = (deg: number, normal: number, now = 0) => {
   return l;
 };
 
-describe("locking a new view (Eric, Nov 5: \"within 10 degrees of a new 90-degree baseline, and then you tap … it locks in\")", () => {
-  it("let go within 10° of a quarter, the view eases there exactly (about 0.16 s) and it's snapped; the base isn't changed yet", () => {
-    expect(F.streetSnapDeg).toBe(10);
-    for (const [deg, q] of [[95, 90], [81, 90], [-99, 270], [172, 180], [-185, 180]] as const) {
+describe("locking a new view (Eric, Nov 5: \"… and then you tap … it locks in\"; Nov 6: \"about like 45 degrees … it should snap to the new direction\")", () => {
+  it("let go, the view eases to the nearest quarter exactly (about 0.16 s) and it's snapped; the base isn't changed yet", () => {
+    expect(F.streetSnapDeg).toBe(45);
+    for (const [deg, q] of [[95, 90], [81, 90], [54, 90], [-50, 270], [-99, 270], [172, 180], [-185, 180]] as const) {
       const l = looked(deg, 0, 1000);
       expect(l.snapped, `${deg}°`).toBe(q);
       expect(l.at(1000 + F.streetSnapMs), `${deg}° eased to the quarter`).toBeCloseTo(deg < -100 ? -180 : deg < 0 ? -90 : q, 6);
     }
   });
-  it("from a base of east: the quarters are the world's (a look to the left within 10° of north snaps to north)", () => {
+  it("from a base of east: the quarters are the world's (a look 84° left of east snaps to north)", () => {
     const l = looked(-84, 90, 0);
     expect(l.snapped).toBe(0);
     expect(l.at(1000)).toBeCloseTo(-90, 6);
   });
-  it("past 10° it stays where you left it, not snapped; back near the normal view it eases there, not snapped either", () => {
-    const l = looked(54, 0, 0);
-    expect(l.snapped).toBeNull();
-    expect(l.at(1000)).toBeCloseTo(54, 6);
-    const m = looked(78, 0, 0);
-    expect(m.snapped).toBeNull();
+  it("past 45° it snaps to the next quarter: 50° left of north snaps to west, -90", () => {
+    const l = looked(-50, 0, 0);
+    expect(l.snapped).toBe(270);
+    expect(l.at(1000)).toBeCloseTo(-90, 6);
+    const m = looked(54, 0, 0);
+    expect(m.snapped).toBe(90);
+    expect(m.at(1000)).toBeCloseTo(90, 6);
+  });
+  it("a look that lets go on the normal heading's own quarter isn't snapped: it eases there, not snapped", () => {
     const n = looked(6, 0, 0);
     expect(n.snapped, "the normal heading's own quarter").toBeNull();
     expect(n.at(1000)).toBe(0);
@@ -189,21 +192,22 @@ describe("locking a new view (Eric, Nov 5: \"within 10 degrees of a new 90-degre
     expect(lockIn(turn, look, 1000)).toBe(0);
     expect(turn.at(5000)).toBe(0);
   });
-  it("no lock when not snapped: nothing changes, and your first step eases the view back to the base heading", () => {
+  it("no lock when nothing snapped (the nearest quarter is the normal heading's): nothing changes, and your first step eases the view back", () => {
     const turn = new Turn(90);
-    const look = looked(-54, 90, 0);
+    const look = looked(-20, 90, 0);
     expect(lockIn(turn, look, 500)).toBeNull();
     expect(turn.to).toBe(90);
     look.back(500);
     expect(look.at(500 + F.streetLookBackMs)).toBe(0);
   });
-  it("a step first (an arrow: `back`) forgets the snap, so nothing is locked in after it", () => {
+  it("an arrow step locks in the snapped quarter, through the same path as a tap: the base is 90, the view doesn't ease back", () => {
     const turn = new Turn(0);
     const look = looked(95, 0, 0);
-    look.back(400);
+    // (The frame's step: lockIn first; `back` only when nothing snapped.)
+    expect(lockIn(turn, look, 400)).toBe(90);
+    expect(turn.at(1000)).toBe(90);
+    expect(look.at(400)).toBe(0);
     expect(look.snapped).toBeNull();
-    expect(lockIn(turn, look, 500)).toBeNull();
-    expect(turn.to).toBe(0);
   });
   it("a new drag forgets the last snap until it's let go", () => {
     const look = looked(95, 0, 0);

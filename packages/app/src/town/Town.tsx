@@ -658,7 +658,12 @@ function startTown(
   };
   const stopKeys = listenKeys();
   const offHeld = onHeld(paintKeys);
-  const offQuarter = onHeld(() => (keyQuarter = quarterOf(turn.to)));
+  // (An arrow's press locks a snapped look round in first, so its step goes by the new base heading, not the old one's.)
+  const offQuarter = onHeld(() => {
+    const b = lockIn(turn, look, performance.now());
+    if (b !== null) base = b;
+    keyQuarter = quarterOf(turn.to);
+  });
   // (The signs' pixel font is the game's own; it's loaded on first use, so ask for it now.)
   void document.fonts?.load('8px "Press Start 2P"').catch(() => {});
   // The bosses' sounds for a tap on one, made ahead off the page's thread (the sound worker), so a tap never costs a frame.
@@ -681,8 +686,8 @@ function startTown(
   const look = new LookAround();
   /**
    * The base heading (Nov 5, brief-street-controls-map.md): the normal heading off a home's strip, north, east, south or west. A look round
-   * snapped to a quarter and locked in by a tap or a run sets it (turn.ts lockIn); the arrows never do. North as the town opens and as you
-   * come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
+   * snapped to a quarter and locked in by any way of setting off (a tap, a run, an arrow: turn.ts lockIn) sets it. North as the town
+   * opens and as you come out of a building (`resume`); a strip's turn leaves it alone (stepping off goes back to it).
    */
   let base = 0;
   /** (Tests) The heading held (the turn's stills), or null. */
@@ -973,7 +978,12 @@ function startTown(
     if (STREET_TOWN) {
       const h = town.you.walker.here();
       turn.aim(nearestTurn(baseHeading(h.c, h.r, base), turn.to), now);
-      if (town.you.walker.moving()) look.back(now);
+      // (Any way of setting off locks a snapped quarter in, the base heading; with nothing snapped, your first step eases the view back.)
+      if (town.you.walker.moving()) {
+        const b = lockIn(turn, look, now);
+        if (b !== null) base = b;
+        else look.back(now);
+      }
       heading = pinHeading ?? turn.at(now) + look.at(now);
     }
   };

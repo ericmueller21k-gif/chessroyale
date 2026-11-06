@@ -7,8 +7,8 @@ import { asAdmin, test, lookDrag, quickTap } from "./helpers.ts";
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md):
  * - hold to run: a press held still runs you the way your finger is from your pawn (up, down, left or right of the view), at once;
  *   moving the finger changes the way and never turns the camera; letting go stops you; a run into a home's door opens its card;
- * - locking a new view: a look round let go within 10° of a quarter snaps there; a tap (or a run) next makes it the base heading, which
- *   the arrows follow; not snapped, your first step eases back; a building's in and out resets it to north;
+ * - locking a new view: a look round let go snaps to the nearest quarter (split at 45°, Nov 6: "about like 45 degrees"); a tap, a run or
+ *   an arrow next makes it the base heading, which the arrows follow; a building's in and out resets it to north;
  * - the minimap: on by default, top right, your dot moving with you; its button hides it (remembered); a tap opens it large with the
  *   boss portraits, the Colosseum and the park; a tap closes it; it never covers the arrows, the zoom pair or the chat.
  * Phone (touch, through the browser's touch events) and computer (the mouse's left button), Canvas 2D and WebGL.
@@ -221,7 +221,7 @@ for (const backend of ["2d", "webgl"] as const) {
     expect([...new Set((await headings(page)).map(([h, l]) => `${h}/${l}`))], "the camera never turned").toEqual(["0/0"]);
   });
 
-  test(`locking a new view (${backend}): a drag let go near east snaps there; a tap locks it in and the up arrow goes east; not snapped, a tap eases back; a building's in and out resets north`, async ({ page }) => {
+  test(`locking a new view (${backend}): a drag let go near east snaps there; a tap locks it in and the up arrow goes east; about 54° left of east snaps to north, a tap locks it in; a building's in and out resets north`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 500_000 : 200_000);
     await open(page, backend);
     // (Fountain Street east of the park: room to walk and run east, round the world's wrap, before the park.)
@@ -259,31 +259,32 @@ for (const backend of ["2d", "webgl"] as const) {
     await f.up();
     await settle(page);
     expect(way(from, await you(page)), "a run up goes east").toEqual([1, 0]);
-    // Not snapped (about 54° left of east): a tap eases back to the base heading (east), which stays. (From (6, 28), west of the park, the
-    // zoom at rest: a run on a slow WebGL runner can carry you into the park, whose step out glides the zoom, and a tap point read during
-    // a glide is a square off by the time it lands.)
+    // About 54° left of east: let go, it snaps to north (the nearest quarter), eased there exactly; snapped, the base still east. (From
+    // (6, 28), west of the park, the zoom at rest: a run on a slow WebGL runner can carry you into the park, whose step out glides the zoom,
+    // and a tap point read during a glide is a square off by the time it lands.)
     await walkTo(page, [6, 28]);
     await expect.poll(async () => (await cam(page)).zoom, { timeout: 5000 }).toBe(2);
     await drag(page, -0.3);
-    await page.waitForTimeout(300);
+    await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
     c = await cam(page);
-    expect(c.snapped, "not snapped").toBeNull();
-    expect(Math.abs(c.heading - 36), "left where it was let go").toBeLessThan(6);
+    expect([c.snapped, c.base], "snapped to north, the base still east").toEqual([0, 90]);
     // (Two squares east on Fountain Street's middle row: all street, no lamps. Aiming two east of wherever you stood once landed on the
     // south sidewalk's lamp at (4, 26), after a held arrow's extra step put you on that sidewalk; a tap on a lamp's square walks you
     // beside it, to (3, 26).)
+    // A tap (a walk) locks north in: the new base heading; the camera stays north through the walk.
     const sq2 = [8, 28] as const;
     await tapSquare(page, sq2);
-    await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(90);
+    await expect.poll(async () => (await cam(page)).base, { timeout: 3000 }).toBe(0);
     await settle(page);
     expect(await you(page), "walked to the square tapped").toEqual([...sq2]);
-    expect((await cam(page)).base, "no lock").toBe(90);
-    // Puddles' Botanical Garden: its door's square is on its strip (the camera faces its front, north; the base stays east). A run
+    c = await cam(page);
+    expect([c.heading, c.headingBase, c.snapped], "still north, nothing snapped").toEqual([0, 0, null]);
+    // Puddles' Botanical Garden: its door's square is on its strip (the camera faces its front, north; the base stays north). A run
     // toward it opens its card, as the arrows do; in and out, the view is north again.
     await walkTo(page, [9, 16]);
     await expect.poll(async () => (await cam(page)).strip, { timeout: 5000 }).toBe("gardener");
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
-    expect((await cam(page)).base, "a strip leaves the base alone").toBe(90);
+    expect((await cam(page)).base, "a strip leaves the base alone").toBe(0);
     const card = page.getByRole("dialog", { name: "Puddles' Botanical Garden", exact: true });
     const toward = await holdPoint(page, "up");
     await f.down(toward.x, toward.y);
@@ -337,9 +338,10 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   // The arrow turns with the camera: a look round a quarter to the right points it east.
   await drag(page, 0.5);
   await expect.poll(async () => (await dot(page)).deg, { timeout: 3000 }).toBe(90);
-  // (Snapped to east; an arrow's step first eases it back north, nothing locked in.)
-  await arrowStep(page, "ArrowUp");
-  await expect.poll(async () => (await dot(page)).deg, { timeout: 3000 }).toBe(0);
+  // (Snapped to east: an arrow's step locks it in, the base east, and that step goes east: up is east now.)
+  expect(await arrowStep(page, "ArrowUp"), "up goes east").toEqual([1, 0]);
+  await expect.poll(async () => (await dot(page)).deg, { timeout: 3000 }).toBe(90);
+  expect((await cam(page)).base, "the arrow locked east in").toBe(90);
 
   // The button: off hides it (and its box goes, so the chips may use the corner), remembered on this device; on brings it back.
   const btn = page.getByRole("button", { name: "Map", exact: true });
