@@ -47,6 +47,9 @@ Decision note: `docs/decisions/2026-11-06-welcome-crate.md`. Area page: `docs/ar
   - The reveal shows "HunChess gold & black", "Not tradeable", no purity and no "Open another".
   - Each HunChess ride's locker tile shows "HunChess" and "Not tradeable" in place of its color and purity.
   - The ride wears and rides like any ride in the town.
+  - A profile's Wearing row lists it as "Ride · HunChess gold & black · Not tradeable": no "% pure", no "Shiny"
+    (`app/src/item-details.ts`, used by `ProfileParts.tsx`). Item art never adds its shiny class for one, and the locker's delete
+    dialog shows no purity for one.
   - A one-time notice shows on home and on a match's result screen.
 
 ## Player-visible text (all new)
@@ -59,6 +62,7 @@ Decision note: `docs/decisions/2026-11-06-welcome-crate.md`. Area page: `docs/ar
 - "You have 1. Open it!", "Opened. Its ride is in your locker."
 - "One per account, for finishing 5 games in any mode or against any boss. It holds one ride, any of the game's rides, each as likely,
   in HunChess gold and black. It and its ride can't be traded."
+- A profile's Wearing row for a HunChess ride: "Ride · HunChess gold & black · Not tradeable"
 - "Possible rides", "Ride · HunChess gold & black", "HunChess gold & black", "A HunChess ride" (the Fischer Random banner's line)
 - Item names "HunChess <ride name>" (e.g. "HunChess Balloon Pup"); descriptions "<ride> in HunChess gold and black, from the Welcome
   Crate. <the ride's line>"
@@ -105,13 +109,15 @@ Decision note: `docs/decisions/2026-11-06-welcome-crate.md`. Area page: `docs/ar
   - no purity;
   - old lockers and a database without the table.
 - Unit: `packages/app/test/hunchess-rides.test.ts`: every ride's colorway loads and every layer of every view, frame and trail is in
-  its filter; its cells, size and pace are its ride's.
+  its filter; its cells, size and pace are its ride's; a profile's Wearing details for every HunChess ride list no purity or shine,
+  while other items keep theirs.
 - e2e: `e2e/welcome-crate.spec.ts` (phone and computer): a signed-in account finishes 4 games (progress 4/5) and then a 5th, through
   the app's own result path `POST /api/results`. Then it:
   - sees the notice once;
   - opens the crate (strip, Fischer Random, reveal) to a HunChess ride: "Not tradeable", no purity;
   - opens again and gets the same ride, nothing new;
   - finds no trade, sell or list buttons, and "Not tradeable" on the locker tile;
+  - finds its profile's Wearing row reading "Ride · HunChess gold & black · Not tradeable", with no purity or shine;
   - rides it in the town (`__townRide`);
   - plays a sixth game, which grants nothing.
 

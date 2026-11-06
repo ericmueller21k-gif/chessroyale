@@ -39,7 +39,8 @@ The calls made here, each easy to change:
   vanishes on a dark page. Levels per ride where the remap failed: only the Rodeo Bull (nearly all dark brown) is lifted. Lifting the
   bulb, the log and the moon was tried and dropped (it washed them out to cream). A new ride gets its colorway with no change.
 - **Its stored finish:** yellow (paints the colored parts gold), a two-color ride's second part midnight (black), blemish 0. **No
-  purity is shown** for the crate or its rides: not on the crate page, the reveal, the locker tile or its label; no shine on them.
+  purity is shown** for the crate or its rides: not on the crate page, the reveal, the locker tile or its label, the delete
+  dialog, or a profile's Wearing row ("Ride · HunChess gold & black · Not tradeable"); no shine on them anywhere.
 - **Never tradeable, never listable.** There is no trading, gifting or listing in the game today (Nov 6: nothing in the server's
   routes or the app moves an item between accounts but a guest's sign-in). `tradeable()` in core says no for the crate and every
   HunChess ride, with `NOT_TRADEABLE` as the refusal: whatever trade or listing path comes must ask it on the server. "Not tradeable"
