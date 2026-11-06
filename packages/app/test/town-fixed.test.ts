@@ -97,10 +97,10 @@ describe("looking round (round 5 addendum; Eric: \"hold your mouse, move it a li
   it("a drag turns the view: across the box's width about half a turn, left looks left; letting go keeps it", () => {
     const l = new LookAround();
     l.grab(0);
-    l.drag(-390, 390);
+    l.drag(390, 390);
     expect(l.at(10)).toBeCloseTo(-TOWN_FEEL.streetLookPerWidth, 6);
     expect(TOWN_FEEL.streetLookPerWidth).toBe(180);
-    l.drag(195, 390);
+    l.drag(-195, 390);
     expect(l.at(20)).toBeCloseTo(90, 6);
     l.release();
     expect(l.at(5000)).toBeCloseTo(90, 6);
@@ -109,7 +109,7 @@ describe("looking round (round 5 addendum; Eric: \"hold your mouse, move it a li
   it("the first step eases it back over about 0.3 s, the short way round; not while you still drag", () => {
     const l = new LookAround();
     l.grab(0);
-    l.drag(-390 * 1.5, 390); // three quarters round to the left
+    l.drag(390 * 1.5, 390); // three quarters round to the left (the finger to the right)
     l.back(100); // (still dragging: nothing)
     expect(l.at(100)).toBeCloseTo(-270, 6);
     l.release();

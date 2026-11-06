@@ -509,12 +509,13 @@ export async function lookDrag(page: Page, box: { x: number; y: number; width: n
   const cdp = await page.context().newCDPSession(page);
   const y = Math.round(box.y + box.height * yShare);
   const x0 = box.x + box.width / 2;
-  const at = (i: number) => Math.round(x0 + (share * box.width * i) / steps);
+  // (Positive `share` looks right: the finger moves left, pulling the world; Eric, Nov 6.)
+  const at = (i: number) => Math.round(x0 - (share * box.width * i) / steps);
   const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", x: number, buttons: number) =>
     cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
   await ev("mouseMoved", at(0), 0);
   // (The first move well past the town's drag threshold, `dragPx` 8, however short the steps: a drag from its first move.)
-  const first = Math.abs(at(1) - at(0)) >= 16 || share === 0 ? at(1) : at(0) + Math.sign(share) * 16;
+  const first = Math.abs(at(1) - at(0)) >= 16 || share === 0 ? at(1) : at(0) - Math.sign(share) * 16;
   await Promise.all([ev("mousePressed", at(0), 1), ev("mouseMoved", first, 1)]);
   for (let i = 2; i <= steps; i++) {
     await ev("mouseMoved", at(i), 1);

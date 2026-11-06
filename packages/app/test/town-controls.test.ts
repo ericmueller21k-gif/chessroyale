@@ -141,7 +141,7 @@ describe("the run's way: from your pawn to the finger, snapped to up, down, left
 const looked = (deg: number, normal: number, now = 0) => {
   const l = new LookAround();
   l.grab(0);
-  l.drag((deg / F.streetLookPerWidth) * 390, 390);
+  l.drag(-(deg / F.streetLookPerWidth) * 390, 390);
   l.release(now, normal);
   return l;
 };
