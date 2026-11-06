@@ -38,7 +38,7 @@ async function shot(page: Page, name: string) {
   if (dir) await page.screenshot({ path: `${dir}/${name}-${isComputer() ? "computer-1280" : "phone-390"}.png` });
 }
 
-test("two players: a request accepted, online in each other's list, the invites setting, an invite joined from its toast, then a block", async ({ browser }) => {
+test("two players: a request accepted, online in each other's list, the invites setting, an invite joined from its toast, then a block", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(4 * 60_000);
   const ann = await player(browser, "Ann Friend");
   const bo = await player(browser, "Bo Friend");

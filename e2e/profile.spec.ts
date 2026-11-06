@@ -81,7 +81,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
-test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", async ({ page }) => {
+test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Eric");
   const crate = page.locator(".locker-grid").first();
   const fromShop = page.locator(".locker-grid").nth(1);
@@ -182,7 +182,7 @@ test("home → queue → match, then tap a name for that player's profile (phone
   await expect(phone.getByText("You've already reported this player in this match.")).toBeVisible();
 });
 
-test("in a match: a bot's name opens a bot's card, yours opens your profile", async ({ page }) => {
+test("in a match: a bot's name opens a bot's card, yours opens your profile", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(2 * 60_000);
   await named(page, "Solo");
   await page.goto("/?debug&pace=quick&mode=crowd&augments=0");
@@ -376,7 +376,7 @@ test.describe("rides lazy", () => {
   });
 });
 
-test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has every ride's admin copy (Nov 1: every boss's); wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", async ({ page }) => {
+test("rides for an admin (Oct 31; admins own one of every item): the Ride tab has every ride's admin copy (Nov 1: every boss's); wearing Riding Chirp's, the preview rides it, and in the town square your pawn rides it, in its color", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Eric");
   // (Once this page's account exists, as a player: no ride.)
   await page.goto("/shop");

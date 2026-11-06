@@ -64,7 +64,7 @@ const strip = (page: Page) => page.locator(".ws-strip").getAttribute("data-prog"
 const pawns = (fen: string, color: "w" | "b") => fen.split(" ")[0]!.split("").filter((c) => c === (color === "w" ? "P" : "p")).length;
 
 test.describe("Timber", () => {
-  test("admins first: no tile for a player; an admin's Boss raid screen has his tile", async ({ page }) => {
+  test("admins first: no tile for a player; an admin's Boss raid screen has his tile", { tag: "@phone-only" }, async ({ page }) => {
     await page.goto("/?debug&mode=raid");
     await openBossRaid(page);
     const tiles = page.getByRole("radiogroup", { name: "Bosses" });
@@ -76,7 +76,7 @@ test.describe("Timber", () => {
     await expect(tiles.getByRole("radio", { name: "Timber", exact: true })).toBeVisible();
   });
 
-  test("the workshop strip fills on the clock without moving anything; his finished pawn drops on his half; the Gnaw eats a pawn", async ({ page }) => {
+  test("the workshop strip fills on the clock without moving anything; his finished pawn drops on his half; the Gnaw eats a pawn", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(180_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));

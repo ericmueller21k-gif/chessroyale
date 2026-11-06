@@ -7,7 +7,7 @@ import { named, test } from "./helpers.ts";
  * (supply boxes or presents) and odds, and opening it spins its own boxes and lands on one of its own items. On a
  * phone and a computer, with nothing sideways-scrolling.
  */
-test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", async ({ page }) => {
+test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Two Crates");
   await page.goto("/shop?crates");

@@ -41,7 +41,7 @@ async function openConfirm(page: Page, title: RegExp, note: RegExp) {
   return confirm;
 }
 
-test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"You resigned\", the boss won), and nothing goes on after it", async ({ page }) => {
+test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"You resigned\", the boss won), and nothing goes on after it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -100,7 +100,7 @@ test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"
   expect(errors).toEqual([]);
 });
 
-test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign mid-match stops it there, out last of 100", async ({ page }) => {
+test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign mid-match stops it there, out last of 100", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await named(page, "Quitter");
   // The votes (before move 1): Leave.
@@ -132,7 +132,7 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });
 
-test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and the lobby, with nobody left, closes", async ({ page }) => {
+test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and the lobby, with nobody left, closes", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Tess");
   await page.goto("/squads/test/relay?nolanding&debug&clock=90,0,3,0");
@@ -163,7 +163,7 @@ test("Squads (a test lobby): Resign leaves the lobby, a bot plays your seat, and
 const device = (browser: Browser) =>
   browser.newContext(phone() ? ({ ...devices["iPhone 13"], browserName: undefined } as never) : { viewport: { width: 1280, height: 800 } });
 
-test("online boss raid: one resigns, a bot takes the seat, the other plays on (and now runs the boss); the one who left isn't put back", async ({ browser }) => {
+test("online boss raid: one resigns, a bot takes the seat, the other plays on (and now runs the boss); the one who left isn't put back", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(5 * 60_000);
   const q = pool("resign");
   const [ca, cb] = [await device(browser), await device(browser)];

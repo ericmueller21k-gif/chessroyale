@@ -63,7 +63,7 @@ async function watchStand(page: Page) {
 }
 const standSeen = (page: Page) => page.evaluate(() => (window as any).__stand as boolean);
 
-test("Babur's hoops: a move the God King would save stands inside the walls, a capture within a ring first; once they're out he saves the next", async ({ page }) => {
+test("Babur's hoops: a move the God King would save stands inside the walls, a capture within a ring first; once they're out he saves the next", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

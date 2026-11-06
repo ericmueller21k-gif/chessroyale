@@ -107,7 +107,7 @@ test("every boss is on Maia, no guard, by default for an admin (Boss alone, a ph
   }
 });
 
-test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", async ({ browser }) => {
+test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", { tag: "@phone-only" }, async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "one run covers both devices");
   test.setTimeout(5 * 60_000);
   // (wrangler dev's MAIA_TEST counts everyone as an admin for the lobby's choice; only the admin's app may run Maia.)

@@ -23,7 +23,7 @@ const lockerNow = (page: Page) => page.evaluate(async () => (await (await fetch(
 const finishGame = (page: Page) =>
   page.evaluate(async () => (await fetch("/api/results", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true }) })).ok);
 
-test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", async ({ page }) => {
+test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await named(page, "Tess");

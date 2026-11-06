@@ -120,7 +120,7 @@ type Rec = {
 };
 const recorded = (page: Page) => page.evaluate(() => (window as any).__rec as Rec[]);
 
-test("Moo & Moon: a moonbeam falls on one of your pieces and burns a crescent into its square; it can't move for your turn, then it's free", async ({ page }) => {
+test("Moo & Moon: a moonbeam falls on one of your pieces and burns a crescent into its square; it can't move for your turn, then it's free", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -493,7 +493,7 @@ test("Moo & Moon: the Moon on his meter fills with it, new to full, and says a l
   expect(errors).toEqual([]);
 });
 
-test("Moo & Moon: his tile picks him, and Boss alone meets him: his figure in the bar, his entrance line with its icon, no page errors", async ({ page }) => {
+test("Moo & Moon: his tile picks him, and Boss alone meets him: his figure in the bar, his entrance line with its icon, no page errors", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

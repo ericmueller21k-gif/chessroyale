@@ -132,7 +132,7 @@ test("solo Crowd: the top 4 meet him; the God King's help tried spends a charge;
   expect(errors).toEqual([]);
 });
 
-test("online: a Crowd boss final meets him: his intro by name for everyone, four in the battle; a try at the God King spends a charge and your move goes on; his bullet clock", async ({ page }) => {
+test("online: a Crowd boss final meets him: his intro by name for everyone, four in the battle; a try at the God King spends a charge and your move goes on; his bullet clock", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(16 * 60_000);
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   const errors: string[] = [];

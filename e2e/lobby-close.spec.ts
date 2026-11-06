@@ -34,7 +34,7 @@ async function playToResults(page: Page, minutes: number) {
   throw new Error("no results in time");
 }
 
-test("a finished match: a reload mid-match rejoins it; its results survive a reload while they're up; then it closes: home, a note, your result", async ({ page, browser }) => {
+test("a finished match: a reload mid-match rejoins it; its results survive a reload while they're up; then it closes: home, a note, your result", { tag: "@phone-only" }, async ({ page, browser }) => {
   test.setTimeout(6 * 60_000);
   await named(page, "Closer");
   // A boss raid of one with two crowd moves: a short online match. Its results stay up 30 s.
@@ -118,7 +118,7 @@ test("Home or Play again from results: the address is / again, so reopening the 
   expect(path(page)).toBe("/");
 });
 
-test("a code typed into Join that leads nowhere: \"Can't join\", not an endless \"Connecting…\"", async ({ page }) => {
+test("a code typed into Join that leads nowhere: \"Can't join\", not an endless \"Connecting…\"", { tag: "@phone-only" }, async ({ page }) => {
   await page.goto("/");
   await openPlayWithFriends(page);
   await page.getByRole("textbox", { name: "Lobby code" }).fill("ZZZZZ");

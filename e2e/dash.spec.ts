@@ -73,7 +73,7 @@ const seen = (page: Page) => page.evaluate(() => (window as any).__dash as Seen)
 const dash = (page: Page) => page.evaluate(() => (window as any).match.boss.powers.dash);
 
 test.describe("Dash", () => {
-  test("admins first: no tile for a player; an admin's Boss raid screen has his tile", async ({ page }) => {
+  test("admins first: no tile for a player; an admin's Boss raid screen has his tile", { tag: "@phone-only" }, async ({ page }) => {
     await page.goto("/?debug&mode=raid");
     await openBossRaid(page);
     const tiles = page.getByRole("radiogroup", { name: "Bosses" });
@@ -85,7 +85,7 @@ test.describe("Dash", () => {
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toBeVisible();
   });
 
-  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 3 s a move counted down over the board; out of time, a move is played for you, never a loss; nothing moves", async ({ page }) => {
+  test("Clock Slap takes time off your bank and flies it to him; Time Scramble: 3 s a move counted down over the board; out of time, a move is played for you, never a loss; nothing moves", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));

@@ -76,7 +76,7 @@ async function resign(page: Page, word: "Resign" | "Leave" = "Resign") {
   await page.getByRole("alertdialog").getByRole("button", { name: word }).click();
 }
 
-test("two players: one tap to queue, the vote on the game's own board, checkmate with real taps, and both ranks move", async ({ browser }) => {
+test("two players: one tap to queue, the vote on the game's own board, checkmate with real taps, and both ranks move", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const a = await player(browser, "Ann Duel");
   const b = await player(browser, "Bo Duel");
@@ -151,7 +151,7 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   expect(await record(white)).toMatchObject({ games: 1, wins: 0, losses: 1 });
 });
 
-test("resigning, then a flag: Play again queues both again; each game counts", async ({ browser }) => {
+test("resigning, then a flag: Play again queues both again; each game counts", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const a = await player(browser, "Ann Clock");
   const b = await player(browser, "Bo Clock");
@@ -186,7 +186,7 @@ test("resigning, then a flag: Play again queues both again; each game counts", a
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 2/5", { timeout: 15_000 });
 });
 
-test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", async ({ browser }) => {
+test("every change is drawn, even in the same millisecond as the last draw (the clock held still from the last move): the result, then the rank", { tag: "@phone-only" }, async ({ browser }) => {
   // (The game screen once redrew by setting the time as its state, and Preact skips a state set to the value it holds: a
   // change in the same millisecond as the clocks' last tick wasn't drawn, and "Updating your rank…" stayed up for good.
   // A held clock makes every change land in the same millisecond. docs/decisions/2026-10-28-two-flaky-tests.md.)
@@ -207,7 +207,7 @@ test("every change is drawn, even in the same millisecond as the last draw (the 
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
 });
 
-test("a first move that never comes: the game is aborted, nobody's rank moves", async ({ browser }) => {
+test("a first move that never comes: the game is aborted, nobody's rank moves", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Abort");
   const b = await player(browser, "Bo Abort");
@@ -223,7 +223,7 @@ test("a first move that never comes: the game is aborted, nobody's rank moves", 
   expect((await record(black)).games).toBe(0);
 });
 
-test("a reload mid-game comes back to the same game, its clocks running; a declined offer, then a draw both agree to", async ({ browser }) => {
+test("a reload mid-game comes back to the same game, its clocks running; a declined offer, then a draw both agree to", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const a = await player(browser, "Ann Draw");
   const b = await player(browser, "Bo Draw");
@@ -266,7 +266,7 @@ test("a reload mid-game comes back to the same game, its clocks running; a decli
   expect(await record(white)).toMatchObject({ games: 1, draws: 1 });
 });
 
-test("Leave before the first moves: the game is called off, with no result and no rank change", async ({ browser }) => {
+test("Leave before the first moves: the game is called off, with no result and no rank change", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Leave");
   const b = await player(browser, "Bo Leave");
@@ -282,7 +282,7 @@ test("Leave before the first moves: the game is called off, with no result and n
   expect((await record(black)).games).toBe(0);
 });
 
-test("nobody to play: the search's Cancel, then Few players online: Keep waiting, or a bot (unranked)", async ({ browser }) => {
+test("nobody to play: the search's Cancel, then Few players online: Keep waiting, or a bot (unranked)", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const a = await player(browser, "Ann Alone");
   const pool = poolName();
