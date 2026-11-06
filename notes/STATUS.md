@@ -334,3 +334,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   - The claw on the kit is APPROVED ("fine with new design … update it later"). Merge claude/kit-claw into claude/boingo-home, then finish Boingo's room (the resume list: fps, computer stills, GIFs, areas.json, docs, PR) and send Eric the room stills before live.
   - Settings: I design the mockup myself and SEND IT FIRST for his OK (Sounds and Gameplay pages, plus the move-confirm style picker), then build after his OK.
 - **Sprite kit pilot = SMUDGY (Eric, Nov 6):** "use Smudgy to test because in the battle intro he's facing the wrong way when the match starts". Convert Smudgy to the sprite kit AND fix his facing at the battle intro's start (he must face the board/player as the match begins). Before/after stills and a GIF of the intro to Eric before the pilot merges.
+- **Eric, Nov 6 ~22:40 (playtest; QUEUED, start only after the queue is empty): Dash's Scramble Rush.**
+  - It fires with no warning. Treat it like the other ults: when he plays it at the start of his turn, the banner comes up, then
+    "Next turn: Scramble Rush", and he says a line (e.g. "Hope you were watching."). The put-back starts the turn after.
+  - The put-back can be spammed: a hard cap of 2 moves per piece. A third try shakes the piece, with small fading text "No more tries".
