@@ -1038,7 +1038,7 @@ function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: st
           Delete {d.name}
           {n > 1 ? ` ×${n}` : ""}?
         </strong>
-        <span class="small">{n > 1 ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>
+        <span class="small">{n > 1 && showsPurity(top.def) ? `${colorName(top)} · the best is ${purity(top.blemish).toFixed(1)}%` : finishLine(top)}</span>
         <p class="small">It's gone for good. This can't be undone.</p>
         {error && <p class="shop-error">{error}</p>}
         <div class="locker-dialog-actions">

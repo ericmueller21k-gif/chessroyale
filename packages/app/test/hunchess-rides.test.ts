@@ -74,3 +74,17 @@ describe("the HunChess colorway (Nov 6)", () => {
     }
   });
 });
+
+describe("no purity or shine for a HunChess ride on a profile (Nov 6)", () => {
+  it("a profile's Wearing row lists a HunChess ride's slot, its colorway and Not tradeable; never a purity or Shiny", async () => {
+    const { wornDetails } = await import("../src/item-details.ts");
+    for (const d of HUNCHESS_RIDES) {
+      const details = wornDetails("ride", { def: d.id, color: "yellow", color2: d.colors === 2 ? "midnight" : null, blemish: 0, seed: 7 });
+      expect(details, d.id).toEqual(["Ride", "HunChess gold & black", "Not tradeable"]);
+      expect(details.join(" · "), d.id).not.toMatch(/pure|purity|shiny|%/i);
+    }
+    // Every other item still lists its purity, and Shiny at 90%+.
+    expect(wornDetails("ride", { def: "balloon-pup", color: "cobalt", blemish: 40, seed: 7 })).toEqual(["Ride", "Cobalt", "60% pure"]);
+    expect(wornDetails("head", { def: "beanie", color: "red", blemish: 2, seed: 7 })).toEqual(["Head", "Red", "98% pure", "Shiny"]);
+  });
+});

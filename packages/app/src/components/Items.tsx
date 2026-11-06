@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { aboveHat, behindPiece, isShiny, secondColor, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import type { RiderDraft } from "./rides/kit.ts";
@@ -1175,7 +1175,7 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
   const s = Math.max(w, h) * 1.12;
   const vb = `${x + w / 2 - s / 2} ${y + h / 2 - s / 2} ${s} ${s}`;
   return (
-    <span class={`item-art${isShiny(finish.blemish) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
+    <span class={`item-art${isShiny(finish.blemish) && showsPurity(def) ? " shiny" : ""}${cls ? ` ${cls}` : ""}`} style={{ "--sw": String(Math.max(0.4, s / 100)) }} data-drawn={ride ? String(+!!d) : undefined}>
       <svg viewBox={vb} aria-hidden="true">
         {ride ? (
           <RideLayers id={def} c={ride} d={d} finish={{ ...finish, def }} side={side} anim="idle" f={0}>
