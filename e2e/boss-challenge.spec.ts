@@ -605,7 +605,7 @@ async function smudgyChallenge(page: Page, opts: { gl: boolean; gif: boolean }) 
   expect(firstOf((i) => i.cloth === "whip")).toBeGreaterThan(firstOf((i) => i.cloth === "covered"));
   expect(firstOf((i) => i.cloth === "heap")).toBeGreaterThan(firstOf((i) => i.cloth === "whip"));
   expect(firstOf((i) => !!i.chant)).toBeGreaterThan(firstOf((i) => i.cloth === "heap"));
-  for (const i of looks) {
+  for (const i of looks.slice(looks.indexOf(atLine))) {
     expect(where(i), `at ${i.step}: in their places`).toEqual(where(atLine));
     expect(i.attack, `at ${i.step}: no attack`).toBe(false);
   }

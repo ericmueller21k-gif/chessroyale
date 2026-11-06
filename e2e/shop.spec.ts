@@ -600,7 +600,8 @@ test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
   // The sculptures: the rook on its plinth in the west-back corner, a canvas stack and the easel by it.
-  await walkTo([4, 6]);
+  await walkTo([6, 6]);
+  await walkTo([3, 5]);
   await still("sculptures");
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });

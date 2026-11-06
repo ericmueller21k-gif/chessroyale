@@ -140,8 +140,10 @@ export const SHOP_SMUDGY_TABLE_AT = { c: 9.5, r: 14 } as const;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!inTarp(x, y)) continue;
-      const fold = Math.sin(x * 0.09 + y * 0.03) + Math.sin(y * 0.2 - x * 0.02) * 0.5;
-      c[y]![x] = fold > 1.15 ? "7" : fold < -1.2 ? "8" : fold > 0.7 ? "6" : "5";
+      // Creases: long thin diagonal lines, a lit strip beside each.
+      const f = (x * 0.55 + y * 1.3 + Math.sin(y * 0.1) * 6) % 58;
+      const g = (x * 1.2 - y * 0.4 + 400) % 83;
+      c[y]![x] = f < 1.1 || g < 1 ? "7" : f < 2.6 ? "6" : "5";
       if (!inTarp(x, y - 1) || !inTarp(x - 1, y)) c[y]![x] = "6";
       if (!inTarp(x, y + 1) || !inTarp(x + 1, y)) c[y]![x] = "8";
     }
