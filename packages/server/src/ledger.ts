@@ -1,4 +1,4 @@
-import type { CrateRoll } from "@chessroyale/core";
+import { OPS, type CrateRoll } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 
 /**
@@ -81,6 +81,24 @@ export async function ledgerAccount(sql: Sql, userId: string): Promise<LedgerAcc
   return account ? { user: userId, account } : null;
 }
 
+/** The app's id for one action (a boss crate's buy, an open, an admin's grant, a claw play): 8 to 64 letters, digits, "-" or "_". */
+const REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;
+/** An action's request id (account.ts makes one per tap, and a retry sends it again), or null: none, or not one (an older app). */
+export const requestId = (x: unknown): string | null => (typeof x === "string" && REQUEST_ID.test(x) ? x : null);
+
+/** An op's key, or how to make it from the account's ledger id (a key that names an account names it by that, never by its user id). */
+export type OpKey = string | ((ledgerId: string) => string);
+export const keyFor = (k: OpKey, a: LedgerAccount): string => (typeof k === "string" ? k : k(a.account));
+/** The keys that name an account (the audit of Nov 6, §1). */
+export const opKeys = {
+  /** An online boss battle's token drop: its lobby's code and when its match began (a code is used again once its lobby closes). */
+  onlineDrop: (code: string, startedAt: number): OpKey => (a) => `drop:${code}:${startedAt}:${a}`,
+  /** A Squads placement reward: its lobby's code and when that lobby was made. */
+  squadsReward: (code: string, createdAt: number): OpKey => (a) => `squads:${code}:${createdAt}:${a}`,
+  /** An action the app sent with its request id: `boss-crate`, `open`, `grant`, `claw`. */
+  request: (kind: string, request: string): OpKey => (a) => `${kind}:${a}:${request}`,
+};
+
 /** One leg of an op: its ledger row, and the balance write that goes with it (written only if the op applies: `ours`). */
 export interface Leg {
   kind: AssetKind;
@@ -112,6 +130,7 @@ export type NewItem = Pick<CrateRoll, "def" | "color" | "color2" | "blemish" | "
 /** The legs there are. Each says what changes and writes that change. */
 export const leg = {
   coins: (user: string, delta: number, source: string | null = null) => walletLeg("coins", user, delta, source),
+  crates: (user: string, delta: number, source: string | null = null) => walletLeg("crates", user, delta, source),
   keys: (user: string, delta: number, source: string | null = null) => walletLeg("keys", user, delta, source),
   tokens: (user: string, boss: string, delta: number, source: string | null = null) =>
     countLeg(
@@ -278,19 +297,36 @@ export async function deleteItems(sql: Sql, a: LedgerAccount, ids: readonly stri
 }
 
 /**
- * Every balance an account holds, each table's as rows (kind, asset, n), in SQL: `?1` is the account's id. What the ledger's sums must
- * equal. (A boss crate counts by its kind; a Welcome Crate while it's unopened.) One SELECT each: D1 refuses a compound SELECT of
- * more than a few terms, so a statement reads one of these at a time.
+ * Every balance there is, each table's as rows (user_id, asset, n) of one kind: what the ledger's sums must equal. (A boss crate counts
+ * by its kind; a Welcome Crate while it's unopened.) One SELECT each: D1 refuses a compound SELECT of more than a few terms, so a
+ * statement reads one of these at a time.
  */
-const BALANCES = [
-  "SELECT 'coins' AS kind, '' AS asset, coins AS n FROM wallets WHERE user_id = ?1",
-  "SELECT 'crates' AS kind, '' AS asset, crates AS n FROM wallets WHERE user_id = ?1",
-  "SELECT 'keys' AS kind, '' AS asset, crate_keys AS n FROM wallets WHERE user_id = ?1",
-  "SELECT 'token' AS kind, boss AS asset, n FROM boss_tokens WHERE user_id = ?1",
-  "SELECT 'shop' AS kind, item_id AS asset, 1 AS n FROM inventory WHERE user_id = ?1",
-  "SELECT 'item' AS kind, id AS asset, 1 AS n FROM items WHERE user_id = ?1",
-  "SELECT 'boss_crate' AS kind, crate AS asset, COUNT(*) AS n FROM boss_crates WHERE user_id = ?1 GROUP BY crate",
-  "SELECT 'welcome' AS kind, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE user_id = ?1 AND opened_at IS NULL",
+const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
+  { kind: "coins", rows: "SELECT user_id, '' AS asset, coins AS n FROM wallets" },
+  { kind: "crates", rows: "SELECT user_id, '' AS asset, crates AS n FROM wallets" },
+  { kind: "keys", rows: "SELECT user_id, '' AS asset, crate_keys AS n FROM wallets" },
+  { kind: "token", rows: "SELECT user_id, boss AS asset, n FROM boss_tokens" },
+  { kind: "shop", rows: "SELECT user_id, item_id AS asset, 1 AS n FROM inventory" },
+  { kind: "item", rows: "SELECT user_id, id AS asset, 1 AS n FROM items" },
+  { kind: "boss_crate", rows: "SELECT user_id, crate AS asset, COUNT(*) AS n FROM boss_crates GROUP BY user_id, crate" },
+  { kind: "welcome", rows: "SELECT user_id, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE opened_at IS NULL" },
+];
+/** One account's balances (`?1`, its id), as rows (kind, asset, n), a table at a time. */
+const BALANCES = HOLDINGS.map((h) => `SELECT '${h.kind}' AS kind, asset, n FROM (${h.rows}) WHERE user_id = ?1`);
+/** What an account's ledger (`account`, its ledger id) holds of one asset. */
+const ledgerSum = (account: string, kind: AssetKind, asset: string) =>
+  `COALESCE((SELECT SUM(l.delta) FROM ledger l WHERE l.account = ${account} AND l.asset_kind = '${kind}' AND l.asset_id = ${asset}), 0)`;
+/**
+ * Each table's differences, every account's at once, as rows (user_id, account, asset, diff: the balance minus the ledger's sum):
+ * the assets it holds a balance row of, and those its ledger holds that it has no balance row of. (An account with no ledger id yet:
+ * `account` null, and its ledger holds nothing.)
+ */
+const differences = (h: (typeof HOLDINGS)[number]) => [
+  `SELECT b.user_id, k.account, b.asset, b.n - ${ledgerSum("k.account", h.kind, "b.asset")} AS diff
+   FROM (${h.rows}) b LEFT JOIN ledger_accounts k ON k.user_id = b.user_id WHERE b.user_id IN (SELECT id FROM users)`,
+  `SELECT k.user_id, l.account, l.asset_id AS asset, -SUM(l.delta) AS diff FROM ledger l JOIN ledger_accounts k ON k.account = l.account
+   WHERE l.asset_kind = '${h.kind}' AND NOT EXISTS (SELECT 1 FROM (${h.rows}) b WHERE b.user_id = k.user_id AND b.asset = l.asset_id)
+   GROUP BY l.account, l.asset_id`,
 ];
 
 /** Gives an account its ledger id in a batch, if it has none (only an account that exists). */
@@ -392,4 +428,91 @@ export async function ledgerMismatches(sql: Sql, userId: string): Promise<{ kind
   );
   for (const r of legs) add(r);
   return [...sums.values()].filter((s) => s.diff !== 0).sort((a, b) => a.kind.localeCompare(b.kind) || a.asset.localeCompare(b.asset));
+}
+
+/**
+ * The backfill (part II; the audit of Nov 6, §1): what each account held before its changes went into the ledger. Per account and
+ * asset, one leg of the balance minus the ledger's sum (reason `backfill`), keyed `backfill:v1:<ledger id>:<kind>:<asset>`, so a rerun
+ * adds nothing, and the two agree from then on. One batch (one transaction), each difference worked out in the statement that writes
+ * its leg, so an op landing meanwhile is counted once, before or after. Every account holding anything gets its ledger id first.
+ * Answers how many legs it wrote. (The admins' POST /api/admin/ledger/backfill: ops-admin.ts.)
+ */
+export async function backfillLedger(sql: Sql, now: number): Promise<number> {
+  const nonce = newId(9);
+  const count = async () => (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ledger WHERE op_id >= 'backfill:' AND op_id < 'backfill;'"))?.n ?? 0;
+  const before = await count();
+  await sql.batch([
+    ...HOLDINGS.map((h) =>
+      stmt(
+        `INSERT INTO ledger_accounts (user_id, account) SELECT user_id, lower(hex(randomblob(12))) FROM (SELECT DISTINCT user_id FROM (${h.rows}))
+         WHERE user_id IN (SELECT id FROM users) ON CONFLICT (user_id) DO NOTHING`,
+      ),
+    ),
+    ...HOLDINGS.flatMap((h) =>
+      differences(h).map((diffs) =>
+        stmt(
+          `INSERT INTO ledger (${COLS})
+           SELECT 'backfill:v1:' || d.account || ':${h.kind}:' || d.asset, 0, d.account, '${h.kind}', d.asset, d.diff, 'backfill', NULL, ?1, ?2
+           FROM (${diffs}) d WHERE d.account IS NOT NULL AND d.diff <> 0
+           ON CONFLICT (op_id, leg) DO NOTHING`,
+          now,
+          nonce,
+        ),
+      ),
+    ),
+  ]);
+  return (await count()) - before;
+}
+
+/**
+ * The daily check (index.ts, the schedule): accounts whose balances and ledger disagree, found for every account at once (two
+ * statements a table), then up to `limit` of them read in full (ledgerMismatches). Empty: they all agree.
+ */
+/** The schedule's run at `t` (every 15 minutes) is the daily check's: the first in OPS.ledgerCheck.hourUtc. */
+export function ledgerCheckDue(t: number): boolean {
+  const d = new Date(t);
+  return d.getUTCHours() === OPS.ledgerCheck.hourUtc && d.getUTCMinutes() < 15;
+}
+
+export interface Disagreement {
+  user: string;
+  /** Its ledger id (null: none yet, so its ledger holds nothing). */
+  account: string | null;
+  mismatches: { kind: string; asset: string; diff: number }[];
+}
+export async function ledgerCheck(sql: Sql, limit: number): Promise<Disagreement[]> {
+  const users = new Map<string, string | null>();
+  for (const h of HOLDINGS) {
+    for (const diffs of differences(h)) {
+      if (users.size >= limit) break;
+      const rows = await sql.all<{ user_id: string; account: string | null }>(`SELECT DISTINCT user_id, account FROM (${diffs}) WHERE diff <> 0 LIMIT ?`, limit - users.size);
+      for (const r of rows) users.set(r.user_id, r.account);
+    }
+  }
+  const out: Disagreement[] = [];
+  for (const [user, account] of users) out.push({ user, account, mismatches: await ledgerMismatches(sql, user) });
+  return out.filter((r) => r.mismatches.length);
+}
+
+/**
+ * TODO(claw, part II): Boingo's claw machine (server/claw.ts) is on claude/claw-machine and claude/boingo-home, not on main yet, and
+ * writes boss_tokens and boss_crates itself. When it lands, its playClaw keeps its claw_plays row and its answers and hands its
+ * balance writes to this op instead: `applyOp(sql, me, clawOp(me, {...}))`. ledger.test.ts's guard fails on claw.ts until it does.
+ *
+ * One play: a token of `boss` in (only when one is there), and on a win its crate in, unopened (`crateRow`: the new boss_crates row),
+ * keyed by the app's id for the play (`claw:<ledger id>:<request>`: a retry or a double tap plays once); `log`, the play's own row,
+ * goes in only if the play applies.
+ */
+export function clawOp(
+  a: LedgerAccount,
+  p: { request: string; boss: string; crate: string; won: boolean; crateRow: string; now: number; log?: (ours: Cond) => Stmt[] },
+): Op {
+  return {
+    id: keyFor(opKeys.request("claw", p.request), a),
+    reason: "claw",
+    now: p.now,
+    when: cond("EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= 1)", a.user, p.boss),
+    legs: [leg.tokens(a.user, p.boss, -1, p.request), ...(p.won ? [leg.bossCrateIn(a.user, p.crateRow, p.crate, p.now)] : [])],
+    ...(p.log ? { also: p.log } : {}),
+  };
 }

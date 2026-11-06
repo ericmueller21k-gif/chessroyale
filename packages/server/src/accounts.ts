@@ -32,7 +32,7 @@ import {
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
-import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, leg, ledgerAccount, mergeMoves } from "./ledger.ts";
+import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -674,17 +674,20 @@ const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
 /** A move in SAN (e.g. Nxe5, O-O-O, e8=Q+), or null. */
 export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
 
-export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number): Promise<void> {
+/** `once.since`: written only if this account has no result from this online lobby (`r.lobby`) since then (a lobby writing it again). */
+export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number, once?: { since: number }): Promise<void> {
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
   const mode = r.mode === "crowd" || r.mode === "boss" || r.mode === "squads" ? r.mode : "classic";
   // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
   const ranked = r.online && r.ranked === true;
+  const lobby = r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
        brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+     ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -704,7 +707,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     flag(r.survived),
     flag(r.lastStand),
     mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
-    r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
+    lobby,
     ranked ? 1 : 0,
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
@@ -713,6 +716,7 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     r.online && r.abandoned === true ? 1 : null,
     // (An account deleted mid-match gets nothing new.)
     userId,
+    ...(once ? [userId, lobby, once.since] : []),
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
@@ -1101,22 +1105,22 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
 }
 
 /**
- * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free).
- * (Not in the ledger yet: part II moves it there with Squads' reward key, written at least once. ledger.test.ts lists it.)
+ * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free). One ledger
+ * op, keyed by `op` (Squads': opKeys.squadsReward, so its lobby can write it again after a failure or a restart and it pays once;
+ * none: a fresh key). Answers what became of it; null: nothing to give, or no such account (deleted mid-match). A failed write throws.
  */
-export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
+export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now()): Promise<Outcome | null> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
-  if (!c && !k) return;
-  // (Not for an account deleted mid-match.)
-  await sql.run(
-    `INSERT INTO wallets (user_id, coins, crates) SELECT ?, ?, ? ${IF_ACCOUNT}
-     ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates`,
-    userId,
-    c,
-    k,
-    userId,
-  );
+  if (!c && !k) return null;
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return null;
+  return applyOp(sql, me, {
+    id: op === undefined ? `reward:${crypto.randomUUID()}` : keyFor(op, me),
+    reason: "reward",
+    now,
+    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.crates(userId, k)] : [])],
+  });
 }
 
 /**

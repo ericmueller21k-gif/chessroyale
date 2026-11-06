@@ -2,7 +2,7 @@ import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCo
 import type { Sql, Stmt } from "./accounts.ts";
 import { bossCrateHoldings, tokenHoldings } from "./boss-tokens.ts";
 import { welcomeState, type WelcomeState } from "./welcome.ts";
-import { deleteItems, ledgerAccount } from "./ledger.ts";
+import { applyOp, deleteItems, keyFor, leg, ledgerAccount, opKeys } from "./ledger.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -107,8 +107,9 @@ export async function looksOf(sql: Sql, userIds: readonly string[], admins: Read
 }
 
 /**
- * Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. (Not in the ledger
- * yet: part II moves it there with the app's request id. ledger.test.ts lists it.)
+ * Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. One ledger op (the
+ * item in), keyed by the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more and answers
+ * the first open's item. (An older app's open, with none: a fresh key, as each tap was an open.)
  */
 export async function openCrate(
   sql: Sql,
@@ -117,27 +118,37 @@ export async function openCrate(
   force: { fischer?: boolean; shiny?: boolean },
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? crateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   if (!CRATES_FREE) return { ok: false, message: "You need a crate and a key." };
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return { ok: false, message: "No such crate." };
   const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
   const roll = rollCrate(mulberry32(seed), crate, CRATES_FREE ? force : {});
   const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  await sql.run(
-    "INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    id,
-    userId,
-    roll.def,
-    roll.color,
-    roll.color2 ?? null,
-    roll.blemish,
-    roll.seed,
-    crate.id,
-    roll.fischer ? 1 : 0,
-    now,
-  );
+  const op = request ? keyFor(opKeys.request("open", request), me) : `open:${id}`;
+  const done = await applyOp(sql, me, { id: op, reason: "crate open", now, legs: [leg.item(userId, { ...roll, id }, crate.id, now)] });
+  if (done === "replay") {
+    const first = await openedItem(sql, userId, op);
+    if (first) return { ok: true, ...first, locker: await lockerState(sql, userId, admin) };
+  }
+  if (done !== "applied") return { ok: false, message: "No such crate." };
   return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId, admin) };
+}
+
+/** The item an open (op `opId`) put in your locker, as its answer was: a retry of the open answers it again. Null: none, or gone since. */
+export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance } | null> {
+  const r = await sql.first<ItemInstance & { fischer: number }>(
+    `SELECT i.id, i.def, i.color, i.color2, i.blemish, i.seed, i.fischer FROM ledger l JOIN items i ON i.id = l.asset_id AND i.user_id = ?
+     WHERE l.op_id = ? AND l.asset_kind = 'item' AND l.delta > 0 LIMIT 1`,
+    userId,
+    opId,
+  );
+  if (!r) return null;
+  const look = { def: r.def, color: r.color, ...(r.color2 ? { color2: r.color2 } : {}), blemish: r.blemish, seed: r.seed };
+  return { roll: { fischer: r.fischer === 1, ...look }, item: { id: r.id, ...look } };
 }
 
 /**
