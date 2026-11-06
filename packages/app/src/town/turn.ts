@@ -2,7 +2,7 @@
  * The street town's camera's turn (Nov 5; round 3 made it; round 5: north, but for a boss home's strip, strips.ts, and a drag's look
  * round, LookAround): the heading eases over `TOWN_FEEL.streetTurnMs` a quarter turn, about you (the camera keeps following you). The
  * arrow keys go through the normal heading (never the look round's). Since Nov 5 (brief-street-controls-map.md) the normal heading off a
- * strip is the base heading, any of the four quarters: a look round snapped to a quarter and locked in by a tap or a run (`lockIn`); north
+ * strip is the base heading, any of the four quarters: a look round let go snaps to a quarter and is locked in by any way of setting off (`lockIn`); north
  * as the town opens and after a building. Pure: no DOM, nothing allocated on a frame.
  */
 import { TOWN_FEEL } from "./feel.ts";
@@ -75,14 +75,15 @@ export const mod360 = (h: number): number => ((h % 360) + 360) % 360;
  * it snaps back"). A drag turns the camera about your pawn by an offset on top of its normal heading: dragging left turns the view left
  * (you see more to your left), `TOWN_FEEL.streetLookPerWidth` degrees a screen's width. Pure: Town.tsx feeds it the drag and the step.
  *
- * Locking a new view (Nov 5, brief-street-controls-map.md; Eric: "if it detects that you're … within 10 degrees of a new 90-degree
- * baseline, and then you tap in that direction, it switches your view … it locks in"):
- * - **Letting go** (`release` with the normal heading): within `streetSnapDeg` of a quarter (north, east, south or west), the view eases
- *   to it exactly over `streetSnapMs`; when that quarter isn't the normal heading's, it's `snapped`. Otherwise it stays where you left it.
- * - **A tap or a run next** (`lock`): a snapped quarter becomes the new base heading (Town.tsx turns the camera's normal heading to it, and
- *   the offset goes to 0: the camera doesn't move).
- * - **Not snapped**, or **an arrow next**: your first step eases it back to the normal view over `streetLookBackMs` (`back`), as before;
- *   a snap is forgotten.
+ * Locking a new view (Nov 6; Eric: "about like 45 degrees … everything should be split … if you hit like negative 50
+ * degrees and then run in that new direction, it should snap to the new direction"):
+ * - **Letting go** (`release` with the normal heading): the view eases to the nearest quarter (north, east, south or west) over
+ *   `streetSnapMs` (`streetSnapDeg` is 45: every let-go snaps, the split being halfway between two quarters). When that quarter isn't the
+ *   normal heading's, it's `snapped`.
+ * - **Any way of setting off** (a tap, a run, an arrow step: Town.tsx's `lockIn`): a snapped quarter becomes the new base heading (Town.tsx
+ *   turns the camera's normal heading to it, and the offset goes to 0: the camera doesn't move), so the arrows follow the new base.
+ * - **Nothing snapped** (the quarter is the normal heading's): your first step eases the view back to the normal view over
+ *   `streetLookBackMs` (`back`), as before.
  */
 export class LookAround {
   /** The offset (degrees) the drag set, or where an ease is going. */
@@ -152,7 +153,10 @@ export class LookAround {
     this.t0 = -Infinity;
     return s;
   }
-  /** You set off (an arrow, a tap, the on-screen arrows): ease back to the normal view, a snap forgotten. Nothing while dragging or already there. */
+  /**
+   * You set off with nothing snapped (Town.tsx tries `lock`, via `lockIn`, first): ease back to the normal view. A snap is forgotten
+   * here too. Nothing while dragging or already there.
+   */
   back(now: number): void {
     if (this.dragFrom !== null) return;
     this.snapped = null;
@@ -180,10 +184,10 @@ export class LookAround {
 }
 
 /**
- * Locks a snapped quarter in as the base heading (Nov 5, brief-street-controls-map.md: a tap's walk or a run after a snap): the look
+ * Locks a snapped quarter in as the base heading (Nov 5, brief-street-controls-map.md; Nov 6: a tap, a run or an arrow after a snap): the look
  * round's offset is taken into the camera's normal heading, so the camera stays where it is (a snap still easing finishes its last few
- * degrees as a turn). Answers the new base heading (0, 90, 180 or 270), or null when nothing was snapped (then nothing changes: your
- * first step eases the view back, `LookAround.back`).
+ * degrees as a turn). Answers the new base heading (0, 90, 180 or 270), or null when nothing was snapped (then nothing changes, and
+ * your first step eases the view back: `LookAround.back`).
  */
 export function lockIn(turn: Turn, look: LookAround, now: number): number | null {
   const off = look.at(now);

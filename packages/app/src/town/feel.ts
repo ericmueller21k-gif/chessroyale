@@ -166,11 +166,12 @@ export const TOWN_FEEL = {
    */
   streetRunDeadPx: 14,
   /**
-   * Locking a new view (Nov 5; Eric: "if it detects that you're … within 10 degrees of a new 90-degree baseline, and then you tap in that
-   * direction, it switches your view"): letting go of a look round within this many degrees of a quarter (north, east, south or west)
-   * eases the camera there over `streetSnapMs`; a tap or a run next locks it in as the base heading.
+   * Locking a new view (Nov 5; Nov 6, Eric: "about like 45 degrees … everything should be split … 45 degrees … if you hit like negative 50
+   * degrees and then run in that new direction, it should snap to the new direction"): letting go of a look round eases the camera to the
+   * nearest quarter (north, east, south or west) over `streetSnapMs`: the split is 45 degrees either side of each quarter, so this is 45
+   * and every let-go snaps. Any way of setting off (a tap, a run, an arrow) locks it in as the base heading.
    */
-  streetSnapDeg: 10,
+  streetSnapDeg: 45,
   streetSnapMs: 160,
   /**
    * The minimap (Nov 5; Eric: "an overlay on the top right, partially see-through, not super big"): its width a share of the town's
