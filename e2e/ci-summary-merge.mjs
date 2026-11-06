@@ -1,7 +1,7 @@
 // CI's e2e summary (.github/workflows/e2e.yml, the `result` job): every shard's record (e2e/ci-summary.ts writes
 // shard-N.json) as one Markdown page for the run: flaky tests first (failed, then passed on the retry: kept in view
 // until they're fixed), then failed tests, both with their shard; then each shard's counts and time; then the test
-// time by file as a ready-made e2e/ci-timings.json. A shard with no record
+// time by file and project as a ready-made e2e/ci-timings.json. A shard with no record
 // stopped before its tests ended. NOTE, if given, goes under the heading (the plan's one line: what this run tests and
 // why).
 // Usage: node e2e/ci-summary-merge.mjs SHARDS DIR [NOTE] >> "$GITHUB_STEP_SUMMARY"
@@ -40,10 +40,9 @@ for (const { n, record: r } of shards) {
   else out.push(`| ${n} | ${r.status === "passed" ? "✅" : "❌"} ${r.status} | ${r.counts.passed} | ${r.counts.failed} | ${r.counts.flaky} | ${r.counts.skipped}${r.counts.notRun ? ` (+${r.counts.notRun} not run)` : ""} | ${time(r.seconds)} |`);
 }
 out.push("", "A failed or flaky shard's report, with the retried tests' traces: the run's artifacts (`e2e-report-shard-N`); open it with `npx playwright show-report <folder>`.", "");
-const timings = Object.fromEntries(
-  shards
-    .flatMap((s) => Object.entries(s.record?.timings ?? {}))
-    .sort(([a], [b]) => a.localeCompare(b)),
-);
-out.push("<details><summary>Test time by file (seconds), as e2e/ci-timings.json for rebalancing the shards</summary>", "", "```json", JSON.stringify(timings, null, 2), "```", "", "</details>");
+// (By project, each test's last attempt: ci-timings.json's form. The plans read main's last green run's records
+// themselves; the committed file is their fallback, worth refreshing from here now and then.)
+const timings = shards.flatMap((s) => Object.entries(s.record?.projects ?? {})).sort(([a], [b]) => a.localeCompare(b));
+const json = `{\n${timings.map(([f, p]) => `  ${JSON.stringify(f)}: { ${Object.entries(p).map(([k, v]) => `${JSON.stringify(k)}: ${v}`).join(", ")} }`).join(",\n")}\n}`;
+out.push("<details><summary>Test time by file and project (seconds), as e2e/ci-timings.json</summary>", "", "```json", json, "```", "", "</details>");
 console.log(out.join("\n"));

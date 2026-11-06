@@ -59,16 +59,126 @@ export function specFiles(dir = DIR) {
     .sort();
 }
 
-/** Each spec file's measured test time (ci-timings.json, seconds, both projects); one it doesn't know counts as the median. */
-export function weigher(timings) {
-  const known = Object.values(timings).sort((a, b) => a - b);
-  const median = known.length ? known[Math.floor(known.length / 2)] : 60;
-  return (file) => timings[file] ?? median;
+/** Playwright's projects, in playwright.config.ts's order. */
+export const PROJECTS = ["phone", "desktop"];
+/** Workers per shard: Playwright's default, half the runner's 4 cores. */
+export const WORKERS = 2;
+
+/** One file's entry as { phone, desktop } seconds (an older table's single number, both projects, split evenly). */
+const perProject = (v) => (typeof v === "number" ? Object.fromEntries(PROJECTS.map((p) => [p, v / PROJECTS.length])) : v);
+
+/**
+ * Each spec file's measured test time in one project (ci-timings.json: seconds, by file and project); a file it doesn't
+ * know counts as the project's median.
+ */
+export function projectWeigher(timings) {
+  const median = {};
+  for (const p of PROJECTS) {
+    const known = Object.values(timings).map((v) => perProject(v)[p] ?? 0).sort((a, b) => a - b);
+    median[p] = known.length ? known[Math.floor(known.length / 2)] : 30;
+  }
+  return (file, project) => (timings[file] === undefined ? median[project] : (perProject(timings[file])[project] ?? 0));
 }
 
-export function readTimings(dir = DIR) {
-  return JSON.parse(readFileSync(join(dir, "ci-timings.json"), "utf8"));
+/** Each spec file's measured test time, both projects; one it doesn't know counts as the median. */
+export function weigher(timings) {
+  const time = projectWeigher(timings);
+  return (file) => PROJECTS.reduce((sum, p) => sum + time(file, p), 0);
 }
+
+/**
+ * The test times: e2e/ci-timings.json, overlaid with the times in `live` (a folder of e2e-summary records, shard-N.json
+ * at any depth: main's last green run, which the plan job downloads) for every file they measured. Records from before
+ * the per-project times (no `projects`) are skipped.
+ */
+export function readTimings(dir = DIR, live = process.env.E2E_LIVE_TIMINGS) {
+  const timings = JSON.parse(readFileSync(join(dir, "ci-timings.json"), "utf8"));
+  if (live) Object.assign(timings, readLiveTimings(live));
+  return timings;
+}
+
+/** The per-project test times in a folder of e2e-summary records (empty when there are none). */
+export function readLiveTimings(live) {
+  const out = {};
+  let entries = [];
+  try {
+    entries = readdirSync(live, { recursive: true }).map(String).filter((f) => /(^|\/)shard-\d+\.json$/.test(f));
+  } catch {
+    return out;
+  }
+  for (const f of entries.sort()) {
+    try {
+      Object.assign(out, JSON.parse(readFileSync(join(live, f), "utf8")).projects ?? {});
+    } catch {}
+  }
+  return out;
+}
+
+/**
+ * How long one shard's tests take on the clock, as Playwright runs them: each file in each project is one job; jobs
+ * queue project by project (config order), each project's files in name order; a free worker takes the next job.
+ * So two long files that sort last share no worker time: what spreading by sums alone missed (Nov 6, run 943's shard 3:
+ * 45 test-minutes took 25.4 on the clock, as shop's desktop half ran alone at the end).
+ */
+export function makespan(files, time, workers = WORKERS) {
+  const sorted = [...files].sort((a, b) => a.localeCompare(b));
+  const busy = Array(workers).fill(0);
+  for (const p of PROJECTS)
+    for (const f of sorted) {
+      const i = busy.indexOf(Math.min(...busy));
+      busy[i] += time(f, p);
+    }
+  return Math.max(...busy);
+}
+
+/**
+ * Spread `files` over `total` shards so the slowest shard ends soonest (by `makespan`): longest files first, each to the
+ * shard it delays least; then, while it helps, move a file off the slowest shard, or swap one with another shard.
+ * Deterministic: the same files and times give the same shards. Returns each shard's files and its makespan (seconds).
+ */
+export function assign(files, time, total, workers = WORKERS) {
+  const sum = (f) => PROJECTS.reduce((s, p) => s + time(f, p), 0);
+  const shards = Array.from({ length: total }, () => []);
+  const span = Array(total).fill(0);
+  const load = Array(total).fill(0);
+  for (const f of [...files].sort((a, b) => sum(b) - sum(a) || a.localeCompare(b))) {
+    let best = 0;
+    let bestSpan = Infinity;
+    for (let i = 0; i < total; i++) {
+      const s = makespan([...shards[i], f], time, workers);
+      if (s < bestSpan || (s === bestSpan && load[i] < load[best])) [best, bestSpan] = [i, s];
+    }
+    shards[best].push(f);
+    span[best] = bestSpan;
+    load[best] += sum(f);
+  }
+  for (let round = 0; round < 500; round++) {
+    const w = span.indexOf(Math.max(...span));
+    let move = null;
+    let gain = 0;
+    for (let j = 0; j < total; j++) {
+      if (j === w) continue;
+      for (const f of shards[w]) {
+        const rest = shards[w].filter((x) => x !== f);
+        // Move f to j, or swap it with one of j's files (g).
+        for (const g of [null, ...shards[j]]) {
+          const a = g ? [...rest, g] : rest;
+          const b = g ? [...shards[j].filter((x) => x !== g), f] : [...shards[j], f];
+          const sa = makespan(a, time, workers);
+          const sb = makespan(b, time, workers);
+          const d = span[w] - Math.max(sa, sb);
+          if (d > gain + 1e-9) [move, gain] = [{ j, a, b, sa, sb }, d];
+        }
+      }
+    }
+    if (!move) break;
+    [shards[w], shards[move.j], span[w], span[move.j]] = [move.a, move.b, move.sa, move.sb];
+  }
+  return shards.map((f, i) => ({ files: [...f].sort(), seconds: span[i] }));
+}
+
+/** A spec file as a Playwright file filter: a regular expression, dots escaped and the end anchored. */
+export const fileFilter = (f) => `${f.replaceAll(".", "\\.")}$`;
 
 export function readAreas(dir = DIR) {
   return JSON.parse(readFileSync(join(dir, "areas.json"), "utf8"));
@@ -161,16 +271,27 @@ export function shardCount(specs, weight) {
   return Math.max(1, Math.min(MAX_SHARDS, specs.length, Math.ceil(seconds / SHARD_SECONDS)));
 }
 
-/** The plan as the workflow's outputs, and the note for the run's page (Markdown). */
-export function plan({ full, specs, why }, weight, all) {
+/**
+ * The plan as the workflow's outputs, and the note for the run's page (Markdown). `timings` are the test times
+ * (readTimings); `source` says where they came from. `assignment` is each shard's spec files as Playwright filters
+ * (a JSON list, shard 1 first), so every shard runs exactly what the plan spread.
+ */
+export function plan({ full, specs, why }, timings, all, source = "e2e/ci-timings.json") {
+  const weight = weigher(timings);
   const total = full ? MAX_SHARDS : shardCount(specs, weight);
   const minutes = (s) => Math.round(s / 60);
-  const seconds = (full ? all : specs).reduce((sum, f) => sum + weight(f), 0);
+  const files = full ? all : specs;
+  const seconds = files.reduce((sum, f) => sum + weight(f), 0);
+  const shards = assign(files, projectWeigher(timings), total);
   const note = full
     ? `Every spec file (${all.length}) on ${total} shards: ${full.replaceAll("`", "")}.`
     : `${specs.length} of ${all.length} spec files on ${total} shard${total > 1 ? "s" : ""}: the areas this pull request changes, plus the smoke set.`;
   const md = [`## e2e plan: ${note}`, ""];
-  md.push(`Test time: about ${minutes(seconds)} minutes in all (both projects, by e2e/ci-timings.json), so about ${minutes(seconds / total / 2)} on the clock per shard (2 workers each), plus about a minute of setup.`, "");
+  md.push(
+    `Test time: about ${minutes(seconds)} minutes in all (both projects, by ${source}). On the clock, with ${WORKERS} workers a shard: ` +
+      `${shards.map((s) => minutes(s.seconds)).join(", ")} minutes (shard 1 first), plus about a minute of setup.`,
+    "",
+  );
   if (!full) md.push("To run every spec on this pull request, add the `full-e2e` label (docs/areas/ops.md, \"CI e2e\").", "");
   if (why.length) {
     md.push("| Changed | Runs |", "| --- | --- |");
@@ -179,8 +300,13 @@ export function plan({ full, specs, why }, weight, all) {
     md.push("");
   }
   if (!full) md.push(`Specs: ${specs.map((s) => `\`${s}\``).join(", ")}`, "");
-  const shards = Array.from({ length: total }, (_, i) => i + 1);
-  const outputs = { specs: specs.join(" "), total: String(total), shards: JSON.stringify(shards), note };
+  const outputs = {
+    specs: specs.join(" "),
+    total: String(total),
+    shards: JSON.stringify(shards.map((_, i) => i + 1)),
+    assignment: JSON.stringify(shards.map((s) => s.files.map(fileFilter).join(" "))),
+    note,
+  };
   return { outputs, md: md.join("\n") };
 }
 
@@ -692,7 +818,10 @@ function main(argv) {
   else if (mode === "diff" && rest.length === 1) picked = select(diffFrom(rest[0]), readAreas(), all, gitRepo(rest[0]));
   else if (mode === "files" && rest.length) picked = select(rest, readAreas(), all, gitRepo(localBase()));
   else throw new Error('usage: node e2e/ci-select.mjs full "<why>" | diff <base> | files <path>...');
-  const { outputs, md } = plan(picked, weigher(readTimings()), all);
+  // (E2E_LIVE_TIMINGS: main's last green run's records, downloaded by the plan job; E2E_LIVE_RUN: that run's number.)
+  const live = process.env.E2E_LIVE_TIMINGS ? Object.keys(readLiveTimings(process.env.E2E_LIVE_TIMINGS)).length : 0;
+  const source = live ? `main's last green run (#${process.env.E2E_LIVE_RUN ?? "?"}, ${live} file${live === 1 ? "" : "s"}), the rest e2e/ci-timings.json` : "e2e/ci-timings.json";
+  const { outputs, md } = plan(picked, readTimings(), all, source);
   const lines = Object.entries(outputs).map(([k, v]) => `${k}=${v.replace(/\n/g, " ")}`);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, lines.join("\n") + "\n");
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
