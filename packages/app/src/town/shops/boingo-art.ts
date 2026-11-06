@@ -117,8 +117,8 @@ for (let s = 0; s < 4; s++) tile(`floor-${s}`, carpet(11 + s * 7));
 
 /** The battle mat: 6 x 6 squares (columns 9-14, rows 9-14), pink and teal stripes in a ring, a gold edge, the two marks. */
 export const MAT = { c0: 9, r0: 9, c1: 14, r1: 14 } as const;
-/** The marks: Boingo's west (his red-and-gold star), yours east (a gold ring with a pawn). */
-export const SHOP_BOINGO_MARKS = { boss: [10, 12], you: [13, 12] } as const;
+/** The marks: Boingo's west (his red-and-gold star), yours east (a gold ring with a pawn), on the mat's middle line. */
+export const SHOP_BOINGO_MARKS = { boss: [10, 11.5], you: [13, 11.5] } as const;
 function matTile(col: number, row: number): Cv {
   const c = cv(T, T);
   const mx = ((MAT.c0 + MAT.c1 + 1) / 2) * T;
@@ -157,8 +157,9 @@ function matTile(col: number, row: number): Cv {
         if (!boss && Math.hypot(x - cx, y - cy + 8) < 3.5) c[y]![x] = "w";
       }
   };
-  mark(SHOP_BOINGO_MARKS.boss[0], SHOP_BOINGO_MARKS.boss[1] - 0.5, true);
-  mark(SHOP_BOINGO_MARKS.you[0], SHOP_BOINGO_MARKS.you[1] - 0.5, false);
+  // (A room's (c, r) is the middle of its square: the pixel (c + 0.5, r + 0.5) squares in, as Folio's marks.)
+  mark(SHOP_BOINGO_MARKS.boss[0], SHOP_BOINGO_MARKS.boss[1], true);
+  mark(SHOP_BOINGO_MARKS.you[0], SHOP_BOINGO_MARKS.you[1], false);
   return c;
 }
 for (let r = MAT.r0; r <= MAT.r1; r++) for (let col = MAT.c0; col <= MAT.c1; col++) tile(`ring-${col}-${r}`, matTile(col, r));
