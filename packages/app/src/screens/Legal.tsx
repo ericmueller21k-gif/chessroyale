@@ -570,7 +570,8 @@ function Terms() {
       <h2>Open-source parts</h2>
       <p>
         Stockfish (GPL-3.0) and Maia-3 (AGPL-3.0) run in your browser as separate programs under their own licenses, linked in
-        Settings and the FAQ. Nothing here limits your rights under those licenses.
+        the HunChess Handbook's <a href="/faq#faq-credits">"Copyright, credits and licenses"</a> section (Settings → HunChess Handbook).
+        Nothing here limits your rights under those licenses.
       </p>
 
       <h2>No warranty, limited liability</h2>
