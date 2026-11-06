@@ -1,0 +1,333 @@
+/* Boingo's claw machine (Nov 6; claw/ClawMachine.tsx). Phone first: a cabinet in the middle of the screen over the room's zoomed view,
+   its own screen at the top, the glass with the claw and the prizes, and the controls under it, each part a fixed size (nothing moves
+   as the stages change). The claw's place across the glass is --claw-x (0 to 1), written each frame while it roams. */
+.claw-root {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.claw-veil {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: manipulation;
+}
+.claw-machine {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100%, 400px);
+  padding: 14px 14px 16px;
+  border-radius: 22px 22px 14px 14px;
+  background: linear-gradient(#d9354a, #a8203a);
+  border: 3px solid #f6c84c;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.claw-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+/* The machine's own screen: one line, its height kept whatever it says. */
+.claw-screen {
+  box-sizing: border-box;
+  height: 52px;
+  margin: 0 44px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #101820;
+  color: #7ef0b0;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  text-align: center;
+  display: grid;
+  place-items: center;
+  border: 2px solid #2b3a48;
+}
+.claw-glass {
+  position: relative;
+  height: 230px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(180, 225, 255, 0.35), rgba(120, 170, 220, 0.18)), #23324a;
+  border: 3px solid #f6c84c;
+}
+.claw-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 8px;
+  height: 6px;
+  background: #c9ced8;
+}
+/* The arm: its middle at --claw-x across the glass; its cable's length (--claw-drop, 0 up to 1 down) by the stage. */
+.claw-arm {
+  --claw-drop: 0;
+  position: absolute;
+  top: 8px;
+  left: calc(8% + var(--claw-x, 0.5) * 84%);
+  width: 56px;
+  margin-left: -28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: left 0ms linear;
+}
+.claw-carry .claw-arm {
+  transition: left 1100ms ease-in-out;
+}
+.claw-cable {
+  width: 3px;
+  height: calc(14px + var(--claw-drop) * 128px);
+  background: #c9ced8;
+  transition: height 900ms ease-in-out;
+}
+.claw-drop .claw-arm {
+  --claw-drop: 1;
+}
+.claw-head {
+  width: 48px;
+  height: 36px;
+  fill: #c9ced8;
+  stroke: #e8ecf2;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.claw-prong {
+  fill: none;
+  transition: transform 250ms ease-out;
+}
+.claw-prong-l {
+  transform-origin: 16px 7px;
+}
+.claw-prong-r {
+  transform-origin: 24px 7px;
+}
+/* Open while it roams and goes down; closed once it grabs. */
+.claw-roam .claw-prong-l,
+.claw-drop .claw-prong-l {
+  transform: rotate(18deg);
+}
+.claw-roam .claw-prong-r,
+.claw-drop .claw-prong-r {
+  transform: rotate(-18deg);
+}
+.claw-prize {
+  margin-top: -14px;
+  transform: scale(0.75);
+}
+/* A loss: the crate rises with the claw, then slips out at the top and falls back to the pile. */
+.claw-lift .claw-prize.claw-slip {
+  animation: claw-slip 900ms ease-in forwards;
+}
+@keyframes claw-slip {
+  0%,
+  70% {
+    transform: scale(0.75) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.75) translateY(150px) rotate(25deg);
+    opacity: 0;
+  }
+}
+.claw-pile {
+  position: absolute;
+  left: 22%;
+  right: 4%;
+  bottom: 4px;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+}
+.claw-pile-crate {
+  transform: scale(0.7);
+  transform-origin: bottom center;
+  margin: 0 -10px;
+}
+/* The chute: bottom left, where a won crate drops. */
+.claw-chute {
+  position: absolute;
+  left: 3%;
+  bottom: 0;
+  width: 17%;
+  height: 74px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 2px solid #f6c84c;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  display: grid;
+  place-items: end center;
+}
+.claw-chute-crate {
+  transform: scale(0.6);
+  transform-origin: bottom center;
+  animation: claw-chute-drop 380ms ease-in;
+}
+@keyframes claw-chute-drop {
+  from {
+    transform: scale(0.6) translateY(-120px);
+  }
+  to {
+    transform: scale(0.6) translateY(0);
+  }
+}
+/* The coin dropping into the slot (top right). */
+.claw-coin {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 40px;
+  height: 40px;
+  animation: claw-coin 700ms ease-in forwards;
+}
+.claw-coin canvas {
+  width: 40px;
+  height: 40px;
+}
+@keyframes claw-coin {
+  from {
+    transform: translateY(-30px) scale(1.2);
+    opacity: 1;
+  }
+  80% {
+    transform: translateY(26px) scale(0.9);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(40px) scale(0.6);
+    opacity: 0;
+  }
+}
+/* The controls under the glass: one fixed-height box, whatever the stage shows. */
+.claw-controls {
+  height: 196px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+}
+.claw-none {
+  margin: 0;
+  text-align: center;
+  font-weight: 700;
+}
+.claw-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.claw-token {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  min-height: 44px;
+  border-radius: 10px;
+  border: 2px solid #f6c84c;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+.claw-token canvas {
+  width: 36px;
+  height: 36px;
+}
+.claw-token:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.claw-token-name {
+  display: block;
+  line-height: 1.4;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.claw-token-n {
+  font-weight: 700;
+}
+.claw-stop {
+  height: 96px;
+  border: 0;
+  border-radius: 48px;
+  background: radial-gradient(circle at 50% 35%, #ff6a6a, #c4122b);
+  color: #fff;
+  font-size: 34px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  box-shadow: 0 6px 0 #7a0a1a;
+  cursor: pointer;
+}
+.claw-stop:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #7a0a1a;
+}
+.claw-stop:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.claw-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.claw-actions button,
+.claw-admin {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 2px solid #f6c84c;
+  background: #f6c84c;
+  color: #3a1a00;
+  font: inherit;
+  font-weight: 800;
+  font-size: 17px;
+  cursor: pointer;
+}
+.claw-actions .claw-done,
+.claw-actions .claw-again:not(:first-child),
+.claw-admin {
+  background: transparent;
+  color: #fff;
+}
+.claw-admin {
+  min-height: 36px;
+  font-size: 13px;
+}
+/* Open now: the Crates tab's own opening, on the machine's own panel. */
+.claw-opening {
+  background: var(--surface);
+  color: var(--text);
+  min-height: 420px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .claw-cable,
+  .claw-carry .claw-arm {
+    transition-duration: 1ms;
+  }
+}

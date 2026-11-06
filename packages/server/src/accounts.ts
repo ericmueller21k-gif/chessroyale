@@ -31,6 +31,7 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
+import { CLAW_SCHEMA } from "./claw.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -145,6 +146,7 @@ const SCHEMA = [
   ...LOCKER_SCHEMA,
   // Boss tokens, the drops that gave them and an open solo boss battle (boss-tokens.ts).
   ...BOSS_TOKENS_SCHEMA,
+  ...CLAW_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.

@@ -1,16 +1,24 @@
+import { testParams } from "../test-switches.ts";
+
 /**
- * The claw machine in Boingo's Funhouse (Nov 6): a stub. Tapping the machine's coin slot calls this; another helper replaces it
- * with the real machine. Until then it shows a small "Coming soon" card, closed by a tap.
+ * Boingo's claw machine (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md). Boingo's Funhouse places the machine and, on a tap
+ * of its coin slot, calls `openClawMachine()`: the machine's own screen opens over the page (ClawMachine.tsx, its own chunk, loaded
+ * on that first tap: nothing of it loads with the app). One at a time: a second call while it's open does nothing.
  */
+let open = false;
+
 export function openClawMachine(): void {
-  if (document.querySelector(".claw-soon")) return;
-  const card = document.createElement("div");
-  card.className = "claw-soon";
-  card.setAttribute("role", "dialog");
-  card.style.cssText =
-    "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;padding:16px 24px;border-radius:12px;" +
-    "background:#2a1640;color:#fff;font:600 16px system-ui,sans-serif;text-align:center;box-shadow:0 6px 24px #0008;cursor:pointer";
-  card.innerHTML = '<div style="font-size:18px">Claw machine</div><div style="opacity:.8;margin-top:4px">Coming soon</div>';
-  card.addEventListener("click", () => card.remove());
-  document.body.appendChild(card);
+  if (open) return;
+  open = true;
+  void import("./ClawMachine.tsx")
+    .then((m) => m.mountClawMachine(() => void (open = false)))
+    .catch(() => void (open = false));
+}
+
+/**
+ * The test switch `?claw=1` (where the test switches are allowed: an admin, TEST_SWITCHES, the dev server): opens the machine as the
+ * page loads, for the e2e and stills (and before Boingo's room places it). Called once the account has loaded.
+ */
+export function openClawFromAddress(): void {
+  if (testParams().get("claw") === "1") openClawMachine();
 }

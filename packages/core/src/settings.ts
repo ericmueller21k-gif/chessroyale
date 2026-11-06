@@ -2980,6 +2980,22 @@ export const BOSS_TOKENS = {
 } as const;
 
 /**
+ * Boingo's claw machine (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md): one boss token in, a chance at that boss's Boss
+ * Crate. Decided by the server as the coin goes in (server/claw.ts): `winChance` of the time the crate goes into your inventory,
+ * unopened. The claw's ride on screen only shows that answer: the stop tap never changes it. At 0.25 a crate costs 4 tokens on
+ * average, against BOSS_CRATE_PRICE's 3 tokens (or 1 token and a key): a use for extra tokens, not a cheaper crate.
+ *   - `roamSeconds`: how long the claw roams on its own before it drops anyway (no tap needed);
+ *   - `dropMs`, `liftMs`, `carryMs`: the claw going down, coming up and carrying over the chute (a loss slips at the top of the lift).
+ */
+export const CLAW = {
+  winChance: 0.25,
+  roamSeconds: 8,
+  dropMs: 900,
+  liftMs: 900,
+  carryMs: 1100,
+} as const;
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,
