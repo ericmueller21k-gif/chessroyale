@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { devices, expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md):
@@ -53,6 +53,19 @@ async function open(page: Page, backend: "2d" | "webgl" = "2d") {
   await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", backend);
 }
+/**
+ * Waits (each frame, not expect.poll's growing gaps: a run covers a square in about a tenth of a second) until your column (`axis` 0) or
+ * row (1) is at least `n` squares from `from`'s.
+ */
+const ranOn = (page: Page, from: readonly number[], axis: 0 | 1, n: number, timeout = 10_000) =>
+  page.waitForFunction(
+    ([f, a, k]) => {
+      const v = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!.dataset.you!.split(",").map(Number);
+      return Math.abs(v[a]! - f[a]!) >= k;
+    },
+    [from, axis, n] as const,
+    { polling: "raf", timeout },
+  );
 /** The way from a to b on the world's squares (east, north), the short way round east-west. */
 const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 69) % 46) - 23), Math.sign(b[1]! - a[1]!)];
 
@@ -83,8 +96,11 @@ async function pawn(page: Page) {
   return { x: cv.x + (b.x0 + b.x1) / 2, y: cv.y + (b.y0 + b.fy) / 2 };
 }
 const OFF: Record<string, readonly [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
-/** Where to hold for a run `dir`: `px` from your pawn's middle that way. */
-async function holdPoint(page: Page, dir: string, px = 110) {
+/**
+ * Where to hold for a run `dir`: `px` from your pawn's middle that way. (Well past a square: running, the camera's follow lets your pawn
+ * lead its rest spot on screen by up to about a square, and a bot in the way can stop it while the finger's held.)
+ */
+async function holdPoint(page: Page, dir: string, px = 170) {
   const c = await pawn(page);
   return { x: c.x + OFF[dir]![0] * px, y: c.y + OFF[dir]![1] * px };
 }
@@ -109,12 +125,8 @@ const headings = (page: Page) =>
   });
 /** A drag across the box from its middle, `share` of its width (negative: leftward), by the mouse, in steps. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 /** Taps square `sq` where it's drawn (a quick tap: a walk). */
 async function tapSquare(page: Page, sq: readonly [number, number]) {
@@ -160,9 +172,9 @@ for (const backend of ["2d", "webgl"] as const) {
       await f.down(at.x, at.y);
       await expect.poll(async () => (await cam(page)).run, { message: `${dir}: a run`, timeout: 3000 }).toBe(dir);
       // Running: two squares that way (and the start no later than a step after the hold time).
-      await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).not.toBe(from.join(","));
+      await ranOn(page, from, w[0] ? 0 : 1, 1);
       expect(Date.now() - t0, `${dir}: set off at once`).toBeLessThan(2500);
-      await expect.poll(async () => Math.abs((await you(page))[w[0] ? 0 : 1]! - from[w[0] ? 0 : 1]!), { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
+      await ranOn(page, from, w[0] ? 0 : 1, 2);
       await f.up();
       const at0 = await you(page);
       await settle(page);
@@ -185,12 +197,12 @@ for (const backend of ["2d", "webgl"] as const) {
     const start = await you(page);
     const at = await holdPoint(page, "right");
     await f.down(at.x, at.y);
-    await expect.poll(async () => (await you(page))[0], { timeout: 5000 }).toBeGreaterThanOrEqual(start[0] + 1);
+    await ranOn(page, start, 0, 1);
     // The finger slides round to above your pawn, in steps (a swipe that would turn the camera, were it not a run).
     const to = await holdPoint(page, "up");
     for (let i = 1; i <= 10; i++) await f.move(at.x + ((to.x - at.x) * i) / 10, at.y + ((to.y - at.y) * i) / 10);
     await expect.poll(async () => (await cam(page)).run, { timeout: 3000 }).toBe("up");
-    await expect.poll(async () => (await you(page))[1], { timeout: 5000 }).toBeGreaterThanOrEqual(start[1] + 1);
+    await ranOn(page, start, 1, 1);
     await f.up();
     await settle(page);
     const c = await cam(page);
@@ -210,9 +222,10 @@ for (const backend of ["2d", "webgl"] as const) {
     // A tap (a walk): east becomes the base heading; the camera stays there through the walk.
     await watchHeadings(page);
     const here = await you(page);
-    await tapSquare(page, [here[0] + 2, here[1]]);
+    await tapSquare(page, [here[0] + 1, here[1]]);
     await expect.poll(async () => (await cam(page)).base, { timeout: 3000 }).toBe(90);
     await settle(page);
+    expect(await you(page), "walked to the square tapped").toEqual([here[0] + 1, here[1]]);
     expect([...new Set((await headings(page)).map(([h]) => Math.round(h)))], "the camera stayed east").toEqual([90]);
     c = await cam(page);
     expect([c.heading, c.headingBase, c.look, c.snapped]).toEqual([90, 90, 0, null]);
@@ -226,7 +239,7 @@ for (const backend of ["2d", "webgl"] as const) {
     const from = await you(page);
     const up = await holdPoint(page, "up");
     await f.down(up.x, up.y);
-    await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).not.toBe(from.join(","));
+    await ranOn(page, from, 0, 1);
     await f.up();
     await settle(page);
     expect(way(from, await you(page)), "a run up goes east").toEqual([1, 0]);
@@ -430,15 +443,7 @@ test("stills and GIFs: the controls and the minimap", async ({ page }) => {
   await page.waitForTimeout(800);
   await gif("4-look-snap-lock-phone", async () => {
     await page.waitForTimeout(400);
-    const b = (await canvas(page).boundingBox())!;
-    const y = b.y + b.height * 0.35;
-    await page.mouse.move(b.x + b.width / 2, y);
-    await page.mouse.down();
-    for (let i = 1; i <= 14; i++) {
-      await page.mouse.move(b.x + b.width / 2 + (0.54 * b.width * i) / 14, y);
-      await page.waitForTimeout(40);
-    }
-    await page.mouse.up();
+    await lookDrag(page, (await canvas(page).boundingBox())!, 0.54, 14, 0.35, 40);
     await page.waitForTimeout(700);
     const here = await you(page);
     await tapSquare(page, [here[0] + 2, here[1]]);

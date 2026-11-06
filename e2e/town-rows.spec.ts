@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town, round 4 (Nov 5; brief-town-rows.md): the rows on every street, the chase camera, the town that wraps east-west
@@ -89,12 +89,8 @@ async function skyAtSides(page: Page): Promise<number> {
 
 /** (Round 5) A drag across the box from its middle, `share` of its width (negative: leftward): a look round, half a turn a width. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 
 // (Round 5: the camera faces north; a drag looks round. Looking along a street both ways is a drag a quarter turn each way, from where

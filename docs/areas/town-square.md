@@ -943,6 +943,30 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `__townAt("tap-square", …)`.
   - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
   - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
+- **Controls and the minimap (Nov 5, after round 5).** Still the admins' street town only.
+  - **Three gestures** (`town/press.ts`), told apart by the drag threshold (`dragPx`) and a hold time (`feel.ts streetHoldMs`, 180 ms;
+    timed from the pointer's own event time): a quick tap walks; a press that moves past the threshold first looks round; a press held
+    still runs.
+  - **Hold to run** (`town/run.ts`): the way from your pawn to the finger on screen, snapped to up, down, left or right of the view,
+    held as an arrow is (`arrows.ts hold`), so it is the arrows' walk (the same pace, the same card at a door). Moving the finger changes
+    the way and never turns the camera; letting go stops you at the next square. Mouse: the left button.
+  - **The base heading** (`Town.tsx base`, `turn.ts lockIn`): a look round let go within `streetSnapDeg` (10°) of a quarter eases
+    there (`streetSnapMs`) and is snapped; a tap's walk or a run next locks it in as the normal heading off a strip, which the arrows,
+    the screen step and runs follow. Not snapped, or an arrow first: the first step eases back. The town opening and a building's in and
+    out reset it to north (`freshView`); a home's strip turns the view but leaves the base alone.
+  - **The opening zoom step** is the third (`streetZoomStart` 2, Eric: "number three"); the park's step out goes from there to the
+    overview. The rows' culling stays at the in and mockup steps (`zoom <= 1`).
+  - **The minimap** (`town/minimap.ts`, `TownMap.tsx`), built from the plan's data (`street.ts`: ground, lots, walls, park,
+    Colosseum): small at the box's top right (`mapShare` 26% on a phone, `mapShareComputer` 13% in a computer's frame, at most
+    `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
+    canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
+    stored per device (`brc.townMap`, on by default), greyed inside a building. A tap opens it large in the middle (every boss home's
+    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
+    (`MAP_BOX`).
+  - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).
+  - **Tests:** `packages/app/test/town-controls.test.ts`, `e2e/town-controls.spec.ts`.
+  - Decision: [2026-11-05-street-controls-map.md](../decisions/2026-11-05-street-controls-map.md). Stills:
+    `docs/street-controls-map/`.
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).

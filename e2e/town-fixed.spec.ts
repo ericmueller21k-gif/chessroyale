@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { expect, type Page } from "@playwright/test";
-import { asAdmin, test } from "./helpers.ts";
+import { asAdmin, test, lookDrag } from "./helpers.ts";
 
 /**
  * The street town, round 5 (Nov 5; brief-town-fixed-cam.md): one fixed view. The camera faces north whatever you press (Eric: "There
@@ -109,12 +109,8 @@ async function arrowStep(page: Page, key: string) {
 const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 69) % 46) - 23), Math.sign(b[1]! - a[1]!)];
 /** A drag across the box from its middle, `share` of its width (negative: leftward), by the mouse, in steps. */
 async function drag(page: Page, share: number) {
-  const b = (await canvas(page).boundingBox())!;
-  const y = b.y + b.height * 0.35;
-  await page.mouse.move(b.x + b.width / 2, y);
-  await page.mouse.down();
-  for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + (share * b.width * i) / 12, y);
-  await page.mouse.up();
+  // (The press and its first move together, so a slow frame can't make it a hold to run: helpers.ts lookDrag.)
+  await lookDrag(page, (await canvas(page).boundingBox())!, share);
 }
 
 for (const backend of ["2d", "webgl"] as const) {

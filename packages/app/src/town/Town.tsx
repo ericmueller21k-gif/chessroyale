@@ -39,7 +39,7 @@ import { account, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
-import { N, colI, fromCam, proj, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
+import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
 import { shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
@@ -1194,15 +1194,27 @@ function startTown(
   const finger = new FingerRun();
   /** Where the press's finger is now (client px). */
   const fingerAt = { x: 0, y: 0 };
+  const steerPose = { x: 0, y: 0, hop: 0, tilt: 0, step: false, t: 0 };
+  const steerQ = { dx: 0, dz: 0 };
+  const steerAt = newPt();
+  const steerRest = newPt();
   /**
-   * The finger steers the run: the way from your pawn's middle on screen (as the last frame drew it) to the finger, snapped to up, down,
-   * left or right of the normal view (the arrows'), held as an arrow is. Within `streetRunDeadPx` of your pawn, the way it had.
+   * The finger steers the run: the way from your pawn's middle on screen to the finger, snapped to up, down, left or right of the normal
+   * view (the arrows'), held as an arrow is. Within `streetRunDeadPx` of your pawn, the way it had. Your pawn as it stands still: where
+   * the last frame drew it, less its lead on the camera (running, the camera's follow lets it get up to about a square ahead on screen;
+   * steering from there would feed the run's own lead back into its way, and a finger near it would flip it back and forth).
    */
   const steer = () => {
     const rc = box.getBoundingClientRect();
     const b = r.drawnBox(0);
-    const x = b ? (b.x0 + b.x1) / 2 : r.W / 2;
-    const y = b ? (b.y0 + b.fy) / 2 : r.H * 0.6;
+    let x = b ? (b.x0 + b.x1) / 2 : r.W / 2;
+    let y = b ? (b.y0 + b.fy) / 2 : r.H * 0.6;
+    const pose = town.you.walker.pose(performance.now(), steerPose);
+    rel(r.view, camX, camY, pose.x, pose.y, steerQ);
+    if (proj(r.view, steerQ.dx, steerQ.dz, 0, steerAt) && proj(r.view, 0, 0, 0, steerRest)) {
+      x -= steerAt.x - steerRest.x;
+      y -= steerAt.y - steerRest.y;
+    }
     finger.steer(fingerAt.x - rc.left - x, fingerAt.y - rc.top - y, f.streetRunDeadPx);
   };
   /**

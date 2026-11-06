@@ -445,3 +445,26 @@ export async function bossAloneFromHome(page: Page, boss?: string) {
   if (boss) await page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio", { name: boss, exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "START" }).click();
 }
+
+/**
+ * The street town's look round: a drag by the mouse's left button across `box` from its middle, `share` of its width (negative:
+ * leftward), at `yShare` of its height, in `steps` moves. The press and its first move go to the browser together (the DevTools
+ * protocol's own mouse events), so no frame comes between them: on a slow software-WebGL runner a frame can take longer than the
+ * street town's hold time (`streetHoldMs`, brief-street-controls-map.md), and a press held that long before it moves is a run.
+ */
+export async function lookDrag(page: Page, box: { x: number; y: number; width: number; height: number }, share: number, steps = 12, yShare = 0.35, pauseMs = 0) {
+  const cdp = await page.context().newCDPSession(page);
+  const y = Math.round(box.y + box.height * yShare);
+  const x0 = box.x + box.width / 2;
+  const at = (i: number) => Math.round(x0 + (share * box.width * i) / steps);
+  const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", x: number, buttons: number) =>
+    cdp.send("Input.dispatchMouseEvent", { type, x, y, button: "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
+  await ev("mouseMoved", at(0), 0);
+  await Promise.all([ev("mousePressed", at(0), 1), ev("mouseMoved", at(1), 1)]);
+  for (let i = 2; i <= steps; i++) {
+    await ev("mouseMoved", at(i), 1);
+    if (pauseMs) await page.waitForTimeout(pauseMs);
+  }
+  await ev("mouseReleased", at(steps), 0);
+  await cdp.detach();
+}
