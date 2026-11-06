@@ -1209,7 +1209,8 @@ function startTown(
     const b = r.drawnBox(0);
     let x = b ? (b.x0 + b.x1) / 2 : r.W / 2;
     let y = b ? (b.y0 + b.fy) / 2 : r.H * 0.6;
-    const pose = town.you.walker.pose(performance.now(), steerPose);
+    // (Your pose as the last frame drew it, with that frame's camera: on a slow frame the walk has gone on since.)
+    const pose = town.you.walker.pose(drawnAt, steerPose);
     rel(r.view, camX, camY, pose.x, pose.y, steerQ);
     if (proj(r.view, steerQ.dx, steerQ.dz, 0, steerAt) && proj(r.view, 0, 0, 0, steerRest)) {
       x -= steerAt.x - steerRest.x;

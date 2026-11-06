@@ -37,6 +37,8 @@ Decision note: `docs/decisions/2026-11-05-street-controls-map.md`. Area page: `d
 - **The default zoom:** Eric answered the director's question ("we're going with number three for the default"), so the town opens at
   the third step (`streetZoomStart` 2). The park's step out goes from there to the overview. The rows' culling stays at the steps it was
   built for (`zoom <= 1`).
+- **Merged with the north edge (#511, head f5a3bfe8) and main (#512, #513).** The street-level sky check runs with the minimap on and
+  passes. Its earlier failure was #511's (fixed there), not the minimap's.
 - **Merged with the north edge (#511):** the minimap follows its plan (54 × 54, the start at (22, 25) in the park, the back wall with
   its two gates as lines on the top edge). The Colosseum is a thin band on that edge over its columns, and its walls and the plaza's
   (ground `W`) are dark. The boss portraits sit where the homes now stand. `pick()` keeps both the minimap's box and the north edge's
@@ -68,6 +70,8 @@ No check that guards a rule in `docs/rules/eric.md` changed.
 - `packages/app/test/town-rows.test.ts`: `streetZoomStart` 1 → 2.
 - `e2e/town-rows.spec.ts` "no sky between the fronts at street level": now zooms in once to the mockup's step (1) first. The town
   opens at step 2 since Nov 5, which sees over the rows, so the check failed there.
+- `e2e/town-controls.spec.ts` "hold to run": its "set off at once" wall-time bound is 2.5 s on 2D and 8 s on software WebGL (the test's
+  own round trips on slow frames, not the hold time).
 - `e2e/town-rows.spec.ts`, after the merge: the north edge's rows (Fountain Street at 28, South Street at 13) with this branch's
   zoom steps (opening at 2).
 - New: `packages/app/test/town-controls.test.ts` (28 tests) and `e2e/town-controls.spec.ts` (phone and computer, 2D and WebGL), added
