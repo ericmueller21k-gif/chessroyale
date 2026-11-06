@@ -163,6 +163,13 @@ export const TOWN_FEEL = {
    * slides inward along it, whatever the scale; 1.3 is the most the rows hold.
    */
   streetBuildScale: 1,
+  /**
+   * (Nov 5, round 6, ported in the north edge round; the brief: "Moo's paddock and Ginger's dome sit low in their rows … look sunk or short
+   * beside their neighbors") These homes are drawn this much bigger again in the street town, their foot on their row's front line where it
+   * was, so their height sits with their neighbors' (a paddock's fence and post, an igloo's dome, beside fronts of three and four floors).
+   * A home this makes too wide for its row's end slides inward along it, as any does (rows.ts).
+   */
+  streetHomeScale: { moo: 1.3, gingerbread: 1.3 } as Readonly<Record<string, number>>,
   /** While it turns, the clouds slide this many box widths a quarter turn (the sun stays put). */
   streetTurnClouds: 1.3,
   /**

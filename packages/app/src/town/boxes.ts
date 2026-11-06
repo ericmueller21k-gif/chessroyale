@@ -20,7 +20,9 @@ import { homeBox, type HomeId as ArtHomeId } from "./home-boxes.ts";
 import { STREET_LOTS, type StreetLot } from "./street.ts";
 import { lookalike } from "./lookalike.ts";
 import { wallArt } from "./wall.ts";
-import type { Facing } from "./rows.ts";
+import { PORTAL_BOX, ringBox } from "./houses/coliseum-ring.ts";
+import { homePx, type Facing } from "./rows.ts";
+import { RING_PX, WALL_H } from "./houses/coliseum-shape.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import type { HomeId } from "./world.ts";
@@ -28,7 +30,8 @@ import type { HomeId } from "./world.ts";
 const SQ = 37;
 
 /** What a box is: a boss's home, an everyday building on a row, a bigger one behind the rows, a garden's shed or a square of hedge. */
-export type BoxKind = "home" | "house" | "tall" | "wall" | "shed" | "hedge";
+/** (The north edge round: a stretch of the Colosseum's ring, and its portal, the Colosseum's own box.) */
+export type BoxKind = "home" | "house" | "tall" | "wall" | "ring" | "portal" | "shed" | "hedge";
 
 /** A box standing in the town. */
 export interface BoxInst {
@@ -49,8 +52,8 @@ export interface BoxInst {
   /** Its front line's middle (world): where its front sorts, a home's item stands, and every point is measured from. */
   fx: number;
   fy: number;
-  /** A home's id (the game's), an everyday building's lot (its index in STREET_LOTS), a prop's index in PROPS (a shed, a hedge). */
-  home: HomeId | null;
+  /** A home's id (the game's; the Colosseum's portal: "coliseum"), an everyday building's lot (its index in STREET_LOTS), a prop's index in PROPS (a shed, a hedge). */
+  home: HomeId | "coliseum" | null;
   lot: number;
   prop: number;
   /** Its left and right sides, covered by a neighbour at least as tall: never drawn. */
@@ -60,6 +63,12 @@ export interface BoxInst {
   tile: Character | null;
   /** A run of hedge: every prop it stands for (the first, `prop`, draws it). */
   props: number[];
+  /**
+   * (Nov 6) Drawn even where the rows hide it (render.ts's culling): a front of the row back to back behind a home with no side walls (a
+   * dome or a slope to the ground: Ginger's igloo, Hollow's peak). Seen past the home's curve from along its street, it fills what would
+   * otherwise show sky.
+   */
+  open?: boolean;
 }
 
 /**
@@ -80,10 +89,10 @@ export const pxOf = (box: TownBox): number => box.px ?? SQ;
 export const BUILD_PX = SQ / TOWN_FEEL.streetBuildScale;
 /** An art drawn bigger (its own copy, so the art's caches stay the art's). */
 const bigger = new WeakMap<TownBox, TownBox>();
-function big(box: TownBox): TownBox {
-  if (box.px === BUILD_PX) return box;
+function big(box: TownBox, px = BUILD_PX): TownBox {
+  if (box.px === px) return box;
   let b = bigger.get(box);
-  if (!b) bigger.set(box, (b = { ...box, px: BUILD_PX }));
+  if (!b || b.px !== px) bigger.set(box, (b = { ...box, px }));
   return b;
 }
 /** A home's back seen from behind (round 4): its own side wall's picture across its body (a home with a `back` keeps that). */
@@ -96,9 +105,12 @@ function withRear(box: TownBox): TownBox {
 }
 /** A lot's building as a box: a home's, an everyday design's, or a row's look-alike (round 4), drawn the street town's bigger size. */
 export function lotArt(l: StreetLot, low = false): TownBox {
-  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)));
+  // (A home: drawn bigger again where the street town asks, round 6: rows.ts homePx.)
+  if (l.kind === "home") return big(withRear(homeBox(l.id as ArtHomeId, low)), homePx(l.id as ArtHomeId));
   if (l.look) return big(lookalike(l.look));
   if (l.wall) return wallArt(l.wall);
+  if (l.ring !== undefined) return ringBox(l.ring);
+  if (l.kind === "portal") return PORTAL_BOX;
   return big(building(l.id as never, l.w, l.v));
 }
 
@@ -155,8 +167,13 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
   STREET_LOTS.forEach((l, lot) => {
     const box = lotArt(l);
     const low = l.kind === "home" ? lotArt(l, true) : box;
-    // (Its front line: the lot's front edge plus the box's inset; its picture centred on the lot. A row's look-alike: where the row put it.)
-    if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
+    // (Its front line: the lot's front edge plus the box's inset; its picture centered on the lot. A row's look-alike: where the row put it.
+    // A stretch of the Colosseum's ring: facing out from the oval, its front's middle where the ring has it.)
+    if (l.dir && l.at) {
+      const h = box.front.w / pxOf(box) / 2;
+      out.push({ i: out.length, kind: l.kind, box, low, facing: l.facing, ox: l.at.x - l.dir.ux * h, oy: l.at.y - l.dir.uy * h, ux: l.dir.ux, uy: l.dir.uy, bx: -l.dir.uy, by: l.dir.ux, fx: 0, fy: 0, home: null, lot, prop: -1, hideL: false, hideR: false, tile: null, props: [] });
+    } else if (l.kind === "portal" && l.at) add(l.kind, box, low, "S", l.at.x, l.at.y, { lot, home: "coliseum" });
+    else if (l.at) add(l.kind, box, low, l.facing, l.at.x, l.at.y, { lot, home: null });
     else if (l.facing === "S") add(l.kind, box, low, "S", l.c0 + l.w / 2 - 0.5 + (l.shift ?? 0), l.r0 - 0.5 + box.inset, { lot, home: l.kind === "home" ? gameHome(l.id) : null });
     else add(l.kind, box, low, "W", l.c0 - 0.5 + box.inset, l.r0 + l.w / 2 - 0.5, { lot, home: null });
   });
@@ -198,7 +215,31 @@ export function streetBoxes(props: readonly { kind: string; x: number; y: number
     b.fy = b.oy + (b.uy * b.box.front.w) / pxOf(b.box) / 2;
   }
   coverSides(out);
+  openBehind(out);
   return out;
+}
+
+/** Marks the fronts standing back to back behind a home with no side walls (BoxInst.open). */
+function openBehind(boxes: BoxInst[]): void {
+  const a = { x: 0, y: 0 };
+  // (Its front's span east-west, measured from the home's front's middle the short way round the wrap.)
+  const span = (o: BoxInst, from: number): [number, number] => {
+    boxPoint(o, o.box, 0, 0, a);
+    const s0 = wrapF(a.x - from);
+    boxPoint(o, o.box, o.box.front.w, 0, a);
+    const s1 = wrapF(a.x - from);
+    return [Math.min(s0, s1), Math.max(s0, s1)];
+  };
+  for (const h of boxes) {
+    if (h.kind !== "home" || h.box.left || h.box.right || h.facing !== "S") continue;
+    const [h0, h1] = span(h, h.fx);
+    for (const b of boxes) {
+      // (Facing the other way, its front line within the home's block behind it, along the same stretch.)
+      if (b.kind !== "house" || b.facing !== "N" || b.fy <= h.fy || b.fy - h.fy > 3.5 || Math.abs(wrapF(b.fx - h.fx)) > 8) continue;
+      const [b0, b1] = span(b, h.fx);
+      if (Math.min(b1, h1 + 1) > Math.max(b0, h0 - 1)) b.open = true;
+    }
+  }
 }
 
 /** World point of a box's own (u, t): into `out` (squares, not wrapped). */
@@ -496,7 +537,10 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   let bz = cq.dz;
   let ax2 = ax;
   let az2 = az;
-  const zn = NEAR - v.back;
+  // (The Colosseum's ring and portal, the north edge round: cut nearer, as near as the projection holds (a hair over 0.5 deep at the
+  // ground), so a stretch you stand beside on the plaza, looking along it, runs on to the box's edge: no gap into the ring.)
+  const solid = BI.kind === "ring" || BI.kind === "portal";
+  const zn = (solid ? Math.max(0.05, (0.56 - v.h * v.sn) / v.cs) : NEAR) - v.back;
   w.s0 = 0;
   w.s1 = 1;
   if (az2 < zn && bz < zn) return;
@@ -530,7 +574,8 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   // Strips: each a step in its top of about `boxStrip` px at most (fine: WebGL's; else the 2D fallback's), and at least 2 px wide.
   const f = TOWN_FEEL;
   const dh = Math.abs(h1 - h0);
-  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
+  // (The Colosseum's: the fine count on the 2D fallback too, so a stretch close by steps smoothly; far off it needs few.)
+  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE || (solid && Math.max(pa.k, pb.k) > 90) ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
   worldNormal(BI, nbx, nby, nw);
   w.shade = Math.min(0.6, wallShade(nw.x, nw.y, v.hc, v.hs) + extraShade);
   w.on = true;
@@ -582,10 +627,14 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   let nOrd = 0;
   const faces = g.faces;
   const f = TOWN_FEEL;
+  // (A stretch of the Colosseum's ring with the camera lower than its rim: its rim, seats and podium are hidden behind its outer wall, so
+  // they're left out rather than drawn and covered.)
+  const bowl = BI.kind !== "ring" || v.h > WALL_H / RING_PX;
   for (let i = 0; i < faces.length; i++) {
     const fg = faces[i]!;
     const fp = p.faces[i]!;
     fp.on = false;
+    if (!bowl) continue;
     // Turned away from the camera (its outward normal; the camera stands `back` behind its focus, `h` up)?
     worldNormal(b, fg.nx, fg.ny, nw);
     const ncx = nw.x * v.hc - nw.y * v.hs;

@@ -10,12 +10,15 @@
  * Nothing here allocates once a view is made: projections write into a point the caller owns.
  */
 import { TOWN_FEEL, type CamSet } from "./feel.ts";
+import { STREET_TOWN } from "./admin-town.ts";
+import PLAN from "./street-plan.json" with { type: "json" };
 
 /**
  * The world is N x N squares and wraps on both axes (the street town, round 4: east-west only, `WRAP`). (Slices 1 to 5: 40; slice 6
- * made room for the park and the bigger Colosseum.)
+ * made room for the park and the bigger Colosseum.) The street town's is its plan's (the north edge round, Nov 5: 54, grown 8 rows
+ * south for Meadow Street and so 8 columns east too).
  */
-export const N = 46;
+export const N: number = STREET_TOWN ? PLAN.size : 46;
 
 /**
  * Which ways the world wraps. Today's town: both. The street town (Nov 5, round 4; Eric: "the Colosseum sits at the top centre, at the
