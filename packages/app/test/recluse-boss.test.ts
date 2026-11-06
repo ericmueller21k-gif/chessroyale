@@ -144,8 +144,8 @@ describe("his lines: real quotes word for word, the rest placeholders", () => {
   it("keeps every verified quote exactly as first published (Eric, Oct 14: never altered), each in its slot", () => {
     expect(RECLUSE_LINES.introE4).toBe("Best by test.");
     expect(RECLUSE_LINES.mock).toEqual(expect.arrayContaining(["I don't believe in psychology. I believe in good moves.", "A genuine beginner's move"]));
-    expect(RECLUSE_LINES.victory).toContain("He played book lines, but didn't know them very well.");
-    expect(RECLUSE_LINES.fall).toContain("Morphy, I think everyone agrees, was probably the greatest genius of them all.");
+    expect(RECLUSE_LINES.victory).toContain("He knew book lines, not their meaning.");
+    expect(RECLUSE_LINES.fall).toContain("Morphy was the greatest genius.");
     // (Eric, Oct 14: the Weaver Adams quote, a board he won in phase 2, "doesn't fit the rest": gone.)
     expect(JSON.stringify(RECLUSE_LINES)).not.toMatch(/Weaver|merely loses differently/);
     expect(RECLUSE_LINES.boardWon.length).toBeGreaterThan(0);

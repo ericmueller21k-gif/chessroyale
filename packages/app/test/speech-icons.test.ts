@@ -31,7 +31,7 @@ describe("icon tokens in a line", () => {
   });
 
   it("drops the icons, and the space before each, for a screen reader or plain text", () => {
-    expect(plainLine("Hi! This is Moo. He's my best friend. (Moo! {heart})")).toBe("Hi! This is Moo. He's my best friend. (Moo!)");
+    expect(plainLine("Hi! I'm Moo, best friend. (Moo! {heart})")).toBe("Hi! I'm Moo, best friend. (Moo!)");
     expect(plainLine("(Moo. {zzz})")).toBe("(Moo.)");
     expect(plainLine("(Moo… {question})")).toBe("(Moo…)");
     expect(plainLine("I'm hungry {milk} Moo")).toBe("I'm hungry Moo");

@@ -12,7 +12,7 @@
 import type { Beat } from "./boss-beats.ts";
 
 export const GARDENER_LINES: Partial<Record<Beat, readonly string[]>> = {
-  entrance: ["Mind the flower beds.", "Big feet, gentle hands. Wipe yours.", "Welcome to my garden. Stay as long as you like. Longer, ideally."],
+  entrance: ["Mind the flower beds.", "Big feet, gentle hands. Wipe yours.", "Welcome! Stay as long as you like."],
   plantMany: ["A few seeds to start…", "Good soil here. Very good soil."],
   plant: ["Another one.", "Take your time. They grow either way.", "Plop."],
   move: ["Slow and steady.", "One step at a time.", "Easy does it.", "Patience."],
@@ -31,7 +31,7 @@ export const GARDENER_LINES: Partial<Record<Beat, readonly string[]>> = {
   ownEaten: ["Not that one! Bad plant!", "Well… it was hungry."],
   victory: ["Another fine harvest.", "Everything in its season."],
   defeat: ["Trampled… my whole garden…", "I'll replant. I always do."],
-  kingAttack: ["Hold still, your majesty. You look thirsty.", "Spritz! Spritz! Spritz!", "A royal soaking!"],
+  kingAttack: ["Hold still, majesty. Looking thirsty.", "Spritz! Spritz! Spritz!", "A royal soaking!"],
 };
 
 /** How often each moment speaks: Moo's, plus the opening five seeds, the watering, its reactions and a killer plant's meal always, and the 30 s seed rarely (Moo's moon, flurry and daze have no counterpart here). */

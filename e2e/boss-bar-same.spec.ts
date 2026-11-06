@@ -8,7 +8,7 @@ import { bossAloneFromHome, test } from "./helpers.ts";
 /**
  * The phone boss bar is the same for every playable boss (docs/decisions/2026-10-24-boss-bar-same.md; Eric, Oct 24: "there should be
  * some continuity as far as the size and where their name sits… these box sizes should not change… these are the kind of checks
- * that should be… built"). One bar (99 px), one figure box (58 px wide, the bar's content tall), its feet on the same baseline for
+ * that should be… built"). One bar (99 px, styles.css --bar-h), one figure box (58 px wide, the bar's content tall), its feet on the same baseline for
  * every boss; the name, level, bars, status and free room in the same place for every boss. A boss is drawn at its own size
  * (4/3 or less for the big animals' steps, never below full size), and its drawing, at rest, stays 2 px inside the screen's left
  * edge, 2 px clear of the name column, and under the "BOSS · move N" text; it may hang out of the bar's top and left edge. Every
@@ -22,7 +22,7 @@ const SIZES: [number, number][] = [[320, 568], [390, 844], [428, 777]];
 const BASE = "/?debug&pace=quick&clock=60&laststand=0&brain=stockfish";
 /** A pixel of slack for rounding (the box's edges are fractional at some widths). */
 const TOL = 1;
-/** The bar's height, the figure box's width and height (styles.css: the bar 99 px, the box 58 px wide, the bar's content tall). */
+/** The bar's height, the figure box's width and height (styles.css: the bar 99 px, the box 58 px wide, 88 px tall). */
 const BAR_H = 99;
 const BOX_W = 58;
 const BOX_H = 88;
@@ -189,7 +189,9 @@ const sayLine = (page: Page, text: string, typed = false): Promise<LineRes> =>
         const rg = document.createRange();
         rg.selectNodeContents(el);
         // (A row: the text's boxes whose tops lie within 3 px of each other; the rows' pitch is the closest two rows.)
-        const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5).map((q) => q.top).sort((a, b) => a - b);
+        // (Only the rows shown: a line that runs past two rows would clamp with an ellipsis, a safety net only: lines.test.ts shortens them.)
+        const clipBottom = (el.querySelector(".speech-clip") as HTMLElement | null)?.getBoundingClientRect().bottom ?? Infinity;
+        const tops = [...rg.getClientRects()].filter((q) => q.width > 0.5 && q.height > 0.5 && q.top < clipBottom - 1).map((q) => q.top).sort((a, b) => a - b);
         const rowTops: number[] = [];
         for (const t of tops) if (!rowTops.length || t - rowTops[rowTops.length - 1]! > 3) rowTops.push(t);
         const pitch = rowTops.length > 1 ? Math.min(...rowTops.slice(1).map((t, i) => t - rowTops[i]!)) : 0;
@@ -435,7 +437,7 @@ for (const def of PLAYABLE) {
       for (const l of lined) writeFileSync(`${dir}/lined-${l.w}-${safe(def.name)}.png`, l.png);
     }
 
-    // Every line, inside the bar and beside the status, in at most three rows (two of them the same pitch as at 390); a one-row line
+    // Every line, inside the bar and beside the status, in at most two rows, at every width (lines.test.ts); a one-row line
     // never past 60% of its room.
     const rowsWrong: string[] = [];
     for (const [w] of SIZES) {
@@ -446,11 +448,10 @@ for (const def of PLAYABLE) {
         // The rows the line gets (Eric, Oct 24): one row when its one-row width is at most 60% of the room's text width; else two
         // balanced rows when two rows hold the line at the room's width; else three, never four. Both widths are measured here.
         const room = r.main.w - r.frame;
-        const want = r.w1 <= 0.6 * room ? 1 : r.roomRows <= 2 ? 2 : 3;
+        const want = r.w1 <= 0.6 * room ? 1 : 2;
         // (At 320 px, where the name column moved, a line may take one row more, never four.)
-        const more = w === 320 && nameMoved(def.id) ? 1 : 0;
-        if (r.rows > want + more || r.rows < want) rowsWrong.push(`${who}: ${r.rows} rows, want ${want} (one row ${r.w1.toFixed(1)} px, room ${room.toFixed(1)} px, ${r.roomRows} rows at the room's width)`);
-        expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(3);
+        if (r.rows > want || r.rows < want) rowsWrong.push(`${who}: ${r.rows} rows, want ${want} (one row ${r.w1.toFixed(1)} px, room ${room.toFixed(1)} px, ${r.roomRows} rows at the room's width)`);
+        expect.soft(r.rows, `${who}: rows`).toBeLessThanOrEqual(2);
         if (r.rows >= 2) expect.soft(r.pitch, `${who}: the rows' pitch`).toBeGreaterThanOrEqual(ROW_PITCH_MIN);
         expect.soft(r.bubble.x, `${who}: inside the bar, left`).toBeGreaterThanOrEqual(r.bar.x - TOL);
         expect.soft(r.bubble.r, `${who}: inside the bar, right`).toBeLessThanOrEqual(r.bar.r + TOL);
