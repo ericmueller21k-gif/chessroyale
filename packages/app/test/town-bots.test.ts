@@ -95,8 +95,8 @@ describe("town square: the bots (Oct 27)", () => {
     // "sidekick-ginger-elf"; he keeps Ginger's shop, not a town bot: Crumb stays Ginger's kid in the town. Folio's paper turtle, Nov 5:
     // folioturtle.ts, the art's id "sidekick-folio-turtle"; it keeps Folio's shop, not a town bot: Pleat, the frog, stays Folio's kid.)
     const files = readdirSync(new URL("../src/characters/sidekicks/", import.meta.url)).filter((f) => f.endsWith(".ts"));
-    expect(files).toHaveLength(21);
-    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf", folioturtle: "sidekick-folio-turtle" };
+    expect(files).toHaveLength(22);
+    const artId: Record<string, string> = { timber: "sidekick-beaver", hollowdog: "sidekick-hollow-dog", rooster: "sidekick-pig-rooster", dealer: "sidekick-grex-dealer", elf: "sidekick-ginger-elf", folioturtle: "sidekick-folio-turtle", smudgykeeper: "sidekick-smudgy-keeper" };
     for (const file of files) {
       const name = file.replace(/\.ts$/, "") as keyof typeof SIDEKICK_SHEETS;
       const mod = (await import(`../src/characters/sidekicks/${file}`)) as Record<string, unknown>;

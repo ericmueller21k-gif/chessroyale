@@ -514,7 +514,7 @@ export function painterPose(f: number): { fist: Pt; tilt: number; dip: boolean }
   if (i < PAINTER_LOOP.dip) return { fist: [44 - (i % 2), 40 + (i % 2) * 3 - (i === 2 ? 2 : 0)], tilt: 72 + (i % 2) * 8, dip: false };
   // Down to the paint table: reach, dab, back up.
   const j = i - PAINTER_LOOP.dip;
-  return { fist: [[44, 41], [45, 43], [44, 41]][j]! as Pt, tilt: [115, 122, 110][j]!, dip: true };
+  return { fist: ([[44, 41], [45, 43], [44, 41]] as Pt[])[j]!, tilt: [115, 122, 110][j]!, dip: true };
 }
 /** Which canvas stage frame `f` of the loop shows (0 blank to 3 finished). */
 export const stageOf = (f: number) => Math.floor((f % PAINTER_LOOP.frames) / PAINTER_LOOP.stage);
