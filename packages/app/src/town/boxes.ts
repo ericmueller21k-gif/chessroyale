@@ -26,6 +26,9 @@ import { RING_PX, WALL_H } from "./houses/coliseum-shape.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import type { HomeId } from "./world.ts";
+import { affine, DARK_SIDE, lightStep, type Step } from "./kit/prims.ts";
+
+export { affine };
 
 const SQ = 37;
 
@@ -412,6 +415,12 @@ export function faceLight(nx: number, ny: number, nz: number, hc: number, hs: nu
   const l = 0.74 + 0.36 * (cx * -0.5 + cy * -0.35 + nz * 0.79);
   return l < 0.55 ? 0.55 : l > 1.12 ? 1.12 : l;
 }
+/** A roof face's light, as a step of its palette's ramps (kit/prims.ts `lightStep`): its normal (world) turned into the camera's frame. */
+export function faceStep(nx: number, ny: number, nz: number, hc: number, hs: number): Step {
+  return lightStep(nx * hc - ny * hs, nx * hs + ny * hc, nz);
+}
+/** A wall shaded this much or more (`wallShade`, a back's extra included) is drawn one ramp step darker; less, the base. */
+export const DARK_SHADE = 0.3 * DARK_SIDE;
 /**
  * A wall's shade (0: none; the art: a side turned to the screen's left 6%, one turned right 30%): by how far its normal (world: east,
  * north) is turned from facing the camera, so a front facing the camera has none and a wall turns smoothly from one to the other.
@@ -442,6 +451,8 @@ export interface WallPlan {
   dz: number;
   strips: number;
   shade: number;
+  /** Its light: the base, or one ramp step darker (a side turned right, `DARK_SHADE`). */
+  step: Step;
   /** The part of its picture drawn (0..1 along it): all of it, or (a wall running past the camera, the chase camera's rows) only what's in front of it. */
   s0: number;
   s1: number;
@@ -478,7 +489,7 @@ export interface BoxPlan {
   minY: number;
   maxY: number;
 }
-const newWall = (): WallPlan => ({ on: false, x0: 0, y0: 0, k0: 0, x1: 0, y1: 0, k1: 0, dx: 0, dz: 0, strips: 1, shade: 0, s0: 0, s1: 1 });
+const newWall = (): WallPlan => ({ on: false, x0: 0, y0: 0, k0: 0, x1: 0, y1: 0, k1: 0, dx: 0, dz: 0, strips: 1, shade: 0, step: 0, s0: 0, s1: 1 });
 /** A wall is cut this far (squares) in front of the camera: what's nearer (or behind it) isn't drawn. */
 const NEAR = 0.6;
 export function newPlan(box: TownBox): BoxPlan {
@@ -572,6 +583,7 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(f.boxStripsFine, Math.ceil(dh / f.boxStripFine), Math.ceil((pb.x - pa.x) / 2)));
   worldNormal(BI, nbx, nby, nw);
   w.shade = Math.min(0.6, wallShade(nw.x, nw.y, v.hc, v.hs) + extraShade);
+  w.step = w.shade >= DARK_SHADE ? -1 : 0;
   w.on = true;
   P.on = true;
   grow(pa.x, pa.y);
@@ -742,36 +754,6 @@ export function wholeFits(fg: FaceGeom, fp: FacePlan): number {
   return Math.hypot(X - fp.x[2]!, Y - fp.y[2]!);
 }
 const AF = new Float64Array(6);
-
-/**
- * The affine map (a, b, c, d, e, f: x' = a x + c y + e, y' = b x + d y + f, a 2D context's setTransform order) taking three points
- * (sx, sy) to (dx, dy), into `out`. False when the three are in a line.
- */
-export function affine(
-  sx0: number, sy0: number, dx0: number, dy0: number,
-  sx1: number, sy1: number, dx1: number, dy1: number,
-  sx2: number, sy2: number, dx2: number, dy2: number,
-  out: Float64Array,
-): boolean {
-  const ux = sx1 - sx0;
-  const uy = sy1 - sy0;
-  const vx = sx2 - sx0;
-  const vy = sy2 - sy0;
-  const det = ux * vy - uy * vx;
-  if (Math.abs(det) < 1e-9) return false;
-  const px = dx1 - dx0;
-  const py = dy1 - dy0;
-  const qx = dx2 - dx0;
-  const qy = dy2 - dy0;
-  // [a c; b d] [ux vx; uy vy] = [px qx; py qy]
-  out[0] = (px * vy - qx * uy) / det;
-  out[2] = (qx * ux - px * vx) / det;
-  out[1] = (py * vy - qy * uy) / det;
-  out[3] = (qy * ux - py * vx) / det;
-  out[4] = dx0 - out[0]! * sx0 - out[2]! * sy0;
-  out[5] = dy0 - out[1]! * sx0 - out[3]! * sy0;
-  return true;
-}
 
 /** (Tests) Squares in the world: N. */
 export const WORLD = N;
