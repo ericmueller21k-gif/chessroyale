@@ -10817,6 +10817,181 @@ a.fd-row-link {
 .ps-choice:active {
   filter: brightness(1.15);
 }
+/* Gameplay and customization → Move confirm style (MoveConfirmChoice in screens/Settings.tsx): three choices, each with a
+   small looping preview, a three by three board with the effect on it. The previews loop only when motion is allowed;
+   otherwise each shows its first frame. Mockup: the effects themselves are built after Eric's OK. */
+.mc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mc-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 10px 8px 8px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  font: 600 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.mc-opt:active {
+  filter: brightness(1.15);
+}
+.mc-opt.on {
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+}
+.mc-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mc-text strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+.mc-text span {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fd-sub);
+  overflow-wrap: anywhere;
+}
+.mc-opt.on .mc-text span {
+  color: var(--fd-gold-ink);
+  opacity: 0.8;
+}
+.mc-tile {
+  position: relative;
+  flex: none;
+  width: 84px;
+  height: 84px;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.mc-board {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+}
+.mc-sq.l {
+  background-color: var(--sq-light);
+}
+.mc-sq.d {
+  background-color: var(--sq-dark);
+}
+/* The target square (classic, soft press): the centre one. */
+.mc-target {
+  position: absolute;
+  left: 33.333%;
+  top: 33.333%;
+  width: 33.333%;
+  height: 33.333%;
+}
+.mc-piece {
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fbfbf7, #8a909c 55%, #3b3f4a);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+/* Classic: three beeps, three green border flashes on the target square. */
+.mc-tile-classic .mc-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  border: 3px solid var(--good);
+  opacity: 0;
+}
+/* Soft press: the square fades green and back, and the piece presses down and up. */
+.mc-tile-soft .mc-target::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--good) 60%, transparent);
+  opacity: 0;
+}
+/* Vote trace: each candidate square (its share of the votes, under 5% none) gets its green line. */
+.mc-cand {
+  position: absolute;
+  width: 33.333%;
+  height: 33.333%;
+  box-sizing: border-box;
+  padding: 3px;
+}
+.mc-trace {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.mc-trace path {
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  stroke-linecap: butt;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 0 100;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mc-tile-classic .mc-target::after {
+    animation: mc-beeps 2.4s ease-out infinite;
+  }
+  .mc-tile-soft .mc-target::after {
+    animation: mc-glow 2.4s ease-in-out infinite;
+  }
+  .mc-tile-soft .mc-piece {
+    animation: mc-press 2.4s ease-in-out infinite;
+  }
+  .mc-trace path {
+    animation: mc-trace 3.2s ease-in-out infinite;
+  }
+  .mc-cand.chosen path {
+    animation-name: mc-trace-quick;
+  }
+}
+@keyframes mc-beeps {
+  0% { opacity: 0; }
+  4% { opacity: 1; }
+  10% { opacity: 0; }
+  18% { opacity: 1; }
+  24% { opacity: 0; }
+  32% { opacity: 1; }
+  40%, 100% { opacity: 0; }
+}
+@keyframes mc-glow {
+  0%, 100% { opacity: 0; }
+  30%, 50% { opacity: 1; }
+  80% { opacity: 0; }
+}
+@keyframes mc-press {
+  0%, 100% { transform: scale(1); }
+  30%, 50% { transform: scale(0.84); }
+}
+@keyframes mc-trace {
+  0% { stroke-dasharray: 0 100; }
+  40% { stroke-dasharray: var(--s) 100; }
+  88% { stroke-dasharray: var(--s) 100; }
+  96%, 100% { stroke-dasharray: 0 100; }
+}
+/* The chosen move's line finishes quickly. */
+@keyframes mc-trace-quick {
+  0% { stroke-dasharray: 0 100; }
+  12% { stroke-dasharray: var(--s) 100; }
+  88% { stroke-dasharray: var(--s) 100; }
+  96%, 100% { stroke-dasharray: 0 100; }
+}
+
 .fd-rules {
   background: var(--fd-panel);
   border-radius: 14px;

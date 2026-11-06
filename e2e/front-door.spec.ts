@@ -67,20 +67,27 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   // (Friends and Account show once accounts are on, Friends right after Quick chat; the order is the same either way.)
   const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
+  await expect.poll(labels).toEqual(["THEME", "BOARD", "SOUND AND GAMEPLAY", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
   // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
   await expect(page.getByText(/Opening moves|Sound lab/)).toHaveCount(0);
-  // (The Reveal sound list is collapsed until its title is tapped, Oct 24.)
+  // The sound settings and the gameplay choices are pages of their own (Nov 6). The Reveal sound list is collapsed until
+  // its title is tapped (Oct 24).
+  await page.getByRole("button", { name: /Sounds ›/ }).click();
+  await expect(page.getByRole("heading", { name: "Sounds" })).toBeVisible();
   await page.getByRole("button", { name: "Reveal sound" }).click();
   await expect(page.getByRole("radiogroup", { name: "Reveal sound" })).toBeVisible();
+  await page.getByRole("button", { name: "Back to Settings" }).click();
   // Board: animations off takes the motion trail with it; both stick.
+  await page.getByRole("button", { name: /Gameplay and customization ›/ }).click();
+  await expect(page.getByRole("heading", { name: "Gameplay and customization" })).toBeVisible();
   const anim = page.getByRole("switch", { name: /Animations/ });
   await expect(anim).toBeChecked();
   await anim.click();
   await expect(page.getByRole("switch", { name: /Motion trail/ })).toBeDisabled();
   await page.reload();
+  await page.getByRole("button", { name: /Gameplay and customization ›/ }).click();
   await expect(page.getByRole("switch", { name: /Animations/ })).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Motion trail/ })).not.toBeChecked();
 
@@ -88,14 +95,18 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
-  const practice = page.getByRole("switch", { name: /Practice mode/ });
-  await expect(practice).not.toBeChecked();
+  await expect.poll(labels).toEqual(["THEME", "BOARD", "SOUND AND GAMEPLAY", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).toBeDisabled();
+  // Practice mode is on the Gameplay page (Nov 6).
+  await page.getByRole("button", { name: /Gameplay and customization ›/ }).click();
+  const practice = page.getByRole("switch", { name: /Practice mode/ });
+  await expect(practice).not.toBeChecked();
   await practice.click();
   await page.reload();
+  await page.getByRole("button", { name: /Gameplay and customization ›/ }).click();
   await expect(page.getByRole("switch", { name: /Practice mode/ })).toBeChecked();
+  await page.getByRole("button", { name: "Back to Settings" }).click();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
 });

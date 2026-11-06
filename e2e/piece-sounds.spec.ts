@@ -21,11 +21,18 @@ async function openSound(page: Page, title: string) {
   await expect(head).toHaveAttribute("aria-expanded", "true");
 }
 
+/** Settings → Sounds (Nov 6: the sound settings are a page of their own; the Settings row opens it). */
+async function openSounds(page: Page) {
+  await page.getByRole("button", { name: /Sounds ›/ }).click();
+  await expect(page.getByRole("heading", { name: "Sounds" })).toBeVisible();
+}
+
 test("piece sounds: pick a move and a capture sound, hear one, and they're kept after a reload", async ({ page }) => {
   await page.addInitScript(() => ((window as any).__soundLog = []));
   const requested: string[] = [];
   page.on("request", (r) => requested.push(r.url()));
   await page.goto("/settings?debug");
+  await openSounds(page);
   // Nothing loaded before a tap (the first tap of a visit loads the picked sounds and the classics: see below).
   expect(pieceFiles(requested)).toEqual([]);
   await openSound(page, "Move sound");
@@ -60,6 +67,7 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
   // Kept on the device: the same after a reload.
   requested.length = 0;
   await page.reload();
+  await openSounds(page);
   // (Opening the lists is the first tap of this visit: it loads the picked sounds, the classics and castling's classic knock.)
   await openSound(page, "Move sound");
   await openSound(page, "Capture sound");
@@ -102,6 +110,7 @@ test("piece sounds: pick a move and a capture sound, hear one, and they're kept 
 
 test("piece sounds: each Sound list is collapsed when Settings opens, a tap opens it with every ▶, and it's collapsed again after a reload or a visit elsewhere", async ({ page }) => {
   await page.goto("/settings");
+  await openSounds(page);
   const lists = [
     { title: "Move sound", pick: "Classic knock", count: 9 },
     { title: "Capture sound", pick: "Classic double knock", count: 9 },
@@ -135,16 +144,19 @@ test("piece sounds: each Sound list is collapsed when Settings opens, a tap open
   await expect(head("Move sound")).toHaveAttribute("aria-expanded", "true");
   await expect(head("Move sound")).toContainText("Wooden tap");
   await page.reload();
+  await openSounds(page);
   await expect(head("Move sound")).toHaveAttribute("aria-expanded", "false");
   await expect(head("Move sound")).toContainText("Wooden tap");
   await expect(move).toHaveCount(0);
   await head("Move sound").click();
   await expect(move.getByRole("radio", { checked: true })).toHaveAccessibleName(/^Wooden tap/);
   // Leaving Settings and coming back: all collapsed again, the pick kept.
+  await page.getByRole("button", { name: "Back to Settings" }).click();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toHaveCount(0);
   await page.getByRole("button", { name: "Settings", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await openSounds(page);
   for (const { title } of lists) await expect(head(title)).toHaveAttribute("aria-expanded", "false");
   await expect(head("Move sound")).toContainText("Wooden tap");
   await expect(move).toHaveCount(0);
@@ -229,6 +241,7 @@ test("the reveal sound (Settings → Sound, beside the piece sounds): the steel 
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/settings");
+  await openSounds(page);
   await openSound(page, "Reveal sound");
   const reveal = page.getByRole("radiogroup", { name: "Reveal sound" });
   expect(await reveal.getByRole("radio").locator("strong").allTextContents()).toEqual(["Steel pan", "Kalimba", "Marimba", "Glockenspiel", "Music box", "8-bit blip"]);
@@ -242,6 +255,7 @@ test("the reveal sound (Settings → Sound, beside the piece sounds): the steel 
   // A pick (it plays too), kept on the device.
   await reveal.getByRole("radio", { name: /^Marimba/ }).click();
   await page.reload();
+  await openSounds(page);
   await openSound(page, "Reveal sound");
   await expect(page.getByRole("radiogroup", { name: "Reveal sound" }).getByRole("radio", { checked: true })).toHaveAccessibleName(/^Marimba/);
   expect(await page.evaluate(() => localStorage.getItem("brc.reelVoice"))).toBe("marimba");

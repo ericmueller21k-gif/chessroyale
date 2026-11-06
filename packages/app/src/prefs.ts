@@ -292,3 +292,42 @@ export const showUnderBoard = (layout: UnderBoardLayout) => saveUnderBoardView({
 
 /** Folds the space under the board to its header bar, or opens it again, keeping the layout. */
 export const foldUnderBoard = (open: boolean) => saveUnderBoardView({ ...underBoardView(), open });
+
+const MOVE_CONFIRM_KEY = "brc.moveConfirm";
+
+/**
+ * Gameplay and customization, "Move confirm style" (mockup, Nov 6): what a confirmed move looks and sounds like. Classic
+ * is today's three beeps and green border flash; Soft press is one soft tone with the square under the piece fading green
+ * and back; Vote trace (crowd and 50 v 50) draws a green line round each candidate's square in proportion to its share of
+ * the votes. Only the choice is kept here: the effects are built after Eric approves the look. Per device.
+ */
+export const MOVE_CONFIRM_STYLES = ["classic", "soft", "trace"] as const;
+export type MoveConfirmStyle = (typeof MOVE_CONFIRM_STYLES)[number];
+
+/** What a stored value means: one of the three; anything else (nothing, junk, a newer build's name) is Classic. */
+export function parseMoveConfirm(stored: unknown): MoveConfirmStyle {
+  return MOVE_CONFIRM_STYLES.find((s) => s === stored) ?? "classic";
+}
+
+/** (Without storage, a pick lasts as long as the page.) */
+let moveConfirmMemory: MoveConfirmStyle | null = null;
+
+export function moveConfirmStyle(): MoveConfirmStyle {
+  if (moveConfirmMemory) return moveConfirmMemory;
+  try {
+    return parseMoveConfirm(localStorage.getItem(MOVE_CONFIRM_KEY));
+  } catch {
+    return "classic";
+  }
+}
+
+export function setMoveConfirmStyle(s: MoveConfirmStyle) {
+  const pick = parseMoveConfirm(s);
+  try {
+    localStorage.setItem(MOVE_CONFIRM_KEY, pick);
+    moveConfirmMemory = null;
+  } catch {
+    moveConfirmMemory = pick;
+  }
+  listeners.forEach((l) => l());
+}

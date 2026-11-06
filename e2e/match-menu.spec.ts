@@ -127,6 +127,7 @@ test("a crowd match's list: Animations and Motion trail, locked as in Settings �
 
   // Settings → Board shows the same (the prefs are kept on the device).
   await page.goto("/settings");
+  await page.getByRole("button", { name: /Gameplay and customization ›/ }).click();
   const sAnim = page.getByRole("switch", { name: /^Animations/ });
   const sTrail = page.getByRole("switch", { name: /^Motion trail/ });
   await expect(sAnim).toBeChecked();

@@ -8,7 +8,7 @@ import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
 import { signOut, tooYoung } from "../account.ts";
-import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors } from "../prefs.ts";
+import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, type BoardColors, moveConfirmStyle, setMoveConfirmStyle, type MoveConfirmStyle } from "../prefs.ts";
 import { clearAllPremoves } from "../board/yours.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
@@ -197,37 +197,112 @@ function SoundReport() {
   );
 }
 
+/** Move confirm style: the three choices, each a small animated preview (CSS, styles.css "Move confirm style"). */
+const MOVE_CONFIRM_OPTIONS: readonly { id: MoveConfirmStyle; label: string; note: string }[] = [
+  { id: "classic", label: "Classic", note: "Today's three beeps and a green border flash (the default)." },
+  { id: "soft", label: "Soft press", note: "One soft tone. The square under the piece fades green and back, like pressing down on the board." },
+  { id: "trace", label: "Vote trace", note: "Crowd and 50 v 50: a green line round each move's square, as long as its share of the votes." },
+];
+
+/** Vote trace's candidates in the preview: the square, and its share of the votes (under 5% draws nothing). */
+const TRACE_CANDIDATES = [
+  { col: 0, row: 0, share: 55, chosen: true },
+  { col: 2, row: 1, share: 36, chosen: false },
+  { col: 0, row: 2, share: 4, chosen: false },
+] as const;
+
+/** One preview tile: a three by three board, the target square (classic, soft press) or the candidates (vote trace). */
+function MoveConfirmTile({ kind }: { kind: MoveConfirmStyle }) {
+  const cells = Array.from({ length: 9 }, (_, i) => {
+    const col = i % 3;
+    const row = Math.floor(i / 3);
+    return <i key={i} class={`mc-sq ${(col + row) % 2 ? "d" : "l"}`} />;
+  });
+  return (
+    <span class={`mc-tile mc-tile-${kind}`} aria-hidden="true">
+      <span class="mc-board">{cells}</span>
+      {kind === "trace" ? (
+        TRACE_CANDIDATES.map((c) => (
+          <span key={`${c.col}${c.row}`} class={`mc-cand${c.chosen ? " chosen" : ""}`} style={{ left: `${(c.col * 100) / 3}%`, top: `${(c.row * 100) / 3}%` }}>
+            {c.share >= 5 && (
+              <svg class="mc-trace" viewBox="0 0 100 100" preserveAspectRatio="none" style={{ "--s": String(c.share) }}>
+                {/* Two lines from the top and bottom centers, each running both ways to the side middles (100% closes the square). */}
+                <path pathLength={100} d="M50 0 L100 0 L100 50" />
+                <path pathLength={100} d="M50 0 L0 0 L0 50" />
+                <path pathLength={100} d="M50 100 L100 100 L100 50" />
+                <path pathLength={100} d="M50 100 L0 100 L0 50" />
+              </svg>
+            )}
+          </span>
+        ))
+      ) : (
+        <span class="mc-target">
+          <span class="mc-piece" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 /**
- * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"): the theme, sound (the move, capture and
- * reveal sounds), the board (its colors, animations, motion trail, premoves, arrows and highlights), quick chat,
- * friends, how to play (and the FAQ), help (the feedback sheet: bugs, feedback, ideas), installing, your sign-in, privacy
- * and terms; and for admins, testing (practice mode, the eval bar, and the shelved Auto chess demo).
+ * Move confirm style (Gameplay and customization; Eric, Nov 6): three choices, each with a small looping preview. Mockup:
+ * the choice is kept on the device, and the effects themselves come after Eric's OK.
  */
-export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => void; onFaq?: (section?: string) => void; onAutoChess?: () => void }) {
-  const { config, profile } = useAccount();
+function MoveConfirmChoice() {
+  const [chosen, setChosen] = useState(moveConfirmStyle);
+  return (
+    <div class="ps-picker mc-picker">
+      <span class="fd-toggle-text">
+        <strong>Move confirm style</strong>
+        <span>What you see and hear when your move is confirmed. Only you see it.</span>
+      </span>
+      <div class="mc-list" role="radiogroup" aria-label="Move confirm style">
+        {MOVE_CONFIRM_OPTIONS.map((o) => (
+          <button
+            key={o.id}
+            type="button"
+            role="radio"
+            aria-checked={chosen === o.id}
+            class={`mc-opt${chosen === o.id ? " on" : ""}`}
+            onClick={() => {
+              setChosen(o.id);
+              setMoveConfirmStyle(o.id);
+            }}
+          >
+            <MoveConfirmTile kind={o.id} />
+            <span class="mc-text">
+              <strong>{o.label}</strong>
+              <span>{o.note}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The page's head: a back arrow to Settings, the title. */
+function SubHead({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <header class="fd-page-head">
+      <BackButton onClick={onBack} label="Back to Settings" />
+      <h1>{title}</h1>
+      <span class="fd-head-spacer" />
+    </header>
+  );
+}
+
+/**
+ * Sounds (Eric, Nov 6): every sound setting in one place. The mute switch, the Move, Capture and Reveal sounds, and (for
+ * admins) the sound report. The move-confirm sound comes from its style, so a line here points to Gameplay.
+ */
+function SoundsPage({ onBack, onGameplay }: { onBack: () => void; onGameplay: () => void }) {
+  const { profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
-  // (Testing's switches read as they are now: who's a tester is known once the account loads.)
-  useEffect(() => onPrefsChange(() => rerender((n) => n + 1)), []);
-  const [anim, setAnim] = useState(crowdAnimations);
-  const [trail, setTrail] = useState(crowdTrail);
-  const [chatOn, setChatOn] = useState(() => !chatOff());
-  const [busy, setBusy] = useState(false);
-  // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
-  const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
-  const u = profile?.user;
   return (
     <div class="fd-page fd-settings">
-      <header class="fd-page-head">
-        <BackButton onClick={onBack} />
-        <h1>Settings</h1>
-        <span class="fd-head-spacer" />
-      </header>
-
-      <section class="fd-section">
-        <h2 class="fd-label">THEME</h2>
-        <ThemeChoice />
-      </section>
+      <SubHead title="Sounds" onBack={onBack} />
 
       <section class="fd-section">
         <h2 class="fd-label">SOUND</h2>
@@ -242,11 +317,14 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           Piece sounds, ticks, the reveal, and the queue's pops.
         </Toggle>
         <SoundPicker title="Move sound" options={PIECE_SOUNDS.move} chosen={pieceSound("move").id} pick={(id) => setPieceSound("move", id).id} hear={(id) => previewPieceSound("move", id)}>
-          What a piece makes as it lands, in every mode. Tap {"\u25B6\uFE0E"} to hear one.
+          What a piece makes as it lands, in every mode. Tap {"▶︎"} to hear one.
         </SoundPicker>
         <SoundPicker title="Capture sound" options={PIECE_SOUNDS.capture} chosen={pieceSound("capture").id} pick={(id) => setPieceSound("capture", id).id} hear={(id) => previewPieceSound("capture", id)}>
           When a piece takes another. Pick any with any move sound.
         </SoundPicker>
+        <button type="button" class="fd-row-link" onClick={onGameplay}>
+          Move confirm sound: set in Gameplay ›
+        </button>
         <SoundPicker
           title="Reveal sound"
           options={REVEAL_SOUNDS}
@@ -261,9 +339,39 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         </SoundPicker>
       </section>
 
+      {profile?.admin && (
+        <section class="fd-section">
+          <h2 class="fd-label">TESTING</h2>
+          <SoundReport />
+        </section>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Gameplay and customization (Eric, Nov 6): the move confirm style, then the board's choices (animations, the motion trail,
+ * premoves, arrows and highlights), and for admins practice mode.
+ */
+function GameplayPage({ onBack }: { onBack: () => void }) {
+  const { profile } = useAccount();
+  const [, rerender] = useState(0);
+  useEffect(() => onPrefsChange(() => rerender((n) => n + 1)), []);
+  const [anim, setAnim] = useState(crowdAnimations);
+  const [trail, setTrail] = useState(crowdTrail);
+  // (Arrows and highlights are drawn with a mouse: greyed on a device without one.)
+  const [mouse] = useState(() => typeof matchMedia === "function" && matchMedia("(any-pointer: fine)").matches);
+  return (
+    <div class="fd-page fd-settings">
+      <SubHead title="Gameplay and customization" onBack={onBack} />
+
+      <section class="fd-section">
+        <h2 class="fd-label">MOVE CONFIRM</h2>
+        <MoveConfirmChoice />
+      </section>
+
       <section class="fd-section">
         <h2 class="fd-label">BOARD</h2>
-        <BoardColorsChoice />
         <Toggle
           title="Animations"
           checked={anim}
@@ -300,6 +408,66 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           With a mouse: right-drag for an arrow, right-click to color a square (hold Ctrl, Alt or Shift for other colors). A
           left-click clears them. Only you see them.
         </Toggle>
+      </section>
+
+      {profile?.admin && (
+        <section class="fd-section">
+          <h2 class="fd-label">TESTING</h2>
+          <p class="fd-note">For testers (admins). Players never see these: for them practice mode is off.</p>
+          <Toggle title="Practice mode" checked={practiceOn()} onChange={setPracticeOn}>
+            Unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the leaderboard.
+          </Toggle>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Settings (Eric, Oct 15: "smoothness, quickness, with some variety offered"; reorganized Nov 6): the theme, the board
+ * colors, two pages (Sounds, and Gameplay and customization: the move confirm style, animations, motion trail, premoves,
+ * arrows and highlights, practice mode), quick chat, friends, how to play (and the FAQ), help (the feedback sheet: bugs,
+ * feedback, ideas), installing, your sign-in, privacy and terms; and for admins, testing (the eval bar, and the shelved
+ * Auto chess demo).
+ */
+export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => void; onFaq?: (section?: string) => void; onAutoChess?: () => void }) {
+  const { config, profile } = useAccount();
+  const [page, setPage] = useState<"main" | "sounds" | "gameplay">("main");
+  const [chatOn, setChatOn] = useState(() => !chatOff());
+  const [busy, setBusy] = useState(false);
+  const u = profile?.user;
+  // (Each page starts at its top.)
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [page]);
+  if (page === "sounds") return <SoundsPage onBack={() => setPage("main")} onGameplay={() => setPage("gameplay")} />;
+  if (page === "gameplay") return <GameplayPage onBack={() => setPage("main")} />;
+  return (
+    <div class="fd-page fd-settings">
+      <header class="fd-page-head">
+        <BackButton onClick={onBack} />
+        <h1>Settings</h1>
+        <span class="fd-head-spacer" />
+      </header>
+
+      <section class="fd-section">
+        <h2 class="fd-label">THEME</h2>
+        <ThemeChoice />
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">BOARD</h2>
+        <BoardColorsChoice />
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">SOUND AND GAMEPLAY</h2>
+        <button type="button" class="fd-row-link" onClick={() => setPage("sounds")}>
+          🔊 Sounds ›
+        </button>
+        <button type="button" class="fd-row-link" onClick={() => setPage("gameplay")}>
+          🎮 Gameplay and customization ›
+        </button>
       </section>
 
       <section class="fd-section">
@@ -392,15 +560,11 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
       {profile?.admin && (
         <section class="fd-section">
           <h2 class="fd-label">TESTING</h2>
-          <p class="fd-note">For testers (admins). Players never see these: for them practice mode is off, and the eval bar is off for everyone.</p>
-          <Toggle title="Practice mode" checked={practiceOn()} onChange={setPracticeOn}>
-            Unlimited power-ups (the engine's top 3 moves, any time). You're marked 💡 on the leaderboard.
-          </Toggle>
+          <p class="fd-note">For testers (admins). Players never see these: the eval bar is off for everyone.</p>
           {/* (Off for everyone since Nov 1: shown, switched off and not tappable; the stored choice is ignored.) */}
           <Toggle title="Eval bar" checked={false} disabled onChange={() => undefined}>
             Off for now: the engine's winning chances in a bar beside the board, shown on no screen.
           </Toggle>
-          <SoundReport />
           {/* (Auto chess, the demo, shelved: Eric, Oct 19. Testers only; its screen is /autochess.) */}
           {onAutoChess && (
             <button type="button" class="fd-row-link" onClick={onAutoChess}>
