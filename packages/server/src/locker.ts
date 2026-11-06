@@ -2,6 +2,7 @@ import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCo
 import type { Sql, Stmt } from "./accounts.ts";
 import { bossCrateHoldings, tokenHoldings } from "./boss-tokens.ts";
 import { welcomeState, type WelcomeState } from "./welcome.ts";
+import { deleteItems, ledgerAccount } from "./ledger.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -105,7 +106,10 @@ export async function looksOf(sql: Sql, userIds: readonly string[], admins: Read
   return out;
 }
 
-/** Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. */
+/**
+ * Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. (Not in the ledger
+ * yet: part II moves it there with the app's request id. ledger.test.ts lists it.)
+ */
 export async function openCrate(
   sql: Sql,
   userId: string,
@@ -161,25 +165,30 @@ export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemI
 /**
  * Deletes crate items you own, for good (the locker's hold-to-delete, after a confirmation). Taken off first if worn.
  * Ids that aren't yours are ignored, and so are admin copies (never stored, so nothing to delete: one stays worn).
- * `admin`: as lockerState's, for the locker it answers with.
+ * `admin`: as lockerState's, for the locker it answers with. Each deletion is a ledger op (`delete:<item id>`), all in one batch
+ * (ledger.ts, deleteItems), so a second tap deletes nothing more.
  */
-export async function deleteLockerItems(sql: Sql, userId: string, itemIds: unknown, admin = false): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
+export async function deleteLockerItems(
+  sql: Sql,
+  userId: string,
+  itemIds: unknown,
+  admin = false,
+  now = Date.now(),
+): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
   if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.length > 500 || !itemIds.every((id) => typeof id === "string")) {
     return { ok: false, message: "No such items." };
   }
-  for (const id of (itemIds as string[]).filter((id) => !isAdminCopy(id))) {
-    await sql.run("DELETE FROM equipped_items WHERE user_id = ? AND item_id = ?", userId, id);
-    await sql.run("DELETE FROM items WHERE user_id = ? AND id = ?", userId, id);
-  }
+  const ids = (itemIds as string[]).filter((id) => !isAdminCopy(id));
+  const me = ids.length ? await ledgerAccount(sql, userId) : null;
+  if (me) await deleteItems(sql, me, ids, now);
   return { ok: true, locker: await lockerState(sql, userId, admin) };
 }
 
 /**
- * A guest's crate items and choices join the account they sign in to (the account's own choices win): the statements,
- * for the sign-in's one batch.
+ * A guest's choices join the account they sign in to (the account's own choices win): the statements, for the sign-in's one batch.
+ * (Its crate items move with their ledger legs: ledger.ts, mergeMoves.)
  */
 export const lockerMoves = (from: string, to: string): Stmt[] => [
-  { sql: "UPDATE items SET user_id = ? WHERE user_id = ?", params: [to, from] },
   { sql: "INSERT OR IGNORE INTO equipped_items (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped_items WHERE user_id = ?", params: [to, from] },
   { sql: "DELETE FROM equipped_items WHERE user_id = ?", params: [from] },
 ];
