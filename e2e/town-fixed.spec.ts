@@ -245,11 +245,13 @@ for (const backend of ["2d", "webgl"] as const) {
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(0);
     const seen = await headings(page);
     expect(seen.some((h) => Math.abs(h) > 20 && Math.abs(h) < 160), `eased back through the middle: ${[...new Set(seen.map(Math.round))].join(" ")}`).toBe(true);
-    // A tap while turned walks to the square under the finger, from the turned view, then eases back.
-    await drag(page, 0.5);
+    // A tap while turned walks to the square under the finger, from the turned view, then eases back. (Nov 5: a drag let go within 10°
+    // of a quarter snaps there and a tap then locks it in, e2e/town-controls.spec.ts; this one stops at about 72°, short of the snap.)
+    await drag(page, 0.4);
     await page.waitForTimeout(300);
     c = await cam(page);
-    expect(c.look, "a quarter turn to the right").toBeGreaterThan(60);
+    expect(c.look, "most of a quarter turn to the right").toBeGreaterThan(60);
+    expect(c.look, "not snapped to east").toBeLessThan(80);
     const here = await you(page);
     const sq = [here[0], here[1] - 1] as const;
     const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);

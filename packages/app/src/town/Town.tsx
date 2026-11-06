@@ -1490,6 +1490,8 @@ function startTown(
           snapped: look.snapped,
           gesture: press.gesture(),
           run: finger.dir,
+          // (Your pawn as the last frame drew it: the finger's run is steered from its middle.)
+          you: r.drawnBox(0),
           // (The street town: its zoom step's memory in the park: the step you had coming in, null if none.)
           parkBefore: STREET_TOWN ? sz.before : null,
           mag: r.lensMag,
