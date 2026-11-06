@@ -207,3 +207,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   + test waits. Street town: two helpers in parallel: north edge + 3D Colosseum (claude/street-north-edge, 8987) and controls
   (hold to run, 10° snap and lock, reset to north in and out of buildings) + minimap (claude/street-controls-map, 8988). Merge
   north edge first. Asked Eric: default zoom step (4 steps, opens at index 1, the mockup's) vs "the middle of three".
+- Nov 6 ~00:30: CONTAINER RESTART stopped 4 helpers; worktrees survived on disk. Relaunched all 4 to resume from their worktrees
+  (commit WIP first, push often): ginger steps (app fix pushed f0a6fc42), north edge (all WIP was uncommitted), controls + minimap
+  (2 commits pushed), Smudgy (barely started). Folio LIVE (0fd7944d, main green). Squads waiting on Eric's OK.
