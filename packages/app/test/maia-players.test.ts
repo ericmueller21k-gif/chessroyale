@@ -1,7 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossBrainFor, isPlayable, maiaRatingFor, type Settings } from "@chessroyale/core";
 import { isAdmin, maiaAllowed, maiaLikely, soloBrain } from "../src/boss-brain.ts";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 /**
  * Maia for players (BOSS_BRAIN.forPlayers, the one value; DECISIONS.md, "Every boss on Maia", Oct 12): on, a player's

@@ -13,7 +13,7 @@ import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
-import { SoloMatch } from "./solo.ts";
+import { loadOpenings, SoloMatch } from "./solo.ts";
 import { FinalScreen } from "./screens/Final.tsx";
 import { HomeScreen } from "./screens/Home.tsx";
 import { LobbyScreen } from "./screens/Lobby.tsx";
@@ -375,6 +375,11 @@ export function App() {
   useEffect(() => {
     if (config?.accounts && profile) startLive();
   }, [config?.accounts, !!profile]);
+  // The opening library, off the first load: fetched once the page has settled, so a solo match finds it there (solo.ts).
+  useEffect(() => {
+    const id = setTimeout(() => void loadOpenings().catch(() => {}), 2000);
+    return () => clearTimeout(id);
+  }, []);
   // Your account (a guest one the first time).
   useEffect(() => {
     let name: string | undefined;
@@ -935,7 +940,7 @@ export function App() {
     }
     unlockAudio();
     setLoading(true);
-    const engines = await enginePool();
+    const [engines] = await Promise.all([enginePool(), loadOpenings()]);
     setLoading(false);
     const fill = !!opts.fill;
     const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);

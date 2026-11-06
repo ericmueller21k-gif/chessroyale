@@ -1,10 +1,13 @@
 import { readdirSync, statSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_BRAIN, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
 import { HumanUciEngine, type UciTransport } from "@chessroyale/chess";
 import { MaiaGate, retryable } from "../src/maia-gate.ts";
 import { downloadProgress, fileTotal } from "../src/maia.ts";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 /**
  * Maia's loading step before a solo boss battle (DECISIONS.md, "Maia's loading step", Oct 14): Stockfish paused first,

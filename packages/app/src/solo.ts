@@ -1,6 +1,5 @@
 import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import openingsData from "@chessroyale/chess/data/openings.json";
 import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushSquares, rushTimeline } from "@chessroyale/chess";
 import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
@@ -29,7 +28,28 @@ export const HUMAN = "you";
 const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_KILL_MS = 3800;
-const library = openingsData as unknown as Opening[];
+/**
+ * The opening library (packages/chess/data/openings.json: 350 kB of the first load's main chunk until Nov 6): its own chunk now,
+ * loaded on first use. Home asks for it once the page is idle (App.tsx), and a solo match waits for it before it starts
+ * (`startSolo`), so nothing on screen changes; a test awaits it before `start()`.
+ */
+let library: readonly Opening[] | null = null;
+let libraryLoad: Promise<readonly Opening[]> | null = null;
+export function loadOpenings(): Promise<readonly Opening[]> {
+  libraryLoad ??= import("@chessroyale/chess/data/openings.json").then(
+    (m) => (library = m.default as unknown as Opening[]),
+    (e) => {
+      // (A failed fetch is tried again next time.)
+      libraryLoad = null;
+      throw e;
+    },
+  );
+  return libraryLoad;
+}
+function openings(): readonly Opening[] {
+  if (!library) throw new Error("The opening library isn't loaded yet: await loadOpenings() first");
+  return library;
+}
 
 export function boardView(b: BoardState): BoardView {
   return netBoard(b, true);
@@ -381,7 +401,7 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       // Re-checks go to the engine server first (see withServerRecheck).
       engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
-      library,
+      library: openings(),
       raidSide: this.raidSide,
       // (The hippo gardener's seeds: this device's time while the page is in view.)
       clock: gardenClock,
