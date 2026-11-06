@@ -10,7 +10,7 @@
 import { newPt, type Pt } from "../camera.ts";
 import { CHUTE, PILE, pickCrate, type ClawPose } from "../../claw/view.ts";
 import { drawModel, type Place } from "../kit/draw.ts";
-import type { V3 } from "../kit/prims.ts";
+import type { Shape, V3 } from "../kit/prims.ts";
 import { CLAW_CABINET, CLAW_W, CLAW_Y, inX, inZ } from "../kit/models/claw-cabinet.ts";
 
 /** The cabinet's box in the room (its squares' edges, a little inside them) and its heights. */
@@ -42,6 +42,36 @@ export const newHits = (): CabinetHits => ({ slot: { x0: 0, y0: 0, x1: 0, y1: 0,
 
 const SQ = 37;
 const Q = [newPt(), newPt()];
+/** A shape that only moves with the view (no part, or a crate on the pile, the won crate in the tray: their changes are in the key). */
+const still = (s: Shape) => !s.part || s.part.startsWith("pile") || s.part === "tray";
+/** The cached pictures of the still parts, the view they were made for, and the view last frame. */
+const cache = { back: null as HTMLCanvasElement | null, front: null as HTMLCanvasElement | null, key: "" };
+let last = "";
+const K = newPt();
+/** The view: where three of the model's corners land on screen, the pile, the tray, the canvas's size. */
+function viewKey(p3: (x: number, y: number, l: number, out: Pt) => boolean, at: Place, took: number, tray: boolean, cv: HTMLCanvasElement): string {
+  let k = `${took}|${tray}|${cv.width}x${cv.height}`;
+  for (const [x, y, l] of [[0, 0, 0], [1, 0, 0], [0, 1, 1]]) k += p3(at.x + x!, at.y + y!, l!, K) ? `|${K.x.toFixed(2)},${K.y.toFixed(2)}` : "|-";
+  return k;
+}
+/** Draws into a canvas the size of `like` (made or resized and cleared first). */
+function paint(which: "back" | "front", like: HTMLCanvasElement, draw: (g: CanvasRenderingContext2D) => void): void {
+  const c = (cache[which] ??= document.createElement("canvas"));
+  if (c.width !== like.width || c.height !== like.height) ((c.width = like.width), (c.height = like.height));
+  const g = c.getContext("2d")!;
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.clearRect(0, 0, c.width, c.height);
+  draw(g);
+}
+/** A cached picture over the room's canvas, pixel for pixel. */
+function blit(g: CanvasRenderingContext2D, cv: HTMLCanvasElement | null): void {
+  if (!cv) return;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.globalAlpha = 1;
+  g.drawImage(cv, 0, 0);
+  g.restore();
+}
 /** The parts' offsets this frame (texels), reused. */
 const move: Record<string, V3> = {};
 const shown = new Set<string>();
@@ -80,7 +110,25 @@ export function drawCabinet(g: CanvasRenderingContext2D, p3: P3, _camX: number, 
   if (arrow) set("arrow", [0, 0, Math.round(1.1 * Math.sin(now / 180))]);
   // The sign's bulbs, one in three lit, stepping every 260 ms (as the walls' do).
   set(`chase${(3 - (Math.floor(now / 260) % 3)) % 3}`, [0, 0, 0]);
-  drawModel(g, CLAW_CABINET, at, (wx, wy, l, out) => p3(wx, -wy, l, out), { dpr, move, hide: (p) => !shown.has(p) });
+  const kp3 = (wx: number, wy: number, l: number, out: Pt) => p3(wx, -wy, l, out);
+  const hide = (p: string) => !shown.has(p);
+  // Still for a second frame running (the close-up while you play): what doesn't move is drawn from two pictures made once, the inside
+  // (layers to 2) and the glass and front (layers 3 and 4), the moving parts live between them. Otherwise the whole model, live.
+  const key = viewKey(kp3, at, took, pose.inTray, g.canvas);
+  const steady = key === last;
+  last = key;
+  if (!steady) drawModel(g, CLAW_CABINET, at, kp3, { dpr, move, hide });
+  else {
+    if (cache.key !== key) {
+      cache.key = key;
+      paint("back", g.canvas, (c) => drawModel(c, CLAW_CABINET, at, kp3, { dpr, move, hide, pick: (s, l) => l < 3 && still(s) }));
+      paint("front", g.canvas, (c) => drawModel(c, CLAW_CABINET, at, kp3, { dpr, move, hide, pick: (s, l) => l >= 3 && l < 5 && still(s) }));
+    }
+    blit(g, cache.back);
+    drawModel(g, CLAW_CABINET, at, kp3, { dpr, move, hide, pick: (s, l) => l < 3 && !still(s) });
+    blit(g, cache.front);
+    drawModel(g, CLAW_CABINET, at, kp3, { dpr, move, hide, pick: (s, l) => l >= 5 || (l >= 3 && !still(s)) });
+  }
   // The coin slot's box on screen (the tap target).
   const sl = slotOf(c);
   hits.slot.on = false;

@@ -55,15 +55,15 @@ export const CLAW_CABINET: Model = {
     c: ramp("d", "c", "C"), // the felt
     r: ramp("R", "r", "e"), // a crate, the joystick's ball
     q: ramp("q", "R", "r"), // a crate's lid
-    l: ramp("l", "l", "l"), // glass: see-through
-    L: ramp("L", "L", "L"), // its glare
+    l: ramp("+", "+", "+"), // glass: Boingo's faint see-through wash
+    L: ramp("-", "-", "-"), // its glare, a little stronger
   },
   textures: {
     baseFront: gridOf(66, 39, "h", [[0, 0, 66, 2, "y"], [0, 35, 66, 4, "y"], [2, 15, 18, 2, "y"], [2, 17, 18, 15, "v"], [32, 10, 6, 9, "y"], [34, 12, 2, 5, "k"]]),
     baseSide: gridOf(66, 39, "h", [[0, 0, 66, 2, "y"], [0, 35, 66, 4, "y"]]),
     felt: ["cccccc", "ccCccc", "cccccc", "cccccc", "cccccC", "cccccc"].map((r) => r.replace(/C/g, "p")),
     back: ["ppvvvvvv", "vppvvvvv", "vvppvvvv", "vvvppvvv", "vvvvppvv", "vvvvvppv", "vvvvvvpp", "pvvvvvvp"],
-    glass: gridOf(66, 48, "l", [[44, 4, 2, 8, "L"], [46, 12, 2, 8, "L"], [48, 20, 2, 8, "L"], [50, 28, 2, 8, "L"], [52, 36, 2, 6, "L"]]),
+    glass: gridOf(66, 48, "l", Array.from({ length: 10 }, (_, i) => [44 + i, 4 + 4 * i, 1, 4, "L"] as const)),
     glassPlain: ["l"],
     sign: gridOf(68, 17, "h", [[0, 0, 68, 2, "y"], [0, 15, 68, 2, "y"], ...Array.from({ length: 9 }, (_, i) => [4 + 7 * i, 7, 3, 3, "y"] as const)]),
     pink: ["h"],
@@ -94,7 +94,7 @@ export const CLAW_CABINET: Model = {
     { prim: "wedge", at: [4, -6, 33], size: [58, 6, 6], lo: 0.5, faces: { front: "gold", side: "purple", top: "dark" }, layer: 4 },
     box([24, -4, 37], [2, 2, 7], all("steel"), { layer: 5 }),
     { prim: "dome", at: [22, -6, 43], size: [6, 6, 4], n: 6, m: 2, faces: all("red"), layer: 5 },
-    { prim: "cyl", at: [31, -5, 38], size: [7, 4, 2], n: 6, faces: all("gold"), layer: 5 },
+    { prim: "cyl", at: [42, -5, 38], size: [7, 4, 2], n: 6, faces: all("gold"), layer: 5 },
     // Inside: the chute (a clear box, its gold-rimmed opening), the pile.
     box([cx - 9, cz - 9, 39], [19, 19, 15], { front: "glassPlain", top: "chuteTop" }, { glass: true, layer: 1, far: 0.5 }),
     ...PILE.map(([x, z, l], i) => crate([Math.round(inX(x) - 5.5), Math.round(inZ(z) - 5.5), 39 + 11 * l], `pile${i}`)),
