@@ -39,6 +39,9 @@ realize, organize, meter, canceled, traveled. Don't rename existing code identif
 - **Prefer number checks to pixel checks** in new e2e tests: read positions and state through the test hooks (`__townCam` and similar) instead of sampling the canvas. Use pixels only when the pixels are the point, such as a sky gap.
 
 ## Local servers (Nov 6: a standalone `wrangler dev` respawns after `fuser -k` and has blocked ports for hours)
-- Never start `wrangler dev` by hand or in the background. Let Playwright start it (its `webServer`, in an untracked copy of playwright.config.ts with your own port), so it stops when the run ends.
+- Never start `wrangler dev` by hand or in the background. Let Playwright start it (its `webServer`), so it stops when the run ends.
+- Set your own port with `E2E_PORT=<port>` (default 8788, often taken) and stop copying playwright.config.ts (from PR #527 on). Each run starts
+  from a fresh state folder (`E2E_KEEP_STATE=1` keeps `.wrangler/state`); a server already on the port is used only with `E2E_REUSE=1`.
+  The scripts in `scripts/` default to `E2E_PORT` too.
 - For stills or measurements that need a live server, run them as a Playwright spec or script under that same webServer.
 - If a port still won't free after one `fuser -k`, stop and tell the director the port. Don't retry in a loop or hold /tmp/claude-0/e2e.lock while waiting.
