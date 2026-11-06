@@ -103,3 +103,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 
 - **Lean docs and stills (Eric, Nov 6; the audit §4):** stills out of the repo, sent to Eric directly; PR bodies of at most 40 lines; decision notes of at most 10 lines; area pages grow by at most 5 lines a PR. In rules-common.md.
 - **Overnight order (Nov 6):** ledger I (xhigh) → ledger II → street town WebGL-only → the 3D kit → the claw on the kit → intros as data. The audit is at notes/audit-2026-11-06.md.
+
+- **Taps are logical (Eric, Nov 6):** anything a player would naturally tap goes to its relevant page or pop-up. On the home card, the pawn opens the inventory, and the icon (and level) opens the icon picker. Eric will name more cases as they come up; don't over-engineer.
+- **No browser zoom (Eric, Nov 6):** no pinch or double-tap zoom on phones or computers. The viewport meta has user-scalable=no, plus touch-action: manipulation and iOS gesture blocking.
