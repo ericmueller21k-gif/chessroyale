@@ -13630,7 +13630,8 @@ img.qicon {
    `--bc-shift`) moves its drawing inside the box. The name column is one width, so the room beside it is the same for every boss. */
 @media (max-width: 899px), (max-height: 599px) {
   .boss-bar.has-char {
-    --bar-h: 99px;
+    /* (116 px, Nov 6: a fixed height that fits his words' three rows under the name's meters, so the board never jumps.) */
+    --bar-h: 116px;
     min-height: var(--bar-h);
     padding-left: 5px;
     gap: 12px;
@@ -13638,7 +13639,8 @@ img.qicon {
   /* (58 px wide, from 5 px in: the feet at its middle, 34 px from the bar's left edge, 48 px from the screen's; the name column 12 px past the box, 89 px from the screen's.) */
   .boss-char.place-bar {
     width: 58px;
-    height: calc(var(--bar-h) - 11px);
+    /* (The figure keeps its 88 px box, as it was at the 99 px bar: the figure's size doesn't change.) */
+    height: 88px;
     align-self: flex-end;
     margin: 0;
     z-index: 3;

@@ -8,7 +8,7 @@ import { bossAloneFromHome, test } from "./helpers.ts";
 /**
  * The phone boss bar is the same for every playable boss (docs/decisions/2026-10-24-boss-bar-same.md; Eric, Oct 24: "there should be
  * some continuity as far as the size and where their name sits… these box sizes should not change… these are the kind of checks
- * that should be… built"). One bar (99 px), one figure box (58 px wide, the bar's content tall), its feet on the same baseline for
+ * that should be… built"). One bar (116 px, styles.css --bar-h), one figure box (58 px wide, the bar's content tall), its feet on the same baseline for
  * every boss; the name, level, bars, status and free room in the same place for every boss. A boss is drawn at its own size
  * (4/3 or less for the big animals' steps, never below full size), and its drawing, at rest, stays 2 px inside the screen's left
  * edge, 2 px clear of the name column, and under the "BOSS · move N" text; it may hang out of the bar's top and left edge. Every
@@ -22,8 +22,8 @@ const SIZES: [number, number][] = [[320, 568], [390, 844], [428, 777]];
 const BASE = "/?debug&pace=quick&clock=60&laststand=0&brain=stockfish";
 /** A pixel of slack for rounding (the box's edges are fractional at some widths). */
 const TOL = 1;
-/** The bar's height, the figure box's width and height (styles.css: the bar 99 px, the box 58 px wide, the bar's content tall). */
-const BAR_H = 99;
+/** The bar's height, the figure box's width and height (styles.css: the bar 116 px, the box 58 px wide, 88 px tall). */
+const BAR_H = 116;
 const BOX_W = 58;
 const BOX_H = 88;
 /** The bar's bottom padding, under the feet: the figure's feet sit this far above the bar's bottom edge (styles.css). */
