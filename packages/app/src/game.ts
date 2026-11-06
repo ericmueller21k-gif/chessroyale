@@ -166,6 +166,17 @@ export interface DarkNote {
 /** Hollow's Lights out as the screens see it (`at` in local time; every beat follows from it: lightsOutTimeline). */
 export type LightsView = NetLightsOut;
 
+/**
+ * Dash's Scramble Rush as the screens see it: its key, when it began (local time; every beat follows from it: rushTimeline), and
+ * your placements so far (each swept piece's square before the sweep → the square you put it on). The swept pieces and, once
+ * it's over, the verdict are the boss view's (`powers.dash.rush`).
+ */
+export interface RushView {
+  key: string;
+  at: number;
+  places: Record<string, string>;
+}
+
 /** The reveal: your group's picks and scores (same shape the server sends). */
 export type GroupReveal = Pick<BoardRound, "fenBefore" | "bestMove" | "playerIds" | "king" | "kingCalls" | "lastStand"> & {
   result: Pick<BoardRound["result"], "players" | "playedMove" | "drawRule" | "brilliant">;
@@ -213,7 +224,7 @@ export type Phase =
    * the loading step before the intro, while the boss's Maia brain loads (maia-gate.ts): the intro's first frame, held;
    * `afterLoading`: the intro that follows it.
    */
-  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; fall?: boolean }
+  | { kind: "boss"; boss: BossView; until: number; thinking?: boolean; intro?: boolean; loading?: boolean; afterLoading?: boolean; lights?: LightsView; rush?: RushView; fall?: boolean }
   /**
    * The Hidden Boss's phase change (`at`: when it began; PHASE_CHANGE in recluse-phase2.ts): the book's slam, the board
    * split into four, his revive, the Chess960 shuffle. Then `simul`: his phase 2, four boards at once (GameView.simul).
@@ -388,6 +399,8 @@ export interface GameView {
   readonly darkNote: DarkNote | null;
   /** Hollow's Lights out: you tap a square (in the round that's on). */
   lightsTap(square: string): void;
+  /** Dash's Scramble Rush: you put the swept piece that stood on `from` (before his sweep) on `to`, while its countdown is on. */
+  rushPlace(from: string, to: string): void;
   /** Quick chat (online matches only; see `enabled`). */
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */
