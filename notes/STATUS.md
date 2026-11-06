@@ -294,3 +294,4 @@ Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
   2. the 3D kit;
   3. the claw on the kit;
   4. intros as data.
+- **PARKED (waiting on Eric's UI):** the settings split into Sounds and Gameplay, plus move confirm styles (classic, soft press, vote trace). See notes/briefs/idea-settings-and-move-confirm.md. GIFs to Eric before anything goes live.
