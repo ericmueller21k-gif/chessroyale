@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
 import { devices, expect, type Page } from "@playwright/test";
-import { asAdmin, test, lookDrag } from "./helpers.ts";
+import { asAdmin, test, lookDrag, quickTap } from "./helpers.ts";
 
 /**
  * The street town's controls and minimap (Nov 5; brief-street-controls-map.md, docs/decisions/2026-11-05-street-controls-map.md):
@@ -30,7 +30,7 @@ const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 const you = async (p: Page) => (await canvas(p).getAttribute("data-you"))!.split(",").map(Number) as [number, number];
 type DBox = { x0: number; y0: number; x1: number; y1: number; fx: number; fy: number };
-type Cam = { heading: number; headingBase: number; look: number; base: number; snapped: number | null; gesture: string; run: string | null; strip: string | null; you: DBox | null };
+type Cam = { zoom: number; heading: number; headingBase: number; look: number; base: number; snapped: number | null; gesture: string; run: string | null; strip: string | null; you: DBox | null };
 type Me = { c: number; r: number; moving: boolean };
 type W = {
   __townWalk: (s: readonly [number, number]) => boolean;
@@ -65,7 +65,9 @@ const ranOn = (page: Page, from: readonly number[], axis: 0 | 1, n: number, time
     },
     [from, axis, n] as const,
     { polling: "raf", timeout },
-  );
+  ).catch(async (e) => {
+    throw new Error(`no run ${n} from ${from} (at ${(await you(page)).join(",")}): ${String(e).split("\n")[0]}`);
+  });
 /** The way from a to b on the world's squares (east, north), the short way round east-west. */
 const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 69) % 46) - 23), Math.sign(b[1]! - a[1]!)];
 
@@ -97,11 +99,11 @@ async function pawn(page: Page) {
 }
 const OFF: Record<string, readonly [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 /**
- * Where to hold for a run `dir`: `px` from your pawn's middle that way. (Well past a square: running, the camera's follow lets your pawn
- * lead its rest spot on screen by up to about a square, and a bot in the way can stop it while the finger's held.)
+ * Where to hold for a run `dir`: `px` that way from your pawn's middle where it stands still (`origin`, else where it's drawn now). The
+ * run is steered from there (your pawn's rest spot on screen; running, the camera's follow lets it lead by up to about a square).
  */
-async function holdPoint(page: Page, dir: string, px = 170) {
-  const c = await pawn(page);
+async function holdPoint(page: Page, dir: string, px = 110, origin?: { x: number; y: number }) {
+  const c = origin ?? (await pawn(page));
   return { x: c.x + OFF[dir]![0] * px, y: c.y + OFF[dir]![1] * px };
 }
 /** Records the camera's heading and look every frame from now (read with `headings`). */
@@ -133,7 +135,7 @@ async function tapSquare(page: Page, sq: readonly [number, number]) {
   const xy = await page.evaluate((s) => (window as unknown as W).__townAt("tap-square", s), sq);
   expect(xy, `${sq} drawn`).not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
-  await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
+  await quickTap(page, cv.x + xy!.x, cv.y + xy!.y);
 }
 async function arrowStep(page: Page, key: string) {
   const from = await you(page);
@@ -160,21 +162,23 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`hold to run (${backend}): a press held still runs you each way the finger is from your pawn, at once; letting go stops you; the camera never turns`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    // (West of the park, which starts at column 13: its step out would move your pawn on screen mid-run.)
-    await walkTo(page, [5, 20]);
+    // (On Fountain Street east of the park (it ends at column 32), with room either way: the park's step out would move your pawn on
+    // screen mid-run.)
+    await walkTo(page, [38, 20]);
     const f = await finger(page);
     await watchHeadings(page);
-    // Right, up, left, down: in that order you stay on Fountain Street (rows 19 to 22), west of the park.
+    // Right, up, left, down: in that order you stay on Fountain Street (rows 19 to 22), clear of the park.
     for (const [dir, w] of [["right", [1, 0]], ["up", [0, 1]], ["left", [-1, 0]], ["down", [0, -1]]] as const) {
       const from = await you(page);
       const at = await holdPoint(page, dir);
       const t0 = Date.now();
       await f.down(at.x, at.y);
       await expect.poll(async () => (await cam(page)).run, { message: `${dir}: a run`, timeout: 3000 }).toBe(dir);
-      // Running: two squares that way (and the start no later than a step after the hold time).
+      // Running that way (setting off no later than a step after the hold time).
       await ranOn(page, from, w[0] ? 0 : 1, 1);
       expect(Date.now() - t0, `${dir}: set off at once`).toBeLessThan(2500);
-      await ranOn(page, from, w[0] ? 0 : 1, 2);
+      // (Two squares along the street, one across it: you stay on the street's rows, off the sidewalks' lamps.)
+      await ranOn(page, from, w[0] ? 0 : 1, w[0] ? 2 : 1);
       await f.up();
       const at0 = await you(page);
       await settle(page);
@@ -191,16 +195,19 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`a run steers (${backend}): sliding the finger mid-run changes the way, and the camera doesn't turn`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    await walkTo(page, [3, 20]);
+    // (Fountain Street east of the park, from where it runs on round the world's east-west wrap to the park's west side: room to run
+    // right while the test reads and slides, however slow the machine.)
+    await walkTo(page, [36, 20]);
     const f = await finger(page);
     await watchHeadings(page);
     const start = await you(page);
-    const at = await holdPoint(page, "right");
+    const rest = await pawn(page);
+    const at = await holdPoint(page, "right", 110, rest);
     await f.down(at.x, at.y);
     await ranOn(page, start, 0, 1);
     // The finger slides round to above your pawn, in steps (a swipe that would turn the camera, were it not a run).
-    const to = await holdPoint(page, "up");
-    for (let i = 1; i <= 10; i++) await f.move(at.x + ((to.x - at.x) * i) / 10, at.y + ((to.y - at.y) * i) / 10);
+    const to = await holdPoint(page, "up", 110, rest);
+    for (let i = 1; i <= 4; i++) await f.move(at.x + ((to.x - at.x) * i) / 4, at.y + ((to.y - at.y) * i) / 4);
     await expect.poll(async () => (await cam(page)).run, { timeout: 3000 }).toBe("up");
     await ranOn(page, start, 1, 1);
     await f.up();
@@ -222,10 +229,10 @@ for (const backend of ["2d", "webgl"] as const) {
     // A tap (a walk): east becomes the base heading; the camera stays there through the walk.
     await watchHeadings(page);
     const here = await you(page);
-    await tapSquare(page, [here[0] + 1, here[1]]);
+    await tapSquare(page, [here[0] + 2, here[1]]);
     await expect.poll(async () => (await cam(page)).base, { timeout: 3000 }).toBe(90);
     await settle(page);
-    expect(await you(page), "walked to the square tapped").toEqual([here[0] + 1, here[1]]);
+    expect(await you(page), "walked to the square tapped").toEqual([here[0] + 2, here[1]]);
     expect([...new Set((await headings(page)).map(([h]) => Math.round(h)))], "the camera stayed east").toEqual([90]);
     c = await cam(page);
     expect([c.heading, c.headingBase, c.look, c.snapped]).toEqual([90, 90, 0, null]);
@@ -250,8 +257,10 @@ for (const backend of ["2d", "webgl"] as const) {
     expect(c.snapped, "not snapped").toBeNull();
     expect(Math.abs(c.heading - 36), "left where it was let go").toBeLessThan(6);
     const here2 = await you(page);
-    await tapSquare(page, [here2[0] + 1, here2[1]]);
+    await tapSquare(page, [here2[0] + 2, here2[1]]);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(90);
+    await settle(page);
+    expect(await you(page), "walked to the square tapped").toEqual([here2[0] + 2, here2[1]]);
     expect((await cam(page)).base, "no lock").toBe(90);
     // Puddles' Botanical Garden: its door's square is on its strip (the camera faces its front, north; the base stays east). A run
     // toward it opens its card, as the arrows do; in and out, the view is north again.
@@ -405,6 +414,11 @@ test("stills and GIFs: the controls and the minimap", async ({ page }) => {
   await page.waitForTimeout(600);
   await page.screenshot({ path: `${STILLS}/2-minimap-large-${project}.png` });
   await page.locator(".tm-big").click();
+  // The park from the opening step (the third, Nov 5): its step out is the overview; you and every figure on screen.
+  await walkTo(page, [16, 20]);
+  await expect.poll(async () => (await cam(page)).zoom, { timeout: 5000 }).toBe(3);
+  await page.waitForTimeout(1200);
+  await page.screenshot({ path: `${STILLS}/5-park-step-out-${project}.png` });
   if (project !== "phone") return;
   /** Frames every ~100 ms while `act` runs, made into a GIF. */
   const gif = async (name: string, act: () => Promise<void>) => {
@@ -426,20 +440,21 @@ test("stills and GIFs: the controls and the minimap", async ({ page }) => {
     rmSync(dir, { recursive: true, force: true });
   };
   const f = await finger(page);
-  await walkTo(page, [6, 20]);
+  await walkTo(page, [36, 20]);
   await page.waitForTimeout(800);
   await gif("3-hold-to-run-turn-phone", async () => {
     await page.waitForTimeout(400);
-    const at = await holdPoint(page, "right");
+    const rest = await pawn(page);
+    const at = await holdPoint(page, "right", 110, rest);
     await f.down(at.x, at.y);
     await page.waitForTimeout(1600);
-    const to = await holdPoint(page, "up");
+    const to = await holdPoint(page, "up", 110, rest);
     for (let i = 1; i <= 6; i++) await f.move(at.x + ((to.x - at.x) * i) / 6, at.y + ((to.y - at.y) * i) / 6);
     await page.waitForTimeout(900);
     await f.up();
     await page.waitForTimeout(800);
   });
-  await walkTo(page, [8, 20]);
+  await walkTo(page, [38, 20]);
   await page.waitForTimeout(800);
   await gif("4-look-snap-lock-phone", async () => {
     await page.waitForTimeout(400);

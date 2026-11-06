@@ -468,3 +468,16 @@ export async function lookDrag(page: Page, box: { x: number; y: number; width: n
   await ev("mouseReleased", at(steps), 0);
   await cdp.detach();
 }
+
+/**
+ * A quick tap by the mouse's left button at (x, y) in the street town: the press and the release go to the browser together, so no frame
+ * comes between them (on a slow software-WebGL runner one frame can outlast the hold time, `streetHoldMs`, and the press would be a run).
+ */
+export async function quickTap(page: Page, x: number, y: number) {
+  const cdp = await page.context().newCDPSession(page);
+  const ev = (type: "mousePressed" | "mouseMoved" | "mouseReleased", buttons: number) =>
+    cdp.send("Input.dispatchMouseEvent", { type, x: Math.round(x), y: Math.round(y), button: type === "mouseMoved" ? "none" : "left", buttons, clickCount: type === "mouseMoved" ? 0 : 1, pointerType: "mouse" });
+  await ev("mouseMoved", 0);
+  await Promise.all([ev("mousePressed", 1), ev("mouseReleased", 0)]);
+  await cdp.detach();
+}
