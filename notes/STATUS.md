@@ -316,3 +316,17 @@ Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
   4. the flake fixes by pattern (colosseum, town-rows, home-polish clock races, sound/autochess timing, intro 50 ms polls);
   5. check split in two (chess package tests on their own: about 5 min);
   6. lazy-load boss art and openings.json (35–40% off first load).
+
+## Nov 6 ~20:10 UTC: Eric: "finish the audit fixes and parked settings, and sprite kit if you have everything needed from me … I want everything to be done." Quiet mode: one message when the whole queue is live.
+One Opus at a time, in order:
+1. Pipeline quick wins (#527, running).
+2. Pipeline proposals as PRs:
+   - (1) timings auto-refresh;
+   - (2) areas.json re-scope;
+   - (4) the flake fixes by pattern;
+   - (5) check split;
+   - (6) lazy-load boss art and openings;
+   - (3) @phone-only: I sign off the list myself.
+3. Sprite kit: the infrastructure, plus one pilot boss. The pilot's look needs Eric's OK before its merge (I promised that); the infrastructure merges on green.
+4. Intros as data (architecture audit row 8).
+BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the claw machine on the kit (stills sent, no answer), and the move-confirm GIFs (part of the settings work).
