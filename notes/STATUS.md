@@ -244,3 +244,8 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 6 ~04:50: Eric saw the Meadow Street still: Moo's and Hollow's homes nearly touching with a sliver building and sky between.
   New rule (RULES.md). #511 HELD: north edge helper re-spaces Meadow Street, checks every street, adds a unit test, re-runs, pushes.
   #510 merged c570f6dc; Welcome Crates live. Haiku helper: Welcome Crate meters (claude/welcome-meters).
+- Nov 6 ~05:20: main e2e on 7ec28d4b red: webgl-phone town-tags.spec:157 "tags fade … (not a pop)" both tries: no in-between
+  alpha frames. Cause (from code): nameAlpha fades by distance over 1 square (4.5→5.5); on the slow software-WebGL CI runner a
+  walk crosses that square between two frames, so the tag pops. A real slow phone would see the same pop. Fix queued for the next
+  Opus slot (after north edge; render.ts conflict): ease each tag's drawn alpha toward its target over ~150 ms (time-based), so a fade
+  shows at any frame rate. Passed on #509's own PR run and main's previous run. Watching c570f6dc's run.
