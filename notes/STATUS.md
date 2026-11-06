@@ -233,3 +233,7 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
 - Nov 6 ~03:05: usage reset; ONE OPUS AT A TIME now. Eric: the claw machine must be the real 3D cabinet in Boingo's room (walk up,
   zoom, the in-room claw grabs and usually drops), not a 2D overlay. Resumed Boingo room helper: merge claude/claw-machine (keep the
   server as reviewed), retire the 2D screen, in-room 3D cabinet + claw play, then finish its list. Eric loves the confetti floor.
+- Nov 6 ~03:55: Eric: "just start the Colosseum and finish it … I want to see it live … with the movement changes as well."
+  Boingo PAUSED (claw in-room WIP). North edge RESUMED (merge main, fix the South Street row hole ≤30 min, fps, stills, e2e) →
+  PR full-e2e → merge → then controls + minimap (merge main, rerun e2e) → PR → merge. Then Boingo resumes. #510 e2e fixes in CI;
+  #509 Welcome Crates CI after the crate-row test fix.
