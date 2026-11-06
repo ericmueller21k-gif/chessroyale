@@ -559,6 +559,12 @@ export const TOWN_FEEL = {
    */
   nameRadius: 5,
   nameFadeSquares: 1,
+  /**
+   * A tag's drawn alpha eases toward that target over about this long (ms) rather than following it frame by frame (Nov 6: a slow frame
+   * walks you a square at once, and the fade popped), but never more than `nameEaseStep` of the way from 0 to 1 in one frame.
+   */
+  nameEaseMs: 150,
+  nameEaseStep: 0.5,
 
   // ---- The homes' names (two styles, for Eric to compare: either can be turned off here).
   /** Each home's name floats over it, white with a dark outline, as you come near. */

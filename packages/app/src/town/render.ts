@@ -52,7 +52,7 @@ import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type B
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, restShade, shadedImg, type Piece, type RoofArt } from "./box-draw.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
-import { TAG_STYLE, TagCache, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
+import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
 export const BOSS_ART: Record<HomeId, Character> = {
@@ -1261,6 +1261,19 @@ export class Renderer {
     return out;
   }
 
+  /** Each figure's tag as last drawn: its alpha and that frame's time (made once a figure). */
+  private readonly tagEase = new WeakMap<object, { a: number; at: number }>();
+  private tagPrev = NaN;
+  private tagNow = NaN;
+  /** A figure's tag alpha eased toward `to` (tags.ts easeTag) from where the last frame drew it; `to` if the last frame didn't. */
+  private easedTag(key: object, to: number, now: number): number {
+    let e = this.tagEase.get(key);
+    if (!e) this.tagEase.set(key, (e = { a: to, at: now }));
+    e.a = e.at === this.tagPrev ? easeTag(e.a, to, now - e.at) : to;
+    e.at = now;
+    return e.a;
+  }
+
   /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
   private tag(text: string, x: number, y: number, kind: TagKind, size: number, alpha: number): void {
     let t = this.tags[this.nTags];
@@ -1430,6 +1443,8 @@ export class Renderer {
     // One item per person in the square (the list can change: people come and go).
     const people = town.people;
     this.tagNames = namesMode();
+    this.tagPrev = this.tagNow;
+    this.tagNow = now;
     this.youTable = seated(town.you);
     let np = 0;
     for (const it of this.items) if (it.kind === "person") np++;
@@ -1593,7 +1608,8 @@ export class Renderer {
           if (it.on && far < f.tagFar && this.fade > 0.02) {
             const always = person === town.hold || person === town.meet?.bot || person === town.leave?.bot || (!!table && table === this.youTable);
             const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
-            const a = tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1));
+            // (Eased toward it over about 150 ms, so a slow frame doesn't pop it: tags.ts easeTag.)
+            const a = this.easedTag(person, tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1)), now);
             if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade);
           }
         }
