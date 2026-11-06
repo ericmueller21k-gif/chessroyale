@@ -324,7 +324,8 @@ function playCv(f: number): Cv {
   // posts
   for (const x of [8, 70, 132]) rect(c, x, 40, 5, PS_H - 42, "i");
   // nets between levels (a diamond mesh)
-  for (let li = 0; li < 3; li++) {
+  // (The top level is under the roof: nets between the ground, the first and the second.)
+  for (let li = 0; li < 2; li++) {
     const y1 = levels[li]!;
     const y0 = y1 - 56;
     for (let y = y0; y < y1; y++) for (let x = 13; x < 70; x++) if ((x + y) % 7 === 0 || (x - y + 700) % 7 === 0) put(c, x, y, "N");
@@ -476,8 +477,10 @@ function raceCv(f: number): Cv {
     rect(c, SQ_W - 12, y - 6, 2, 7, "w");
     knight(c, Math.round(10 + run[i]! * (SQ_W - 28)), y, RACE_COLORS[i]![0]);
   }
-  // the counter and the targets
+  // the counter and the targets, the cabinet's front down to the floor behind the players
   rect(c, 0, 64, SQ_W, 8, "p");
+  rect(c, 0, 72, SQ_W, SQ_H - 74, "P");
+  for (let x = 6; x < SQ_W; x += 12) ellipse(c, x, 78, 1.5, 1.5, "A");
   for (let i = 0; i < RACE.players; i++) {
     const x = Math.round(T * 0.6 + i * T * 1.1);
     ellipse(c, x + 6, 60, 4, 4, "w");
