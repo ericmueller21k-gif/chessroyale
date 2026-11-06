@@ -651,8 +651,10 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   drag from down to up, it should be the same as the town movement"; the room's rows run toward the camera where the town's run away, so
   its camY goes the other way); the focus button brings it back.
 - **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
-  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
-  none either). Inside is just you: the town's bots and other players don't come in.
+  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. A tap is the town's press
+  (`town/press.ts`; Nov 5, `shops/tap.ts`): what's under the finger is picked at the press and again at the release, and it walks you
+  only if both are the same (the camera trails your walk, so a release alone could pick the square beside the one you pressed;
+  [2026-11-05-ginger-steps.md](../decisions/2026-11-05-ginger-steps.md)). There's no joystick (the town has none either). Inside is just you: the town's bots and other players don't come in.
 - **On a ride** (Eric, Nov 2: "your rider goes in with you"; `SHOP_FEEL.rideInside`, true): your ride comes in under you, the town's own
   rider (its frames as `town/rides.ts` composed them, the ride at its scale, 0.75 of the pawn), at the room's camera; its idle standing,
   its move a cycle a step, its side, back (up the room) or front (down it) the way you go, at its pace (`RIDES.speed`). You come out still
