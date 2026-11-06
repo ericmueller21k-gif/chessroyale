@@ -1,13 +1,14 @@
 # The Playwright e2e suite (both projects, phone and desktop). Docs: docs/areas/ops.md, "CI e2e"; CLAUDE.md, "Test lanes".
 #
 # - A pull request runs a fast check: the specs of the areas it changes plus a small smoke set, on as few shards as they
-#   need (about 4 to 8 minutes in all). The `plan` job picks them (e2e/ci-select.mjs, from e2e/areas.json: path
+#   need (about 15 to 20 minutes for a targeted PR, Nov 6). The `plan` job picks them (e2e/ci-select.mjs, from e2e/areas.json: path
 #   globs to spec files) and says why on the run's page. A shared foundation (package.json, the lockfile, the
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
 #   does the `full-e2e` label (adding it starts a new run). settings.ts, e2e/helpers.ts and a few shared app modules
 #   (`traced` in areas.json) are followed through the code instead: the specs of what uses what the diff changes.
-# - A push to main (and a manual run) runs every spec on 10 shards, about 25 minutes: the full run after each merge. One
-#   main run at a time: a push waits for the run going, and only the newest waiting push runs (it covers the others).
+# - A push to main (and a manual run) runs every spec on 10 shards, about 28 minutes (Nov 6), plus any wait for runners:
+#   the full run after each merge. One main run at a time: a push waits for the run going, and only the newest
+#   waiting push runs (it covers the others).
 #
 # Each shard runs whole spec files, spread by their measured time (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result`
 # job puts one summary on the run's page (flaky tests first, then failed ones, each with its shard and error;
