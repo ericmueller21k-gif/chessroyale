@@ -78,7 +78,10 @@ Not measured yet (see "Left" below).
   (the shared e2e lock was busy; a scratch measuring spec is ready).
 - `town-rows.spec.ts` "no sky between the fronts", South Street west, computer, 2D: fails (0.126 > 0.005). The moved homes back onto
   South Street now; Hollow Peak's slope beside the camera leaves sky where the near cut leaves out the row past your pawn. Needs a look.
-- Stills in `docs/street-north-edge/`: see the folder (if present).
+- Stills in `docs/street-north-edge/`: not taken yet; the test is ready (`STILLS=docs/street-north-edge npx playwright test
+  e2e/town-fixed.spec.ts -g "stills: the north edge"`).
+- The e2e above passed locally on phone and computer, both renderers, except the South Street sky check; the gateway and park table
+  fixes were rerun on the computer only.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
