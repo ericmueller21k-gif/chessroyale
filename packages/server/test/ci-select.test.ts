@@ -119,7 +119,8 @@ describe("shards", () => {
   const weight = weigher(readTimings());
 
   it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
-    expect(shardCount(smoke, weight)).toBe(1);
+    expect(shardCount(smoke, () => 100)).toBe(1);
+    expect(shardCount(smoke, () => 200)).toBe(2);
     expect(shardCount(["e2e/formats.spec.ts"], () => 5000)).toBe(1);
     expect(shardCount(all, weight)).toBe(MAX_SHARDS);
     expect(MAX_SHARDS).toBe(10);
