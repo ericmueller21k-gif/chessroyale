@@ -72,8 +72,8 @@ export const mod360 = (h: number): number => ((h % 360) + 360) % 360;
 /**
  * Looking around (Nov 5, round 5; Eric: "hold your mouse, move it a little to the left and bring it back to the right … so you could see
  * what the houses are to your left … but not where your pawn is standing or which direction he's facing … when you start to run again,
- * it snaps back"). A drag turns the camera about your pawn by an offset on top of its normal heading: dragging left turns the view left
- * (you see more to your left), `TOWN_FEEL.streetLookPerWidth` degrees a screen's width. Pure: Town.tsx feeds it the drag and the step.
+ * it snaps back"). A drag turns the camera about your pawn by an offset on top of its normal heading: dragging left turns the view right
+ * (you pull the world: you see more to your right), `TOWN_FEEL.streetLookPerWidth` degrees a screen's width. Pure: Town.tsx feeds it the drag and the step.
  *
  * Locking a new view (Nov 6; Eric: "about like 45 degrees … everything should be split … if you hit like negative 50
  * degrees and then run in that new direction, it should snap to the new direction"):
@@ -121,10 +121,13 @@ export class LookAround {
     this.dragFrom = this.off;
     this.snapped = null;
   }
-  /** The drag is `dx` px across a box `width` px wide: dragging left (dx < 0) turns the view left. */
+  /**
+   * The drag is `dx` px across a box `width` px wide. Dragging left (dx < 0) turns the view right: you pull the world, so you see more
+   * of what's on your right (Eric, Nov 6: "you push to the left, you see more of what's on your right … just revert that").
+   */
   drag(dx: number, width: number): void {
     if (this.dragFrom === null) return;
-    this.off = this.dragFrom + (TOWN_FEEL.streetLookPerWidth * dx) / Math.max(1, width);
+    this.off = this.dragFrom - (TOWN_FEEL.streetLookPerWidth * dx) / Math.max(1, width);
   }
   /**
    * Let go: the view stays turned; or, given the normal heading (the street town), within `streetSnapDeg` of a quarter it eases there
