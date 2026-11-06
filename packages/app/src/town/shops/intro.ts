@@ -34,6 +34,8 @@ import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
 import { startCrumple } from "./crumple-gl.ts";
+import { startSplatter } from "./smudgy-splatter.ts";
+import { clothAnims } from "./challenge.ts";
 import { FOLIO_MOVES, FOLIO_PLANE, folioAnims, type FolioMove, type FolioPlane } from "./challenge.ts";
 import { BLITZ_MOVES, CHALLENGE_FEEL, CREW_MOVES, blitzAnims, type BlitzMove, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
@@ -53,6 +55,7 @@ type IntroArt =
     ) & {
       dark?: undefined;
       folio?: undefined;
+      cloth?: undefined;
       dash?: typeof import("./blitz-intro-art.ts");
       ice?: IceMods;
       rope?: typeof import("./pig-intro-art.ts");
@@ -63,10 +66,12 @@ type IntroArt =
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); folio?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined }
+  | { dark: typeof import("./hollow-intro-art.ts"); folio?: undefined; cloth?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined }
   // Folio's: its moves, the folding stools and table (its table), the plane, the board unfolding; no storm (the crumple is its
   // transition: crumple-gl.ts).
-  | { folio: FolioMods; table: Character; palette: Readonly<Record<string, string>>; dark?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; storm?: undefined; front?: undefined };
+  // Smudgy's: the covered table (his table) and the cloth's whip; no storm (the splatter is his: smudgy-splatter.ts).
+  | { cloth: typeof import("./smudgy-intro-art.ts"); table: Character; palette: Readonly<Record<string, string>>; folio?: undefined; dark?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; storm?: undefined; front?: undefined }
+  | { folio: FolioMods; table: Character; palette: Readonly<Record<string, string>>; cloth?: undefined; dark?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; storm?: undefined; front?: undefined };
 /** Folio's: its props (shops/folio-intro-art.ts) and its moves (characters/folio-intro.ts). */
 interface FolioMods {
   props: typeof import("./folio-intro-art.ts");
@@ -114,6 +119,8 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   // kit. The table's slab is its folded table's top (paper), the board the park table's ink, as the art's board is.)
   folio: () =>
     Promise.all([import("./folio-intro-art.ts"), import("../../characters/folio-intro.ts")]).then(([props, moves]) => ({ folio: { props, moves }, table: props.INTRO_FOLIO_TABLE, palette: FOLIO_TABLE_PALETTE })),
+  // (Smudgy's: his round table under its cloth, the cloth's whip; one small chunk with the paint kit.)
+  smudgy: () => import("./smudgy-intro-art.ts").then((m) => ({ cloth: m, table: m.INTRO_SMUDGY_TABLE, palette: m.INTRO_SMUDGY_TABLE_PALETTE })),
   gingerbread: () =>
     Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
       ice: { props, moves, elves },
@@ -198,6 +205,8 @@ export interface LoadedIntro {
   dash: DashArt | null;
   /** Folio's folding (null: another's): its moves' frames, the sheets', stools', table's, plane's and board's; see FolioArt. */
   folio: FolioArt | null;
+  /** Smudgy's cloth (null: another's): its frames (covered, whip, heap), its foot the table's, at the room's scale. */
+  cloth: { ch: Character; frames: Record<"covered" | "whip" | "heap", HTMLCanvasElement[]> } | null;
 }
 
 /**
@@ -382,8 +391,13 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let ice: IceArt | null = null;
     let dash: DashArt | null = null;
     let folio: FolioArt | null = null;
+    let cloth: LoadedIntro["cloth"] = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.folio) {
+    if (art?.cloth) {
+      const m = art.cloth;
+      anims = clothAnims({ cloth: m.INTRO_SMUDGY_CLOTH, boardFrame: m.WHIP_BOARD_FRAME });
+      cloth = { ch: m.INTRO_SMUDGY_CLOTH, frames: all(m.INTRO_SMUDGY_CLOTH, ["covered", "whip", "heap"]) };
+    } else if (art?.folio) {
       const { props: m, moves: g } = art.folio;
       anims = folioAnims({ mover: g.BOSS_FOLIO_INTRO, stool: m.INTRO_FOLIO_STOOL, table: m.INTRO_FOLIO_TABLE, plane: m.INTRO_FOLIO_PLANE, board: m.INTRO_FOLIO_BOARD, route: m.INTRO_FOLIO_PLANE_ROUTE });
       folio = {
@@ -524,7 +538,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     const kit = bossKit(def.name);
     // (Hollow's own intro has none: the dark is his transition.)
     // (Folio's neither: the crumple is its.)
-    const ka = dark || folio ? null : (kit?.kingAttack ?? null);
+    // (Smudgy's neither: the splatter is his.)
+    const ka = dark || folio || cloth ? null : (kit?.kingAttack ?? null);
     const attack = ka
       ? {
           ch: ka.ch,
@@ -556,6 +571,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       ice,
       dash,
       folio,
+      cloth,
     };
   });
   p.catch(() => loading.delete(home));
@@ -901,7 +917,7 @@ export interface Storm {
  * (`data-phase`: "in", "covered", "out"; `data-covered="1"` once it has covered the screen) for tests.
  */
 /** The boss's transition: its own (Alfil's sandstorm), or the default (the flash and the wipe). */
-export const startTransition = (intro: LoadedIntro): Storm => (intro.folio ? startCrumple(intro) : intro.dark ? startDark(intro) : intro.storm ? startStorm(intro) : startWipe(intro));
+export const startTransition = (intro: LoadedIntro): Storm => (intro.cloth ? startSplatter(intro) : intro.folio ? startCrumple(intro) : intro.dark ? startDark(intro) : intro.storm ? startStorm(intro) : startWipe(intro));
 
 export function startStorm(intro: LoadedIntro): Storm {
   const F = CHALLENGE_FEEL;

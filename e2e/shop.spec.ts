@@ -57,6 +57,27 @@ async function shopAt(p: Page, kind: "keeper" | "door" | "square", sq?: readonly
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
 const shopCam = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopCam?.() ?? null);
+/**
+ * Waits until you've stopped and the room's camera rests on your square. The camera trails your walk by about a square and a half
+ * and glides on after you stop: a square's point read while it glides has moved by the time the click lands, at a walk's pace by
+ * more than half a square (main's e2e, Nov 5: a tap read for (5, 7) in Ginger's igloo landed on the wall square west of it, and the
+ * room walked you to the free square nearest that, (5, 6), one short). So a tap is aimed once the view rests on you:
+ * docs/decisions/2026-11-05-ginger-steps.md.
+ */
+const viewOnYou = (p: Page) =>
+  expect
+    .poll(
+      () =>
+        p.evaluate(() => {
+          const cam = (window as unknown as Hooks).__shopCam?.();
+          const you = document.querySelector<HTMLCanvasElement>("canvas.town-shop-canvas")?.dataset.you;
+          if (!cam || !you) return false;
+          const [c, r] = you.split(",").map(Number);
+          return Math.hypot(cam.focus[0] - c!, cam.focus[1] - r!) < 0.01;
+        }),
+      { message: "you've stopped and the view rests on you", timeout: 10_000, intervals: [50] },
+    )
+    .toBe(true);
 
 /**
  * Walks up to a home (its chip glides the camera there if it's off screen) and opens its card: its "Go in". (An admin's town is the
@@ -402,6 +423,11 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await still("bend");
   await walkTo([7, 6]);
   // The dog behind the counter: a tap on him walks you in front of it, the counter between you; his card says "Shopkeeper".
+  // (Aimed once you've stopped on (7, 6) and the view rests on you. There you're within talking range and his card opens by itself:
+  // closed first, or the tap would only close it. Nov 5: docs/decisions/2026-11-05-ginger-steps.md.)
+  await viewOnYou(page);
+  if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
   await expect.poll(() => shopAt(page, "keeper"), { message: "the dog is drawn round the bend" }).not.toBeNull();
   const at = (await shopAt(page, "keeper"))!;
   await page.mouse.click(at.x, at.y);
@@ -550,6 +576,65 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   expect(errors).toEqual([]);
 });
 
+test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", async ({ page }) => {
+  test.setTimeout(150_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  // (Smudgy is live for everyone, so his studio is too: a player's town.)
+  await page.goto("/town?sky=day");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("smudgy"));
+  await expect.poll(() => homeAt(page, "smudgy"), { message: "Smudgy's Art Gallery comes into view" }).not.toBeNull();
+  await goIn(page, "smudgy", "Smudgy's Art Gallery");
+  await expect(room(page)).toHaveAttribute("data-room", "smudgy");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Smudgy's Art Gallery");
+  // A dark room of deep paint: the chat's words light.
+  await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
+  const name = test.info().project.name;
+  const still = async (what: string) => {
+    if (!SHOTS) return;
+    await page.waitForTimeout(1200);
+    await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
+  };
+  const walkTo = async (sq: readonly [number, number]) => {
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  // (Just inside the door: the drop cloth and its covered table ahead, the life class behind it, the shop at the back.)
+  await still("door");
+  await walkTo([11, 16]);
+  await still("table");
+  await walkTo([9, 11]);
+  await still("life-class");
+  // The gallery owner behind the counter: a tap on it walks you up to the counter; its card says "Shopkeeper", no name.
+  await expect.poll(() => shopAt(page, "keeper"), { message: "the gallery owner is drawn" }).not.toBeNull();
+  const at = (await shopAt(page, "keeper"))!;
+  await page.mouse.click(at.x, at.y);
+  const card = page.getByRole("dialog", { name: "Shopkeeper", exact: true });
+  await expect(card).toBeVisible({ timeout: 20_000 });
+  await expect(card.getByRole("heading")).toHaveText(["Shopkeeper"]);
+  await still("counter");
+  await card.getByRole("button", { name: "Talk" }).click();
+  const crate = page.getByRole("dialog", { name: "Smudgy's Boss Crate", exact: true });
+  await expect(crate).toBeVisible();
+  await expect(crate).toContainText("3 Smudgy tokens, or 1 Smudgy token + 1 crate key");
+  await expect(crate.locator(".shop-prize-name").first()).toHaveText("Brush Ride");
+  await expect(crate).toContainText("You have 0 Smudgy tokens and 0 crate keys.");
+  await expect(crate.getByRole("button", { name: "Buy with 3 Smudgy tokens" })).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(crate).toBeHidden();
+  // The sculptures: the rook on its plinth in the west-back corner, a canvas stack and the easel by it.
+  await walkTo([6, 6]);
+  await walkTo([3, 5]);
+  await still("sculptures");
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 type CrewHook = {
   __shopCrew?: () => {
     lift: { at: [number, number]; anim: string; waiting: boolean; leg: number };
@@ -608,6 +693,7 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   // In the lift's way: stand on its row, a square past its next stop, and it waits for you (Eric, Nov 4: "If you block it, it stops");
   // step aside and it goes on ("If you move out of the way, it starts moving again").
   const walkTo = async (sq: readonly [number, number]) => {
+    await viewOnYou(page);
     await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
     const xy = (await shopAt(page, "square", sq))!;
     await page.mouse.click(xy.x, xy.y);
@@ -686,6 +772,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await expect(crate).toBeHidden();
 
   const tapTo = async (sq: readonly [number, number]) => {
+    await viewOnYou(page);
     // (Within talking range of the shopkeeper his card is open: closed first, or the tap would close it.)
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     await expect.poll(() => shopAt(page, "square", sq), { message: `(${sq}) is on screen` }).not.toBeNull();
