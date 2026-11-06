@@ -6,8 +6,8 @@
  * as the sprites.
  *
  * Painter's order: a model's shapes by layer, then far to near within a layer (each shape's faces together: a convex shape's faces
- * turned toward the camera never overlap). A see-through shape (glass) has its far faces drawn before everything, its near ones in
- * its layer, so what's inside shows through.
+ * turned toward the camera never overlap). A see-through shape (glass) has its far faces drawn first (before everything, or in the
+ * layer it names), its near ones in its layer, so what's inside shows through.
  */
 import type { Pt } from "../camera.ts";
 import type { Ctx } from "../paint.ts";
@@ -195,6 +195,7 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
   let depth = 0;
   let layer = 0;
   let glass = false;
+  let far = 0;
   for (let i = 0; i < A.faces.length; i++) {
     const F = A.faces[i]!;
     if (F.shape !== si) {
@@ -208,6 +209,7 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
       depth = pt.depth;
       layer = s.layer ?? 0;
       glass = !!s.glass;
+      far = s.far ?? -1e6;
     }
     if (hidden) continue;
     const f = F.f;
@@ -231,7 +233,7 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
     const ex = sg * (at.ux * f.n[0] + at.bx * f.n[1]);
     const ey = sg * (at.uy * f.n[0] + at.by * f.n[1]);
     const step = lightStep(ex * hc - ey * hs, ex * hs + ey * hc, sg * f.n[2]);
-    list.push({ i, layer: glass && !facing ? -1e6 + layer : layer, depth, step });
+    list.push({ i, layer: glass && !facing ? far : layer, depth, step });
   }
   list.sort((a, b) => a.layer - b.layer || b.depth - a.depth || a.i - b.i);
   ctx.save();

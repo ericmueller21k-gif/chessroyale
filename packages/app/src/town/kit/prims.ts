@@ -32,8 +32,9 @@ export interface Shape {
   part?: string;
   /** Its place in the drawing order: lower first; shapes in one layer are drawn far to near. */
   layer?: number;
-  /** See-through (glass): its far faces are drawn before everything, its near ones in its layer. */
+  /** See-through (glass): its far faces are drawn first (in layer `far`, default before everything), its near ones in its layer. */
   glass?: boolean;
+  far?: number;
   /** Faces left out (a top under a lid, a back against a wall). */
   hide?: readonly Role[];
   /** An n-gon's corners (cyl, dome; default 8) and a dome's rings (default 3). */
