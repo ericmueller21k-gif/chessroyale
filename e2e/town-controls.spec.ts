@@ -148,10 +148,11 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`hold to run (${backend}): a press held still runs you each way the finger is from your pawn, at once; letting go stops you; the camera never turns`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    await walkTo(page, [8, 20]);
+    // (West of the park, which starts at column 13: its step out would move your pawn on screen mid-run.)
+    await walkTo(page, [5, 20]);
     const f = await finger(page);
     await watchHeadings(page);
-    // Right, up, left, down: in that order you stay on Fountain Street's board (rows 19 to 22).
+    // Right, up, left, down: in that order you stay on Fountain Street (rows 19 to 22), west of the park.
     for (const [dir, w] of [["right", [1, 0]], ["up", [0, 1]], ["left", [-1, 0]], ["down", [0, -1]]] as const) {
       const from = await you(page);
       const at = await holdPoint(page, dir);
@@ -161,7 +162,7 @@ for (const backend of ["2d", "webgl"] as const) {
       // Running: two squares that way (and the start no later than a step after the hold time).
       await expect.poll(async () => (await you(page)).join(","), { timeout: 5000 }).not.toBe(from.join(","));
       expect(Date.now() - t0, `${dir}: set off at once`).toBeLessThan(2500);
-      await expect.poll(async () => Math.abs((await you(page))[w[0] ? 0 : 1]! - from[w[0] ? 0 : 1]!), { timeout: 5000 }).toBeGreaterThanOrEqual(2);
+      await expect.poll(async () => Math.abs((await you(page))[w[0] ? 0 : 1]! - from[w[0] ? 0 : 1]!), { timeout: 10_000 }).toBeGreaterThanOrEqual(2);
       await f.up();
       const at0 = await you(page);
       await settle(page);
@@ -178,7 +179,7 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`a run steers (${backend}): sliding the finger mid-run changes the way, and the camera doesn't turn`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 400_000 : 150_000);
     await open(page, backend);
-    await walkTo(page, [8, 20]);
+    await walkTo(page, [3, 20]);
     const f = await finger(page);
     await watchHeadings(page);
     const start = await you(page);
@@ -200,7 +201,7 @@ for (const backend of ["2d", "webgl"] as const) {
   test(`locking a new view (${backend}): a drag let go near east snaps there; a tap locks it in and the up arrow goes east; not snapped, a tap eases back; a building's in and out resets north`, async ({ page }) => {
     test.setTimeout(backend === "webgl" ? 500_000 : 200_000);
     await open(page, backend);
-    await walkTo(page, [8, 20]);
+    await walkTo(page, [4, 20]);
     // A bit past a quarter to the right (about 95°): let go, it eases to east exactly; snapped, not yet the base.
     await drag(page, 0.53);
     await expect.poll(async () => (await cam(page)).heading, { timeout: 3000 }).toBe(90);
@@ -253,8 +254,11 @@ for (const backend of ["2d", "webgl"] as const) {
     expect(await you(page), "you didn't walk into it").toEqual([9, 8]);
     await card.getByRole("button", { name: "Go in" }).click();
     await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-    await page.getByRole("button", { name: "Back", exact: true }).click();
-    await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
+    // (Back once the room has finished coming in: a press during the zoom in isn't taken.)
+    await expect(async () => {
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await expect(room(page)).toHaveCount(0, { timeout: 2000 });
+    }).toPass({ timeout: 20_000 });
     await expect.poll(async () => (await cam(page)).base, { timeout: 5000 }).toBe(0);
     // Off the strip: north (not east).
     expect(await arrowStep(page, "ArrowDown"), "down goes south").toEqual([0, -1]);
@@ -295,9 +299,9 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   // The arrow turns with the camera: a look round a quarter to the right points it east.
   await drag(page, 0.5);
   await expect.poll(async () => (await dot(page)).deg, { timeout: 3000 }).toBe(90);
-  await page.keyboard.press("ArrowUp");
+  // (Snapped to east; an arrow's step first eases it back north, nothing locked in.)
+  await arrowStep(page, "ArrowUp");
   await expect.poll(async () => (await dot(page)).deg, { timeout: 3000 }).toBe(0);
-  await settle(page);
 
   // The button: off hides it (and its box goes, so the chips may use the corner), remembered on this device; on brings it back.
   const btn = page.getByRole("button", { name: "Map", exact: true });

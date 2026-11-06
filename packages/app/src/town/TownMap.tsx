@@ -49,6 +49,8 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
   const on = useMapOn();
   const [big, setBig] = useState(false);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number; computer: boolean }>({ w: 0, h: 0, computer: false });
+  /** The chat's box (in the town's box) as last laid out: the map keeps clear of it (null: the chat isn't showing). */
+  const [chat, setChat] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const anchor = useRef<HTMLDivElement>(null);
   const small = useRef<HTMLButtonElement>(null);
   const smallCv = useRef<HTMLCanvasElement>(null);
@@ -61,14 +63,30 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
     const box = anchor.current?.closest<HTMLElement>(".town-box");
     if (!box) return;
     const computer = !!box.closest(".town-screen.in-frame");
-    const measure = () => setBoxSize((o) => (o.w === box.clientWidth && o.h === box.clientHeight && o.computer === computer ? o : { w: box.clientWidth, h: box.clientHeight, computer }));
+    const chatEl = box.querySelector<HTMLElement>(".town-chat");
+    const measure = () => {
+      setBoxSize((o) => (o.w === box.clientWidth && o.h === box.clientHeight && o.computer === computer ? o : { w: box.clientWidth, h: box.clientHeight, computer }));
+      // (The chat's box as laid out: its size changes as it shows, hides or the box resizes. A chat carried over the map is the player's
+      // choice: the map doesn't chase it.)
+      const c = chatEl?.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      const next = c && c.width > 0 ? { x: Math.round(c.left - b.left), y: Math.round(c.top - b.top), w: Math.round(c.width), h: Math.round(c.height) } : null;
+      setChat((o) => (o === next || (o && next && o.x === next.x && o.y === next.y && o.w === next.w && o.h === next.h) ? o : next));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(box);
+    if (chatEl) ro.observe(chatEl);
     return () => ro.disconnect();
   }, []);
   const f = TOWN_FEEL;
   const sw = Math.round(Math.min(f.mapMaxPx, Math.max(72, boxSize.w * (boxSize.computer ? f.mapShareComputer : f.mapShare))));
+  const sh = mapHeight(sw);
+  // Its top: the box's top right corner; where the chat's box reaches over that corner (a narrow computer frame, where the chat takes the
+  // whole top), just under the chat instead, on the same right edge.
+  const GAP = 8;
+  const mapLeft = boxSize.w - GAP - sw - 2 * GAP;
+  const top = chat && chat.y < GAP + sh + GAP && chat.x + chat.w > mapLeft ? chat.y + chat.h + GAP : GAP;
   // The small map: drawn once a size; its box kept for the chips and the test hooks (zero while it doesn't show).
   useLayoutEffect(() => {
     if (!show || !boxSize.w) {
@@ -87,7 +105,7 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
       MAP_DOTS.delete(dot);
       MAP_BOX.w = MAP_BOX.h = 0;
     };
-  }, [show, sw, boxSize.w, boxSize.h]);
+  }, [show, sw, top, boxSize.w, boxSize.h]);
   // The large map: the whole town in the middle of the box, as big as it fits.
   const bw0 = Math.min(f.mapBigMaxPx, Math.floor(Math.min(boxSize.w, boxSize.h) * f.mapBigShare));
   const bw = mapHeight(bw0) > boxSize.h * f.mapBigShare ? Math.floor((bw0 * boxSize.h * f.mapBigShare) / mapHeight(bw0)) : bw0;
@@ -109,7 +127,6 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
   useEffect(() => {
     if (!show) setBig(false);
   }, [show]);
-  const sh = mapHeight(sw);
   const pt = { x: 0, y: 0 };
   const iconPx = Math.round(Math.max(18, Math.min(34, bs * 2.8)));
   const park = (parkPoint(bs, pt), { ...pt });
@@ -117,7 +134,7 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
   return (
     <div class="tm-root" ref={anchor}>
       {show && (
-        <button type="button" class="tm-small" ref={small} aria-label="Open the map" style={{ width: `${sw}px`, height: `${sh}px`, opacity: f.mapOpacity }} onClick={() => setBig(true)}>
+        <button type="button" class="tm-small" ref={small} aria-label="Open the map" style={{ top: `${top}px`, width: `${sw}px`, height: `${sh}px`, opacity: f.mapOpacity }} onClick={() => setBig(true)}>
           <canvas ref={smallCv} aria-hidden="true" />
           <div class="tm-you" ref={smallYou} aria-hidden="true" />
         </button>

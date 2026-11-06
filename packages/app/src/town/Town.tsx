@@ -1326,6 +1326,14 @@ function startTown(
     keys.start();
     keysAsk();
   };
+  /**
+   * When the pointer's event happened (its timeStamp, on performance.now()'s clock), not when it's handled: a slow frame holds a move back,
+   * and the hold time must not turn a drag that started at once into a run (or a quick tap into one).
+   */
+  const evAt = (e: PointerEvent) => {
+    const t = performance.now();
+    return e.timeStamp > 0 && e.timeStamp <= t ? e.timeStamp : t;
+  };
   const onDown = (e: PointerEvent) => {
     // (The street town: a mouse's left button only, for a tap, a look round and a run alike.)
     if (STREET_TOWN && e.pointerType === "mouse" && e.button !== 0) return;
@@ -1338,7 +1346,7 @@ function startTown(
     const v = r.view;
     drag = { id: e.pointerId, x: e.clientX, y: e.clientY, cx: camX, cy: camY, kx: v.kf, ky: Math.max(8, rowSpan(r)) };
     closing = !!card;
-    const now = performance.now();
+    const now = evAt(e);
     if (closing) return press.down(e.clientX, e.clientY, "", now);
     const xy = local(e);
     const p = plan(r.pick(xy.x, xy.y));
@@ -1351,8 +1359,8 @@ function startTown(
     fingerAt.x = e.clientX;
     fingerAt.y = e.clientY;
     const was = press.gesture();
-    const now = performance.now();
-    if (!press.move(e.clientX, e.clientY, now)) {
+    if (!press.move(e.clientX, e.clientY, evAt(e))) {
+      const now = performance.now();
       // A run (held still past the hold time; a move that comes in late starts it too): the finger steers, the camera never turns.
       if (press.running()) {
         if (was !== "run") startRun(now);
