@@ -1032,9 +1032,10 @@ describe("the challenge's pacing (Nov 2)", () => {
         expect(m.bossClear.c + low(ch, "idle", band / k)[1] * k, "pig: his idle as drawn").toBeLessThanOrEqual(bossEdge - GAP);
         for (const a of ["doubleYank", "brag"]) expect(m.bossClear.c + low(BOSS_PIG_INTRO, a, band / k)[1] * k, `pig: his ${a}`).toBeLessThanOrEqual(bossEdge - GAP);
       }
-      // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too. (Dash has none: he stands.)
-      const ka = kit.kingAttack;
-      expect(!!ka, `${id} has a God King attack`).toBe(id !== "dash");
+      // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too. (Dash's isn't in his intro, Nov 6:
+      // he stands through its beat.)
+      expect(!!kit.kingAttack, `${id} has a God King attack`).toBe(true);
+      const ka = id === "dash" ? null : kit.kingAttack;
       // (Wrangler's lasso lashes the floor nearly two squares out in front of him (0.95 at its rope's crack, 1.94 at its lash): clear
       // of his bucket he'd stand 3.5 squares out, his spin off a phone's left edge (Eric, Nov 4: sprites always on screen). He stands
       // at the usual place, his feet and all of him standing clear of it; only the swung rope crosses over it. Nov 4, Eric to confirm.)
