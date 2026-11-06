@@ -535,6 +535,8 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   };
   /** Taps a square and waits until you stand on it. */
   const walkTo = async (sq: readonly [number, number]) => {
+    // (Aim once the view rests on you: a square read while the camera glides moves before the tap lands. viewOnYou, above.)
+    await viewOnYou(page);
     await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
     const at = (await shopAt(page, "square", sq))!;
     await page.mouse.click(at.x, at.y);
@@ -597,6 +599,8 @@ test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the
     await page.screenshot({ path: `${SHOTS}/${what}-${name}.png` });
   };
   const walkTo = async (sq: readonly [number, number]) => {
+    // (Aim once the view rests on you: a square read while the camera glides moves before the tap lands. viewOnYou, above.)
+    await viewOnYou(page);
     await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
     const at = (await shopAt(page, "square", sq))!;
     await page.mouse.click(at.x, at.y);
