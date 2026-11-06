@@ -132,6 +132,8 @@ interface FaceRec {
   /** This frame: on screen, its corners there, its step, drawn before everything (a glass's far face). */
   xs: Float64Array;
   ys: Float64Array;
+  /** Its corners in the world this frame (x, y, lift), for strips. */
+  ws: Float64Array;
 }
 interface ModelArt {
   ramps: Ramps;
@@ -154,7 +156,7 @@ export function artOf(m: Model): ModelArt {
       const grid = m.textures[texOf(s, f)];
       if (!grid) throw new Error(`kit: no texture "${texOf(s, f)}"`);
       const poly: Poly = { n: f.pts.length, tx: f.tx, ty: f.ty, tx0: 0, ty0: 0, tw: f.tw, th: f.th };
-      faces.push({ shape: si, f, poly, texel: gridTexel(grid), xs: new Float64Array(f.pts.length), ys: new Float64Array(f.pts.length) });
+      faces.push({ shape: si, f, poly, texel: gridTexel(grid), xs: new Float64Array(f.pts.length), ys: new Float64Array(f.pts.length), ws: new Float64Array(f.pts.length * 3) });
     }
   });
   arts.set(m, (a = { ramps, faces, mids, steps: [] }));
@@ -223,6 +225,9 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
       }
       F.xs[k] = pt.x;
       F.ys[k] = pt.y;
+      F.ws[k * 3] = W.x;
+      F.ws[k * 3 + 1] = W.y;
+      F.ws[k * 3 + 2] = W.lift;
     }
     if (!ok) continue;
     // Facing the camera when its corners run the same way on screen as in its texture (both y down).
@@ -242,23 +247,65 @@ export function drawModel(ctx: Ctx, m: Model, at: Place, p3: P3, o: DrawOpts = {
     const F = A.faces[e.i]!;
     const st = e.step;
     const arts = (A.steps[st + 1] ??= packFaces(A.faces.map((G) => faceCuts(G.poly, G.texel, A.ramps, st, { soft: G.f.soft }))));
-    drawFace(ctx, dpr, F.poly, F.xs, F.ys, arts[e.i]!);
+    drawFace(ctx, dpr, F.poly, F.xs, F.ys, arts[e.i]!, F.ws, p3);
   }
   ctx.restore();
 }
 
-/** A face's art on screen at its corners (`xs`, `ys`): whole when an affine puts its every corner within a pixel, else its triangles. */
-export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, ys: ArrayLike<number>, art: FaceArt): void {
+/** Strips a face may be cut into, at most, where its perspective is too strong for one affine. */
+const MAX_STRIPS = 12;
+const S0: Pt = { x: 0, y: 0, k: 0, depth: 0 };
+const S1: Pt = { x: 0, y: 0, k: 0, depth: 0 };
+const S2: Pt = { x: 0, y: 0, k: 0, depth: 0 };
+/** A point `s` of the way from world corner a to b of a face (`ws`: x, y, lift each), projected into `out`. */
+function along(ws: Float64Array, a: number, b: number, s: number, p3: P3, out: Pt): boolean {
+  return p3(ws[a * 3]! + (ws[b * 3]! - ws[a * 3]!) * s, ws[a * 3 + 1]! + (ws[b * 3 + 1]! - ws[a * 3 + 1]!) * s, ws[a * 3 + 2]! + (ws[b * 3 + 2]! - ws[a * 3 + 2]!) * s, out);
+}
+/**
+ * A face's art on screen at its corners (`xs`, `ys`): whole when an affine puts its every corner within a pixel; a rectangle (a box's
+ * face) too foreshortened for that in strips of whole texels across the way it recedes (its world corners `ws` and the camera `p3`
+ * give each strip's own corners, as the town's walls are drawn); anything else as its triangles.
+ */
+export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, ys: ArrayLike<number>, art: FaceArt, ws?: Float64Array, p3?: P3): void {
   const n = p.n;
   const l = n - 1;
-  let whole = n === 3;
+  let err = n === 3 ? 0 : Infinity;
   if (n === 4 && affine(p.tx[0]!, p.ty[0]!, xs[0]!, ys[0]!, p.tx[1]!, p.ty[1]!, xs[1]!, ys[1]!, p.tx[l]!, p.ty[l]!, xs[l]!, ys[l]!, M)) {
     const X = M[0]! * p.tx[2]! + M[2]! * p.ty[2]! + M[4]!;
     const Y = M[1]! * p.tx[2]! + M[3]! * p.ty[2]! + M[5]!;
-    whole = Math.hypot(X - xs[2]!, Y - ys[2]!) < 0.75;
+    err = Math.hypot(X - xs[2]!, Y - ys[2]!);
   }
-  if (whole) {
+  if (err < 0.75) {
     if (affine(p.tx[0]!, p.ty[0]!, xs[0]!, ys[0]!, p.tx[1]!, p.ty[1]!, xs[1]!, ys[1]!, p.tx[l]!, p.ty[l]!, xs[l]!, ys[l]!, M)) put(ctx, dpr, art.whole);
+    return;
+  }
+  // A rectangle in its texture (corners top left, top right, bottom right, bottom left): strips.
+  const w = p.tx[1]!, h = p.ty[3]!;
+  const rect = n === 4 && ws && p3 && Math.abs(p.tx[0]!) + Math.abs(p.ty[0]!) + Math.abs(p.ty[1]!) + Math.abs(p.tx[3]!) + Math.abs(p.tx[2]! - w) + Math.abs(p.ty[2]! - h) < 1e-6;
+  if (rect && err < Infinity) {
+    // Across the way it recedes: columns when its left and right edges differ on screen more than its top and bottom do, else rows.
+    const lr = Math.abs(Math.hypot(xs[3]! - xs[0]!, ys[3]! - ys[0]!) - Math.hypot(xs[2]! - xs[1]!, ys[2]! - ys[1]!));
+    const tb = Math.abs(Math.hypot(xs[1]! - xs[0]!, ys[1]! - ys[0]!) - Math.hypot(xs[2]! - xs[3]!, ys[2]! - ys[3]!));
+    const cols = lr >= tb;
+    const len = cols ? w : h;
+    const k = Math.min(MAX_STRIPS, Math.ceil(len), Math.ceil(err / 0.75) + 1);
+    const pc = art.whole;
+    for (let i = 0; i < k; i++) {
+      const a = Math.round((i * len) / k), b = Math.round(((i + 1) * len) / k);
+      if (b <= a) continue;
+      // The strip's top left, top right and bottom left, on screen.
+      const ok = cols
+        ? along(ws, 0, 1, a / w, p3, S0) && along(ws, 0, 1, b / w, p3, S1) && along(ws, 3, 2, a / w, p3, S2)
+        : along(ws, 0, 3, a / h, p3, S0) && along(ws, 1, 2, a / h, p3, S1) && along(ws, 0, 3, b / h, p3, S2);
+      if (!ok) continue;
+      const [u0, v0, u1, v1, u2, v2] = cols ? [a, 0, b, 0, a, h] : [0, a, w, a, 0, b];
+      if (!affine(u0, v0, S0.x, S0.y, u1, v1, S1.x, S1.y, u2, v2, S2.x, S2.y, M)) continue;
+      // (Each strip a texel wider than its share, under the next, so no seam opens between them.)
+      const more = i < k - 1 ? 1 : 0;
+      const sx = cols ? a : -1, sy = cols ? -1 : a;
+      const sw = cols ? b - a + more : w + 2, sh = cols ? h + 2 : b - a + more;
+      put(ctx, dpr, pc, sx, sy, sw, sh);
+    }
     return;
   }
   for (let t = 0; t < n - 2; t++) {
@@ -268,8 +315,10 @@ export function drawFace(ctx: Ctx, dpr: number, p: Poly, xs: ArrayLike<number>, 
   }
 }
 /** A piece through the affine `M`: nearest at 1.5 screen pixels a texel and above. */
-function put(ctx: Ctx, dpr: number, pc: Piece): void {
+function put(ctx: Ctx, dpr: number, pc: Piece, tx?: number, ty?: number, tw?: number, th?: number): void {
   ctx.setTransform(dpr * M[0]!, dpr * M[1]!, dpr * M[2]!, dpr * M[3]!, dpr * M[4]!, dpr * M[5]!);
   ctx.imageSmoothingEnabled = Math.sqrt(Math.abs(M[0]! * M[3]! - M[1]! * M[2]!)) < 1.5;
-  ctx.drawImage(pc.cv, pc.sx, pc.sy, pc.w, pc.h, pc.sx - pc.ox, pc.sy - pc.oy, pc.w, pc.h);
+  // (All of it, or the texels (tx, ty, tw x th) of its texture: a strip; the piece's margin pixel round it included.)
+  if (tx === undefined) ctx.drawImage(pc.cv, pc.sx, pc.sy, pc.w, pc.h, pc.sx - pc.ox, pc.sy - pc.oy, pc.w, pc.h);
+  else ctx.drawImage(pc.cv, pc.ox + tx, pc.oy + ty!, tw!, th!, tx, ty!, tw!, th!);
 }
