@@ -423,6 +423,11 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await still("bend");
   await walkTo([7, 6]);
   // The dog behind the counter: a tap on him walks you in front of it, the counter between you; his card says "Shopkeeper".
+  // (Aimed once you've stopped on (7, 6) and the view rests on you. There you're within talking range and his card opens by itself:
+  // closed first, or the tap would only close it. Nov 5: docs/decisions/2026-11-05-ginger-steps.md.)
+  await viewOnYou(page);
+  if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toBeHidden();
   await expect.poll(() => shopAt(page, "keeper"), { message: "the dog is drawn round the bend" }).not.toBeNull();
   const at = (await shopAt(page, "keeper"))!;
   await page.mouse.click(at.x, at.y);

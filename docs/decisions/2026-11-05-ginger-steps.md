@@ -1,6 +1,6 @@
 # The Ginger Igloo test's "one square short": the tap read while the camera glided (Nov 5, 2026)
 
-Lane: the shop area (a test-only fix). Main's run 42110146243 (3f50ee8c), shard 2 of 5, `[desktop] e2e/shop.spec.ts`
+Lane: the shop area (the tests, and the shops' tap: the shared press code is unchanged). Main's run 42110146243 (3f50ee8c), shard 2 of 5, `[desktop] e2e/shop.spec.ts`
 "Ginger Igloo (Nov 5)", both tries in `tapTo`: first expected `data-you` "6,5", received "5,5"; the retry expected "5,7",
 received "5,6".
 
@@ -22,12 +22,21 @@ click, how far the tapped square's middle had moved from the click: with each ta
 31 px; with 80 ms more between the read and the click (CI's round trips), 46 to 71 px, and 2 of 5 runs failed exactly as
 CI's retry did ("5,7" expected, "5,6" received, at 54 and 71 px).
 
-**The fix (the test only).** Each tap is aimed once you've stopped and the view rests on you (`viewOnYou`: the camera's focus
-within 0.01 of a square of your square), before the shopkeeper's card check and the read. Every check is unchanged. Runs: on the
-computer 20 of 20 (10 with the 80 ms gap that reproduced the failure, 10 plain, 2 workers), on the phone 20 of 20, and
-`e2e/shop.spec.ts` whole on both (32 of 32).
+**The fix, in the tests.** Each tap is aimed once you've stopped and the view rests on you (`viewOnYou`: the camera's focus
+within 0.01 of a square of your square). Ginger's `tapTo` waits for it before the shopkeeper's card check and the read, and so does
+Jefferson's `walkTo` (it reads and clicks the same way). Every check is unchanged.
 
-**Not changed (for the director).** The shop resolves a tap's square at the pointer's release with the camera as it is then;
-the town resolves it at the press and again at the release and walks only if both agree. A player tapping mid-walk with a
-slow release could land a square off in a shop. A separate question from this failure (a test click's press and release are
-a few ms apart).
+**The fix, in the app (the director, Nov 5: a player could hit it).** A shop picked a tap's square at the release only, with the
+camera as it was then. Mid-walk the view moves about 0.9 px/ms, so in a 100 ms tap it moves about a square, and a player could be
+sent one square off. Shops now do what the town does (`town/press.ts`, as the town's `onDown`/`onUp` use it): what's under the finger
+is picked at the press and again at the release (`shops/tap.ts` `pressKey`: the Shopkeeper, or the square under the finger), and
+you walk only if both are the same. A release on anything else lets go without walking. The hit test moved, unchanged, into
+`shops/tap.ts` (`squareUnder`) so it can be unit-tested with a moving camera (`packages/app/test/shop-tap.test.ts`). A press with a
+card open closes it as before (the town's way: unless it became a drag).
+
+**Runs.** On the computer, 20 of 20 with the 80 ms gap that reproduced the failure, and 20 of 20 earlier (before the app change:
+10 with the gap, 10 plain). On the phone, 20 of 20. `e2e/shop.spec.ts` whole on both projects: RUNS_FULL.
+
+**Left alone: the arrow-key step (unconfirmed).** Under 3 parallel workers, 1 of 10 computer runs timed out at the keys part's
+wait for `data-you` "10,4". It never happened with 2 workers, CI's default. The likely cause is a frame longer than a step (90 ms),
+so the walker takes two steps in one frame and "10,4" is never drawn, but that isn't confirmed. It is not `tapTo`.
