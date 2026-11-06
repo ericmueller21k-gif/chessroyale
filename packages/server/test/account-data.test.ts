@@ -122,6 +122,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   boss_tokens: "user_id boss n",
   chat_mod_log: "id user_id at action until by reason note ended_at seen",
   chat_picks: "user_id lines emoji",
+  claw_plays: "id user_id request boss won crate at",
   email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
   equipped: "user_id slot item_id",
   equipped_items: "user_id slot item_id",
