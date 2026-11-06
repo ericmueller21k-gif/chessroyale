@@ -125,6 +125,15 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
     `wallets.crate_keys`. A guest signing in to an account brings them along (added up; the drops and the crates too, so the window
     counts the drops).
+- **Boingo's claw machine** (Nov 6; [2026-11-06-claw-machine.md](../decisions/2026-11-06-claw-machine.md); `CLAW` in core's settings; the
+  server's side `server/claw.ts`, the app's `packages/app/src/claw/`): one boss token in, and `CLAW.winChance` (0.25) of the time that
+  boss's Boss Crate goes into your inventory, unopened (it opens as a bought one). `POST /api/shop/claw {boss, request}` decides it as the
+  coin goes in, in one D1 batch (the play logged only if the token is there, the token off only if it was logged, the crate in only if it
+  won), idempotent by the app's `request` id (`claw_plays` is unique per account and request: a retry answers the first play); the shop's
+  kill switch refuses it; guests can't play. The claw on screen only shows the answer (STOP is cosmetic). Boingo's Funhouse calls
+  `openClawMachine()` on a tap of the coin slot; `?claw=1` (a test switch) opens it too; `?clawSeed=N` is the e2e's seed, honored only
+  where TEST_SWITCHES is on. Admins get test tokens from the existing grant (the machine's "Admin: +3 of each token"). About 4 tokens a
+  crate on average, against a bought crate's 3: a use for extras.
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
   solid-red "!" in it, always at the top right of the crate pages: the Crates tab and each crate's own page (not the opening or the
   reveal). It sits over the page's corner (`gamble-ring` in `styles.css`: out of the flow, a 40 px tap target round a 30 px ring), so it
@@ -156,6 +165,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Server rolls and storage (D1 `items`, `equipped_items`) | `packages/server/src/locker.ts`; the shop's API in `api.ts` / `accounts.ts` |
 | Boss tokens, crate keys, the boss crate purchase, solo battles, admins' grants | `packages/server/src/boss-tokens.ts`; rules `packages/core/src/boss-tokens.ts`; the crates `BOSS_CRATES` in `crates.ts` |
 | The token pictures, the inventory's tokens, the result box | `packages/app/src/components/tokens/`, `TokenArt.tsx`, `TokenBox.tsx`; `boss-tokens.ts` (the app's asking); `screens/Crates.tsx` (`TokenStock`, `AdminGrants`) |
+| Boingo's claw machine (the play, its log `claw_plays`; the app's machine, flow and sounds) | `packages/server/src/claw.ts`; `packages/app/src/claw/` (`index.ts`: `openClawMachine`; `flow.ts`; `ClawMachine.tsx`; `sounds.ts`) |
 | Admins' copies of every item (never stored) | `packages/core/src/admin-copies.ts`; added in `locker.ts` and `accounts.ts` (`shopState`) |
 | Bots' outfits | `packages/core/src/bot-looks.ts`, `packages/app/src/looks.ts` |
 | The icon builder | `packages/app/src/components/PixelIcon.tsx`, `icon-pixels.ts`; server check `isPixelIcon` in `accounts.ts` |
@@ -169,11 +179,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 ## Tests and tools
 
 - Unit: `packages/core/test/crates.test.ts` (rides: their slot, no crate, a look keeping its ride), `bot-looks.test.ts`, `packages/server/test/accounts.test.ts` (a ride in the ride slot only),
-  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `boss-tokens.test.ts` (the drop rule and its window, a race for the
+  `shop-buy.test.ts` (buying with coins, `SHOP_FREE` off), `claw.test.ts` (the claw machine: one token a play, refused with none, about 25%, the crate on a win, a retry, plays at once, guests, the seed only with TEST_SWITCHES, the admins' grant), `boss-tokens.test.ts` (the drop rule and its window, a race for the
   window's first place, which boss, guests where sign-in is set up, 10 moves / 5 minutes, solo timed by the server and counted once,
   the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
-- e2e: `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
+- e2e: `e2e/claw.spec.ts` (the claw machine: an admin's test tokens, a forced win opened with Open now, a forced loss, one token each), `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
   its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
   straight in the local database).
