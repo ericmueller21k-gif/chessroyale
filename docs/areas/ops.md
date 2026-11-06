@@ -11,7 +11,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   D1 (`hunchess`) for accounts, results, the locker, fair play and budgets. The domain is hunchess.com.
 - **Deploy:** every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`) through Workers Builds.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
-  branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
+  branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
+  run side by side and `check` is green when both are) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
 - **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
   `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
