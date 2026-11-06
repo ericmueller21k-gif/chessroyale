@@ -7,9 +7,10 @@ const { N, newView, pickSquare, proj, rel, setHeading, setView, forEachSquare } 
 const { STRIPS, stripAt, stripOf, baseHeading, headingFacing } = await import("../src/town/strips.ts");
 const { LookAround, Turn, nearestTurn, quarterOf, screenStep } = await import("../src/town/turn.ts");
 const { STREET_HOMES, STREET_LOTS, STREET_PROPS, STREET_GROUND, STREET_COLISEUM } = await import("../src/town/street.ts");
-const { HOMES, COLISEUM, PROPS, createTown, destFor, walkable, findPath } = await import("../src/town/world.ts");
-const { streetBoxes, boxPoint } = await import("../src/town/boxes.ts");
-const { STANDING, COLISEUM_FOOT, HOUSE_COLISEUM_STREET } = await import("../src/town/houses/coliseum.ts");
+const { HOMES, COLISEUM, PROPS, STATUES, createTown, destFor, walkable, findPath } = await import("../src/town/world.ts");
+const { PIECE_ART } = await import("../src/town/houses/coliseum.ts");
+const { STATUE_W } = await import("../src/town/houses/statues.ts");
+const PLAN = (await import("../src/town/street-plan.json")).default;
 const { TOWN_FEEL } = await import("../src/town/feel.ts");
 
 /**
@@ -145,53 +146,45 @@ describe("looking round (round 5 addendum; Eric: \"hold your mouse, move it a li
   });
 });
 
-describe("the Colosseum against the back wall (round 5; Eric: \"you can't go past it. It's all blocked off\")", () => {
+describe("the Colosseum against the back wall (round 5; Eric: \"you can't go past it. It's all blocked off\"; the north edge round: one back line)", () => {
   const C = STREET_COLISEUM;
-  it("sits at the top centre, its top row the north edge", () => {
+  const LINE = PLAN.coliseum.line;
+  it("sits at the north edge, its top row the edge, on the promenade's line (the town wraps east-west, so that's its middle)", () => {
     expect(COLISEUM).toEqual(C);
     expect(C.r0 + C.size - 1).toBe(N - 1);
-    expect(C.c0 + C.size / 2 - 0.5).toBeCloseTo(N / 2 - 0.5, 0);
+    expect(C.c0 + C.size / 2 - 0.5).toBe(22.5);
+    // (Its first row the plinths' row, before the line: the statues and pieces stand on it, half under the ring's front.)
+    expect(C.r0 + 0.5).toBe(LINE);
   });
-  it("nothing beside or behind it is walkable: you only come at it from the front; nothing past the north edge either", () => {
-    for (let r = C.r0; r < N; r++)
-      for (let c = C.c0 - 4; c < C.c0 + C.size + 4; c++) expect(walkable(c, r), at(c, r)).toBe(false);
-    for (let c = 0; c < N; c++) expect(walkable(c, N)).toBe(false);
-    // Nothing walkable on the back two rows, the whole way along.
-    for (const r of [44, 45]) for (let c = 0; c < N; c++) expect(walkable(c, r), at(c, r)).toBe(false);
+  it("nothing past the back line is walkable: you only come at it from the front, through the plaza", () => {
+    for (let r = Math.ceil(LINE); r <= N; r++) for (let c = 0; c < N; c++) expect(walkable(c, r), at(c, r)).toBe(false);
     // The plaza before it is: from the gate's square down to the town.
     expect(walkable(22, C.r0 - 1)).toBe(true);
-    expect(findPath({ c: 22, r: C.r0 - 1 }, (c, r) => c === 22 && r === 17, walkable)).not.toBeNull();
-    // And no path from the plaza reaches a square beside it (its grove, four columns either side).
-    const beside = (c: number, r: number) => r >= C.r0 && ((c >= C.c0 - 4 && c < C.c0) || (c >= C.c0 + C.size && c < C.c0 + C.size + 4));
-    expect(findPath({ c: 22, r: C.r0 - 1 }, beside, walkable)).toBeNull();
+    expect(findPath({ c: 22, r: C.r0 - 1 }, (c, r) => c === 22 && r === 25, walkable)).not.toBeNull();
   });
-  it("a wall with a closed gate either side of it on its front line, the back wall along the whole edge, the grove behind them", () => {
+  it("the back wall along the whole line but the Colosseum's ring, its ends under the ring; walls along the plaza's front with gateways", () => {
     const walls = STREET_LOTS.filter((l) => l.kind === "wall");
-    const side = walls.filter((l) => l.r0 === C.r0);
-    expect(side.map((l) => [l.c0, l.c0 + l.w - 1])).toEqual([[C.c0 - 4, C.c0 - 1], [C.c0 + C.size, C.c0 + C.size + 3]]);
-    for (const l of side) expect(l.wall!.gate).not.toBeNull();
-    // The back wall: every column but the Colosseum's, once.
-    const back = walls.filter((l) => l.r0 === N - 1);
-    const cols = back.flatMap((l) => Array.from({ length: l.w }, (_, k) => l.c0 + k)).sort((a, b) => a - b);
-    expect(cols).toEqual(Array.from({ length: N }, (_, c) => c).filter((c) => c < C.c0 || c >= C.c0 + C.size));
-    for (const l of back) expect(l.at!.y).toBeCloseTo(N - 0.5, 9);
-    // Trees behind the walls (treetops over them), no skyline tower on the back rows.
-    expect(STREET_PROPS.filter((p) => p.kind === "tree" && p.y >= C.r0 && (p.x < C.c0 || p.x >= C.c0 + C.size)).length).toBeGreaterThanOrEqual(30);
-    expect(STREET_LOTS.filter((l) => l.kind === "tall" && l.r0 >= 40)).toEqual([]);
-  });
-  it("nothing stands north of the back wall: no building's foot and no prop past the edge", () => {
-    const pt = { x: 0, y: 0 };
-    for (const b of streetBoxes(PROPS)) {
-      boxPoint(b, b.box, b.box.front.w / 2, 0, pt);
-      expect(pt.y, b.box.id).toBeLessThanOrEqual(N - 0.5 + 1e-9);
+    // The back wall: its front on the line, every column once but those under the ring's front (20..25).
+    const back = walls.filter((l) => l.r0 === C.r0 + 1);
+    const cols = back.flatMap((l) => Array.from({ length: l.w }, (_, k) => (l.c0 + k) % N)).sort((a, b) => a - b);
+    expect(cols).toEqual(Array.from({ length: N }, (_, c) => c).filter((c) => c < 20 || c > 25));
+    for (const l of back) expect(l.at!.y).toBeCloseTo(LINE, 9);
+    // The plaza's front: three walls on Colosseum Row's north sidewalk, from column 13 to 32, an open arch in each, no closed gate.
+    const front = walls.filter((l) => l.r0 === 39);
+    expect(front.map((l) => [l.c0, l.c0 + l.w - 1])).toEqual([[13, 20], [21, 24], [25, 32]]);
+    for (const l of front) {
+      expect(l.wall!.gate).toBeNull();
+      expect(l.wall!.arches!.length, l.name).toBe(1);
     }
-    for (const p of STREET_PROPS) expect(p.y, `${p.kind} ${p.x},${p.y}`).toBeLessThanOrEqual(N - 1);
+    // Treetops over the plaza's stretches of the back wall; no skyline tower near the line.
+    expect(STREET_PROPS.filter((p) => p.kind === "tree" && p.y > LINE).length).toBeGreaterThanOrEqual(6);
+    expect(STREET_LOTS.filter((l) => l.kind === "tall" && l.r0 + l.d > 36)).toEqual([]);
   });
   it("no second Colosseum (nor any square twice) in view: the wrap never shows the town beside itself, at every zoom step", () => {
     for (const steps of TOWN_FEEL.streetZoomSteps)
       for (const [W, H] of [[390, 844], [1280, 800]] as const)
-        for (const camX of [0, 6, 13, 22, 31, 40, 45])
-          for (const camY of [33, 26, 20, 5]) {
+        for (const camX of [0, 6, 13, 22, 31, 40, 47, 53])
+          for (const camY of [41, 36, 28, 20, 13, 5]) {
             const v = newView();
             setView(v, W, H, 0, 1, 0, 0, steps);
             const seen = new Set<string>();
@@ -205,15 +198,21 @@ describe("the Colosseum against the back wall (round 5; Eric: \"you can't go pas
     // (The Colosseum is one thing in the world: drawn where the shortest way round puts it, once.)
     expect(HOMES.length).toBe(16);
   });
-  it("the statues and chess pieces before it stand side by side on its front line, planted, never overlapping; no pawn floats at its back", () => {
-    const s = [...STANDING].sort((a, b) => a.x0 - b.x0);
-    expect(s.length).toBe(8);
-    for (let i = 1; i < s.length; i++) expect(s[i]!.x0, `${s[i - 1]!.name} | ${s[i]!.name}`).toBeGreaterThanOrEqual(s[i - 1]!.x1);
-    for (const x of s) {
-      expect(x.foot, x.name).toBeGreaterThanOrEqual(COLISEUM_FOOT);
-      expect(x.foot - COLISEUM_FOOT, x.name).toBeLessThanOrEqual(6);
+  it("the statues and chess pieces stand side by side on the plaza against the back line, planted, never overlapping", () => {
+    const fig = PROPS.filter((p) => p.kind === "statue" || p.kind === "piece");
+    expect(fig.length).toBe(8);
+    const span = (p: (typeof fig)[number]) => {
+      const w = p.kind === "statue" ? STATUE_W : PIECE_ART[p.v]!.w;
+      const half = w / 2 / TOWN_FEEL.housePxPerSquare;
+      return [p.x - half, p.x + half] as const;
+    };
+    const s = [...fig].sort((a, b) => a.x - b.x);
+    for (let i = 1; i < s.length; i++) expect(span(s[i]!)[0], `${s[i - 1]!.kind} ${s[i - 1]!.v} | ${s[i]!.kind} ${s[i]!.v}`).toBeGreaterThanOrEqual(span(s[i - 1]!)[1] - 0.02);
+    // On the plinths' row, between the plaza you walk on and the line; each statue's square the plaza's before it.
+    for (const p of fig) {
+      expect(p.y).toBeGreaterThan(41.5);
+      expect(p.y).toBeLessThan(LINE);
     }
-    const parts = new Set(HOUSE_COLISEUM_STREET.anims.idle!.frames[0]!.layers.map((l) => l.part));
-    for (const p of ["pawnL", "pawnR", "plinthPL", "plinthPR"]) expect(parts.has(p), p).toBe(false);
+    for (const st of STATUES) expect(walkable(st.c, st.r), `${st.id}'s square`).toBe(true);
   });
 });

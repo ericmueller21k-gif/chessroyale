@@ -301,12 +301,13 @@ def arch_at(c, c0, w=30, h=66):
 lots.append(wall2("The plaza's west wall", 13, 39, 8, 0.3, 96, 0.4, [arch_at(15, 13)]))
 lots.append(wall2("The plaza's grand gateway", 21, 39, 4, 0.3, 150, 0.4, [{"x": 74, "w": 116, "h": 104}], True))
 lots.append(wall2("The plaza's east wall", 25, 39, 8, 0.3, 96, 0.4, [arch_at(30, 25)]))
-# The back wall on the line, the whole way round but the Colosseum (its oval meets the line between x = 18.4 and 26.6): from column 27
-# east round the wrap to column 18, in stretches of six or so.
+# The back wall on the line, the whole way round but the Colosseum: from column 26 east round the wrap to column 19, in stretches of six.
+# (Its oval meets the line at x = 18.9 and 26.1, and is at x = 18.0 and 27.0 by the wall's back, half a square on: each end of the wall
+# runs on under the ring's seats, so no gap between the wall and the ring shows the meadow behind.)
 BACK = []
-c = 27
-while c <= 18 + N:
-    w = min(6, 18 + N - c + 1)
+c = 26
+while c <= 19 + N:
+    w = min(6, 19 + N - c + 1)
     BACK.append((c, w))
     c += w
 for i, (c0, w) in enumerate(BACK):

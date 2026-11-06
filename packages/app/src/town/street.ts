@@ -9,7 +9,7 @@
  * position (x, y) is in squares, a square's middle at whole numbers.
  */
 import PLAN from "./street-plan.json" with { type: "json" };
-import { N, WRAP } from "./camera.ts";
+import { N } from "./camera.ts";
 import type { Design } from "./buildings.ts";
 import type { LookSpec } from "./lookalike.ts";
 import type { WallSpec } from "./wall.ts";
@@ -193,47 +193,3 @@ export const STREET_COLISEUM = { c0: PLAN.coliseum.c0, r0: PLAN.coliseum.r0, siz
 /** The streets, with the way the camera faces on each (degrees from north: Seam Avenue faces east, round 3's turn). */
 export const STREET_STREETS: readonly { id: string; name: string; axis: string; c0: number; c1: number; r0: number; r1: number; cam: number }[] = PLAN.streets;
 
-/**
- * Whether the Colosseum shows from (x, y) (Nov 5, round 4; Eric: "you won't actually be able to see the Colosseum unless you're like
- * running towards it"): the rows hide it, so it shows only down a street or across a square that opens onto it. True when a straight line
- * from (x, y) reaches some square of its outline without crossing a lot (a row's or a home's). Worked out once a square (cached).
- */
-const COL = PLAN.coliseum;
-const colTargets: { x: number; y: number }[] = [];
-for (let i = 0; i < COL.size; i++) {
-  colTargets.push({ x: COL.c0 + i, y: COL.r0 }, { x: COL.c0 + i, y: COL.r0 + COL.size - 1 });
-  if (i > 0 && i < COL.size - 1) colTargets.push({ x: COL.c0, y: COL.r0 + i }, { x: COL.c0 + COL.size - 1, y: COL.r0 + i });
-}
-const seenCache = new Map<number, boolean>();
-export function colosseumSeen(x: number, y: number): boolean {
-  const c0 = ((Math.round(x) % N) + N) % N;
-  const r0 = ((Math.round(y) % N) + N) % N;
-  const key = r0 * N + c0;
-  const hit = seenCache.get(key);
-  if (hit !== undefined) return hit;
-  const L = STREET_GROUND_KEY.L;
-  let seen = false;
-  for (const t of colTargets) {
-    let dx = t.x - c0;
-    let dy = t.y - r0;
-    if (WRAP.ew) dx -= N * Math.round(dx / N);
-    if (WRAP.ns) dy -= N * Math.round(dy / N);
-    const n = Math.ceil(Math.hypot(dx, dy) * 4);
-    let open = true;
-    for (let k = 1; k < n; k++) {
-      const c = ((Math.round(c0 + (dx * k) / n) % N) + N) % N;
-      const r = ((Math.round(r0 + (dy * k) / n) % N) + N) % N;
-      if (c === c0 && r === r0) continue;
-      if (STREET_GROUND[r * N + c] === L) {
-        open = false;
-        break;
-      }
-    }
-    if (open) {
-      seen = true;
-      break;
-    }
-  }
-  seenCache.set(key, seen);
-  return seen;
-}

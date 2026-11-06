@@ -871,7 +871,9 @@ export class Renderer {
         this.sqKey[n] = sqKeyOf(m, 4, (cu + ru) & 1);
       } else {
       const gk = groundAt[r * N + c]!;
-      this.sqKey[n] = sqKeyOf(m, gk === PAVING || gk === WALL || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || onColiseum(c, r) ? 1 : 0, (c + r) & 1);
+      // (The street town's Colosseum, the north edge round: the board's squares under its oval only; round it, behind the back wall, the
+      // meadow, as past the edge.)
+      this.sqKey[n] = sqKeyOf(m, gk === PAVING || gk === WALL || (STREET_TOWN && ROW_GROUND[r * N + c]) ? 2 : gk === GRASS ? 3 : gk === GARDEN || gk === LOT ? 4 : gk === ARENA || plotAt[r * N + c] || (!STREET_TOWN && onColiseum(c, r)) ? 1 : 0, (c + r) & 1);
       }
       const o = n * 8;
       const cx = (q[0]! + q[2]! + q[4]! + q[6]!) / 4;

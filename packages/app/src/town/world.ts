@@ -47,7 +47,9 @@ export const WALK_ROWS = 4;
 /** The middle of the gate's sill, on the Colosseum's front edge (between its two middle columns). */
 const GATE_X = COLISEUM.c0 + (COLISEUM.size - 1) / 2;
 const GATE_Y = COLISEUM.r0 - 0.5;
-export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_ROWS }, (_, i) => ({ c: COLISEUM.c0 + (i % COLISEUM.size), r: COLISEUM.r0 - 1 - Math.floor(i / COLISEUM.size) })).sort(
+/** (The street town, the north edge round: two rows, the plaza's; the third is its front wall's.) */
+const APRON_DEEP = STREET_TOWN ? 2 : APRON_ROWS;
+export const APRON: readonly Sq[] = Array.from({ length: COLISEUM.size * APRON_DEEP }, (_, i) => ({ c: COLISEUM.c0 + (i % COLISEUM.size), r: COLISEUM.r0 - 1 - Math.floor(i / COLISEUM.size) })).sort(
   (a, b) => Math.hypot(a.c - GATE_X, a.r - GATE_Y) - Math.hypot(b.c - GATE_X, b.r - GATE_Y),
 );
 

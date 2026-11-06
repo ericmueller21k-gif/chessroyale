@@ -538,32 +538,10 @@ export const HOUSE_COLISEUM: Character = {
 };
 
 /**
- * The street town's Colosseum (Nov 5, round 5; Eric: "It looks like these pawns are floating"): the same picture without the two marble
- * pawns at its back corners, which stand on plinths drawn 78 px up the picture to look far back from the old high camera; at the
- * street town's low camera they float over the plaza. Everything else that stands before it (the queen and king by the gate, the
- * bishop, rook, knight and pawn, the two statues) stands on its front line, side by side.
- */
-const BACK_PAWNS = new Set(["plinthPL", "pawnL", "plinthPR", "pawnR"]);
-export const HOUSE_COLISEUM_STREET: Character = {
-  ...HOUSE_COLISEUM,
-  id: "house-coliseum-street",
-  anims: { idle: { ...idle, frames: frames.map((fr) => ({ ...fr, layers: fr.layers.filter((l) => !BACK_PAWNS.has(l.part)) })) } },
-};
-
-/**
  * Where a statue's picture stands over this one (frame pixels: its top left; it is STATUE_W x statueH(id)), its
  * pedestal's foot on the front row's line, either side of the gate.
  */
 export const statueSpot = (id: StatueId): Pt => [CX + (id === "marble" ? -1 : 1) * STATUE_OFF - STATUE_W / 2, FRONT + 1 - statueH(id)];
-/** (Tests) What stands on the plaza before the street town's Colosseum: each plinth's and statue's span across (px) and its foot. */
-export const STANDING: readonly { name: string; x0: number; x1: number; foot: number }[] = [
-  ...front.filter((n) => n.startsWith("plinth")).map((n) => ({ name: n, x0: at[n]![0], x1: at[n]![0] + PLINTH_W, foot: at[n]![1] + PLINTH_H })),
-  ...(["marble", "bronze"] as const).map((id) => {
-    const [x, y] = statueSpot(id);
-    return { name: id, x0: x, x1: x + STATUE_W, foot: y + statueH(id) };
-  }),
-];
-export const COLISEUM_FOOT = FOOT;
 
 /** Where the tablet's blank face is (frame pixels), for the game to write "The Colosseum" on. */
 export const HOUSE_COLISEUM_SIGN = signFace(BOARD[0], BOARD[1], BW, BH);

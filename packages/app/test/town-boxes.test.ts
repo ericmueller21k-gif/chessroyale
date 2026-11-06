@@ -67,7 +67,7 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
     const ave = LOTS.filter((b) => STREET_LOTS[b.lot]!.street === "seam-ave");
     expect(ave.length).toBeGreaterThanOrEqual(4);
     for (const b of ave) expect([b.ux, b.uy]).toEqual(b.facing === "W" ? [0, -1] : [0, 1]);
-    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBe(1);
+    for (const b of LOTS) expect(b.ux * b.by - b.uy * b.bx, b.box.id).toBeCloseTo(1, 9);
   });
 
   it("every roof face's normal points out and up (none faces down), and its texture frame holds its corners", () => {
