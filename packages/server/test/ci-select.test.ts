@@ -118,17 +118,17 @@ describe("the table (e2e/areas.json)", () => {
 describe("shards", () => {
   const weight = weigher(readTimings());
 
-  it("as few as the specs need, at least 1, at most 5, never more than the files", () => {
+  it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
     expect(shardCount(smoke, weight)).toBe(1);
     expect(shardCount(["e2e/formats.spec.ts"], () => 5000)).toBe(1);
     expect(shardCount(all, weight)).toBe(MAX_SHARDS);
-    expect(MAX_SHARDS).toBe(5);
+    expect(MAX_SHARDS).toBe(10);
   });
 
-  it("every spec: 5 shards and no file list (each shard spreads every spec file); otherwise the files", () => {
+  it("every spec: 10 shards and no file list (each shard spreads every spec file); otherwise the files", () => {
     const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, weight, all);
-    expect(full.outputs).toMatchObject({ specs: "", total: "5", shards: "[1,2,3,4,5]" });
-    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 5 shards: this is a push run, which tests everything.`);
+    expect(full.outputs).toMatchObject({ specs: "", total: "10", shards: "[1,2,3,4,5,6,7,8,9,10]" });
+    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 10 shards: this is a push run, which tests everything.`);
     const one = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
     expect(one.outputs.specs.split(" ")).toContain("e2e/sawyer.spec.ts");
     expect(JSON.parse(one.outputs.shards)).toEqual(Array.from({ length: Number(one.outputs.total) }, (_, i) => i + 1));
