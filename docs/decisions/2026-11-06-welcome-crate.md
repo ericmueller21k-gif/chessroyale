@@ -5,12 +5,21 @@ random rider, with a HunChess-theme gold and black crate. Never tradeable. Purit
 Something on it which says 'Thank you for being an early tester!', and also a note saying not tradeable. See if you can do all the
 colors for all the riders and the crate and the UI wiring." How it works: [shop.md](../areas/shop.md), "The Welcome Crate".
 
+Then, the same day: "the first one you get after 5 games, the next one you get after 25." So there are two Welcome Crates, at 5 and
+25 finished games (`WELCOME_GIFT.milestones`), each once per account under the same rules; the second looks the same and holds a
+HunChess ride different from the one the first gave.
+
 The calls made here, each easy to change:
 
-- **One per account, ever, by the server.** A table `welcome_crates` keyed by the account (`user_id` PRIMARY KEY). The grant is one
-  statement: it inserts the row only while the account is signed in (an email or a Google account) and its finished games, counted in
-  that same statement, reach `WELCOME_GIFT.games` (5, settings.ts); `ON CONFLICT DO NOTHING` makes a second grant a no-op. So retries,
-  races, two tabs and two Workers can't grant two. Nothing the app sends asks for it.
+- **Each once per account, ever, by the server.** A table `welcome_crates` keyed by the account and the milestone (PRIMARY KEY
+  (`user_id`, `milestone`)). The grant is one statement over both milestones: it inserts a milestone's row only while the account is
+  signed in (an email or a Google account) and its finished games, counted in that same statement, reach it (5, then 25:
+  `WELCOME_GIFT.milestones` in settings.ts); `ON CONFLICT DO NOTHING` makes a second grant of either a no-op. So retries, races, two
+  tabs and two Workers can't grant two of either (tested: 12 grants at once at 5, 10 at once at 25). Nothing the app sends asks for it.
+- **The second's ride is a different one.** Opening takes the earliest unopened crate. Its roll leaves out every ride an earlier
+  Welcome Crate of the account gave (kept on its row, `def`, so deleting the first ride doesn't let it come again), and the insert
+  checks that in the same transaction: two opens at once with both crates waiting open both, with two different rides (the loser of
+  the check rolls again). Only if every ride had been won would a repeat be allowed (it can't happen with two crates).
 - **What counts as a finished game.** Every row of `results` (online matches written by their rooms: Classic, Crowd and 50 v 50, boss
   raids, friends' lobbies, Squads; and solo matches, saved by the app from their result screen) plus every ranked 1 v 1 game
   (`ranked_1v1.games`; aborted ones are never recorded). A match left before its first move is never recorded. **Abandoned** matches
@@ -50,10 +59,13 @@ The calls made here, each easy to change:
 - **Its look in the app:** the crate's own art (black chest, the logo's gold `#f2c14e` trim, bands, corners and pawn, "HUNCHESS",
   an idle glint every few seconds, still under reduced motion), first in the Crates tab; its page lists every ride it can give, each as
   likely; the opening is the Crates tab's own strip, landing on Fischer Random ("A HunChess ride"), then the ride.
-- **Progress hint:** "Finish 5 games to earn your Welcome Crate: 3/5" on the crate's row and page until it's earned (a guest's adds
-  "Sign in to earn it.").
-- **Stored** (all new; older data reads as "not earned yet"): table `welcome_crates` (`user_id`, `granted_at`, `games`, `seen_at`,
-  `opened_at`, `item_id`), column `results.abandoned` (NULL on every older row), and the ride as an ordinary `items` row. The account's
+- **Progress hint:** the next milestone's, on the crate's row and page: "Finish 5 games to earn your Welcome Crate: 3/5", then
+  "Finish 25 games for your second Welcome Crate: 7/25" (a guest's adds "Sign in to earn it."); "You have 1. Open it!" while one
+  waits; "Both opened. Their rides are in your locker." at the end. The notice fires for each. The app's `welcomeProgress()`
+  (account.ts) answers `{ next: 5 | 25 | null, done }` from the account as loaded, for a tutorial's hint.
+- **The backfill covers both:** an account with 25 or more past finished games gets both crates on its next app load.
+- **Stored** (all new; older data reads as "not earned yet"): table `welcome_crates` (`user_id`, `milestone`, `granted_at`, `games`,
+  `seen_at`, `opened_at`, `item_id`, `def`), column `results.abandoned` (NULL on every older row), and the ride as an ordinary `items` row. The account's
   download has it ("welcomeCrate"), deleting the account erases it.
 
 Lane: full (stored data, fair play, the shared core).

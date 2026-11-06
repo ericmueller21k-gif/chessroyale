@@ -127,9 +127,11 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts the drops).
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
-  - **Earned** once per account, ever, at 5 finished games in any mode or against any boss (a `results` row not marked `abandoned`, or
-    a ranked 1 v 1 game), by the server only: one statement inserts the account's `welcome_crates` row (keyed by the account) only while
-    it's signed in and the count reaches 5, and does nothing if it's there. Checked on every `/api/me` (the backfill) and after every
+  - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
+    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (a `results` row not marked `abandoned`, or a
+    ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
+    milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
+    `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
     removed mid-match as `abandoned` (not counted); a resignation counts.
   - **The notice** (`components/WelcomeNotice.tsx`): **"You earned a Welcome Crate!"**, "Thank you for being an early tester!", "It's in
@@ -146,7 +148,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     cream, with a gold trim; `HUNCHESS_LEVELS` lifts a ride whose remap fails: the Rodeo Bull). No purity shown, no shine.
   - **Never tradeable or listable:** `tradeable()` in core says no for the crate and its rides (there's no trading or listing yet: any
     path that comes asks it on the server). The locker's tile shows "HunChess" and "Not tradeable" in place of its color and purity.
-  - **Stored:** `welcome_crates` (`user_id`, `granted_at`, `games`, `seen_at`, `opened_at`, `item_id`), `results.abandoned`; the ride is
+  - **Stored:** `welcome_crates` (`user_id`, `milestone`, `granted_at`, `games`, `seen_at`, `opened_at`, `item_id`, `def`), `results.abandoned`; the ride is
     an `items` row (crate `welcome-hunchess`). Older data reads as not earned yet. In the account's download ("welcomeCrate") and erased
     with it.
 - **The gambling warning** (Eric, Nov 1; `components/GamblingWarning.tsx`): a small red ring, see-through in the middle, with a bubbly
