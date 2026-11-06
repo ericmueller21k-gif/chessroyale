@@ -43,12 +43,17 @@ export function DressedPawn({
   shadow,
   side = "w",
   ride = false,
+  onTap,
+  tapLabel,
 }: {
   look?: ItemLook;
   size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage" | "avatar";
   shadow?: boolean;
   side?: "w" | "b";
   ride?: boolean;
+  /** A tap on the pawn (Home's card: your inventory). Its own root takes the tap, so the layout is the same. */
+  onTap?: () => void;
+  tapLabel?: string;
 }) {
   const pawn = useRef<HTMLSpanElement>(null);
   // Home's hero pawn hops, on a computer as on a phone, not under reduced motion (Eric: "add the bounce effect every 30
@@ -78,10 +83,19 @@ export function DressedPawn({
       <Avatar look={look} side={side} ride={ride} />
     </span>
   );
+  const cls = `fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}${onTap ? " fd-tap" : ""}`;
+  // (Home's hero: the box sits in a pawn-sized wrapper that hops, so the hop moves the pawn and nothing in the layout.)
+  const inner = size === "hero" ? <span class="fd-hop">{box}</span> : box;
+  if (!onTap) return <span ref={pawn} class={cls} aria-hidden="true">{inner}</span>;
+  const key = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onTap();
+    }
+  };
   return (
-    <span ref={pawn} class={`fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}`} aria-hidden="true">
-      {/* (Home's hero: the box sits in a pawn-sized wrapper that hops, so the hop moves the pawn and nothing in the layout.) */}
-      {size === "hero" ? <span class="fd-hop">{box}</span> : box}
+    <span ref={pawn} class={cls} role="button" tabIndex={0} aria-label={tapLabel} onClick={onTap} onKeyDown={key}>
+      {inner}
     </span>
   );
 }
