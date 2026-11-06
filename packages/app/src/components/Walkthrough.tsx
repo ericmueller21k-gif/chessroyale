@@ -14,8 +14,9 @@ import {
 import { account } from "../account.ts";
 
 /**
- * The first-time walkthrough over the home screen. A slide's spot (its `data-tour` element) is cut out of the dim with a
- * gold ring and a pulsing glow, and lifted slightly (scaled from its centre). The highlight glides to the next spot; the
+ * The first-time walkthrough over the home screen. A slide's spot (its `data-tour` element) is cut out of the dim: the spot
+ * is the element's exact box and radius, transparent inside, its box-shadow dimming everything outside. A soft gold glow
+ * starts at the element's edge and pulses; the element is lifted slightly (scaled from its centre). The highlight glides to the next spot; the
  * bubble is docked at the bottom of the screen while the spot's centre is in the top half, and at the top once it is past
  * halfway, fading when it moves. A slide with no spot (the Handbook) dims the whole screen. Tap anywhere to go on. The last
  * slide shows both Welcome Crates and a "Go to your inventory" button (the shop's Crates tab). "Don't show this tutorial
@@ -26,7 +27,6 @@ import { account } from "../account.ts";
 export const WALKTHROUGH_REPLAY_KEY = "hunchess.tutorial.replay";
 export const WALKTHROUGH_REPLAY_EVENT = "hunchess:walkthrough";
 
-const PAD = 8;
 const DOCK_MOVE_MS = 180;
 const GLIDE_MS = 250;
 
@@ -105,8 +105,9 @@ interface SpotBox {
 }
 
 /**
- * The cut-out for an element, padded. A lit element is scaled about its centre, so its centre stays put and its size
- * comes from offsetWidth/offsetHeight (untransformed): the cut-out is the same whether or not the lift is on yet.
+ * The cut-out for an element: its exact box and radius (no padding, so no page colour shows round it). A lit element is
+ * scaled about its centre, so its centre stays put and its size comes from offsetWidth/offsetHeight (untransformed): the
+ * cut-out is the same whether or not the lift is on yet.
  */
 function boxOf(el: HTMLElement, lit: boolean): SpotBox {
   const r = el.getBoundingClientRect();
@@ -116,11 +117,11 @@ function boxOf(el: HTMLElement, lit: boolean): SpotBox {
   const cy = r.top + r.height / 2;
   const own = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
   return {
-    top: cy - h / 2 - PAD,
-    left: cx - w / 2 - PAD,
-    width: w + PAD * 2,
-    height: h + PAD * 2,
-    radius: Math.min(own, Math.min(w, h) / 2) + PAD,
+    top: cy - h / 2,
+    left: cx - w / 2,
+    width: w,
+    height: h,
+    radius: Math.min(own, Math.min(w, h) / 2),
     scale: lit ? litScale(el) : 1,
   };
 }

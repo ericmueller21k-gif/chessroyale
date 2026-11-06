@@ -24,7 +24,7 @@ const box = (page: Page) => dialogOf(page).getByRole("checkbox", { name: /Don't 
 
 /**
  * A slide's spot is cut out of the dim, not covered by it: no dim layer over a spot, and the lit element sits inside the
- * cut-out. The bubble is docked at the bottom while the spot's centre is in the top half of the screen, else at the top.
+ * cut-out (to within a pixel: the cut-out is the element's exact box). The bubble is docked at the bottom while the spot's centre is in the top half of the screen, else at the top.
  * (A slide with no spot, the Handbook, has the full dim and no cut-out.)
  */
 async function expectSpotAndDock(page: Page) {
@@ -43,7 +43,7 @@ async function expectSpotAndDock(page: Page) {
         topHalf: cy < innerHeight / 2,
         atBottom: Math.abs(innerHeight - b.bottom - 16) <= 1,
         atTop: Math.abs(b.top - 16) <= 1,
-        litInside: !lit || (lit.left >= s.left && lit.right <= s.right && lit.top >= s.top && lit.bottom <= s.bottom),
+        litInside: !lit || (lit.left >= s.left - 1 && lit.right <= s.right + 1 && lit.top >= s.top - 1 && lit.bottom <= s.bottom + 1),
       };
     });
     expect(r.litInside).toBe(true);

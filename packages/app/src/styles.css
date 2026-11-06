@@ -23839,8 +23839,10 @@ button.sq-tiny {
    pulsing glow; the bubble docks at the top or bottom. */
 .wt-root { position: fixed; inset: 0; z-index: 900; cursor: pointer; }
 .wt-dim { position: absolute; inset: 0; background: rgba(8, 10, 14, 0.62); animation: wt-fade-in 250ms ease; }
-.wt-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 0 3px #f5c542; pointer-events: none; }
-.wt-spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 18px 6px rgba(245, 197, 66, 0.7); animation: wt-glow 1.6s ease-in-out infinite; }
+/* The spot is the element's exact box, transparent inside: only its box-shadow dims the outside. No ring and no padding. */
+.wt-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; }
+/* The gold glow starts at the element's edge (no spread gap) and fades outward; only its opacity pulses. */
+.wt-spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 14px 4px rgba(245, 197, 66, 0.75); animation: wt-glow 1.6s ease-in-out infinite; }
 .wt-spot.wt-glide { transition: top 250ms ease, left 250ms ease, width 250ms ease, height 250ms ease, transform 250ms ease, border-radius 250ms ease; }
 .wt-track { transition: transform 250ms ease; }
 .wt-lit { transform: scale(var(--wt-scale, 1.05)); }
