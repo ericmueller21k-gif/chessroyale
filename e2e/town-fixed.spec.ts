@@ -337,6 +337,12 @@ test("stills: the north edge", async ({ page }) => {
     await turn(deg);
     await shot(name);
   }
+  // A look round beside it: from the plaza by the portal, along its curving wall and out over the plaza.
+  await walkTo(page, [25, 41]);
+  for (const [name, deg] of [["4b-beside-looking-north-west", -50], ["4c-beside-looking-north-east", 40], ["4d-beside-looking-west", -100]] as const) {
+    await turn(deg);
+    await shot(name);
+  }
   await turn(null);
   await walkTo(page, [22, 32]);
   await shot("5-from-the-park");
