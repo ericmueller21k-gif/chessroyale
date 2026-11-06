@@ -1,6 +1,7 @@
 # The Ginger Igloo test's "one square short": the tap read while the camera glided (Nov 5, 2026)
 
-Lane: the shop area (the tests, and the shops' tap: the shared press code is unchanged). Main's run 42110146243 (3f50ee8c), shard 2 of 5, `[desktop] e2e/shop.spec.ts`
+Lane: the shop area. App code changed, but only the shops' own tap (`shops/ShopRoom.tsx` and the new `shops/tap.ts`); the shared
+press code (`town/press.ts`) and the town are unchanged, so the shop area's e2e covers it. Main's run 42110146243 (3f50ee8c), shard 2 of 5, `[desktop] e2e/shop.spec.ts`
 "Ginger Igloo (Nov 5)", both tries in `tapTo`: first expected `data-you` "6,5", received "5,5"; the retry expected "5,7",
 received "5,6".
 
@@ -24,7 +25,9 @@ CI's retry did ("5,7" expected, "5,6" received, at 54 and 71 px).
 
 **The fix, in the tests.** Each tap is aimed once you've stopped and the view rests on you (`viewOnYou`: the camera's focus
 within 0.01 of a square of your square). Ginger's `tapTo` waits for it before the shopkeeper's card check and the read, and so does
-Jefferson's `walkTo` (it reads and clicks the same way). Every check is unchanged.
+Jefferson's `walkTo` (it reads and clicks the same way). Hollow Peak's tap on the dog waits for it too, and closes his card
+first if it opened by itself (you're within talking range on (7, 6), and a tap with a card open only closes it), as Ginger's
+`tapTo` does. Every check is unchanged; Hollow Peak's gains one (the card is closed before the tap).
 
 **The fix, in the app (the director, Nov 5: a player could hit it).** A shop picked a tap's square at the release only, with the
 camera as it was then. Mid-walk the view moves about 0.9 px/ms, so in a 100 ms tap it moves about a square, and a player could be
@@ -34,8 +37,10 @@ you walk only if both are the same. A release on anything else lets go without w
 `shops/tap.ts` (`squareUnder`) so it can be unit-tested with a moving camera (`packages/app/test/shop-tap.test.ts`). A press with a
 card open closes it as before (the town's way: unless it became a drag).
 
-**Runs.** On the computer, 20 of 20 with the 80 ms gap that reproduced the failure, and 20 of 20 earlier (before the app change:
-10 with the gap, 10 plain). On the phone, 20 of 20. `e2e/shop.spec.ts` whole on both projects: RUNS_FULL.
+**Runs** (local, 2 workers, the app change in). The Ginger Igloo test on the computer: 20 of 20 with 80 ms added between the read
+and the click (the gap that reproduced the failure before the fix), and 20 of 20 plain. `e2e/shop.spec.ts` whole on both
+projects: 32 of 32. `shop-tap.test.ts`: 4 of 4. Before the app change: on the computer 20 of 20 (10 with the gap, 10 plain), on
+the phone 20 of 20.
 
 **Left alone: the arrow-key step (unconfirmed).** Under 3 parallel workers, 1 of 10 computer runs timed out at the keys part's
 wait for `data-you` "10,4". It never happened with 2 workers, CI's default. The likely cause is a frame longer than a step (90 ms),
