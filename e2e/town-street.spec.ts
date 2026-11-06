@@ -42,6 +42,7 @@ type Hooks = {
   __townAt?: (k: string, id?: unknown) => { x: number; y: number } | null;
   __townGlide?: (to: string | readonly [number, number]) => void;
   __townCam?: () => { zoom: number; zoomTarget: number; focus: number[] };
+  __townBossBack?: (id: string) => boolean;
 };
 
 /** The street town, an admin's, open by day (drawn with WebGL: its only drawing, Nov 6). */
@@ -52,17 +53,36 @@ async function openStreet(page: Page, query = "") {
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
 
+/** Waits until the camera's focus holds still for half a second. */
+async function settled(page: Page) {
+  const focus = () => page.evaluate(() => (window as unknown as Hooks).__townCam?.().focus.map((x) => x.toFixed(3)).join(","));
+  let last = await focus();
+  await expect(async () => {
+    await page.waitForTimeout(500);
+    const now = await focus();
+    const same = now === last;
+    last = now;
+    expect(same, "the camera at rest").toBe(true);
+  }).toPass({ timeout: 20_000 });
+}
+
 /** Taps a home (the camera glides to it first) until its card opens. */
 async function tapHome(page: Page, id: string, name: string) {
   const card = page.getByRole("dialog", { name, exact: true });
+  // (Its boss to its rest square first, so a tap on the home can't land on the boss passing in front of it: its card is the boss's.)
+  await expect.poll(() => page.evaluate((h) => (window as unknown as Hooks).__townBossBack?.(h) ?? false, id), { timeout: 30_000 }).toBe(true);
   await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
-  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing.)
-  await page.waitForTimeout(1200);
+  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing. On WebGL, software in the
+  // tests, frames are slower: wait for the camera to stop rather than a set time.)
+  await settled(page);
   await expect(async () => {
     if (await card.isVisible()) return;
     const xy = await page.evaluate((h) => (window as unknown as Hooks).__townAt?.("home", h) ?? null, id);
     // (Not drawn from where the camera is now (a tap that missed walked you off): look at it again, and try once more.)
-    if (!xy) await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
+    if (!xy) {
+      await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
+      await settled(page);
+    }
     expect(xy, "drawn").not.toBeNull();
     const cv = (await canvas(page).boundingBox())!;
     await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
@@ -111,19 +131,15 @@ test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you
   const errors = watchErrors(page);
   await openStreet(page);
   await page.waitForTimeout(600);
-  // Where you walk, every 50 ms.
-  const seen: string[] = [];
-  let watching = true;
-  const watch = (async () => {
-    while (watching) {
-      seen.push((await you(page)).join(","));
-      await page.waitForTimeout(50);
-    }
-  })();
+  // Where you walk: every square the canvas says you're on, noted in the page as it changes (a slow frame can't skip one between reads).
+  await canvas(page).evaluate((cv) => {
+    const w = window as unknown as { __seen: string[] };
+    w.__seen = [cv.dataset.you!];
+    new MutationObserver(() => w.__seen.push(cv.dataset.you!)).observe(cv, { attributes: true, attributeFilter: ["data-you"] });
+  });
   const card = await tapHome(page, "gingerbread", "Ginger Igloo");
   await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("34,31");
-  watching = false;
-  await watch;
+  const seen = await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
   // (Out of the park east, along Fountain Street: columns 33 to 36, rows 27 to 30.)
   expect(seen.some((s) => /^3[3-6],(2[7-9]|30)$/.test(s)), `along Fountain Street: ${[...new Set(seen)].join(" ")}`).toBe(true);
   await expect(card).toBeVisible();
