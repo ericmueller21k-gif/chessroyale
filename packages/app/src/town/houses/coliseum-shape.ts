@@ -58,9 +58,14 @@ function corners(): { pts: { x: number; y: number }[]; chord: number } {
   return { pts: walk(chord).pts.slice(0, RING_M), chord };
 }
 const C = corners();
-/** Every stretch's length (squares), and its front picture's width (px; its box drawn at W / CHORD px a square, about 37). */
+/** Every stretch's length (squares), and its front picture's width (px; its box drawn at W / CHORD px a square, about 37 / COL_SCALE). */
 export const CHORD = C.chord;
-export const RING_W = Math.round(CHORD * SQ);
+/**
+ * The art drawn this much bigger than the town's 37 px a square (Eric, on the round's first stills: "it looks very small"): its arches,
+ * tiers and portal with it; about 8.5 squares to the rim.
+ */
+export const COL_SCALE = 1.2;
+export const RING_W = Math.round((CHORD * SQ) / COL_SCALE);
 const W = RING_W;
 export const RING_PX = W / CHORD;
 

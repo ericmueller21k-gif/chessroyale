@@ -2200,7 +2200,8 @@ export class Renderer {
     const y0 = p.y - ch.foot[1] * px;
     const s = bandOf(v, it.dx, it.dz);
     const prop = PROPS[it.i]!;
-    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" ? this.nearFade(it) : 1);
+    // (A tree, and the plaza's statues and chess pieces (the north edge round), nearer the camera than you fade out: never between.)
+    const alpha = (1 - 0.6 * s) * enterOf(v, it.dx, it.dz) * (prop.kind === "tree" || prop.kind === "statue" || prop.kind === "piece" ? this.nearFade(it) : 1);
     if (alpha <= 0.004) return;
     // A statue on the street town's plaza (the north edge round): its figure (or its close-up) and its quote, as today's over the
     // Colosseum's picture.
@@ -3645,7 +3646,7 @@ export class Renderer {
    * (Tests) The street town's boxes the last frame drew: each one's art, which way it faces, its draws (strips and faces; the 2D
    * fallback's cost), whether its front was drawn and faced you, and how many of its sides were drawn.
    */
-  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number }[] {
+  boxDraws(): { id: string; kind: string; facing: "S" | "N" | "W" | "E"; draws: number; front: boolean; facesYou: boolean; sides: number; x: number; y: number; foot: number[] | null }[] {
     return this.boxes
       .filter((b) => this.plans[b.i]!.on)
       .map((b) => {
@@ -3653,8 +3654,19 @@ export class Renderer {
         const f = p.front;
         // (Its front faces you: turned neither way from the camera, so unshaded.)
         // (Its front line's middle in the world, round 5: what stands where.)
-        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy };
+        // (The north edge round: its front's foot on screen as drawn, its ends' x and y (s0..s1 of it if cut): where it stands as you turn.)
+        return { id: b.box.id, kind: b.kind, facing: b.facing, draws: p.draws, front: f.on, facesYou: f.on && f.shade < 0.004, sides: +p.left.on + +p.right.on, x: ((b.fx % N) + N) % N, y: b.fy, foot: f.on ? this.footOf(b, f) : null };
       });
+  }
+  /** (Tests) A box's front's drawn ends on screen and the world points they stand for: [x0, y0, x1, y1, s0, s1, wx0, wy0, wx1, wy1]. */
+  private footOf(b: BoxInst, f: WallPlan): number[] {
+    const pt = { x: 0, y: 0 };
+    const out = [f.x0, f.y0, f.x1, f.y1, f.s0, f.s1];
+    for (const s of [f.s0, f.s1]) {
+      boxPoint(b, b.box, s * b.box.front.w, 0, pt);
+      out.push(((pt.x % N) + N) % N, pt.y);
+    }
+    return out;
   }
   private readonly bossAlpha: number[] = [];
   private readonly personAlpha: number[] = [];

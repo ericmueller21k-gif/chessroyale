@@ -98,7 +98,12 @@ export const ROW_DEPTH = 2.3;
 export const ROW_FLAT = 1.2;
 /** A look-alike's widths (squares) to pick from, and the narrowest one may be (a slim filler front). */
 const WIDTHS = [1, 1.5, 2, 2, 2.5, 3] as const;
-const MIN_W = 0.6;
+/**
+ * The narrowest a look-alike may be: the narrowest normal one, a square (Eric, Nov 6: "Nothing should be that close … not two bosses";
+ * round 4's slim fillers, down to 0.6, read as a sliver squeezed in). Two boss homes in a row always have a whole one between them.
+ */
+export const ROW_MIN_W = WIDTHS[0];
+const MIN_W = ROW_MIN_W;
 /** Each look-alike runs this many px past each of its edges, under its neighbour, so a rounding crack never shows sky. */
 export const ROW_OVERLAP_PX = 1;
 
@@ -288,7 +293,7 @@ export const ROW_SIDES: readonly RowSide[] = [
   sideOf("colrow-s-east", "colosseum-row", "N", 32.5, AVE_E, 34, 34, 604, { ...BACK, inset: ROW_INSET_BACK }),
   // Colosseum Row's north side: from the plaza's east side round over the wrap (Seam Avenue ends at Colosseum Row) to its west side, its
   // backs against the back wall (the north edge round: its corners as deep as the homes, so the plaza's sides are built to the wall).
-  sideOf("colrow-n", "colosseum-row", "S", 32.5, 12.5 + SIZE, 40, 42, 701, { flat: ROW_FLAT, cornerDepth: ROW_DEPTH, landmark: true }),
+  sideOf("colrow-n", "colosseum-row", "S", 32.5, 12.5 + SIZE, 40, 43, 701, { flat: ROW_FLAT, cornerDepth: ROW_DEPTH, landmark: true }),
   // Seam Avenue's own stretch between South Street's and Fountain Street's corners: east of it (fronts face west) and west of it
   // (facing east, one square deep).
   { id: "ave-e", street: "seam-ave", facing: "W", a0: cornerBack(17, "S"), a1: cornerBack(25, "N"), d0: 3, d1: 5, corner0: false, corner1: false, seed: 1101, inset: ROW_INSET_BACK, flat: ROW_FLAT, cornerDepth: ROW_FLAT },

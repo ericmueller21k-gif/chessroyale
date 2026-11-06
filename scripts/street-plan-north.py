@@ -197,7 +197,7 @@ OLD_N = N
 N = 54
 ADD_C = 8  # columns inserted after column 42
 ADD_R = 8  # rows inserted after row 3 (Meadow Street's block)
-LINE = 42.5
+LINE = 43.5
 def mc(c):
     """Round 5's column c (0..45) here."""
     return c + ADD_C if c >= 43 else c
@@ -210,7 +210,7 @@ def my(y):
     return y + ADD_R if round(y) >= 4 else y
 
 # The Colosseum's oval (coliseum-ring.ts has the same numbers: its middle and half axes; the portal before it).
-OVAL = {"cx": 22.5, "cy": 47.6, "a": 7.4, "b": 5.9}
+OVAL = {"cx": 22.5, "cy": 49.0, "a": 8.8, "b": 7.0}
 def in_oval(c, r):
     return ((c - OVAL["cx"]) / OVAL["a"]) ** 2 + ((r - OVAL["cy"]) / OVAL["b"]) ** 2 <= 1.0
 
@@ -231,22 +231,27 @@ for r in range(N):
         g.append(["#" if c in AVE_C else "=" for c in range(N)])
     elif r <= 10:
         g.append(["#" if c in AVE_C else "=" if c in AVE_SW or c in LANE else "L" for c in range(N)])
-    elif r <= 42:
+    elif r <= 39:
         g.append(list(wide[r - ADD_R]))
+    elif r <= 43:
+        g.append(["L"] * N)  # Colosseum Row's north lots (four deep, to the line); the plaza below
     else:
         g.append(["A" if in_oval(c, r) else "g" for c in range(N)])
-# Seam Avenue ends at Colosseum Row: north of it (rows 39..42) its columns are the row's sidewalk and lots, as either side.
+# Seam Avenue ends at Colosseum Row: north of it (rows 39..43) its columns are the row's sidewalk and lots, as either side.
 for c in AVE_C + AVE_SW:
     g[39][c] = "="
-    for r in (40, 41, 42):
-        g[r][c] = "L"
-# The plaza: the front wall along row 39 ("W": a wall's or a plinth's square, paved, not walked on, not in the way of a look), its
-# gateways open; rows 40..41 paved; row 42 the plinths' row, the Colosseum's ground where its oval reaches.
-GATES = [15] + LANE + [30]
+# The plaza (Eric, on the round's first stills: the Colosseum "behind this random wall … looks very small"): open to Colosseum Row, rows
+# 40..43 across columns 13..32, up to the back line. The Colosseum stands proud of the line in its middle: under its ring's front and the
+# figures before its flanks (rows 42..43, columns 17..28) the Colosseum's ground ("A" under the oval, "W" round it: paved, not walked
+# on). The four lesser chess pieces stand at the plaza's front corners ("W"). Rows 42..43 either side, before the gates, are walked on.
 for c in range(13, 33):
-    g[39][c] = "=" if c in GATES else "W"
-    g[40][c] = g[41][c] = "="
-    g[42][c] = "A" if in_oval(c, 42) or c in LANE else "W"
+    for r in (40, 41, 42, 43):
+        g[r][c] = "="
+    for r in (42, 43):
+        if 17 <= c <= 28:
+            g[r][c] = "A" if in_oval(c, r) else "W"
+for c, r in ((13, 40), (13, 41), (32, 40), (32, 41)):
+    g[r][c] = "W"
 ground = ["".join(row) for row in g]
 assert all(len(row) == N for row in ground) and len(ground) == N
 
@@ -270,6 +275,18 @@ for s in streets:
         s["c1"] = N - 1
 
 MOVED = {"hopper", "pig", "moo", "hollow"}
+# Eric, Nov 6: "Moo & Moon Meadow and Hollow Peak right next to each other, with a little building squeezed in … a terrible design.
+# Nothing should be that close … not two bosses." The rule (rows.ts ROW_MIN_W): two boss homes are never neighbours, a whole look-alike
+# of a normal width (a square at least) between them, and no look-alike narrower, a row's ends too. So these lots move along their rows
+# (squares east): Hollow's and G-Rex's from beside Moo's and Ginger's; and the homes that left a sliver at a row's end.
+SPACE = {"hollow": 2, "grex": 1, "hopper": 1, "pig": 1, "timber": 1, "sawyer": -1, "tiger": -1}
+def shift_lot(l, d):
+    """A home's lot `d` squares east: its door, rest square and wander box with it."""
+    l["c0"] += d
+    for k in ("door", "rest"):
+        l[k] = {"c": l[k]["c"] + d, "r": l[k]["r"]}
+    w = l["wander"]
+    l["wander"] = {"x0": w["x0"] + d, "x1": w["x1"] + d, "y0": w["y0"], "y1": w["y1"]}
 lots = []
 for l in out["lots"]:
     l = dict(l)
@@ -280,6 +297,7 @@ for l in out["lots"]:
         l.update(r0=8, street="meadow-st", door={"c": l["door"]["c"], "r": 7}, rest={"c": l["rest"]["c"], "r": 7})
         w = l["wander"]
         l["wander"] = {"x0": w["x0"], "x1": w["x1"], "y0": 6.7, "y1": 7.85}
+        shift_lot(l, SPACE.get(l["id"], 0))
     else:
         l["c0"] = mc(l["c0"])
         l["r0"] = mr(l["r0"])
@@ -289,6 +307,11 @@ for l in out["lots"]:
         if "wander" in l:
             w = l["wander"]
             l["wander"] = {"x0": w["x0"], "x1": w["x1"], "y0": my(w["y0"]), "y1": my(w["y1"])}
+        if l["kind"] == "home":
+            shift_lot(l, SPACE.get(l["id"], 0))
+        # (Colosseum Row's north homes: four deep, their backs on the line.)
+        if l["kind"] == "home" and l["r0"] == 40:
+            l["d"] = 4
     lots.append(l)
 assert all(l["r0"] + l["d"] - 1 < LINE for l in lots), "no lot past the line"
 
@@ -299,21 +322,21 @@ def wall2(name, c0, r0, w, inset, h, depth, arches, crest=False):
 SQ = 37
 def arch_at(c, c0, w=30, h=66):
     return {"x": round((c - c0 + 0.5) * SQ), "w": w, "h": h}
-# The plaza's front wall, its three gateways: the west and east ones a square wide, the grand one four (the promenade's).
-lots.append(wall2("The plaza's west wall", 13, 39, 8, 0.3, 96, 0.4, [arch_at(15, 13)]))
-lots.append(wall2("The plaza's grand gateway", 21, 39, 4, 0.3, 150, 0.4, [{"x": 74, "w": 116, "h": 104}], True))
-lots.append(wall2("The plaza's east wall", 25, 39, 8, 0.3, 96, 0.4, [arch_at(30, 25)]))
-# The back wall on the line, the whole way round but the Colosseum: from column 26 east round the wrap to column 19, in stretches of six.
-# (Its oval meets the line at x = 18.9 and 26.1, and is at x = 18.0 and 27.0 by the wall's back, half a square on: each end of the wall
-# runs on under the ring's seats, so no gap between the wall and the ring shows the meadow behind.)
+# The back wall on the line (y = 43.5), the whole way round, the Colosseum its centrepiece: a gate either side of it, a little past the
+# statues (columns 13..16 and 29..32: a grand arch, open onto the trees behind, the crown's crest over it; you walk up to it, never
+# through: the line is the edge), their inner ends against the ring's flanks; from the east gate round the wrap to the west one, plain
+# stretches of six.
+GATE_ARCH = [{"x": 74, "w": 92, "h": 112}]
+lots.append(wall2("The west gate", 13, 44, 4, 0.0, 168, 0.5, GATE_ARCH, True))
+lots.append(wall2("The east gate", 29, 44, 4, 0.0, 168, 0.5, GATE_ARCH, True))
 BACK = []
-c = 26
-while c <= 19 + N:
-    w = min(6, 19 + N - c + 1)
+c = 33
+while c <= 12 + N:
+    w = min(6, 12 + N - c + 1)
     BACK.append((c, w))
     c += w
 for i, (c0, w) in enumerate(BACK):
-    lots.append(wall2(f"The back wall ({i + 1})", c0 % N, 43, w, 0.0, 148, 0.5, []))
+    lots.append(wall2(f"The back wall ({i + 1})", c0 % N, 44, w, 0.0, 148, 0.5, []))
 
 props = []
 for p in out["props"]:
@@ -333,12 +356,23 @@ props.append({"kind": "lamp", "x": mc(43), "y": 39, "v": 0})
 # chess pieces: the bronze queen and king by the portal, a marble bishop and rook past the marble statue, a knight and a pawn past the
 # bronze one (coliseum-ring.ts PIECES: v is the piece).
 PIECES = ["queen", "king", "bishop", "rook", "knight", "pawn"]
-for kind, v, x in [("piece", 0, 19.45), ("piece", 1, 25.55), ("statue", 0, 17), ("statue", 1, 28), ("piece", 2, 15.3), ("piece", 3, 13.6), ("piece", 4, 29.7), ("piece", 5, 31.4)]:
+for kind, v, x in [("piece", 0, 19.45), ("piece", 1, 25.55), ("statue", 0, 17), ("statue", 1, 28)]:
     props.append({"kind": kind, "x": x, "y": 42.05, "v": v})
-# Treetops over the plaza's stretches of the back wall: a row of trees behind it, either side of the Colosseum.
-for c in list(range(12, 17, 2)) + list(range(29, 34, 2)):
-    props.append({"kind": "tree", "x": c, "y": 44, "v": c % 3})
-assert all(p["y"] <= LINE or (p["kind"] == "tree" and p["y"] == 44) for p in props), "nothing north of the line but the trees"
+# The lesser pieces at the plaza's front corners, on Colosseum Row: the bishop and rook west, the knight and pawn east.
+for v, x, y in [(2, 13, 40.05), (3, 13, 41.05), (4, 32, 40.05), (5, 32, 41.05)]:
+    props.append({"kind": "piece", "x": x, "y": y, "v": v})
+# (The homes moved along their rows above: a lamp standing on a door or rest square steps a square aside.)
+_keep = {(q[k]["c"], q[k]["r"]) for q in lots if q["kind"] == "home" for k in ("door", "rest")}
+for q in props:
+    if q["kind"] == "lamp" and (round(q["x"]), round(q["y"])) in _keep:
+        for d in (-1, 1, -2, 2):
+            if (round(q["x"]) + d, round(q["y"])) not in _keep:
+                q["x"] += d
+                break
+# Trees behind the gates, over the wall and through their arches.
+for x, y in [(12.5, 45), (14.5, 45.6), (16, 45), (13.5, 46.8), (29, 45), (30.5, 45.6), (32.5, 45), (31.5, 46.8)]:
+    props.append({"kind": "tree", "x": x, "y": y, "v": round(x * 2) % 3})
+assert all(p["y"] <= LINE or p["kind"] == "tree" for p in props), "nothing north of the line but the trees"
 
 park = dict(out["park"])
 park["r1"] = mr(park["r1"])

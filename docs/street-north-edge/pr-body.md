@@ -2,39 +2,55 @@
 
 Eric, Nov 5: "There's nothing behind it. It's at the end of the map … it's a solid back wall … the most back thing is the Colosseum, with
 gates running along and then exits out of the gates into the town … we probably have to actually draw the Colosseum out, at least on the
-sides, because the way it's glitching right now looks really sloppy." Still an admin's town only (`STREET_TOWN`).
+sides, because the way it's glitching right now looks really sloppy."
 
-Decision note: `docs/decisions/2026-11-05-street-north-edge.md`. Area page: `docs/areas/town-square.md` (the street town, "The north edge").
+Eric, Nov 6, on the first stills: the plaza's wall "looks like the Colosseum is behind this random wall, and it looks very small"; and
+"Moo & Moon Meadow and Hollow Peak right next to each other, with a little building squeezed in … Nothing should be that close … not two
+bosses." On the redesign: "Yes, everything looks good… run one quick test… rotate the camera… 15 degrees… Make sure… the Colosseum's not
+glitching… If that passes, then we're good to push it." The rotation check passes (below).
 
-**Lane: full e2e** (add the `full-e2e` label): the plan and the box drawing are shared by every street-town spec.
+Still an admin's town only (`STREET_TOWN`). Decision note: `docs/decisions/2026-11-05-street-north-edge.md`. Area page:
+`docs/areas/town-square.md` (the street town, "The north edge").
+
+**Lane: full e2e** (the `full-e2e` label): the plan and the box drawing are shared by every street-town spec.
 
 ## What changed
 
 - **The plan** (`scripts/street-plan-north.py`, its north edge section; `town/street-plan.json` rebuilt): 54 × 54 (was 46).
-  - One back line at y = 42.5: a solid wall the whole way round but for the Colosseum, its ends running on under the ring. North of it
-    only the Colosseum, a plain meadow (ground) and a few treetops over the plaza's stretches of wall. Nothing walkable there.
-  - Upper Street is gone. Its four homes (Hopper's, Wrangler's, Moo's, Hollow's) stand on **Meadow Street**, a new street 8 rows south,
-    between the closing row and South Street (three wide, so South Street keeps its south sidewalk), at their old columns, backed by a row facing South Street; a lane on the promenade's line.
-    The world grows 8 columns east too (it's square); Seam Avenue runs from Meadow Street to Colosseum Row.
-  - The plaza (rows 40–41) is walled along row 39 with three open **gateways** onto Colosseum Row (columns 15, 21–24 with a crest, 30).
-    Its statues and chess pieces stand on row 42 as figures. The apron is its two walkable rows.
+  - **One back line at y = 43.5:** a solid wall the whole way round, meeting the Colosseum's ring at its flanks; the Colosseum is its
+    centrepiece, about 1.5 squares proud of it. North of it only the Colosseum, a plain meadow (ground) and trees. Nothing walkable there.
+  - **Two gates** in the back wall, either side of the Colosseum, a little past the statues (columns 13–16 and 29–32): a taller stretch
+    with a grand arch, open onto trees, the crown's crest over it. You walk up to one, never through.
+  - **The plaza is open to Colosseum Row** (rows 40–43, columns 13–32): no wall in front of the Colosseum. The queen and king flank the
+    portal, the statues stand before the ring's flanks, the bishop and rook and the knight and pawn mark the plaza's front corners.
+  - **Meadow Street:** Upper Street is gone; its four homes (Hopper's, Wrangler's, Moo's, Hollow's) stand on a new street 8 rows south,
+    between the closing row and South Street (three wide, so South Street keeps its south sidewalk), backed by a row facing South Street; a
+    lane on the promenade's line. The world grows 8 columns east too (it's square); Seam Avenue runs from Meadow Street to Colosseum Row.
+  - **Boss homes are never neighbours:** a whole look-alike between any two in a row, and no look-alike narrower than 1 square
+    (`rows.ts ROW_MIN_W`, the narrowest normal one; the slim fillers went down to 0.6). Lots moved along their rows with their doors, rest
+    squares and wander boxes: Hollow +2, Hopper +1, Wrangler +1, G-Rex +1, Timber +1, Sawyer −1, Tiger −1. Lamps that landed on
+    a door or rest square step aside.
   - The start is the same park square, now (22, 25); the park and its zoom-out area move with it.
-- **The Colosseum as a solid** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`, new): 18 ring boxes round its oval (outer wall
-  of arches and the board's checkered band; rim, seats and podium inside) and a portal box on the plaza (gate, "THE COLOSSEUM" tablet,
-  relief; banners and flag on the ring). About twice as tall as round 5's wall. Drawn where it stands like any box, over the rows' roofs
-  from near enough; never left out by the near cut, cut nearer the camera and given fine strips on 2D, so a drag beside it shows its
-  wall, not its bowl. Round 4's line of sight (`colosseumSeen`) and round 5's flat street picture (`HOUSE_COLISEUM_STREET`) removed.
-  Today's town's Colosseum is unchanged.
+- **The Colosseum as a solid** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`, new): 18 ring boxes round an oval 17.6 × 14
+  squares (outer wall of arches and the board's checkered band; rim, seats and podium inside) and a portal box on the plaza (gate, "THE
+  COLOSSEUM" tablet, relief; banners and flag on the ring), drawn 1.2x (about 8.5 squares to the rim). Drawn where it stands like any box,
+  over the rows' roofs from near enough; never left out by the near cut and cut nearer the camera, so a drag beside it shows its wall, not
+  its bowl; below its rim its bowl is left out (hidden anyway), and only stretches close by get the fine strips on 2D. Round 4's line of
+  sight (`colosseumSeen`) and round 5's flat street picture (`HOUSE_COLISEUM_STREET`) removed. Today's town's Colosseum is unchanged.
 - **Walls** (`town/wall.ts`): open arches (seen from both sides) and a crest.
+- **Statues and chess pieces** on the plaza fade out when nearer the camera than you, as trees do (`render.ts`).
 - **Ported from `claude/street-colosseum-big`:** Moo's paddock and Ginger's dome 1.3x (`TOWN_FEEL.streetHomeScale`, `rows.ts homePx`);
   the tap guard (a tap on a building's front, side, back or roof never opens something behind it).
 - Ground: the board's squares under the oval only (round it, the meadow).
+- Test hook: each box in `__townCam().boxes` has `foot`, its front's drawn ends on screen and the world points they stand for.
 
 ## Player-visible changes (admins' street town only)
 
-- The Colosseum is a 3D building: its curved wall shows from any heading when you look round near it.
-- A wall closes the plaza, with three archways out onto Colosseum Row; a solid back wall runs behind everything.
+- The Colosseum is a big 3D building at the head of the plaza, the centrepiece of a back wall that closes the town, with a grand gate on
+  each side.
+- The plaza opens straight onto Colosseum Row.
 - No street or home behind or beside the Colosseum; Upper Street's four homes are on the new Meadow Street in the south.
+- Boss homes are spaced: never two side by side, no thin building squeezed between.
 - Moo & Moon Meadow and Ginger Igloo are drawn bigger. No new text.
 
 ## Checks changed (old → new)
@@ -43,56 +59,91 @@ Unit (`packages/app/test`):
 - `town-street.test.ts`: "is 46 x 46 …" → "is 54 x 54 …" (and the `W` ground key); start (22, 17) → (22, 25); a ring lot is checked as
   a ring stretch; the park `r1` 26 → 34.
 - `town-fixed.test.ts`, "the Colosseum against the back wall":
-  - "sits at the top centre" → "sits at the north edge, on the promenade's line" (centred on column 22.5, its first row the plinths').
-  - "nothing beside or behind it is walkable" → "nothing past the back line is walkable" (every row from 43).
-  - "a wall with a closed gate either side … the back wall along the whole edge, the grove behind" → "the back wall along the whole
-    line but the ring, walls along the plaza's front with gateways" (treetops ≥ 6, was ≥ 30 grove trees).
+  - "sits at the top centre" → "sits at the north edge, on the promenade's line" (centred on column 22.5; the line 1.5 past its first row).
+  - "nothing beside or behind it is walkable" → "nothing past the back line is walkable" (every row from 44).
+  - "a wall with a closed gate either side … the back wall along the whole edge, the grove behind" → "the back wall along the whole line,
+    the Colosseum its centrepiece, a gate either side of it; the plaza open to Colosseum Row" (every column but 17–28 once; the gates at
+    13–16 and 29–32 with a crest; row 39 walkable across the plaza; trees ≥ 6, was ≥ 30 grove trees).
   - "nothing stands north of the back wall" → moved to `town-north-edge.test.ts` ("nothing drawn past it").
   - "no second Colosseum (nor any square twice)" → same, over the grown map's columns and rows.
-  - "the statues and chess pieces … on its front line" (the flat picture's `STANDING`) → "… on the plaza against the back line" (props).
-- `town-rows.test.ts`: the streets (Upper Street → Meadow Street); Upper Street's north row over the wrap → Colosseum Row's; the
-  Fountain Street line-of-sight spots 8 rows on (Colosseum Row's north row closing Seam Avenue's end may show, as Upper Street's did);
-  wrap distances for 54; the plaza-to-the-bottom-street path; the park's slack squares 8 rows on. "The Colosseum hides behind the rows"
-  (`colosseumSeen`) removed with the line of sight.
-- `town-boxes.test.ts`: a box's along/back handedness `toBe(1)` → `toBeCloseTo(1, 9)` (the ring's are float).
-- New `town-north-edge.test.ts`: nothing walkable or drawn past the line; no street or lot past it; every boss home with door, strip
-  and rest square; the gateways walkable and the only ways out; the Colosseum drawn as faces from 8 headings, a closed silhouette at
+  - "the statues and chess pieces … on its front line" (the flat picture's `STANDING`) → "… stand on the plaza, planted, never
+    overlapping" (props; side by side along each row they stand on; none walked through).
+- `town-rows.test.ts`:
+  - the streets: Upper Street → Meadow Street; Upper Street's north row over the wrap → Colosseum Row's;
+  - the Fountain Street line-of-sight spots 8 rows on (Colosseum Row's north row closing Seam Avenue's end may show, as Upper Street's did);
+  - "draws fall to well under half" from Fountain Street: shown / near `< 0.5` → `< 0.55` (with no look-alike under a square there are
+    fewer, wider fronts near: 27 of 52 shown, was 28 of 55);
+  - wrap distances for 54; the plaza-to-the-bottom-street path; the park's slack squares 8 rows on;
+  - "The Colosseum hides behind the rows" (`colosseumSeen`) removed with the line of sight.
+- `town-boxes.test.ts`: a box's along/back handedness `toBe(1)` → `toBeCloseTo(1, 9)` (the ring's are float); the roofs drawn in the art's
+  order counted over boxes but the ring's (its bowl is left out below its rim).
+- New `town-north-edge.test.ts`: nothing walkable or drawn past the line; no street or lot past it; every boss home with door, strip and
+  rest square; the plaza open to Colosseum Row; the gates either side, past the statues, walked up to and never through; **boss homes
+  never neighbours and no look-alike under a square, every row**; the Colosseum drawn as faces from 8 headings, a closed silhouette at
   different depths; Moo's and Ginger's homes 1.3x.
 
 e2e:
-- `town-fixed.spec.ts`: coordinates 8 rows on; "the Colosseum against the back wall" rewritten (the plaza's three walls ahead from the
-  park, nothing past the line, its ring drawn; up at the gate opens its card; up at the plaza's corners and walks past the line are
-  stopped); new "the plaza": a drag round in eighths, nothing past the line at each, the ring's faces drawn, figures on screen; down
-  through the west gateway onto Colosseum Row. New stills test.
-- `town-street.spec.ts`: start (22, 25); Ginger's door (34, 31); Smudgy's (19, 16); the park table's stools row 31; new "Meadow Street:
-  each moved home's card opens".
+- `town-fixed.spec.ts`:
+  - coordinates 8 rows on; Timber's door (4, 31) → (5, 31).
+  - "the Colosseum against the back wall" rewritten: from the park, no wall before it and its two gates in view, nothing past the line,
+    its ring drawn; up at the gate opens its card; up before each gate and walks past the line stopped.
+  - New "the plaza": a drag round in eighths, nothing past the line at each, the ring's faces drawn, figures on screen; then straight
+    down onto Colosseum Row.
+  - New **"the Colosseum stays put as the view turns"** (2D and WebGL, phone and computer): from (22, 38), four squares before the portal,
+    turning 0, +15, +30, +45, 0, −15, −30, −45 degrees: at each, both ends of the portal's drawn foot and of every ring stretch in view lie
+    within 2 px of their own world points' projection; from step to step the portal's foot moves as the ground under it does (within 3 px)
+    and by more than 20 px. Eric's rotation check, so the old "follows the camera around" can't come back.
+  - The stills test: Eric's set (below), and the rotation stills and frames.
+- `town-street.spec.ts`: start (22, 25); Ginger's door (34, 23) → (34, 31); Smudgy's (19, 16); the park table's stools row 31; new
+  "Meadow Street: each moved home's card opens".
 - `town-rows.spec.ts`: Fountain Street row 20 → 28, South Street row 5 → 13, the park's squares and the stills' spots 8 rows on.
 
 ## Frame rate
 
-Not measured yet: see "Left".
+Headless (software rendering), phone (iPhone 13) and computer (1280 × 800), 5 s a route, main (83ceba92) and this branch served in turn
+from the same local Worker, medians of 3 (fps), and the boxes' draws a frame (the mean). Routes: **the plaza** (up the promenade from the
+park to the gate and back), **Fountain Street** (east along it through the park), **a look round** beside the Colosseum (dragging across
+the box again and again at (20, 41)).
+
+| | Main (fps) | This branch (fps) | Draws |
+| --- | --- | --- | --- |
+| Phone, 2D, the plaza | 59.6 | 60.1 | 7 → 19 |
+| Phone, 2D, Fountain Street | 59.3 | 60.1 | 19 → 26 |
+| Phone, 2D, a look round | 57.2 | 53.1 | 26 → 63 |
+| Computer, 2D, the plaza | 59.2 | 60.0 | 11 → 38 |
+| Computer, 2D, Fountain Street | 60.0 | 59.7 | 43 → 38 |
+| Computer, 2D, a look round | 57.5 | 53.1 | 38 → 89 |
+| Phone, WebGL, the plaza | 17.6 | 18.7 | 7 → 69 |
+| Phone, WebGL, Fountain Street | 22.3 | 21.8 | 36 → 47 |
+| Phone, WebGL, a look round | 15.0 | 16.3 | 49 → 127 |
+| Computer, WebGL, the plaza | 20.7 | 24.4 | 17 → 94 |
+| Computer, WebGL, Fountain Street | 26.3 | 26.0 | 85 → 81 |
+| Computer, WebGL, a look round | 19.1 | 18.3 | 81 → 153 |
+
+- WebGL runs on software GL headless, so its numbers are low on both builds; they move together.
+- **The one drop: the 2D look round beside the Colosseum, about 57 → 53 fps (−7%).** Main draws one flat picture there; this draws the
+  ring's 18 stretches and the portal as you turn. Two cuts already in: below its rim its bowl (rim, seats, podium) is left out, hidden
+  behind its wall anyway (that took the plaza back to 60), and only stretches close by get the fine strips on 2D. Without them, the
+  first measurement was 44 fps.
+- If the director wants it back to main's: left out ring stretches whose front faces away (behind the ring's own front) a frame earlier,
+  in `planBox` (today they're planned and found facing away), or draw the ring's far stretches with fewer strips. Not done here.
 
 ## Stills
 
-`docs/street-north-edge/`, phone and computer (Canvas 2D): `1-plaza-close`, `2-looking-west`, `3-looking-east`, `4-turned-away`, a look
-round beside the Colosseum (`4b-beside-looking-north-west`, `4c-beside-looking-north-east`, `4d-beside-looking-west`),
-`5-from-the-park`, `6-grand-gateway`, `6-west-gateway`, `7-meadow-street`, `8-overview` (the top zoom step).
+`docs/street-north-edge/`, phone and computer (Canvas 2D): `1-from-the-park`, `2-from-colosseum-row`, `3-plaza-close`,
+`4-beside-west-looking-east`, `4-beside-west-looking-west`, `5-beside-east-looking-west`, `5-beside-east-looking-east`, `6-west-gate`,
+`7-meadow-street`, `8-overview` (the top zoom step). The rotation check: `rot-2d-phone--30`, `rot-2d-phone-0`, `rot-2d-phone-+30`,
+`rot-webgl-desktop-0`, and the turns from −45 to +45 degrees, `rot-2d-phone-turn.gif` and `rot-webgl-phone-turn.gif`.
 
 ## Test results (local)
 
-- Typecheck clean; the town unit tests (21 files, 290 tests) pass, after merging main (83ceba92).
-- e2e on phone and computer, Canvas 2D and WebGL: `town-fixed`, `town-street` and `town-rows` pass. The gateway walk and the park
-  table checks were fixed and rerun on the computer. The South Street "no sky between the fronts" check was fixed (below) and rerun on
-  both. `town.spec.ts` (a player's town) was not run locally.
-- The South Street fix: Meadow Street is three squares wide (the others four), so South Street keeps its south sidewalk. Without it,
-  its south row stood at the street's edge, where the near cut ("nothing between the camera and you") left out the fronts beside the
-  camera and sky showed beside Hollow Peak's roof (0.126 against 0.005).
-
-## Left
-
-- Frame rate against main (plaza, Fountain Street, a look round; 2D and WebGL; phone and computer): not measured. My local Worker on
-  8987 is stuck (a respawning runtime holds the port and doesn't answer), so no server to measure on.
-- The full town e2e area rerun after the last layout change (Meadow Street three wide): only the sky check was rerun.
+- Typecheck (all packages) clean; the town unit tests pass (21 files, 292 tests), main (83ceba92) merged.
+- e2e, phone and computer, Canvas 2D and WebGL, `town-fixed`, `town-street`, `town-rows` and `town.spec.ts`: 89 passed, 6 skipped
+  (stills only), 1 failed: Fountain Street west's "no sky between the fronts" (computer, 2D, 0.012). Its cause: G-Rex's lot moved two
+  squares east sat entirely between the camera and you there, so the near cut left it out and sky showed over Ginger's dome. Fixed in the
+  layout (G-Rex +1, Ginger where it was; the spacing rule still holds), then `town-rows` and `town-street` rerun on phone and computer:
+  16 passed. `town-fixed` and `town.spec.ts` were not rerun after that last one-square move (CI's full run covers them).
+- The rotation check, "the Colosseum stays put as the view turns", passes on phone and computer, 2D and WebGL.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 

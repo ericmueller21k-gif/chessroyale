@@ -21,7 +21,7 @@ import type { Character, Layer, Part } from "../../characters/sprite.ts";
 import { box, character, flatRoof, quadF, sideArt, type Face, type Piece, type TownBox } from "../town-kit.ts";
 import { signFace, TORCH, type LightPool, type LightSpot } from "./kit.ts";
 import { COLISEUM_PALETTE, COLISEUM_PARTS, COLISEUM_SIZES } from "./coliseum.ts";
-import { CAVEA, CHORD, RING, RING_M, RING_PX, RING_W, WALL_H, PORTAL_DEPTH, PORTAL_W } from "./coliseum-shape.ts";
+import { CAVEA, CHORD, COL_SCALE, RING, RING_M, RING_PX, RING_W, WALL_H, PORTAL_DEPTH, PORTAL_W } from "./coliseum-shape.ts";
 export { CAVEA, CHORD, OVAL, RING, RING_M, RING_PX, WALL_H, PORTAL_DEPTH, PORTAL_W, type RingSeg } from "./coliseum-shape.ts";
 
 const SQ = 37;
@@ -259,11 +259,11 @@ function portalFront(): { ch: Character; sign: { x: number; y: number; w: number
 export const PORTAL = portalFront();
 /** The portal's box: its front, its stone sides, a flat roof. */
 export const PORTAL_BOX: TownBox = (() => {
-  const D = Math.round(PORTAL_DEPTH * SQ);
+  const D = Math.round((PORTAL_DEPTH * SQ) / COL_SCALE);
   const side = { mat: "stone" as const, rows: [], trim: [0, 30] };
   return {
     id: "coliseum-portal", front: PORTAL.ch, lights: PORTAL.lights, sign: PORTAL.sign, lot: { w: 4, d: 1 }, inset: 0, depth: PORTAL_DEPTH,
     body: { x0: 0, x1: PORTAL_W }, left: sideArt("coliseum-portal-L", PAL, side, D, PORTAL_H - 4, true), right: sideArt("coliseum-portal-R", PAL, side, D, PORTAL_H - 4, false),
-    roof: flatRoof(0, PORTAL_W, PORTAL_H - 3, "wallstone"), roofPal: PAL, taper: 1,
+    roof: flatRoof(0, PORTAL_W, PORTAL_H - 3, "wallstone"), roofPal: PAL, taper: 1, px: SQ / COL_SCALE,
   };
 })();

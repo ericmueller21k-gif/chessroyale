@@ -142,7 +142,7 @@ function withRows(lots: StreetLot[]): StreetLot[] {
 function colosseumLots(): StreetLot[] {
   const C = PLAN.coliseum;
   const portal: StreetLot = {
-    kind: "portal", id: "portal", v: 0, c0: C.c0 + C.size / 2 - 2, r0: C.r0, w: 4, d: 1, facing: "S", street: "plaza", name: "The Colosseum",
+    kind: "portal", id: "portal", v: 0, c0: C.c0 + C.size / 2 - 3, r0: C.r0, w: 5, d: 1, facing: "S", street: "plaza", name: "The Colosseum",
     inset: 0, depth: PORTAL_DEPTH, at: { x: C.c0 + (C.size - 1) / 2, y: C.r0 - 0.5 },
   };
   return [

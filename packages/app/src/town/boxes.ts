@@ -22,6 +22,7 @@ import { lookalike } from "./lookalike.ts";
 import { wallArt } from "./wall.ts";
 import { PORTAL_BOX, ringBox } from "./houses/coliseum-ring.ts";
 import { homePx, type Facing } from "./rows.ts";
+import { RING_PX, WALL_H } from "./houses/coliseum-shape.ts";
 import type { Face, RoofTex, SideArt, TownBox } from "./town-kit.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import type { HomeId } from "./world.ts";
@@ -544,7 +545,7 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   const f = TOWN_FEEL;
   const dh = Math.abs(h1 - h0);
   // (The Colosseum's: the fine count on the 2D fallback too, so a stretch close by steps smoothly; far off it needs few.)
-  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE || solid ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
+  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE || (solid && Math.max(pa.k, pb.k) > 90) ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
   worldNormal(BI, nbx, nby, nw);
   w.shade = Math.min(0.6, wallShade(nw.x, nw.y, v.hc, v.hs) + extraShade);
   w.on = true;
@@ -596,10 +597,14 @@ export function planBox(p: BoxPlan, b: BoxInst, box: TownBox, v: View, camX: num
   let nOrd = 0;
   const faces = g.faces;
   const f = TOWN_FEEL;
+  // (A stretch of the Colosseum's ring with the camera lower than its rim: its rim, seats and podium are hidden behind its outer wall, so
+  // they're left out rather than drawn and covered.)
+  const bowl = BI.kind !== "ring" || v.h > WALL_H / RING_PX;
   for (let i = 0; i < faces.length; i++) {
     const fg = faces[i]!;
     const fp = p.faces[i]!;
     fp.on = false;
+    if (!bowl) continue;
     // Turned away from the camera (its outward normal; the camera stands `back` behind its focus, `h` up)?
     worldNormal(b, fg.nx, fg.ny, nw);
     const ncx = nw.x * v.hc - nw.y * v.hs;

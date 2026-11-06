@@ -101,7 +101,8 @@ describe("the street town's buildings are boxes (Nov 5, round 3)", () => {
       }
       for (let k = 1; k < p.nOrder; k++) expect(p.faces[p.order[k - 1]!]!.dz).toBeGreaterThanOrEqual(p.faces[p.order[k]!]!.dz);
     }
-    expect(roofs).toBeGreaterThan(LOTS.length - 4);
+    // (The Colosseum's ring stretches, the north edge round: from a camera lower than their rim, their bowl is hidden behind their wall and left out.)
+    expect(roofs).toBeGreaterThan(LOTS.filter((b) => b.kind !== "ring").length - 4);
   });
 
   it("a face turned away from the camera isn't drawn: a gable's far slope, a side wall facing away", () => {

@@ -45,21 +45,21 @@
   "######################################################",
   "######################################################",
   "######################################################",
-  "=============WW=WWWWW====WWWWW=WW=====================",
-  "LLLLLLLLLLLLL====================LLLLLLLLLLLLLLLLLLLLL",
-  "LLLLLLLLLLLLL====================LLLLLLLLLLLLLLLLLLLLL",
-  "LLLLLLLLLLLLLWWWWWWWWAAAAWWWWWWWWLLLLLLLLLLLLLLLLLLLLL",
-  "ggggggggggggggggggAAAAAAAAAAgggggggggggggggggggggggggg",
+  "======================================================",
+  "LLLLLLLLLLLLLW==================WLLLLLLLLLLLLLLLLLLLLL",
+  "LLLLLLLLLLLLLW==================WLLLLLLLLLLLLLLLLLLLLL",
+  "LLLLLLLLLLLLL====WWWWWWWWWWWW====LLLLLLLLLLLLLLLLLLLLL",
+  "LLLLLLLLLLLLL====WAAAAAAAAAAW====LLLLLLLLLLLLLLLLLLLLL",
   "gggggggggggggggggAAAAAAAAAAAAggggggggggggggggggggggggg",
   "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg",
-  "gggggggggggggggggAAAAAAAAAAAAggggggggggggggggggggggggg",
-  "ggggggggggggggggggAAAAAAAAAAgggggggggggggggggggggggggg",
-  "ggggggggggggggggggggAAAAAAgggggggggggggggggggggggggggg"
+  "gggggggggggggggAAAAAAAAAAAAAAAAggggggggggggggggggggggg",
+  "gggggggggggggggAAAAAAAAAAAAAAAAggggggggggggggggggggggg",
+  "ggggggggggggggAAAAAAAAAAAAAAAAAAgggggggggggggggggggggg",
+  "ggggggggggggggAAAAAAAAAAAAAAAAAAgggggggggggggggggggggg",
+  "ggggggggggggggAAAAAAAAAAAAAAAAAAgggggggggggggggggggggg",
+  "gggggggggggggggAAAAAAAAAAAAAAAAggggggggggggggggggggggg",
+  "gggggggggggggggAAAAAAAAAAAAAAAAggggggggggggggggggggggg",
+  "ggggggggggggggggAAAAAAAAAAAAAAgggggggggggggggggggggggg"
  ],
  "groundKey": {
   "#": "BOARD",
@@ -252,7 +252,7 @@
    "kind": "home",
    "id": "timber",
    "v": 0,
-   "c0": 3,
+   "c0": 4,
    "r0": 32,
    "w": 4,
    "d": 3,
@@ -264,16 +264,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 4,
+    "c": 5,
     "r": 31
    },
    "rest": {
-    "c": 6,
+    "c": 7,
     "r": 31
    },
    "wander": {
-    "x0": 2.7,
-    "x1": 6.3,
+    "x0": 3.7,
+    "x1": 7.3,
     "y0": 30.7,
     "y1": 31.85
    }
@@ -282,7 +282,7 @@
    "kind": "home",
    "id": "sawyer",
    "v": 0,
-   "c0": 9,
+   "c0": 8,
    "r0": 32,
    "w": 4,
    "d": 3,
@@ -294,16 +294,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 10,
+    "c": 9,
     "r": 31
    },
    "rest": {
-    "c": 12,
+    "c": 11,
     "r": 31
    },
    "wander": {
-    "x0": 8.7,
-    "x1": 12.3,
+    "x0": 7.699999999999999,
+    "x1": 11.3,
     "y0": 30.7,
     "y1": 31.85
    }
@@ -342,7 +342,7 @@
    "kind": "home",
    "id": "grex",
    "v": 0,
-   "c0": 37,
+   "c0": 38,
    "r0": 32,
    "w": 4,
    "d": 3,
@@ -354,16 +354,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 39,
+    "c": 40,
     "r": 31
    },
    "rest": {
-    "c": 37,
+    "c": 38,
     "r": 31
    },
    "wander": {
-    "x0": 36.7,
-    "x1": 40.3,
+    "x0": 37.7,
+    "x1": 41.3,
     "y0": 30.7,
     "y1": 31.85
    }
@@ -375,7 +375,7 @@
    "c0": 3,
    "r0": 40,
    "w": 4,
-   "d": 3,
+   "d": 4,
    "facing": "S",
    "street": "colosseum-row",
    "side": true,
@@ -402,10 +402,10 @@
    "kind": "home",
    "id": "tiger",
    "v": 0,
-   "c0": 9,
+   "c0": 8,
    "r0": 40,
    "w": 4,
-   "d": 3,
+   "d": 4,
    "facing": "S",
    "street": "colosseum-row",
    "side": false,
@@ -414,16 +414,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 10,
+    "c": 9,
     "r": 39
    },
    "rest": {
-    "c": 12,
+    "c": 11,
     "r": 39
    },
    "wander": {
-    "x0": 8.7,
-    "x1": 12.3,
+    "x0": 7.699999999999999,
+    "x1": 11.3,
     "y0": 38.7,
     "y1": 39.85
    }
@@ -435,7 +435,7 @@
    "c0": 33,
    "r0": 40,
    "w": 4,
-   "d": 3,
+   "d": 4,
    "facing": "S",
    "street": "colosseum-row",
    "side": false,
@@ -465,7 +465,7 @@
    "c0": 39,
    "r0": 40,
    "w": 4,
-   "d": 3,
+   "d": 4,
    "facing": "S",
    "street": "colosseum-row",
    "side": false,
@@ -492,7 +492,7 @@
    "kind": "home",
    "id": "hopper",
    "v": 0,
-   "c0": 3,
+   "c0": 4,
    "r0": 8,
    "w": 4,
    "d": 3,
@@ -504,16 +504,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 5,
+    "c": 6,
     "r": 7
    },
    "rest": {
-    "c": 3,
+    "c": 4,
     "r": 7
    },
    "wander": {
-    "x0": 2.7,
-    "x1": 6.3,
+    "x0": 3.7,
+    "x1": 7.3,
     "y0": 6.7,
     "y1": 7.85
    }
@@ -522,7 +522,7 @@
    "kind": "home",
    "id": "pig",
    "v": 0,
-   "c0": 9,
+   "c0": 10,
    "r0": 8,
    "w": 4,
    "d": 3,
@@ -534,16 +534,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 11,
+    "c": 12,
     "r": 7
    },
    "rest": {
-    "c": 9,
+    "c": 10,
     "r": 7
    },
    "wander": {
-    "x0": 8.7,
-    "x1": 12.3,
+    "x0": 9.7,
+    "x1": 13.3,
     "y0": 6.7,
     "y1": 7.85
    }
@@ -582,7 +582,7 @@
    "kind": "home",
    "id": "hollow",
    "v": 0,
-   "c0": 37,
+   "c0": 39,
    "r0": 8,
    "w": 4,
    "d": 3,
@@ -594,16 +594,16 @@
    "inset": 0.45,
    "depth": 2.3,
    "door": {
-    "c": 39,
+    "c": 41,
     "r": 7
    },
    "rest": {
-    "c": 37,
+    "c": 39,
     "r": 7
    },
    "wander": {
-    "x0": 36.7,
-    "x1": 40.3,
+    "x0": 38.7,
+    "x1": 42.3,
     "y0": 6.7,
     "y1": 7.85
    }
@@ -703,52 +703,24 @@
    "id": "wall",
    "v": 0,
    "c0": 13,
-   "r0": 39,
-   "w": 8,
-   "d": 1,
-   "facing": "S",
-   "street": "plaza",
-   "name": "The plaza's west wall",
-   "inset": 0.3,
-   "depth": 0.4,
-   "wall": {
-    "w": 8,
-    "h": 96,
-    "gate": null,
-    "depth": 0.4,
-    "arches": [
-     {
-      "x": 92,
-      "w": 30,
-      "h": 66
-     }
-    ],
-    "crest": false
-   }
-  },
-  {
-   "kind": "wall",
-   "id": "wall",
-   "v": 0,
-   "c0": 21,
-   "r0": 39,
+   "r0": 44,
    "w": 4,
    "d": 1,
    "facing": "S",
    "street": "plaza",
-   "name": "The plaza's grand gateway",
-   "inset": 0.3,
-   "depth": 0.4,
+   "name": "The west gate",
+   "inset": 0.0,
+   "depth": 0.5,
    "wall": {
     "w": 4,
-    "h": 150,
+    "h": 168,
     "gate": null,
-    "depth": 0.4,
+    "depth": 0.5,
     "arches": [
      {
       "x": 74,
-      "w": 116,
-      "h": 104
+      "w": 92,
+      "h": 112
      }
     ],
     "crest": true
@@ -758,36 +730,36 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 25,
-   "r0": 39,
-   "w": 8,
+   "c0": 29,
+   "r0": 44,
+   "w": 4,
    "d": 1,
    "facing": "S",
    "street": "plaza",
-   "name": "The plaza's east wall",
-   "inset": 0.3,
-   "depth": 0.4,
+   "name": "The east gate",
+   "inset": 0.0,
+   "depth": 0.5,
    "wall": {
-    "w": 8,
-    "h": 96,
+    "w": 4,
+    "h": 168,
     "gate": null,
-    "depth": 0.4,
+    "depth": 0.5,
     "arches": [
      {
-      "x": 204,
-      "w": 30,
-      "h": 66
+      "x": 74,
+      "w": 92,
+      "h": 112
      }
     ],
-    "crest": false
+    "crest": true
    }
   },
   {
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 26,
-   "r0": 43,
+   "c0": 33,
+   "r0": 44,
    "w": 6,
    "d": 1,
    "facing": "S",
@@ -808,8 +780,8 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 32,
-   "r0": 43,
+   "c0": 39,
+   "r0": 44,
    "w": 6,
    "d": 1,
    "facing": "S",
@@ -830,8 +802,8 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 38,
-   "r0": 43,
+   "c0": 45,
+   "r0": 44,
    "w": 6,
    "d": 1,
    "facing": "S",
@@ -852,8 +824,8 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 44,
-   "r0": 43,
+   "c0": 51,
+   "r0": 44,
    "w": 6,
    "d": 1,
    "facing": "S",
@@ -874,8 +846,8 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 50,
-   "r0": 43,
+   "c0": 3,
+   "r0": 44,
    "w": 6,
    "d": 1,
    "facing": "S",
@@ -896,9 +868,9 @@
    "kind": "wall",
    "id": "wall",
    "v": 0,
-   "c0": 2,
-   "r0": 43,
-   "w": 6,
+   "c0": 9,
+   "r0": 44,
+   "w": 4,
    "d": 1,
    "facing": "S",
    "street": "plaza",
@@ -906,51 +878,7 @@
    "inset": 0.0,
    "depth": 0.5,
    "wall": {
-    "w": 6,
-    "h": 148,
-    "gate": null,
-    "depth": 0.5,
-    "arches": [],
-    "crest": false
-   }
-  },
-  {
-   "kind": "wall",
-   "id": "wall",
-   "v": 0,
-   "c0": 8,
-   "r0": 43,
-   "w": 6,
-   "d": 1,
-   "facing": "S",
-   "street": "plaza",
-   "name": "The back wall (7)",
-   "inset": 0.0,
-   "depth": 0.5,
-   "wall": {
-    "w": 6,
-    "h": 148,
-    "gate": null,
-    "depth": 0.5,
-    "arches": [],
-    "crest": false
-   }
-  },
-  {
-   "kind": "wall",
-   "id": "wall",
-   "v": 0,
-   "c0": 14,
-   "r0": 43,
-   "w": 6,
-   "d": 1,
-   "facing": "S",
-   "street": "plaza",
-   "name": "The back wall (8)",
-   "inset": 0.0,
-   "depth": 0.5,
-   "wall": {
-    "w": 6,
+    "w": 4,
     "h": 148,
     "gate": null,
     "depth": 0.5,
@@ -1073,11 +1001,11 @@
   ],
   "oval": {
    "cx": 22.5,
-   "cy": 47.6,
-   "a": 7.4,
-   "b": 5.9
+   "cy": 49.0,
+   "a": 8.8,
+   "b": 7.0
   },
-  "line": 42.5
+  "line": 43.5
  },
  "props": [
   {
@@ -1310,7 +1238,7 @@
   },
   {
    "kind": "lamp",
-   "x": 5,
+   "x": 4,
    "y": 31,
    "v": 0
   },
@@ -1328,13 +1256,13 @@
   },
   {
    "kind": "lamp",
-   "x": 11,
+   "x": 10,
    "y": 31,
    "v": 0
   },
   {
    "kind": "lamp",
-   "x": 11,
+   "x": 10,
    "y": 39,
    "v": 0
   },
@@ -1364,7 +1292,7 @@
   },
   {
    "kind": "lamp",
-   "x": 40,
+   "x": 39,
    "y": 31,
    "v": 0
   },
@@ -2234,13 +2162,13 @@
   },
   {
    "kind": "lamp",
-   "x": 4,
+   "x": 3,
    "y": 7,
    "v": 0
   },
   {
    "kind": "lamp",
-   "x": 10,
+   "x": 9,
    "y": 7,
    "v": 0
   },
@@ -2306,62 +2234,74 @@
   },
   {
    "kind": "piece",
-   "x": 15.3,
-   "y": 42.05,
+   "x": 13,
+   "y": 40.05,
    "v": 2
   },
   {
    "kind": "piece",
-   "x": 13.6,
-   "y": 42.05,
+   "x": 13,
+   "y": 41.05,
    "v": 3
   },
   {
    "kind": "piece",
-   "x": 29.7,
-   "y": 42.05,
+   "x": 32,
+   "y": 40.05,
    "v": 4
   },
   {
    "kind": "piece",
-   "x": 31.4,
-   "y": 42.05,
+   "x": 32,
+   "y": 41.05,
    "v": 5
   },
   {
    "kind": "tree",
-   "x": 12,
-   "y": 44,
-   "v": 0
+   "x": 12.5,
+   "y": 45,
+   "v": 1
   },
   {
    "kind": "tree",
-   "x": 14,
-   "y": 44,
+   "x": 14.5,
+   "y": 45.6,
    "v": 2
   },
   {
    "kind": "tree",
    "x": 16,
-   "y": 44,
-   "v": 1
-  },
-  {
-   "kind": "tree",
-   "x": 29,
-   "y": 44,
+   "y": 45,
    "v": 2
   },
   {
    "kind": "tree",
-   "x": 31,
-   "y": 44,
+   "x": 13.5,
+   "y": 46.8,
+   "v": 0
+  },
+  {
+   "kind": "tree",
+   "x": 29,
+   "y": 45,
    "v": 1
   },
   {
    "kind": "tree",
-   "x": 33,
-   "y": 44,
+   "x": 30.5,
+   "y": 45.6,
+   "v": 1
+  },
+  {
+   "kind": "tree",
+   "x": 32.5,
+   "y": 45,
+   "v": 2
+  },
+  {
+   "kind": "tree",
+   "x": 31.5,
+   "y": 46.8,
    "v": 0
   }
  ]
