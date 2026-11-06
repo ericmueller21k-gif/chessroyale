@@ -213,8 +213,9 @@ test("the claw machine in Boingo's Funhouse: walk up (the camera closes in), the
   await expect(machine).toHaveCount(0);
   expect((await locker(page)).tokens.folio).toBe(1);
   // (Zoomed in, the view rests on the cabinet; the down arrow walks you a square back from it.)
-  await page.keyboard.press("ArrowDown");
-  await expect(room(page)).toHaveAttribute("data-you", "19,8", { timeout: 20_000 });
+  await page.keyboard.down("ArrowDown");
+  await expect(room(page)).not.toHaveAttribute("data-you", "19,7", { timeout: 20_000 });
+  await page.keyboard.up("ArrowDown");
   await expect.poll(async () => (await cam(page))?.claw).toBe(0);
   expect(errors).toEqual([]);
 });

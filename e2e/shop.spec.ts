@@ -1245,12 +1245,15 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await walkTo([13, 8]);
   await walkTo([16, 4]);
   await still("squirt-race");
-  await walkTo([16, 9]);
+  await walkTo([17, 7]);
+  await walkTo([17, 10]);
   await walkTo([17, 13]);
   await still("spin-game");
+  await walkTo([13, 15]);
   await walkTo([8, 15]);
   await walkTo([4, 17]);
   await still("roll-ball");
+  await walkTo([6, 13]);
   await walkTo([8, 10]);
   // The clown attendant behind the counter: a tap on him walks you up to the counter; his card says "Shopkeeper", no name.
   await viewOnYou(page);

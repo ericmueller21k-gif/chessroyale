@@ -758,5 +758,5 @@ export const SHOP_FEEL = {
    * screen's height (at most `wide` of its width, the lens at most `maxMag`), its middle `atY` down the screen, above the machine's
    * controls docked at the bottom.
    */
-  claw: { glideMs: 900, tall: 0.56, wide: 0.86, maxMag: 3, atY: 0.4 },
+  claw: { glideMs: 900, tall: 0.56, wide: 0.8, maxMag: 3, atY: 0.4 },
 } as const;
