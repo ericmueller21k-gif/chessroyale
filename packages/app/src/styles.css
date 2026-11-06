@@ -23846,6 +23846,9 @@ button.sq-tiny {
 .wt-spot.wt-glide { transition: top 250ms ease, left 250ms ease, width 250ms ease, height 250ms ease, transform 250ms ease, border-radius 250ms ease; }
 .wt-track { transition: transform 250ms ease; }
 .wt-lit { transform: scale(var(--wt-scale, 1.05)); }
+/* A disabled control the walkthrough highlights (PLAY waits for a mode pick) shows at its normal brightness, not the disabled dim. */
+.wt-lit:disabled,
+.wt-lit[aria-disabled="true"] { opacity: 1; }
 .wt-bubble { position: absolute; left: 0; right: 0; margin: 0 auto; width: calc(100% - 32px); max-width: 480px; padding: 16px 18px; border-radius: 16px; background: #fff; color: #1d2230; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4); cursor: default; max-height: calc(100vh - 32px); overflow-y: auto; transition: opacity 220ms ease; }
 .wt-dock-bottom { bottom: max(16px, env(safe-area-inset-bottom)); }
 .wt-dock-top { top: max(16px, env(safe-area-inset-top)); }
