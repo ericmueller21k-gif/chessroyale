@@ -16,7 +16,7 @@ import { chromium, devices } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import sharp from "sharp";
 
-const [out = "home-frames", base = "http://localhost:8788"] = process.argv.slice(2);
+const [out = "home-frames", base = `http://localhost:${process.env.E2E_PORT ?? 8788}`] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
 const b = await chromium.launch();
 const pool = `frames-home-${Date.now().toString(36)}`;

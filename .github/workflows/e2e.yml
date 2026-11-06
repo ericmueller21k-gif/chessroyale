@@ -1,13 +1,14 @@
 # The Playwright e2e suite (both projects, phone and desktop). Docs: docs/areas/ops.md, "CI e2e"; CLAUDE.md, "Test lanes".
 #
 # - A pull request runs a fast check: the specs of the areas it changes plus a small smoke set, on as few shards as they
-#   need (about 4 to 8 minutes in all). The `plan` job picks them (e2e/ci-select.mjs, from e2e/areas.json: path
-#   globs to spec files) and says why on the run's page. A shared foundation (package.json, the lockfile, the
+#   need (about 15 to 20 minutes for a targeted PR, Nov 6). The `plan` job picks them (e2e/ci-select.mjs, from
+#   e2e/areas.json: path globs to spec files) and says why on the run's page. A shared foundation (package.json, the lockfile, the
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
 #   does the `full-e2e` label (adding it starts a new run). settings.ts, e2e/helpers.ts and a few shared app modules
 #   (`traced` in areas.json) are followed through the code instead: the specs of what uses what the diff changes.
-# - A push to main (and a manual run) runs every spec on 10 shards, about 25 minutes: the full run after each merge. One
-#   main run at a time: a push waits for the run going, and only the newest waiting push runs (it covers the others).
+# - A push to main (and a manual run) runs every spec on 10 shards, about 28 minutes (Nov 6), plus any wait for runners:
+#   the full run after each merge. One main run at a time: a push waits for the run going, and only the newest
+#   waiting push runs (it covers the others).
 #
 # Each shard runs whole spec files, spread by their measured time (e2e/ci-shard.mjs, e2e/ci-timings.json). The `result`
 # job puts one summary on the run's page (flaky tests first, then failed ones, each with its shard and error;
@@ -70,7 +71,7 @@ jobs:
       shards: ${{ steps.plan.outputs.shards }}
       note: ${{ steps.plan.outputs.note }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 2
       - id: plan
@@ -96,12 +97,18 @@ jobs:
           fi
 
   # The shards.
+  # The shards and `perf` run in Playwright's own image (Nov 6), matching the lockfile's @playwright/test: Chromium, its
+  # system libraries and fonts come with it. Installing them on the runner took 10-23 s, but 8 of 60 shards took 2-13
+  # minutes (apt's fonts at 18 kB/s from the runner's mirror). Bump the tag with @playwright/test; the first step checks.
+  # (--ipc=host: Chromium's shared memory, as Playwright's Docker docs advise.)
   shard:
     needs: plan
     name: ${{ format('shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
     runs-on: ubuntu-24.04
-    # A full run's shard tests for about 30 minutes; the system libraries' install (apt, below) has taken up to 16 on a
-    # slow runner (Oct 26), so 45 cut two shards off mid-run with every test still green.
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
+    # A full run's shard tests for about 20 minutes; the rest is headroom for a stalled test and its retry.
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -109,32 +116,26 @@ jobs:
         shard: ${{ fromJSON(needs.plan.outputs.shards) }}
     env:
       E2E_SHARD_LABEL: ${{ format('Shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
-      E2E_SUMMARY_FILE: ${{ github.workspace }}/e2e-summary/shard-${{ matrix.shard }}.json
+      # (Relative: in a container job, github.workspace is the runner's path, not the container's.)
+      E2E_SUMMARY_FILE: e2e-summary/shard-${{ matrix.shard }}.json
       SHARD: ${{ matrix.shard }}
       # The plan's spec files (empty: every spec file).
       SPECS: ${{ needs.plan.outputs.specs }}
       TOTAL: ${{ needs.plan.outputs.total }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Playwright version
-        id: pw
-        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
-      # (The download is skipped when the cache has it; the system libraries are installed either way.)
-      - name: Install Chromium
-        timeout-minutes: 20
-        run: npx playwright install --with-deps --only-shell chromium
+      - name: The image matches the lockfile's Playwright
+        run: |
+          v=$(node -p 'require("@playwright/test/package.json").version')
+          [ "$v" = 1.56.1 ] || { echo "::error::@playwright/test is $v: change the container image tag to v$v (e2e.yml, shard and perf)"; exit 1; }
+      # (Not `npm run build`: the app's build typechecks first, which `check` already does.)
       - name: Build the app
-        run: npm run build
+        run: npm run build -w maia-worker && (cd packages/app && npx vite build)
       - name: Run ${{ format('shard {0} of {1}', matrix.shard, needs.plan.outputs.total) }}
         run: |
           files=$(node e2e/ci-shard.mjs "$SHARD" "$TOTAL" $SPECS)
@@ -147,7 +148,7 @@ jobs:
       # and which only flake (Eric, Oct 18). Under a kilobyte a shard.)
       - name: Keep the summary
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-summary-${{ matrix.shard }}
           path: e2e-summary/
@@ -157,7 +158,7 @@ jobs:
       # (On a failure, or when a test only passed on its retry: e2e/ci-summary.ts leaves shard-N.flaky.)
       - name: Keep the report
         if: ${{ failure() || hashFiles('e2e-summary/*.flaky') != '' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-report-shard-${{ matrix.shard }}
           path: playwright-report/
@@ -174,10 +175,10 @@ jobs:
       NOTE: ${{ needs.plan.outputs.note }}
       SHARDS: ${{ needs.plan.outputs.shards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           sparse-checkout: e2e
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         continue-on-error: true
         with:
           pattern: e2e-summary-*
@@ -193,34 +194,30 @@ jobs:
   perf:
     if: ${{ inputs.perf }}
     runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --ipc=host
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Playwright version
-        id: pw
-        run: echo "version=$(node -p 'require("@playwright/test/package.json").version')" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}-chromium-shell
-      - name: Install Chromium
-        timeout-minutes: 20
-        run: npx playwright install --with-deps --only-shell chromium
+      - name: The image matches the lockfile's Playwright
+        run: |
+          v=$(node -p 'require("@playwright/test/package.json").version')
+          [ "$v" = 1.56.1 ] || { echo "::error::@playwright/test is $v: change the container image tag to v$v (e2e.yml, shard and perf)"; exit 1; }
       - name: Build the app
-        run: npm run build
+        run: npm run build -w maia-worker && (cd packages/app && npx vite build)
       # One worker, so the specs don't share the runner's CPU with each other. A runner is neither Eric's phone nor the
       # local machine: read the numbers as a trend, not a verdict.
       - name: Run the perf specs
         run: npx playwright test --grep @perf --project phone --workers 1 --forbid-only --reporter=list,github,html
       - name: Keep the report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-perf-report
           path: playwright-report/

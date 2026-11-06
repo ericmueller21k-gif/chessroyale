@@ -14,7 +14,7 @@ import { resolve, join } from "node:path";
 import { chromium, devices } from "@playwright/test";
 
 const args = process.argv.slice(2).filter((a) => !a.includes("="));
-const base = process.argv.find((a) => a.startsWith("base="))?.slice(5) ?? "http://localhost:8788";
+const base = process.argv.find((a) => a.startsWith("base="))?.slice(5) ?? `http://localhost:${process.env.E2E_PORT ?? 8788}`;
 const only = process.argv.find((a) => a.startsWith("only="))?.slice(5) ?? "";
 const [out = "recluse-frames", which = "both", scheme = "light"] = args;
 const outDir = resolve(out);

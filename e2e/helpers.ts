@@ -1,5 +1,11 @@
 import { execFileSync } from "node:child_process";
+import { join, resolve } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
+
+/** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
+export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
+/** Its local D1 databases (sqlite files), for the specs that read them. */
+export const D1_DIR = join(E2E_STATE, "v3/d1/miniflare-D1DatabaseObject");
 
 /**
  * Playwright's `test`, plus: every browser context a test opens itself (`browser.newContext()`, e.g. a second
@@ -431,7 +437,7 @@ async function withEmail(page: Page, email: string) {
 async function localSql(page: Page, sql: string) {
   for (let attempt = 1; ; attempt++) {
     try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
+      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
       return;
     } catch (e) {
       const why = String((e as { stderr?: unknown }).stderr ?? e);

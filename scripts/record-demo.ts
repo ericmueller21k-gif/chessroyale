@@ -11,7 +11,7 @@
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 
-const BASE = process.env.BASE ?? "http://localhost:8788";
+const BASE = process.env.BASE ?? `http://localhost:${process.env.E2E_PORT ?? 8788}`;
 const SECONDS = Number(process.env.DEMO_SECONDS ?? 45);
 const W = 390;
 const H = 844;
