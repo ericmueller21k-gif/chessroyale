@@ -61,12 +61,25 @@ No check that guards a rule in `docs/rules/eric.md` changed.
   "+ in the park" once → twice (your press still wins: back out at 1).
 - `e2e/town-street.spec.ts` "opens at its default zoom step": `zoom`/`zoomTarget` 1 → 2.
 - `packages/app/test/town-rows.test.ts`: `streetZoomStart` 1 → 2.
+- `e2e/town-rows.spec.ts` "no sky between the fronts at street level": now zooms in once to the mockup's step (1) first. The town
+  opens at step 2 since Nov 5, which sees over the rows, so the check failed there.
 - New: `packages/app/test/town-controls.test.ts` (28 tests) and `e2e/town-controls.spec.ts` (phone and computer, 2D and WebGL), added
   to the town area in `e2e/areas.json`.
 
 ## Frame rate
 
-FRAME_RATE_PLACEHOLDER
+The same build, minimap on vs off (the stored choice), Canvas 2D, headless. Phone (iPhone 13) and computer (1440 × 900), 5 s walking
+east along Fountain Street from (3, 20) into the park, 2 runs each, interleaved. The machine was shared and loaded, so the numbers are
+rough: one pass, cut short by the pause.
+
+| | Map on | Map off |
+| --- | --- | --- |
+| Phone | 55.5, 55.5 | 53.7, 57.0 |
+| Computer | 53.5, 52.6 | 53.5, 56.5 |
+
+Within this machine's noise. The map adds no drawing to the world's frame. Each frame it sets one CSS transform, and only when your dot
+moves a quarter pixel or turns half a degree. WebGL wasn't measured: the run was lost when the disk filled. Worth one run each in a quiet
+moment, or the director's call.
 
 ## Stills and GIFs (`docs/street-controls-map/`)
 
