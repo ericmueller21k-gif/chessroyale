@@ -2529,6 +2529,12 @@ export const SQUADS_LOBBY = {
     5: { coins: 20, crates: 0 },
   } as Readonly<Record<1 | 2 | 3 | 5, { coins: number; crates: number }>>,
   /**
+   * A reward (and its results row) stays in the lobby's record until it's written (server/squads-do.ts): a failed write is tried again
+   * this often, and the lobby waits to close for it up to `rewardRetryHours` past its closing time (then it closes, and says so).
+   */
+  rewardRetrySeconds: 60,
+  rewardRetryHours: 24,
+  /**
    * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
    * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
    * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that
@@ -2913,6 +2919,11 @@ export const OPS = {
     /** Errors and player reports are deleted after this many days (the 15-minute cron). */
     keepDays: 30,
   },
+  /**
+   * The item ledger's daily check (server/ledger.ts, ledgerCheck): the 15-minute cron's run in this hour (UTC) finds the accounts whose
+   * balances and ledger disagree and logs up to `accounts` of them in full (one error line for /admin/ops says how many).
+   */
+  ledgerCheck: { hourUtc: 9, accounts: 20 },
 } as const;
 
 /**

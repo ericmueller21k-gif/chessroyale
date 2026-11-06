@@ -14,8 +14,8 @@ import {
   type ItemInstance,
 } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
-import { lockerState, type LockerState } from "./locker.ts";
-import { applyOp, cond, firstLeg, leg, ledgerAccount, type LedgerAccount } from "./ledger.ts";
+import { lockerState, openedItem, type LockerState } from "./locker.ts";
+import { applyOp, cond, firstLeg, keyFor, leg, ledgerAccount, opKeys, requestId, type LedgerAccount, type OpKey } from "./ledger.ts";
 
 /**
  * Boss tokens, crate keys and buying a boss's crate (Eric, Nov 2; BOSS_TOKENS and BOSS_CRATE_PRICE in core's settings;
@@ -85,10 +85,11 @@ export interface DropOptions {
   /** The randomness (tests); the server's own otherwise. */
   rng?: () => number;
   /**
-   * The drop's ledger key: a solo battle's is `drop:solo:<battle>` (endSoloBattle), so it drops once however often it's counted.
-   * None: a fresh one per call (an online battle's, until part II gives it `drop:<code>:<matchStart>:<user>`).
+   * The drop's ledger key, so it drops once however often it's counted: a solo battle's is `drop:solo:<battle>` (endSoloBattle), an
+   * online one's `drop:<code>:<match start>:<ledger id>` (opKeys.onlineDrop: its match room may count it again after a restart).
+   * None: a fresh one per call.
    */
-  op?: string;
+  op?: OpKey;
 }
 
 /**
@@ -108,7 +109,7 @@ export async function countBossBattle(sql: Sql, userId: string, now: number, opt
   if (!me) return null;
   const id = randomHex(12);
   const battle = opts.battle.slice(0, 64);
-  const op = opts.op ?? `drop:${id}`;
+  const op = opts.op === undefined ? `drop:${id}` : keyFor(opts.op, me);
   const done = await applyOp(sql, me, {
     id: op,
     reason: "drop",
@@ -221,8 +222,10 @@ export async function bossCrateHoldings(sql: Sql, userId: string): Promise<Recor
  * the crate to your inventory"; until then a buy opened it at once): a `boss_crates` row, unopened, which the Crates tab opens
  * (openBossCrate). One ledger op, one transaction (D1's batch: all of it or none; as the coin shop's buyItem): it applies only if the
  * tokens (and the key) are there, checked in that transaction, and then the crate goes in and they come off, so the price is paid
- * exactly when the crate is given, and the ledger keeps what it cost after the crate is opened. Two taps or two devices at once are
- * two buys, each paid for in full or refused; a count can't go below zero (the table's CHECK, and the guard).
+ * exactly when the crate is given, and the ledger keeps what it cost after the crate is opened. Its key is the app's request id for the
+ * buy (`boss-crate:<ledger id>:<request>`): a retry of it buys nothing more and answers the first buy (an older app's buy, with none,
+ * is keyed by its new crate). Two buys (two devices) are two, each paid for in full or refused; a count can't go below zero (the
+ * table's CHECK, and the guard).
  */
 export async function buyBossCrate(
   sql: Sql,
@@ -231,17 +234,18 @@ export async function buyBossCrate(
   way: unknown,
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; crate: string; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   if (way !== "tokens" && way !== "key") return { ok: false, message: "No such price." };
   const cost = wayCost(way);
   const me = await ledgerAccount(sql, userId);
-  // (The new crate's row id keys its op: a fresh one per buy, as two taps are two buys. Part II keys it by the app's request id.)
   const id = randomHex(9);
+  const op = me && (request ? keyFor(opKeys.request("boss-crate", request), me) : `boss-crate:${id}`);
   const done = me
     ? await applyOp(sql, me, {
-        id: `boss-crate:${id}`,
+        id: op!,
         reason: `boss crate (${way})`,
         now,
         when: cond(
@@ -260,8 +264,10 @@ export async function buyBossCrate(
         ],
       })
     : "refused";
-  if (done !== "applied") return { ok: false, message: notEnough(crate.boss, way) };
-  return { ok: true, crate: crate.id, locker: await lockerState(sql, userId, admin) };
+  // (A retry of a buy made already: the crate it bought.)
+  const bought = done === "replay" ? ((await firstLeg(sql, op!))?.asset_id ?? crate.id) : crate.id;
+  if (done === "refused") return { ok: false, message: notEnough(crate.boss, way) };
+  return { ok: true, crate: bought, locker: await lockerState(sql, userId, admin) };
 }
 
 /** Why a boss crate couldn't be opened: "You have no Babur's Boss Crate to open." */
@@ -271,8 +277,9 @@ export const noneToOpen = (name: string) => `You have no ${name} to open.`;
  * Opens one of your boss crates (the Crates tab, Nov 2), as a crate opens: the roll is the server's (its own randomness, never a test
  * switch: a boss crate is paid for), from that crate's pool, and the item goes into the locker. One ledger op per crate, one
  * transaction: the oldest crate you hold comes off and the item goes in, both recorded (the crate's row goes, its history stays in the
- * ledger). So a crate opens once, never twice (two taps or two devices at once: one item, one crate gone, the other refused), and
- * nobody opens one they haven't got.
+ * ledger). So a crate opens once, never twice (two devices at once: one item, one crate gone, the other refused), and nobody opens one
+ * they haven't got. The open's key is the app's request id for it (`open:<ledger id>:<request>`): a retry of it opens nothing more
+ * and answers the first open's item. (An older app's open, with none, is keyed by the crate it takes: `open:<its row>`.)
  */
 export async function openBossCrate(
   sql: Sql,
@@ -280,12 +287,20 @@ export async function openBossCrate(
   crateId: unknown,
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
-  let me: LedgerAccount | null = null;
-  // The oldest one you hold, opened as a ledger op keyed by that crate (`open:<its row>`: it opens once). Another open that took it
-  // first (a replay of its op) or since: the next one, if you hold another.
+  let me: LedgerAccount | null = request ? await ledgerAccount(sql, userId) : null;
+  const keyed = me && request ? keyFor(opKeys.request("open", request), me) : null;
+  // A retry of an open made already (perhaps of your last crate): its item.
+  const again = async () => {
+    const first = keyed ? await openedItem(sql, userId, keyed) : null;
+    return first ? { ok: true as const, ...first, locker: await lockerState(sql, userId, admin) } : null;
+  };
+  const first = await again();
+  if (first) return first;
+  // The oldest one you hold. Another open that took it first or since: the next one, if you hold another.
   for (let attempt = 0; attempt < 4; attempt++) {
     const held = await sql.first<{ id: string }>("SELECT id FROM boss_crates WHERE user_id = ? AND crate = ? ORDER BY bought_at, id LIMIT 1", userId, crate.id);
     me ??= held ? await ledgerAccount(sql, userId) : null;
@@ -293,13 +308,15 @@ export async function openBossCrate(
     const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
     const item: ItemInstance = { id: randomHex(9), def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed };
     const done = await applyOp(sql, me, {
-      id: `open:${held.id}`,
+      id: keyed ?? `open:${held.id}`,
       reason: "boss crate open",
       now,
       when: cond("EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)", held.id, userId),
       legs: [leg.bossCrateOut(userId, held.id, crate.id), leg.item(userId, { ...roll, id: item.id }, crate.id, now)],
     });
     if (done === "applied") return { ok: true, roll, item, locker: await lockerState(sql, userId, admin) };
+    // (The same open, sent twice at once: the other one's item.)
+    if (done === "replay" && keyed) return (await again()) ?? { ok: false, message: noneToOpen(crate.name) };
   }
   return { ok: false, message: noneToOpen(crate.name) };
 }
@@ -309,12 +326,13 @@ const grantCount = (n: unknown) => (typeof n === "number" && Number.isInteger(n)
 
 /**
  * An admin's test grant (the Crates tab's admin box; the API checks it's an admin): crate keys, and any boss's tokens, to their
- * own account. Never a drop: the window doesn't count it.
+ * own account. Never a drop: the window doesn't count it. Keyed by the app's request id (`grant:<ledger id>:<request>`): a retry
+ * gives nothing more. (An older app's, with none: a fresh key.)
  */
 export async function grantTestItems(
   sql: Sql,
   userId: string,
-  body: { keys?: unknown; boss?: unknown; tokens?: unknown },
+  body: { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown },
   now = Date.now(),
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const keys = grantCount(body.keys);
@@ -322,9 +340,9 @@ export async function grantTestItems(
   if (!keys && !tokens) return { ok: false, message: "Nothing to give." };
   const me = await ledgerAccount(sql, userId);
   if (!me) return { ok: false, message: "Nothing to give." };
-  // (A fresh op per grant; part II keys it by the app's request id.)
+  const request = requestId(body.request);
   await applyOp(sql, me, {
-    id: `grant:${randomHex(9)}`,
+    id: request ? keyFor(opKeys.request("grant", request), me) : `grant:${randomHex(9)}`,
     reason: "admin grant",
     now,
     legs: [...(keys ? [leg.keys(userId, keys)] : []), ...(tokens ? [leg.tokens(userId, body.boss as string, tokens)] : [])],
