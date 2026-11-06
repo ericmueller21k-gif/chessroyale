@@ -68,9 +68,10 @@ describe("every spec (fail-safe)", () => {
     "packages/app/package.json",
     "playwright.config.ts",
     "wrangler.jsonc",
-    ".github/workflows/e2e.yml",
-    "e2e/ci-select.mjs",
     "e2e/helpers.ts",
+    "packages/core/src/crates.ts",
+    "packages/server/src/accounts.ts",
+    "packages/server/src/ledger.ts",
     "packages/core/src/settings.ts",
     "packages/chess/src/runner.ts",
     "packages/chess/src/protocol.ts",
@@ -83,6 +84,15 @@ describe("every spec (fail-safe)", () => {
     expect(r.full).toBe(`\`${path}\` is a shared foundation`);
     expect(r.specs).toEqual([]);
   });
+
+  it.each([".github/workflows/e2e.yml", "e2e/ci-select.mjs", "e2e/ci-shard.mjs", "e2e/ci-summary.ts", "e2e/ci-summary-merge.mjs"])(
+    "a CI-only change (%s): the smoke set, not every spec (ci-select's unit tests run in check; main runs everything)",
+    (path) => {
+      const r = pick(path, "docs/x.md");
+      expect(r.full).toBeNull();
+      expect(r.specs).toEqual(smoke);
+    },
+  );
 
   it.each(["packages/app/src/brand-new.ts", "packages/app/src/components/NewBoss.tsx", "packages/chess/src/bosses/newboss.ts", "somewhere/new.txt", "e2e/new-helper.ts"])(
     "a path the table doesn't know: %s",

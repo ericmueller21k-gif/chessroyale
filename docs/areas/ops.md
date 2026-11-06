@@ -33,7 +33,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
     `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
     `main.tsx`, `board/OwnBoard.tsx`, `account.ts`, and since Nov 2 `game.ts`, `prefs.ts`, `test-switches.ts`,
-    `screens/Hud.tsx` and `components/EvalBar.tsx` are followed through the code instead of running everything. The
+    `screens/Hud.tsx` and `components/EvalBar.tsx`, and since Nov 6 every `packages/core/src` module but `index.ts` and
+    the server's `accounts.ts`, `api.ts`, `account-data.ts`, `locker.ts`, `boss-tokens.ts` and `ranked.ts`, are followed
+    through the code instead of running everything (a change that reaches the server's `index.ts` still runs it all). The
     plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
     declarations the diff changes (a settings object, a helper, a function or class; comments and types don't run),
     anything in the module that uses them (and the module state a changed function names; not a constant holding a plain
@@ -46,11 +48,10 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     read cleanly). The plan's table says, per traced module, what changed and who uses it. A file reached through a
     trace counts like the table counts its own changes, nothing more: what it passes on to other files isn't followed.
   - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
-    lockfile, the Playwright and Wrangler config, this workflow and its scripts, `packages/core` (but settings.ts and
-    boss.ts, traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
+    lockfile, the Playwright and Wrangler config, `packages/core/src/index.ts` (its other modules traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
     `api.ts`, `lobby.ts`, `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's
     entry, board, match flow (`game.ts`; `solo.ts` and `net.ts` traced), the play screen and the components every
-    mode shares), or a path no area has (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    mode shares), or a path no area has. A CI-only change (`e2e.yml`, `e2e/ci-*`) runs the smoke set (Nov 6), (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
   - **On every push to main: the whole suite**, both projects, on 10 shards (about 28 minutes, Nov 6: the slowest

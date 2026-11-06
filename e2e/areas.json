@@ -17,6 +17,31 @@
     "modules": [
       "packages/core/src/settings.ts",
       "packages/core/src/boss.ts",
+      "packages/core/src/admin-copies.ts",
+      "packages/core/src/age-gate.ts",
+      "packages/core/src/boss-tokens.ts",
+      "packages/core/src/bot-looks.ts",
+      "packages/core/src/chat.ts",
+      "packages/core/src/crates.ts",
+      "packages/core/src/fairplay.ts",
+      "packages/core/src/friends.ts",
+      "packages/core/src/match.ts",
+      "packages/core/src/pauses.ts",
+      "packages/core/src/profile.ts",
+      "packages/core/src/ranked.ts",
+      "packages/core/src/rating-curve.ts",
+      "packages/core/src/rating.ts",
+      "packages/core/src/rng.ts",
+      "packages/core/src/scoring.ts",
+      "packages/core/src/shop.ts",
+      "packages/core/src/votes.ts",
+      "packages/core/src/welcome.ts",
+      "packages/server/src/accounts.ts",
+      "packages/server/src/api.ts",
+      "packages/server/src/account-data.ts",
+      "packages/server/src/locker.ts",
+      "packages/server/src/boss-tokens.ts",
+      "packages/server/src/ranked.ts",
       "e2e/helpers.ts",
       "packages/app/src/net.ts",
       "packages/app/src/solo.ts",
@@ -40,11 +65,6 @@
     "packages/*/tsconfig.json",
     "playwright.config.ts",
     "wrangler.jsonc",
-    ".github/workflows/e2e.yml",
-    "e2e/ci-select.mjs",
-    "e2e/ci-shard.mjs",
-    "e2e/ci-summary.ts",
-    "e2e/ci-summary-merge.mjs",
     "e2e/helpers.ts",
     "packages/core/src/**",
     "packages/chess/src/runner.ts",
@@ -72,6 +92,7 @@
     "packages/server/src/locker.ts",
     "packages/server/src/boss-tokens.ts",
     "packages/server/src/ranked.ts",
+    "packages/server/src/ledger.ts",
     "packages/app/index.html",
     "packages/app/vite.config.ts",
     "packages/app/sw-template.js",
@@ -140,6 +161,10 @@
     "e2e/perf-probe.js"
   ],
   "areas": {
+    "CI's e2e plan, shards and summary (the smoke set proves a shard still plans, runs and reports; ci-select's unit tests run in check; main runs everything)": {
+      "paths": [".github/workflows/e2e.yml", "e2e/ci-*.mjs", "e2e/ci-summary.ts"],
+      "specs": ["e2e/boss-smoke.spec.ts", "e2e/front-door.spec.ts", "e2e/boss-character.spec.ts", "e2e/lobby-chat.spec.ts"]
+    },
     "bosses: the rules they all share (powers, timing, the brain)": {
       "paths": [
         "packages/chess/src/boss-powers.ts",
@@ -175,6 +200,7 @@
     "bosses: the art, sounds and moments they all share": {
       "paths": [
         "packages/app/src/characters/index.ts",
+        "packages/app/src/characters/side-size.ts",
         "packages/app/src/characters/kits.ts",
         "packages/app/src/characters/power-art.ts",
         "packages/app/src/characters/effects.ts",
@@ -504,6 +530,8 @@
       "paths": [
         "packages/app/src/App.tsx",
         "packages/app/src/screens/Home.tsx",
+        "packages/app/src/components/Walkthrough.tsx",
+        "packages/app/src/tutorial.ts",
         "packages/app/src/components/FrontDoor.tsx",
         "packages/app/src/components/FrontMenu.tsx",
         "packages/app/src/home-art/**"
@@ -528,7 +556,7 @@
       ]
     },
     "a computer's board size, every game screen (board-size.css)": {
-      "paths": ["packages/app/src/board-size.css"],
+      "paths": ["packages/app/src/board-size.css", "packages/app/src/game-frame.css"],
       "specs": [
         "e2e/desktop-board.spec.ts",
         "e2e/board-layout.spec.ts",
@@ -579,13 +607,15 @@
       "specs": ["e2e/boss-challenge.spec.ts"]
     },
     "the Colosseum (/colosseum, the first look)": {
-      "paths": ["packages/app/src/colosseum/**"],
+      "paths": ["packages/app/src/colosseum/**", "packages/server/src/ranged.ts"],
       "specs": ["e2e/colosseum.spec.ts"]
     },
     "Auto chess, the demo": {
       "paths": [
         "packages/app/src/autochess/**",
         "packages/app/src/screens/AutoChess.tsx",
+        "packages/app/src/components/AcStarArt.tsx",
+        "packages/app/src/components/FloatGold.tsx",
         "packages/chess/src/hunchess/**"
       ],
       "specs": ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"]
@@ -635,6 +665,7 @@
       "paths": [
         "packages/app/src/screens/Profile.tsx",
         "packages/app/src/screens/PlayerProfile.tsx",
+        "packages/app/src/item-details.ts",
         "packages/app/src/screens/PublicProfile.tsx",
         "packages/app/src/profile-nav.ts",
         "packages/app/src/public-profile.ts",
@@ -660,6 +691,8 @@
       "paths": [
         "packages/app/src/screens/Shop.tsx",
         "packages/app/src/screens/Crates.tsx",
+        "packages/app/src/welcome-rows.ts",
+        "packages/app/src/components/blotches.ts",
         "packages/app/src/components/GamblingWarning.tsx",
         "packages/app/src/components/Cosmetics.tsx",
         "packages/app/src/components/Items.tsx",
