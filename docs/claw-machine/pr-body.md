@@ -63,7 +63,6 @@ Admins only: "Admin: +3 of each token". The machine itself appears only once Boi
 
 ## Known follow-ups
 
-- The picker's token names clip their descenders by a pixel or two on a phone ("Big Boy", "Puddles"): a CSS touch to finish.
 - Boingo's Funhouse (`claude/boingo-home`) calls `openClawMachine()`; when it merges, main is merged here and the stub resolved (this
   module wins).
 

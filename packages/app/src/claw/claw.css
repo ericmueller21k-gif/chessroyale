@@ -265,11 +265,8 @@
 }
 .claw-token-name {
   display: block;
-  line-height: 1.3;
-  padding-bottom: 1px;
+  line-height: 1.4;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .claw-token-n {
