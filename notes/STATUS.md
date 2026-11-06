@@ -306,3 +306,13 @@ Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
 - **Dash v2 (Eric, Nov 6):** brief-dash-v2.md, the next Opus after the red-tests helper, then the pipeline audit.
 - **Haiku running:** claude/boss-bubbles (all boss speech in the God King's bubble design, plus the huge-text bug).
 - **REAL RACE (money), the next Opus after Dash v2, xhigh:** ledger.test.ts:234 failed once in #524's check: three concurrent `openCrate` calls with the SAME request id returned 2 different answers (item or roll). It passed 8/8 locally. Possibly the free crate open's idempotency replays the roll before the first op commits, or two attempts both "win". Root-cause it in ledger.ts and openCrate: one answer per request id under any race; add a deterministic race test.
+
+## Pipeline audit (Nov 6, notes/pipeline-audit-2026-11-06.md)
+- **Running now:** quick wins Q1–Q8 as one PR (claude/pipeline-quick-wins).
+- **Queued, in order (helper PRs):**
+  1. timings auto-refresh from the last green main run;
+  2. areas.json re-scope, so fewer PRs run everything (about 15 min per PR);
+  3. the @phone-only tag for logic specs (up to 30% of e2e time; needs my sign-off on the list);
+  4. the flake fixes by pattern (colosseum, town-rows, home-polish clock races, sound/autochess timing, intro 50 ms polls);
+  5. check split in two (chess package tests on their own: about 5 min);
+  6. lazy-load boss art and openings.json (35–40% off first load).
