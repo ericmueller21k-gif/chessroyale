@@ -295,3 +295,8 @@ Mine: #513, CI on 10 shards (MAX_SHARDS 10), watcher boarosuz3.
   3. the claw on the kit;
   4. intros as data.
 - **PARKED (waiting on Eric's UI):** the settings split into Sounds and Gameplay, plus move confirm styles (classic, soft press, vote trace). See notes/briefs/idea-settings-and-move-confirm.md. GIFs to Eric before anything goes live.
+
+## Nov 6 ~15:20 UTC: the next Opus slot after the 3D kit (a694ff16), as one "red tests" helper:
+1. **#518 (the snap fix, head 8c6c2e15) is blocked** by town-rows "no sky", South Street east, phone: 0.011 and 0.0129 on both tries. It's the same spot CI flagged on #511 (0.013) that never reproduced locally. Real: find the gap at that pose and fix it in the drawing or layout, not the check. Then merge #518.
+2. **Main 446c4775: account.spec:5 on the phone.** The crowd solo match stays in "simulating" for 3 minutes (second time today; the first was on #511, where the town was cleared). Root-cause it: the server sim, the match DO, a timer, the client.
+3. **Main 446c4775: colosseum.spec:162 on the computer.** After switching to 3D pieces, drawCalls was 3 when ≥5 was expected, after 9 plies. #519 didn't touch the Colosseum match.
