@@ -91,7 +91,6 @@
   "e2e/town-chat.spec.ts": 623,
   "e2e/town-desktop.spec.ts": 42,
   "e2e/town-tags.spec.ts": 42,
-  "e2e/town-webgl.spec.ts": 72,
   "e2e/town.spec.ts": 494,
   "e2e/vote-hint.spec.ts": 91,
   "e2e/votes.spec.ts": 141

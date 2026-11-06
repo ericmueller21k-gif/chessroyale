@@ -571,6 +571,7 @@ function startTown(
   const leaveStreet = (why: TownGlFallback) => {
     reportTownFallback(why);
     const u = new URL(location.href);
+    u.pathname = "/town";
     u.searchParams.set("street", "off");
     location.replace(u.href);
   };

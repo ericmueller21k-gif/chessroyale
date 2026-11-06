@@ -12,7 +12,8 @@ import { asAdmin, test } from "./helpers.ts";
  * after, every figure on screen at rest). Round 4 (the rows, the chase camera, the plan wrapping east-west only, its rows 6 up): the
  * squares moved with the plan; the turn is the chase camera's (behind you, the way you walk); round 2's and 3's stills tests went with
  * their plans (round 4's are in e2e/town-rows.spec.ts). Round 5 (one fixed view): the chase camera's turn test went with it
- * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round).
+ * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round). Nov 6: on WebGL only; a context lost for good opens the
+ * page again in today's town.
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -43,11 +44,12 @@ type Hooks = {
   __townCam?: () => { zoom: number; zoomTarget: number; focus: number[] };
 };
 
-/** The street town, an admin's, open by day. */
+/** The street town, an admin's, open by day (drawn with WebGL: its only drawing, Nov 6). */
 async function openStreet(page: Page, query = "") {
   await asAdmin(page);
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
 
 /** Taps a home (the camera glides to it first) until its card opens. */
@@ -203,3 +205,45 @@ async function towardKey(page: Page, dir: "N" | "E" | "S" | "W") {
 
 // (Round 5: "the boxes and the chase camera's turn" went with the chase camera: e2e/town-fixed.spec.ts walks the one fixed view, a
 // home's strip and the look round, on both renderers.)
+
+test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again; lost twice within a minute, the page opens again in today's town (Canvas 2D)", async ({ page }) => {
+  test.setTimeout(200_000);
+  await openStreet(page);
+  const lose = (restore: boolean) =>
+    page.evaluate(async (restore) => {
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+      const ext = (cv.getContext("webgl2") as WebGL2RenderingContext).getExtension("WEBGL_lose_context")!;
+      const lost = new Promise((ok) => cv.addEventListener("webglcontextlost", ok, { once: true }));
+      ext.loseContext();
+      await lost;
+      if (restore) {
+        // (Restoring is allowed once the lost event's dispatch is over.)
+        await new Promise((ok) => setTimeout(ok, 50));
+        const back = new Promise((ok) => cv.addEventListener("webglcontextrestored", ok, { once: true }));
+        ext.restoreContext();
+        await back;
+      }
+    }, restore);
+  type P = { __townPaint: () => { backend: string; lost: boolean } };
+  const paint = () => page.evaluate(() => (window as unknown as P).__townPaint());
+  const colors = () =>
+    canvas(page).evaluate((cv: HTMLCanvasElement) => {
+      const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      const seen = new Set<number>();
+      for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
+      return seen.size;
+    });
+  await lose(true);
+  // Back: drawing again with WebGL (its textures made again), the world not blank, still the street town.
+  await expect.poll(async () => (await paint())?.lost, { message: "back" }).toBe(false);
+  expect((await paint())!.backend).toBe("webgl");
+  expect(await colors(), "the world drawn again with WebGL").toBeGreaterThan(40);
+  expect(await you(page)).toEqual([22, 25]);
+  // Lost again within the minute: the page opens again (`?street=off`) in today's town, drawn with Canvas 2D, where a player's opens.
+  await lose(false);
+  await page.waitForURL(/[?&]street=off/, { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "2d");
+  expect(await you(page), "today's town").toEqual([22, 17]);
+  expect(await colors(), "the world drawn with Canvas 2D").toBeGreaterThan(40);
+});

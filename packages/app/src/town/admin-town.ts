@@ -12,6 +12,7 @@ export const ADMIN_TOWN: boolean = !!account().profile?.admin;
 /** Whether this browser can give a WebGL 2 context (a throwaway canvas's, let go at once). False where there's no page (Node). */
 export function hasWebGL2(): boolean {
   try {
+    if (typeof WebGL2RenderingContext === "undefined") return false;
     const gl = document.createElement("canvas").getContext("webgl2");
     gl?.getExtension("WEBGL_lose_context")?.loseContext();
     return !!gl;
