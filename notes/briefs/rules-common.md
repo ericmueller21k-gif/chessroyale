@@ -14,8 +14,9 @@
   `fuser -k PORT/tcp`; never kill PIDs. Don't list processes, inspect /proc or the environment, print environment
   variables, read auth or config files, or call session or agent tools. Never force-push, rebase or push empty commits.
   Don't merge.
-- **Don't open the PR** (not with `gh`, not through GitHub's REST API, not any other way). Push the branch and write the
-  PR's title and full body to the file named in Deliver; the director opens it and watches CI. The body: what changed,
+- **The PR:** if your brief says to open it, open it through the GitHub MCP (`mcp__github__create_pull_request`), and then call
+  `unsubscribe_pr_activity` for it. Otherwise push the branch and write the PR's title and full body to the file named in Deliver;
+  the director opens it. Either way, the director watches CI and merges. Never use `gh` or the REST API. The body: what changed,
   every player-visible change and new text, changed checks old → new, the lane; it ends with these two lines:
 
    🤖 Generated with [Claude Code](https://claude.com/claude-code)
