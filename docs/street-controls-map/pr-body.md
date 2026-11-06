@@ -68,9 +68,6 @@ No check that guards a rule in `docs/rules/eric.md` changed.
 - `packages/app/test/town-rows.test.ts`: `streetZoomStart` 1 → 2.
 - `e2e/town-rows.spec.ts` "no sky between the fronts at street level": now zooms in once to the mockup's step (1) first. The town
   opens at step 2 since Nov 5, which sees over the rows, so the check failed there.
-- `e2e/town-rows.spec.ts` "no sky between the fronts": now runs with the minimap off. With it on, Fountain Street west on WebGL (computer)
-  read 0.0080 against < 0.005, the same both runs; with it off, it passes. The likely cause: the edge chips that keep off the map's corner
-  moving into the strip the check reads. Unproven; the director may want a look.
 - `e2e/town-rows.spec.ts`, after the merge: the north edge's rows (Fountain Street at 28, South Street at 13) with this branch's
   zoom steps (opening at 2).
 - New: `packages/app/test/town-controls.test.ts` (28 tests) and `e2e/town-controls.spec.ts` (phone and computer, 2D and WebGL), added
