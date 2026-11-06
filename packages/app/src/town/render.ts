@@ -1635,7 +1635,9 @@ export class Renderer {
         continue;
       }
       // (A hedge is low: drawn between the camera and you too, as the art says.)
-      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" ? -Infinity : cut);
+      // (The Colosseum's ring and portal too, the north edge round: you're always before it, on the plaza, so it never stands between the
+      // camera and you; left out, a drag round beside it would look into its bowl.)
+      planBox(p, b, fine ? b.box : b.low, v, this.camX, this.camY, fine, b.kind === "hedge" || big ? -Infinity : cut);
     }
     // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
     // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)

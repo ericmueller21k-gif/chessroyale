@@ -506,7 +506,10 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   let bz = cq.dz;
   let ax2 = ax;
   let az2 = az;
-  const zn = NEAR - v.back;
+  // (The Colosseum's ring and portal, the north edge round: cut nearer, as near as the projection holds (a hair over 0.5 deep at the
+  // ground), so a stretch you stand beside on the plaza, looking along it, runs on to the box's edge: no gap into the ring.)
+  const solid = BI.kind === "ring" || BI.kind === "portal";
+  const zn = (solid ? Math.max(0.05, (0.56 - v.h * v.sn) / v.cs) : NEAR) - v.back;
   w.s0 = 0;
   w.s1 = 1;
   if (az2 < zn && bz < zn) return;
@@ -540,7 +543,8 @@ function planWall(w: WallPlan, ch: Character | null, u0: number, t0: number, u1:
   // Strips: each a step in its top of about `boxStrip` px at most (fine: WebGL's; else the 2D fallback's), and at least 2 px wide.
   const f = TOWN_FEEL;
   const dh = Math.abs(h1 - h0);
-  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
+  // (The Colosseum's: the fine count on the 2D fallback too, so a stretch close by steps smoothly; far off it needs few.)
+  w.strips = dh < 0.75 ? 1 : Math.max(1, Math.min(FINE || solid ? f.boxStripsFine : f.boxStrips, Math.ceil(dh / (FINE ? f.boxStripFine : f.boxStrip)), Math.ceil((pb.x - pa.x) / 2)));
   worldNormal(BI, nbx, nby, nw);
   w.shade = Math.min(0.6, wallShade(nw.x, nw.y, v.hc, v.hs) + extraShade);
   w.on = true;
