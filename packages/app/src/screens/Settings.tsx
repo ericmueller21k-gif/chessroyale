@@ -325,7 +325,7 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
             📖 How each mode works ›
           </button>
           <button type="button" class="fd-row-link" onClick={() => onFaq()}>
-            📖 FAQ · How it works ›
+            📖 HunChess Handbook ›
           </button>
         </section>
       )}
