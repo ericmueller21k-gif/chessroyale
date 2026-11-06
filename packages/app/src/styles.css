@@ -23753,3 +23753,7 @@ button.sq-tiny {
 .hunchess .item-shine {
   display: none;
 }
+/* On the blue windows (the crate's row and page, the notice, the reveal): the logo's own gold, readable on the blue. */
+.ff-window .welcome-thanks {
+  color: #f2c14e;
+}

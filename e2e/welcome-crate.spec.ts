@@ -113,7 +113,8 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await expect(tile.locator(".not-tradeable")).toHaveText("Not tradeable");
   await expect(tile).not.toContainText("%");
   await expect(tile.locator(".locker-worn")).toHaveText("Worn");
-  await expect(page.getByRole("button", { name: /trade|sell|list for/i })).toHaveCount(0);
+  // (Its own label says "not tradeable": a button named for trading, selling or listing would be a word of its own.)
+  await expect(page.getByRole("button", { name: /\b(trade|sell|list)\b/i })).toHaveCount(0);
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(2);
   await shot(page, "not-tradeable");
 

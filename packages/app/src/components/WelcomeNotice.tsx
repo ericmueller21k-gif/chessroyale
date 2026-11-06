@@ -45,7 +45,7 @@ export function WelcomeNotice({ refresh = false }: { refresh?: boolean }) {
           <strong>{WELCOME_TEXT.earned}</strong>
         </p>
         <p class="small welcome-thanks">{WELCOME_TEXT.thanks}</p>
-        <p class="small muted">It's in your inventory's Crates. {WELCOME_TEXT.notTradeable}.</p>
+        <p class="small">It's in your inventory's Crates. {WELCOME_TEXT.notTradeable}.</p>
         <div class="locker-dialog-actions">
           <button type="button" class="ff-button small" ref={ok} onClick={close}>
             ▶ OK
