@@ -220,3 +220,6 @@ sounds, #460 ride into shops + Timber 2 Gnaws + 🐟 Stockfish + no King praise 
   #507 LIVE (de7933db, main green). North edge PAUSED at 03b47ef5: left = frame rate vs main, South Street west sky e2e failing
   (0.126 vs 0.005: Hollow's roof slope beside the camera after the move; needs a design fix), stills. Stuck wrangler on 8987
   killed (Eric's OK). Tutorial (Haiku): Handbook rename + slide module pushed; overlay in progress until 02:59.
+- Nov 6 ~02:45: controls + minimap PAUSED at 1c6d7420 (claude/street-controls-map): built; local e2e unproven (disk-full run), the
+  WebGL look-round e2e not rerun, WebGL fps not measured; merges main after north edge. Street town ships as north edge then
+  controls. #508 Smudgy merged 83ceba92 (deploying). #509 Welcome Crates open, full e2e running.
