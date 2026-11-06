@@ -521,7 +521,21 @@ function Spin({ tiles, land, ms, look, onDone }: { tiles: Tile[]; land: number; 
  * Opening a crate: the server rolls, the strip spins to a tier's present, which unwraps straight to the reveal; or
  * to Fischer Random, which gets its banner and a second spin among its items before the reveal.
  */
-function CrateOpening({
+/** A boss crate's picture with its boss's token on its corner, as its Crates tab row draws it (and Boingo's claw machine's prize, Nov 6). */
+export function BossCrateArt({ crate }: { crate: BossCrateDef }) {
+  const { Crate } = CRATE_LOOKS[crate.look];
+  return (
+    <span class="crate-row-art">
+      <Crate />
+      <span class="crate-row-token">
+        <TokenArt boss={crate.boss} />
+      </span>
+    </span>
+  );
+}
+
+/** A crate opening: the strip, the unwrap, Fischer Random and the reveal (the Crates tab's; Boingo's claw machine's Open now, Nov 6). */
+export function CrateOpening({
   crate,
   force,
   resume,
