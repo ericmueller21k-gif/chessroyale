@@ -223,12 +223,20 @@ export function CratesPanel() {
 }
 
 /** Where your Welcome Crate is: "ready" (yours to open), "opened", or not earned yet ("locked"; a guest's always is). */
-const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) => profile?.locker?.welcome ?? { games: 0, status: "locked" as const, notice: false };
-/** The line under the crate saying where yours is. */
-function welcomeLine(w: { games: number; status: string }, signedIn: boolean): string {
-  if (w.status === "ready") return "You have 1. Open it!";
-  if (w.status === "opened") return "Opened. Its ride is in your locker.";
-  return signedIn ? WELCOME_TEXT.progress(w.games) : `${WELCOME_TEXT.progress(w.games)}. Sign in to earn it.`;
+const welcomeOf = (profile: ReturnType<typeof useAccount>["profile"]) =>
+  profile?.locker?.welcome ?? { games: 0, next: WELCOME_GIFT.milestones[0] as number | null, unopened: 0, status: "locked" as const, notice: false };
+/**
+ * The line under the crate saying where yours are (Eric: "the first one you get after 5 games, the next one you get after 25"): one
+ * waiting ("You have 1. Open it!"), else the next milestone's progress ("Finish 25 games for your second Welcome Crate: 7/25"), else
+ * both opened.
+ */
+function welcomeLine(w: { games: number; next?: number | null; unopened?: number; status: string }, signedIn: boolean): string {
+  const waiting = w.unopened ?? (w.status === "ready" ? 1 : 0);
+  if (waiting > 0) return `You have ${waiting}. Open ${waiting === 1 ? "it" : "them"}!`;
+  const next = w.next === undefined ? (w.status === "locked" ? WELCOME_GIFT.milestones[0] : null) : w.next;
+  if (next === null) return "Both opened. Their rides are in your locker.";
+  const line = WELCOME_TEXT.progress(w.games, next);
+  return signedIn ? line : `${line}. Sign in to earn it.`;
 }
 
 /**
@@ -496,8 +504,9 @@ function WelcomePage({ resume, onBack }: { resume?: Unseen; onBack: () => void }
         </span>
       </div>
       <p class="small muted">
-        One per account, for finishing {WELCOME_GIFT.games} games in any mode or against any boss. It holds one ride, any of the game's
-        rides, each as likely, in HunChess gold and black. It and its ride can't be traded.
+        Two per account: one for finishing {WELCOME_GIFT.milestones[0]} games in any mode or against any boss, another at {WELCOME_GIFT.milestones[1]}. Each holds
+        one ride, any of the game's rides, each as likely (the second never the first's), in HunChess gold and black. They and their
+        rides can't be traded.
       </p>
       <h3 class="ff-title">Possible rides</h3>
       <div class="odds-list">
@@ -656,7 +665,9 @@ function CrateOpening({
 }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
   // "Open another": a boss crate only while you hold one more (greyed at none); the Crates tab's own, always.
-  const more = isWelcomeCrate(crate.id) ? false : !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
+  // (A Welcome Crate: another only while a second waits.)
+  const welcomeLeft = useAccount().profile?.locker?.welcome?.unopened ?? 0;
+  const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
   const [round, setRound] = useState(0);

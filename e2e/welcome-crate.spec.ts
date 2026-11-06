@@ -16,13 +16,13 @@ const shot = async (page: Page, name: string) => {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${test.info().project.name}.png` });
 };
 
-type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcome: { games: number; status: string; notice: boolean; item?: string } };
+type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcome: { games: number; next: number | null; unopened: number; status: string; notice: boolean; item?: string } };
 const lockerNow = (page: Page) => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
 /** One finished game, saved as a solo result screen saves it (the app's own path). */
 const finishGame = (page: Page) =>
   page.evaluate(async () => (await fetch("/api/results", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true }) })).ok);
 
-test("the Welcome Crate: 5 finished games earn it once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing", async ({ page }) => {
+test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await named(page, "Tess");
@@ -93,7 +93,8 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await reveal.getByRole("button", { name: "▶ Wear" }).click();
   await expect(reveal.getByRole("button", { name: "Wearing it" })).toBeVisible();
   await reveal.getByRole("button", { name: "▶ Done" }).click();
-  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Opened. Its ride is in your locker.");
+  // (The next milestone: Eric, "the first one you get after 5 games, the next one you get after 25".)
+  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Finish 25 games for your second Welcome Crate: 5/25");
   await expect(page.getByRole("button", { name: /^▶ Open$/ })).toBeDisabled();
 
   // Opening again (a second tap, another device): nothing new, the same ride.
@@ -135,10 +136,31 @@ test("the Welcome Crate: 5 finished games earn it once; its notice, opening it t
   await page.waitForTimeout(800);
   await shot(page, "town");
 
-  // A sixth game grants nothing: still one crate, opened, one ride, no notice.
+  // A sixth game grants nothing: still one crate, opened, one ride, no notice; the next is at 25.
   expect(await finishGame(page)).toBe(true);
   locker = await lockerNow(page);
-  expect(locker.welcome).toMatchObject({ status: "opened", notice: false });
+  expect(locker.welcome).toMatchObject({ status: "opened", notice: false, next: 25, games: 6 });
   expect(locker.items.filter((i) => i.def.endsWith("-hunchess"))).toHaveLength(1);
+
+  // The second at 25: its notice, then it opens to a different HunChess ride.
+  for (let i = 6; i < 24; i++) expect(await finishGame(page)).toBe(true);
+  expect((await lockerNow(page)).welcome).toMatchObject({ status: "opened", next: 25, games: 24, notice: false });
+  expect(await finishGame(page)).toBe(true);
+  await page.goto("/");
+  await expect(page.locator(".welcome-notice")).toContainText("You earned a Welcome Crate!", { timeout: 20_000 });
+  await page.locator(".welcome-notice").getByRole("button", { name: "▶ OK" }).click();
+  await page.goto("/shop?crates");
+  await expect(row).toContainText("You have 1. Open it!");
+  await row.click();
+  await page.getByRole("button", { name: /^▶ Open$/ }).click();
+  await expect(reveal).toBeVisible({ timeout: 40_000 });
+  await expect(reveal.locator(".reveal-name")).toHaveText(/^HunChess /);
+  await reveal.getByRole("button", { name: "▶ Done" }).click();
+  await expect(page.locator(".welcome-crate-hero .welcome-progress")).toHaveText("Both opened. Their rides are in your locker.");
+  locker = await lockerNow(page);
+  const both = locker.items.filter((i) => i.def.endsWith("-hunchess"));
+  expect(both).toHaveLength(2);
+  expect(new Set(both.map((i) => i.def)).size).toBe(2);
+  expect(locker.welcome).toMatchObject({ status: "opened", next: null, unopened: 0, notice: false });
   expect(errors).toEqual([]);
 });

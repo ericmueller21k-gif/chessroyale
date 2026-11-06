@@ -7,9 +7,11 @@ import { WELCOME_GIFT } from "./settings.ts";
  * mode or any boss. It contains a special HunChess-colored random rider, with a HunChess-theme gold and black crate. Never
  * tradeable. Purity isn't listed for these. Limit one per account."
  *
- *   - Earned once per account, ever, by the server (server/welcome.ts: a stored row keyed by the account, checked and set in one
- *     statement), at WELCOME_GIFT.games finished games. Never in CRATES (the Crates tab can't open one free) nor BOSS_CRATES.
- *   - Its prize: one of every ride's HunChess colorway (HUNCHESS_RIDES in crates.ts), each as likely, rolled by the server.
+ *   - Two of them (Eric: "the first one you get after 5 games, the next one you get after 25"): each earned once per account, ever,
+ *     by the server (server/welcome.ts: a stored row keyed by the account and the milestone, checked and set in one statement), at
+ *     WELCOME_GIFT.milestones finished games. Never in CRATES (the Crates tab can't open one free) nor BOSS_CRATES.
+ *   - Its prize: one of every ride's HunChess colorway (HUNCHESS_RIDES in crates.ts), each as likely, rolled by the server; the second
+ *     never gives the ride the first gave (while another is left).
  *   - Never tradeable, never listable (`tradeable`, every path that would move an item between accounts asks it), and no purity
  *     is shown for the crate or its rides.
  */
@@ -23,8 +25,14 @@ export const WELCOME_TEXT = {
   thanks: "Thank you for being an early tester!",
   notTradeable: "Not tradeable",
   earned: "You earned a Welcome Crate!",
-  /** The progress hint: "Finish 5 games to earn your Welcome Crate: 3/5". */
-  progress: (games: number) => `Finish ${WELCOME_GIFT.games} games to earn your Welcome Crate: ${Math.min(games, WELCOME_GIFT.games)}/${WELCOME_GIFT.games}`,
+  /**
+   * The progress hint toward the next crate: "Finish 5 games to earn your Welcome Crate: 3/5", then "Finish 25 games for your second
+   * Welcome Crate: 7/25".
+   */
+  progress: (games: number, milestone: number = WELCOME_GIFT.milestones[0]) =>
+    milestone === WELCOME_GIFT.milestones[0]
+      ? `Finish ${milestone} games to earn your Welcome Crate: ${Math.min(games, milestone)}/${milestone}`
+      : `Finish ${milestone} games for your second Welcome Crate: ${Math.min(games, milestone)}/${milestone}`,
 } as const;
 
 /**
@@ -48,11 +56,13 @@ export const WELCOME_CRATE: CrateDef = {
 export const HUNCHESS_FINISH = { color: "yellow", color2: "midnight", blemish: 0 } as const;
 
 /**
- * Opens the Welcome Crate: one ride from every ride's HunChess colorway, each as likely (two draws of `rng`: the ride, its seed).
- * The server's randomness only (server/welcome.ts).
+ * Opens a Welcome Crate: one ride from every ride's HunChess colorway, each as likely (two draws of `rng`: the ride, its seed), leaving
+ * out `won` (the rides an earlier Welcome Crate gave: Eric, the second holds a different one) while any other is left. The server's
+ * randomness only (server/welcome.ts).
  */
-export function rollWelcome(rng: Rng): CrateRoll {
-  const list = WELCOME_CRATE.items;
+export function rollWelcome(rng: Rng, won: readonly string[] = []): CrateRoll {
+  const left = WELCOME_CRATE.items.filter((d) => !won.includes(d));
+  const list = left.length ? left : WELCOME_CRATE.items;
   const def = list[Math.min(list.length - 1, Math.floor(rng() * list.length))]!;
   const seed = Math.floor(rng() * 2 ** 31);
   return {
@@ -64,6 +74,9 @@ export function rollWelcome(rng: Rng): CrateRoll {
     seed,
   };
 }
+
+/** The next Welcome Crate milestone an account hasn't earned (5, then 25), or null once it has both. */
+export const nextWelcomeMilestone = (earned: readonly number[]): number | null => WELCOME_GIFT.milestones.find((m) => !earned.includes(m)) ?? null;
 
 /** Whether a crate id is the Welcome Crate's. */
 export const isWelcomeCrate = (id: unknown) => id === WELCOME_CRATE_ID;

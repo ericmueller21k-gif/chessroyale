@@ -152,7 +152,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   solo_battles: "user_id id started_at",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online age_ok_at",
   wallets: "user_id coins crates crate_keys",
-  welcome_crates: "user_id granted_at games seen_at opened_at item_id",
+  welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
 
 /** The server's source files, every folder. */
