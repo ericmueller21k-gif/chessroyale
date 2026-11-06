@@ -32,6 +32,7 @@ import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
 import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace } from "../src/components/KingAttack.tsx";
 import { evalBarOn } from "../src/prefs.ts";
 import { timberSound, type TimberSound } from "../src/characters/timber-sounds.ts";
+import { DASH_LINES } from "../src/characters/dash-lines.ts";
 
 // A boss's attack on a king (Eric, Oct 10: Hollow first): the kit's `kingAttack`, his frames on the shared beats, the
 // God King's blows on its lashes in his Last Stand, and the hits on the king's square.
@@ -52,7 +53,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -368,6 +369,54 @@ describe("Timber's attack on a king (Nov 2)", () => {
 });
 
 /**
+ * Dash's (Nov 6; Eric: "when you blunder, all bosses are supposed to jump on the board and attack; he never had that built"): he
+ * dashes in from his side with his trail, swipes his claws at the king ten times, high and low, and dashes off; his whoosh and his
+ * snap in turn, a pop on the king's square each hit.
+ */
+describe("Dash's attack on a king (Nov 6)", () => {
+  const kit = bossKit("Dash")!;
+  const ka = kit.kingAttack!;
+  const anim = ka.ch.anims[ka.anim]!;
+  const s = starts(anim);
+  const hits = anim.frames.flatMap((f, i) => (kingAttackHits().includes(s[i]!) ? [f] : []));
+
+  it("is his kit's, facing our left, 48 frame pixels a square, a square off; lasting the attack exactly, empty at both ends", () => {
+    expect(ka).toMatchObject({ anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true });
+    expect(animLength(anim)).toBe(KING_ATTACK.ms);
+    expect(anim.frames[0]!.layers).toEqual([]);
+    expect(anim.frames.at(-1)!.layers).toEqual([]);
+    // (In by the time the attack lands; off by the time it leaves.)
+    expect(s.findIndex((t) => t >= KING_ATTACK.landAt)).toBeGreaterThan(0);
+  });
+
+  it("swipes on each of the shared hits, a whoosh and a snap in turn (his own sounds), all ten under a move", () => {
+    expect(hits).toHaveLength(KING_ATTACK.lashes);
+    expect(hits.map((f) => f.cue)).toEqual(kingAttackHits().map((_, i) => (i % 2 ? "snap" : "whoosh")));
+    expect([kit.sounds.whoosh, kit.sounds.snap, kit.sounds.zip, kit.sounds.skid]).toEqual(["dashWhoosh", "dashSnap", "dashZip", "dashSqueak"]);
+    for (const f of anim.frames) if (f.cue) expect(kit.sounds[f.cue], f.cue).toBeTruthy();
+    expect(ka.hit("e1", 0, "L", 7)).toEqual({ square: "e1", name: "popHit", anim: "hitHL", since: 7 });
+    expect(kit.chance.kingAttack).toBe(1);
+    expect(DASH_LINES.kingAttack?.length).toBeGreaterThan(0);
+  });
+
+  it("his claws' slash reaches past the middle of the king's square on each hit, his body clear of it; nothing cut off at the frame's edge", () => {
+    for (const f of hits) {
+      expect(reach(ka, f)).toBeGreaterThan(ka.stand);
+      expect(reach(ka, f)).toBeLessThan(ka.stand + 0.5);
+      // (Only the slash's white and orange streaks get there: his fur, jacket, cap and clock stay a fifth of a square off.)
+      expect(reach(ka, f, (k) => !"OHN".includes(k))).toBeLessThanOrEqual(ka.stand - 0.2);
+    }
+    const ch = ka.ch;
+    anim.frames.forEach((f, i) => {
+      for (const [, , k] of f.specks ?? []) expect(ch.palette, `frame ${i + 1}: speck "${k}"`).toHaveProperty(k);
+      const keys = frameKeys(ch, f);
+      const edge = [...keys[0]!, ...keys[ch.h - 1]!, ...keys.map((r) => r[0]), ...keys.map((r) => r[ch.w - 1])];
+      expect(edge.filter(Boolean), `kingAttack frame ${i + 1}`).toEqual([]);
+    });
+  });
+});
+
+/**
  * Where each attacker looks (Eric, Oct 18: Wrangler "looks like he's hitting him without looking"): in every hit frame,
  * the features of his face (the keys below, in his head part as drawn: flipped if its layer is) against the middle of
  * the whole head. A head turned to one side (Sawyer, Wrangler, Jefferson) or eyes glancing (Big Boy, Ginger) must point
@@ -399,6 +448,8 @@ const FACES: Record<string, { keys: string; front?: boolean; head?: string; gaze
   Folio: { keys: "x", front: true },
   // (Timber's face is turned a little to our left, toward the board, as all his art is: his eyes, nose and mouth.)
   Timber: { keys: "xX" },
+  // (Dash's face is turned to our left, toward the board, as all his art is: his nose.)
+  Dash: { keys: "n" },
 };
 /** Where his eyes look in a frame (the mean of his two pupils' x, in eye pixels; - toward our left), from the eye layers' own poses. */
 function gazeTurn(f: Anim["frames"][number]): number {

@@ -1,8 +1,7 @@
 import { RECLUSE_PHASE2, BOSS_ALONE_SCORING, bossClockSettings, BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, MATCHMAKING, type ItemLook, type MatchmakingType, botVotes, castPregameVote, clockAfterVote, closePregameVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type BossBrain, type PlayerState, type Settings } from "@chessroyale/core";
 import { GUARD_WORDS, MatchRunner, START_FEN, baseAt, ShowdownScout, brainLine as brainWords, boardSlots, type HumanUciEngine, netBoard, type LobbyPlayer, type LivePick, toSan, type BoardSlot, type BoardState, type NetFinal, type Opening, type RoundReport, type UciEngine } from "@chessroyale/chess";
-import openingsData from "@chessroyale/chess/data/openings.json";
-import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs } from "@chessroyale/chess";
-import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, Phase, SimulView, Standing, VoteView } from "./game.ts";
+import { bulletClock, crowdRace, phase2Numbers, phase2ToMove, botRoster, bossIntroTimeline, bossThinkMs, landedEarlyMs, fullMoonMs, folioTurnMs, bossTurnShowMs, judgeTaps, bossRules, kingHelpBlocked, kingMoveMs, kingStrikeMs, lightsDeadline, lightsOutTimeline, lightsRoundEnd, lastStandMs, powerMomentMs, rushSquares, rushTimeline } from "@chessroyale/chess";
+import type { BossView, BoardView, DarkNote, ExitKind, FinalView, GameView, Hint, LightsView, MoveRecord, RushView, Phase, SimulView, Standing, VoteView } from "./game.ts";
 import { PHASE2_ULT_ANIMS, PHASE_CHANGE, Phase2Game, phase2Follows, phase2Mates, phaseChangeRun } from "./recluse-phase2.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { playInPlace, setEngineAt, setFigureRun } from "./components/BossCharacter.tsx";
@@ -29,7 +28,28 @@ export const HUMAN = "you";
 const FINAL_SHOW_MS = 3200;
 /** Boss battle: how long the boss's move shows, how long it thinks at least, and how long a strike shows. */
 const BOSS_KILL_MS = 3800;
-const library = openingsData as unknown as Opening[];
+/**
+ * The opening library (packages/chess/data/openings.json: 350 kB of the first load's main chunk until Nov 6): its own chunk now,
+ * loaded on first use. Home asks for it once the page is idle (App.tsx), and a solo match waits for it before it starts
+ * (`startSolo`), so nothing on screen changes; a test awaits it before `start()`.
+ */
+let library: readonly Opening[] | null = null;
+let libraryLoad: Promise<readonly Opening[]> | null = null;
+export function loadOpenings(): Promise<readonly Opening[]> {
+  libraryLoad ??= import("@chessroyale/chess/data/openings.json").then(
+    (m) => (library = m.default as unknown as Opening[]),
+    (e) => {
+      // (A failed fetch is tried again next time.)
+      libraryLoad = null;
+      throw e;
+    },
+  );
+  return libraryLoad;
+}
+function openings(): readonly Opening[] {
+  if (!library) throw new Error("The opening library isn't loaded yet: await loadOpenings() first");
+  return library;
+}
 
 export function boardView(b: BoardState): BoardView {
   return netBoard(b, true);
@@ -381,7 +401,7 @@ export class SoloMatch implements GameView {
       rng: this.rng,
       // Re-checks go to the engine server first (see withServerRecheck).
       engines: this.engines.map((e) => withServerRecheck(e, () => this.runner?.state.boards.length ?? 1)),
-      library,
+      library: openings(),
       raidSide: this.raidSide,
       // (The hippo gardener's seeds: this device's time while the page is in view.)
       clock: gardenClock,
@@ -733,6 +753,50 @@ export class SoloMatch implements GameView {
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, lights });
   }
 
+  // ---------------- Dash's Scramble Rush ----------------
+
+  /** The Rush on (your turn waits for it): its key, when it began, your placements so far. */
+  private rush: RushView | null = null;
+
+  /** As your turn begins: the countdown and his sweep, his line and the God King's, your ten seconds; timed here as online. */
+  private rushTurn() {
+    if (this.timer) clearTimeout(this.timer);
+    const at = Date.now();
+    this.rush = { key: `r-${at}`, at, places: {} };
+    this.showRush();
+    this.timer = setTimeout(() => this.rushStep(), rushTimeline().placeUntil);
+  }
+  private showRush() {
+    const r = this.rush!;
+    this.set({ kind: "boss", boss: this.bossSnapshot(), until: 0, rush: { ...r, places: { ...r.places } } });
+  }
+  /** Time's up: your placements judged (rushJudge), the board as it was and the verdict; then his extra move, or your turn. */
+  private rushStep() {
+    const r = this.rush;
+    if (!r || this.stopped) return;
+    if (this.runner.rushDue()) {
+      this.runner.finishRush(this.you.alive ? { [HUMAN]: r.places } : {});
+      this.showRush();
+      this.timer = setTimeout(() => this.rushStep(), Math.max(0, r.at + rushTimeline().total - Date.now()));
+      return;
+    }
+    this.rush = null;
+    this.nextRound();
+  }
+  /** The Rush: you put the swept piece from `from` on `to` (a free square), while your ten seconds are on. Again and again. */
+  rushPlace(from: string, to: string) {
+    const r = this.rush;
+    const rush = this.runner.state.boss?.powers?.dash?.rush;
+    if (!r || !rush || rush.correct !== undefined || this.phase.kind !== "boss" || !this.phase.rush || !this.you.alive) return;
+    const t = Date.now() - r.at;
+    const tl = rushTimeline();
+    if (t < tl.placeAt - 300 || t > tl.placeUntil) return;
+    const places = { ...r.places, [from]: to };
+    if (rushSquares(this.runner.boards.get(this.runner.state.boards[0]!)!.fen, rush, places).get(from) !== to) return;
+    r.places = places;
+    this.showRush();
+  }
+
   /** Lights out: a tap in the round on, while it's open for you (each tap gives you a second more; one try a piece). */
   lightsTap(square: string) {
     const l = this.lights;
@@ -865,7 +929,7 @@ export class SoloMatch implements GameView {
     const [played] = await Promise.all([pick, new Promise((r) => setTimeout(r, bossThinkMs(snap)))]);
     if (this.stopped) return;
     if (!played) return this.nextRound();
-    const showMs = powerMomentMs([{ kind: "extra" }]);
+    const showMs = powerMomentMs([{ kind: this.runner.boss?.id === "dash" ? "rushExtra" : "extra" }]);
     this.set({ kind: "boss", boss: this.bossSnapshot(), until: Date.now() + showMs });
     this.timer = setTimeout(() => this.nextRound(), showMs);
   }
@@ -1258,7 +1322,9 @@ export class SoloMatch implements GameView {
       // (Hollow's Lights out, Big Boy's Big Bounce, Alfil's steps, Chub & Chirp's Carrot Patch cast (his whole turn) and
       // hop come at the start of his turn, before his move.)
       if (this.runner.bossToMove()) return void (this.runner.lightsOutDue() ? this.lightsOutTurn() : this.runner.bounceDue() ? this.bounceTurn() : this.runner.alfilStep() ? this.alfilTurn() : this.runner.carrotDue() ? this.carrotTurn() : this.runner.repaintDue() ? this.repaintTurn() : this.runner.waterDue() ? this.waterTurn() : this.runner.hopDue() ? this.hopTurn() : this.bossTurn());
-      // (A failed Lights out: his extra move, after his own and before your turn.)
+      // (Dash's Scramble Rush, as your turn begins: the turn waits for it.)
+      if (this.runner.rushDue()) return void this.rushTurn();
+      // (A failed Lights out or Scramble Rush: his extra move, after his own and before your turn.)
       if (this.runner.extraMoveDue()) return void this.extraTurn();
       // (Boingo's funhouse: his move for you, as your turn begins.)
       if (this.runner.funhouseDue()) return void this.funhouseTurn();
@@ -1519,6 +1585,8 @@ export class SoloMatch implements GameView {
           if (this.runner.bossToMove()) await this.runner.playBoss(this.engines[0]);
           continue;
         }
+        // (Dash's Scramble Rush with nobody watching: the bots' from the seed.)
+        if (this.runner.rushDue()) this.runner.finishRush({});
         if (this.runner.extraMoveDue()) {
           await this.runner.playExtraMove(this.engines[0]);
           continue;

@@ -13,7 +13,7 @@ import { chromium, devices } from "@playwright/test";
 import { Chess } from "chess.js";
 import sharp from "sharp";
 
-const [out = "chat-frames", movesArg = "2", scheme = "dark", layout = "split", base = "http://localhost:8788"] = process.argv.slice(2);
+const [out = "chat-frames", movesArg = "2", scheme = "dark", layout = "split", base = `http://localhost:${process.env.E2E_PORT ?? 8788}`] = process.argv.slice(2);
 const moves = Number(movesArg);
 mkdirSync(out, { recursive: true });
 const b = await chromium.launch();

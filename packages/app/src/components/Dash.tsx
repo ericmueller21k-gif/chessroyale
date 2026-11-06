@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
-import { pickLine } from "../characters/boss-beats.ts";
+import { hash, pickLine } from "../characters/boss-beats.ts";
+import { DASH_FIT_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
 import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
@@ -119,11 +120,32 @@ function flagMoment({ moment }: MomentProps) {
   );
 }
 
-const MOMENTS: Record<"slap" | "scramble" | "flag", MomentUi> = {
+/** His clock fit: a few quick smacks where he stands (`fit3` to `fit5`), and a line about how much he loves that clock. */
+function fitMoment({ moment }: MomentProps) {
+  const n = Math.max(3, Math.min(5, moment.count ?? 3));
+  return (
+    <div class="power-moment pm-fit pm-stay" data-count={n}>
+      <InPlace runKey={moment.key} anims={[`fit${n}`]} since={moment.at} />
+    </div>
+  );
+}
+
+/** His extra move after a failed Scramble Rush: its own moment as it lands (Hollow's "TWICE!" in his colors; his line came as time was up). */
+function rushExtraMoment({ boss, banner }: MomentProps) {
+  return <div class="power-moment pm-extra pm-stay">{banner("TWICE!", `${boss.name} moves again`, "dash")}</div>;
+}
+
+/** One of his lines for a moment, the same on every screen (by the moment's key). */
+const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
+
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "rushExtra", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
   scramble: { order: 3, kit: "ultimate", lineAt: B.scramble.castAt, view: (p) => scrambleMoment(p) },
+  // (A quirk, not a power: no banner, nothing for you to do; the dock keeps the turn's line.)
+  clockFit: { order: 4, kit: "power", view: fitMoment, line: (_kit, m) => lineOf(DASH_FIT_LINES, m.key) },
+  rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 
 // ---------------- The countdown over the board ----------------
@@ -204,6 +226,7 @@ export function TickTally({ boss, moments }: { boss: BossView; moments: () => Mo
 
 export const DASH_UI = {
   id: "dash",
+  // (Time Scramble's warning: RAGE!, "Next turn: Time Scramble". His Scramble Rush has none: its countdown is its start.)
   // (Every moment where he stands, the warning's too: never over the board.)
   inPlace: true,
   ultimate: { name: "Time Scramble" },

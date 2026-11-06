@@ -110,7 +110,7 @@ async function refused(page: Page, fen: string, move: string, why: string) {
 /** Nothing on the page wider than the screen. */
 const noSideScroll = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 
-test("Folio's Draft: the ink mark and its line, DRAFT and its line, a count of your moves; left standing for two moves the piece is folded (its paper, FOLDED), its moves refused with why", async ({ page }) => {
+test("Folio's Draft: the ink mark and its line, DRAFT and its line, a count of your moves; left standing for two moves the piece is folded (its paper, FOLDED), its moves refused with why", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -179,7 +179,7 @@ test("Folio's Draft: the ink mark and its line, DRAFT and its line, a count of y
   expect(errors).toEqual([]);
 });
 
-test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once), then the crease drawn for four turns, none of your moves across it (refused with why, another works); then it unfolds", async ({ page }) => {
+test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once), then the crease drawn for four turns, none of your moves across it (refused with why, another works); then it unfolds", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -240,7 +240,7 @@ test("Folio's Crease: its pencil line with the warning ('Mind the crease.' once)
   expect(errors).toEqual([]);
 });
 
-test("Folio's Revision: the board holds your move, both moves are struck out, the pieces go back, its new move plays, and the move list strikes both through", async ({ page }) => {
+test("Folio's Revision: the board holds your move, both moves are struck out, the pieces go back, its new move plays, and the move list strikes both through", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -314,7 +314,7 @@ test("Folio's tile and stage, its figure in the bar or beside the board, at 320 
   expect(errors).toEqual([]);
 });
 
-test("Folio online: a reload mid-crease draws the crease as it stands, without its moment again", async ({ page }) => {
+test("Folio online: a reload mid-crease draws the crease as it stands, without its moment again", { tag: "@phone-only" }, async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "one run is enough: a computer");
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];

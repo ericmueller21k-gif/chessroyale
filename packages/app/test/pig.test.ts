@@ -248,7 +248,7 @@ describe("his lines", () => {
     expect(PIG_LINES).not.toHaveProperty("spent");
     expect(PIG_LINES).not.toHaveProperty("ultimateWarn");
     expect(PIG_LINES.ready).toEqual(["I've got you in my sights."]);
-    expect(PIG_LINES.ultimate).toContain("This board ain't big enough for the six of us.");
+    expect(PIG_LINES.ultimate).toContain("Too small for all six of us.");
     expect(PIG_LINES.smug!.some((l) => /snort/i.test(l))).toBe(true);
   });
 

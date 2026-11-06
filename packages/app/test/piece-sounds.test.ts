@@ -235,10 +235,7 @@ describe("piece sounds: the classics are PyChess's (GPL-3.0), credited", () => {
     expect(notice).toContain("variations of\n  PyChess's sounds, made by our script");
   });
 
-  it("credited in Settings and the FAQ, with a link to PyChess's sounds and the license", () => {
-    const settings = read("../src/screens/Settings.tsx");
-    expect(settings).toContain(`Classic piece sounds and their variations: <a href="${PYCHESS}">PyChess</a> (GPL-3.0)`);
-    expect(settings).toContain('<a href="/engine/COPYING.txt">license</a>');
+  it("credited in the FAQ's Copyright, credits and licenses section, with a link to PyChess's sounds and the license", () => {
     const faq = read("../src/faq/content.ts");
     expect(faq).toContain(`- **Classic piece sounds** and their variations: [PyChess](${PYCHESS}) (GPL-3.0).`);
     expect(faq).toContain("[license](/engine/COPYING.txt)");

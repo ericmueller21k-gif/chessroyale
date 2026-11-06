@@ -62,9 +62,9 @@ describe("the challenge's flow", () => {
     expect(run(["fight", "atDoor", "cancel", "fight"])).toBe("toDoor");
   });
 
-  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger and Dash their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
+  it("every boss whose home has an inside has an intro (Alfil, Big Boy, Timber, Hollow, Wrangler, Jefferson, Ginger, Dash, Folio and Smudgy their own, Babur and Puddles the default); every other boss is challenged as before (the Boss raid screen)", () => {
     const withIntro = ALL_HOMES.filter((h) => introOf(h.id)).map((h) => h.id).sort();
-    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "gardener", "gingerbread", "grex", "hollow", "pig", "tiger", "timber"]);
+    expect(withIntro).toEqual(["alfil", "bigboy", "dash", "folio", "gardener", "gingerbread", "grex", "hollow", "pig", "smudgy", "tiger", "timber"]);
     expect(withIntro).toEqual(Object.keys(SHOPS).sort());
     expect(introOf("alfil")).toMatchObject({ custom: true, line: "I'll show you the power of the old piece." });
     expect(introOf("tiger")).toMatchObject({ custom: false, name: "Babur", line: "Fine. One more show. Then I'm on break." });
@@ -84,11 +84,15 @@ describe("the challenge's flow", () => {
     // (Ginger, Nov 5: his own, the icicle; his line a placeholder until Eric's Gemini lines; you both stand on the marks, no stools.)
     expect(introOf("gingerbread")).toMatchObject({ custom: true, name: "Ginger", line: "Cold enough for you?", layout: "across", crewLine: "Coming, boss!" });
     expect(introOf("gingerbread")!.seated).toBeUndefined();
-    expect(introOf("folio")).toBeNull();
+    // (Folio, Nov 5: its own, the folding and the plane, then the crumple; its line its entrance's; a quiet line one of five.)
+    expect(introOf("folio")).toMatchObject({ custom: true, name: "Folio", line: "Every game's a draft. Write one?", layout: "across", clear: 2.3 });
+    expect(introOf("folio")!.chant).toHaveLength(5);
+    // (Smudgy, Nov 6: his own, the cloth whipped off, then the splatter; his line his entrance's first; his reveal line Eric's idea.)
+    expect(introOf("smudgy")).toMatchObject({ custom: true, name: "Smudgy", line: "Artist at work. Wet paint!", layout: "across", seated: true, chant: ["Careful, don't get any paint on the pieces!"] });
   });
 
-  it("the layout: across for all ten today (the boss on the left, you on the right: Eric's normal look)", () => {
-    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex", "gingerbread"] as const) expect(introOf(id)!.layout, id).toBe("across");
+  it("the layout: across for all twelve today (the boss on the left, you on the right: Eric's normal look)", () => {
+    for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig", "grex", "gingerbread", "folio", "smudgy"] as const) expect(introOf(id)!.layout, id).toBe("across");
   });
 });
 
@@ -1028,9 +1032,10 @@ describe("the challenge's pacing (Nov 2)", () => {
         expect(m.bossClear.c + low(ch, "idle", band / k)[1] * k, "pig: his idle as drawn").toBeLessThanOrEqual(bossEdge - GAP);
         for (const a of ["doubleYank", "brag"]) expect(m.bossClear.c + low(BOSS_PIG_INTRO, a, band / k)[1] * k, `pig: his ${a}`).toBeLessThanOrEqual(bossEdge - GAP);
       }
-      // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too. (Dash has none: he stands.)
-      const ka = kit.kingAttack;
-      expect(!!ka, `${id} has a God King attack`).toBe(id !== "dash");
+      // Its attack, swung where it stands: its feet (the lowest 0.3 of a square) clear of the stool too. (Dash's isn't in his intro, Nov 6:
+      // he stands through its beat.)
+      expect(!!kit.kingAttack, `${id} has a God King attack`).toBe(true);
+      const ka = id === "dash" ? null : kit.kingAttack;
       // (Wrangler's lasso lashes the floor nearly two squares out in front of him (0.95 at its rope's crack, 1.94 at its lash): clear
       // of his bucket he'd stand 3.5 squares out, his spin off a phone's left edge (Eric, Nov 4: sprites always on screen). He stands
       // at the usual place, his feet and all of him standing clear of it; only the swung rope crosses over it. Nov 4, Eric to confirm.)

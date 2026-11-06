@@ -63,7 +63,7 @@ async function expectEmblem(page: Page, scope: string, id: string | null, size: 
 const overlap = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }) =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-test("the versus screen shows both ranks' emblems; the result of a division up shows the new one, with the RP change", async ({ browser }) => {
+test("the versus screen shows both ranks' emblems; the result of a division up shows the new one, with the RP change", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const pool = `rt${test.info().project.name.slice(0, 1)}${Math.random().toString(36).slice(2, 9)}`;
   const a = await player(browser, "Ann Tier", GOLD3);
@@ -165,7 +165,7 @@ test("home's ranked row and the profile show your rank's emblem; the row's panel
   await expectEmblem(page, ".dv-profile", "radiant-d1", 96);
 });
 
-test("?rank= shows that rank on an admin's own screens, and does nothing for a player; the top tiers' loops hold still under reduced motion", async ({ browser }) => {
+test("?rank= shows that rank on an admin's own screens, and does nothing for a player; the top tiers' loops hold still under reduced motion", { tag: "@phone-only" }, async ({ browser }) => {
   // A player: the address's ?rank= is ignored (their own placements show, no emblem).
   const p = await player(browser, "Pat Player", null, { asPlayer: true, path: "/?nolanding&rank=gold-3" });
   await p.getByRole("radio", { name: /1 v 1/ }).click();

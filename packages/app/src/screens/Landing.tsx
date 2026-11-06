@@ -114,7 +114,7 @@ export function LandingScreen({
         ))}
       </section>
       <footer class="landing-foot muted small">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a> · Engine: <a href="https://stockfishchess.org">Stockfish</a> (GPL-3.0)
+        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
       </footer>
     </div>
   );

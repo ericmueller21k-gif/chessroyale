@@ -151,11 +151,12 @@ test("piece sounds: each Sound list is collapsed when Settings opens, a tap open
 });
 
 test("piece sounds: the classics and their variations are credited to PyChess (GPL-3.0), with the license served", async ({ page }) => {
-  await page.goto("/settings");
-  const credit = page.locator(".sounds-credit");
-  await expect(credit).toContainText("Classic piece sounds and their variations: PyChess (GPL-3.0)");
-  await expect(credit.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
-  await expect(credit.getByRole("link", { name: "license" })).toHaveAttribute("href", "/engine/COPYING.txt");
+  // The credits are in the Handbook's last section (Eric, Nov 6).
+  await page.goto("/faq#faq-credits");
+  const faq = page.locator("li", { hasText: "Classic piece sounds and their variations: PyChess (GPL-3.0)." });
+  await expect(faq).toHaveCount(1);
+  await expect(faq.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
+  await expect(faq.getByRole("link", { name: "license" })).toHaveAttribute("href", "/engine/COPYING.txt");
   for (const [path, text] of [
     ["/engine/COPYING.txt", "GNU GENERAL PUBLIC LICENSE"],
     ["/licenses/third-party.txt", "variations of\n  PyChess's sounds, made by our script"],
@@ -165,12 +166,6 @@ test("piece sounds: the classics and their variations are credited to PyChess (G
     expect(r.ok(), path).toBe(true);
     expect(await r.text(), path).toContain(text);
   }
-  // The FAQ's credits say the same.
-  await page.goto("/faq#credits");
-  const faq = page.locator("li", { hasText: "Classic piece sounds and their variations: PyChess (GPL-3.0)." });
-  await expect(faq).toHaveCount(1);
-  await expect(faq.getByRole("link", { name: "PyChess" })).toHaveAttribute("href", "https://github.com/pychess/pychess/tree/master/sounds");
-  await expect(faq.getByRole("link", { name: "license" })).toHaveAttribute("href", "/engine/COPYING.txt");
 });
 
 test("piece sounds: every option decodes, starts on its hit and is as loud as the classic", async ({ page }) => {

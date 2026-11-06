@@ -56,7 +56,7 @@ export const PROMOTION_OPT_OUT: Readonly<Record<string, string>> = {};
  * The runner's steps the driver plays, by name. A runner method that names a step (`…Due`, `…Step`) and isn't listed
  * here fails the kit (`unknownSteps`): a new kind of step must be played by the driver, never skipped silently.
  */
-export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hopDue", "extraMoveDue", "funhouseDue", "darkForcedDue", "bossKillDue"] as const;
+export const KNOWN_STEPS = ["lightsOutDue", "bounceDue", "alfilStep", "carrotDue", "repaintDue", "waterDue", "hopDue", "rushDue", "extraMoveDue", "funhouseDue", "darkForcedDue", "bossKillDue"] as const;
 
 /** Runner methods that look like steps but aren't in KNOWN_STEPS. */
 export function unknownSteps(): string[] {
@@ -566,6 +566,14 @@ export async function runBattle(k: KitBattle, sf: StockfishMoves | null): Promis
         c.endsTooProbe(pre, r, `his move ${move}`);
       }
       seen();
+      continue;
+    }
+    if (r.rushDue()) {
+      // (Dash's Scramble Rush: nobody's placements, so none back; the board never changes.)
+      const before = r.boards.get(r.state.boards[0]!)!.fen;
+      r.finishRush({});
+      note("rush");
+      if (r.boards.get(r.state.boards[0]!)!.fen !== before) c.failures.push(`${where}: the Scramble Rush changed the board`);
       continue;
     }
     if (r.extraMoveDue()) {

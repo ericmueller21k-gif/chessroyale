@@ -218,7 +218,7 @@ export function sideArt(id: string, pal: Record<string, string>, spec: SideSpec,
 }
 
 // ---- Roof tiles: 37 x 37 top-down textures (rows run along the tile's x), keyed in the roof's ramp (d e f) or a material's.
-export type RoofTex = "wall" | "wallstone" | "wallplain" | "crumb" | "shingle" | "slate" | "clay" | "tar" | "glass" | "canvas" | "turf" | "hedge" | "sand" | "icing" | "paper" | "plank" | "crystal" | "quilt" | "grass" | "metal" | "thatch";
+export type RoofTex = "wall" | "wallstone" | "wallplain" | "crumb" | "shingle" | "slate" | "clay" | "tar" | "glass" | "canvas" | "turf" | "hedge" | "sand" | "icing" | "paper" | "plank" | "crystal" | "quilt" | "grass" | "metal" | "thatch" | "seats" | "podium";
 export const ROOF_TILES: Record<RoofTex, (x: number, y: number) => string> = {
   wall: (x, y) => MAT.brick(x, y),
   wallstone: (x, y) => MAT.stone(x, y),
@@ -241,6 +241,15 @@ export const ROOF_TILES: Record<RoofTex, (x: number, y: number) => string> = {
   grass: (x, y) => (grain(x, y, 37) > 0.75 ? "r" : grain(x, y, 38) > 0.9 ? "S" : "s"),
   metal: (x) => (x % 6 === 0 ? "X" : x % 6 === 1 ? "w" : "x"),
   thatch: (x, y) => (grain(x, y >> 1, 39) > 0.6 ? "e" : grain(x, y, 40) > 0.8 ? "d" : "f"),
+  // (The street town's Colosseum, the north edge round, in its own palette's keys: houses/coliseum-ring.ts.) Its seats: six rows a tile,
+  // each a lit edge, its tread and a shadow under the next, a dark doorway (a vomitorium) now and then; the podium: the board's squares.
+  seats: (x, y) => {
+    const s = Math.floor((y * 6) / 37);
+    const d = y - Math.ceil((s * 37) / 6);
+    if (s % 3 === 1 && x % 37 >= 15 && x % 37 < 22 && d > 0) return d === 1 ? "X" : "x";
+    return d === 0 ? "5" : d === 1 ? "1" : d < 4 ? "2" : "3";
+  },
+  podium: (x, y) => ((Math.floor((x * 5) / 37) + Math.floor((y * 5) / 37)) % 2 ? "L" : "D"),
 };
 /** A roof tile as a Character (37 x 37, no outline) in a palette: what the box renderer textures a face with. */
 export function roofTile(tex: RoofTex, pal: Record<string, string>, id: string = tex): Character {

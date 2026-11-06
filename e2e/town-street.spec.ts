@@ -12,7 +12,8 @@ import { asAdmin, test } from "./helpers.ts";
  * after, every figure on screen at rest). Round 4 (the rows, the chase camera, the plan wrapping east-west only, its rows 6 up): the
  * squares moved with the plan; the turn is the chase camera's (behind you, the way you walk); round 2's and 3's stills tests went with
  * their plans (round 4's are in e2e/town-rows.spec.ts). Round 5 (one fixed view): the chase camera's turn test went with it
- * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round).
+ * (e2e/town-fixed.spec.ts has the fixed view, the strips and the look round). Nov 6: on WebGL only; a context lost for good opens the
+ * page again in today's town.
  */
 test.use({ actionTimeout: 15_000 });
 
@@ -41,26 +42,47 @@ type Hooks = {
   __townAt?: (k: string, id?: unknown) => { x: number; y: number } | null;
   __townGlide?: (to: string | readonly [number, number]) => void;
   __townCam?: () => { zoom: number; zoomTarget: number; focus: number[] };
+  __townBossBack?: (id: string) => boolean;
 };
 
-/** The street town, an admin's, open by day. */
+/** The street town, an admin's, open by day (drawn with WebGL: its only drawing, Nov 6). */
 async function openStreet(page: Page, query = "") {
   await asAdmin(page);
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
+}
+
+/** Waits until the camera's focus holds still for half a second. */
+async function settled(page: Page) {
+  const focus = () => page.evaluate(() => (window as unknown as Hooks).__townCam?.().focus.map((x) => x.toFixed(3)).join(","));
+  let last = await focus();
+  await expect(async () => {
+    await page.waitForTimeout(500);
+    const now = await focus();
+    const same = now === last;
+    last = now;
+    expect(same, "the camera at rest").toBe(true);
+  }).toPass({ timeout: 20_000 });
 }
 
 /** Taps a home (the camera glides to it first) until its card opens. */
 async function tapHome(page: Page, id: string, name: string) {
   const card = page.getByRole("dialog", { name, exact: true });
+  // (Its boss to its rest square first, so a tap on the home can't land on the boss passing in front of it: its card is the boss's.)
+  await expect.poll(() => page.evaluate((h) => (window as unknown as Hooks).__townBossBack?.(h) ?? false, id), { timeout: 30_000 }).toBe(true);
   await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
-  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing.)
-  await page.waitForTimeout(1200);
+  // (Round 4: let the glide settle before the first tap, so it lands on the home, not on someone passing. On WebGL, software in the
+  // tests, frames are slower: wait for the camera to stop rather than a set time.)
+  await settled(page);
   await expect(async () => {
     if (await card.isVisible()) return;
     const xy = await page.evaluate((h) => (window as unknown as Hooks).__townAt?.("home", h) ?? null, id);
     // (Not drawn from where the camera is now (a tap that missed walked you off): look at it again, and try once more.)
-    if (!xy) await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
+    if (!xy) {
+      await page.evaluate((h) => (window as unknown as Hooks).__townGlide?.(h), id);
+      await settled(page);
+    }
     expect(xy, "drawn").not.toBeNull();
     const cv = (await canvas(page).boundingBox())!;
     await page.mouse.click(cv.x + xy!.x, cv.y + xy!.y);
@@ -69,7 +91,7 @@ async function tapHome(page: Page, id: string, name: string) {
   return card;
 }
 
-test("an admin's street town opens at its default zoom step, at the start (22, 17), the camera facing north; a player's opens as today (zoomed out, at (22, 17))", async ({ page }) => {
+test("an admin's street town opens at its default zoom step, at the start (22, 25; the north edge round: 8 rows on), the camera facing north; a player's opens as today (zoomed out, at (22, 17))", async ({ page }) => {
   const errors = watchErrors(page);
   // A player's town: today's.
   await page.goto("/town?sky=day");
@@ -78,16 +100,17 @@ test("an admin's street town opens at its default zoom step, at the start (22, 1
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "true");
   // An admin's: the street town.
   await openStreet(page);
-  expect(await you(page)).toEqual([22, 17]);
+  expect(await you(page)).toEqual([22, 25]);
   await expect(page.getByRole("button", { name: "Zoom in" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Zoom out" })).toHaveAttribute("aria-pressed", "false");
   const cam = (await page.evaluate(() => (window as unknown as Hooks).__townCam?.()))!;
-  // (Round 4: the zoom is a step, 0 in .. 3 the overview; the default, 1, from the first frame. You open in the park: no step out.)
-  expect(cam.zoom, "the default step from the first frame").toBe(1);
-  expect(cam.zoomTarget).toBe(1);
+  // (Round 4: the zoom is a step, 0 in .. 3 the overview; the default from the first frame, 2 since Nov 5 (Eric: "we're going with number
+  // three for the default"). You open in the park: no step out.)
+  expect(cam.zoom, "the default step from the first frame").toBe(2);
+  expect(cam.zoomTarget).toBe(2);
   // Facing north: the camera looks up the board from behind you, its focus on your column, ahead of you (rows rising).
   expect(Math.abs(cam.focus[0]! - 22)).toBeLessThan(0.01);
-  expect(cam.focus[1]!).toBeGreaterThanOrEqual(17);
+  expect(cam.focus[1]!).toBeGreaterThanOrEqual(25);
   // The sky over the rooftops: the top of the world's box is sky (its blue), not a building.
   const top = await canvas(page).evaluate((cv: HTMLCanvasElement) => {
     const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, 4).data;
@@ -104,25 +127,21 @@ test("an admin's street town opens at its default zoom step, at the start (22, 1
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you there, along the street, to its door square (34, 23), and its card opens", async ({ page }) => {
+test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you there, along the street, to its door square (34, 31), and its card opens", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
   await page.waitForTimeout(600);
-  // Where you walk, every 50 ms.
-  const seen: string[] = [];
-  let watching = true;
-  const watch = (async () => {
-    while (watching) {
-      seen.push((await you(page)).join(","));
-      await page.waitForTimeout(50);
-    }
-  })();
+  // Where you walk: every square the canvas says you're on, noted in the page as it changes (a slow frame can't skip one between reads).
+  await canvas(page).evaluate((cv) => {
+    const w = window as unknown as { __seen: string[] };
+    w.__seen = [cv.dataset.you!];
+    new MutationObserver(() => w.__seen.push(cv.dataset.you!)).observe(cv, { attributes: true, attributeFilter: ["data-you"] });
+  });
   const card = await tapHome(page, "gingerbread", "Ginger Igloo");
-  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("34,23");
-  watching = false;
-  await watch;
-  // (Out of the park east, along Fountain Street: columns 33 to 36, rows 19 to 22.)
-  expect(seen.some((s) => /^3[3-6],(19|2[0-2])$/.test(s)), `along Fountain Street: ${[...new Set(seen)].join(" ")}`).toBe(true);
+  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("34,31");
+  const seen = await page.evaluate(() => (window as unknown as { __seen: string[] }).__seen);
+  // (Out of the park east, along Fountain Street: columns 33 to 36, rows 27 to 30.)
+  expect(seen.some((s) => /^3[3-6],(2[7-9]|30)$/.test(s)), `along Fountain Street: ${[...new Set(seen)].join(" ")}`).toBe(true);
   await expect(card).toBeVisible();
   if (STILLS) {
     await page.waitForTimeout(1200);
@@ -131,12 +150,26 @@ test("walking down Fountain Street to Ginger Igloo's door: a tap on it walks you
   expect(errors, "no page or console errors").toEqual([]);
 });
 
-test("Smudgy's Art Gallery: a tap walks you to its door square (19, 8); from there the arrow toward it opens its card and you stay put", async ({ page }) => {
+test("Meadow Street (the north edge round: Upper Street's homes moved south): each moved home's card opens on a tap", async ({ page }) => {
+  test.setTimeout(200_000);
+  const errors = watchErrors(page);
+  await openStreet(page);
+  await page.waitForTimeout(600);
+  for (const [id, name] of [["hopper", "Chub & Chirp's Grassland"], ["pig", "Wrangler's Stall"], ["moo", "Moo & Moon Meadow"], ["hollow", "Hollow Peak"]] as const) {
+    const card = await tapHome(page, id, name);
+    await expect(card, name).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+  }
+  expect(errors, "no page or console errors").toEqual([]);
+});
+
+test("Smudgy's Art Gallery: a tap walks you to its door square (19, 16); from there the arrow toward it opens its card and you stay put", async ({ page }) => {
   const errors = watchErrors(page);
   await openStreet(page);
   await page.waitForTimeout(600);
   const card = await tapHome(page, "smudgy", "Smudgy's Art Gallery");
-  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("19,8");
+  await expect.poll(async () => (await you(page)).join(","), { message: "at its door square", timeout: 20_000 }).toBe("19,16");
   await page.waitForTimeout(600);
   await page.keyboard.press("Escape");
   await expect(card).toBeHidden();
@@ -155,8 +188,8 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   const errors = watchErrors(page);
   await openStreet(page);
   await expect(canvas(page)).toHaveAttribute("data-sit", "0");
-  // The park's fourth table, (19, 23), ahead on your left past the fountain: its stools (18, 23) and (20, 23). (The one on your row,
-  // (19, 18), has a home's edge chip over it on a phone.)
+  // The park's fourth table, (19, 31), ahead on your left past the fountain: its stools (18, 31) and (20, 31). (The one on your row,
+  // (19, 26), has a home's edge chip over it on a phone.)
   const at = await page.evaluate(() => (window as unknown as Hooks).__townAt?.("table", 3) ?? null);
   expect(at, "the table is drawn at the start").not.toBeNull();
   const cv = (await canvas(page).boundingBox())!;
@@ -164,7 +197,7 @@ test("a park table: a tap on the one ahead on your left walks you to a free stoo
   const card = page.getByRole("dialog", { name: "Chess table", exact: true });
   await expect(card).toBeVisible();
   for (const name of ["Casual", "Ranked"]) await expect(card.getByRole("button", { name, exact: true })).toBeDisabled();
-  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),23$/);
+  await expect.poll(async () => (await you(page)).join(","), { message: "you walk to a stool", timeout: 5000 }).toMatch(/^(18|20),31$/);
   await expect(canvas(page)).toHaveAttribute("data-sit", "1");
   const stool = (await you(page)).join(",");
   await page.mouse.click(cv.x + cv.width * 0.3, cv.y + cv.height * 0.85);
@@ -188,3 +221,45 @@ async function towardKey(page: Page, dir: "N" | "E" | "S" | "W") {
 
 // (Round 5: "the boxes and the chase camera's turn" went with the chase camera: e2e/town-fixed.spec.ts walks the one fixed view, a
 // home's strip and the look round, on both renderers.)
+
+test("the street town's WebGL context lost: nothing drawn until it's back, then it draws again; lost twice within a minute, the page opens again in today's town (Canvas 2D)", async ({ page }) => {
+  test.setTimeout(200_000);
+  await openStreet(page);
+  const lose = (restore: boolean) =>
+    page.evaluate(async (restore) => {
+      const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+      const ext = (cv.getContext("webgl2") as WebGL2RenderingContext).getExtension("WEBGL_lose_context")!;
+      const lost = new Promise((ok) => cv.addEventListener("webglcontextlost", ok, { once: true }));
+      ext.loseContext();
+      await lost;
+      if (restore) {
+        // (Restoring is allowed once the lost event's dispatch is over.)
+        await new Promise((ok) => setTimeout(ok, 50));
+        const back = new Promise((ok) => cv.addEventListener("webglcontextrestored", ok, { once: true }));
+        ext.restoreContext();
+        await back;
+      }
+    }, restore);
+  type P = { __townPaint: () => { backend: string; lost: boolean } };
+  const paint = () => page.evaluate(() => (window as unknown as P).__townPaint());
+  const colors = () =>
+    canvas(page).evaluate((cv: HTMLCanvasElement) => {
+      const d = cv.getContext("2d")!.getImageData(0, 0, cv.width, cv.height).data;
+      const seen = new Set<number>();
+      for (let i = 0; i < d.length; i += 4 * 97) seen.add((d[i]! << 16) | (d[i + 1]! << 8) | d[i + 2]!);
+      return seen.size;
+    });
+  await lose(true);
+  // Back: drawing again with WebGL (its textures made again), the world not blank, still the street town.
+  await expect.poll(async () => (await paint())?.lost, { message: "back" }).toBe(false);
+  expect((await paint())!.backend).toBe("webgl");
+  expect(await colors(), "the world drawn again with WebGL").toBeGreaterThan(40);
+  expect(await you(page)).toEqual([22, 25]);
+  // Lost again within the minute: the page opens again (`?street=off`) in today's town, drawn with Canvas 2D, where a player's opens.
+  await lose(false);
+  await page.waitForURL(/[?&]street=off/, { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-backend", "2d");
+  expect(await you(page), "today's town").toEqual([22, 17]);
+  expect(await colors(), "the world drawn with Canvas 2D").toBeGreaterThan(40);
+});

@@ -220,6 +220,8 @@ describe("buying a boss's crate", () => {
       ["pig", "pen-pony"],
       ["grex", "jefferson-giraffe"],
       ["gingerbread", "ginger-sled"],
+      ["folio", "folio-crane"],
+      ["smudgy", "smudgy-brush"],
     ]);
     for (const c of BOSS_CRATES) expect(c.items).toContain(c.ride);
     const { sql, id } = await account();

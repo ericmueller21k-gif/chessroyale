@@ -1,7 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BOSS_CLOCK, DEFAULT_SETTINGS, RAID_SETTINGS, type Settings } from "@chessroyale/core";
 import { legalMoves, type UciEngine } from "@chessroyale/chess";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 /** A stand-in engine: its searches answer at once with the first legal moves. */
 const engine = {

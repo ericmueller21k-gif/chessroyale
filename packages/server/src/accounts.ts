@@ -31,6 +31,8 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
+import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
+import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -145,6 +147,10 @@ const SCHEMA = [
   ...LOCKER_SCHEMA,
   // Boss tokens, the drops that gave them and an open solo boss battle (boss-tokens.ts).
   ...BOSS_TOKENS_SCHEMA,
+  // The Welcome Crate (Nov 6): one row per account that earned it (welcome.ts).
+  ...WELCOME_SCHEMA,
+  // The ledger (Nov 6): every change to a balance or an inventory, append-only (ledger.ts).
+  ...LEDGER_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.
@@ -221,6 +227,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // Whether the player had the eval bar on (Oct 10, 2026: Settings can switch it off): 1 on, 0 off, NULL unknown (older
   // results, older apps). To see later who turns it off and how they do.
   { table: "results", column: "eval_bar", type: "INTEGER" },
+  // A result recorded because its player abandoned the match (Nov 6: gone too long, idle or removed mid-match): 1; NULL otherwise
+  // (and for every result from before). The Welcome Crate's count of finished games leaves these out (welcome.ts).
+  { table: "results", column: "abandoned", type: "INTEGER" },
   // A report made during a match: that match's lobby code (one report per reporter, player and match).
   { table: "reports", column: "match", type: "TEXT" },
   // A report of a line in the town square's chat (Oct 28, 2026): the line's text and when it was said, from the server's
@@ -275,7 +284,7 @@ export async function refreshRating(sql: Sql, userId: string): Promise<void> {
 const ready = new WeakSet<object>();
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
 const SCHEMA_VERSION = (() => {
-  const text = JSON.stringify([SCHEMA, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
+  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return `${text.length}-${(h >>> 0).toString(36)}`;
@@ -294,6 +303,8 @@ export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
     return;
   }
   for (const s of SCHEMA) await sql.run(s);
+  // (The ledger's append-only triggers: a second lock beside ledger.ts's own. A database that refused them would still load.)
+  for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
   // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
   const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
   if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
@@ -526,6 +537,8 @@ export async function signInWithIdentity(
         ...shopMoves(current.id, owner.id),
         ...lockerMoves(current.id, owner.id),
         ...tokenMoves(current.id, owner.id),
+        // (The balances themselves, with their ledger legs: ledger.ts.)
+        ...mergeMoves(current.id, owner.id, now),
         ...rankedMoves(current.id, owner.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
@@ -651,6 +664,8 @@ export interface MatchResult {
   held?: boolean;
   /** The player had the eval bar on (Settings), as far as their app said. */
   evalBar?: boolean | null;
+  /** Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). */
+  abandoned?: boolean;
 }
 
 /** A count from a result (0-500), or null. */
@@ -659,17 +674,20 @@ const flag = (b: unknown) => (b === true ? 1 : b === false ? 0 : null);
 /** A move in SAN (e.g. Nxe5, O-O-O, e8=Q+), or null. */
 export const cleanSan = (m: unknown) => (typeof m === "string" && /^(?:[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?|O-O(?:-O)?)[+#]?$/.test(m) ? m : null);
 
-export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number): Promise<void> {
+/** `once.since`: written only if this account has no result from this online lobby (`r.lobby`) since then (a lobby writing it again). */
+export async function recordResult(sql: Sql, userId: string, r: MatchResult, now: number, once?: { since: number }): Promise<void> {
   const rating = typeof r.rating === "number" && Number.isFinite(r.rating) ? Math.round(r.rating) : null;
   const cuts = count(r.cuts);
   const strikes = count(r.strikes);
   const mode = r.mode === "crowd" || r.mode === "boss" || r.mode === "squads" ? r.mode : "classic";
   // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
   const ranked = r.online && r.ranked === true;
+  const lobby = r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}`,
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+     ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
     userId,
     mode,
     r.online ? 1 : 0,
@@ -689,13 +707,16 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     flag(r.survived),
     flag(r.lastStand),
     mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
-    r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null,
+    lobby,
     ranked ? 1 : 0,
     r.held ? 1 : 0,
     typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
     flag(r.evalBar),
+    // (Only an online match's room says a player abandoned it.)
+    r.online && r.abandoned === true ? 1 : null,
     // (An account deleted mid-match gets nothing new.)
     userId,
+    ...(once ? [userId, lobby, once.since] : []),
   );
   // Only a ranked match moves your ranking (and not while fair play holds your results).
   if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
@@ -744,6 +765,9 @@ export interface Profile {
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
 export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS): Promise<Profile> {
   const admin = admins(user);
+  // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
+  // once ever (welcome.ts). Never in the way of the profile.
+  await grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
   const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
     "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
     user.id,
@@ -1041,31 +1065,24 @@ export async function buyItem(sql: Sql, userId: string, itemId: unknown, now: nu
   if (state.owned.includes(item.id)) return { ok: true, shop: admin ? await shopState(sql, userId, true) : state };
   const price = SHOP_FREE ? 0 : item.price;
   if (price > state.coins) return { ok: false, message: "Not enough coins." };
-  if (price > 0) {
-    // One transaction (D1's batch: all of it or none), as another buy may have run since the read above
-    // (docs/decisions/2026-10-16-atomic-shop-purchase.md). The item goes in only if the coins are there; a plain
-    // INSERT, so an item owned by then fails it and nothing happens. Then the coins come off, only if they're there
-    // and the item is in. Nothing can change the wallet between the two statements of one transaction, so when the
-    // item went in, the coins come off. Two taps on one item pay once; two items at once can't go below zero.
-    const failed = await sql
-      .batch([
-        stmt("INSERT INTO inventory (user_id, item_id, acquired_at) SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, now, userId, price),
-        stmt(
-          "UPDATE wallets SET coins = coins - ? WHERE user_id = ? AND coins >= ? AND EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)",
-          price,
-          userId,
-          price,
-          userId,
-          item.id,
-        ),
-      ])
-      .then(() => null, (e: unknown) => e);
-    // Owned: bought now, or by another buy since (the batch failed and changed nothing): a no-op success, as above.
-    if (!(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) {
-      if (failed) throw failed;
-      return { ok: false, message: "Not enough coins." };
-    }
-  } else await sql.run("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) VALUES (?, ?, ?)", userId, item.id, now);
+  // One op in the ledger (`shop:<ledger id>:<item>`; ledger.ts), as one transaction (D1's batch: all of it or none), as another buy
+  // may have run since the read above (docs/decisions/2026-10-16-atomic-shop-purchase.md): it applies only while the item isn't yours
+  // and the coins are there, checked in that same transaction; then the item goes in and the coins come off. Two taps on one item pay
+  // once (the second is the same op); two items at once can't go below zero.
+  const me = await ledgerAccount(sql, userId);
+  const done = me
+    ? await applyOp(sql, me, {
+        id: `shop:${me.account}:${item.id}`,
+        reason: "shop",
+        now,
+        when: price
+          ? cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?) AND EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND coins >= ?)", userId, item.id, userId, price)
+          : cond("NOT EXISTS (SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?)", userId, item.id),
+        legs: [leg.shopItem(userId, item.id, now), ...(price ? [leg.coins(userId, -price)] : [])],
+      })
+    : "refused";
+  // Owned: bought now, or by another buy since (this one refused, changing nothing): a no-op success, as above.
+  if (done !== "applied" && !(await sql.first("SELECT 1 FROM inventory WHERE user_id = ? AND item_id = ?", userId, item.id))) return { ok: false, message: "Not enough coins." };
   // A chat pack's lines go into any empty slots of the player's quick chat (the rest they pick in their profile).
   if (item.slot === "chat" && item.look.pack) {
     const { picks, added } = chatPicksAfterGetting(state.chat, item.look.pack);
@@ -1088,41 +1105,33 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
 }
 
 /**
- * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free).
+ * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free). One ledger
+ * op, keyed by `op` (Squads': opKeys.squadsReward, so its lobby can write it again after a failure or a restart and it pays once;
+ * none: a fresh key). Answers what became of it; null: nothing to give, or no such account (deleted mid-match). A failed write throws.
  */
-export async function grantReward(sql: Sql, userId: string, coins: number, crates: number): Promise<void> {
+export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now()): Promise<Outcome | null> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
-  if (!c && !k) return;
-  // (Not for an account deleted mid-match.)
-  await sql.run(
-    `INSERT INTO wallets (user_id, coins, crates) SELECT ?, ?, ? ${IF_ACCOUNT}
-     ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates`,
-    userId,
-    c,
-    k,
-    userId,
-  );
+  if (!c && !k) return null;
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return null;
+  return applyOp(sql, me, {
+    id: op === undefined ? `reward:${crypto.randomUUID()}` : keyFor(op, me),
+    reason: "reward",
+    now,
+    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.crates(userId, k)] : [])],
+  });
 }
 
 /**
- * A guest's items, equipped choices, coins, crates, crate keys and chat picks join the account they sign in to (the account's own
- * choices win): the statements, for the sign-in's one batch. The wallet is added up, so it must leave the guest in the
- * same transaction.
+ * A guest's equipped choices and chat picks join the account they sign in to (the account's own choices win): the statements, for
+ * the sign-in's one batch. (Its items, coins, crates and crate keys move with their ledger legs: ledger.ts, mergeMoves.)
  */
 function shopMoves(from: string, to: string): Stmt[] {
   return [
-    stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt("INSERT OR IGNORE INTO equipped (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped WHERE user_id = ?", to, from),
-    stmt(
-      "INSERT INTO wallets (user_id, coins, crates, crate_keys) SELECT ?, coins, crates, crate_keys FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys",
-      to,
-      from,
-    ),
     stmt("INSERT OR IGNORE INTO chat_picks (user_id, lines, emoji) SELECT ?, lines, emoji FROM chat_picks WHERE user_id = ?", to, from),
-    stmt("DELETE FROM inventory WHERE user_id = ?", from),
     stmt("DELETE FROM equipped WHERE user_id = ?", from),
-    stmt("DELETE FROM wallets WHERE user_id = ?", from),
     stmt("DELETE FROM chat_picks WHERE user_id = ?", from),
   ];
 }

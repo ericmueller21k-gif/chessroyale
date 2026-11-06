@@ -1,6 +1,8 @@
 import { CRATES_FREE, ITEM_SLOTS, adminCopies, adminCopyDef, crateDef, isAdminCopy, itemDef, mulberry32, rollCrate, type CrateRoll, type ItemInstance, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
 import { bossCrateHoldings, tokenHoldings } from "./boss-tokens.ts";
+import { welcomeState, type WelcomeState } from "./welcome.ts";
+import { applyOp, deleteItems, keyFor, leg, ledgerAccount, opKeys } from "./ledger.ts";
 
 /**
  * The locker: crate items a player owns (each with its own color, blemish and seed) and what's equipped in each
@@ -50,6 +52,8 @@ export interface LockerState {
   tokens: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger": only those you have some of; Nov 2): boss-tokens.ts. */
   bossCrates: Record<string, number>;
+  /** The HunChess Welcome Crate (Nov 6): earned or not, opened or not, its one-time notice, the finished games so far (welcome.ts). */
+  welcome: WelcomeState;
 }
 
 /** A player's locker. `admin`: theirs is an admin's, so it has an admin copy of every item they don't own. */
@@ -72,7 +76,7 @@ export async function lockerState(sql: Sql, userId: string, admin = false): Prom
   // (Crates earned, e.g. Squads' placement rewards, are counted in the wallet for when crates stop being free.)
   const earned = CRATES_FREE ? null : ((await sql.first<{ crates: number | null }>("SELECT crates FROM wallets WHERE user_id = ?", userId).catch(() => null))?.crates ?? 0);
   const { tokens, keys } = await tokenHoldings(sql, userId);
-  return { items, equipped, look, crates: earned, keys, tokens, bossCrates: await bossCrateHoldings(sql, userId) };
+  return { items, equipped, look, crates: earned, keys, tokens, bossCrates: await bossCrateHoldings(sql, userId), welcome: await welcomeState(sql, userId) };
 }
 
 /**
@@ -102,7 +106,11 @@ export async function looksOf(sql: Sql, userIds: readonly string[], admins: Read
   return out;
 }
 
-/** Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. */
+/**
+ * Opens a crate (free and unlimited while testing). `force` only works while testing. `admin`: as lockerState's. One ledger op (the
+ * item in), keyed by the app's request id for the open (`open:<ledger id>:<request>`): a retry of it opens nothing more and answers
+ * the first open's item. (An older app's open, with none: a fresh key, as each tap was an open.)
+ */
 export async function openCrate(
   sql: Sql,
   userId: string,
@@ -110,27 +118,36 @@ export async function openCrate(
   force: { fischer?: boolean; shiny?: boolean },
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? crateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   if (!CRATES_FREE) return { ok: false, message: "You need a crate and a key." };
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return { ok: false, message: "No such crate." };
   const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
   const roll = rollCrate(mulberry32(seed), crate, CRATES_FREE ? force : {});
   const id = [...crypto.getRandomValues(new Uint8Array(9))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  await sql.run(
-    "INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    id,
+  const op = request ? keyFor(opKeys.request("open", request), me) : `open:${id}`;
+  const done = await applyOp(sql, me, { id: op, reason: "crate open", now, legs: [leg.item(userId, { ...roll, id }, crate.id, now)] });
+  // Every attempt answers the item as stored (this one's, or on a replay the first's), never its own roll, so every answer to one
+  // request is the same whichever attempt applied it.
+  const opened = done === "refused" ? null : await openedItem(sql, userId, op);
+  if (!opened) return { ok: false, message: "No such crate." };
+  return { ok: true, ...opened, locker: await lockerState(sql, userId, admin) };
+}
+
+/** The item an open (op `opId`) put in your locker, as stored: every attempt at the open answers this. Null: none, or gone since. */
+export async function openedItem(sql: Sql, userId: string, opId: string): Promise<{ roll: CrateRoll; item: ItemInstance } | null> {
+  const r = await sql.first<ItemInstance & { fischer: number }>(
+    `SELECT i.id, i.def, i.color, i.color2, i.blemish, i.seed, i.fischer FROM ledger l JOIN items i ON i.id = l.asset_id AND i.user_id = ?
+     WHERE l.op_id = ? AND l.asset_kind = 'item' AND l.delta > 0 LIMIT 1`,
     userId,
-    roll.def,
-    roll.color,
-    roll.color2 ?? null,
-    roll.blemish,
-    roll.seed,
-    crate.id,
-    roll.fischer ? 1 : 0,
-    now,
+    opId,
   );
-  return { ok: true, roll, item: { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed }, locker: await lockerState(sql, userId, admin) };
+  if (!r) return null;
+  const look = { def: r.def, color: r.color, ...(r.color2 ? { color2: r.color2 } : {}), blemish: r.blemish, seed: r.seed };
+  return { roll: { fischer: r.fischer === 1, ...look }, item: { id: r.id, ...look } };
 }
 
 /**
@@ -158,25 +175,30 @@ export async function equipLocker(sql: Sql, userId: string, slot: unknown, itemI
 /**
  * Deletes crate items you own, for good (the locker's hold-to-delete, after a confirmation). Taken off first if worn.
  * Ids that aren't yours are ignored, and so are admin copies (never stored, so nothing to delete: one stays worn).
- * `admin`: as lockerState's, for the locker it answers with.
+ * `admin`: as lockerState's, for the locker it answers with. Each deletion is a ledger op (`delete:<item id>`), all in one batch
+ * (ledger.ts, deleteItems), so a second tap deletes nothing more.
  */
-export async function deleteLockerItems(sql: Sql, userId: string, itemIds: unknown, admin = false): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
+export async function deleteLockerItems(
+  sql: Sql,
+  userId: string,
+  itemIds: unknown,
+  admin = false,
+  now = Date.now(),
+): Promise<{ ok: true; locker: LockerState } | { ok: false; message: string }> {
   if (!Array.isArray(itemIds) || itemIds.length === 0 || itemIds.length > 500 || !itemIds.every((id) => typeof id === "string")) {
     return { ok: false, message: "No such items." };
   }
-  for (const id of (itemIds as string[]).filter((id) => !isAdminCopy(id))) {
-    await sql.run("DELETE FROM equipped_items WHERE user_id = ? AND item_id = ?", userId, id);
-    await sql.run("DELETE FROM items WHERE user_id = ? AND id = ?", userId, id);
-  }
+  const ids = (itemIds as string[]).filter((id) => !isAdminCopy(id));
+  const me = ids.length ? await ledgerAccount(sql, userId) : null;
+  if (me) await deleteItems(sql, me, ids, now);
   return { ok: true, locker: await lockerState(sql, userId, admin) };
 }
 
 /**
- * A guest's crate items and choices join the account they sign in to (the account's own choices win): the statements,
- * for the sign-in's one batch.
+ * A guest's choices join the account they sign in to (the account's own choices win): the statements, for the sign-in's one batch.
+ * (Its crate items move with their ledger legs: ledger.ts, mergeMoves.)
  */
 export const lockerMoves = (from: string, to: string): Stmt[] => [
-  { sql: "UPDATE items SET user_id = ? WHERE user_id = ?", params: [to, from] },
   { sql: "INSERT OR IGNORE INTO equipped_items (user_id, slot, item_id) SELECT ?, slot, item_id FROM equipped_items WHERE user_id = ?", params: [to, from] },
   { sql: "DELETE FROM equipped_items WHERE user_id = ?", params: [from] },
 ];

@@ -149,8 +149,12 @@ test("Chess Town's button under day, dusk and night: the clock picks one as the 
 test("home: your pawn hops on a phone and a computer alike, 4 s after home shows and then every 30 s, never under reduced motion; the hop's animation runs", async ({ page }) => {
   test.setTimeout(180_000);
   await named(page, "Test2");
-  // (The hop, on a fake clock: the hero's first show is the zero, and the pawn's hop classes are logged with the clock's time.)
-  await page.clock.install();
+  // (The hop, on a fake clock: the hero's first show is the zero, and the pawn's hop classes are logged with the clock's time. The clock
+  // is paused before the page loads and only ever stepped by the test, so no real time passes between home showing and the count:
+  // Nov 6, with it running until the hero was seen, a busy runner's frames and round trips came between, and the first hop missed its
+  // window 5 times in 16 main runs.)
+  await page.clock.install({ time: new Date(2026, 5, 15, 12, 0) });
+  await page.clock.pauseAt(new Date(2026, 5, 15, 12, 0, 1));
   await page.addInitScript(() => {
     const w = window as unknown as { __heroAt?: number; __hopLog: [number, number][] };
     w.__hopLog = [];
@@ -167,17 +171,15 @@ test("home: your pawn hops on a phone and a computer alike, 4 s after home shows
   });
   const hopping = async (reduced: boolean) => {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
-    await page.clock.resume();
     await page.goto("/");
+    // (Frame by frame on the paused clock until home shows: its effects wait for frames.)
+    const shown = () => page.evaluate(() => (window as unknown as { __heroAt?: number }).__heroAt !== undefined);
+    for (let i = 0; i < 2000 && !(await shown()); i++) await page.clock.runFor(16);
     await expect(page.locator(".fd-hero")).toBeVisible();
-    // (The hop's timer starts in the pawn's effect, which waits for a frame: let two frames pass before the clock stops, or on a busy
-    // runner the stop's jump runs that waiting frame at 1 s and the first hop comes at 5 s, so 4.5 s finds none. Oct 30, CI.)
-    await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(done, 0)))));
     const heroAt = await page.evaluate(() => (window as unknown as { __heroAt: number }).__heroAt);
-    // (Freeze the clock a second after the hero shows, then run 70 s of it: the first hop at 4 s, the next at 34 s and at 64 s.)
-    await page.clock.pauseAt(heroAt + 1000);
+    // (To 4.5 s after the hero showed, then 66.5 s more: the first hop at 4 s, the next at 34 s and at 64 s.)
+    await page.clock.runFor(heroAt + 4500 - (await page.evaluate(() => Date.now())));
     // (Mid-hop, 4.5 s in: the hop's own animation is running on this layout, a phone's or a computer's.)
-    await page.clock.runFor(3_500);
     const during = await page.evaluate(() => {
       const hop = document.querySelector(".fd-hero .fd-pawn.hop .fd-hop");
       return hop ? getComputedStyle(hop).animationName : null;

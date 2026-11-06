@@ -22,7 +22,7 @@ const [out = "perf-out", mode = "gingerbread", which = "both", movesArg = "25", 
 const MOVES = Number(movesArg) || 25;
 // online: a Ginger raid on a running local server (npx wrangler dev --port 8788 --var TEST_SWITCHES:1 ..., after
 // npm run build).
-const ONLINE = process.env.PERF_URL ?? "http://localhost:8788/";
+const ONLINE = process.env.PERF_URL ?? `http://localhost:${process.env.E2E_PORT ?? 8788}/`;
 const outDir = resolve(out);
 mkdirSync(outDir, { recursive: true });
 // PERF_PROFILE=<move>: a CPU profile of that move's idle and drag (an unminified build, so the names read).

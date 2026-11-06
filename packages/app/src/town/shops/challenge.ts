@@ -170,6 +170,39 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     },
     facesLeft: true,
   },
+  // (Nov 5: its own, the art's (intro-folio-nov5.md): in its sanctuary you both walk on to the marks on the clean page and it says its
+  // entrance line (characters/folio-lines.ts); you both step back a pace; the stools fold themselves up from flat sheets, then the
+  // table; a paper aeroplane brings the board folded flat, banks over the table, drops it and flies off; the board unfolds on the table
+  // like a map; it bows and says a quiet line (one of five at random: `chant`); then the screen crumples into a ball over black and
+  // opens up as the match (the crumple, crumple-gl.ts). docs/decisions/2026-11-05-folio-home.md. It steps back to 2.3 squares from the
+  // table's middle (the art's), you to the usual 2.2. No God King attack in it: the crumple is its transition, as Hollow's dark is his.)
+  // (Nov 6: his own, the drop cloth whipped off the table (Eric: "He starts out, he pulls the white tablecloth off … to reveal the
+  // board. And the stools can just already be there. It doesn't need to be fancy."), then his reveal line, then the splatter. His line
+  // is his battle entrance's first (characters/smudgy.ts SMUDGY_LINES); the reveal line Eric's idea in the director's words. Seated:
+  // the stools are there already, so you both walk on straight to your marks beside them and stay. No attack: the splatter is his.)
+  smudgy: {
+    name: "Smudgy",
+    line: "Artist at work. Wet paint!",
+    layout: "across",
+    custom: true,
+    seated: true,
+    chant: ["Careful, don't get any paint on the pieces!"],
+    // His own sounds (characters/smudgy-sounds.ts): the cloth's whoosh as he whips it off, its soft flop as it lands in a heap, a wet
+    // splat for each splat of the splatter (a few, faster and faster), and the brush's swipe that wipes it away.
+    cues: { whoosh: "smudgyWhoosh", flop: "smudgyFlop", splat: "smudgySplat", swipe: "smudgySwipe" },
+  },
+  folio: {
+    name: "Folio",
+    line: "Every game's a draft. Write one?",
+    layout: "across",
+    custom: true,
+    chant: ["It's quiet in here. Stay as long as you like.", "Come back whenever it gets too loud out there.", "Take your time. The page will wait.", "Think as long as you need. I'm in no hurry.", "Quiet helps. So does a clean page."],
+    clear: 2.3,
+    // Its cues, each a sound of its own (characters/folio-sounds.ts): its crisp fold for each crease of the stools and the table, a soft
+    // tap as each stands (set), the plane's glide in, the packet's soft landing on the table, its soft unfold for each of the board's two
+    // flaps, a rustle as it bows; the screen crumpled into a ball and opened out flat.
+    cues: { fold: "folioFold", set: "folioSet", whoosh: "folioGlide", land: "folioLand", unfold: "folioUnfold", bow: "folioRustle", crumple: "folioBall", open: "folioOpen" },
+  },
   // (Nov 3: his own, the darkness ball drinking the cave's light, Eric's design with his changes (docs/decisions/2026-11-03-hollow-intro.md);
   // his entrance line as before (characters/hollow.ts), then a channel line as he starts to charge. His pond is smaller than the other
   // circles: the drawn marks, SHOP_HOLLOW_MARKS, the usual spacing.)
@@ -508,6 +541,55 @@ export const CHALLENGE_FEEL = {
    */
   blitz: { lineMs: 1800, awayMs: 200, holdMs: 80 },
   /**
+   * Folio's own (Nov 5; the art's timeline, intro-folio-nov5.md, its beats 1 to 5). Its line (`lineMs`); you both step back a pace
+   * (`backMs`, eased: it glides, you slide, no hop) to the clear places; `stoolLeadMs` on, the west stool folds up from its sheet (its
+   * art's frames), the east one `stoolGapMs` after it, the table `tableAfterMs` after that; `planeAfterMs` after the table stands the
+   * plane comes in along its route (the art's INTRO_FOLIO_PLANE_ROUTE: its points and times, eased between), banks over the table and
+   * lets the board go; the packet falls to the table's top over `fallMs`; `unfoldLeadMs` on, the board unfolds (its frames), and from
+   * then on the game's own board is on the table (the unfolded sheet cross-fading into it over `swapMs`: the game draws its boards
+   * tilted toward you, the art's sheet lies flat); `bowAfterMs` on, it bows (its frames) and `quietLeadMs` into its bow says its quiet
+   * line for `quietMs`; `crumpleAfterMs` after the line has gone, the crumple. About 11.1 s from the marks to the crumple, 13.4 s to
+   * the match; about 15.5 s from just inside the door (the art's 14.9 s from its shorter walk-on).
+   *
+   * The crumple (`crumple`, the art's CRUMPLE_TIMING: crumple-gl.ts): the screen crumpled over black (`crumpleMs`), held as a ball
+   * (`holdMs`; longer while the match loads; once it shows, its picture has `maxHoldMs`, or the ball fades through black onto it instead),
+   * opened as the match screen
+   * (`openMs`), its creases' shade lingering on the flat match (`lingerMs`). Without WebGL (or if it fails), a cross-fade through black:
+   * to black over `fadeMs`, held black while the match loads, up from black over `fadeMs`.
+   */
+  /**
+   * Smudgy's intro (Nov 6): on the marks a beat (`faceMs`), his line (`lineMs`), a pause (`grabMs`) and he whips the cloth off (its
+   * art's frames: up, sailing west over him, dropped in a heap); a beat (`revealLeadMs`), his reveal line (`revealMs`), a beat
+   * (`afterMs`), then the splatter: splats land, faster and faster (a gap of `firstGapMs` between the first two down to `lastGapMs`),
+   * `perSplat` at a time, each `minR` to `maxR` of the screen's shorter side, until `coverMs` (the screen is filled under them then,
+   * however many landed); held covered at least `holdMinMs` (longer while the match loads); a brush stroke sweeps it away across the
+   * screen over `wipeMs`, its band of paint `strokeW` of the screen wide. Never stuck: every phase goes by the clock.
+   */
+  smudgy: {
+    lineMs: 2500,
+    grabMs: 300,
+    revealLeadMs: 250,
+    revealMs: 2400,
+    afterMs: 300,
+    splat: { coverMs: 1200, firstGapMs: 150, lastGapMs: 12, perSplat: 2, minR: 0.06, maxR: 0.2, holdMinMs: 250, wipeMs: 500, strokeW: 0.12, splatSounds: 6 },
+  },
+  folio: {
+    lineMs: 2200,
+    backMs: 400,
+    stoolLeadMs: 50,
+    stoolGapMs: 350,
+    tableAfterMs: 550,
+    planeAfterMs: 340,
+    fallMs: 280,
+    unfoldLeadMs: 90,
+    bowAfterMs: 180,
+    quietLeadMs: 100,
+    quietMs: 2400,
+    crumpleAfterMs: 250,
+    swapMs: 250,
+    crumple: { crumpleMs: 800, holdMs: 400, openMs: 800, lingerMs: 260, maxHoldMs: 3000, fadeMs: 350 },
+  },
+  /**
    * Hollow's own (Nov 3; Eric's design: "the darkness ball in his belly powers up… It sucks in the light: the lanterns go out one by
    * one, the bulb string's lights are drawn in toward him, light from everything around, even from your own chest piece… Everything goes
    * black. It does NOT all switch back on: darkness everywhere, and a dim, steady light around you, the board and him"; approved with his
@@ -661,7 +743,8 @@ export interface MarksFeel {
 export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: DrawnMarks | null, feel: Omit<MarksFeel, "log"> = CHALLENGE_FEEL): Marks | null {
   let c0 = Infinity, c1 = -Infinity, r0 = Infinity, r1 = -Infinity;
   for (const p of layout) {
-    if (!/^(circle|ring|emblem)-/.test(p.name)) continue;
+    // (Folio's clean page, `page-<col>-<row>`, is its battle circle.)
+    if (!/^(circle|ring|emblem|page)-/.test(p.name)) continue;
     c0 = Math.min(c0, p.col);
     c1 = Math.max(c1, p.col);
     r0 = Math.min(r0, p.row);
@@ -973,8 +1056,64 @@ export function blitzAnims(w: { mover: ArtLike; table: ArtLike; stool: ArtLike; 
     key: { whoosh: at(w.mover, "bolt", "whoosh"), skid: at(w.mover, "arrive", "skid"), drop: at(w.mover, "arrive", "drop"), pieces: at(w.pop, "idle", "pop") },
   };
 }
+/** Folio's moves (characters/folio-intro.ts BOSS_FOLIO_INTRO): the glide (its walk-on and its step back), the bow, its idle. */
+export const FOLIO_MOVES = ["glide", "bow", "idle"] as const;
+export type FolioMove = (typeof FOLIO_MOVES)[number];
+/** The plane's animations (shops/folio-intro-art.ts INTRO_FOLIO_PLANE). */
+export const FOLIO_PLANE = ["fly", "bank", "drop", "away"] as const;
+export type FolioPlane = (typeof FOLIO_PLANE)[number];
+/** A point of the plane's route: [column, row, lift in squares] and when it passes (ms from the plane's start). */
+export interface FolioRoutePoint {
+  readonly at: readonly [number, number, number];
+  readonly ms: number;
+}
+/**
+ * Folio's intro (Nov 5; CHALLENGE_FEEL.folio): each frame's ms and cue (the art's) for its moves, a stool's and the table's folding,
+ * the plane's, the board's unfolding; and the plane's route.
+ */
+export interface FolioAnims {
+  folio: true;
+  moves: { readonly [m in FolioMove]: readonly number[] };
+  stool: readonly number[];
+  table: readonly number[];
+  plane: { readonly [m in FolioPlane]: readonly number[] };
+  unfold: readonly number[];
+  cues: { bow: readonly (string | undefined)[]; stool: readonly (string | undefined)[]; table: readonly (string | undefined)[]; unfold: readonly (string | undefined)[] };
+  route: readonly FolioRoutePoint[];
+}
+/** Folio's FolioAnims from its art: its moves (BOSS_FOLIO_INTRO), the stool's and table's `fold`, the plane, the board's `unfold`, the route. */
+export function folioAnims(w: { mover: ArtLike; stool: ArtLike; table: ArtLike; plane: ArtLike; board: ArtLike; route: readonly FolioRoutePoint[] }): FolioAnims {
+  const ms = (ch: ArtLike, a: string) => ch.anims[a]!.frames.map((f) => f.ms);
+  const cues = (ch: ArtLike, a: string) => ch.anims[a]!.frames.map((f) => f.cue);
+  return {
+    folio: true,
+    moves: { glide: ms(w.mover, "glide"), bow: ms(w.mover, "bow"), idle: ms(w.mover, "idle") },
+    stool: ms(w.stool, "fold"),
+    table: ms(w.table, "fold"),
+    plane: { fly: ms(w.plane, "fly"), bank: ms(w.plane, "bank"), drop: ms(w.plane, "drop"), away: ms(w.plane, "away") },
+    unfold: ms(w.board, "unfold"),
+    cues: { bow: cues(w.mover, "bow"), stool: cues(w.stool, "fold"), table: cues(w.table, "fold"), unfold: cues(w.board, "unfold") },
+    route: w.route,
+  };
+}
+/**
+ * Smudgy's intro (Nov 6; CHALLENGE_FEEL.smudgy): the cloth's whip, its frames' ms and cues (the art's: INTRO_SMUDGY_CLOTH), and the
+ * whip's frame from which the board shows under it (off the table's top).
+ */
+export interface ClothAnims {
+  cloth: true;
+  whip: readonly number[];
+  cues: readonly (string | undefined)[];
+  boardFrame: number;
+}
+export function clothAnims(w: { cloth: ArtLike; boardFrame: number }): ClothAnims {
+  const f = w.cloth.anims.whip!.frames;
+  return { cloth: true, whip: f.map((x) => x.ms), cues: f.map((x) => x.cue), boardFrame: w.boardFrame };
+}
+export const isCloth = (a: IntroAnims): a is ClothAnims => "cloth" in a;
 /** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's), the icicle (Ginger's) or the dashes (Dash's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims;
+export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims | ClothAnims;
+export const isFolio = (a: IntroAnims): a is FolioAnims => "folio" in a;
 export const isBlitz = (a: IntroAnims): a is BlitzAnims => "blitz" in a;
 export const isIce = (a: IntroAnims): a is IceAnims => "ice" in a;
 export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
@@ -1000,7 +1139,9 @@ export type IntroStep =
   | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag"
   | "call" | "wave" | "walk" | "creak"
   | "blast" | "fall" | "stab" | "toss" | "cast"
-  | (typeof BLITZ_DASHES)[number];
+  | (typeof BLITZ_DASHES)[number]
+  | "back" | "fold" | "plane" | "unfold" | "bow" | "quiet"
+  | "whip" | "reveal";
 export interface IntroBeat {
   step: IntroStep;
   at: number;
@@ -1009,7 +1150,7 @@ export interface IntroBeat {
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz"
+  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz" | "folio" | "smudgy"
 >;
 /**
  * When things happen in Ginger's intro (ms from the marks; CHALLENGE_FEEL.ice): his charge and blast; the blast flying and bursting;
@@ -1088,6 +1229,33 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
+  if (a && isCloth(a)) {
+    // Smudgy's own: his line; a pause; the whip (the cloth up, over him and down in a heap); a beat, his reveal line, a beat; then the
+    // splatter (no attack).
+    const K = feel.smudgy;
+    add("line", K.lineMs);
+    add("pause", K.grabMs);
+    add("whip", sum(a.whip));
+    add("reveal", K.revealLeadMs + K.revealMs + K.afterMs);
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
+  if (a && isFolio(a)) {
+    // Folio's own: its line; the step back; the stools folding (and the gap to the table); the table folding (and the gap to the
+    // plane); the plane in to the packet landing; the board unfolding (and the gap to the bow); the bow's lead; the quiet line (and
+    // the gap to the crumple). No attack: the crumple is its transition.
+    const T = folioTimes(a, feel);
+    add("line", feel.folio.lineMs);
+    add("back", feel.folio.backMs);
+    add("stools", T.table - T.stoolW + feel.folio.stoolLeadMs);
+    add("fold", T.plane - T.table);
+    add("plane", T.land - T.plane);
+    add("unfold", T.bow - T.land);
+    add("bow", T.quiet - T.bow);
+    add("quiet", T.crumple - T.quiet);
+    out.push({ step: "done", at: t, end: Infinity });
+    return out;
+  }
   if (a && isBlitz(a)) {
     // Dash's own: his line; his four dashes (each a bolt off, out of sight, back with a thing tossed onto the table, a beat); his
     // brag; the attack's beat. (No pause after the line: he's off.)
@@ -1273,6 +1441,10 @@ export interface IntroNow {
   ice: IceNow | null;
   /** Dash's own intro (his dashes): what he and his props do now; null for every other intro. */
   blitz: BlitzNow | null;
+  /** Folio's own intro (the folding, the plane, the board): what it and its props do now; null for every other intro. */
+  folio: FolioNow | null;
+  /** Smudgy's own intro: the cloth's animation and frame now (covered, whipped off, in its heap); null for every other intro. */
+  cloth: { anim: "covered" | "whip" | "heap"; frame: number } | null;
 }
 /** A board carrier in Ginger's intro: where (squares), which way, its animation and frame; null: still in the stockroom. */
 export interface CarrierNow {
@@ -1566,6 +1738,122 @@ export function blitzCues(a: BlitzAnims, feel: Pick<typeof CHALLENGE_FEEL, "face
   return out.sort((x, y) => x.at - y.at);
 }
 /**
+ * When things happen in Folio's intro (ms from the marks; CHALLENGE_FEEL.folio): its line; the step back; each stool's fold and the
+ * table's; the plane's start, its bank, the packet let go and landed; the unfold and the board done; the bow; the quiet line; the
+ * crumple.
+ */
+export function folioTimes(a: FolioAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "folio"> = CHALLENGE_FEEL) {
+  const F = feel.folio;
+  const line = feel.faceMs;
+  const back = line + F.lineMs;
+  const stoolW = back + F.backMs + F.stoolLeadMs;
+  const stoolE = stoolW + F.stoolGapMs;
+  const table = stoolE + F.tableAfterMs;
+  const tableUp = table + sum(a.table);
+  const plane = tableUp + F.planeAfterMs;
+  const r = a.route;
+  // (The route's points: its third is over the table as it banks, its fourth where the packet is let go.)
+  const bank = plane + r[2]!.ms;
+  const drop = plane + r[3]!.ms;
+  const planeGone = plane + r[r.length - 1]!.ms;
+  const land = drop + F.fallMs;
+  const unfold = land + F.unfoldLeadMs;
+  const board = unfold + sum(a.unfold);
+  const bow = board + F.bowAfterMs;
+  const quiet = bow + F.quietLeadMs;
+  const crumple = quiet + F.quietMs + F.crumpleAfterMs;
+  return { line, back, stoolW, stoolE, table, tableUp, plane, bank, drop, planeGone, land, unfold, board, bow, quiet, quietEnd: quiet + F.quietMs, crumple };
+}
+/** A folding piece of Folio's intro: lying flat (its sheet), folding (its `fold`'s frame), or standing (`idle`). */
+export type FoldNow = { anim: "sheet" } | { anim: "fold" | "idle"; frame: number };
+/**
+ * Folio's intro `t` ms in (its beats): its move; the two stools and the table (each its sheet, folding, or standing); the plane (where
+ * it is, `lift` squares up, its animation); the packet falling (where, how high); the board on the table's top (the packet, its
+ * unfolding, then the game's own board: `real`).
+ */
+export interface FolioNow {
+  move: { anim: FolioMove; frame: number };
+  stools: readonly [FoldNow, FoldNow];
+  table: FoldNow;
+  plane: { anim: FolioPlane; frame: number; c: number; r: number; lift: number } | null;
+  /**
+   * The packet falling from the plane to the table's top: `from` the plane's height as it let go (squares over the floor), `u` of its
+   * fall (eased in: it speeds up); null: not falling.
+   */
+  packet: { from: number; u: number } | null;
+  /** The board's top-view picture on the table: the packet lying, its unfold's frame; null: none (not landed, or the real board's on). */
+  board: { anim: "packet" | "unfold"; frame: number } | null;
+  /** The game's own board is on the table (from the unfold's end), coming in over the unfolded sheet (`swap` 0 to 1). */
+  real: boolean;
+  swap: number;
+}
+const easeIO = (u: number) => u * u * (3 - 2 * u);
+/** Where the plane is `pt` ms along its route (eased between its points, as the art plays it): into `out`. */
+export function folioPlaneAt(route: readonly FolioRoutePoint[], pt: number, out: { c: number; r: number; lift: number }): void {
+  let k = 0;
+  while (k < route.length - 2 && pt > route[k + 1]!.ms) k++;
+  const a = route[k]!;
+  const b = route[k + 1]!;
+  const u = easeIO(Math.min(1, Math.max(0, (pt - a.ms) / (b.ms - a.ms))));
+  out.c = a.at[0] + (b.at[0] - a.at[0]) * u;
+  out.r = a.at[1] + (b.at[1] - a.at[1]) * u;
+  out.lift = a.at[2] + (b.at[2] - a.at[2]) * u;
+}
+/** Folio's intro `t` ms in: see FolioNow. */
+export function folioAt(a: FolioAnims, t: number, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "folio"> = CHALLENGE_FEEL): FolioNow {
+  const T = folioTimes(a, feel);
+  const M = a.moves;
+  let move: FolioNow["move"] = { anim: "idle", frame: frameAt(M.idle, t, true) };
+  if (t >= T.back && t < T.back + feel.folio.backMs) move = { anim: "glide", frame: frameAt(M.glide, t - T.back, true) };
+  else if (t >= T.bow && t < T.bow + sum(M.bow)) move = { anim: "bow", frame: frameAt(M.bow, t - T.bow, false) };
+  const fold = (from: number, ms: readonly number[]): FoldNow => (t < from ? { anim: "sheet" } : t < from + sum(ms) ? { anim: "fold", frame: frameAt(ms, t - from, false) } : { anim: "idle", frame: 0 });
+  let plane: FolioNow["plane"] = null;
+  const pt = t - T.plane;
+  if (pt >= 0 && t < T.planeGone) {
+    const at = { c: 0, r: 0, lift: 0 };
+    folioPlaneAt(a.route, pt, at);
+    const P = a.plane;
+    const bankAt = T.bank - T.plane;
+    const dropAt = T.drop - T.plane;
+    const [anim, ms, loop] =
+      pt < bankAt ? (["fly", pt, true] as const) : pt < dropAt ? (["bank", pt - bankAt, false] as const) : pt < dropAt + sum(P.drop) ? (["drop", pt - dropAt, false] as const) : (["away", pt, true] as const);
+    plane = { anim, frame: frameAt(P[anim], ms, loop), ...at };
+  }
+  let packet: FolioNow["packet"] = null;
+  if (t >= T.drop && t < T.land) {
+    const u = (t - T.drop) / (T.land - T.drop);
+    packet = { from: a.route[3]!.at[2], u };
+  }
+  const swap = Math.min(1, Math.max(0, (t - T.board) / feel.folio.swapMs));
+  const board: FolioNow["board"] = t < T.land || swap >= 1 ? null : t < T.unfold ? { anim: "packet", frame: 0 } : { anim: "unfold", frame: frameAt(a.unfold, t - T.unfold, false) };
+  return { move, stools: [fold(T.stoolW, a.stool), fold(T.stoolE, a.stool)], table: fold(T.table, a.table), plane, packet, board, real: t >= T.board, swap };
+}
+/**
+ * Folio's cues, and when (CHALLENGE_FEEL.folio): each stool's and the table's own on their frames (a fold for each crease, `set` as it
+ * stands), the plane's glide in as it starts, the packet's landing, the board's two unfolds on their frames, the bow's on its frame.
+ * (The crumple's and the open's are the transition's: crumple-gl.ts.)
+ */
+export function folioCues(a: FolioAnims, feel: Pick<typeof CHALLENGE_FEEL, "faceMs" | "folio"> = CHALLENGE_FEEL): { cue: string; at: number }[] {
+  const T = folioTimes(a, feel);
+  const out: { cue: string; at: number }[] = [];
+  const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number) => {
+    let t = from;
+    ms.forEach((m, i) => {
+      const cue = cues[i];
+      if (cue) out.push({ cue, at: t });
+      t += m;
+    });
+  };
+  play(a.stool, a.cues.stool, T.stoolW);
+  play(a.stool, a.cues.stool, T.stoolE);
+  play(a.table, a.cues.table, T.table);
+  out.push({ cue: "whoosh", at: T.plane });
+  out.push({ cue: "land", at: T.land });
+  play(a.unfold, a.cues.unfold, T.unfold);
+  play(a.moves.bow, a.cues.bow, T.bow);
+  return out.sort((x, y) => x.at - y.at);
+}
+/**
  * Jefferson's intro `t` ms in (CHALLENGE_FEEL.crew): his move, the crew's clock (the room walks each of them), your lift and the table.
  * He and you stand on your marks from the start to the end (he stands; you on your lift).
  */
@@ -1813,7 +2101,9 @@ const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
   // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
   // (Dash's: you both walk on to where you stand clear of the stools, and nobody steps after they land.)
-  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a))) return Infinity;
+  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a) || isCloth(a))) return Infinity;
+  // (Folio's: you both step back a pace after its line, before the stools fold up: introAt eases it, no hop.)
+  if (a && isFolio(a)) return stepAt(beats, "back");
   if (!a || isLog(a)) return stepAt(beats, "pop");
   if (isBlocks(a)) return stepAt(beats, "chairs");
   return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
@@ -1858,7 +2148,25 @@ export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): Woo
 export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null };
+  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null, cloth: null };
+  if (a && isCloth(a)) {
+    // (Smudgy's: the covered table from the walk on; the cloth whipped off, then in its heap; the board on the table from the whip's
+    // `boardFrame` on (its stools are in the table's picture: they were there all along); his reveal line after its lead.)
+    const w = stepAt(beats, "whip");
+    const r = stepAt(beats, "reveal") + CHALLENGE_FEEL.smudgy.revealLeadMs;
+    const u = t - w;
+    const cloth = u < 0 ? { anim: "covered" as const, frame: 0 } : u < sum(a.whip) ? { anim: "whip" as const, frame: frameAt(a.whip, u, false) } : { anim: "heap" as const, frame: 0 };
+    const shown = u >= sum(a.whip.slice(0, a.boardFrame));
+    return { ...base, cloth, table: shown, stools: false, chant: t >= r && t < r + CHALLENGE_FEEL.smudgy.revealMs };
+  }
+  if (a && isFolio(a)) {
+    // (Folio's: you both step back a pace (no hop) to the clear places; the table (the game's board on it) from the unfold's end, its
+    // stools from theirs (each folds up on its own: FolioNow); its quiet line (the `chant`) from `quietLeadMs` into its bow.)
+    const T = folioTimes(a);
+    const u = Math.min(1, Math.max(0, (t - T.back) / CHALLENGE_FEEL.folio.backMs));
+    const z = folioAt(a, t);
+    return { ...base, folio: z, back: u * u * (3 - 2 * u), hop: 0, table: z.real, stools: false, chant: t >= T.quiet && t < T.quietEnd };
+  }
   if (a && isBlitz(a)) {
     // (Dash's: the table and its board from the board's toss on (the shoe boxes stand from the first, its own lid on top); the stools
     // from the last.)
@@ -1933,6 +2241,8 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (isCrew(a)) return crewCues(beats, a);
   if (isIce(a)) return iceCues(a);
   if (isBlitz(a)) return blitzCues(a);
+  if (isFolio(a)) return folioCues(a);
+  if (isCloth(a)) return clothCues(beats, a);
   if (isLog(a)) {
     // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
     const out: { cue: string; at: number }[] = [];
@@ -1984,6 +2294,17 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   ];
 }
 
+/** Smudgy's: the whip's frames' own cues (the whoosh as it lifts, the flop as it lands in a heap), at their times. */
+export function clothCues(beats: readonly IntroBeat[], a: ClothAnims): { cue: string; at: number }[] {
+  const out: { cue: string; at: number }[] = [];
+  let t = stepAt(beats, "whip");
+  a.whip.forEach((ms, i) => {
+    const cue = a.cues[i];
+    if (cue) out.push({ cue, at: t });
+    t += ms;
+  });
+  return out;
+}
 /**
  * Wrangler's cues, and when (his intro's beats; CHALLENGE_FEEL.rope): his moves' own on their frames (the spin's whirl each loop, the
  * throw, the yank's heaves each loop, the cross throw's wind-up and its two throws a hair apart, the double yank's heaves, the brag's

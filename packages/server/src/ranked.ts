@@ -9,6 +9,7 @@ import { RANKED_1V1, duelCoins, newRankedRecord, rankedGame, ratingNow, type Ran
 import type { Color, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
+import { cond, leg, ledgerAccount, opStatements, type LedgerAccount } from "./ledger.ts";
 import { rankOf } from "./ranked-schema.ts";
 import { seatName } from "./text-filter.ts";
 
@@ -105,7 +106,8 @@ const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" 
  *   - each player's new record from both records as they stand now (core's rankedGame), unless fair play is holding
  *     them (`held`: in review): their rank stays as it is and they earn nothing; the opponent's game counts;
  *   - coins (duelCoins) to each player's wallet, at most RANKED_1V1.coins.perDay paying games a UTC day per account
- *     (the count is kept on their ranked_1v1 row, written in the same batch);
+ *     (the count is kept on their ranked_1v1 row, written in the same batch), each a ledger op (`ranked:<game>:<color>`,
+ *     ledger.ts), so a game pays a player once even if its row were ever written again;
  *   - the game's row goes in only if neither player's record changed since it was read (another game of theirs ending
  *     at the same moment): then everything else in the batch applies only if that row is this recording's (its
  *     nonce), so a game recorded twice changes nothing the second time. A row that didn't go in is read again and
@@ -119,6 +121,8 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
   const fewest = Math.floor(g.moves.length / 2);
   const isHeld: Record<Color, boolean> = { w: await held(g.players.w), b: await held(g.players.b) };
   const day = dayOf(g.endedAt);
+  // (Each player's ledger id, read once: null for an account deleted since, which is paid nothing.)
+  const ledgerIds: Partial<Record<Color, LedgerAccount | null>> = {};
   for (let attempt = 0; attempt < 4; attempt++) {
     const before = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
     const nonce = randomToken(9);
@@ -171,18 +175,11 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
           ),
         );
       }
-      if (coins > 0) {
-        writes.push(
-          stmt(
-            `INSERT INTO wallets (user_id, coins, crates) SELECT ?, ?, 0 WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}
-             ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins`,
-            g.players[c],
-            coins,
-            g.players[c],
-            g.id,
-            nonce,
-          ),
-        );
+      if (coins > 0 && !(c in ledgerIds)) ledgerIds[c] = await ledgerAccount(sql, g.players[c]);
+      const payee = coins > 0 ? ledgerIds[c] : null;
+      if (payee) {
+        // (Paid only if this recording's game row went in: `mine`.)
+        writes.push(...opStatements(payee, { id: `ranked:${g.id}:${c}`, reason: "ranked", now: g.endedAt, when: cond(mine, g.id, nonce), legs: [leg.coins(g.players[c], coins, g.id)] }, nonce));
       }
       outcome[c] = { change, coins };
     }

@@ -76,15 +76,15 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   alfil: ["Before your bishops, there was me.", "The old piece is back.", "Make room. Big guy coming through.", "Old school wins."],
   hopper: ["Chub and Chirp! Best friends!", "He's Chirp. I'm Chub. We hop.", "Got any carrots?"],
   // The director's draft (Oct 19), as written: two of his entrance lines and a smug one, which read right outside a match.
-  smudgy: ["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."],
+  smudgy: ["Chameleons blend. I stand out.", "Artist at work. Wet paint!", "A masterpiece, if I say so myself."],
   // The director's draft (Oct 20), as written (`{heart}` is one of his pixel icons, drawn in the line: speech-icons.ts).
-  moo: ["Hi! This is Moo. He's my best friend. (Moo! {heart})", "I watched your farm for ages. Let's play! (Moo? {question})", "Best friends make the best moves! (Moo! {heart})"],
+  moo: ["Hi! I'm Moo, best friend. (Moo! {heart})", "I watched your farm. Let's play! (Moo? {question})", "Best friends, best moves! (Moo! {heart})"],
   // The director's draft (Oct 21), as written: his entrance, a seed line and a smug one, which read right outside a match.
   gardener: ["Mind the flower beds.", "Good soil here. Very good soil.", "Everything's coming up roses."],
   // The director's draft (Oct 24), as written: lines that read right outside a match.
   tiger: ["No roaring tonight. Balloons only.", "Another masterpiece.", "Don't rush the artist."],
   // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
-  folio: ["Every game is a draft. Shall we write one?"],
+  folio: ["Every game's a draft. Write one?"],
   timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
   dash: ["Yo yo yo! Dash in the building, fam!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.

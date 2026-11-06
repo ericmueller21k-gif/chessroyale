@@ -32,7 +32,7 @@ import { FOLIO_LINES } from "./folio-lines.ts";
 import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
 import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
-import { DASH_FIGURE as DASH } from "./dash-figure.ts";
+import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
 import { lineSounds } from "../speech.tsx";
 import type { Stance } from "./stance.ts";
@@ -899,6 +899,10 @@ export const BOSS_KITS: Record<string, BossKit> = {
     lines: DASH_LINES,
     chance: DASH_CHANCE,
     portrait: { x: 18, y: 10, w: 38, h: 34, anim: "idle", frame: 0 },
+    // His attack on a king (Eric, Nov 6: "when you blunder, all bosses are supposed to jump on the board and attack"): he dashes
+    // in from his side with his trail, swipes his claws at it ten times, high and low (a whoosh and a snap in turn), and dashes
+    // off (dash-figure.ts: DASH_ATTACK). Facing our left; 48 frame pixels a square (he's lanky), a square off.
+    kingAttack: { ch: DASH_ATTACK, anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true, hit: popItem },
   },
   "Hidden Boss": {
     barScale: 1,

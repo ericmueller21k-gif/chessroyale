@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, mulberry32, type CarrotPatch, type Settings } from "@chessroyale/core";
 import { MatchRunner, crowdRace, legalMoves, type EngineLike, type Opening, type UciEngine } from "@chessroyale/chess";
-import { SoloMatch } from "../src/solo.ts";
+import { loadOpenings, SoloMatch } from "../src/solo.ts";
 import { NetMatch } from "../src/net.ts";
+
+// (The opening library is its own chunk, loaded on first use: solo.ts.)
+beforeAll(() => loadOpenings());
 
 /**
  * The eval bar during Chub & Chirp's Carrot Patch race reads the engine's own evaluation, carrots ignored, solo and

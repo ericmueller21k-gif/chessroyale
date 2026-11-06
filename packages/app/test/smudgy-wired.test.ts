@@ -54,7 +54,7 @@ describe("Smudgy is live", () => {
     expect(kit.kingAttack).toMatchObject({ ch: SMUDGY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1.8, facesLeft: true });
   });
 
-  it("says every line of the director's draft as written, each at most 48 characters (the three over 42 named here: the entrance lines 'Every chameleon blends in. I'd rather stand out.' (48) and 'Hold still. I'm painting you into a corner.' (43), and the king attack's 'Hold still, your majesty. You need a touch-up.' (46))", () => {
+  it("says every line of the director's draft, each at most 48 characters, and none past 42 (the boss bar's two rows at 320 px: lines.test.ts)", () => {
     const all = Object.values(SMUDGY_LINES).flat() as string[];
     // (42 lines in the draft; the three select lines are three of them.)
     expect(all).toHaveLength(42);
@@ -65,8 +65,8 @@ describe("Smudgy is live", () => {
       // (The "…" is the ellipsis character, as the other bosses' lines.)
       expect(l, l).not.toMatch(/\.\.\./);
     }
-    expect(all.filter((l) => l.length > 42)).toEqual(["Every chameleon blends in. I'd rather stand out.", "Hold still. I'm painting you into a corner.", "Hold still, your majesty. You need a touch-up."]);
-    expect(SMUDGY_LINES.camoStrike).toEqual(["Surprise! A rook all along!", "Ta-da! Nobody ever notices me. Until now."]);
+    expect(all.filter((l) => l.length > 42)).toEqual([]);
+    expect(SMUDGY_LINES.camoStrike).toEqual(["Surprise! A rook all along!", "Ta-da! Nobody notices me. Now."]);
     expect(SMUDGY_LINES.rookTaken).toEqual(["Hey! How did you know?!", "My masterpiece!"]);
     expect(SMUDGY_LINES.power).toContain("Now you see it…");
     expect(SMUDGY_LINES.ultimate).toContain("Let's switch things up.");
@@ -96,12 +96,12 @@ describe("Smudgy is live", () => {
       expect(10 * Math.log10(sum / s.length), name).toBeLessThan(MOVE_MEAN_DB - 2);
       expect(s, `${name} is the same every time`).toEqual(smudgySound(name, 44100));
     }
-    expect([...SMUDGY_SOUNDS].sort()).toEqual(["dab", "drip", "giggle", "oof", "splash", "swish", "thump"]);
+    expect([...SMUDGY_SOUNDS].sort()).toEqual(["dab", "drip", "flop", "giggle", "oof", "splash", "splat", "swipe", "swish", "thump", "whoosh"]);
   });
 
   it("on the select screen: his splash, the draft's three select lines (all of them his own lines), and full size on the stage", () => {
     expect(SELECT_SOUND.smudgy).toBe("smudgySplash");
-    expect(SELECT_LINES.smudgy).toEqual(["Every chameleon blends in. I'd rather stand out.", "Smudgy, artist. Don't touch the wet parts.", "A masterpiece, if I say so myself."]);
+    expect(SELECT_LINES.smudgy).toEqual(["Chameleons blend. I stand out.", "Artist at work. Wet paint!", "A masterpiece, if I say so myself."]);
     const own = new Set(Object.values(bossKit(NAME)!.lines).flat());
     for (const l of SELECT_LINES.smudgy!) expect(own.has(l), l).toBe(true);
   });

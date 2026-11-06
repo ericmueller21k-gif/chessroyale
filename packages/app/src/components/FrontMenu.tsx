@@ -42,9 +42,9 @@ const crown = () => (
   </Icon>
 );
 
-function Item({ label, icon, on, tip, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; onClick: () => void }) {
+function Item({ label, icon, on, tip, tour, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; tour?: string; onClick: () => void }) {
   return (
-    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} aria-current={on ? "page" : undefined} title={tip ? label : undefined} onClick={onClick}>
+    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} data-tour={tour} aria-current={on ? "page" : undefined} title={tip ? label : undefined} onClick={onClick}>
       <span class="fd-menu-icon">{icon}</span>
       <span>{label}</span>
     </button>
@@ -62,11 +62,12 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
       <div class="fd-menu">
-        <Item tip={tip} label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
-        <Item tip={tip} label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
-        <Item tip={tip} label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
+        <Item tip={tip} tour="play" label="Play" on={page === "home" || page === "queue"} onClick={nav.home} icon={<Icon d="M7 4.5v15l12-7.5z" />} />
+        <Item tip={tip} tour="chess-town" label="Chess Town" on={page === "town"} onClick={nav.chessTown} icon={<Pic ch={ARENA_TOWN_BADGE} scale={1} class="fd-menu-crest" />} />
+        <Item tip={tip} tour="boss-battle" label="Boss Battle" on={page === "raid"} onClick={nav.soloBoss} icon={crown()} />
         <Item
           tip={tip}
+          tour="play-with-friends"
           label="Play with friends"
           on={page === "lobby"}
           onClick={nav.friends}
@@ -81,6 +82,7 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
         />
         <Item
           tip={tip}
+          tour="shop"
           label="Shop & crates"
           on={page === "shop"}
           onClick={nav.shop}
@@ -91,10 +93,10 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
             </Icon>
           }
         />
-        <Item tip={tip} label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
+        <Item tip={tip} tour="profile" label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
       </div>
       <div class="fd-menu fd-menu-end">
-        <Item tip={tip} label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />
+        <Item tip={tip} tour="settings" label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />
       </div>
     </nav>
   );

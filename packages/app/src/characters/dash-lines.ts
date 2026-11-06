@@ -16,21 +16,43 @@ import type { Beat } from "./boss-beats.ts";
 
 export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
   entrance: ["Yo yo yo! Dash in the building, fam!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
-  move: ["Speed, baby.", "Too easy, fam.", "Ayo, what size are those? Asking for a friend."],
+  move: ["Speed, baby.", "Too easy, fam.", "Ayo, what size? Asking for a friend."],
   capture: ["That piece? Chopped. Fully chopped.", "Sheesh!"],
   power: ["Yoink! That time's mine now, cuz.", "Sheesh! Clock slap, baby!", "W in the chat. W on my clock."],
   hurt: ["Yo, that's lowkey rude.", "Okay, okay. W for you, fam. Small W."],
   strike: ["Yoink!", "Too slow, cuz!"],
-  thinking: ["Bro, I already know my move. No cap.", "Clock's ticking, fam. Tick tock, my guy.", "Yo, where'd you cop those kicks, broski?"],
-  check: ["Check, broski. It's giving… checkmate.", "Check! That's bussin. Is that the word? That's the word."],
-  smug: ["This game is chopped, bro. Chopped.", "Am I the main character? Kinda, yeah.", "Real quick: you wanna try these on?"],
-  rattled: ["Bro, I'm not sweating. It's just humid.", "Deadass did not see that coming."],
+  thinking: ["Bro, I already know my move. No cap.", "Clock's ticking, fam. Tick tock.", "Yo, where'd you cop those kicks, broski?"],
+  check: ["Check, broski. It's giving… checkmate.", "Check! Bussin. Is that the word?"],
+  smug: ["Chopped, bro. Chopped.", "Main character? Kinda, yeah.", "Real quick: you wanna try these on?"],
+  rattled: ["Not sweating. It's just humid.", "Deadass did not see that coming."],
   ultimateWarn: ["Speed run, broski! Let's gooo!", "Lace up, fam. This is gonna be quick."],
   ultimate: ["Three seconds a move, cuz. Skrrt!", "Tick tock, my guy. Tick tock."],
   flag: ["Too slow, cuz! I picked one for you.", "No cap, you need Cheetahs.", "Bro moved like he's in flip-flops."],
   victory: ["Too fast, fam! Built different!", "W! Big W! Hashtag no cap.", "W in the chat. Shoes are 20% off, broski."],
   defeat: ["GG, cuz. Lowkey you're goated.", "I'm cooked. Bro, I'm so cooked."],
+  // His attack on a king (the God King's Last Stand after your blunder, and his mate).
+  kingAttack: ["Too slow, my guy! Swipe, swipe, swipe!", "Blunder tax, fam. Paid in full.", "Zoom zoom! That one's on you, cuz."],
 };
+
+/**
+ * Dash v2's lines (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md), in his voice:
+ * - `fit`: his clock fit (at most twice a battle, a few quick smacks): a quirk, he just loves that clock (Eric's two, and three more);
+ * - his Scramble Rush: as the sweep ends (`done`), a piece put down one square off (`close`) or further (`far`), and the crowd too
+ *   few back, as he moves again (`fail`). The God King's are his (godKing.ts: rushAsk, rushWell).
+ */
+export const DASH_FIT_LINES: readonly string[] = [
+  "Nothing beats that click. I love this clock.",
+  "Best sound in the world, fam.",
+  "Click click! Sorry, it's a whole vibe.",
+  "My guy, listen to that. Pure music.",
+  "Can't help it, cuz. This clock is my therapy.",
+];
+export const DASH_RUSH_LINES = {
+  done: ["Hope I wasn't too quick for you.", "Blink and you missed it, fam.", "Too fast? My bad, cuz. Not really."],
+  close: ["Close, but not quite!"],
+  far: ["Not even close."],
+  fail: ["Guess I'll move again. Clearly you weren't paying attention.", "My turn again, fam. Rules are rules.", "Nah, that's not it. I'll take another one, cuz."],
+} as const;
 
 /** How often each moment speaks: every boss's beats, his slap, his scramble and your flag always. */
 export const DASH_CHANCE: Partial<Record<Beat, number>> = {
@@ -49,4 +71,5 @@ export const DASH_CHANCE: Partial<Record<Beat, number>> = {
   ultimateWarn: 1,
   ultimate: 1,
   flag: 1,
+  kingAttack: 1,
 };

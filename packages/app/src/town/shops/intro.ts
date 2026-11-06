@@ -33,6 +33,10 @@ import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park
 import { BOSS_ART } from "../render.ts";
 import type { HomeId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
+import { startCrumple } from "./crumple-gl.ts";
+import { startSplatter } from "./smudgy-splatter.ts";
+import { clothAnims } from "./challenge.ts";
+import { FOLIO_MOVES, FOLIO_PLANE, folioAnims, type FolioMove, type FolioPlane } from "./challenge.ts";
 import { BLITZ_MOVES, CHALLENGE_FEEL, CREW_MOVES, blitzAnims, type BlitzMove, DARK_MOVES, ROPE_MOVES, crewAnims, type CrewMove, boardSquare, darkAnims, drainAt, drawnTop, frameAt, introBeats, introOf, ropeAnims, stormEdge, wipeAt, type BossIntro, type DarkMove, type IntroAnims, type IntroBeat, type IntroLayout, type LogMove, type RopeMove, LOG_MOVES, logAnims } from "./challenge.ts";
 
 /**
@@ -50,6 +54,8 @@ type IntroArt =
       | { dash: typeof import("./blitz-intro-art.ts"); table: Character; ice?: undefined; crew?: undefined; rope?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined }
     ) & {
       dark?: undefined;
+      folio?: undefined;
+      cloth?: undefined;
       dash?: typeof import("./blitz-intro-art.ts");
       ice?: IceMods;
       rope?: typeof import("./pig-intro-art.ts");
@@ -60,7 +66,17 @@ type IntroArt =
       front: Character;
     })
   // Hollow's: the dark (his moves, the cave's lights going out, the motes); the park table; no storm (the dark is his transition).
-  | { dark: typeof import("./hollow-intro-art.ts"); dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined };
+  | { dark: typeof import("./hollow-intro-art.ts"); folio?: undefined; cloth?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; table?: undefined; palette?: undefined; storm?: undefined; front?: undefined }
+  // Folio's: its moves, the folding stools and table (its table), the plane, the board unfolding; no storm (the crumple is its
+  // transition: crumple-gl.ts).
+  // Smudgy's: the covered table (his table) and the cloth's whip; no storm (the splatter is his: smudgy-splatter.ts).
+  | { cloth: typeof import("./smudgy-intro-art.ts"); table: Character; palette: Readonly<Record<string, string>>; folio?: undefined; dark?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; storm?: undefined; front?: undefined }
+  | { folio: FolioMods; table: Character; palette: Readonly<Record<string, string>>; cloth?: undefined; dark?: undefined; dash?: undefined; ice?: undefined; rope?: undefined; crew?: undefined; pyramid?: undefined; blocks?: undefined; wood?: undefined; storm?: undefined; front?: undefined };
+/** Folio's: its props (shops/folio-intro-art.ts) and its moves (characters/folio-intro.ts). */
+interface FolioMods {
+  props: typeof import("./folio-intro-art.ts");
+  moves: typeof import("../../characters/folio-intro.ts");
+}
 /** Ginger's: his props (shops/ginger-intro-art.ts), his moves (characters/ginger-intro.ts) and his elves (the board carriers). */
 interface IceMods {
   props: typeof import("./ginger-intro-art.ts");
@@ -99,6 +115,12 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   // blizzard; the room's own elves keep working.)
   // (Dash's: his moves, the shoe-box table and stools, his dust trail, the pieces' pop, his clock rush; one chunk.)
   dash: () => import("./blitz-intro-art.ts").then((m) => ({ dash: m, table: m.INTRO_BLITZ_TABLE, palette: m.INTRO_BLITZ_TABLE_PALETTE, storm: m.INTRO_BLITZ_STORM, front: m.INTRO_BLITZ_FRONT })),
+  // (Folio's: its moves, the sheets folding into the stools and the table, the plane, the board unfolding; one chunk with its paper
+  // kit. The table's slab is its folded table's top (paper), the board the park table's ink, as the art's board is.)
+  folio: () =>
+    Promise.all([import("./folio-intro-art.ts"), import("../../characters/folio-intro.ts")]).then(([props, moves]) => ({ folio: { props, moves }, table: props.INTRO_FOLIO_TABLE, palette: FOLIO_TABLE_PALETTE })),
+  // (Smudgy's: his round table under its cloth, the cloth's whip; one small chunk with the paint kit.)
+  smudgy: () => import("./smudgy-intro-art.ts").then((m) => ({ cloth: m, table: m.INTRO_SMUDGY_TABLE, palette: m.INTRO_SMUDGY_TABLE_PALETTE })),
   gingerbread: () =>
     Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
       ice: { props, moves, elves },
@@ -108,6 +130,12 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
       front: props.INTRO_GINGER_FRONT,
     })),
 };
+
+/**
+ * Folio's table's slab and board (paintTable's keys): the slab its folded table's paper top (its gilt-lit top edge, the top, the front
+ * in shade), the squares the park table's ink (TABLE_INK), as the art's unfolding board is drawn.
+ */
+const FOLIO_TABLE_PALETTE: Readonly<Record<string, string>> = { "1": "#fff7e6", "2": "#f3e7cc", "3": "#efe1c4", "4": "#d3bd95", "5": "#a58e69", L: TABLE_INK.light, D: TABLE_INK.dark };
 
 type PyramidAnim = "rise" | "idle" | "crack" | "crumble";
 type BlocksAnim = "build" | "plop" | "chairs" | "idle";
@@ -175,6 +203,25 @@ export interface LoadedIntro {
   ice: IceArt | null;
   /** Dash's dashes (null: another's): his moves' frames, the shoe-box table's and stools', his dust trail's, the pop's; see DashArt. */
   dash: DashArt | null;
+  /** Folio's folding (null: another's): its moves' frames, the sheets', stools', table's, plane's and board's; see FolioArt. */
+  folio: FolioArt | null;
+  /** Smudgy's cloth (null: another's): its frames (covered, whip, heap), its foot the table's, at the room's scale. */
+  cloth: { ch: Character; frames: Record<"covered" | "whip" | "heap", HTMLCanvasElement[]> } | null;
+}
+
+/**
+ * Folio's intro, ready (shops/folio-intro-art.ts, characters/folio-intro.ts; ShopRoom draws it): its moves' frames (BOSS_FOLIO_INTRO,
+ * at its town figure's pixels, drawn facing our left: mirrored to face east), the flat sheets' top views and their size in squares, a
+ * stool's and the table's folding and standing frames (the table's top `top` px over its foot), the plane's, and the board's top views
+ * (the packet, its unfolding, `squares` across on the table's top). At the room's scale (1:1), but Folio's.
+ */
+export interface FolioArt {
+  mover: { ch: Character; frames: Record<FolioMove, HTMLCanvasElement[]> };
+  sheets: { stool: HTMLCanvasElement; table: HTMLCanvasElement; squares: { readonly stool: readonly [number, number]; readonly table: readonly [number, number] } };
+  stool: { ch: Character; frames: Record<"fold" | "idle", HTMLCanvasElement[]> };
+  table: { ch: Character; frames: Record<"fold" | "idle", HTMLCanvasElement[]>; top: number };
+  plane: { ch: Character; frames: Record<FolioPlane, HTMLCanvasElement[]> };
+  board: { ch: Character; frames: Record<"packet" | "unfold", HTMLCanvasElement[]>; squares: number };
 }
 
 /**
@@ -304,6 +351,18 @@ const scaled = (src: HTMLCanvasElement, k: number, flip = false): HTMLCanvasElem
   return c;
 };
 
+/** A picture cut to its drawn pixels (alpha over 40, as the art's mockup lays a flat sheet: its own size, not its frame's). */
+const trimmed = (src: HTMLCanvasElement): HTMLCanvasElement => {
+  const d = src.getContext("2d")!.getImageData(0, 0, src.width, src.height).data;
+  let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < src.height; y++)
+    for (let x = 0; x < src.width; x++)
+      if (d[(y * src.width + x) * 4 + 3]! > 40) ((x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y)));
+  if (x1 < 0) return src;
+  const c = canvasOf(x1 - x0 + 1, y1 - y0 + 1);
+  c.getContext("2d")!.drawImage(src, -x0, -y0);
+  return c;
+};
 /** A picture's third (0 the left square, 1 the middle, 2 the right), as a canvas of its own. */
 const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
   const w = Math.round(img.width / 3);
@@ -331,8 +390,25 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     let crew: CrewArt | null = null;
     let ice: IceArt | null = null;
     let dash: DashArt | null = null;
+    let folio: FolioArt | null = null;
+    let cloth: LoadedIntro["cloth"] = null;
     const all = <A extends string>(ch: Character, names: readonly A[]) => Object.fromEntries(names.map((a) => [a, ch.anims[a]!.frames.map((_, i) => toCanvas(ch, a, i))])) as Record<A, HTMLCanvasElement[]>;
-    if (art?.dash) {
+    if (art?.cloth) {
+      const m = art.cloth;
+      anims = clothAnims({ cloth: m.INTRO_SMUDGY_CLOTH, boardFrame: m.WHIP_BOARD_FRAME });
+      cloth = { ch: m.INTRO_SMUDGY_CLOTH, frames: all(m.INTRO_SMUDGY_CLOTH, ["covered", "whip", "heap"]) };
+    } else if (art?.folio) {
+      const { props: m, moves: g } = art.folio;
+      anims = folioAnims({ mover: g.BOSS_FOLIO_INTRO, stool: m.INTRO_FOLIO_STOOL, table: m.INTRO_FOLIO_TABLE, plane: m.INTRO_FOLIO_PLANE, board: m.INTRO_FOLIO_BOARD, route: m.INTRO_FOLIO_PLANE_ROUTE });
+      folio = {
+        mover: { ch: g.BOSS_FOLIO_INTRO, frames: all(g.BOSS_FOLIO_INTRO, FOLIO_MOVES) },
+        sheets: { stool: trimmed(toCanvas(m.INTRO_FOLIO_SHEETS, "stool", 0)), table: trimmed(toCanvas(m.INTRO_FOLIO_SHEETS, "table", 0)), squares: m.INTRO_FOLIO_SHEET_SQUARES },
+        stool: { ch: m.INTRO_FOLIO_STOOL, frames: all(m.INTRO_FOLIO_STOOL, ["fold", "idle"]) },
+        table: { ch: m.INTRO_FOLIO_TABLE, frames: all(m.INTRO_FOLIO_TABLE, ["fold", "idle"]), top: m.INTRO_FOLIO_TABLE_TOP },
+        plane: { ch: m.INTRO_FOLIO_PLANE, frames: all(m.INTRO_FOLIO_PLANE, FOLIO_PLANE) },
+        board: { ch: m.INTRO_FOLIO_BOARD, frames: all(m.INTRO_FOLIO_BOARD, ["packet", "unfold"]), squares: m.INTRO_FOLIO_BOARD_SQUARES },
+      };
+    } else if (art?.dash) {
       const m = art.dash;
       anims = blitzAnims({ mover: m.BOSS_BLITZ_INTRO, table: m.INTRO_BLITZ_TABLE, stool: m.INTRO_BLITZ_STOOL, dust: m.INTRO_BLITZ_DUST, pop: m.INTRO_BLITZ_POP });
       dash = {
@@ -461,7 +537,10 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
     // Its God King attack, if its kit has one (every playable boss's does, Timber's too since Nov 2; the Hidden Boss has no home).
     const kit = bossKit(def.name);
     // (Hollow's own intro has none: the dark is his transition.)
-    const ka = dark ? null : (kit?.kingAttack ?? null);
+    // (Folio's neither: the crumple is its.)
+    // (Smudgy's neither: the splatter is his.)
+    // (Dash's neither: his attack on a king came after his intro, Nov 6; in it he stands through its beat, as drawn.)
+    const ka = dark || folio || cloth || def.name === "Dash" ? null : (kit?.kingAttack ?? null);
     const attack = ka
       ? {
           ch: ka.ch,
@@ -492,6 +571,8 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       crew,
       ice,
       dash,
+      folio,
+      cloth,
     };
   });
   p.catch(() => loading.delete(home));
@@ -837,7 +918,7 @@ export interface Storm {
  * (`data-phase`: "in", "covered", "out"; `data-covered="1"` once it has covered the screen) for tests.
  */
 /** The boss's transition: its own (Alfil's sandstorm), or the default (the flash and the wipe). */
-export const startTransition = (intro: LoadedIntro): Storm => (intro.dark ? startDark(intro) : intro.storm ? startStorm(intro) : startWipe(intro));
+export const startTransition = (intro: LoadedIntro): Storm => (intro.cloth ? startSplatter(intro) : intro.folio ? startCrumple(intro) : intro.dark ? startDark(intro) : intro.storm ? startStorm(intro) : startWipe(intro));
 
 export function startStorm(intro: LoadedIntro): Storm {
   const F = CHALLENGE_FEEL;

@@ -1,5 +1,24 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { allWebgl, globToRegExp, MAX_SHARDS, plan, readAreas, readModule, readTimings, select, shardCount, specFiles, traceModule, weigher, WEBGL_JOBS } from "../../../e2e/ci-select.mjs";
+import {
+  assign,
+  globToRegExp,
+  makespan,
+  MAX_SHARDS,
+  plan,
+  projectWeigher,
+  readAreas,
+  readLiveTimings,
+  readModule,
+  readTimings,
+  select,
+  shardCount,
+  specFiles,
+  traceModule,
+  weigher,
+} from "../../../e2e/ci-select.mjs";
 
 /**
  * CI's e2e plan (e2e/ci-select.mjs, from e2e/areas.json; docs/areas/ops.md, "CI e2e"): a pull request runs the specs of
@@ -68,9 +87,10 @@ describe("every spec (fail-safe)", () => {
     "packages/app/package.json",
     "playwright.config.ts",
     "wrangler.jsonc",
-    ".github/workflows/e2e.yml",
-    "e2e/ci-select.mjs",
     "e2e/helpers.ts",
+    "packages/core/src/crates.ts",
+    "packages/server/src/accounts.ts",
+    "packages/server/src/ledger.ts",
     "packages/core/src/settings.ts",
     "packages/chess/src/runner.ts",
     "packages/chess/src/protocol.ts",
@@ -83,6 +103,15 @@ describe("every spec (fail-safe)", () => {
     expect(r.full).toBe(`\`${path}\` is a shared foundation`);
     expect(r.specs).toEqual([]);
   });
+
+  it.each([".github/workflows/e2e.yml", "e2e/ci-select.mjs", "e2e/ci-shard.mjs", "e2e/ci-summary.ts", "e2e/ci-summary-merge.mjs"])(
+    "a CI-only change (%s): the smoke set, not every spec (ci-select's unit tests run in check; main runs everything)",
+    (path) => {
+      const r = pick(path, "docs/x.md");
+      expect(r.full).toBeNull();
+      expect(r.specs).toEqual(smoke);
+    },
+  );
 
   it.each(["packages/app/src/brand-new.ts", "packages/app/src/components/NewBoss.tsx", "packages/chess/src/bosses/newboss.ts", "somewhere/new.txt", "e2e/new-helper.ts"])(
     "a path the table doesn't know: %s",
@@ -116,62 +145,71 @@ describe("the table (e2e/areas.json)", () => {
 });
 
 describe("shards", () => {
-  const weight = weigher(readTimings());
+  const timings = readTimings(undefined, "");
+  const weight = weigher(timings);
 
-  it("as few as the specs need, at least 1, at most 5, never more than the files", () => {
-    expect(shardCount(smoke, weight)).toBe(1);
+  it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
+    expect(shardCount(smoke, () => 100)).toBe(1);
+    expect(shardCount(smoke, () => 200)).toBe(2);
     expect(shardCount(["e2e/formats.spec.ts"], () => 5000)).toBe(1);
     expect(shardCount(all, weight)).toBe(MAX_SHARDS);
-    expect(MAX_SHARDS).toBe(5);
+    expect(MAX_SHARDS).toBe(10);
   });
 
-  it("every spec: 5 shards and no file list (each shard spreads every spec file); otherwise the files", () => {
-    const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, weight, all);
-    expect(full.outputs).toMatchObject({ specs: "", total: "5", shards: "[1,2,3,4,5]" });
-    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 5 shards: this is a push run, which tests everything.`);
-    const one = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
+  it("every spec: 10 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
+    const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, timings, all);
+    expect(full.outputs).toMatchObject({ specs: "", total: "10", shards: "[1,2,3,4,5,6,7,8,9,10]" });
+    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 10 shards: this is a push run, which tests everything.`);
+    const filters: string[] = JSON.parse(full.outputs.assignment).flatMap((s: string) => s.split(" "));
+    expect(filters.sort()).toEqual(all.map((f) => `${f.replaceAll(".", "\\.")}$`).sort());
+    const one = plan(pick("packages/app/src/components/Sawyer.tsx"), timings, all);
     expect(one.outputs.specs.split(" ")).toContain("e2e/sawyer.spec.ts");
     expect(JSON.parse(one.outputs.shards)).toEqual(Array.from({ length: Number(one.outputs.total) }, (_, i) => i + 1));
+    expect(JSON.parse(one.outputs.assignment).join(" ").split(" ").length).toBe(one.outputs.specs.split(" ").length);
     expect(one.md).toContain("full-e2e");
   });
 
-  it("a file the timings don't know counts as their median", () => {
-    const w = weigher({ "e2e/a.spec.ts": 10, "e2e/b.spec.ts": 20, "e2e/c.spec.ts": 300 });
-    expect(w("e2e/new.spec.ts")).toBe(20);
-  });
-});
-
-describe("the town on WebGL (areas.json, `webgl`)", () => {
-  const weight = weigher(readTimings());
-  const gl = [...areas.webgl!.specs].sort();
-
-  it("a town file or one of its drawing specs: those specs again on WebGL; a chat spec, the chat's server, docs or a boss: none", () => {
-    expect(gl).toEqual(["e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/town-webgl.spec.ts", "e2e/town.spec.ts"]);
-    expect(pick("packages/app/src/town/paint-gl.ts").webgl).toEqual(gl);
-    expect(pick("e2e/town-tags.spec.ts").webgl).toEqual(gl);
-    expect(pick("e2e/town-chat.spec.ts").webgl).toEqual([]);
-    expect(pick("packages/server/src/town-chat.ts").webgl).toEqual([]);
-    expect(pick("docs/areas/town-square.md", "packages/app/src/components/Sawyer.tsx").webgl).toEqual([]);
+  it("a file the timings don't know counts as each project's median; an old single number splits evenly", () => {
+    const t = projectWeigher({ "e2e/a.spec.ts": { phone: 10, desktop: 0 }, "e2e/b.spec.ts": { phone: 20, desktop: 4 }, "e2e/c.spec.ts": 300 });
+    expect([t("e2e/new.spec.ts", "phone"), t("e2e/new.spec.ts", "desktop")]).toEqual([20, 4]);
+    expect(t("e2e/c.spec.ts", "desktop")).toBe(150);
+    expect(weigher({ "e2e/a.spec.ts": 10, "e2e/b.spec.ts": 20, "e2e/c.spec.ts": 300 })("e2e/new.spec.ts")).toBe(20);
   });
 
-  it("a shared foundation with a town file: every spec, and the town's on WebGL too", () => {
-    const r = pick("package.json", "packages/app/src/town/render.ts");
-    expect(r.full).not.toBeNull();
-    expect(r.webgl).toEqual(gl);
-    expect(pick("package.json").webgl).toEqual([]);
+  it("a shard's clock time follows Playwright's order: project by project, files by name, the next job to the first free worker", () => {
+    const t = projectWeigher({ "e2e/a.spec.ts": { phone: 10, desktop: 10 }, "e2e/b.spec.ts": { phone: 10, desktop: 10 }, "e2e/z.spec.ts": { phone: 60, desktop: 60 } });
+    // Phone: a and b side by side, z after a (70); desktop: a, b and z on the other worker (10 + 10 + 10 + 60 = 90),
+    // not the 80 that half the sum would say.
+    expect(makespan(["e2e/z.spec.ts", "e2e/a.spec.ts", "e2e/b.spec.ts"], t)).toBe(90);
+    expect(makespan(["e2e/a.spec.ts"], t)).toBe(10);
   });
 
-  it("the plan: a WebGL job per project after the numbered shards, with its files, only when picked; a manual run's are the same", () => {
-    const on = plan(pick("packages/app/src/town/paint-gl.ts"), weight, all);
-    const n = Number(on.outputs.total);
-    expect(JSON.parse(on.outputs.shards)).toEqual([...Array.from({ length: n }, (_, i) => i + 1), ...WEBGL_JOBS]);
-    expect(WEBGL_JOBS).toEqual(["webgl-phone", "webgl-desktop"]);
-    expect(on.outputs.webgl.split(" ")).toEqual(gl);
-    expect(on.md).toContain("VITE_TOWN_GL=1");
-    const off = plan(pick("packages/app/src/components/Sawyer.tsx"), weight, all);
-    expect(JSON.parse(off.outputs.shards)).toEqual(Array.from({ length: Number(off.outputs.total) }, (_, i) => i + 1));
-    expect(off.outputs.webgl).toBe("");
-    expect(allWebgl(areas, all)).toEqual(gl);
+  it("spreads files so the slowest shard ends soonest: on the measured times, within 3% of a perfect split, every file once", () => {
+    const time = projectWeigher(timings);
+    const shards = assign(all, time, MAX_SHARDS);
+    expect(shards.flatMap((s) => s.files).sort()).toEqual([...all].sort());
+    const ideal = all.reduce((sum, f) => sum + weight(f), 0) / MAX_SHARDS / 2;
+    for (const s of shards) expect(s.seconds).toBeLessThanOrEqual(ideal * 1.03);
+    for (const s of shards) expect(s.seconds).toBe(makespan(s.files, time));
+    expect(assign(all, time, MAX_SHARDS)).toEqual(shards);
+  });
+
+  it("main's last green run's records overlay the committed times, file by file; older records (no projects) are skipped", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ci-live-"));
+    try {
+      mkdirSync(join(dir, "e2e-summary-1"));
+      mkdirSync(join(dir, "e2e-summary-2"));
+      writeFileSync(join(dir, "e2e-summary-1", "shard-1.json"), JSON.stringify({ projects: { "e2e/sawyer.spec.ts": { phone: 7, desktop: 3 } } }));
+      writeFileSync(join(dir, "e2e-summary-2", "shard-2.json"), JSON.stringify({ timings: { "e2e/shop.spec.ts": 5 } }));
+      writeFileSync(join(dir, "e2e-summary-2", "shard-2.flaky"), "");
+      expect(readLiveTimings(dir)).toEqual({ "e2e/sawyer.spec.ts": { phone: 7, desktop: 3 } });
+      const merged = readTimings(undefined, dir);
+      expect(merged["e2e/sawyer.spec.ts"]).toEqual({ phone: 7, desktop: 3 });
+      expect(merged["e2e/shop.spec.ts"]).toEqual(timings["e2e/shop.spec.ts"]);
+      expect(readLiveTimings(join(dir, "missing"))).toEqual({});
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -245,8 +283,6 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     expect(r.full).toBeNull();
     expect(r.specs).toEqual([...new Set([...smoke, "e2e/town.spec.ts", "e2e/town-chat.spec.ts"])].sort());
     expect(r.specs).not.toContain("e2e/solo.spec.ts");
-    // (town.spec.ts is one of the town's drawing specs: the WebGL jobs run too.)
-    expect(r.webgl.length).toBeGreaterThan(0);
   });
 
   it("a shared module (net.ts): the areas of the files that import what changed; one App.tsx imports runs everything", () => {

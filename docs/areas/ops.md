@@ -11,7 +11,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   D1 (`hunchess`) for accounts, results, the locker, fair play and budgets. The domain is hunchess.com.
 - **Deploy:** every push to `main` builds (`npm run build`) and deploys (`npx wrangler deploy`) through Workers Builds.
   The "Workers Builds: chessroyale" check fails instantly on PR branches (Cloudflare's preview build for non-production
-  branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`) and the e2e run decide whether a PR
+  branches): only `check` (typecheck and unit tests, `.github/workflows/check.yml`: since Nov 6 `unit` and `chess`, packages/chess's tests,
+  run side by side and `check` is green when both are) and the e2e run decide whether a PR
   is green. Merge with a merge commit, then confirm the deploy live.
 - **CI e2e** (Oct 15, DECISIONS.md "e2e on GitHub Actions for every PR"; fast PR checks since Oct 18,
   `docs/decisions/2026-10-18-faster-pipeline.md`, a trial): `.github/workflows/e2e.yml`, on GitHub's standard runners
@@ -33,7 +34,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
     `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
     `main.tsx`, `board/OwnBoard.tsx`, `account.ts`, and since Nov 2 `game.ts`, `prefs.ts`, `test-switches.ts`,
-    `screens/Hud.tsx` and `components/EvalBar.tsx` are followed through the code instead of running everything. The
+    `screens/Hud.tsx` and `components/EvalBar.tsx`, and since Nov 6 every `packages/core/src` module but `index.ts` and
+    the server's `accounts.ts`, `api.ts`, `account-data.ts`, `locker.ts`, `boss-tokens.ts` and `ranked.ts`, are followed
+    through the code instead of running everything (a change that reaches the server's `index.ts` still runs it all). The
     plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
     declarations the diff changes (a settings object, a helper, a function or class; comments and types don't run),
     anything in the module that uses them (and the module state a changed function names; not a constant holding a plain
@@ -46,47 +49,35 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     read cleanly). The plan's table says, per traced module, what changed and who uses it. A file reached through a
     trace counts like the table counts its own changes, nothing more: what it passes on to other files isn't followed.
   - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
-    lockfile, the Playwright and Wrangler config, this workflow and its scripts, `packages/core` (but settings.ts and
-    boss.ts, traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
+    lockfile, the Playwright and Wrangler config, `packages/core/src/index.ts` (its other modules traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
     `api.ts`, `lobby.ts`, `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's
     entry, board, match flow (`game.ts`; `solo.ts` and `net.ts` traced), the play screen and the components every
-    mode shares), or a path no area has (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    mode shares), or a path no area has. A CI-only change (`e2e.yml`, `e2e/ci-*`) runs the smoke set (Nov 6), (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
-  - **On every push to main: the whole suite**, both projects, on 5 shards (about 44 minutes in all since Oct 30,
-    1 for setup; 22 on Oct 18): the full run after each merge, which the director checks before the next merge.
+  - **On every push to main: the whole suite**, both projects, on 10 shards (about 28 minutes, Nov 6: the slowest
+    shard's tests about 26, setup about 1 in Playwright's image): the full run after each merge, which the director checks before the next merge.
     **One main run at a time** (Nov 1; `check` too): a push while main's run is going waits (the run going is never
     cancelled), and a newer push replaces the one waiting. A merge whose own run was skipped is tested by the next run,
     which runs every spec on main with every merge since the last run; its summary starts with "The merges this run
-    covers" (and the WebGL jobs go by all of them). **When that run is red,** the culprit is one of those merges: the
+    covers". **When that run is red,** the culprit is one of those merges: the
     failed test's `file:line` and error usually name its area, and the plan table of each merge's own PR run says
     whether it ran that spec; if it isn't clear, re-run the failed spec locally on each merge in turn (`git checkout
     <merge>`, `npx playwright test <spec>`), oldest first.
-  - **The town on WebGL** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): a change to the town's
-    area (`webgl` in `areas.json`: a path of the town square's area, or one of the specs below) also runs the town's
-    drawing specs (`town`, `town-desktop`, `town-tags`, `town-webgl`) again on a `VITE_TOWN_GL=1` build, WebGL the town's
-    default (software WebGL: the runners have no GPU). Two more jobs beside the shards, `webgl-phone` and `webgl-desktop`
-    in the shard matrix ("the town on WebGL, webgl-phone"): one project each, one worker (two software-WebGL pages on a
-    runner's 4 CPUs make every check slow enough to miss the chat's and the tags' timings), `TOWN_GL_BUILD=1` for the
-    one check that reads the default. About 10 minutes of tests each (measured locally: 9 for the phone, 10.5 for the
-    computer) plus setup, side by side with the shards, so a town PR's run is about as long as before (its town-chat
-    shard is the longer one); about 25 runner minutes more per run. Their records are in `result`'s summary as shards
-    `webgl-phone` and `webgl-desktop` (their times kept out of the timings table). On a pull request, a push to main that
-    merged such a change (the plan diffs `HEAD^1`) and the full-e2e label; a manual run always. The chat's two specs
-    aren't in it: HTML over the canvas, nothing in them depends on the backend, and on software WebGL they'd need about
-    four more such jobs.
   - **Layout:** `plan`, then the `shard` jobs side by side, then `result`. Each shard runs whole spec files of the
-    plan's list (every spec file on main), spread by their measured test time (`e2e/ci-shard.mjs` reads
-    `e2e/ci-timings.json`; a new spec counts as the median until the table is refreshed); inside a file the tests run
-    in order, as locally. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
+    plan's list (every spec file on main), spread by the plan (`assign` in `e2e/ci-select.mjs`; `e2e/ci-shard.mjs N
+    TOTAL` shows one locally) so the slowest shard ends soonest: by each file's time per project, from main's last green
+    run's `e2e-summary-N` records (Nov 6; `e2e/ci-timings.json` for files they lack, and a new spec counts as the median),
+    simulating Playwright's order (project by project, files by name, 2 workers). Inside a file the tests run in order. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
     wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
-    (`playwright.config.ts`). 2 workers per runner, as locally (half the runner's 4 CPUs). Setup (checkout, npm ci,
-    Chromium from cache, the build) takes about a minute per shard.
+    (`playwright.config.ts`). A test tagged `@phone-only` (logic, server and flow; Nov 6) skips the desktop project;
+    layout, the board, home and every guard test of `docs/rules/eric.md` run on both. 2 workers per runner, as locally
+    (half the runner's 4 CPUs). Setup (checkout, npm ci, the build) takes about a minute per shard.
   - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
     record; `e2e/ci-summary-merge.mjs` renders them): the plan's line (what this run tested and why), flaky tests,
     then failed ones, each with its shard, `file:line`, project, the line it failed on and the gist of its error;
-    each shard's counts and time; and the test time by file as a ready-made `ci-timings.json` (refreshed Oct 18 from
-    two full runs). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
+    each shard's counts and time; and the test time by file and project as a ready-made `ci-timings.json` (the fallback;
+    refreshed Nov 6 from run 943). `result` is red if the plan or any shard is. A shard with a failed or flaky test uploads its HTML
     report with the retries' traces (`e2e-report-shard-N`, kept 7 days; `npx playwright show-report <folder>`).
     Each shard's record (`e2e-summary-N`: its failed and flaky tests) is kept 90 days, for a look at which tests
     catch real bugs and which only flake (Eric, Oct 18; the first look about two weeks on).
@@ -105,8 +96,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Caches:** npm (`setup-node`) and Playwright's Chromium (headless shell only, the browser headless runs use;
     `~/.cache/ms-playwright`, keyed by Playwright's version).
   - **Concurrency:** a new push to a PR (or a label added to it) cancels that PR's run still going; pushes to `main`
-    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7, and the town's
-    WebGL jobs two more when they run: the account's
+    each get their own run. A full run takes 7 jobs (plan, 5 shards, result), a PR's fast check 3 to 7: the account's
     limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
@@ -327,7 +317,9 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-error-capture-
   (`pruneProblems`).
 - **The 15-minute cron's jobs**, in order, each failing apart (`scheduled()` in `index.ts`): old errors and reports
   (`pruneProblems`), sign-in code records an hour old (`purgeEmailCodes`), chat moderators' decisions past keeping
-  (`pruneChatMod`, [chat.md](chat.md)), then fair play's deep re-check.
+  (`pruneChatMod`, [chat.md](chat.md)), once a day at `OPS.ledgerCheck.hourUtc` the item ledger's check (`ledgerCheck`: each account whose
+  balances and ledger disagree logged, one error on /admin/ops), then fair play's deep re-check. The ledger's one-off backfill:
+  an admin's `POST /api/admin/ledger/backfill` from the site (re-runnable: it adds nothing the second time).
 - The privacy policy (`/privacy`, `screens/Legal.tsx`) says the same in plain words.
 
 ## Health
@@ -340,8 +332,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
     Squads included (`LiveBoard.health`);
   - errors this hour, the hour before and in the last 24 hours (rows are per clock hour), how many kinds, the top 10
     (the town's WebGL fallbacks left out: they have their own count, next);
-  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"): page loads whose
-    town asked for WebGL and drew with Canvas 2D instead, in the last 24 hours and 7 days, in all and by reason
+  - **the town's WebGL fallbacks** (Oct 30; docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later"; Nov 6: the street town's): page
+    loads whose street town couldn't draw with WebGL and went to today's town instead, in the last 24 hours and 7 days, in all and by reason
     (`townFallbacks`). The page reports one at most (`reportTownFallback` in the app's problems.ts, never on the frame
     loop, nothing shown to the player) through the error reporting, as the kind `town-gl-fallback` with its reason as the
     message (`TOWN_GL_FALLBACK` in core's settings.ts: `no-webgl2`, `no-context`, `shader`, `lost-twice`, `not-back`):

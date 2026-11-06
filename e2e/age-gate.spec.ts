@@ -3,9 +3,10 @@ import { createHash } from "node:crypto";
 import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { TOO_YOUNG_LINE } from "@chessroyale/core";
-import { pickMode } from "./helpers.ts";
+import { D1_DIR, E2E_STATE, pickMode } from "./helpers.ts";
 
 /**
  * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md), on a phone: before signing in, a neutral
@@ -18,7 +19,6 @@ import { pickMode } from "./helpers.ts";
 
 // node:sqlite through require, to read the local D1 that wrangler dev keeps (read only).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
-const D1_DIR = join(process.cwd(), ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
 function d1<T>(query: string, ...params: string[]): T[] {
   for (const f of readdirSync(D1_DIR).filter((x) => x.endsWith(".sqlite"))) {
     const db = new DatabaseSync(join(D1_DIR, f), { readOnly: true });
@@ -38,7 +38,7 @@ function d1<T>(query: string, ...params: string[]): T[] {
 async function d1Write(page: Page, sql: string) {
   for (let attempt = 1; ; attempt++) {
     try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--command", sql], { stdio: "pipe" });
+      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
       return;
     } catch (e) {
       const why = String((e as { stderr?: unknown }).stderr ?? e);

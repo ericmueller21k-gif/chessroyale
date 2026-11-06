@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useState } from "preact/hooks";
 import { GearIcon } from "../components/MatchMenu.tsx";
 import { CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, chatBackground, chatMode, nextChatMode, onChatBackground, onChatMode, setChatBackground, setChatMode, type ChatMode } from "./chat.ts";
 import { NAMES_CHOICE, NAMES_LABEL, NAMES_MODES, namesMode, namesNote, onNamesMode, setNamesMode, type NamesMode } from "./tags.ts";
+import { mapOn, onMapOn, setMapOn } from "./minimap.ts";
 import "./town-chat.css";
 
 /** The chat's mode now, redrawing when it changes (the icon, the sheet and the box all read it here). */
@@ -65,11 +66,33 @@ function ChatIcon({ mode }: { mode: ChatMode }) {
   );
 }
 
-export function TownChatTools() {
+/**
+ * The map button (the street town, Nov 5; Eric: "Another icon [with our other icons] … click it, it turns it off"): a folded map, lit (green)
+ * while the minimap shows, gray while it's off; a tap turns it. Remembered per device (minimap.ts), on by default. Grayed inside a building
+ * (the map is the town's), never hidden.
+ */
+function MapIcon({ on }: { on: boolean }) {
+  return (
+    <svg class={`tm-btn-icon${on ? " lit" : ""}`} viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+      <path class="tm-btn-sheet" d="M3 6.2 8.6 4l6.8 2.4L21 4.3v13.5l-5.6 2.2-6.8-2.4L3 19.7z" />
+      <path class="tm-btn-fold" d="M8.6 4v13.6M15.4 6.4V20" />
+      <circle class="tm-btn-dot" cx="12" cy="11.6" r="1.9" />
+    </svg>
+  );
+}
+
+export function TownChatTools({ map = false, mapDisabled = false }: { map?: boolean; mapDisabled?: boolean }) {
   const mode = useChatMode();
   const [open, setOpen] = useState(false);
+  const [mapShown, setMapShown] = useState(mapOn);
+  useEffect(() => onMapOn(() => setMapShown(mapOn())), []);
   return (
     <div class="town-tools">
+      {map && (
+        <button type="button" class="town-tool tm-toggle" aria-label="Map" aria-pressed={mapShown} title={mapShown ? "Hide the map" : "Show the map"} disabled={mapDisabled} onClick={() => setMapOn(!mapShown)}>
+          <MapIcon on={mapShown} />
+        </button>
+      )}
       <button type="button" class="town-tool tc-mode" data-mode={mode} aria-label={CHAT_MODE_LABEL[mode]} title={CHAT_MODE_LABEL[mode]} onClick={() => setChatMode(nextChatMode(mode))}>
         <ChatIcon mode={mode} />
       </button>

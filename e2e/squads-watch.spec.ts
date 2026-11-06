@@ -86,7 +86,7 @@ async function jumpSwitch(page: Page) {
 }
 const closeMenu = (page: Page) => page.keyboard.press("Escape");
 
-test("Quick board jump, on by default: once you've moved, the big board goes to the board you play next; a tap on your tiny board brings you back and you stay", async ({ page }) => {
+test("Quick board jump, on by default: once you've moved, the big board goes to the board you play next; a tap on your tiny board brings you back and you stay", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
@@ -118,7 +118,7 @@ test("Quick board jump, on by default: once you've moved, the big board goes to 
   await expect(page.locator(".sq-status")).toContainText(/^Moved · Board \d|^Their move|is over|landing/);
 });
 
-test("Quick board jump when you're the last to move: the half ends at once, and the big board still goes to your next board", async ({ page }) => {
+test("Quick board jump when you're the last to move: the half ends at once, and the big board still goes to your next board", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
@@ -144,7 +144,7 @@ test("Quick board jump when you're the last to move: the half ends at once, and 
   await expect(page.locator(".sq-tiny.on .sq-mark.next")).toHaveCount(1);
 });
 
-test("Quick board jump, switched off: you stay on your board after moving; the device remembers it", async ({ page }) => {
+test("Quick board jump, switched off: you stay on your board after moving; the device remembers it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await relayLobby(page);
   const s = await nextDuty(page);
@@ -164,7 +164,7 @@ test("Quick board jump, switched off: you stay on your board after moving; the d
   await expect(await jumpSwitch(page)).toHaveAttribute("aria-checked", "false");
 });
 
-test("who's watching: another player showing your board puts their pawn (their items on) and an eye over it, without moving the board; gone when they look away or leave", async ({ page, baseURL }) => {
+test("who's watching: another player showing your board puts their pawn (their items on) and an eye over it, without moving the board; gone when they look away or leave", { tag: "@phone-only" }, async ({ page, baseURL }) => {
   test.setTimeout(240_000);
   const look = { head: { def: "wizard-hat", color: "cobalt", blemish: 0, seed: 1 }, face: { def: "dark-shades", color: "midnight", blemish: 0, seed: 2 } };
   const wes = new SquadsClient({ base: baseURL!, name: "Wes", look });

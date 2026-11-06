@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect } from "@playwright/test";
+import { test } from "./helpers.ts";
 import { BOARD_SEL, soloFromHome } from "./helpers.ts";
 const FEN = "r3k2r/pppq1ppp/2npbn2/2b1p3/2B1P3/2NPBN2/PPPQ1PPP/R3K2R w KQkq - 6 8";
 test("castling registers by tap-tap and by drag", async ({ page }, info) => {

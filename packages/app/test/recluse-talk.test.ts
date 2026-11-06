@@ -27,6 +27,8 @@ function play(phase: TalkPhase, stretches: Stretch[], rng: () => number) {
   const voice = new Voice();
   const chatter = new Chatter(phase, 0, rng);
   const said: { at: number; text: string }[] = [];
+  // (The screen time his own other lines hold: a line from its moment for its hold, as the voice keeps it.)
+  const held: [number, number][] = [];
   let t = 0;
   let k = 0;
   // (The longest he's quiet: no line of his up at all.)
@@ -36,6 +38,7 @@ function play(phase: TalkPhase, stretches: Stretch[], rng: () => number) {
     if (s.line) {
       const before = voice.line(t);
       voice.say(s.line.text, `m${k++}`, s.line.priority, t);
+      held.push([t, t + holdMs(s.line.text)]);
       // (His chatter never holds another line back for long: with nothing up the line starts at once; over his chatter,
       // once the chatter has typed out and been readable for SPEECH.minReadMs, the rule for every line, Oct 24.)
       if (!before) expect(voice.line(t)?.text).toBe(s.line.text);
@@ -60,10 +63,29 @@ function play(phase: TalkPhase, stretches: Stretch[], rng: () => number) {
     }
     t = end;
   }
-  return { said, end: t, quiet };
+  return { said, end: t, quiet, held };
 }
 
 const gaps = (at: number[]) => at.slice(1).map((x, i) => x - at[i]!);
+/**
+ * Each gap between his chatter lines, less the time his other lines held the screen inside it (the union of their holds, so
+ * overlapping holds count once): the quiet he'd feel, with his own words on screen not counted (Nov 6, Eric's decision).
+ */
+const netGaps = (at: number[], held: [number, number][]) =>
+  at.slice(1).map((b, i) => {
+    const a = at[i]!;
+    const parts = held.map(([x, y]) => [Math.max(x, a), Math.min(y, b)] as const).filter(([x, y]) => y > x).sort((p, q) => p[0] - q[0]);
+    let covered = 0;
+    let [cx, cy] = [-Infinity, -Infinity];
+    for (const [x, y] of parts) {
+      if (x > cy) {
+        covered += cy - cx > 0 ? cy - cx : 0;
+        [cx, cy] = [x, y];
+      } else cy = Math.max(cy, y);
+    }
+    covered += cy - cx > 0 ? cy - cx : 0;
+    return b - a - covered;
+  });
 const sec = (ms: number) => Math.round(ms / 100) / 10;
 
 /**
@@ -114,15 +136,17 @@ describe("his chatter", () => {
     const { everyMs, jitterMs } = RECLUSE_TALK;
     for (const seed of [1, 2, 3, 4, 5]) {
       const rng = seeded(seed);
-      const { said, end, quiet } = play(1, phase1(rng), rng);
+      const { said, end, quiet, held } = play(1, phase1(rng), rng);
       // Never quiet for long: at most an interval, and a moment of his or a bit of his turn it waited out.
       expect(quiet, `seed ${seed}`).toBeLessThanOrEqual(everyMs + jitterMs + 5000);
       const at = said.map((s) => s.at);
       // Steady from the start to the end of the fight: the first within an interval, then never much over one.
       expect(at[0]!, `seed ${seed}`).toBeLessThanOrEqual(everyMs + jitterMs + 5000);
       const g = gaps(at);
-      // (The longest are where his bullet line was up when one came due: his own words first.)
-      expect(Math.max(...g), `seed ${seed}: ${g.map(sec)}`).toBeLessThanOrEqual(everyMs + jitterMs + 10_000);
+      // (The gap less the time his own other lines held the screen inside it: the bullet, bullet-plus and rattled lines. Not true
+      // silence, which `quiet` checks above, unchanged.)
+      const net = netGaps(at, held);
+      expect(Math.max(...net), `seed ${seed}: net ${net.map(sec)}, raw ${g.map(sec)}`).toBeLessThanOrEqual(everyMs + jitterMs + 2000);
       expect(Math.min(...g)).toBeGreaterThanOrEqual(everyMs - jitterMs);
       expect(end - at.at(-1)!).toBeLessThanOrEqual(everyMs + jitterMs + 10_000);
       const mean = (at.at(-1)! - at[0]!) / (at.length - 1);

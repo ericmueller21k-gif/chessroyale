@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
 import { bossAloneElo, chosenDifficulty, rememberDifficulty } from "../boss-difficulty.ts";
@@ -17,6 +18,7 @@ import { BossFace } from "../components/BossCharacter.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
+import { Walkthrough } from "../components/Walkthrough.tsx";
 import { LIVE_WINDOW_MEDIA } from "../bot-replays.ts";
 import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
@@ -455,6 +457,14 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
   );
 }
 
+/** Enter or space on a tap target (a div with role=button) does what a tap does. */
+const tapKey = (e: KeyboardEvent, go: () => void) => {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    go();
+  }
+};
+
 /**
  * Home (the approved mockup, docs/mockups/front-door/Main.dc.html; the RANKED row and the Boss raid card, Eric, Oct 16):
  * the top bar (logo, coins, your pawn), the live line, your dressed pawn with your icon, name and rating, the RANKED row
@@ -497,6 +507,7 @@ export function HomeScreen({
   onChessTown,
   onAutoChess,
   onProfile,
+  onInventory,
   onSettings,
   onShop,
   onSignIn,
@@ -544,6 +555,8 @@ export function HomeScreen({
   /** Auto chess's card beside Boss Battle's, under Other modes: the screen, as /autochess opens it. */
   onAutoChess: () => void;
   onProfile: () => void;
+  /** Your pawn on the card: your inventory (the shop's Locker tab). */
+  onInventory: () => void;
   /** The phone's gear in the top bar: Settings, as Profile → Settings opens it. */
   onSettings: () => void;
   /** The phone's shop icon in the top bar. */
@@ -722,14 +735,17 @@ export function HomeScreen({
     if (firstView.current) firstView.current = false;
     else scrollTo(0, 0);
   }, [view]);
+  // Your icon and name open the icon picker (your profile's Edit sheet, straight to the icon).
+  const onIcon = () => openProfile({ you: true, name, section: "icon" });
   const hero = (
     <section class="fd-hero" aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
-      <DressedPawn look={look} size="hero" shadow ride />
+      {/* (Your pawn opens your inventory; your icon, level, name and rating open the icon picker: Eric, Nov 6.) */}
+      <DressedPawn look={look} size="hero" shadow ride onTap={onInventory} tapLabel="Open your inventory" />
       {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) */}
-      <div class="fd-hero-id">
+      <div class="fd-hero-id fd-hero-tap" role="button" tabIndex={0} aria-label="Change your icon" onClick={onIcon} onKeyDown={(e) => tapKey(e, onIcon)}>
         <span class="fd-hero-icon">
           <UserIcon icon={profile?.user.icon ?? "♟"} />
           {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}
@@ -777,6 +793,8 @@ export function HomeScreen({
       )}
       {/* (A moderator's warning or chat ban, once: chat moderation's.) */}
       <ChatNotice />
+      {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
+      <WelcomeNotice />
     </>
   );
   if (queueing)
@@ -993,7 +1011,7 @@ export function HomeScreen({
         <span>{loading ? "Loading the engine…" : hint}</span>
       </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
-      <button type="button" class="fd-play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       {error && <p class="fd-error">{error}</p>}
@@ -1004,7 +1022,7 @@ export function HomeScreen({
   // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
   // (`fd-town`; styles.css gives both the same size at every width).
   const chessTownButton = (
-    <button type="button" class="fd-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+    <button type="button" class="fd-town" data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
       <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
       <span class="fd-town-label">Chess Town</span>
     </button>
@@ -1013,7 +1031,7 @@ export function HomeScreen({
   // solo screen (Boss alone's form of the Boss raid screen). A half card, side by side with Auto chess under Other modes
   // (`rd-pair`, styles.css).
   const soloCard = (
-    <button type="button" class="rd-card rd-half" onClick={() => onRaid(true)}>
+    <button type="button" class="rd-card rd-half" data-tour="boss-battle" onClick={() => onRaid(true)}>
       <span class="rd-face" aria-hidden="true">
         <BossCardFace everyMs={cardEveryMs()} fadeMs={FRONT_DOOR.bossCardFadeMs} />
       </span>
@@ -1044,16 +1062,17 @@ export function HomeScreen({
        * through Profile). No coins: the shop and your profile show them. A computer has the logo, the shop, Play with
        * friends and Settings in its side menu, your pawn top right, and friends in its live panel.)
        */}
+      <Walkthrough onShop={onShop} />
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} />
-          <button type="button" class="fd-icon-btn fd-top-shop" aria-label="Shop & crates" onClick={onShop}>
+          <AccountBar onProfile={onProfile} tourId="profile" />
+          <button type="button" class="fd-icon-btn fd-top-shop" data-tour="shop" aria-label="Shop & crates" onClick={onShop}>
             <ShopIcon />
           </button>
           <button
             type="button"
-            class="fd-icon-btn fd-top-friends"
+            class="fd-icon-btn fd-top-friends" data-tour="play-with-friends"
             aria-label={friendsNews ? `Friends, ${friendsNews} new` : "Friends"}
             onClick={() => setFriends(true)}
           >
@@ -1064,7 +1083,7 @@ export function HomeScreen({
               </span>
             )}
           </button>
-          <button type="button" class="fd-icon-btn fd-top-gear" aria-label="Settings" onClick={onSettings}>
+          <button type="button" class="fd-icon-btn fd-top-gear" data-tour="settings" aria-label="Settings" onClick={onSettings}>
             <GearIcon />
           </button>
         </div>

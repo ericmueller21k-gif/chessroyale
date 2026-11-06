@@ -72,10 +72,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
-  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (the default: the canvas's own
-  context, the same calls as before) and WebGL 2 (`?gl=1`, `town/paint-gl.ts`; below, "WebGL").
-- **WebGL (`?gl=1`, Oct 30; docs/decisions/2026-10-30-town-webgl.md).** Anyone's `/town?gl=1` (read once as the page opens,
-  `TOWN_ASKED.gl`) draws the same picture with WebGL 2 in about 5 draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
+  It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
+  WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
+- **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,
+  docs/decisions/2026-11-06-street-webgl-only.md).** It draws the same picture with WebGL 2 in a few draw calls a frame instead of hundreds of canvas calls. `paint-gl.ts` stands in for the part of the 2D
   context render.ts uses (state, transforms, save and restore, paths, clips, strokes, shadows, text, images) and batches the
   frame into textured and solid triangles: textures from the canvases render.ts already makes, packed into 2048 px atlas
   pages (layers of one array texture) and uploaded again only when render.ts calls `changed` (a tag or a table's board drawn again); clips that are upright
@@ -85,10 +85,11 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   modes too), each draw using the least that covers what it holds: the same pixels, much less work for a software
   renderer. 4x multisampling on a GPU; where the browser would render WebGL in software (no GPU, or SwiftShader in the
   headless tests: `failIfMajorPerformanceCaveat` refuses the first context), none, which halves a frame there (Oct 30,
-  later). No WebGL 2, no context, or its shader fails: Canvas 2D, silently. Context lost: nothing
-  drawn until it's back (textures made again); lost twice within a minute, or not back within 5 s: Canvas 2D for the page.
-  Each of those fallbacks is reported once a page with its reason, nothing shown (the health view counts them:
-  docs/areas/ops.md, "Health"). Without `?gl=1`, Canvas 2D exactly as before. The canvas says which (`data-backend`).
+  later). An admin's device without WebGL 2 gets today's town (admin-town.ts `STREET_TOWN`). No context, or its shader fails:
+  the page opens again in today's town (`?street=off`). Context lost: nothing drawn until it's back (textures made again);
+  lost twice within a minute, or not back within 5 s: the page opens again in today's town. Each of those fallbacks is
+  reported once a page with its reason, nothing shown (the health view counts them: docs/areas/ops.md, "Health"). The
+  canvas says which backend (`data-backend`).
 - **Taps** (slice 4: `town/press.ts`; cleaned up in slice 5). A finger down presses the square you'd walk to like a
   button: its face dims a little and one bold gold border lies on its edge, glowing outside only, while the finger is
   down; up on the same thing releases it with one short pulse of that border (brighter, a little wider, fading) and you
@@ -194,7 +195,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     always visible but the name tags no"; `town/tags.ts`, `TOWN_FEEL.nameRadius` 5 and `nameFadeSquares` 1): by default (`near`) a figure's
     tag shows only while the figure is within **5 squares of you in both directions** (|dc| ≤ 5 and |dr| ≤ 5, about a 10 × 10 area, from the
     fractional positions the walkers are drawn at), **fading** over the last square at the edge (alpha 1 up to 4.5, linearly to 0 at 5.5:
-    `nameAlpha`; stateless, from positions each frame, nothing allocated). It takes the smaller alpha of that and today's far-distance fade
+    `nameAlpha`, from positions each frame; the drawn alpha eases toward it over about 150 ms, at most half the way a frame, so a slow frame can't pop it: `easeTag`, Nov 6). It takes the smaller alpha of that and today's far-distance fade
     toward the rim (`tagFar`; `tagAlpha`). **Always shown, whatever the distance**: your own tag; a figure whose card is open (`town.hold`);
     one seated at a table with you; one walking to or from a game with you (`town.meet`, `town.leave`). The figures are always drawn; only the
     tags go. **"Everyone"** (Town settings, under Chat: "Names", the choices "Near you" and "Everyone", the line "Near you: names show within 5
@@ -614,7 +615,31 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   square (and, walking, the one just ahead): a tap walks you round them (up the other staircase if one is on the nearer); one in your way
   as you walk and you wait, then go on or round; an elf waiting for you while you wait for it and you give way. No server state. Test
   hook `__shopElves()` (with your figure's lift frame by frame). docs/decisions/2026-11-05-ginger-home.md.
-- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo"): `SHOPS` in `town/shops/shops.ts`. Their home's card
+- **Folio's sanctuary (Nov 5).** Folio is live, so its Folded House has an inside in everyone's town. Its art (`shops/folio-art.ts`, the
+  art branch's `house-shop-folio` at e7e08bcf, with its `shops/paper-kit.ts`, which the turtle and the intro's props share): a box room
+  that is a page still being written, folded and colored in the middle and thinning to ink sketch and ruled blank paper toward the
+  edges and the back, a margin line down its west side, "being written" lines on the lanterns and the back wall (their idle loops). Its
+  battle spot is the clean page (36 flat `page-<col>-<row>` tiles, columns 7-12, rows 8-13: `isFloor` takes `page-`, never the drifting
+  `pages`, and `marksOf` takes them as its circle), its marks `SHOP_FOLIO_MARKS`. Its roof: pale folded paper, pleats running up to a fold
+  (`roof: "paper"`). Its stained-glass windows light in each pane's color at every placement, and their pools lie on the paper as
+  color (`RoomArt.poolBlend` "multiply", a tint sprite fading to its own color) and drift on one slow sine (`PoolDrift`, `driftAt` in
+  `room.ts`: 9 and 4 px either way over 40 s). Its Shopkeeper, the paper turtle (`characters/sidekicks/folioturtle.ts`, baked as the
+  others; not a town bot: Pleat, the frog, stays Folio's kid), behind the low (19 px) counter on (9, 2) and (10, 2), drawn at (9.5, 2.4).
+  "Folio's Boss Crate" with the Paper Crane. The chat's day tone. docs/decisions/2026-11-05-folio-home.md.
+- **Smudgy's studio (Nov 6).** Smudgy is live, so his Art Gallery has an inside in everyone's town. Its art (`shops/smudgy-art.ts`, drawn
+  by hand in code with `shops/paint-kit.ts`; a copy on `claude/boss-art` under `scripts/boss-art/out/house-shop-smudgy`): a box room, a
+  paint studio in a moody, deep palette (dark teal, deep blue, oxblood, plum, a few warm highlights), dark plank floors with drips and drop
+  cloths, every wall hung with layered abstract canvases, easels, paint pots and brush jars, the Colosseum's pixel pieces
+  (`colosseum/pieces-gba.ts`'s models) as sculptures on plinths. **The life class**: the Colosseum's knight turning on a round platform
+  (16 frames, 6 s a turn) at (9.5, 8), eight art-student chameleons (Dabble's rig in smocks, four colors) on stools round it at easels,
+  one 32-frame loop (8 s: the canvas blank, outline, blocked colors, finished; a brush dip each stage) shared by all, each painter
+  `ShopPlace.t0` into it (an eighth apart; ShopRoom draws a piece's frame at `now + t0`). Its battle spot is a drop cloth (24 flat
+  `circle-<col>-<row>` tiles, columns 6-13, rows 13-15), its marks `SHOP_SMUDGY_MARKS` (7, 14) and (12, 14), the round table under its
+  white cloth (`table`, solid) between them with its stools. Its roof: dark beams over a skylight (`roof: "studio"`). Gallery picture lights (Eric: "lighting that comes down on the walls like in an art gallery"): a brass lamp atop every wall panel, its warm cone baked into the panel and lit at every placement (`SHOP_SMUDGY_LIGHTS`, `SHOP_SMUDGY_POOLS` on the wall). Its Shopkeeper, the
+  gallery owner (`characters/sidekicks/smudgykeeper.ts`: Dabble's rig, gray-green, an oxblood smock and gold half-moon glasses; baked;
+  not a town bot: Dabble stays Smudgy's kid), behind the counter on (9, 2) and (10, 2). "Smudgy's Boss Crate" with the Brush Ride. The
+  chat's night tone. docs/decisions/2026-11-06-smudgy-home.md.
+- **Which homes.** Babur's Circus (`tiger`), Puddles' Botanical Garden (`gardener`) and Alfil's Pyramid (`alfil`, Nov 2: Woolly the Shopkeeper, "Alfil's Boss Crate" with Alfil's Howdah, a sandstone ceiling, the chat's day tone) and Big Boy's Crib (`bigboy`, Nov 2: Blocky the Shopkeeper, "Big Boy's Boss Crate" with Big Boy's Buggy, a nursery ceiling of sky, clouds and stars, the chat's day tone; a ball pit, solid, under a walkway, the shop's platform and the battle circle you walk on, the circle in the walkway's foam squares with a zoo-animal rug in its middle; his toy airplane, three squares deep, stands up whole at its foot, `RoomArt.upright`, rather than lying flat as a plan) and Timber's Lumber Lodge (`timber`, Nov 3, an admin's town only: Rivet the Shopkeeper behind the middle of the workbench, "Timber's Boss Crate" with The Log Roller, a lodge's ceiling of dark planks between heavy beams, the chat's day tone; the giant king being carved on its dais, 4 × 2 squares, stands up whole, `RoomArt.upright`; the circle's branded start marks, `SHOP_TIMBER_MARKS`, passed as Big Boy's are; his challenge his own intro since Nov 3, the log he gnaws into the table, his line "Hard hats on. We're building today.")) and Dash's Kicks (`dash`, Nov 3, an admin's town only: Tick the Shopkeeper on the counter's middle squares, drawn half a square back and west (`at` [9, 1.5]) so the low tortoise's head shows over the 30 px counter, clear of its shoe boxes; "Dash's Boss Crate" with Cheetah Shoes; a store's ceiling of white tiles and light panels; the chat's day tone; the halfpipe, 4 × 2 squares, stands up whole, `RoomArt.upright`; his try-on mats, `SHOP_BLITZ_MARKS`, passed as Timber's are) and Hollow Peak (`hollow`, Nov 3, everyone's town: below, "Hollow's cave") and Wrangler's Stall (`pig`, Nov 4, everyone's town: above, "Wrangler's barn") and Jefferson's Fireworks (`grex`, Nov 4, everyone's town: above, "Jefferson's warehouse") and Ginger Igloo (`gingerbread`, Nov 5, everyone's town: above, "Ginger's igloo") and Folio's Folded House (`folio`, Nov 5, everyone's town: above, "Folio's sanctuary"): `SHOPS` in `town/shops/shops.ts`. Their home's card
   is its name, centered, and **"Go in"** (gold) under it, centered, nothing else (Eric, Nov 2: "chop the Shop and Coming soon": a short
   card, `.town-card.town-door`); every other home's card is as it was (its name, Hollow's line, "Shop" greyed and "Coming soon").
 - **Going in.** "Go in" walks you to the square in front of the door (the plot's front row's middle, a row out); there the town zooms in on
@@ -640,8 +665,10 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   drag from down to up, it should be the same as the town movement"; the room's rows run toward the camera where the town's run away, so
   its camY goes the other way); the focus button brings it back.
 - **Walking** (`shops/room.ts`, pure): a tap walks you a square at a time round what's solid (the walls, the counter, every solid piece's
-  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. There's no joystick (the town has
-  none either). Inside is just you: the town's bots and other players don't come in.
+  squares, the way out's own squares, the Shopkeeper's); a tap on something solid walks you beside it. A tap is the town's press
+  (`town/press.ts`; Nov 5, `shops/tap.ts`): what's under the finger is picked at the press and again at the release, and it walks you
+  only if both are the same (the camera trails your walk, so a release alone could pick the square beside the one you pressed;
+  [2026-11-05-ginger-steps.md](../decisions/2026-11-05-ginger-steps.md)). There's no joystick (the town has none either). Inside is just you: the town's bots and other players don't come in.
 - **On a ride** (Eric, Nov 2: "your rider goes in with you"; `SHOP_FEEL.rideInside`, true): your ride comes in under you, the town's own
   rider (its frames as `town/rides.ts` composed them, the ride at its scale, 0.75 of the pawn), at the room's camera; its idle standing,
   its move a cycle a step, its side, back (up the room) or front (down it) the way you go, at its pace (`RIDES.speed`). You come out still
@@ -717,6 +744,31 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   before his brag. The room's own elves keep working. Every beat is `CHALLENGE_FEEL.ice` or the art's frames (`iceTimes`, `iceAt`,
   `iceCues`); about 13.2 s from the marks to the wipe. Twelve new sounds (`gingerCharge`, `gingerBlast`, `gingerBurst`, `gingerWhoosh`,
   `gingerStab`, `gingerStep`, `gingerHeave`, `gingerClack`, `gingerCast`, `gingerSparkle`, `gingerThump`, `gingerGust`), every cue his own.
+- **Smudgy's challenge (Nov 6, his own):** seated (the stools are already there): you both walk on to the drop cloth's marks beside the
+  covered table; his line "Smudgy, artist. Don't touch the wet parts." (his entrance's first); he whips the cloth off (`smudgy.grabMs`
+  after it; the cloth's frames, `INTRO_SMUDGY_CLOTH` in `shops/smudgy-intro-art.ts`: up, sailing west over him, dropped in a heap by his
+  stool), the game's board on the table from its second frame; his reveal line "Careful, don't get any paint on the pieces!"
+  (`BossIntro.chant`); then **the splatter** (`shops/smudgy-splatter.ts`, `canvas.boss-splatter`): splats in the room's deep paints land
+  faster and faster until the screen is covered (1.2 s), held while the battle loads (at least 0.25 s), and a brush stroke sweeps it away
+  onto the match (0.5 s); every phase by the clock. No attack. Every beat in `CHALLENGE_FEEL.smudgy`; `clothAnims`, `clothCues`. Four new
+  sounds (`smudgyWhoosh`, `smudgyFlop`, `smudgySplat`, `smudgySwipe`).
+- **Folio's challenge (Nov 5, its own; the art's timeline, intro-folio-nov5.md):** you both walk on to the clean page's marks (it glides,
+  its intro's own frames, `BOSS_FOLIO_INTRO` in `characters/folio-intro.ts`, mirrored to face east; its shadow the art's warm see-through
+  brown, not the town figure's near-black, in this room only); its line "Every game is a draft. Shall we write one?"; you both step back
+  a pace (`folio.backMs`, eased, no hop: it to 2.3 from the table's middle, `BossIntro.clear`; you to the usual 2.2); the three flat sheets
+  (lying on the page from the walk in) fold up, the west stool, the east `stoolGapMs` later, then the table; a paper plane flies in from the
+  east along the art's route with the board folded on its back, banks over the table and lets it go; the packet falls flat onto the
+  table's top, lies and unfolds (two folds, like a map), and the game's own board comes in over it (`swapMs`); Folio bows and says one of
+  five quiet lines (`BossIntro.chant`, `chantOf`); `crumpleAfterMs` after the line has gone, **the crumple**: the screen as it is (the
+  room's canvas read at that moment, the page's DOM over it, the header and the chat, taken as the quiet line goes: `shops/snap.ts`
+  through an SVG `foreignObject`) is crumpled over black into a ball (`shops/crumple-gl.ts`: a WebGL mesh, 16 × 34 on a phone, the
+  art's maths in `shops/crumple.ts`), held while the battle loads under it (the battle starts once it's a ball), the match screen
+  taken the same way and cross-faded in on the ball, opened, its creases lingering over the live match (the cover multiplied over the
+  page) and gone. No WebGL (or a failure, or the match's picture over `maxHoldMs` once the match shows): a fade through black. The room
+  stops drawing under the cover. About 11.1 s from the marks to the crumple, 13.4 s to the match. Every beat in `CHALLENGE_FEEL.folio`;
+  `folioTimes`, `folioAt`, `folioCues`. Five new sounds (`folioSet`, `folioGlide`, `folioLand`, `folioBall`, `folioOpen`); the folds,
+  the unfolds and the bow its own fold, unfold and rustle. The crumple's state on its canvas (`canvas.boss-crumple`: `data-mode`,
+  `data-phase`, `data-phases`, `data-dom`, `data-match`) and its frames in `__crumpleFrames` (test switches on).
 - **Dash's challenge (Nov 5, round 3, his own; Eric's design, intro-blitz-nov3.md; an admin's town only while he's in the game for
   admins first):** you both walk on straight to where you stand through it all (`seated`): he at his own place (`BossIntro.clear`
   2.08: the art's `BLITZ_INTRO_DROP_AT`, 72 of his pixels west of the table's foot, so every toss is drawn at the table), you at the
@@ -741,7 +793,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   as before (11 to 13 px), just over his head; it stays in the view. Decision: [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
 - **Which bosses.** Those in `BOSS_INTROS` (`town/shops/challenge.ts`): every boss whose home has an inside (`SHOPS`): Alfil (his own
   intro, `custom: true`), Big Boy (his own, Nov 2), Timber (his own, Nov 3; in an admin's town only while he's in the game for admins
-  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Dash (his own, Nov 5, in an admin's town only: above; no God
+  first), Hollow (his own, Nov 3, everyone's), Wrangler (his own, Nov 4, everyone's: below), Jefferson (his own, Nov 4, everyone's: below), Ginger (his own, Nov 5, everyone's: above), Folio (its own, Nov 5, everyone's: above; its transition the crumple), Dash (his own, Nov 5, in an admin's town only: above; no God
   King attack was drawn for him, so he stands in his idle through the swing's beat, turned to you by his intro's `facesLeft`), Babur
   and Puddles (the default intro). Every
   other boss's card works as before (its confirm, Leave, the Boss
@@ -874,10 +926,11 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
   heading (`setHeading`, `toCam`, `rel`; `forEachSquare` lays the ground from a turned grid). Taps, the arrow keys (`screenStep`: up is
   up the screen) and the drag go through it; the clouds slide, the sun stays; the far Colosseum shows within 45 degrees of north. Seam
   Avenue's fronts face west. A home's floating name sits over its own roof, dropping toward its eave off the buildings behind. Both
-  renderers draw the same pieces (images through an affine transform); the 2D fallback's walls take coarser strips and its domes fewer
-  faces. Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
+  WebGL draws it (Nov 6: no 2D fallback, so its walls take fine strips and its domes every face). Nov 6: the box path goes through the 3D art kit (`town/kit/`: prims, bake, draw; models as data): roofs and walls lit as palette
+  ramp steps with a 1-texel ink edge, every pixel a palette color ([2026-11-06-3d-kit.md](../decisions/2026-11-06-3d-kit.md);
+  `packages/app/test/town-kit.test.ts`). Numbers in `feel.ts` (`streetTurnMs`, `streetTurnClouds`, `box*`, `nameOverRoof`, `nameDropStep`). Test hooks: `__townCam()`'s
   `heading`, `figures`, `boxes`; `__townHeading(deg | null)` holds the heading (the turn's stills). Tests: `packages/app/test/town-boxes.test.ts`,
-  `e2e/town-street.spec.ts` ("the boxes and the turn", both renderers). Decision:
+  `e2e/town-street.spec.ts` ("the boxes and the turn"; a lost context). Decision:
   [2026-11-05-street-town-boxes.md](../decisions/2026-11-05-street-town-boxes.md). Stills: `docs/street-town-boxes/`.
 - **Round 4 (Nov 5): joined rows, the chase camera, the town wrapping east-west only.**
   - **The plan** (`street-plan.json`, from the art's by `scripts/street-plan-north.py`): its `wrap` switch, `{ ew: true, ns: false }`
@@ -915,10 +968,52 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `__townAt("tap-square", …)`.
   - **Tests:** `packages/app/test/town-fixed.test.ts`, `e2e/town-fixed.spec.ts`.
   - Decision: [2026-11-05-street-fixed-view.md](../decisions/2026-11-05-street-fixed-view.md). Stills: `docs/street-town-fixed/`.
+- **The north edge (Nov 5–6): one back line, Meadow Street, the Colosseum as a solid, the centerpiece of the back wall.**
+  - **The plan** (`scripts/street-plan-north.py`, its north edge section): 54 × 54. A back wall on the line y = 43.5 the whole way round,
+    meeting the Colosseum's flanks, a gate either side of it (columns 13–16 and 29–32: an open arch with the crown's crest, not walked
+    through); nothing walks or stands north of it but the ring and the trees behind the gates (the meadow, ground only). Upper Street is
+    gone: its four homes stand on **Meadow Street** (rows 4–6, three wide so South Street keeps its south sidewalk), new south of South
+    Street.
+  - **The plaza** (rows 40–43, columns 13–32) is open to Colosseum Row; its statues and chess pieces stand on it as figures (props
+    `statue`, `piece`), fading out when nearer the camera than you.
+  - **Boss homes are never neighbors:** a whole look-alike between any two, none narrower than `rows.ts ROW_MIN_W` (1 square).
+  - **The Colosseum** (`houses/coliseum-shape.ts`, `houses/coliseum-ring.ts`): 18 ring boxes (kind `ring`) round its oval and a portal
+    (kind `portal`, the Colosseum's place's picture), drawn 1.2x (`COL_SCALE`) from any heading; never cut by `streetNearCut`; its bowl
+    left out below its rim; no line of sight.
+  - **Moo's and Ginger's homes** 1.3x (`TOWN_FEEL.streetHomeScale`, `rows.ts homePx`).
+  - **Test hook:** each box in `__townCam().boxes` has its front's drawn foot (`foot`: its ends on screen and the world points they stand
+    for).
+  - **Tests:** `packages/app/test/town-north-edge.test.ts`; `e2e/town-fixed.spec.ts` (the plaza's look round, the Colosseum staying put
+    as the view turns), `e2e/town-street.spec.ts` (Meadow Street's cards).
+  - Decision: [2026-11-05-street-north-edge.md](../decisions/2026-11-05-street-north-edge.md). Stills: `docs/street-north-edge/`.
+- **Controls and the minimap (Nov 5, after round 5).** Still the admins' street town only.
+  - **Three gestures** (`town/press.ts`), told apart by the drag threshold (`dragPx`) and a hold time (`feel.ts streetHoldMs`, 180 ms;
+    timed from the pointer's own event time): a quick tap walks; a press that moves past the threshold first looks round; a press held
+    still runs.
+  - **Hold to run** (`town/run.ts`): the way from your pawn to the finger on screen, snapped to up, down, left or right of the view,
+    held as an arrow is (`arrows.ts hold`), so it is the arrows' walk (the same pace, the same card at a door). Moving the finger changes
+    the way and never turns the camera; letting go stops you at the next square. Mouse: the left button.
+  - **The base heading** (`Town.tsx base`, `turn.ts lockIn`): a look round let go within `streetSnapDeg` (10°) of a quarter eases
+    there (`streetSnapMs`) and is snapped; a tap's walk or a run next locks it in as the normal heading off a strip, which the arrows,
+    the screen step and runs follow. Not snapped, or an arrow first: the first step eases back. The town opening and a building's in and
+    out reset it to north (`freshView`); a home's strip turns the view but leaves the base alone.
+  - **The opening zoom step** is the third (`streetZoomStart` 2, Eric: "number three"); the park's step out goes from there to the
+    overview. The rows' culling stays at the in and mockup steps (`zoom <= 1`).
+  - **The minimap** (`town/minimap.ts`, `TownMap.tsx`), built from the plan's data (`street.ts`: ground, lots, walls, park,
+    Colosseum): small at the box's top right (`mapShare` 26% on a phone, `mapShareComputer` 13% in a computer's frame, at most
+    `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
+    canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
+    stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
+    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
+    (`MAP_BOX`).
+  - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).
+  - **Tests:** `packages/app/test/town-controls.test.ts`, `e2e/town-controls.spec.ts`.
+  - Decision: [2026-11-05-street-controls-map.md](../decisions/2026-11-05-street-controls-map.md). Stills:
+    `docs/street-controls-map/`.
 
 ## Frame-rate pill (`?fps`)
-`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" with `?gl=1`; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
-`?fps`, `?crowd=N` and `?gl=1` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
+`?fps`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
 
 ## The feel: `town/feel.ts`
 
@@ -965,24 +1060,10 @@ noted wherever a slice changed one.
   `packages/app/test/shop-room.test.ts` (both rooms' walls, counter, pieces and pond solid, the way out, every free square reachable,
   the talking range and where a tap on the Shopkeeper sends you; the crates' words; a way's button needing its price; the buy going
   to the server).
-- `e2e/town-webgl.spec.ts` (Oct 30, WebGL): the same held frame drawn by both backends in one page (`__townHold`, `__townBackend`;
-  `__townPaint()` gives the backend and the last frame's draw calls, `__townBench(n)` the ms a draw of the held frame),
-  compared pixel by pixel, phone and computer: the park by day, the park at night (the lights), a statue up close at night;
-  it reports the largest difference and where. Then a lost context (drawn again when it's back; lost twice, Canvas 2D), and
-  Canvas 2D without `?gl=1`. Measured Oct 30: the largest single difference 33 to 150 (single edge pixels: the GPU's 4x
-  multisampling against the 2D canvas's antialiasing, or a nearest texel picked across a tie), the mean about 1 of 255,
-  under 2.5% of pixels more than 8 apart, at most 0.13% more than 32. `TOWN_GL_STILLS=<dir>` saves full-page stills of both.
-- **Every town spec on WebGL:** build with `VITE_TOWN_GL=1 npm run build` (WebGL the default, as `?gl=1`) and run them as usual;
-  their pixel reads (`colors`, `skyTop`, the tags' and the lights' reads) work on both backends because a WebGL canvas's
-  `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`: the frame drawn again at once
-  and read right after the draw). Headless WebGL is software (SwiftShader: about 14 fps on a phone, 15 on a computer since
-  Oct 30, later; the page's thread waits for each frame), so run them with **one worker**: with two, a check takes 300 to
-  400 ms and the chat's and the tags' timing checks miss. `TOWN_GL_BUILD=1` tells `town-webgl.spec.ts` which default to
-  expect. All six pass so (docs/decisions/2026-10-30-town-webgl.md, "Oct 30, later").
-- **CI on WebGL** (Oct 30): a change to the town's area (`webgl` in `e2e/areas.json`) also runs the drawing specs (town,
-  town-desktop, town-tags, town-webgl) on a `VITE_TOWN_GL=1` build, in two more jobs beside the shards, `webgl-phone` and
-  `webgl-desktop` (one project, one worker each; about 10 minutes of tests each). The chat's two specs aren't in it (HTML
-  over the canvas; nothing in them depends on the backend). docs/areas/ops.md, "CI e2e".
+- **The street town's specs run on WebGL** (Nov 6; town-street, town-rows, town-fixed, town-controls, once each): their pixel reads
+  work because a WebGL canvas's `getContext("2d")` gives the last frame's pixels under the test switches (Town.tsx's `shim`).
+  Headless WebGL is software (SwiftShader, about 14 to 20 fps), so their timeouts are longer. Today's town's `?gl=1` and its
+  CI jobs are retired.
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
   (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, the chat icon is in the bar's

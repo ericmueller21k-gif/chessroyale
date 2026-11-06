@@ -351,7 +351,7 @@ test("the Ranked Standing menu: 1v1, 50 v 50, Squads; the others say Coming soon
   }
 });
 
-test("placements, no games and a ban: the card says so, in the same room", async ({ page }) => {
+test("placements, no games and a ban: the card says so, in the same room", { tag: "@phone-only" }, async ({ page }) => {
   await openDemo(page);
   await loaded(page);
   const full = await layout(page);
@@ -408,7 +408,7 @@ test("placements, no games and a ban: the card says so, in the same room", async
   await expect(ranked.locator('[data-emblem="transcendent"]')).toHaveCount(1);
 });
 
-test("1 v 1 games with no points (placements, one fair play held, one before the points were kept) show a dash; a deleted opponent's game still lists", async ({ page }) => {
+test("1 v 1 games with no points (placements, one fair play held, one before the points were kept) show a dash; a deleted opponent's game still lists", { tag: "@phone-only" }, async ({ page }) => {
   const hour = 3_600_000;
   const recent = [
     { opponent: { id: "deleted", name: "Deleted account", look: null }, result: "win", points: null, at: Date.now() - hour },
@@ -425,7 +425,7 @@ test("1 v 1 games with no points (placements, one fair play held, one before the
   await expect(rows.nth(0).locator(".pp-face .avatar")).toHaveCount(1);
 });
 
-test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", async ({ page }) => {
+test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", { tag: "@phone-only" }, async ({ page }) => {
   await openDemo(page, demoProfile({ ranked1v1: { ...demoProfile().ranked1v1, recent: [] } }));
   await loaded(page);
   const rows = page.locator(".pp-row");
@@ -440,7 +440,7 @@ test("every mode's row in Recent Matches: a raid, 50 v 50, Squads", async ({ pag
   expect((await box(page, ".pp-rows")).height).toBeGreaterThanOrEqual(5 * (isComputer() ? 50.6 : 41.3) - 1);
 });
 
-test("View all: the full list of matches and each worn item's details open in sheets; with nothing, they're greyed", async ({ page }) => {
+test("View all: the full list of matches and each worn item's details open in sheets; with nothing, they're greyed", { tag: "@phone-only" }, async ({ page }) => {
   await openDemo(page);
   await loaded(page);
   await page.locator(".pp-recent").getByRole("button", { name: /^View all/ }).click();
@@ -564,7 +564,7 @@ test("the icon behind the pawn: their drawing, blurred and faded, filling the ci
   }
 });
 
-test("online: a dot at the picture's lower right and 'Online now'; last seen with no dot; hidden: just when they joined", async ({ page }) => {
+test("online: a dot at the picture's lower right and 'Online now'; last seen with no dot; hidden: just when they joined", { tag: "@phone-only" }, async ({ page }) => {
   await openDemo(page);
   await loaded(page);
   const dot = page.locator(".pp-online");
@@ -593,7 +593,7 @@ test("online: a dot at the picture's lower right and 'Online now'; last seen wit
   }
 });
 
-test("the level: an admin sees Level 38; a player's page has no level line, and no room kept for one", async ({ page, browser }) => {
+test("the level: an admin sees Level 38; a player's page has no level line, and no room kept for one", { tag: "@phone-only" }, async ({ page, browser }) => {
   await openDemo(page, demoProfile(), { admin: true });
   await loaded(page);
   await expect(page.locator(".pp-level")).toHaveText("Level 38");
@@ -655,7 +655,7 @@ test("nothing shifts when a note appears: it's a toast over the page's bottom, i
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
 });
 
-test("your own page: from your pawn, today's profile with View public profile at its top; it opens yours with Challenge, Add Friend and ••• greyed", async ({ page }) => {
+test("your own page: from your pawn, today's profile with View public profile at its top; it opens yours with Challenge, Add Friend and ••• greyed", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Eric");
   await switchesOff(page);
   await page.goto("/");
@@ -698,7 +698,7 @@ test("your own page: from your pawn, today's profile with View public profile at
   await page.unrouteAll({ behavior: "ignoreErrors" });
 });
 
-test("an admin's ?rank= shows on their own public page, as on their profile", async ({ page }) => {
+test("an admin's ?rank= shows on their own public page, as on their profile", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Rank Admin");
   await page.goto("/?rank=gold-3");
   await expect(page.locator(".fd-hero-name")).toHaveText("Rank Admin");
@@ -708,7 +708,7 @@ test("an admin's ?rank= shows on their own public page, as on their profile", as
   await expect(page.locator('.pp-ranked [data-emblem="gold-d3"]')).toHaveCount(1);
 });
 
-test("a tap on another player's name opens the public profile; Challenge sends today's invite", async ({ browser }) => {
+test("a tap on another player's name opens the public profile; Challenge sends today's invite", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const ann = await player(browser, "Ann Pub");
   const bo = await player(browser, "Bo Pub");
@@ -741,7 +741,7 @@ test("a tap on another player's name opens the public profile; Challenge sends t
   await expect(bo.page.locator(".fr-toast")).toContainText("Ann Pub invited you to a Crowd lobby", { timeout: 25_000 });
 });
 
-test("Add Friend, Block and Report from the page: a request, the ••• menu with today's two-tap block, today's report sheet", async ({ browser }) => {
+test("Add Friend, Block and Report from the page: a request, the ••• menu with today's two-tap block, today's report sheet", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(3 * 60_000);
   const ann = await player(browser, "Ann Menu");
   const bo = await player(browser, "Bo Menu");
@@ -778,7 +778,7 @@ test("Add Friend, Block and Report from the page: a request, the ••• menu 
   await expect(ann.page.getByRole("button", { name: "Challenge" })).toBeEnabled();
 });
 
-test("a guest where friends are off: Challenge, Add Friend and Block greyed (not gone); Report still works", async ({ page }) => {
+test("a guest where friends are off: Challenge, Add Friend and Block greyed (not gone); Report still works", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Viewer");
   await switchesOff(page);
   await page.route("**/api/friends", (route) => route.fulfill({ json: { off: true } }));

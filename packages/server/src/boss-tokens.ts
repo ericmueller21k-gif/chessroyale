@@ -14,7 +14,8 @@ import {
   type ItemInstance,
 } from "@chessroyale/core";
 import type { Sql, Stmt } from "./accounts.ts";
-import { lockerState, type LockerState } from "./locker.ts";
+import { lockerState, openedItem, type LockerState } from "./locker.ts";
+import { applyOp, cond, firstLeg, keyFor, leg, ledgerAccount, opKeys, requestId, type LedgerAccount, type OpKey } from "./ledger.ts";
 
 /**
  * Boss tokens, crate keys and buying a boss's crate (Eric, Nov 2; BOSS_TOKENS and BOSS_CRATE_PRICE in core's settings;
@@ -83,14 +84,20 @@ export interface DropOptions {
   signedInOnly?: boolean;
   /** The randomness (tests); the server's own otherwise. */
   rng?: () => number;
+  /**
+   * The drop's ledger key, so it drops once however often it's counted: a solo battle's is `drop:solo:<battle>` (endSoloBattle), an
+   * online one's `drop:<code>:<match start>:<ledger id>` (opKeys.onlineDrop: its match room may count it again after a restart).
+   * None: a fresh one per call.
+   */
+  op?: OpKey;
 }
 
 /**
  * A boss battle that counted: maybe a token (BOSS_TOKENS). The first in the rolling window always drops one; after that one in
- * four, up to the cap. Which boss's: one of the live bosses, each as likely. One transaction: the drop goes in only while the
- * window has room for it (counted in the same statement, so two battles counted at once can't both take the last place), and the
- * token comes with it, only if the drop went in. Answers the boss whose token dropped, or null. (An account deleted since gets
- * nothing.)
+ * four, up to the cap. Which boss's: one of the live bosses, each as likely. One ledger op (ledger.ts), one transaction: it applies
+ * only while the window has room for it (counted in the same statement, so two battles counted at once can't both take the last
+ * place), and then the token and the drop's record go in. Answers the boss whose token dropped (a replay of the same op: the first
+ * one's), or null. (An account deleted since gets nothing.)
  */
 export async function countBossBattle(sql: Sql, userId: string, now: number, opts: DropOptions): Promise<string | null> {
   const bosses = dropBosses(opts.off);
@@ -98,32 +105,29 @@ export async function countBossBattle(sql: Sql, userId: string, now: number, opt
   const rng = opts.rng ?? serverRandom;
   const lucky = rng() < BOSS_TOKENS.chance;
   const boss = bosses[Math.min(bosses.length - 1, Math.floor(rng() * bosses.length))]!.id;
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return null;
   const id = randomHex(12);
-  await sql.batch([
-    stmt(
-      `INSERT INTO boss_token_drops (id, user_id, boss, at, battle)
-       SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND (? = 0 OR email IS NOT NULL OR google_sub IS NOT NULL))
-         AND (SELECT COUNT(*) FROM boss_token_drops WHERE user_id = ? AND at > ?) < ?`,
-      id,
-      userId,
-      boss,
-      now,
-      opts.battle.slice(0, 64),
+  const battle = opts.battle.slice(0, 64);
+  const op = opts.op === undefined ? `drop:${id}` : keyFor(opts.op, me);
+  const done = await applyOp(sql, me, {
+    id: op,
+    reason: "drop",
+    now,
+    when: cond(
+      `EXISTS (SELECT 1 FROM users WHERE id = ? AND (? = 0 OR email IS NOT NULL OR google_sub IS NOT NULL))
+       AND (SELECT COUNT(*) FROM boss_token_drops WHERE user_id = ? AND at > ?) < ?`,
       userId,
       opts.signedInOnly ? 1 : 0,
       userId,
       now - TOKEN_WINDOW_MS,
       dropLimit(lucky),
     ),
-    stmt(
-      `INSERT INTO boss_tokens (user_id, boss, n) SELECT ?, ?, 1 WHERE EXISTS (SELECT 1 FROM boss_token_drops WHERE id = ?)
-       ON CONFLICT (user_id, boss) DO UPDATE SET n = n + 1`,
-      userId,
-      boss,
-      id,
-    ),
-  ]);
-  return (await sql.first("SELECT 1 FROM boss_token_drops WHERE id = ?", id)) ? boss : null;
+    legs: [leg.tokens(userId, boss, 1, battle)],
+    also: (ours) => [stmt(`INSERT INTO boss_token_drops (id, user_id, boss, at, battle) SELECT ?, ?, ?, ?, ? WHERE ${ours.sql}`, id, userId, boss, now, battle, ...ours.params)],
+  });
+  if (done === "applied") return boss;
+  return done === "replay" ? ((await firstLeg(sql, op))?.asset_id ?? null) : null;
 }
 
 /** A solo battle's id: 18 hex characters. */
@@ -169,7 +173,7 @@ export async function endSoloBattle(sql: Sql, userId: string, battle: unknown, n
   const row = await sql.first<{ started_at: number }>("DELETE FROM solo_battles WHERE user_id = ? AND id = ? RETURNING started_at", userId, battle);
   if (!row) return { ended: false, counted: false, token: null };
   const counted = battleCounts({ moves: 0, ms: now - row.started_at });
-  return { ended: true, counted, token: counted ? await countBossBattle(sql, userId, now, { ...opts, battle }) : null };
+  return { ended: true, counted, token: counted ? await countBossBattle(sql, userId, now, { ...opts, battle, op: `drop:solo:${battle}` }) : null };
 }
 
 /** How long the result screen may ask for its battle's token. */
@@ -216,10 +220,12 @@ export async function bossCrateHoldings(sql: Sql, userId: string): Promise<Recor
 /**
  * Buys a boss's crate (BOSS_CRATES) one of its two ways, into your inventory (Eric, Nov 2: "Buying a boss crate from shopkeepers adds
  * the crate to your inventory"; until then a buy opened it at once): a `boss_crates` row, unopened, which the Crates tab opens
- * (openBossCrate). One transaction (D1's batch: all of it or none; as the coin shop's buyItem): the crate goes in only if the tokens
- * (and the key) are there, then they come off, only if that crate went in. Nothing can change between the statements of one
- * transaction, so the price is paid exactly when the crate is given: never one without the other. Two taps or two devices at once
- * are two buys, each paid for in full or refused; a count can't go below zero (the table's CHECK, and the guards).
+ * (openBossCrate). One ledger op, one transaction (D1's batch: all of it or none; as the coin shop's buyItem): it applies only if the
+ * tokens (and the key) are there, checked in that transaction, and then the crate goes in and they come off, so the price is paid
+ * exactly when the crate is given, and the ledger keeps what it cost after the crate is opened. Its key is the app's request id for the
+ * buy (`boss-crate:<ledger id>:<request>`): a retry of it buys nothing more and answers the first buy (an older app's buy, with none,
+ * is keyed by its new crate). Two buys (two devices) are two, each paid for in full or refused; a count can't go below zero (the
+ * table's CHECK, and the guard).
  */
 export async function buyBossCrate(
   sql: Sql,
@@ -228,34 +234,40 @@ export async function buyBossCrate(
   way: unknown,
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; crate: string; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
   if (way !== "tokens" && way !== "key") return { ok: false, message: "No such price." };
   const cost = wayCost(way);
+  const me = await ledgerAccount(sql, userId);
   const id = randomHex(9);
-  const paid = "EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)";
-  await sql.batch([
-    stmt(
-      `INSERT INTO boss_crates (id, user_id, crate, bought_at)
-       SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= ?)
-         AND (? = 0 OR EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= ?))`,
-      id,
-      userId,
-      crate.id,
-      now,
-      userId,
-      crate.boss,
-      cost.tokens,
-      cost.keys,
-      userId,
-      cost.keys,
-    ),
-    stmt(`UPDATE boss_tokens SET n = n - ? WHERE user_id = ? AND boss = ? AND ${paid}`, cost.tokens, userId, crate.boss, id, userId),
-    ...(cost.keys ? [stmt(`UPDATE wallets SET crate_keys = crate_keys - ? WHERE user_id = ? AND ${paid}`, cost.keys, userId, id, userId)] : []),
-  ]);
-  if (!(await sql.first(`SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?`, id, userId))) return { ok: false, message: notEnough(crate.boss, way) };
-  return { ok: true, crate: crate.id, locker: await lockerState(sql, userId, admin) };
+  const op = me && (request ? keyFor(opKeys.request("boss-crate", request), me) : `boss-crate:${id}`);
+  const done = me
+    ? await applyOp(sql, me, {
+        id: op!,
+        reason: `boss crate (${way})`,
+        now,
+        when: cond(
+          "EXISTS (SELECT 1 FROM boss_tokens WHERE user_id = ? AND boss = ? AND n >= ?) AND (? = 0 OR EXISTS (SELECT 1 FROM wallets WHERE user_id = ? AND crate_keys >= ?))",
+          userId,
+          crate.boss,
+          cost.tokens,
+          cost.keys,
+          userId,
+          cost.keys,
+        ),
+        legs: [
+          leg.bossCrateIn(userId, id, crate.id, now),
+          ...(cost.tokens ? [leg.tokens(userId, crate.boss, -cost.tokens, id)] : []),
+          ...(cost.keys ? [leg.keys(userId, -cost.keys, id)] : []),
+        ],
+      })
+    : "refused";
+  // (A retry of a buy made already: the crate it bought.)
+  const bought = done === "replay" ? ((await firstLeg(sql, op!))?.asset_id ?? crate.id) : crate.id;
+  if (done === "refused") return { ok: false, message: notEnough(crate.boss, way) };
+  return { ok: true, crate: bought, locker: await lockerState(sql, userId, admin) };
 }
 
 /** Why a boss crate couldn't be opened: "You have no Babur's Boss Crate to open." */
@@ -263,9 +275,11 @@ export const noneToOpen = (name: string) => `You have no ${name} to open.`;
 
 /**
  * Opens one of your boss crates (the Crates tab, Nov 2), as a crate opens: the roll is the server's (its own randomness, never a test
- * switch: a boss crate is paid for), from that crate's pool, and the item goes into the locker. One transaction: the item goes in only
- * if you hold one of these crates, then one of them (the oldest) comes off, only if that item went in. So a crate opens once, never
- * twice (two taps or two devices at once: one item, one crate gone, the other refused), and nobody opens one they haven't got.
+ * switch: a boss crate is paid for), from that crate's pool, and the item goes into the locker. One ledger op per crate, one
+ * transaction: the oldest crate you hold comes off and the item goes in, both recorded (the crate's row goes, its history stays in the
+ * ledger). So a crate opens once, never twice (two devices at once: one item, one crate gone, the other refused), and nobody opens one
+ * they haven't got. The open's key is the app's request id for it (`open:<ledger id>:<request>`): a retry of it opens nothing more
+ * and answers the first open's item. (An older app's open, with none, is keyed by the crate it takes: `open:<its row>`.)
  */
 export async function openBossCrate(
   sql: Sql,
@@ -273,40 +287,38 @@ export async function openBossCrate(
   crateId: unknown,
   now: number,
   admin = false,
+  request: string | null = null,
 ): Promise<{ ok: true; roll: CrateRoll; item: ItemInstance; locker: LockerState } | { ok: false; message: string }> {
   const crate = typeof crateId === "string" ? bossCrateDef(crateId) : undefined;
   if (!crate) return { ok: false, message: "No such crate." };
-  const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
-  const id = randomHex(9);
-  await sql.batch([
-    stmt(
-      `INSERT INTO items (id, user_id, def, color, color2, blemish, seed, crate, fischer, created_at)
-       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM boss_crates WHERE user_id = ? AND crate = ?)`,
-      id,
-      userId,
-      roll.def,
-      roll.color,
-      roll.color2 ?? null,
-      roll.blemish,
-      roll.seed,
-      crate.id,
-      roll.fischer ? 1 : 0,
+  let me: LedgerAccount | null = request ? await ledgerAccount(sql, userId) : null;
+  const keyed = me && request ? keyFor(opKeys.request("open", request), me) : null;
+  // An open's item as stored. Every attempt answers this, never its own roll, so every answer to one request is the same.
+  const opened = async (op: string | null) => {
+    const first = op ? await openedItem(sql, userId, op) : null;
+    return first ? { ok: true as const, ...first, locker: await lockerState(sql, userId, admin) } : null;
+  };
+  // A retry of an open made already (perhaps of your last crate): its item.
+  const first = await opened(keyed);
+  if (first) return first;
+  // The oldest one you hold. Another open that took it first or since: the next one, if you hold another.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const held = await sql.first<{ id: string }>("SELECT id FROM boss_crates WHERE user_id = ? AND crate = ? ORDER BY bought_at, id LIMIT 1", userId, crate.id);
+    me ??= held ? await ledgerAccount(sql, userId) : null;
+    if (!held || !me) break;
+    const roll = rollCrate(mulberry32(crypto.getRandomValues(new Uint32Array(1))[0]!), crate);
+    const op = keyed ?? `open:${held.id}`;
+    const done = await applyOp(sql, me, {
+      id: op,
+      reason: "boss crate open",
       now,
-      userId,
-      crate.id,
-    ),
-    stmt(
-      `DELETE FROM boss_crates WHERE id = (SELECT id FROM boss_crates WHERE user_id = ? AND crate = ? ORDER BY bought_at, id LIMIT 1)
-         AND EXISTS (SELECT 1 FROM items WHERE id = ? AND user_id = ?)`,
-      userId,
-      crate.id,
-      id,
-      userId,
-    ),
-  ]);
-  if (!(await sql.first(`SELECT 1 FROM items WHERE id = ? AND user_id = ?`, id, userId))) return { ok: false, message: noneToOpen(crate.name) };
-  const item: ItemInstance = { id, def: roll.def, color: roll.color, ...(roll.color2 ? { color2: roll.color2 } : {}), blemish: roll.blemish, seed: roll.seed };
-  return { ok: true, roll, item, locker: await lockerState(sql, userId, admin) };
+      when: cond("EXISTS (SELECT 1 FROM boss_crates WHERE id = ? AND user_id = ?)", held.id, userId),
+      legs: [leg.bossCrateOut(userId, held.id, crate.id), leg.item(userId, { ...roll, id: randomHex(9) }, crate.id, now)],
+    });
+    // This open's item, or (the same open sent twice at once) the other one's.
+    if (done === "applied" || (done === "replay" && keyed)) return (await opened(op)) ?? { ok: false, message: noneToOpen(crate.name) };
+  }
+  return { ok: false, message: noneToOpen(crate.name) };
 }
 
 /** A whole number from 0 to BOSS_TOKENS.grantMax, or 0. */
@@ -314,39 +326,45 @@ const grantCount = (n: unknown) => (typeof n === "number" && Number.isInteger(n)
 
 /**
  * An admin's test grant (the Crates tab's admin box; the API checks it's an admin): crate keys, and any boss's tokens, to their
- * own account. Never a drop: the window doesn't count it.
+ * own account. Never a drop: the window doesn't count it. Keyed by the app's request id (`grant:<ledger id>:<request>`): a retry
+ * gives nothing more. (An older app's, with none: a fresh key.)
  */
-export async function grantTestItems(sql: Sql, userId: string, body: { keys?: unknown; boss?: unknown; tokens?: unknown }): Promise<{ ok: true } | { ok: false; message: string }> {
+export async function grantTestItems(
+  sql: Sql,
+  userId: string,
+  body: { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown },
+  now = Date.now(),
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const keys = grantCount(body.keys);
   const tokens = isTokenBoss(body.boss) ? grantCount(body.tokens) : 0;
   if (!keys && !tokens) return { ok: false, message: "Nothing to give." };
-  await sql.batch([
-    ...(keys ? [stmt("INSERT INTO wallets (user_id, crate_keys) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET crate_keys = crate_keys + excluded.crate_keys", userId, keys)] : []),
-    ...(tokens ? [stmt("INSERT INTO boss_tokens (user_id, boss, n) VALUES (?, ?, ?) ON CONFLICT (user_id, boss) DO UPDATE SET n = n + excluded.n", userId, body.boss, tokens)] : []),
-  ]);
+  const me = await ledgerAccount(sql, userId);
+  if (!me) return { ok: false, message: "Nothing to give." };
+  const request = requestId(body.request);
+  await applyOp(sql, me, {
+    id: request ? keyFor(opKeys.request("grant", request), me) : `grant:${randomHex(9)}`,
+    reason: "admin grant",
+    now,
+    legs: [...(keys ? [leg.keys(userId, keys)] : []), ...(tokens ? [leg.tokens(userId, body.boss as string, tokens)] : [])],
+  });
   return { ok: true };
 }
 
 /**
- * A guest's tokens, drops, open solo battle and unopened boss crates join the account it signs in to, for the sign-in's one batch
- * (its crate keys go with the wallet: accounts.ts, shopMoves). Tokens are added up; the drops come along, so the account's window
- * counts them; the account's own open battle wins; the crates come along. (Where sign-in is set up a guest earns none, so this moves nothing there.)
+ * A guest's drops and open solo battle join the account it signs in to, for the sign-in's one batch: the drops come along, so the
+ * account's window counts them; the account's own open battle wins. (Its tokens, crate keys and unopened boss crates move with their
+ * ledger legs: ledger.ts, mergeMoves. Where sign-in is set up a guest earns none, so this moves nothing there.)
  */
 export const tokenMoves = (from: string, to: string): Stmt[] => [
-  stmt(
-    "INSERT INTO boss_tokens (user_id, boss, n) SELECT ?, boss, n FROM boss_tokens WHERE user_id = ? AND n > 0 ON CONFLICT (user_id, boss) DO UPDATE SET n = n + excluded.n",
-    to,
-    from,
-  ),
-  stmt("DELETE FROM boss_tokens WHERE user_id = ?", from),
   stmt("UPDATE boss_token_drops SET user_id = ? WHERE user_id = ?", to, from),
   stmt("INSERT OR IGNORE INTO solo_battles (user_id, id, started_at) SELECT ?, id, started_at FROM solo_battles WHERE user_id = ?", to, from),
   stmt("DELETE FROM solo_battles WHERE user_id = ?", from),
-  // (Its unopened boss crates come along, each one.)
-  stmt("UPDATE boss_crates SET user_id = ? WHERE user_id = ?", to, from),
 ];
 
-/** Drops are kept this long (the window needs a day; the rest is for a person looking into a question), then go. */
+/**
+ * Drops are kept this long (the window needs a day; the rest is for a person looking into a question), then go. (Each drop's token
+ * stays in the ledger, with its battle: ledger.ts.)
+ */
 export const DROPS_KEEP_DAYS = 30;
 /** The Worker's schedule clears old drops (index.ts). */
 export async function purgeTokenDrops(sql: Sql, now: number): Promise<void> {

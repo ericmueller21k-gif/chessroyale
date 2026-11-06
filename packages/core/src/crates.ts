@@ -91,6 +91,11 @@ export interface ItemDef {
   faceLayer?: "above" | "below";
   /** Rolls a second color too (both with the usual color odds), e.g. a present's box and its ribbon. */
   colors?: 2;
+  /**
+   * A HunChess-colored ride (the Welcome Crate's prize, Eric, Nov 6; welcome.ts): the ride it's drawn from (its base's drawing,
+   * cells and size, in the HunChess gold-and-black colorway). Never tradeable, never listed, no purity shown.
+   */
+  hunchess?: string;
 }
 
 /** Whether an item is drawn behind the piece. */
@@ -98,7 +103,8 @@ export const behindPiece = (def: string) => itemDef(def)?.layer === "back";
 /** Whether a face item is drawn above a hat (its `faceLayer`). */
 export const aboveHat = (def: string) => itemDef(def)?.faceLayer === "above";
 
-export const ITEM_DEFS: readonly ItemDef[] = [
+/** Every item but the HunChess colorways (which are made from its rides, below). */
+const BASE_ITEM_DEFS: readonly ItemDef[] = [
   // Winter Crate · Series 1.
   { id: "santa-beard", name: "Santa Beard", tier: "common", slot: "face", faceLayer: "below", description: "Ho ho ho." },
   { id: "beanie", name: "Beanie", tier: "common", slot: "head", description: "A plain knit beanie. Keeps the thinking warm." },
@@ -169,7 +175,32 @@ export const ITEM_DEFS: readonly ItemDef[] = [
   { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
 ];
 
+/** A HunChess colorway's id: its ride's id and this ("balloon-pup-hunchess"), so it never collides with or stacks on the ride. */
+export const HUNCHESS_SUFFIX = "-hunchess";
+
+/**
+ * The HunChess colorway of every ride (Eric, Nov 6: "a special HunChess-colored random rider"; docs/decisions/2026-11-06-welcome-crate.md):
+ * an item of its own (`<ride>-hunchess`), drawn from its ride's drawing in gold and black (the app's `components/rides/hunchess.tsx`),
+ * only ever from the Welcome Crate (welcome.ts), in no other crate. A new ride gets its colorway here with no change.
+ */
+export const HUNCHESS_RIDES: readonly ItemDef[] = BASE_ITEM_DEFS.filter((d) => d.slot === "ride").map((d) => ({
+  id: d.id + HUNCHESS_SUFFIX,
+  name: `HunChess ${d.name}`,
+  tier: d.tier,
+  slot: "ride" as const,
+  description: `${d.name} in HunChess gold and black, from the Welcome Crate. ${d.description}`,
+  ...(d.colors ? { colors: d.colors } : {}),
+  hunchess: d.id,
+}));
+
+export const ITEM_DEFS: readonly ItemDef[] = [...BASE_ITEM_DEFS, ...HUNCHESS_RIDES];
+
 export const itemDef = (id: string) => ITEM_DEFS.find((d) => d.id === id);
+
+/** Whether an item is a HunChess colorway (the Welcome Crate's). */
+export const isHunchess = (def: string | undefined | null): boolean => !!def && !!itemDef(def)?.hunchess;
+/** The ride a HunChess colorway is drawn from ("balloon-pup" for "balloon-pup-hunchess"), else undefined. */
+export const hunchessBase = (def: string | undefined | null): string | undefined => (def ? itemDef(def)?.hunchess : undefined);
 
 /** The strip's special slot: Fischer Random, a second spin for a Legendary or Mythic item. */
 export const FISCHER = "fischer";
@@ -179,7 +210,7 @@ export type PresentTier = "common" | "uncommon" | "rare" | "epic";
 export type FischerTier = "legendary" | "mythic";
 
 /** How a crate looks in the app: its own box on the crate page, and the box each tier comes in on the strip. */
-export type CrateLook = "winter" | "beta";
+export type CrateLook = "winter" | "beta" | "hunchess";
 
 export interface CrateDef {
   id: string;
@@ -350,7 +381,7 @@ const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
  * Every boss's crate (only those whose home has a shop so far: Babur's, Puddles', Alfil's, Big Boy's, Timber's, Dash's, Hollow's (Nov 3,
  * with Hollow's Bulb), Wrangler's (Nov 4, with Pen Pony; `pig`, his home's id), Jefferson's (Nov 4, with Giraffe Gallop; `grex`,
  * his home's id) and Ginger's (Nov 5, with the Candy Cane Sled; `gingerbread`, his home's id and his boss id: its crate's id is
- * `boss-gingerbread`, never the Gingerbread Man skin's `gingerbread`). Timber's
+ * `boss-gingerbread`, never the Gingerbread Man skin's `gingerbread`) and Folio's (Nov 5, with the Paper Crane). Timber's
  * and Dash's (Nov 3) are shown and sold to admins only while they're in the game for admins first (BOSS_ADMIN_FIRST): only an admin
  * holds their tokens.
  */
@@ -365,6 +396,8 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("pig", "Wrangler's Boss Crate", "pen-pony"),
   bossCrate("grex", "Jefferson's Boss Crate", "jefferson-giraffe"),
   bossCrate("gingerbread", "Ginger's Boss Crate", "ginger-sled"),
+  bossCrate("folio", "Folio's Boss Crate", "folio-crane"),
+  bossCrate("smudgy", "Smudgy's Boss Crate", "smudgy-brush"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

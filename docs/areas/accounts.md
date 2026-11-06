@@ -83,6 +83,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
     the download has the rank and the player's kept games (the opponent by name); deleting removes the rank and makes
     the player "deleted" in their opponents' games. A guest's rank moves to the account on sign-in only if the account
     has none.
+  - **The ledger** (store `ledger`: `ledger`, `ledger_accounts`; `ledger.ts`, Nov 6): the download has every change to the balances;
+    deleting closes each balance in it and drops the account's random ledger id, so its rows stay naming nobody (append-only).
   - **Every table is accounted for:** each is in a store in `ACCOUNT_STORES` (`account-data.ts`) or listed in
     `NO_ACCOUNT_DATA`. `account-data.test.ts` fails on a table in neither, from the schema or any `CREATE TABLE` in
     the server. It also pins every table's columns (`SCHEMA_COLUMNS`), so any schema change means checking the two

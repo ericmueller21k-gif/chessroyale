@@ -66,7 +66,7 @@ async function play(page: Page, opts: { leave?: boolean; step?: boolean } = {}) 
 const shadowsShown = (page: Page) =>
   page.evaluate(() => Object.fromEntries([...document.querySelectorAll<HTMLElement>(".power-board .pw-shadow")].map((e) => [e.dataset.square!, Number(e.dataset.size)])));
 
-test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his new name", async ({ page }) => {
+test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his new name", { tag: "@phone-only" }, async ({ page }) => {
   await page.goto("/?debug&clock=40&boss=jefferson");
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
@@ -74,7 +74,7 @@ test("Jefferson (he was G-REX): a test link's ?boss=jefferson meets him, by his 
   expect(await page.evaluate(() => { const b = (window as any).match.boss; return [b.id, b.name]; })).toEqual(["grex", "Jefferson"]);
 });
 
-test("Jefferson: his tiles burn in stages counting down, a piece left on one burns, and the Roman candle's 24 shots fall where their shadows said", async ({ page }) => {
+test("Jefferson: his tiles burn in stages counting down, a piece left on one burns, and the Roman candle's 24 shots fall where their shadows said", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(9 * 60_000);
   // (?laststand=0: leaving a piece to burn on purpose isn't taken back by the God King.)
   await page.goto("/?debug&clock=40&bossMoves=16&boss=grex&power=candle&laststand=0");
@@ -218,7 +218,7 @@ async function asAdmin(page: Page) {
   });
 }
 
-test("the test trigger is hidden from players", async ({ page }) => {
+test("the test trigger is hidden from players", { tag: "@phone-only" }, async ({ page }) => {
   await page.goto("/?debug&clock=40&bossMoves=6&boss=gingerbread");
   await bossAloneFromHome(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
@@ -226,7 +226,7 @@ test("the test trigger is hidden from players", async ({ page }) => {
   await expect(page.locator(".ult-test")).toHaveCount(0);
 });
 
-test("an admin's test trigger against Ginger, pressed during your turn: the blizzard next turn, no warning; twice is once; again once it's over", async ({ page }) => {
+test("an admin's test trigger against Ginger, pressed during your turn: the blizzard next turn, no warning; twice is once; again once it's over", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(5 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=8&boss=gingerbread");
@@ -275,7 +275,7 @@ test("an admin's test trigger against Ginger, pressed during your turn: the bliz
   expect((await powers(page)).ults).toBe(2);
 });
 
-test("an admin's test trigger against Boingo, pressed while the boss thinks: the funhouse", async ({ page }) => {
+test("an admin's test trigger against Boingo, pressed while the boss thinks: the funhouse", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   await asAdmin(page);
   await page.goto("/?debug&clock=40&bossMoves=6&boss=clown");

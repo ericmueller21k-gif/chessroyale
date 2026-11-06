@@ -7,11 +7,11 @@ import { named, test } from "./helpers.ts";
  * (supply boxes or presents) and odds, and opening it spins its own boxes and lands on one of its own items. On a
  * phone and a computer, with nothing sideways-scrolling.
  */
-test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", async ({ page }) => {
+test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Two Crates");
   await page.goto("/shop?crates");
-  await expect(page.locator(".crate-row:not(.boss-crate-row)")).toHaveCount(2);
+  await expect(page.locator(".crate-row:not(.boss-crate-row):not(.welcome-crate-row)")).toHaveCount(2);
   for (const [id, box] of [
     ["beta-001", ".supply-art"],
     ["winter-1", ".present-art:not(.supply-art)"],
@@ -41,7 +41,7 @@ test("crates: choose either crate; each shows its own boxes, spins them and open
 test("crates: the gambling warning's red ring is always at the top of the crate pages and moves nothing; a tap opens its message box, Close puts it away", async ({ page }) => {
   await named(page, "Warned");
   await page.goto("/shop?crates");
-  await expect(page.locator(".crate-row:not(.boss-crate-row)")).toHaveCount(2);
+  await expect(page.locator(".crate-row:not(.boss-crate-row):not(.welcome-crate-row)")).toHaveCount(2);
   const ring = page.getByRole("button", { name: "Gambling warning" });
   const message = page.getByRole("dialog", { name: "Gambling warning" });
   const sideways = () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -99,7 +99,7 @@ test("crates: the gambling warning's red ring is always at the top of the crate 
     await expect(page.locator(".crate-hero")).toBeVisible();
     await near(`${id}'s page`, ".crate-hero");
     await page.getByRole("button", { name: "‹ Crates" }).click();
-    await expect(page.locator(".crate-row:not(.boss-crate-row)")).toHaveCount(2);
+    await expect(page.locator(".crate-row:not(.boss-crate-row):not(.welcome-crate-row)")).toHaveCount(2);
   }
 });
 

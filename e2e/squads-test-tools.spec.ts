@@ -39,7 +39,7 @@ async function tapSquare(page: Page, sq: string) {
 const arrows = (page: Page) => page.locator(`.board-area ${BOARD_SEL.arrowLine}`);
 const labels = (page: Page) => page.locator(".board-area svg.hb-labels text");
 
-test("the start link seats you with bots at once at the first vote; Skip votes; Cheat lines draws the top 3 on your Relay move and stays on", async ({ page }) => {
+test("the start link seats you with bots at once at the first vote; Skip votes; Cheat lines draws the top 3 on your Relay move and stays on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await named(page, "Eric");
   await page.goto("/squads/test?nolanding&debug&clock=90,0,3,0");
@@ -87,7 +87,7 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   await expect(arrows(page)).toHaveCount(0);
 });
 
-test("a player (not a test player) never gets Cheat lines: no button, and switching it on from the page does nothing", async ({ page }) => {
+test("a player (not a test player) never gets Cheat lines: no button, and switching it on from the page does nothing", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await named(page, "Pat");
   // What the server tells a non-admin: `welcome` with test false.

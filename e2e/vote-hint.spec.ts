@@ -21,7 +21,7 @@ async function aboveZones(page: Page) {
   expect(h.y + h.height).toBeLessThanOrEqual(Math.min(...zones));
 }
 
-test("Crowd: the first vote on this device shows the hint until you vote; the second vote and the next match don't", async ({ page }) => {
+test("Crowd: the first vote on this device shows the hint until you vote; the second vote and the next match don't", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Newcomer");
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=1&clock=30");
@@ -44,7 +44,7 @@ test("Crowd: the first vote on this device shows the hint until you vote; the se
   await expect(hint(page)).toHaveCount(0);
 });
 
-test("Squads: the first vote on a new device shows the same hint, above the zones, until you vote", async ({ page }) => {
+test("Squads: the first vote on a new device shows the same hint, above the zones, until you vote", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(2 * 60_000);
   await named(page, "Squaddie");
   await page.goto("/squads/test?nolanding&debug");

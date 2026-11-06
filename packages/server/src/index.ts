@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -10,6 +10,7 @@ import { openLobbyCode } from "./codes.ts";
 import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { purgeTokenDrops } from "./boss-tokens.ts";
+import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeDuelGames } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -88,10 +89,10 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), old boss token drops (boss-tokens.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
-  async scheduled(_event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
     const db = rawEnv.DB;
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
@@ -108,6 +109,16 @@ export default {
         await purgeDuelGames(sql, Date.now()).catch(failed("duels"));
         // Boss token drops past keeping (boss-tokens.ts: DROPS_KEEP_DAYS; the window needs one day).
         await purgeTokenDrops(sql, Date.now()).catch(failed("tokens"));
+        // The item ledger's daily check (ledger.ts): every account whose balances and ledger disagree, logged with what differs, and
+        // one error for /admin/ops saying how many.
+        if (ledgerCheckDue(event.scheduledTime)) {
+          await ledgerCheck(sql, OPS.ledgerCheck.accounts)
+            .then((off) => {
+              for (const d of off) console.error({ ops: "ledger", user: d.user, account: d.account, mismatches: d.mismatches });
+              if (off.length) failed("ledger")(new Error(`ledger check: ${off.length >= OPS.ledgerCheck.accounts ? "at least " : ""}${off.length} accounts' balances and ledger disagree`));
+            })
+            .catch(failed("ledger"));
+        }
         const env = await withSecrets(rawEnv);
         const search = containerSearch(env);
         if (!search) return;

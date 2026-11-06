@@ -937,6 +937,10 @@ export type SoundName =
   | "smudgyDab"
   | "smudgyThump"
   | "smudgyOof"
+  | "smudgyWhoosh"
+  | "smudgyFlop"
+  | "smudgySplat"
+  | "smudgySwipe"
   // Moo & Moon (a raid boss, a cow and his friend the Moon): synthesized, see characters/moo-sounds.ts.
   | "mooSoft"
   | "mooHappy"
@@ -1011,6 +1015,12 @@ export type SoundName =
   | "folioVoice"
   | "folioMurmur"
   | "folioHum"
+  // (Its sanctuary's intro, Nov 5: a folded piece set standing, the plane gliding in, the board landing, the crumple and the open.)
+  | "folioSet"
+  | "folioGlide"
+  | "folioLand"
+  | "folioBall"
+  | "folioOpen"
   // Timber, the beaver builder (a raid boss): synthesized, all wood, see characters/timber-sounds.ts.
   | "timberGnaw"
   | "timberChomp"
@@ -1281,6 +1291,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   smudgyDab: smudgy("dab"),
   smudgyThump: smudgy("thump"),
   smudgyOof: smudgy("oof"),
+  smudgyWhoosh: smudgy("whoosh"),
+  smudgyFlop: smudgy("flop"),
+  smudgySplat: smudgy("splat"),
+  smudgySwipe: smudgy("swipe"),
   mooSoft: mooBoss("mooSoft"),
   mooHappy: mooBoss("mooHappy"),
   mooBig: mooBoss("mooBig"),
@@ -1351,6 +1365,11 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   folioVoice: folioBoss("voice"),
   folioMurmur: folioBoss("murmur"),
   folioHum: folioBoss("hum"),
+  folioSet: folioBoss("set"),
+  folioGlide: folioBoss("glide"),
+  folioLand: folioBoss("land"),
+  folioBall: folioBoss("ball"),
+  folioOpen: folioBoss("open"),
   timberGnaw: timberBoss("gnaw"),
   timberChomp: timberBoss("chomp"),
   timberClack: timberBoss("clack"),
@@ -1566,6 +1585,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   smudgyDab: [["smudgy", "dab"]],
   smudgyThump: [["smudgy", "thump"]],
   smudgyOof: [["smudgy", "oof"]],
+  smudgyWhoosh: [["smudgy", "whoosh"]],
+  smudgyFlop: [["smudgy", "flop"]],
+  smudgySplat: [["smudgy", "splat"]],
+  smudgySwipe: [["smudgy", "swipe"]],
   mooSoft: [["moo", "mooSoft"]],
   mooHappy: [["moo", "mooHappy"]],
   mooBig: [["moo", "mooBig"]],
@@ -1636,6 +1659,11 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   folioVoice: [["folio", "voice"]],
   folioMurmur: [["folio", "murmur"]],
   folioHum: [["folio", "hum"]],
+  folioSet: [["folio", "set"]],
+  folioGlide: [["folio", "glide"]],
+  folioLand: [["folio", "land"]],
+  folioBall: [["folio", "ball"]],
+  folioOpen: [["folio", "open"]],
   timberGnaw: [["timber", "gnaw"]],
   timberChomp: [["timber", "chomp"]],
   timberClack: [["timber", "clack"]],

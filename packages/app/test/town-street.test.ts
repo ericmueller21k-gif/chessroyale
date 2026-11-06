@@ -7,7 +7,7 @@ const { N, wrapI } = await import("../src/town/camera.ts");
 const PLAN = (await import("../src/town/street-plan.json")).default;
 const { ROW_GROUND, STREET_BUILDINGS, STREET_LOTS } = await import("../src/town/street.ts");
 const { ROW_SIDES } = await import("../src/town/rows.ts");
-const { ALL_HOMES, APRON, ARENA, BOARD_GROUND, COLISEUM, GARDEN, GRASS, HOMES, LAMPS, LOT, PARK, PAVING, PROPS, START, STATUES, TABLES, TOWN_BOTS, bossWalks, createTown, destFor, groundAt, homeDoor, inSquare, inWander, plotAt, stepsFrom, tick, walkable } =
+const { ALL_HOMES, APRON, ARENA, BOARD_GROUND, WALL, COLISEUM, GARDEN, GRASS, HOMES, LAMPS, LOT, PARK, PAVING, PROPS, START, STATUES, TABLES, TOWN_BOTS, bossWalks, createTown, destFor, groundAt, homeDoor, inSquare, inWander, plotAt, stepsFrom, tick, walkable } =
   await import("../src/town/world.ts");
 
 /**
@@ -16,12 +16,12 @@ const { ALL_HOMES, APRON, ARENA, BOARD_GROUND, COLISEUM, GARDEN, GRASS, HOMES, L
  * tap on its plot leading there; the bosses in their boxes, stopping only on their rest squares; the bots never stopping on a door or
  * a table's square. Today's town (a player's, and the old admin one) keeps its own tests.
  */
-const KEY: Record<string, number> = { "#": BOARD_GROUND, "=": PAVING, ",": GRASS, g: GARDEN, L: LOT, A: ARENA };
+const KEY: Record<string, number> = { "#": BOARD_GROUND, "=": PAVING, ",": GRASS, g: GARDEN, L: LOT, A: ARENA, W: WALL };
 const lotOf = (id: string) => PLAN.lots.find((l) => l.kind === "home" && l.id === (id === "dash" ? "blitz" : id))!;
 const at = (c: number, r: number) => `${c},${r}`;
 
 describe("the street town's layout is the plan's (Nov 5)", () => {
-  it("is 46 x 46, every square's ground as the plan has it, the rows' squares lots (round 4: a row stands on them, drawn paved)", () => {
+  it("is 54 x 54 (the north edge round: grown 8 rows south and so 8 columns east), every square's ground as the plan has it, the rows' squares lots (round 4: a row stands on them, drawn paved)", () => {
     expect(N).toBe(PLAN.size);
     let rows = 0;
     for (let r = 0; r < N; r++)
@@ -35,9 +35,9 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(rows).toBeGreaterThan(400);
   });
 
-  it("starts you on the promenade just south of the fountain, (22, 17) (round 4: the plan's rows moved up 6), on paving", () => {
+  it("starts you on the promenade just south of the fountain, (22, 25) (round 4: the plan's rows moved up 6; the north edge round: 8 more), on paving", () => {
     expect(START).toEqual({ c: PLAN.start.c, r: PLAN.start.r });
-    expect(START).toEqual({ c: 22, r: 17 });
+    expect(START).toEqual({ c: 22, r: 25 });
     expect(PLAN.start.heading).toBe(0);
     expect(walkable(START.c, START.r)).toBe(true);
   });
@@ -71,6 +71,11 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
       // (Round 5: the back wall and the Colosseum's side walls: their own art, where the plan puts them.)
       if (b.kind === "wall") {
         expect(b.wall && b.at, b.name).toBeTruthy();
+        continue;
+      }
+      // (The north edge round: the Colosseum's ring, its stretches facing out from its oval.)
+      if (b.kind === "ring") {
+        expect(b.at && b.dir && b.ring !== undefined, b.name).toBeTruthy();
         continue;
       }
       expect(b.look && b.at, b.name).toBeTruthy();
@@ -120,7 +125,7 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
 
 describe("the park: the plus with its twelve tables (Nov 5)", () => {
   it("has twelve tables where the plan has them, each with a stool west and east, the stools walkable and the tables not", () => {
-    expect(PARK).toEqual({ c0: 13, r1: 26, w: 20, d: 12 });
+    expect(PARK).toEqual({ c0: 13, r1: 34, w: 20, d: 12 });
     expect(TABLES).toHaveLength(12);
     expect(TABLES.map((t) => ({ c: t.c, r: t.r }))).toEqual(PLAN.park.tables);
     for (const t of TABLES) {

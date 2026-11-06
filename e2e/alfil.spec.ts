@@ -61,7 +61,7 @@ const drawn = (page: Page, color: "white" | "black", kind: string) => page.locat
 /** The pieces a position has, by color and kind. */
 const counted = (fen: string, color: "w" | "b", type: string) => new Chess(fen).board().flat().filter((p) => p && p.color === color && p.type === type).length;
 
-test("Alfil's Tusks (the test switch): two of his pawns marked before his move, then the elephant on one of their squares as his move", async ({ page }) => {
+test("Alfil's Tusks (the test switch): two of his pawns marked before his move, then the elephant on one of their squares as his move", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(6 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -154,7 +154,7 @@ test("Alfil's Tusks (the test switch): two of his pawns marked before his move, 
   expect(errors).toEqual([]);
 });
 
-test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, their shadows growing, then back down", async ({ page }) => {
+test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, their shadows growing, then back down", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -244,7 +244,7 @@ test("Alfil's Mammoth Slam (the test switch): your pieces up for three turns, th
   expect(errors).toEqual([]);
 });
 
-test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN SLAIN! once each, the slam's own banner in its place", async ({ page }) => {
+test("Alfil's Mammoth Slam right after a queen is taken: QUEEN DOWN! and QUEEN SLAIN! once each, the slam's own banner in its place", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(10 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));

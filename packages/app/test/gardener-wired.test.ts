@@ -97,7 +97,7 @@ describe("Puddles is live", () => {
 
 /** Every line of the director's draft (Oct 21), as written. */
 const WRITTEN = {
-  entrance: ["Mind the flower beds.", "Big feet, gentle hands. Wipe yours.", "Welcome to my garden. Stay as long as you like. Longer, ideally."],
+  entrance: ["Mind the flower beds.", "Big feet, gentle hands. Wipe yours.", "Welcome! Stay as long as you like."],
   plantMany: ["A few seeds to start…", "Good soil here. Very good soil."],
   plant: ["Another one.", "Take your time. They grow either way.", "Plop."],
   move: ["Slow and steady.", "One step at a time.", "Easy does it.", "Patience."],
@@ -116,7 +116,7 @@ const WRITTEN = {
   ownEaten: ["Not that one! Bad plant!", "Well… it was hungry."],
   victory: ["Another fine harvest.", "Everything in its season."],
   defeat: ["Trampled… my whole garden…", "I'll replant. I always do."],
-  kingAttack: ["Hold still, your majesty. You look thirsty.", "Spritz! Spritz! Spritz!", "A royal soaking!"],
+  kingAttack: ["Hold still, majesty. Looking thirsty.", "Spritz! Spritz! Spritz!", "A royal soaking!"],
 };
 
 describe("his lines", () => {

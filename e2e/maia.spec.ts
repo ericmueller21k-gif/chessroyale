@@ -107,7 +107,7 @@ test("every boss is on Maia, no guard, by default for an admin (Boss alone, a ph
   }
 });
 
-test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", async ({ browser }) => {
+test("an online raid on the Maia brain: the host's device plays Maia's move, everyone gets the same one, a player's never loads it", { tag: "@phone-only" }, async ({ browser }) => {
   test.skip(test.info().project.name !== "desktop", "one run covers both devices");
   test.setTimeout(5 * 60_000);
   // (wrangler dev's MAIA_TEST counts everyone as an admin for the lobby's choice; only the admin's app may run Maia.)
@@ -296,8 +296,9 @@ test("players meet Maia too (forPlayers on): no Brain picker and no debug line; 
 
 test("the credits name Maia-3 and Stockfish, with the Maia box's license beside it and both engines' source to download", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: a phone");
-  await page.goto("/settings");
-  const credit = page.locator(".maia-credit");
+  // Settings → Handbook → Copyright, credits and licenses (Eric, Nov 6: the notices live in the Handbook now).
+  await page.goto("/faq#faq-credits");
+  const credit = page.locator("section").filter({ has: page.locator("#faq-credits") });
   await expect(credit).toContainText("Maia-3");
   await expect(credit).toContainText("Stockfish");
   await expect(credit).not.toContainText("on request");

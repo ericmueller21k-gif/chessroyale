@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -90,9 +90,10 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * ?power=hoops warns as the second turn begins (the cast after his move on his turn after it). Folio's ?power=draft brings its
  * Draft from turn 2 and tries again every turn once a mark is gone; ?power=crease warns as the second turn begins (the
  * crease lands as the third does); ?power=revision, its once-a-battle third power (not on its BOSS_ROSTER line), comes at
- * the first crowd move it may follow (turn 5 on), whatever the evaluation says.
+ * the first crowd move it may follow (turn 5 on), whatever the evaluation says. Dash's ?power=rush, his once-a-battle Scramble
+ * Rush (not on his BOSS_ROSTER line either), comes as the second turn begins.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -916,6 +917,21 @@ export interface DashState {
   stolen: number;
   flag?: { at: number; move: string } | null;
   flags: number;
+  /** His Scramble Rush (once a battle; Eric, Nov 6), once it has come. */
+  rush?: DashRush | null;
+}
+
+/**
+ * Dash's Scramble Rush (the chess package's bosses/dash.ts): as crowd turn `at` + 1 began, he swept 3 of the crowd's pieces and 3
+ * of his own (never a king) from `from` to empty squares of the middle ranks (`to`; `piece`: color then type, "wn"). Only the
+ * screens see them moved: the game's board never changes. `correct`: how many of the six the crowd put back (its people's mean,
+ * its bots' too), once it's over; under BOSS_POWERS.dashScramble.needCorrect, his extra move (`extra`).
+ */
+export interface DashRush {
+  at: number;
+  moves: { from: string; to: string; piece: string }[];
+  correct?: number;
+  extra?: "due" | "played" | "skipped";
 }
 
 export interface FolioState {
@@ -1386,7 +1402,10 @@ export type PowerEventKind =
   | "gnaw"
   | "slap"
   | "scramble"
-  | "flag";
+  | "flag"
+  // Dash's clock fit (at most twice a battle: `count` quick smacks) and his extra move after a failed Scramble Rush.
+  | "clockFit"
+  | "rushExtra";
 export interface PowerEvent {
   kind: PowerEventKind;
   turn: number;

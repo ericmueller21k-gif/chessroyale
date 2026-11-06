@@ -48,6 +48,8 @@ export interface Moment {
   prize?: string[];
   /** The hippo gardener's watering: what came up where, in the order it plays. */
   growth?: WaterGrowth[];
+  /** Dash's clock fit: how many smacks. */
+  count?: number;
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */

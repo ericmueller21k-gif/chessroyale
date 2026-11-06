@@ -114,6 +114,7 @@ import {
   pigTurn,
   bulletClock,
   dashMoveClock,
+  dashBattle,
   bulletIncrement,
   stopReason,
   alfilBattle,
@@ -1637,19 +1638,29 @@ export class MatchRunner {
     return hollowBattle.lightsTally(this.battle, people, ended);
   }
 
-  /** Hollow's extra move is due: the crowd failed Lights out, and he has played his own move. */
+  /** Hollow's extra move is due (the crowd failed Lights out, and he has played his own move), or Dash's (a failed Scramble Rush). */
   extraMoveDue(): boolean {
-    return hollowBattle.extraMoveDue(this.battle);
+    return hollowBattle.extraMoveDue(this.battle) || dashBattle.extraMoveDue(this.battle);
   }
 
   /** His extra move: a quiet one that gains him only a little (extraMoveFrom), from this device's engine. */
   async playExtraMove(engine: EngineLike = this.opts.engines[0]!): Promise<string | null> {
-    return hollowBattle.playExtraMove(this.battle, engine);
+    return dashBattle.extraMoveDue(this.battle) ? dashBattle.playExtraMove(this.battle, engine) : hollowBattle.playExtraMove(this.battle, engine);
   }
 
-  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove). Returns it, or null. */
+  /** Plays his extra move (from the host's engine online; see hollowBattle.applyExtraMove, dashBattle's). Returns it, or null. */
   applyExtraMove(move: string | null): string | null {
-    return hollowBattle.applyExtraMove(this.battle, move);
+    return dashBattle.extraMoveDue(this.battle) ? dashBattle.applyExtraMove(this.battle, move) : hollowBattle.applyExtraMove(this.battle, move);
+  }
+
+  /** Dash's Scramble Rush is due: it came as this crowd turn began, and the turn waits for it (dashBattle.rushDue). */
+  rushDue(): boolean {
+    return dashBattle.rushDue(this.battle);
+  }
+
+  /** The Rush is over: each person's placements judged, each bot's from the seed, the verdict (dashBattle.finishRush). */
+  finishRush(places: Readonly<Record<string, Readonly<Record<string, unknown>>>>): { correct: Record<string, number>; mean: number; held: boolean } {
+    return dashBattle.finishRush(this.battle, places);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */
