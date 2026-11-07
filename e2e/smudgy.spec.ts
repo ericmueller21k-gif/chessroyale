@@ -521,3 +521,43 @@ test("Smudgy at 320, 360, 390 and 1280 px: his figure whole in the bar, his long
   }
   expect(errors).toEqual([]);
 });
+
+test("Smudgy faces the board as his battle begins (Eric, Nov 6: \"facing the wrong way when the match starts\"): at the intro's last frame and the match's first, you White and you Black", async ({ page }) => {
+  test.setTimeout(240_000);
+  // Every frame from the page's first: the battle's phase, which way his figure is drawn facing (sprite-kit.ts, `data-faces`), where
+  // his feet stand (his box's middle) and the board's middle.
+  await page.addInitScript(() => {
+    const log: { intro: boolean; play: boolean; faces: string | null; feet: number; board: number }[] = [];
+    (window as any).__faces = log;
+    const tick = () => {
+      const ph = (window as any).match?.phase;
+      const fig = [...document.querySelectorAll<HTMLElement>(".boss-char")].find((e) => e.getBoundingClientRect().width > 0 && getComputedStyle(e).visibility !== "hidden");
+      const board = document.querySelector(".hb-board")?.getBoundingClientRect();
+      if (ph && fig && board?.width) {
+        const r = fig.getBoundingClientRect();
+        log.push({ intro: ph.kind === "boss" && !!ph.intro && !ph.loading, play: ph.kind === "play", faces: fig.dataset.faces ?? null, feet: r.left + r.width / 2, board: board.left + board.width / 2 });
+      }
+      if (log.length < 20_000) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  for (const side of ["w", "b"] as const) {
+    await page.goto(`/?debug&clock=60&laststand=0&boss=smudgy${side === "b" ? "&side=b" : ""}`);
+    await bossAloneFromHome(page);
+    await yourMove(page);
+    expect((await state(page)).boss.crowdSide, "the side you play").toBe(side);
+    const log = (await page.evaluate(() => (window as any).__faces)) as { intro: boolean; play: boolean; faces: string | null; feet: number; board: number }[];
+    const end = log.findLastIndex((r) => r.intro);
+    const last = log[end];
+    // (The match's first frame: the next one drawn after the intro's last, his move or yours.)
+    const first = end >= 0 ? log[end + 1] : undefined;
+    expect(first?.intro, `${side}: the frame after the intro`).toBe(false);
+    expect(last, `${side}: the intro was drawn`).toBeDefined();
+    expect(first, `${side}: the match's first frame was drawn`).toBeDefined();
+    for (const [when, r] of [["the intro's last frame", last!], ["the match's first frame", first!]] as const) {
+      // (He stands left of the board, on a phone in the bar above it and on a computer by its corner: facing our right faces it.)
+      expect(r.feet, `${side}, ${when}: he stands left of the board's middle`).toBeLessThan(r.board);
+      expect(r.faces, `${side}, ${when}: he faces the board`).toBe("right");
+    }
+  }
+});

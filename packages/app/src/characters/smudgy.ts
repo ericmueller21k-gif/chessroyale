@@ -29,6 +29,7 @@ import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./pa
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import type { Sprite } from "./sprite-kit.ts";
 
 export const SMUDGY_PALETTE: Record<string, string> = {
   k: "#14210f", // outline
@@ -1330,3 +1331,23 @@ export const SMUDGY_CHANCE: Partial<Record<import("./boss-beats.ts").Beat, numbe
  * who he is), in frame pixels.
  */
 export const SMUDGY_PORTRAIT = { x: OX + 1, y: OY + 2, w: 60, h: 41 } as const;
+
+/**
+ * Smudgy on the sprite kit (sprite-kit.ts; the pilot, Nov 6): his character as it is (the same pixels), the way his art faces
+ * (our left), his anchors at rest (idle's first frame: his feet, the middle of his head, the fist on his brush and the hand on his
+ * palette), his ramps and his frame templates. The board, his room's intro and the town turn him by `facing` (Eric, Nov 6: he
+ * faced away from the board as his battle began).
+ */
+export const SMUDGY_SPRITE: Sprite = {
+  ch: SMUDGY,
+  facing: "left",
+  anchors: {
+    feet: SMUDGY.foot,
+    head: [OX + 32, OY + 29],
+    hands: { brush: [OX + REST.fist[0], OY + REST.fist[1]], palette: [OX + REST.handN[0], OY + REST.handN[1]] },
+  },
+  ramps: { green: "abcde", throat: "lmn", orange: "pqrs", teal: "tuvx", iris: "EFG", apron: "HIJ", wood: "LMNQ", board: "BCD", gold: "OYy", silver: "fgij", bristles: "UVW", paint: "PRK", beret: "ATZo" },
+  frames: { idle: "idle", attack: "camouflage", hurt: "hurt" },
+  // (Drawn without an outline: his ground shadow, sweat and dust, the paint's drips and flecks, and the gold sparkles.)
+  unlined: "z~90PRKyYO",
+};
