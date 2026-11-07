@@ -18,7 +18,8 @@ import { PIG, PIG_ATTACK, PIG_CHANCE, PIG_LINES, PIG_PORTRAIT } from "./pig.ts";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_PORTRAIT } from "./recluse.ts";
 import { ALFIL, ALFIL_ATTACK, ALFIL_CHANCE, ALFIL_LINES, ALFIL_PORTRAIT } from "./alfil.ts";
 import { HOPPER, HOPPER_ATTACK, HOPPER_CHANCE, HOPPER_LINES, HOPPER_PORTRAIT } from "./hopper.ts";
-import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT } from "./smudgy.ts";
+import { SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_PORTRAIT, SMUDGY_SPRITE } from "./smudgy.ts";
+import { BOARD_FACING, facingAs, type Sprite } from "./sprite-kit.ts";
 import { MOO, MOO_ATTACK, MOO_CHANCE, MOO_LINES, MOO_PORTRAIT } from "./moo.ts";
 import { GARDENER, GARDENER_ATTACK, GARDENER_PORTRAIT } from "./gardener.ts";
 import { GARDENER_BAR } from "./gardener-bar.ts";
@@ -73,7 +74,13 @@ export interface KingAttackKit {
 }
 
 export interface BossKit extends BeatLines {
+  /** Its figure as the board draws it (beside the board, in a phone's bar, casting, the result screen). */
   ch: Character;
+  /**
+   * Its sprite, on the sprite kit (sprite-kit.ts): its art as drawn (portraits and the select screen draw that), and the way it faces;
+   * `ch` is then the same sprite turned to face the board (BOARD_FACING). Undefined: not on the kit yet, `ch` as drawn.
+   */
+  sprite?: Sprite;
   /**
    * The drawing in a phone's boss bar, when it isn't `ch` (the Hidden Boss: his full figure is too tall for the bar, so the
    * bar has his bust, cut from the same rig with the same animations; a computer and the results have `ch`).
@@ -481,9 +488,14 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Smudgy, the chameleon painter (Eric, Oct 19): docs/decisions/2026-10-19-smudgy-wired.md.
   "Smudgy": {
     barScale: 1,
-    barShift: 18,
+    // (Facing the board, his tail is on our left: 37 px of him left of his feet, 50 right, where he had 50 and 37. Shifted 5 px, his
+    // drawing's left and right edges in the bar are where they were with 18.)
+    barShift: 5,
     barName: 16,
-    ch: SMUDGY,
+    // (On the sprite kit, the pilot, Nov 6: drawn facing our left, turned to face the board; Eric: "in the battle intro he's facing
+    // the wrong way when the match starts".)
+    sprite: SMUDGY_SPRITE,
+    ch: facingAs(SMUDGY_SPRITE, BOARD_FACING).ch,
     anims: {
       // The boss's periodic strike on a piece is his capture cheer. (`strike` the beat is not `strike` the animation: his
       // reveal, which is the rules' moment `unmask` and plays as `powerHit`.)
@@ -1020,3 +1032,5 @@ export const wipKit = (): BossKit | null => {
  */
 export const kitName = (name: string, roster: readonly BossDef[] = BOSS_ROSTER): string => (BOSS_KITS[name] ? name : (roster.find((b) => b.name === name)?.kit ?? name));
 export const bossKit = (name: string | undefined | null): BossKit | null => (name ? ((WIP_KIT_ASKED && !name.startsWith("original:") ? wipKit() : null) ?? BOSS_KITS[kitName(name)] ?? null) : null);
+/** A boss's art as drawn (its portrait, the select screen): its sprite's, where it's on the sprite kit; else its board figure. */
+export const artOf = (kit: BossKit): Character => kit.sprite?.ch ?? kit.ch;

@@ -31,6 +31,7 @@ import { newPt, proj, tableLift, type TableLift, type View } from "../camera.ts"
 import { TOWN_FEEL } from "../feel.ts";
 import { PARK_TABLE, TABLE_BOARD, TABLE_INK, TABLE_PIECES } from "../houses/park.ts";
 import { BOSS_ART } from "../render.ts";
+import { spriteCanvas } from "../../characters/sprite-kit.ts";
 import type { HomeId } from "../world.ts";
 import { ICE_ELF, ICE_GEAR, ICE_MOVES, iceAnims, type IceElf, type IceGear, type IceMove } from "./challenge.ts";
 import { startCrumple } from "./crumple-gl.ts";
@@ -563,7 +564,7 @@ export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
       blocks,
       wood,
       table,
-      boss: { ch: bossCh, frames: bossIdle.map((_, i) => toCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1), head: drawnTop(bossIdle.map((f) => renderFrame(bossCh, f).data), bossCh.w, bossCh.h) },
+      boss: { ch: bossCh, frames: bossIdle.map((_, i) => spriteCanvas(bossCh, "idle", i)), ends, loop: t, squares: TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale[home] ?? 1), head: drawnTop(bossIdle.map((f) => renderFrame(bossCh, f).data), bossCh.w, bossCh.h) },
       storm,
       attack,
       dark,

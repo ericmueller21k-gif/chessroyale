@@ -85,6 +85,11 @@ export interface Character {
   swap?: () => Swap | null;
   parts: Readonly<Record<string, Part>>;
   anims: Readonly<Record<string, Anim>>;
+  /**
+   * Drawn mirrored, pixel for pixel (the sprite kit's facing: sprite-kit.ts `facingAs`, which also mirrors `foot`). Its layers and
+   * specks stay as the art has them; only the finished picture is turned round.
+   */
+  mirror?: boolean;
 }
 
 /**
@@ -234,6 +239,7 @@ export function frameKeys(ch: Character, frame: Frame): Cells {
     const Y = y + sy;
     if (X >= 0 && Y >= 0 && X < ch.w && Y < ch.h) out[Y]![X] = k;
   }
+  if (ch.mirror) for (const row of out) row.reverse();
   return out;
 }
 

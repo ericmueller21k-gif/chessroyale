@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BOSS_DIFFICULTY, hiddenBosses, menuBosses, type BossDef, type BossDifficultyId, type ItemLook } from "@chessroyale/core";
 import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
-import { bossKit } from "../characters/kits.ts";
+import { artOf, bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
 import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
@@ -301,7 +301,7 @@ export function BossSelect({
               {/* (Its own key each tap: the drop plays again, from the top.) */}
               <span class="dv-st-pawn bs-fig" key={drop.n}>
                 {kit && idle ? (
-                  <SpriteAnim ch={kit.ch} anim={idle} since={drop.at} still={still} class="bs-sprite" style={(({ left, width }) => ({ left: `${left}cqi`, width: `${width}cqi` }))(placeOnStage(kit.ch, idle))} />
+                  <SpriteAnim ch={artOf(kit)} anim={idle} since={drop.at} still={still} class="bs-sprite" style={(({ left, width }) => ({ left: `${left}cqi`, width: `${width}cqi` }))(placeOnStage(artOf(kit), idle))} />
                 ) : (
                   <span class="bs-q bs-q-big" aria-hidden="true">
                     ?
