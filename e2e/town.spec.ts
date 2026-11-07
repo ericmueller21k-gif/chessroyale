@@ -136,9 +136,11 @@ test("the town square at /town: the world is drawn and fills its box under the b
     }, { message: "the camera is back on you", timeout: 6000 })
     .toBeLessThan(2.5);
 
-  // Back goes home, and the address back to /. (A computer's is the side menu's Play since Nov 7: no bar.)
+  // Back asks first ("Leave Chess Town?", e2e/town-leave.spec.ts), and Leave goes home, with the address back to /. (A computer's is the
+  // side menu's Play since Nov 7, no bar: it asks the same.)
   if (computer) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play", exact: true }).click();
   else await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   expect(errors).toEqual([]);

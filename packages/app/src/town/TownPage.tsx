@@ -25,6 +25,8 @@ export interface BotGameAsk {
 
 type Props = {
   onBack: () => void;
+  /** Leaving for another screen: asked first ("Leave Chess Town?", LeaveTown.tsx); the town's back button and chat sign-up use it. */
+  askLeave: (dest: string, go: () => void) => void;
   /** Away too long (town/afk.ts): out of the town, home, with "You've been dropped from the town". */
   onAway: () => void;
   /** A guest's town time is up and they tapped Sign up: out of the town to the app's sign-in. */

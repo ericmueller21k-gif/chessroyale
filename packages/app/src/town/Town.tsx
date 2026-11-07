@@ -70,6 +70,7 @@ import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTest
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
+import { TOWN_BACK_TO } from "./LeaveTown.tsx";
 import { tooYoung } from "../account.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
@@ -121,6 +122,7 @@ function fitRows(card: HTMLElement): void {
 
 export function TownScreen({
   onBack,
+  askLeave,
   onBossAlone,
   onBossChallenge,
   onPlayBot,
@@ -132,6 +134,8 @@ export function TownScreen({
   onSignIn,
 }: {
   onBack: () => void;
+  /** Leaving the town for another screen (the back button, a guest's chat sign-up): the app's "Leave Chess Town?" first (LeaveTown.tsx). */
+  askLeave: (dest: string, go: () => void) => void;
   /** A guest's "Sign up" (their town time is up): the app's sign-in, out of the town. */
   onSignIn?: () => void;
   /** Away too long (afk.ts): out of the town to home, with "You were away". */
@@ -350,7 +354,7 @@ export function TownScreen({
       ) : (
         <header class="town-bar">
           {/* (Inside a shop, back takes you out to the town square.) */}
-          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : onBack}>
+          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : () => askLeave(TOWN_BACK_TO, onBack)}>
             ‹
           </button>
           {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
@@ -386,7 +390,7 @@ export function TownScreen({
         )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
-          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn} />
+          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn && (() => askLeave("Sign in", onSignIn))} />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>

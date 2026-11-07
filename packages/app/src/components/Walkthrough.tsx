@@ -310,48 +310,50 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
           }}
         />
       ))}
-      <div
-        class={`wt-bubble wt-dock-${dock}${moving ? " wt-moving" : ""}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div class="wt-text" key={step}>
-          <p class="wt-count">{step + 1} of {slides.length}</p>
-          <h2 class="wt-title">{title}</h2>
-          {body && <p class="wt-body">{body}</p>}
-          {bars && (
-            <ul class="wt-crates">
-              {bars.map((b) => (
-                <li key={b.goal} class="wt-crate">
-                  <span class="wt-art"><HunchessCrateArt /></span>
-                  <span class="wt-crate-text">
-                    <strong>{TUTORIAL_CRATE_LABEL(b.goal)}</strong>
-                    <span class="wt-bar"><span style={{ width: `${b.fraction * 100}%` }} /></span>
-                    <span class="wt-progress">{b.done} of {b.goal}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          {isCrates && (
-            <button type="button" class="wt-inventory" onClick={(e) => { e.stopPropagation(); close(dontShow); goToCrates(onShop); }}>
-              Go to your inventory
-            </button>
+      <div class={`wt-dock wt-dock-${dock}${moving ? " wt-moving" : ""}`}>
+        {!isLast && <p class="wt-tap">Tap anywhere to continue</p>}
+        <div class="wt-bubble" onClick={(e) => e.stopPropagation()}>
+          <div class="wt-text" key={step}>
+            <div class={`wt-row${slide.kind === "handbook" || slide.kind === "anywhere" ? " wt-prose" : ""}`}>
+              <div class="wt-lead">
+                <h2 class="wt-title">{title}</h2>
+                <p class="wt-count">{step + 1} of {slides.length}</p>
+              </div>
+              {body && <p class="wt-body">{body}</p>}
+              {isCrates && (
+                <button type="button" class="wt-inventory" onClick={(e) => { e.stopPropagation(); close(dontShow); goToCrates(onShop); }}>
+                  Go to your inventory
+                </button>
+              )}
+              {!isLast && (
+                <button type="button" class="wt-skip" onClick={(e) => { e.stopPropagation(); close(false); }}>Skip</button>
+              )}
+            </div>
+            {bars && (
+              <ul class="wt-crates">
+                {bars.map((b) => (
+                  <li key={b.goal} class="wt-crate">
+                    <span class="wt-art"><HunchessCrateArt /></span>
+                    <span class="wt-crate-text">
+                      <strong>{TUTORIAL_CRATE_LABEL(b.goal)}</strong>
+                      <span class="wt-bar"><span style={{ width: `${b.fraction * 100}%` }} /></span>
+                      <span class="wt-progress">{b.done} of {b.goal}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {isLast && (
+            <div class="wt-finish">
+              <label class="wt-check" onClick={(e) => e.stopPropagation()}>
+                <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow((e.target as HTMLInputElement).checked)} />
+                Don't show me this again
+              </label>
+              <button type="button" class="wt-ok" onClick={(e) => { e.stopPropagation(); close(dontShow); }}>OK</button>
+            </div>
           )}
         </div>
-        {isLast ? (
-          <div class="wt-finish">
-            <button type="button" class="wt-ok" onClick={(e) => { e.stopPropagation(); close(dontShow); }}>OK</button>
-            <label class="wt-check" onClick={(e) => e.stopPropagation()}>
-              <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow((e.target as HTMLInputElement).checked)} />
-              Don't show me this again
-            </label>
-          </div>
-        ) : (
-          <div class="wt-actions">
-            <button type="button" class="wt-skip" onClick={(e) => { e.stopPropagation(); close(false); }}>Skip</button>
-            <span class="wt-tap">Tap anywhere to continue</span>
-          </div>
-        )}
       </div>
     </div>
   );

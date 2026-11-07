@@ -96,6 +96,12 @@ removed (old → new) and says whether any of them guards a rule here.
     off shows no box, so nothing to type in (Off stays off); no \"Say something…\" anywhere; the box keeps its place and size throughout",
     phone and computer. Its unit side: `packages/app/test/town-chat.test.ts`, "what each mode does".
   - Decision: [2026-10-28-town-chat-v2.md](../decisions/2026-10-28-town-chat-v2.md), "v4".
+- **Leaving Chess Town asks first (Eric, Nov 7: "you should always have a confirm if you're going back out to a different menu or
+  you're trying to exit").** The side menu, the town's back button, the phone's or browser's back gesture ask "Leave Chess Town?" with
+  Stay (the default, Escape) and Leave; Stay changes nothing. Rooms, boss challenges, the AFK drop and forced exits don't ask.
+  - Guard: `e2e/town-leave.spec.ts`, "the town's back button asks…", "the phone's back gesture asks too…", "a computer's side menu
+    asks first…", "inside a room…", "a boss's challenge from the town…", "no input for the limit…", phone and computer.
+  - Decision: [2026-11-07-leave-town-confirm.md](../decisions/2026-11-07-leave-town-confirm.md).
 - **Name tags show only near you by default (Eric, Oct 28); "Everyone" in Town settings shows them all.** The figures are always drawn;
   a tag shows within 5 squares of you (|dc| and |dr|, so about a 10 × 10 area), fading over the last square; your own tag, an open card's
   figure and a table partner always show. The one more named exception to "nothing hidden".

@@ -70,6 +70,34 @@ const ranOn = (page: Page, from: readonly number[], axis: 0 | 1, n: number, time
   });
 /** The way from a to b on the world's squares (east, north), the short way round east-west. */
 const way = (a: readonly number[], b: readonly number[]) => [Math.sign(((b[0]! - a[0]! + 81) % 54) - 27), Math.sign(b[1]! - a[1]!)];
+/**
+ * Counts your travel square by square (every frame, from data-you): the squares east and north you've gone, signed, the world wrapping
+ * east-west (54 wide). Not the difference of two ends: a run held on for a long wall time (the test's round trips under load let a few
+ * seconds pass before the release) goes past half the world, and the short way round from start to end then reads the other way.
+ */
+const travelStart = (page: Page) =>
+  page.evaluate(() => {
+    const cv = document.querySelector<HTMLCanvasElement>("canvas.town-canvas")!;
+    const t = { on: true, x: 0, y: 0, c: -1, r: -1 };
+    (window as unknown as { __travel: typeof t }).__travel = t;
+    const f = () => {
+      const [c, r] = cv.dataset.you!.split(",").map(Number) as [number, number];
+      if (t.c >= 0) {
+        t.x += ((c - t.c + 81) % 54) - 27;
+        t.y += r - t.r;
+      }
+      t.c = c;
+      t.r = r;
+      if (t.on) requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+const travelEnd = (page: Page) =>
+  page.evaluate(() => {
+    const t = (window as unknown as { __travel: { on: boolean; x: number; y: number } }).__travel;
+    t.on = false;
+    return [t.x, t.y];
+  });
 
 /** A finger: the phone's a touch (the browser's own touch events, as a phone sends them), the computer's the mouse's left button. */
 async function finger(page: Page) {
@@ -176,6 +204,7 @@ test(`hold to run: a press held still runs you each way the finger is from your 
     const from = await you(page);
     const at = await holdPoint(page, dir);
     const t0 = Date.now();
+    await travelStart(page);
     await f.down(at.x, at.y);
     await expect.poll(async () => (await cam(page)).run, { message: `${dir}: a run`, timeout: 3000 }).toBe(dir);
     // Running that way (setting off no later than a step after the hold time), two squares on.
@@ -187,7 +216,8 @@ test(`hold to run: a press held still runs you each way the finger is from your 
     const at0 = await you(page);
     await settle(page);
     const end = await you(page);
-    expect(way(from, end), `${dir} runs you ${w}`).toEqual(w);
+    const travel = await travelEnd(page);
+    expect([Math.sign(travel[0]!), Math.sign(travel[1]!)], `${dir} runs you ${w} (travel ${travel}, from ${from}, to ${end})`).toEqual(w);
     expect(Math.abs(end[0] - at0[0]) + Math.abs(end[1] - at0[1]), `${dir}: stops at the next square`).toBeLessThanOrEqual(1);
     expect((await cam(page)).run, "nothing held after").toBeNull();
     const seen = await headings(page);

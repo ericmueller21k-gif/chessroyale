@@ -36,6 +36,7 @@ import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
+import { LeaveTownConfirm, TOWN_BACK_TO } from "./town/LeaveTown.tsx";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -323,6 +324,10 @@ export function App() {
   // goes there. `sideAsk`: the confirm on screen, and the item behind it; `sideNext`: the page to go to once the match is out.
   const [sideAsk, setSideAsk] = useState<{ exit: MatchExit; then: MatchPage } | null>(null);
   const [sideNext, setSideNext] = useState<{ page: MatchPage; from: SideFrom } | null>(null);
+  // Chess Town's "Leave Chess Town?" (town/LeaveTown.tsx): where you asked to go, and what leaving does. `stay`: put back what
+  // the browser's back gesture took (the town's address), for a back gesture only.
+  const [townAsk, setTownAsk] = useState<{ dest: string; go: () => void; stay?: () => void } | null>(null);
+  const askLeave = (dest: string, go: () => void) => setTownAsk({ dest, go });
   // Chose "play vs bots as a guest" on the landing page (this device remembers).
   const [guest, setGuest] = useState(storedGuest);
   const [inviteSkipped, setInviteSkipped] = useState(false);
@@ -666,6 +671,10 @@ export function App() {
 
   /** The game with a town bot on now: its seat to come back to (null: none). */
   const townGame = useRef<string | null>(null);
+  /** The town's back gesture: the next popstate is ours to skip (a bot game's history.back, backToTown below). */
+  const townSkip = useRef(false);
+  /** The town as it renders this time (read by the back gesture, which runs outside a render): shown, and where it goes. */
+  const townLive = useRef<{ show: boolean; home: () => void }>({ show: false, home: () => {} });
   /**
    * You and a bot sat down at a table in the town: the game, on this device (the bot game's, with Maia's loading step
    * first). Its address is a step of its own in the history, so the back button (or a reload) lands back at the table.
@@ -711,15 +720,31 @@ export function App() {
       return null;
     });
     setTownSeat(seat);
-    if (!popped && (history.state as { townGame?: string } | null)?.townGame) history.back();
+    if (!popped && (history.state as { townGame?: string } | null)?.townGame) {
+      townSkip.current = true;
+      history.back();
+    }
   };
   const backToTownRef = useRef(backToTown);
   backToTownRef.current = backToTown;
   useEffect(() => {
-    const onPop = () => backToTownRef.current(true);
+    const onPop = () => {
+      if (townSkip.current) return void (townSkip.current = false);
+      // The phone's or the browser's back in Chess Town (not at a table's game): it has gone back already, so Stay puts the
+      // town's address back and Leave goes home (the front door, as the town's back button does).
+      if (!townGame.current && townLive.current.show) {
+        setTownAsk({ dest: TOWN_BACK_TO, go: () => townLive.current.home(), stay: () => void history.pushState(null, "", "/town") });
+        return;
+      }
+      backToTownRef.current(true);
+    };
     addEventListener("popstate", onPop);
     return () => removeEventListener("popstate", onPop);
   }, []);
+  // (A town left some other way, the AFK drop or a game starting, takes its question with it.)
+  useEffect(() => {
+    if (!showTown) setTownAsk(null);
+  }, [showTown]);
   // In the town, its address without the seat (it's been read).
   useEffect(() => {
     if (!showTown || duel || !new URLSearchParams(location.search).has("at")) return;
@@ -1255,6 +1280,19 @@ export function App() {
     };
     return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
   };
+  // The town's side menu (and its panel, and the global chat's sign-in): each page asks first. Chess Town itself doesn't.
+  const townNav: FrontNav = {
+    ...nav,
+    home: () => askLeave("Play", nav.home),
+    soloBoss: () => askLeave("Boss Battle", nav.soloBoss),
+    friends: () => askLeave("Play with friends", nav.friends),
+    shop: () => askLeave("the Shop", nav.shop),
+    profile: () => askLeave("your profile", nav.profile),
+    settings: () => askLeave("Settings", nav.settings),
+    friendsList: () => askLeave("your friends", nav.friendsList),
+    signIn: () => askLeave("Sign in", nav.signIn!),
+  };
+  townLive.current = { show: showTown && !match && !duel, home: nav.home };
   const matchNav = sideNav("match", () => (match ? exitFor(match) : null), () => { if (match) leave(); });
   const duelSnap = duel?.snapshot() ?? null;
   const duelOver = duelSnap?.phase === "over";
@@ -1476,7 +1514,8 @@ export function App() {
     return (
       <>
         <TownPage
-          nav={nav}
+          nav={townNav}
+          askLeave={askLeave}
           seat={townSeat}
           stand={townStand}
           onBossChallenge={challengeFromTown}
@@ -1526,6 +1565,19 @@ export function App() {
           }}
         />
         {overlayT}
+        {townAsk && (
+          <LeaveTownConfirm
+            dest={townAsk.dest}
+            onStay={() => {
+              setTownAsk(null);
+              townAsk.stay?.();
+            }}
+            onLeave={() => {
+              setTownAsk(null);
+              townAsk.go();
+            }}
+          />
+        )}
       </>
     );
   }
