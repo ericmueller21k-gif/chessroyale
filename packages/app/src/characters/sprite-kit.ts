@@ -8,7 +8,9 @@
  *   way the art faces as drawn, its anchors (feet, head, hands), its ramps and its frame templates (idle, walk, talk, attack,
  *   hurt: which of its animations plays each).
  * - **Facing is data.** A sprite says which way its art faces; a caller says which way the figure must face (toward the board,
- *   toward the opponent, the way it walks), and the kit mirrors it or not (`facingAs`, `mirrorFor`). No caller guesses.
+ *   toward the opponent, the way it walks), and the kit mirrors it or not (`facingAs`, `mirrorFor`). No caller guesses. Art drawn
+ *   facing front (Big Boy, Nov 7: his shirt reads "BIG BOY") is never mirrored; where a prop must point the other way (an attack on a
+ *   king to his other side) it's drawn `turned`, its writing (the character's `reads` parts) still reading.
  * - **One renderer** (`spriteCanvas`): data to cached canvases, for the town, the rooms, the intros and the boards.
  *
  * Smudgy is the pilot (smudgy.ts `SMUDGY_SPRITE`); the other figures move onto it when they're next touched. `sprites.ts` lists
@@ -19,6 +21,8 @@ import { SIDE_FEEL } from "./side-size.ts";
 import { renderFrame, type Character } from "./sprite.ts";
 
 export type Facing = "left" | "right";
+/** The way a sprite's art faces as drawn: a side, or the front (never mirrored to face a way: `mirrorFor`). */
+export type ArtFacing = Facing | "front";
 export type Pt = readonly [x: number, y: number];
 
 /** The frame templates a sprite fills in: which of its animations plays each. `idle` is required. */
@@ -61,7 +65,7 @@ export interface Sprite {
   /** Its palette, parts (pixel grids) and frames (sprite.ts). */
   ch: Character;
   /** The way its art faces as drawn. */
-  facing: Facing;
+  facing: ArtFacing;
   /** In its frame's pixels, as drawn (at rest: idle's first frame). */
   anchors: Anchors;
   /** Each hue's ramp: its palette keys, dark to light. */
@@ -75,8 +79,8 @@ export interface Sprite {
 /** The facing a figure at `from` needs to look toward `to` (page or world x). */
 export const toward = (from: number, to: number): Facing => (to < from ? "left" : "right");
 
-/** Whether a sprite's art must be mirrored to face `want`. */
-export const mirrorFor = (artFacing: Facing, want: Facing): boolean => artFacing !== want;
+/** Whether a sprite's art must be mirrored to face `want`: never art drawn facing front (it faces every way as drawn). */
+export const mirrorFor = (artFacing: ArtFacing, want: Facing): boolean => artFacing !== "front" && artFacing !== want;
 
 /** A point mirrored across a frame `w` px wide (pixel corners: x and w - x). */
 const flipPt = ([x, y]: Pt, w: number): Pt => [w - x, y];
@@ -100,7 +104,18 @@ export function facingAs(s: Sprite, want: Facing): Sprite {
 }
 
 /** Which way a character drawn from a sprite faces on the screen: the sprite's art facing, turned round if one is mirrored and not the other. */
-export const drawnFacing = (s: Sprite, ch: Character): Facing => (!!ch.mirror !== !!s.ch.mirror ? (s.facing === "left" ? "right" : "left") : s.facing);
+export const drawnFacing = (s: Sprite, ch: Character): ArtFacing => (s.facing === "front" ? "front" : !!ch.mirror !== !!s.ch.mirror ? (s.facing === "left" ? "right" : "left") : s.facing);
+
+const turnedChars = new WeakMap<Character, Character>();
+/**
+ * A character mirrored pixel for pixel, its feet with it, but its writing still reading (its `reads` parts drawn unmirrored where they
+ * stand: sprite.ts): for a figure whose prop must point the other way (Big Boy's attack on a king to his right). Made once per character.
+ */
+export function turned(ch: Character): Character {
+  let m = turnedChars.get(ch);
+  if (!m) turnedChars.set(ch, (m = { ...ch, mirror: !ch.mirror, foot: flipPt(ch.foot, ch.w) }));
+  return m;
+}
 
 /**
  * The board figure (a phone's boss bar, a computer's side figure, the result screen): the boss stands left of the board on

@@ -8,7 +8,7 @@
 import { BOSS_ROSTER, type BossDef } from "@chessroyale/core";
 import type { SoundName } from "../sound.ts";
 import type { Beat, BeatLines, Loop, Stage } from "./boss-beats.ts";
-import { BIGBOY, BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT } from "./bigboy.ts";
+import { BIGBOY_ATTACK, BIGBOY_CHANCE, BIGBOY_LINES, BIGBOY_PORTRAIT, BIGBOY_SPRITE } from "./bigboy.ts";
 import { CLOWN, CLOWN_ATTACK, CLOWN_CHANCE, CLOWN_LINES, CLOWN_PORTRAIT } from "./clown.ts";
 import { GINGER_ATTACK, GINGER_CHANCE, GINGER_LINES, GINGER_PORTRAIT, GINGERBREAD } from "./gingerbread.ts";
 import { GREX, GREX_ATTACK, GREX_CHANCE, GREX_LINES, GREX_PORTRAIT } from "./grex.ts";
@@ -252,7 +252,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
   "Big Boy": {
     barScale: 1,
     barShift: -2,
-    ch: BIGBOY,
+    // (On the sprite kit, Nov 7: drawn facing front, never mirrored, so his shirt reads "BIG BOY"; Eric: "just make him face the right way".)
+    sprite: BIGBOY_SPRITE,
+    ch: facingAs(BIGBOY_SPRITE, BOARD_FACING).ch,
     anims: {
       entrance: "swing",
       thinking: "idle",

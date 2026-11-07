@@ -1,11 +1,13 @@
 /**
  * The figures on the sprite kit (sprite-kit.ts), by their character's id, and the way each figure's art faces as drawn: what the
- * town, the rooms and the intros turn a figure by. Smudgy is the pilot (Nov 6); the others move onto the kit when next touched.
+ * town, the rooms and the intros turn a figure by. Smudgy is the pilot (Nov 6); Big Boy (Nov 7, facing front: never mirrored); the
+ * others move onto the kit when next touched.
  */
-import type { Facing, Sprite } from "./sprite-kit.ts";
+import type { ArtFacing, Facing, Sprite } from "./sprite-kit.ts";
 import { SMUDGY_SPRITE } from "./smudgy.ts";
+import { BIGBOY_SPRITE } from "./bigboy.ts";
 
-export const SPRITES: Readonly<Record<string, Sprite>> = { smudgy: SMUDGY_SPRITE };
+export const SPRITES: Readonly<Record<string, Sprite>> = { smudgy: SMUDGY_SPRITE, bigboy: BIGBOY_SPRITE };
 
 /**
  * The way the art faces for a figure not on the kit yet, where a caller needs it (Nov 6): Alfil's art faces our left, while his
@@ -14,4 +16,4 @@ export const SPRITES: Readonly<Record<string, Sprite>> = { smudgy: SMUDGY_SPRITE
 const ART_FACING: Readonly<Record<string, Facing>> = { alfil: "left" };
 
 /** The way a figure's art faces as drawn (by its character's id), or null: not known yet (its callers keep their own rule). */
-export const artFacing = (id: string): Facing | null => SPRITES[id]?.facing ?? ART_FACING[id] ?? null;
+export const artFacing = (id: string): ArtFacing | null => SPRITES[id]?.facing ?? ART_FACING[id] ?? null;
