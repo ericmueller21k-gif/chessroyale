@@ -89,7 +89,7 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
