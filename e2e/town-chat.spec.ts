@@ -1482,7 +1482,8 @@ test("the privacy page and the terms say what the town square's chat is: typed, 
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/privacy");
   const privacy = page.locator("main, .legal, body").first();
-  await expect(privacy).toContainText("Chat is preset lines and emoji, except in the town square, where signed-in players type.");
+  // (Since Nov 7 the global chat is typed too: the sentence names both.)
+  await expect(privacy).toContainText("Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type.");
   // (Eric OK'd 5 minutes, Oct 28: it was 60 seconds. The same two sentences, nothing else changed: here and under "Kept:" below.)
   await expect(privacy).toContainText("It isn't stored: the server holds each message in memory for 5 minutes, and then it's gone.");
   await expect(privacy).toContainText("A town square message: 5 minutes in memory, never stored (a reported one: its words with the report).");
