@@ -16,6 +16,7 @@ import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
 import { CoachMarks, ReplayButton, ReplayIcon, ReplayTag, useReplayMode } from "../components/MoveReplay.tsx";
 import { replayFrameAt, replayFrames, replayMoves, replayTimes, type ReplayFrame } from "../move-replay.ts";
 import { ownEngine } from "../engine.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
 import {
@@ -27,9 +28,9 @@ import {
   bankText,
   squadColour,
   boardQueue,
-  foldedRows,
   queueLine,
   queuePlace,
+  whenText,
   type TurnRow,
   blockBankNow,
   hasBlocks,
@@ -896,17 +897,17 @@ function useGlide(list: { current: HTMLElement | null }, order: string) {
 /**
  * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left";
  * his correction: one queue for the board on screen): all 8 players in the order they'll move on this board, the next
- * there on top (lit while it's their move now), each with their squad's color and, on the right, the move they last
- * played (a tap shows that position). Your row is bold "You"; on top it says "Your turn · play now" (Eric: nothing
- * lower down, the order says it). A phone shows 4 rows (with you further down, the top 3 and yours) and a tap opens all 8 over the board,
- * so nothing below moves; a computer all 8. One size per state on every board.
+ * there on top (lit while it's their move now), each with their squad's color, their badge, when they move there
+ * ("next", "in 3"; yours "Your turn · play now" while it's on) and, on the right, the move they last played (a tap shows
+ * that position). Eric, Nov 7: a phone shows all 8 too, the box filling the screen down to its bottom and scrolling
+ * inside itself when they don't fit (the page never scrolls); a computer all 8 in the column beside the board.
  */
 function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client: SquadsClient; m: LocalMatch; board: number; computer: boolean; onRow: ((board: number, ply: number) => void) | null; shownPly: number | null }) {
-  const [open, setOpen] = useState(false);
   const queue = boardQueue(m, board, client.myId);
   const line = queueLine(queue);
   const place = queuePlace(queue);
   const waiting = place ? `Waiting for ${place} ${place === 1 ? "player" : "players"}` : null;
+  const finished = !!m.boards[board]?.result;
   const key = m.boards.map((b) => b.moves.length).join();
   const sans = useMemo(() => {
     const out = new Map<string, string>();
@@ -917,51 +918,57 @@ function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client:
     }
     return out;
   }, [key, board]);
-  const all = computer || open;
-  const rows = all ? queue : foldedRows(queue);
   const listRef = useRef<HTMLDivElement>(null);
-  useGlide(listRef, rows.map((r) => r.id).join());
-  // (Whole names, cut with an ellipsis by the row's width, never wrapped: the move's column keeps its place.)
+  useGlide(listRef, queue.map((r) => r.id).join());
+  // (Whole names, cut with an ellipsis by the row's width, never wrapped: the badge and the move's column keep their places.)
   const nameOf = (r: TurnRow) => (r.you ? "You" : client.nameOf(r.id));
-  const list = (
-    <div class={`sq-to-list${all ? " all" : ""}`} ref={listRef} role="list" aria-label={`Turn order on board ${board + 1}`}>
-      {rows.map((r, i) => {
-        const shown = !!r.last && shownPly !== null && r.last.board === board && r.last.ply + 1 === shownPly;
-        const gap = !all && i === 3 && queue.indexOf(r) > 3;
-        return (
-          <button
-            key={r.id}
-            type="button"
-            role="listitem"
-            class={`sq-to-row${i === 0 ? " top" : ""}${r.lit ? " lit" : ""}${r.you ? " you" : ""}${shown ? " shown" : ""}${gap ? " skip" : ""}`}
-            data-place={queue.indexOf(r)}
-            data-id={r.id}
-            style={{ "--sq": squadColour(m.sides[r.side].squadId) }}
-            disabled={!r.last || !onRow}
-            onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
-            aria-label={`${nameOf(r)}${r.you && (line ?? waiting) ? `, ${line ?? waiting}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
-          >
-            <span class="sq-to-mark" aria-hidden="true" />
-            <span class="sq-to-name">{nameOf(r)}</span>
-            {/* (Only on top, Eric: "Your turn · play now"; lower down the queue's order says it. The move's column keeps its place.) */}
-            <span class="sq-to-where">{r.you && line ? line : ""}</span>
-            <span class="sq-to-move">{r.last ? sans.get(r.id) : ""}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
   return (
-    <div class={`sq-to${computer ? " computer" : ""}${open ? " open" : ""}`} role="group" aria-label="Turn order">
-      {list}
-      {!computer && (
-        <button type="button" class="sq-to-more" aria-expanded={open} aria-label={open ? "Show the next 4" : "Show all 8"} onClick={() => setOpen(!open)}>
-          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
-            <path d={open ? "M2.5 7.5L6 4l3.5 3.5" : "M2.5 4.5L6 8l3.5-3.5"} fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          <span>{open ? "4" : "8"}</span>
-        </button>
-      )}
+    <div class={`sq-to${computer ? " computer" : ""}`} role="group" aria-label="Turn order">
+      <div class="sq-to-list" ref={listRef} role="list" aria-label={`Turn order on board ${board + 1}`}>
+        {queue.map((r, i) => {
+          const shown = !!r.last && shownPly !== null && r.last.board === board && r.last.ply + 1 === shownPly;
+          const when = whenText(r, finished);
+          const badge = client.badgeOf(r.id);
+          const bot = client.isBot(r.id);
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="listitem"
+              class={`sq-to-row${i === 0 ? " top" : ""}${r.lit ? " lit" : ""}${r.you ? " you" : ""}${shown ? " shown" : ""}`}
+              data-place={i}
+              data-ahead={r.ahead}
+              data-id={r.id}
+              style={{ "--sq": squadColour(m.sides[r.side].squadId) }}
+              disabled={!r.last || !onRow}
+              onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
+              aria-label={`${nameOf(r)}${bot ? " (bot)" : badge?.rating ? `, rated ${badge.rating}` : ""}${r.you && (line ?? waiting) ? `, ${line ?? waiting}` : when && !r.you ? `, ${when}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
+            >
+              <span class="sq-to-mark" aria-hidden="true" />
+              <span class="sq-to-who">
+                <span class="sq-to-name">{nameOf(r)}</span>
+                {/* (The badge, as on profiles: the 1 v 1 tier's emblem and the rating; a bot's 🤖, as in the squads' lists.) */}
+                {bot ? (
+                  <small class="sq-to-badge bot" aria-hidden="true">
+                    🤖
+                  </small>
+                ) : badge ? (
+                  <span class="sq-to-badge" aria-hidden="true">
+                    {badge.emblem && (
+                      <span class="sq-to-emblem">
+                        <RankEmblem id={badge.emblem} />
+                      </span>
+                    )}
+                    {badge.rating !== null && <span class="sq-to-rating">{badge.rating}</span>}
+                  </span>
+                ) : null}
+              </span>
+              <span class="sq-to-where">{when}</span>
+              <span class="sq-to-move">{r.last ? sans.get(r.id) : "—"}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -151,6 +151,8 @@ export interface TurnRow {
   /** Moving there now (lit): the move this half on the board is theirs, not yet made. */
   lit: boolean;
   you: boolean;
+  /** How many moves on this board come before theirs (0: theirs is the next there), from the schedule. */
+  ahead: number;
   /** The move they last played in this match: its board and ply (null: none yet). */
   last: { board: number; ply: number } | null;
 }
@@ -195,7 +197,7 @@ export function boardQueue(m: Pick<LocalMatch, "sides" | "boards" | "state" | "c
     const id = relayMover(m, board, p);
     if (!id || out.some((r) => r.id === id)) continue;
     const side: Side = m.sides[0].seats.includes(id) ? 0 : 1;
-    out.push({ id, side, lit: p === b.moves.length && !!now && now.players.includes(id) && !m.locked.includes(id), you: id === me, last: last.get(id) ?? null });
+    out.push({ id, side, lit: p === b.moves.length && !!now && now.players.includes(id) && !m.locked.includes(id), you: id === me, ahead: p - b.moves.length, last: last.get(id) ?? null });
   }
   return out;
 }
@@ -215,12 +217,14 @@ export function queuePlace(rows: readonly TurnRow[]): number | null {
 }
 
 /**
- * The rows a phone shows with the queue folded (Eric: the top 4, a tap for all 8): the top 4; with you further down,
- * the top 3 and your row, so it always says where you stand.
+ * When a row's player moves on this board (Eric, Nov 7: "for the other players … something useful"): "now" while it's
+ * their move there (yours: "Your turn · play now"), "next" when theirs is the next move there, else "in N" (their move is
+ * the Nth from now: "in 2", "in 3", …). Nothing on a finished board.
  */
-export function foldedRows(rows: readonly TurnRow[], shown = 4): TurnRow[] {
-  const i = rows.findIndex((r) => r.you);
-  return i < shown ? rows.slice(0, shown) : [...rows.slice(0, shown - 1), rows[i]!];
+export function whenText(row: TurnRow, finished = false): string {
+  if (finished) return "";
+  if (row.lit) return row.you ? "Your turn · play now" : "now";
+  return row.ahead === 0 ? "next" : `in ${row.ahead + 1}`;
 }
 
 /**

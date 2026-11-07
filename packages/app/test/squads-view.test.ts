@@ -6,9 +6,9 @@ import {
   lastMovesBy,
   relayMover,
   boardQueue,
-  foldedRows,
   queueLine,
   queuePlace,
+  whenText,
   bankText,
   cheatArrows,
   cheatEval,
@@ -512,7 +512,7 @@ describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: one qu
     expect(after).toEqual([...before.slice(1), before[0]]);
   });
 
-  it("your row: \"Your turn · play now\" only on top (Eric: nothing lower down); your place for screen readers; a phone's folded 4 keep your row", () => {
+  it("your row: \"Your turn · play now\" only on top (Eric: nothing lower down); your place for screen readers", () => {
     const m = at([[], [], []]);
     const q = (me: string) => boardQueue(m, 2, me);
     // On top with your move on now: "Your turn · play now"; on top before it's on (no move asked yet): nothing yet.
@@ -524,9 +524,27 @@ describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: one qu
     expect(queuePlace(q("a3"))).toBe(2);
     expect(queuePlace(q("b2"))).toBe(7);
     expect(queuePlace(q("zz"))).toBeNull();
-    expect(foldedRows(q("a3")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b0"]);
-    // Further down: the top 3, then you.
-    expect(foldedRows(q("b2")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b2"]);
+  });
+
+  it("when each player moves on this board (Eric, Nov 7): \"now\" while it's theirs (yours: \"Your turn · play now\"), \"next\", then \"in N\" from the schedule; nothing on a finished board", () => {
+    // Board 3, a0 to move there now: a0 now, then b1 next … b2 the 8th move from now.
+    const live = boardQueue(at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]), 2, "a3");
+    expect(live.map((r) => [r.id, whenText(r)])).toEqual([
+      ["a0", "now"],
+      ["b1", "in 2"],
+      ["a3", "in 3"],
+      ["b0", "in 4"],
+      ["a2", "in 5"],
+      ["b3", "in 6"],
+      ["a1", "in 7"],
+      ["b2", "in 8"],
+    ]);
+    expect(whenText(boardQueue(at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]), 2, "a0")[0]!)).toBe("Your turn · play now");
+    // Between halves (no move asked yet): the top's is "next". Each count is how many moves there come before theirs, by the schedule.
+    const idle = boardQueue(at([[], [], ["e2e4"]]), 2, null);
+    expect(idle.map((r) => whenText(r))).toEqual(["next", "in 2", "in 3", "in 4", "in 5", "in 6", "in 7", "in 8"]);
+    for (const r of idle) expect(relayMover(at([[], [], ["e2e4"]]), 2, 1 + r.ahead)).toBe(r.id);
+    expect(whenText(idle[0]!, true)).toBe("");
   });
 
   it("each player's last move, from the schedule: its board and ply (a row's tap shows the position after it)", () => {

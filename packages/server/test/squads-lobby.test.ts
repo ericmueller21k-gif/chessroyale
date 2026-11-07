@@ -57,6 +57,16 @@ describe("squads lobby: seats, parties, the fill", () => {
     expect(L.core.connect(undefined, { name: "Late", v: SQUADS_PROTOCOL })).toMatchObject({ ok: false, message: "This match has already started." });
   });
 
+  it("a signed-in person's badge (their 1 v 1 tier's emblem and rating, Eric, Nov 7) goes to everyone with the lobby; none for a guest or a bot", () => {
+    const L = squadsLobby();
+    const res = L.core.connect(undefined, { name: "Ann", v: SQUADS_PROTOCOL, userId: "u1", badge: { emblem: "gold-d3", rating: 1612 } });
+    const guest = L.join("Bo");
+    const a = (res as { playerId: string }).playerId;
+    const lobby = L.last(guest, "lobby")!.lobby;
+    expect(lobby.players.find((p) => p.id === a)!.badge).toEqual({ emblem: "gold-d3", rating: 1612 });
+    expect(lobby.players.find((p) => p.id === guest)!.badge).toBeUndefined();
+  });
+
   it("the matchmaker stops seating a lobby just before it fills; a lobby nobody is in waits, then fills when someone comes back", () => {
     const L = squadsLobby();
     L.advance(57_000);

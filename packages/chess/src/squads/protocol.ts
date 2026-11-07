@@ -66,6 +66,13 @@ export interface NetSquadsPlayer {
   uid?: string;
   /** What they wear (sent once per player: keep the last one seen). */
   look?: ItemLook;
+  /** A signed-in person's badge (the turn order's): their 1 v 1 tier's emblem id (null: in placements) and rating (null: none yet). */
+  badge?: PlayerBadge;
+}
+
+export interface PlayerBadge {
+  emblem: string | null;
+  rating: number | null;
 }
 
 /** A squad: its seats in order (seat 0 is the rules' "player 1"), and its placement once it's out or has won. */

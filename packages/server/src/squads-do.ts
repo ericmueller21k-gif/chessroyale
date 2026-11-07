@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { SQUADS, SQUADS_LOBBY, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
-import type { PartyClientMessage, SquadsClientMessage } from "@chessroyale/chess/squads";
+import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
 import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
@@ -10,6 +10,7 @@ import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult, type Sql } from "./accounts.ts";
 import { opKeys } from "./ledger.ts";
+import { rankOf } from "./ranked-schema.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
@@ -32,6 +33,24 @@ interface Attached {
   banned?: boolean;
   /** May use the test controls (an admin, or SQUADS_TEST on). */
   test?: boolean;
+  /** Their badge in the turn order (a lobby's sockets only). */
+  badge?: PlayerBadge;
+}
+
+/**
+ * A signed-in person's badge for the turn order (Eric, Nov 7): their 1 v 1 tier's emblem (rankOf, as on profiles) and
+ * their rating ("Rating 1612" on profiles). One read as they connect; none for a guest, or without the database.
+ */
+async function badgeOf(env: Env, userId: string | undefined): Promise<PlayerBadge | undefined> {
+  if (!userId || !env.DB) return undefined;
+  const sql = d1Sql(env.DB);
+  const row = await sql.first<{ rating: number | null; games: number | null; ladder: number | null }>(
+    "SELECT u.rating, r.games, r.ladder FROM users u LEFT JOIN ranked_1v1 r ON r.user_id = u.id WHERE u.id = ?",
+    userId,
+  );
+  if (!row) return undefined;
+  const rank = await rankOf(sql, row.games === null ? null : { games: row.games, ladder: row.ladder });
+  return { emblem: rank.emblem, rating: typeof row.rating === "number" ? Math.round(row.rating) : null };
 }
 
 /** Who is asking (from the session cookie): their account and its name; refused as a guest where sign-in is set up, or banned; an admin. */
@@ -289,8 +308,9 @@ export class SquadsLobby extends DurableObject<Env> {
     const [client, server] = [pair[0], pair[1]];
     const accounts = new Set(Object.values(this.record.accounts));
     const who = await whoIsAsking(request, this.env, (p) => this.ctx.waitUntil(p), (id) => accounts.has(id));
+    const badge = who.guest || who.banned ? undefined : await badgeOf(this.env, who.userId).catch(() => undefined);
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment(who);
+    server.serializeAttachment(badge ? { ...who, badge } : who);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -324,6 +344,7 @@ export class SquadsLobby extends DurableObject<Env> {
         userId: attached.userId,
         test: !!attached.test,
         v: msg.v,
+        ...(attached.badge ? { badge: attached.badge } : {}),
       });
       if (!result.ok) {
         await this.persist(core);

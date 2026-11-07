@@ -16659,8 +16659,9 @@ button.sq-tiny {
   color: #fff;
 }
 .sq-game.sq-relay .board-area .board-wrap {
-  width: min(100%, calc(var(--app-h) - 366px));
-  /* (The turn order under it: a short phone's least, 360 × 560 with its bars, keeps everything on screen.) */
+  /* (The turn order under it: 6 of its rows at a phone with its browser bars, 390 × 664; Eric, Nov 7: "most phones we can
+     squeeze in 6 or 7". A short phone's least, 360 × 560 with its bars, keeps everything on screen.) */
+  width: min(100%, calc(var(--app-h) - 392px));
   min-width: 240px;
 }
 .sq-clockline {
@@ -23865,55 +23866,75 @@ button.sq-tiny {
 
 /* ---- Squads: Relay on 3 boards and a cleaner match screen (Eric, Nov 5, round 2; docs/decisions/2026-11-05-squads-three-boards.md) ---- */
 /* The turn order under the board (Eric's correction, Nov 5): one queue for the board on screen, all 8 players in the order
-   they'll move on it, the next there on top; each with their squad's color, your row saying where you stand, and the move
-   they last played on the right. A phone: 4 rows (a fixed box), a tap on the strip at the right opens all 8 over the board
-   (upward, so nothing below moves); a computer: all 8 in the column beside the board. */
+   they'll move on it, the next there on top; each with their squad's color, their badge, when they move there and the
+   move they last played on the right. Eric, Nov 7: a phone shows all 8 too, the box filling the screen from under the
+   arrows to its bottom (the board a little smaller for it), scrolling inside itself when they don't fit: the page never
+   scrolls. A computer: all 8 in the column beside the board. */
 /* (The turn order's slot in each board's view, and its own element, made once and moved into it: no box of their own.) */
 .sq-island-slot,
 .sq-island {
   justify-self: stretch;
   width: 100%;
   min-width: 0;
+  min-height: 0;
 }
 .sq-to {
+  --sq-row: 17px;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 30px;
-  gap: 4px;
   width: 100%;
-  height: calc(4 * 19px + 3 * 1px + 8px);
+  min-height: 0;
   box-sizing: border-box;
-}
-.sq-to.computer {
-  grid-template-columns: minmax(0, 1fr);
-  height: auto;
 }
 .sq-to-list {
   display: grid;
-  grid-auto-rows: 19px;
+  grid-auto-rows: var(--sq-row);
   gap: 1px;
   align-content: start;
   min-width: 0;
-  padding: 4px;
+  min-height: 0;
+  padding: 3px;
   border-radius: 10px;
   background: var(--surface);
   box-sizing: border-box;
 }
-.sq-to.open .sq-to-list {
-  position: absolute;
-  left: 0;
-  right: 34px;
-  bottom: 0;
-  z-index: 6;
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
+/* A phone (Relay): the screen exactly the visible height (--app-h: dvh, less a maintenance banner), the board area taking
+   what's left under the tiny boards, and the turn order the rest of it under the arrows. */
+@media (max-width: 899px), (max-height: 599px) {
+  .screen.game.sq-game.sq-relay {
+    height: var(--app-h);
+    min-height: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .sq-game.sq-relay > .board-area {
+    flex: 1 1 0;
+    min-height: 0;
+    grid-template-rows: auto auto auto minmax(0, 1fr);
+  }
+  .sq-game.sq-relay > .board-area > .sq-island-slot,
+  .sq-game.sq-relay .sq-island,
+  .sq-game.sq-relay .sq-to {
+    display: grid;
+    height: 100%;
+  }
+  .sq-game.sq-relay .sq-to-list {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* (Its panel holds nothing in Relay on a phone: no gap for it under the turn order.) */
+  .sq-game.sq-relay > .sq-panel:empty {
+    display: none;
+  }
 }
 .sq-to-row {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto 4.6em;
+  grid-template-columns: 4px minmax(0, 1fr) auto 5.6em;
   align-items: center;
   gap: 6px;
   min-width: 0;
-  height: 19px;
+  height: var(--sq-row);
   padding: 0 6px 0 3px;
   border: 0;
   border-radius: 6px;
@@ -23931,7 +23952,7 @@ button.sq-tiny {
 }
 .sq-to-mark {
   width: 4px;
-  height: 13px;
+  height: 75%;
   border-radius: 2px;
   background: var(--sq, var(--line));
 }
@@ -23946,29 +23967,63 @@ button.sq-tiny {
 .sq-to-row.you .sq-to-name {
   font-weight: 800;
 }
-.sq-to-row.skip {
-  border-top: 1px dashed var(--line);
-  border-radius: 0 0 6px 6px;
-}
 .sq-to-row.shown {
   outline: 1.5px solid var(--accent);
   outline-offset: -1.5px;
 }
+/* The name, cut with "…" (never wrapped), and the badge right after it, which never shrinks. */
+.sq-to-who {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
 .sq-to-name {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.sq-to-badge {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sq-to-badge.bot {
+  font-size: 10px;
+}
+.sq-to-row.lit .sq-to-badge {
+  color: inherit;
+}
+/* (The emblem's 48 px art at 14 px.) */
+.sq-to-emblem {
+  width: 14px;
+  height: 14px;
+  overflow: hidden;
+}
+.sq-to-emblem .re-box {
+  transform: scale(calc(14 / 48));
+  transform-origin: 0 0;
+}
 .sq-to-where {
+  min-width: 2.6em;
   font-size: 11px;
   font-weight: 800;
+  text-align: right;
   white-space: nowrap;
   color: var(--accent);
 }
 .sq-to-row.lit .sq-to-where {
   color: inherit;
 }
+/* The last move: one width on every row, room for the longest SAN ("exd8=Q+", "O-O-O+"); "—" before a first move there. */
 .sq-to-move {
   overflow: hidden;
   color: var(--muted);
@@ -23980,36 +24035,19 @@ button.sq-tiny {
 .sq-to-row.lit .sq-to-move {
   color: inherit;
 }
-.sq-to-more {
-  grid-column: 2;
-  grid-row: 1;
-  position: relative;
-  z-index: 7;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 2px;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  font-size: 10px;
-  font-weight: 800;
-  cursor: pointer;
-}
-.sq-to.open .sq-to-more {
-  color: var(--accent);
-}
 @media (min-width: 900px) and (min-height: 600px) {
+  .sq-to {
+    --sq-row: 26px;
+  }
   .sq-to-list {
-    grid-auto-rows: 26px;
     gap: 2px;
+    padding: 4px;
   }
   .sq-to-row {
-    height: 26px;
     font-size: 14px;
+  }
+  .sq-to-badge {
+    font-size: 11px;
   }
   .sq-to-where {
     font-size: 12px;
@@ -24091,13 +24129,9 @@ button.sq-tiny {
     --tb: 33px;
   }
   .sq-relay .sq-to {
-    height: calc(4 * 16px + 3 * 1px + 8px);
-  }
-  .sq-relay .sq-to-list {
-    grid-auto-rows: 16px;
+    --sq-row: 16px;
   }
   .sq-relay .sq-to-row {
-    height: 16px;
     font-size: 11px;
   }
   .sq-game.sq-relay .board-area .board-wrap {
