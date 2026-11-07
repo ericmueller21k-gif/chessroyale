@@ -219,8 +219,8 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     await page.goto(`/?debug&pool=inplace-${w}-${run}`);
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     // Your coins and pawn: the top right of the page, in the live panel.
-    await expect(panel.getByRole("button", { name: "Your profile" })).toBeVisible();
-    const ring = (await panel.getByRole("button", { name: "Your profile" }).boundingBox())!;
+    await expect(panel.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+    const ring = (await panel.getByRole("button", { name: "Your profile", exact: true }).boundingBox())!;
     expect(ring.y).toBeLessThan(40);
     expect(ring.x + ring.width).toBeGreaterThan(w - 40);
     // Your card starts at the top (level with the logo), not low with space above it.
@@ -357,7 +357,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   }
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
@@ -380,7 +380,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   expect(await sideways(page)).toBe(0);
 });
 

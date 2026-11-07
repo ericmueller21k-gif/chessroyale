@@ -1247,7 +1247,7 @@ test("a real player's card (a test player; no real players walk in the town yet)
   // Another player's account (a guest, named), to have a real profile to open.
   const other = await (await browser.newContext()).newPage();
   await other.goto("/");
-  await expect(other.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(other.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   await other.evaluate(() => fetch("/api/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Cyrus" }) }));
   const uid = ((await (await other.request.get("/api/me")).json()) as { user: { id: string; name: string } }).user.id;
   expect(((await (await other.request.get("/api/me")).json()) as { user: { name: string } }).user.name).toBe("Cyrus");
@@ -1367,7 +1367,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp, shoes] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
@@ -1524,7 +1524,7 @@ test.describe("rides lazy", () => {
   test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
     const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
     await wearItem(page, "ride", chirp!);
     // (Its drawing's chunk held back until the boxes are read.)

@@ -457,14 +457,6 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
   );
 }
 
-/** Enter or space on a tap target (a div with role=button) does what a tap does. */
-const tapKey = (e: KeyboardEvent, go: () => void) => {
-  if (e.key === "Enter" || e.key === " ") {
-    e.preventDefault();
-    go();
-  }
-};
-
 /**
  * Home (the approved mockup, docs/mockups/front-door/Main.dc.html; the RANKED row and the Boss raid card, Eric, Oct 16):
  * the top bar (logo, coins, your pawn), the live line, your dressed pawn with your icon, name and rating, the RANKED row
@@ -735,27 +727,34 @@ export function HomeScreen({
     if (firstView.current) firstView.current = false;
     else scrollTo(0, 0);
   }, [view]);
-  // Your icon and name open the icon picker (your profile's Edit sheet, straight to the icon).
+  // Your icon opens the icon picker (your profile's Edit sheet, straight to the icon). Your name and rank line open your
+  // public profile, the page others see (Eric, Nov 7). A guest with no profile loaded yet gets your own page instead.
   const onIcon = () => openProfile({ you: true, name, section: "icon" });
+  const onName = () => (profile ? openProfile({ uid: profile.user.id, name, you: true, public: true }) : openProfile({ you: true, name }));
   const hero = (
     <section class="fd-hero" aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
-      {/* (Your pawn opens your inventory; your icon, level, name and rating open the icon picker: Eric, Nov 6.) */}
+      {/* (Your pawn opens your inventory (Eric, Nov 6); your icon opens the icon picker and your name, rank and public profile: Eric, Nov 7.) */}
       <DressedPawn look={look} size="hero" shadow ride onTap={onInventory} tapLabel="Open your inventory" />
-      {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) */}
-      <div class="fd-hero-id fd-hero-tap" role="button" tabIndex={0} aria-label="Change your icon" onClick={onIcon} onKeyDown={(e) => tapKey(e, onIcon)}>
+      {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) Only the
+          icon and the name and rank line are taps; the rest of the card does nothing. */}
+      <div class="fd-hero-id">
         <span class="fd-hero-icon">
-          <UserIcon icon={profile?.user.icon ?? "♟"} />
+          <button type="button" class="fd-hero-iconbtn" aria-label="Edit icon" onClick={onIcon}>
+            <UserIcon icon={profile?.user.icon ?? "♟"} />
+          </button>
           {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}
           {testSwitchesAllowed() && <LevelRing />}
         </span>
         <div class="fd-hero-text">
-          <div class="fd-hero-name">{name}</div>
-          <div class="fd-hero-sub">
-            <RankLine line={homeRankLine()} />
-          </div>
+          <button type="button" class="fd-hero-namebtn" aria-label="View your profile" onClick={onName}>
+            <span class="fd-hero-name">{name}</span>
+            <span class="fd-hero-sub">
+              <RankLine line={homeRankLine()} />
+            </span>
+          </button>
         </div>
       </div>
       </div>

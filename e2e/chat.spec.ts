@@ -81,7 +81,7 @@ test("quick chat picks in the profile: search, a check, n/10, locked lines to th
   await named(phone, "Phoney");
   for (const p of [desk, phone]) {
     await p.goto("/");
-    await p.getByRole("button", { name: "Your profile" }).click();
+    await p.getByRole("button", { name: "Your profile", exact: true }).click();
     await expect(p.locator(".qp")).toBeVisible();
   }
 

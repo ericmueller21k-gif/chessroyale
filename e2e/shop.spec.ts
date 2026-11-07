@@ -1070,7 +1070,7 @@ for (const ride of [false, true])
     page.on("pageerror", (e) => errors.push(String(e)));
     if (ride) {
       await page.goto("/");
-      await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
       // (No crate holds a ride yet: given straight, as only admins have them.)
       const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
       await wearItem(page, "ride", chirp!);
@@ -1097,7 +1097,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);

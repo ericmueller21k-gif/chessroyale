@@ -8,7 +8,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await page.goto("/");
   // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
   await expect(page.locator(".fd-logo").filter({ visible: true })).toHaveText("HunChess");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   // The live line: you're online (the app told the server you're here).
   const line = page.getByRole("status").filter({ hasText: "online" });
