@@ -128,7 +128,9 @@ test("the menu works as on home: Play goes home, Chess Town comes back to the to
   expect(seen.length, `the center, the menu and the right column each keep one box: ${seen}`).toBe(3);
 
   const menu = page.getByRole("navigation", { name: "Menu" });
+  // (Play asks first from the town: "Leave Chess Town?", e2e/town-leave.spec.ts.)
   await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   await menu.getByRole("button", { name: "Chess Town" }).click();
