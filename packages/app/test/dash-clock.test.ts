@@ -40,9 +40,9 @@ describe("Dash's clock lines (Eric, Nov 7)", () => {
   });
 
   it("the pop-off's beats: the pop-off line, then the love line, each its own moment, the whole 4 to 6 s", () => {
-    const boss = { id: "dash", crowdMoves: 8, startMove: 1, powers: { dash: { popOff: { at: 9 } } } };
+    const boss = { id: "dash", crowdMoves: 8, startMove: 1, powers: { turn: 9, dash: { popOff: { at: 9 } } } };
     const [a, b] = popOffMoments(boss as never, 1000);
-    expect(popOffMoments({ ...boss, crowdMoves: 9 } as never, 1000)).toEqual([]);
+    expect(popOffMoments({ ...boss, powers: { ...boss.powers, turn: 10 } } as never, 1000)).toEqual([]);
     expect(a).toMatchObject({ kind: "popOff", at: 1000, ms: BOSS_POWERS.dashPopOff.popMs });
     expect(b).toMatchObject({ kind: "popOffFast", at: 1000 + BOSS_POWERS.dashPopOff.popMs, ms: BOSS_POWERS.dashPopOff.loveMs });
     // (A screen drawn again carries on: the same start.)

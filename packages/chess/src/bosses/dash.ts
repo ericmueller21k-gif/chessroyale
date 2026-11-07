@@ -214,11 +214,12 @@ export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BO
 }
 
 /**
- * How long his pop-off holds his thinking, ms (its two beats, DASH_FX.popOff), on the turn it comes; else 0. The turn's think
- * waits for it (bossThinkMs, the solo and the server alike), so his move lands after it and no crowd clock runs meanwhile.
+ * How long his pop-off holds his thinking, ms (its two beats, DASH_FX.popOff + popOffFast), while he thinks for the turn it comes
+ * (`powers.turn`: the turn his move after the crowd's is dispatched as). Else 0. That think waits for it (bossThinkMs, the solo and
+ * the server alike), so his move lands after it and no crowd clock runs meanwhile.
  */
-export const popOffMs = (boss: { id?: string; crowdMoves: number; powers?: { dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
-  boss?.id === "dash" && boss.powers?.dash?.popOff?.at === turnOf(boss) ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
+export const popOffMs = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
+  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at === boss.powers.turn ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
 
 // ---------------- Scramble Rush ----------------
 

@@ -157,11 +157,11 @@ const popOffSeen = new Map<string, number>();
 
 /**
  * His pop-off, as his thinking screen's moments (Boss.tsx), from when this device first saw it: the pop-off's two beats, one after
- * the other. Its turn is his turn to think (DashState.popOff: boss.crowdMoves + 1); popOffMs holds his move for them.
+ * the other. It plays while he thinks for the turn it comes (DashState.popOff.at = powers.turn); popOffMs holds his move for them.
  */
 export function popOffMoments(boss: BossView, now = Date.now()): Moment[] {
   const d = boss.id === "dash" ? boss.powers?.dash : null;
-  if (!d?.popOff || d.popOff.at !== boss.crowdMoves + 1) return [];
+  if (!d?.popOff || d.popOff.at !== boss.powers?.turn) return [];
   const key = `${boss.id}:popOff:${d.popOff.at}`;
   const seenKey = `${boss.startMove}:${key}`;
   let at = popOffSeen.get(seenKey);

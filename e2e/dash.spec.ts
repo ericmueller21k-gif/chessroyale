@@ -357,14 +357,17 @@ for (const [right, held] of [
  * smacks and "I gotta pop off", then ten fast smacks and a love line, while he thinks, before his move lands). Read from the page:
  * each moment's key, kind and count as it first shows, and the lines said on screen (the same text as the lines' files).
  */
-type ClockSeen = { moments: Record<string, { kind: string; count: string; at: number }>; lines: string[] };
+type ClockSeen = { moments: Record<string, { kind: string; count: string; at: number }>; lines: string[]; plays: number[] };
 const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
 async function watchClock(page: Page) {
   await page.evaluate((lines: string[]) => {
     const w = window as any;
-    const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[] };
+    const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[], plays: [] as number[] };
     w.__clock = seen;
     setInterval(() => {
+      // (Each turn's clock as it starts: the play phase's startsAt, once per turn.)
+      const ph = w.match?.phase;
+      if (ph?.kind === "play" && ph.startsAt && !seen.plays.includes(ph.startsAt)) seen.plays.push(ph.startsAt);
       for (const el of document.querySelectorAll<HTMLElement>(".power-moment[data-key]")) {
         const key = el.dataset.key!;
         if (!seen.moments[key]) seen.moments[key] = { kind: el.dataset.kind ?? "clockFit", count: el.dataset.count ?? "", at: Date.now() };
@@ -426,9 +429,11 @@ test.describe("Dash's clock", () => {
     // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
     const total = BOSS_POWERS.dashPopOff.popMs + BOSS_POWERS.dashPopOff.loveMs;
     expect(fast[0]!.at - pops[0]!.at).toBeGreaterThanOrEqual(BOSS_POWERS.dashPopOff.popMs - 300);
-    const startsAt = await page.evaluate(() => (window as any).match.phase.startsAt as number);
-    expect(startsAt - pops[0]!.at).toBeGreaterThanOrEqual(total - 300);
-    expect(startsAt - pops[0]!.at).toBeLessThanOrEqual(total + 4000);
+    // (The first clock to start after it: your turn's, once its beats are over and his move has shown.)
+    const after = seen.plays.find((t) => t > pops[0]!.at);
+    expect(after).toBeDefined();
+    expect(after! - pops[0]!.at).toBeGreaterThanOrEqual(total - 300);
+    expect(after! - pops[0]!.at).toBeLessThanOrEqual(total + 3000);
     expect(errors).toEqual([]);
   });
 });

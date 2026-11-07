@@ -89,12 +89,12 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle, before his move lands)", (
     expect(BOSS_POWERS.dashPopOff.hitMs).toBeLessThan(BOSS_POWERS.dashClockFit.smackMs);
   });
 
-  it("holds his thinking only on the turn it comes, for both beats (popOffMs), and never for another boss", () => {
+  it("holds his thinking only while he thinks for the turn it comes, both beats (popOffMs), and never for another boss", () => {
     const at = 9;
-    const on = { id: "dash", crowdMoves: at - 1, powers: { dash: { popOff: { at } } } };
+    const on = { id: "dash", crowdMoves: 8, powers: { turn: at, dash: { popOff: { at } } } };
     expect(popOffMs(on)).toBe(DASH_FX.popOff + DASH_FX.popOffFast);
-    expect(popOffMs({ ...on, crowdMoves: at })).toBe(0);
+    expect(popOffMs({ ...on, powers: { ...on.powers, turn: at + 1 } })).toBe(0);
     expect(popOffMs({ ...on, id: "moo" })).toBe(0);
-    expect(popOffMs({ id: "dash", crowdMoves: at - 1, powers: { dash: { popOff: null } } })).toBe(0);
+    expect(popOffMs({ id: "dash", crowdMoves: 8, powers: { turn: at, dash: { popOff: null } } })).toBe(0);
   });
 });
