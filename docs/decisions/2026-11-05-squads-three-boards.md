@@ -6,8 +6,8 @@ and that becomes their static position … the person who's on the first board w
 them … best 2 out of 3."
 
 His screenshots (`notes/briefs/assets/squads-nov5/`): the bottom of the Relay screen cut off under the browser bar, a
-grayed finished mini board, the "Jump to my next board" switch and its line under the board. Stills of what's built:
-`docs/squads-three-boards/`.
+grayed finished mini board, the "Jump to my next board" switch and its line under the board. Stills of what's built were sent to Eric (not kept
+in the repo).
 
 ## The rules
 
@@ -69,8 +69,8 @@ grayed finished mini board, the "Jump to my next board" switch and its line unde
   - **Never rebuilt** (Eric: "his test of working as good as we want"): each board's view is drawn afresh, but the turn
     order's element is made once and moved into the new view's slot before the screen is painted. Its rows are kept by
     player and glide to their new places (FLIP, about 220 ms; none with reduced motion). Proof: an e2e check (the same
-    element, box and row elements across the three boards), and two recordings,
-    `docs/squads-three-boards/turn-order-glide-phone.gif` and `-desktop.gif`.
+    element, box and row elements across the three boards), and two recordings
+    (the turn order's glide, phone and computer; sent to Eric).
   - Options mocked first: the 6 seated players, or all 8 in two team columns. Eric picked all 8, then asked for the one
     queue.
 - **Stills and tests use real-length names** (Eric): "QueenSacrificeQueen", "knightrider_2009", "Zugzwang Zoe",
