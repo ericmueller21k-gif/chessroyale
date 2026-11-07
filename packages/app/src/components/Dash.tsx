@@ -128,7 +128,7 @@ function flagMoment({ moment }: MomentProps) {
 function fitMoment({ moment }: MomentProps) {
   const n = Math.max(3, Math.min(5, moment.count ?? BOSS_POWERS.dashClockFit.smacks));
   return (
-    <div class="power-moment pm-fit pm-stay" data-count={n}>
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-count={n}>
       <InPlace runKey={moment.key} anims={[`fit${n}`]} since={moment.at} />
     </div>
   );
@@ -137,7 +137,7 @@ function fitMoment({ moment }: MomentProps) {
 /** His pop-off's first beat: three smacks (fit3), "I gotta pop off for a sec". Its second, the fast ten (fit10), comes after. */
 function popOffMoment({ moment }: MomentProps) {
   return (
-    <div class="power-moment pm-fit pm-stay" data-kind="popOff" data-count={BOSS_POWERS.dashPopOff.smacks}>
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind="popOff" data-count={BOSS_POWERS.dashPopOff.smacks}>
       <InPlace runKey={moment.key} anims={["fit3"]} since={moment.at} />
     </div>
   );
@@ -146,7 +146,7 @@ function popOffMoment({ moment }: MomentProps) {
 /** His pop-off's second beat: ten really fast smacks (fit10), then he says how much he loves that clock. */
 function popOffFastMoment({ moment }: MomentProps) {
   return (
-    <div class="power-moment pm-fit pm-stay" data-kind="popOffFast" data-count={BOSS_POWERS.dashPopOff.hits}>
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind="popOffFast" data-count={BOSS_POWERS.dashPopOff.hits}>
       <InPlace runKey={moment.key} anims={["fit10"]} since={moment.at} />
     </div>
   );

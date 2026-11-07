@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_CLOCK, BOSS_POWERS } from "@chessroyale/core";
-import { DASH_RUSH_LINES } from "../packages/app/src/characters/dash-lines.ts";
+import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -350,3 +350,85 @@ for (const [right, held] of [
     if (right === 3) expect(seen.said.some((s) => /Close, but not quite!|Not even close\./.test(s))).toBe(true);
     expect(errors).toEqual([]);
   });
+
+/**
+ * Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md), Boss alone on a phone and a computer. His multi-hit
+ * (`&power=clockfit`: five quick smacks and a line, on his second turn) and his pop-off (`&power=popoff`: on his second turn, three
+ * smacks and "I gotta pop off", then ten fast smacks and a love line, while he thinks, before his move lands). Read from the page:
+ * each moment's key, kind and count as it first shows, and the lines said on screen (the same text as the lines' files).
+ */
+type ClockSeen = { moments: Record<string, { kind: string; count: string; at: number }>; lines: string[] };
+const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
+async function watchClock(page: Page) {
+  await page.evaluate((lines: string[]) => {
+    const w = window as any;
+    const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[] };
+    w.__clock = seen;
+    setInterval(() => {
+      for (const el of document.querySelectorAll<HTMLElement>(".power-moment[data-key]")) {
+        const key = el.dataset.key!;
+        if (!seen.moments[key]) seen.moments[key] = { kind: el.dataset.kind ?? "clockFit", count: el.dataset.count ?? "", at: Date.now() };
+      }
+      const text = document.body.textContent ?? "";
+      for (const l of lines) if (text.includes(l) && !seen.lines.includes(l)) seen.lines.push(l);
+    }, 30);
+  }, ALL_CLOCK_LINES);
+}
+
+test.describe("Dash's clock", () => {
+  test("the clock multi-hit: five quick smacks and a line on his turn (Eric, Nov 7: every four or five of his moves)", async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=clockfit&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    await watchClock(page);
+    // (The test switch: the multi-hit comes on his second turn.)
+    await playOne(page);
+    await playOne(page);
+    await yourMove(page);
+    const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
+    const hits = Object.values(seen.moments).filter((m) => m.kind === "clockFit");
+    expect(hits.length).toBeGreaterThanOrEqual(1);
+    for (const m of hits) expect(m.count).toBe("5");
+    // (Always a line: one of his clock lines is said as the multi-hit plays.)
+    expect(seen.lines.filter((l) => DASH_FIT_LINES.includes(l)).length).toBeGreaterThanOrEqual(1);
+    expect(errors).toEqual([]);
+  });
+
+  test("the pop-off, once: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks; your clock starts after it", async ({ page }) => {
+    test.setTimeout(240_000);
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    await asAdmin(page);
+    await page.goto("/?debug&pace=quick&laststand=0&brain=stockfish&boss=dash&power=popoff&mode=raid");
+    await openBossRaid(page);
+    await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
+    await yourMove(page);
+    await watchClock(page);
+    // (The test switch: the pop-off is his second turn's, and only one comes in a battle.)
+    await playOne(page);
+    await playOne(page);
+    await playOne(page);
+    await yourMove(page);
+    const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
+    const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff");
+    const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast");
+    expect(pops).toHaveLength(1);
+    expect(fast).toHaveLength(1);
+    expect(pops[0]!.count).toBe("3");
+    expect(fast[0]!.count).toBe("10");
+    expect(seen.lines.some((l) => DASH_POPOFF_LINES.includes(l))).toBe(true);
+    expect(seen.lines.some((l) => DASH_LOVE_LINES.includes(l))).toBe(true);
+    // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
+    const total = BOSS_POWERS.dashPopOff.popMs + BOSS_POWERS.dashPopOff.loveMs;
+    expect(fast[0]!.at - pops[0]!.at).toBeGreaterThanOrEqual(BOSS_POWERS.dashPopOff.popMs - 300);
+    const startsAt = await page.evaluate(() => (window as any).match.phase.startsAt as number);
+    expect(startsAt - pops[0]!.at).toBeGreaterThanOrEqual(total - 300);
+    expect(startsAt - pops[0]!.at).toBeLessThanOrEqual(total + 4000);
+    expect(errors).toEqual([]);
+  });
+});
