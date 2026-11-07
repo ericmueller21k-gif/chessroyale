@@ -6,11 +6,16 @@
  * you stood. Pure and light: the town imports it to know which bosses have an intro; the art and the drawing load only when you
  * challenge one (shops/intro.ts). No DOM; tested in packages/app/test/boss-challenge.test.ts.
  *
+ * An intro as data (shops/timeline.ts: Alfil's, Big Boy's, Timber's and Smudgy's, shops/intros/<boss>.ts) has its beats there; the
+ * timing here (introBeats, introAt, introCues) is the default's and the intros still on their own state machines (Hollow's, Wrangler's,
+ * Jefferson's, Ginger's, Dash's, Folio's).
+ *
  * A boss without an intro here is challenged as before (the Boss raid screen, its tile picked).
  */
 import type { HomeId } from "../world.ts";
 import { CREW_SHEETS } from "./grex-crew-sheets.ts";
 import type { ShopPlace } from "./room.ts";
+import { timelineAt, type Timeline, type TimelineNow } from "./timeline.ts";
 
 /** Jefferson's machine guys' step-off and the dozer's wake (their baked sheets' frames: times and cues), for his intro's cues. */
 const CREW_SHEET_CUES = { stepOff: CREW_SHEETS.lift.anims.stepOff, wake: CREW_SHEETS["crew-d"].anims.wake };
@@ -807,66 +812,8 @@ export function boardSquare(how: IntroLayout, file: number, rank: number): { x: 
 
 // ---- The intro's timeline: from when you face each other on the marks.
 
-/** A pyramid's animations (Alfil's): each frame's ms (its `rise`, `idle`, `crack`, `crumble`), and the crumble frame the table shows on. */
-export interface PyramidAnims {
-  rise: readonly number[];
-  idle: readonly number[];
-  crack: readonly number[];
-  crumble: readonly number[];
-  /** The crumble frame (from 0) whose middle is clear: the table and its board show from it on (the art's "table" cue). */
-  tableFrame: number;
-}
-/**
- * Toy blocks' animations (Big Boy's; Eric, Nov 2: "6 toy blocks drop down and stack to form a 3,2,1 pyramid formation, and the board
- * then plops on top. Then 2 more blocks drop for the chairs"): each frame's ms and cue (the art's) for the table building itself
- * (`build`), the board landing on its top block (`plop`: the code drops the board, `boardDropMs`, so it touches down on its first
- * frame) and the two stools dropping in (`chairs`).
- */
-export interface BlocksAnims {
-  build: readonly number[];
-  plop: readonly number[];
-  chairs: readonly number[];
-  cues: { readonly build: readonly (string | undefined)[]; readonly plop: readonly (string | undefined)[]; readonly chairs: readonly (string | undefined)[] };
-}
-/** Timber's moves (characters/timber-intro.ts BOSS_BEAVER_INTRO): his empty-handed waddle, the heave, the carry, the set-down, his gnaw, his dusting off. */
-export const LOG_MOVES = ["walk", "lift", "carry", "setDown", "gnaw", "done"] as const;
-export type LogMove = (typeof LOG_MOVES)[number];
-/** The props' animations Timber's intro plays (shops/timber-intro-art.ts): the log's gnawing, the shavings' fog, a stump's pop. */
-export type LogProp = "gnawed" | "rise" | "hold" | "settle" | "pop";
-/**
- * Timber's log (Nov 3; CHALLENGE_FEEL.log): each frame's ms and cue (the art's) for his moves and the props', and two places from his
- * art, in squares: `reach`, how far east of his foot the log stands as he sets it down and gnaws it (TIMBER_INTRO_REACH: he works
- * that far west of the table's middle, so the log stands on it), and `back`, how far west his dusting off steps him (his `done`).
- */
-export interface LogAnims {
-  moves: { readonly [m in LogMove]: readonly number[] };
-  props: { readonly [p in LogProp]: readonly number[] };
-  cues: { readonly [m in LogMove | LogProp]: readonly (string | undefined)[] };
-  reach: number;
-  back: number;
-}
-/** A picture's animations, as LogAnims needs them (characters/sprite.ts Character's: each frame's ms and cue, and its layers' parts and x). */
+/** A picture's animations, as the intros' anims need them (characters/sprite.ts Character's: each frame's ms and cue, and its layers' parts and x). */
 type ArtLike = { anims: Readonly<Record<string, { frames: readonly { ms: number; cue?: string; layers: readonly { part: string; x: number }[] }[] } | undefined>> };
-/**
- * Timber's LogAnims from his art (shops/timber-intro-art.ts): his moves (`mover`, BOSS_BEAVER_INTRO), the log's gnawing, the fog, a
- * stump's pop, and his `reach` (TIMBER_INTRO_REACH), `perSq` of his pixels a square. His dusting off's step back: the way his foot's
- * layer moves from his still to the move's last frame.
- */
-export function logAnims(w: { mover: ArtLike; log: ArtLike; fog: ArtLike; stump: ArtLike; reach: readonly [number, number] }, perSq: number): LogAnims {
-  const fr = (ch: ArtLike, a: string) => ch.anims[a]!.frames;
-  const msOf = (ch: ArtLike, a: string) => fr(ch, a).map((f) => f.ms);
-  const cuesOf = (ch: ArtLike, a: string) => fr(ch, a).map((f) => f.cue);
-  const footX = (f: { layers: readonly { part: string; x: number }[] }) => f.layers.find((l) => l.part.startsWith("foot"))?.x ?? 0;
-  const done = fr(w.mover, "done");
-  const of = <T>(get: (m: LogMove) => T) => Object.fromEntries(LOG_MOVES.map((m) => [m, get(m)])) as Record<LogMove, T>;
-  return {
-    moves: of((m) => msOf(w.mover, m)),
-    props: { gnawed: msOf(w.log, "gnawed"), rise: msOf(w.fog, "rise"), hold: msOf(w.fog, "hold"), settle: msOf(w.fog, "settle"), pop: msOf(w.stump, "pop") },
-    cues: { ...of((m) => cuesOf(w.mover, m)), gnawed: cuesOf(w.log, "gnawed"), rise: cuesOf(w.fog, "rise"), hold: cuesOf(w.fog, "hold"), settle: cuesOf(w.fog, "settle"), pop: cuesOf(w.stump, "pop") },
-    reach: w.reach[0] / perSq,
-    back: (footX(fr(w.mover, "idle")[0]!) - footX(done[done.length - 1]!)) / perSq,
-  };
-}
 /** Hollow's moves (characters/hollow-intro.ts BOSS_HOLLOW_INTRO): the ball charging, swelling, drinking the light, full, settling back. */
 export const DARK_MOVES = ["charge", "swell", "drink", "full", "settle"] as const;
 export type DarkMove = (typeof DARK_MOVES)[number];
@@ -1105,60 +1052,46 @@ export function folioAnims(w: { mover: ArtLike; stool: ArtLike; table: ArtLike; 
   };
 }
 /**
- * Smudgy's intro (Nov 6; CHALLENGE_FEEL.smudgy): the cloth's whip, its frames' ms and cues (the art's: INTRO_SMUDGY_CLOTH), and the
- * whip's frame from which the board shows under it (off the table's top).
+ * A boss's own art's animations, for an intro still on its own state machine: the dark (Hollow's), the lasso (Wrangler's), the crew
+ * (Jefferson's), the icicle (Ginger's), the dashes (Dash's) or the folding (Folio's). (Alfil's, Big Boy's, Timber's and Smudgy's are
+ * data: shops/timeline.ts.)
  */
-export interface ClothAnims {
-  cloth: true;
-  whip: readonly number[];
-  cues: readonly (string | undefined)[];
-  boardFrame: number;
-}
-export function clothAnims(w: { cloth: ArtLike; boardFrame: number }): ClothAnims {
-  const f = w.cloth.anims.whip!.frames;
-  return { cloth: true, whip: f.map((x) => x.ms), cues: f.map((x) => x.cue), boardFrame: w.boardFrame };
-}
-export const isCloth = (a: IntroAnims): a is ClothAnims => "cloth" in a;
-/** A boss's own art's animations: a pyramid (Alfil's), toy blocks (Big Boy's), a log (Timber's), the dark (Hollow's), the lasso (Wrangler's), the crew (Jefferson's), the icicle (Ginger's) or the dashes (Dash's). */
-export type IntroAnims = PyramidAnims | BlocksAnims | LogAnims | DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims | ClothAnims;
+export type IntroAnims = DarkAnims | RopeAnims | CrewAnims | IceAnims | BlitzAnims | FolioAnims;
 export const isFolio = (a: IntroAnims): a is FolioAnims => "folio" in a;
 export const isBlitz = (a: IntroAnims): a is BlitzAnims => "blitz" in a;
 export const isIce = (a: IntroAnims): a is IceAnims => "ice" in a;
-export const isBlocks = (a: IntroAnims): a is BlocksAnims => "build" in a;
-export const isLog = (a: IntroAnims): a is LogAnims => "props" in a;
 export const isDark = (a: IntroAnims): a is DarkAnims => "gutter" in a;
 export const isRope = (a: IntroAnims): a is RopeAnims => "release" in a;
 export const isCrew = (a: IntroAnims): a is CrewAnims => "creak" in a && "tableIdle" in a;
 /**
- * The intro's steps. Timber's own (a log): "toLog" (he walks west to it, his line still over his head), "lift", "carry" (to the middle),
- * "setDown", "gnaw", the shavings' "rise", "hold" (the table and stumps swap in under it) and "settle", the stumps' "pop", "dust" (his
- * `done`: he dusts off his paws) and "toMark" (he walks to where he swings). Hollow's own (the dark): after the table, "charge",
- * "swell", "drink" (the drain), "full", "blackout", "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board).
- * Wrangler's own (the lasso): after the line, "spin", "throw", "catch" (the loop flying to the bale and cinching), "drag" (the yank and the
- * bale's slide), "land" (it lands; the loop flicked free, the line reeled in), "cross" (the cross throw), "haul" (the double yank), "stools"
- * (the buckets tumbling in and landing, the ropes reeled in) and "brag", then the attack. Jefferson's own (the crew): after the line, "call"
- * (he hollers; the crew stop in it), "wave" (he waves them over), "walk" (they walk round to their spots), "lift" (your lift rises),
- * "creak" (the crates wobble as it locks) and "brag", then the attack.
+ * The intro's steps, for the default's and the intros still on their own state machines (an intro as data names its own beats:
+ * shops/intros/<boss>.ts). Hollow's own (the dark): after the table, "charge", "swell", "drink" (the drain), "full", "blackout",
+ * "black", "dim" (the dim light, his settle) and "iris" (the pool closing on the board). Wrangler's own (the lasso): after the line,
+ * "spin", "throw", "catch" (the loop flying to the bale and cinching), "drag" (the yank and the bale's slide), "land" (it lands; the
+ * loop flicked free, the line reeled in), "cross" (the cross throw), "haul" (the double yank), "stools" (the buckets tumbling in and
+ * landing, the ropes reeled in) and "brag", then the attack. Jefferson's own (the crew): after the line, "call" (he hollers; the crew
+ * stop in it), "wave" (he waves them over), "walk" (they walk round to their spots), "lift" (your lift rises), "creak" (the crates
+ * wobble as it locks) and "brag", then the attack.
  */
 export type IntroStep =
-  | "face" | "line" | "pause" | "rise" | "idle" | "crack" | "crumble" | "build" | "drop" | "plop" | "chairs" | "pop" | "table" | "swing" | "done"
-  | "toLog" | "lift" | "carry" | "setDown" | "gnaw" | "hold" | "settle" | "dust" | "toMark"
+  | "face" | "line" | "pause" | "pop" | "table" | "swing" | "done"
+  | "lift" | "carry"
   | "charge" | "swell" | "drink" | "full" | "blackout" | "black" | "dim" | "iris"
   | "spin" | "throw" | "catch" | "drag" | "land" | "cross" | "haul" | "stools" | "brag"
   | "call" | "wave" | "walk" | "creak"
   | "blast" | "fall" | "stab" | "toss" | "cast"
   | (typeof BLITZ_DASHES)[number]
-  | "back" | "fold" | "plane" | "unfold" | "bow" | "quiet"
-  | "whip" | "reveal";
+  | "back" | "fold" | "plane" | "unfold" | "bow" | "quiet";
 export interface IntroBeat {
-  step: IntroStep;
+  /** Its step (an intro as data names its own: shops/timeline.ts). */
+  step: IntroStep | (string & {});
   at: number;
   end: number;
 }
 const sum = (ms: readonly number[]) => ms.reduce((a, b) => a + b, 0);
 type BeatFeel = Pick<
   typeof CHALLENGE_FEEL,
-  "faceMs" | "lineMs" | "afterLineMs" | "holdMs" | "gapMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "log" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz" | "folio" | "smudgy"
+  "faceMs" | "lineMs" | "afterLineMs" | "tableHoldMs" | "boardDropMs" | "popMs" | "swingMs" | "stormInMs" | "flashMs" | "wipeMs" | "standOff" | "clear" | "dark" | "rope" | "crew" | "ice" | "blitz" | "folio"
 >;
 /**
  * When things happen in Ginger's intro (ms from the marks; CHALLENGE_FEEL.ice): his charge and blast; the blast flying and bursting;
@@ -1207,27 +1140,18 @@ export function drainAt(feel: Pick<typeof CHALLENGE_FEEL, "dark"> = CHALLENGE_FE
     end: k(D.drain.end),
   };
 }
-/**
- * Timber's walks, in squares: from his mark west to the log, carrying it from there to where he works (`reach` west of the table's
- * middle), and from where his dusting off leaves him to where he swings (`log.clear` from the middle). His mark is `standOff.across`
- * from the middle (his room's drawn marks are: a unit test keeps them so).
- */
-export function logWalks(a: LogAnims, feel: Pick<typeof CHALLENGE_FEEL, "log" | "standOff" | "clear"> = CHALLENGE_FEEL): { toLog: number; carry: number; toMark: number } {
-  return { toLog: feel.log.at - feel.standOff.across, carry: feel.log.at - a.reach, toMark: feel.log.clear - a.reach - a.back };
-}
-/** The feel the marks are found with (`marksOf`): Timber's log intro has its own clear place for him (`log.clear`), every other the shared one. */
-export const marksFeel = (a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL, own?: number): MarksFeel =>
-  own !== undefined ? { ...feel, clear: { ...feel.clear, boss: own } } : a && isLog(a) ? { ...feel, clear: { ...feel.clear, boss: feel.log.clear } } : feel;
+/** The feel the marks are found with (`marksOf`): a boss's own clear place (`own`: its BossIntro's, or its intro data's: Timber's `log.clear`), every other the shared one. */
+export const marksFeel = (_a: IntroAnims | null, feel: MarksFeel = CHALLENGE_FEEL, own?: number): MarksFeel =>
+  own !== undefined ? { ...feel, clear: { ...feel.clear, boss: own } } : feel;
 /** How long the boss's transition takes to cover the screen (ms): its own storm's sweep, or the default's flash and wipe. */
 export const coverMs = (custom: boolean, feel: Pick<typeof CHALLENGE_FEEL, "stormInMs" | "flashMs" | "wipeMs"> = CHALLENGE_FEEL): number =>
   custom ? feel.stormInMs : feel.flashMs + feel.wipeMs;
 /**
  * The beats, from when you both stand on your marks (Eric, Nov 2: "slowly walk up to the chessboard, then say your line, then the
  * tiles drop down, then the seats drop down. Add a little delay between these things"): facing each other a moment, the line alone,
- * a pause; then the board coming in, a step at a time: Alfil's pyramid rising, holding, cracking, crumbling (the table inside);
- * Big Boy's blocks stacking, a gap, the board dropping and plopping on, a gap, the stools dropping in; the default's table popping
- * in; then the table on its own a beat, and the attack swung (`swingMs` until the transition has covered the screen); then done
- * (the transition starts).
+ * a pause; then the board coming in (the default's table popping in; a boss's own, as its art plays it); then the table on its own a
+ * beat, and the attack swung (`swingMs` until the transition has covered the screen); then done (the transition starts). An intro as
+ * data has its own (shops/timeline.ts timelineBeats).
  */
 export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL): IntroBeat[] {
   const out: IntroBeat[] = [];
@@ -1237,17 +1161,6 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     t += ms;
   };
   add("face", feel.faceMs);
-  if (a && isCloth(a)) {
-    // Smudgy's own: his line; a pause; the whip (the cloth up, over him and down in a heap); a beat, his reveal line, a beat; then the
-    // splatter (no attack).
-    const K = feel.smudgy;
-    add("line", K.lineMs);
-    add("pause", K.grabMs);
-    add("whip", sum(a.whip));
-    add("reveal", K.revealLeadMs + K.revealMs + K.afterMs);
-    out.push({ step: "done", at: t, end: Infinity });
-    return out;
-  }
   if (a && isFolio(a)) {
     // Folio's own: its line; the step back; the stools folding (and the gap to the table); the table folding (and the gap to the
     // plane); the plane in to the packet landing; the board unfolding (and the gap to the bow); the bow's lead; the quiet line (and
@@ -1351,43 +1264,10 @@ export function introBeats(a: IntroAnims | null, feel: BeatFeel = CHALLENGE_FEEL
     out.push({ step: "done", at: t, end: Infinity });
     return out;
   }
-  if (a && isLog(a)) {
-    // Timber's own: his line, and while it still shows he sets off west for the log; he heaves it up, carries it to the middle, sets
-    // it down, gnaws it; the shavings boil up, hold (the table and stumps swap in under them) and settle; the stumps pop up; he dusts
-    // off his paws and walks to where he swings; the attack. (No table beat on its own: he's walking away from it.)
-    const w = logWalks(a, feel);
-    add("line", feel.log.lineLeadMs);
-    add("toLog", Math.round(w.toLog * feel.log.walkMs));
-    add("lift", sum(a.moves.lift));
-    add("carry", Math.round(w.carry * feel.log.carryMs));
-    add("setDown", sum(a.moves.setDown));
-    add("gnaw", sum(a.props.gnawed));
-    add("rise", sum(a.props.rise));
-    add("hold", feel.log.holdMs);
-    add("settle", sum(a.props.settle));
-    add("pop", sum(a.props.pop));
-    add("dust", sum(a.moves.done));
-    add("toMark", Math.round(w.toMark * feel.log.walkMs));
-    add("swing", Math.max(0, feel.swingMs - coverMs(true, feel)));
-    out.push({ step: "done", at: t, end: Infinity });
-    return out;
-  }
+  // The default's (an intro as data has its own beats: shops/timeline.ts): the line, a pause, the table pops in.
   add("line", feel.lineMs);
   add("pause", feel.afterLineMs);
-  if (!a) add("pop", feel.popMs);
-  else if (isBlocks(a)) {
-    add("build", sum(a.build));
-    add("pause", feel.gapMs);
-    add("drop", feel.boardDropMs);
-    add("plop", sum(a.plop));
-    add("pause", feel.gapMs);
-    add("chairs", sum(a.chairs));
-  } else {
-    add("rise", sum(a.rise));
-    add("idle", feel.holdMs);
-    add("crack", sum(a.crack));
-    add("crumble", sum(a.crumble));
-  }
+  add("pop", feel.popMs);
   add("table", feel.tableHoldMs);
   add("swing", Math.max(0, feel.swingMs - coverMs(!!a, feel)));
   out.push({ step: "done", at: t, end: Infinity });
@@ -1412,21 +1292,13 @@ export function frameAt(ms: readonly number[], t: number, loop: boolean): number
 
 /** What shows `t` ms into the intro. */
 export interface IntroNow {
-  step: IntroStep;
-  /** The pyramid's animation and frame (null: none shows: before it rises, once it's crumbled, or the default intro). */
-  pyramid: { anim: "rise" | "idle" | "crack" | "crumble"; frame: number } | null;
-  /** Toy blocks' animation and frame (null: none shows: before they drop in, or another boss's intro); `idle` once it's all built. */
-  blocks: { anim: "build" | "plop" | "chairs" | "idle"; frame: number } | null;
-  /** How far above its place on the table the board is, in squares (toy blocks: it drops on; 0 for every other intro). */
-  drop: number;
-  /** The table's stools show (with the table; toy blocks: from when they drop in). */
+  step: IntroBeat["step"];
+  /** The table's stools show (with the table). */
   stools: boolean;
   /** The boss's line is over its head (its own beat, alone). */
   line: boolean;
-  /** The table and its board show (from the crumble's clear frame on; toy blocks: from the board's drop; the default: from its pop on). */
+  /** The table and its board show (the default: from its pop on). */
   table: boolean;
-  /** The crumble's last frame (the low drift of sand) lies over the table's foot: kept, as the art allows, until the storm. */
-  drift: boolean;
   /** The default's pop: how far the table has grown in (0 to 1; 1 once in, and always for a boss's own art). */
   pop: number;
   /** The default's dust puff round the table's foot: how far through it is (0 to 1), or -1: none. */
@@ -1435,10 +1307,10 @@ export interface IntroNow {
   back: number;
   /** ...and how high in it (0 to 1: 1 at its top, `hopUp` squares). */
   hop: number;
-  /** Timber's own intro (his log, gnawed into the table): what he and the props show now; null for every other intro. */
-  wood: WoodNow | null;
   /** The boss's channel line is over its head (Hollow's, from his charge's start for `dark.chantMs`). */
   chant: boolean;
+  /** An intro as data (shops/timeline.ts): every actor now (the boss, you, its props); null for every other intro. */
+  cast: TimelineNow["cast"] | null;
   /** Hollow's own intro (the dark): what the light and he do now; null for every other intro. */
   dark: DarkNow | null;
   /** Wrangler's own intro (the lasso): what he, his ropes, the bale and the buckets do now; null for every other intro. */
@@ -1451,8 +1323,6 @@ export interface IntroNow {
   blitz: BlitzNow | null;
   /** Folio's own intro (the folding, the plane, the board): what it and its props do now; null for every other intro. */
   folio: FolioNow | null;
-  /** Smudgy's own intro: the cloth's animation and frame now (covered, whipped off, in its heap); null for every other intro. */
-  cloth: { anim: "covered" | "whip" | "heap"; frame: number } | null;
 }
 /** A board carrier in Ginger's intro: where (squares), which way, its animation and frame; null: still in the stockroom. */
 export interface CarrierNow {
@@ -2084,89 +1954,23 @@ export function darkAt(beats: readonly IntroBeat[], a: DarkAnims, t: number, fee
     iris: smooth(ramp(t, at("iris"), D.irisMs)),
   };
 }
-/** Where Timber's foot is through his intro: his mark, the log, where he works (`reach` west of the table's middle), a step back from there (`back`), where he swings (the boss's clear place). */
-export type LogPlace = "mark" | "log" | "work" | "stepped" | "clear";
-export interface WoodNow {
-  /** His own move and frame, mirrored (`flip`: walking west) or not (facing east, the art's way); null: his town figure (on his mark for the line's start, or swinging at the end). */
-  move: { anim: LogMove | "idle"; frame: number; flip: boolean } | null;
-  /** His foot `u` (0 to 1) of the way from one place to the next (the room puts the places on its floor). */
-  from: LogPlace;
-  to: LogPlace;
-  u: number;
-  /** The log on its own: lying where it waits (until he lifts it), or standing and gnawed in front of him on the table's place (until the fog hides it); null: in his paws, or gone. */
-  log: { anim: "lying" | "standing" | "gnawed"; frame: number } | null;
-  /** The shavings' fog (null: none), and its last frame lying round the table's foot from then on (`ring`, a ring of shavings, kept until the sweep). */
-  fog: { anim: "rise" | "hold" | "settle"; frame: number } | null;
-  ring: boolean;
-  /** The stumps, a seat at each side of the table (null: not yet): popping up out of the floor, then standing. */
-  stumps: { anim: "pop" | "idle"; frame: number } | null;
-}
 const easeOutBack = (u: number) => 1 + 2.2 * (u - 1) ** 3 + 1.2 * (u - 1) ** 2;
 /**
- * When you and the boss hop back clear of the stools, ms into the intro: as they come in (the default's pop; Big Boy's stools
- * starting to drop; Alfil's table showing through the crumble).
+ * When you and the boss hop back clear of the stools, ms into the intro: as they come in (the default's pop). An intro as data hops
+ * you back in its own beats (shops/intros/common.ts hopBack).
  */
 export function hopStart(beats: readonly IntroBeat[], a: IntroAnims | null): number {
   // (Hollow's and Wrangler's: you walked on to your seats, or clear of them; Jefferson's: no stools; nothing to hop back from.)
   // (Dash's: you both walk on to where you stand clear of the stools, and nobody steps after they land.)
-  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a) || isCloth(a))) return Infinity;
+  if (a && (isDark(a) || isRope(a) || isCrew(a) || isIce(a) || isBlitz(a))) return Infinity;
   // (Folio's: you both step back a pace after its line, before the stools fold up: introAt eases it, no hop.)
   if (a && isFolio(a)) return stepAt(beats, "back");
-  if (!a || isLog(a)) return stepAt(beats, "pop");
-  if (isBlocks(a)) return stepAt(beats, "chairs");
-  return stepAt(beats, "crumble") + sum(a.crumble.slice(0, a.tableFrame));
-}
-/**
- * Timber's intro `t` ms in (his log): on his mark (his town figure) through the line's lead; walking west to the log (mirrored); heaving
- * it up (the lying log hidden from the heave's first frame: it's in his paws, his own frames); carrying it east to where he works;
- * setting it down (the standing log on its own from the set-down's last frame, the art's first without it in his paws); gnawing it (the
- * log's own gnawing, his gnaw looping) and on through the fog's rise; under the fog's hold the log is gone (the table and stumps are
- * in: `introAt`), he stands; it settles, its last frame (a ring of shavings) kept; the stumps pop up; he dusts off his paws; he walks
- * west to where he swings (mirrored); then his town figure again (its attack).
- */
-export function woodAt(beats: readonly IntroBeat[], a: LogAnims, t: number): WoodNow {
-  const at = (s: IntroStep) => beats.find((x) => x.step === s)!;
-  const u = (s: IntroStep) => {
-    const b = at(s);
-    return Math.min(1, Math.max(0, (t - b.at) / Math.max(1, b.end - b.at)));
-  };
-  const me = (anim: LogMove | "idle", frame: number, flip = false) => ({ anim, frame, flip });
-  const lastOf = (ms: readonly number[]) => ms.length - 1;
-  const none = { log: null, fog: null, ring: false, stumps: null };
-  const stand = { ...none, ring: true, stumps: { anim: "idle" as const, frame: 0 } };
-  const gnawFrame = () => frameAt(a.moves.gnaw, t - at("gnaw").at, true);
-  if (t < at("toLog").at) return { ...none, move: null, from: "mark", to: "mark", u: 0, log: { anim: "lying", frame: 0 } };
-  if (t < at("lift").at) return { ...none, move: me("walk", frameAt(a.moves.walk, t - at("toLog").at, true), true), from: "mark", to: "log", u: u("toLog"), log: { anim: "lying", frame: 0 } };
-  if (t < at("carry").at) return { ...none, move: me("lift", frameAt(a.moves.lift, t - at("lift").at, false)), from: "log", to: "log", u: 0 };
-  if (t < at("setDown").at) return { ...none, move: me("carry", frameAt(a.moves.carry, t - at("carry").at, true)), from: "log", to: "work", u: u("carry") };
-  if (t < at("gnaw").at) {
-    const frame = frameAt(a.moves.setDown, t - at("setDown").at, false);
-    return { ...none, move: me("setDown", frame), from: "work", to: "work", u: 0, log: frame === lastOf(a.moves.setDown) ? { anim: "standing", frame: 0 } : null };
-  }
-  if (t < at("rise").at) return { ...none, move: me("gnaw", gnawFrame()), from: "work", to: "work", u: 0, log: { anim: "gnawed", frame: frameAt(a.props.gnawed, t - at("gnaw").at, false) } };
-  if (t < at("hold").at)
-    return { ...none, move: me("gnaw", gnawFrame()), from: "work", to: "work", u: 0, log: { anim: "gnawed", frame: lastOf(a.props.gnawed) }, fog: { anim: "rise", frame: frameAt(a.props.rise, t - at("rise").at, false) } };
-  if (t < at("settle").at) return { ...none, move: me("idle", 0), from: "work", to: "work", u: 0, fog: { anim: "hold", frame: frameAt(a.props.hold, t - at("hold").at, true) } };
-  if (t < at("pop").at) return { ...none, move: me("idle", 0), from: "work", to: "work", u: 0, fog: { anim: "settle", frame: frameAt(a.props.settle, t - at("settle").at, false) } };
-  if (t < at("dust").at) return { ...none, ring: true, move: me("idle", 0), from: "work", to: "work", u: 0, stumps: { anim: "pop", frame: frameAt(a.props.pop, t - at("pop").at, false) } };
-  if (t < at("toMark").at) return { ...stand, move: me("done", frameAt(a.moves.done, t - at("dust").at, false)), from: "work", to: "work", u: 0 };
-  if (t < at("swing").at) return { ...stand, move: me("walk", frameAt(a.moves.walk, t - at("toMark").at, true), true), from: "stepped", to: "clear", u: u("toMark") };
-  return { ...stand, move: null, from: "clear", to: "clear", u: 0 };
+  return stepAt(beats, "pop");
 }
 export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: number, feel: Pick<typeof CHALLENGE_FEEL, "popMs" | "puffMs" | "dropFrom" | "hopMs" | "lineMs" | "dark" | "rope" | "crew"> = CHALLENGE_FEEL): IntroNow {
   const b = beats.find((x) => t < x.end) ?? beats[beats.length - 1]!;
   const h = Math.min(1, Math.max(0, (t - hopStart(beats, a)) / feel.hopMs));
-  const base = { step: b.step, pyramid: null, blocks: null, drop: 0, drift: false, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, wood: null, chant: false, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null, cloth: null };
-  if (a && isCloth(a)) {
-    // (Smudgy's: the covered table from the walk on; the cloth whipped off, then in its heap; the board on the table from the whip's
-    // `boardFrame` on (its stools are in the table's picture: they were there all along); his reveal line after its lead.)
-    const w = stepAt(beats, "whip");
-    const r = stepAt(beats, "reveal") + CHALLENGE_FEEL.smudgy.revealLeadMs;
-    const u = t - w;
-    const cloth = u < 0 ? { anim: "covered" as const, frame: 0 } : u < sum(a.whip) ? { anim: "whip" as const, frame: frameAt(a.whip, u, false) } : { anim: "heap" as const, frame: 0 };
-    const shown = u >= sum(a.whip.slice(0, a.boardFrame));
-    return { ...base, cloth, table: shown, stools: false, chant: t >= r && t < r + CHALLENGE_FEEL.smudgy.revealMs };
-  }
+  const base = { step: b.step, pop: 1, puff: -1, line: b.step === "line", back: h * h * (3 - 2 * h), hop: h > 0 && h < 1 ? Math.sin(Math.PI * h) : 0, chant: false, cast: null, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null };
   if (a && isFolio(a)) {
     // (Folio's: you both step back a pace (no hop) to the clear places; the table (the game's board on it) from the unfold's end, its
     // stools from theirs (each folds up on its own: FolioNow); its quiet line (the `chant`) from `quietLeadMs` into its bow.)
@@ -2194,11 +1998,6 @@ export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: nu
     const T = ropeTimes(beats, a);
     return { ...base, rope: ropeAt(beats, a, t), table: t >= stepAt(beats, "land"), stools: t >= T.land };
   }
-  if (a && isLog(a)) {
-    // (Timber's line stays its `lineMs` from its beat's start, over his head as he sets off for the log.)
-    const line = stepAt(beats, "line");
-    return { ...base, line: t >= line && t < line + feel.lineMs, wood: woodAt(beats, a, t), table: t >= stepAt(beats, "hold"), stools: t >= stepAt(beats, "pop") };
-  }
   if (!a || isDark(a)) {
     const p = t - stepAt(beats, "pop");
     // (Hollow's: the table pops in as the default's, still lit; his channel line from his charge's start.)
@@ -2206,40 +2005,21 @@ export function introAt(beats: readonly IntroBeat[], a: IntroAnims | null, t: nu
     const shown = p >= 0;
     return { ...base, ...dark, table: shown, stools: shown, pop: shown ? easeOutBack(Math.min(1, p / feel.popMs)) : 0, puff: shown && p < feel.puffMs ? p / feel.puffMs : -1 };
   }
-  if (isBlocks(a)) {
-    // (Nothing until the blocks drop in; they stack (held built through the gap), the board falls and plops on (held through the
-    // gap), the stools drop in, then it all stands.)
-    const blocks = (anim: "build" | "plop" | "chairs" | "idle", frame: number) => ({ ...base, blocks: { anim, frame } });
-    const drop = beats.find((x) => x.step === "drop")!;
-    if (t < stepAt(beats, "build")) return { ...base, table: false, stools: false };
-    if (t < drop.at) return { ...blocks("build", frameAt(a.build, t - stepAt(beats, "build"), false)), table: false, stools: false };
-    if (t < drop.end) {
-      const u = Math.min(1, (t - drop.at) / Math.max(1, drop.end - drop.at));
-      return { ...blocks("build", a.build.length - 1), table: true, stools: false, drop: feel.dropFrom * (1 - u * u) };
-    }
-    const chairs = stepAt(beats, "chairs");
-    if (t < chairs) return { ...blocks("plop", frameAt(a.plop, t - drop.end, false)), table: true, stools: false };
-    if (t < chairs + sum(a.chairs)) return { ...blocks("chairs", frameAt(a.chairs, t - chairs, false)), table: true, stools: true };
-    return { ...blocks("idle", 0), table: true, stools: true };
-  }
-  const rise = stepAt(beats, "rise");
-  const idle = stepAt(beats, "idle");
-  const crack = stepAt(beats, "crack");
-  const crumble = stepAt(beats, "crumble");
-  if (t < rise) return { ...base, table: false, stools: false };
-  if (t < idle) return { ...base, pyramid: { anim: "rise", frame: frameAt(a.rise, t - rise, false) }, table: false, stools: false };
-  if (t < crack) return { ...base, pyramid: { anim: "idle", frame: frameAt(a.idle, t - idle, true) }, table: false, stools: false };
-  if (t < crumble) return { ...base, pyramid: { anim: "crack", frame: frameAt(a.crack, t - crack, false) }, table: false, stools: false };
-  if (t < crumble + sum(a.crumble)) {
-    const frame = frameAt(a.crumble, t - crumble, false);
-    return { ...base, pyramid: { anim: "crumble", frame }, table: frame >= a.tableFrame, stools: frame >= a.tableFrame };
-  }
-  return { ...base, table: true, stools: true, drift: true };
+  return { ...base, table: false, stools: false };
 }
 /**
- * The cue each beat starts on, and when. A pyramid: "rumble" as it rises, "crack", "crumble", and "table" on the crumble's clear
- * frame. Toy blocks: the art's own cues on their frames ("block" as each lands, "block-top", "plop" as the board touches down, "stool"
- * as each stool lands), and "drop" as the board starts to fall. The default: "table" as it pops in.
+ * An intro as data `t` ms in (shops/timeline.ts), as the room reads an intro: its step, its line and chant, the board and stools, and
+ * every actor (`cast`: you and the boss stand where it says, `back` and `hop` unused).
+ */
+export function castIntroAt(tl: Timeline, t: number): IntroNow {
+  const n = timelineAt(tl, t);
+  const c = n.cast;
+  const on = (k: string) => !!c[k]?.on;
+  return { step: n.step, pop: 1, puff: -1, line: on("line"), chant: on("chant"), table: on("board"), stools: on("stools"), back: 0, hop: 0, cast: c, dark: null, rope: null, crew: null, ice: null, blitz: null, folio: null };
+}
+/**
+ * The cue each beat starts on, and when: the default's "table" as it pops in; a boss's own, as its art's frames say (an intro as data:
+ * shops/timeline.ts timelineCues).
  */
 export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { cue: string; at: number }[] {
   const at = (s: IntroStep) => stepAt(beats, s);
@@ -2249,69 +2029,7 @@ export function introCues(beats: readonly IntroBeat[], a: IntroAnims | null): { 
   if (isCrew(a)) return crewCues(beats, a);
   if (isIce(a)) return iceCues(a);
   if (isBlitz(a)) return blitzCues(a);
-  if (isFolio(a)) return folioCues(a);
-  if (isCloth(a)) return clothCues(beats, a);
-  if (isLog(a)) {
-    // (Timber's: each move's and prop's own cues on their frames, through their beats: looping ones over and over to its end.)
-    const out: { cue: string; at: number }[] = [];
-    const play = (ms: readonly number[], cues: readonly (string | undefined)[], from: number, to: number, loop: boolean) => {
-      if (sum(ms) <= 0) return;
-      let t = from;
-      for (let i = 0; t < to; i = (i + 1) % ms.length) {
-        const cue = cues[i];
-        if (cue) out.push({ cue, at: t });
-        t += ms[i]!;
-        if (!loop && i === ms.length - 1) break;
-      }
-    };
-    const M = a.moves;
-    const P = a.props;
-    const C = a.cues;
-    play(M.lift, C.lift, at("lift"), at("carry"), false);
-    play(M.setDown, C.setDown, at("setDown"), at("gnaw"), false);
-    // (His teeth's sounds while he gnaws, not the log's own: one sound a bite.)
-    play(M.gnaw, C.gnaw, at("gnaw"), at("rise"), true);
-    play(P.rise, C.rise, at("rise"), at("hold"), false);
-    play(P.hold, C.hold, at("hold"), at("settle"), true);
-    play(P.settle, C.settle, at("settle"), at("pop"), false);
-    play(P.pop, C.pop, at("pop"), at("dust"), false);
-    play(M.done, C.done, at("dust"), at("toMark"), false);
-    return out;
-  }
-  if (isBlocks(a)) {
-    const out: { cue: string; at: number }[] = [];
-    const frames = (anim: "build" | "plop" | "chairs") => {
-      let t = at(anim);
-      a[anim].forEach((ms, i) => {
-        const cue = a.cues[anim][i];
-        if (cue) out.push({ cue, at: t });
-        t += ms;
-      });
-    };
-    frames("build");
-    out.push({ cue: "drop", at: at("drop") });
-    frames("plop");
-    frames("chairs");
-    return out;
-  }
-  return [
-    { cue: "rumble", at: at("rise") },
-    { cue: "crack", at: at("crack") },
-    { cue: "crumble", at: at("crumble") },
-    { cue: "table", at: at("crumble") + sum(a.crumble.slice(0, a.tableFrame)) },
-  ];
-}
-
-/** Smudgy's: the whip's frames' own cues (the whoosh as it lifts, the flop as it lands in a heap), at their times. */
-export function clothCues(beats: readonly IntroBeat[], a: ClothAnims): { cue: string; at: number }[] {
-  const out: { cue: string; at: number }[] = [];
-  let t = stepAt(beats, "whip");
-  a.whip.forEach((ms, i) => {
-    const cue = a.cues[i];
-    if (cue) out.push({ cue, at: t });
-    t += ms;
-  });
-  return out;
+  return folioCues(a);
 }
 /**
  * Wrangler's cues, and when (his intro's beats; CHALLENGE_FEEL.rope): his moves' own on their frames (the spin's whirl each loop, the
