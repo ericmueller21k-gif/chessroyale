@@ -67,7 +67,8 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   // (Friends and Account show once accounts are on, Friends right after Quick chat; the order is the same either way.)
   const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
+  // (SQUADS, Nov 5: Quick board jump, always there, after the board's choices.)
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
   // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);

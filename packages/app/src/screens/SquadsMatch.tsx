@@ -776,6 +776,12 @@ function MatchView({
             onUse={() => client.useStockfish(m.key)}
           />
         )}
+        {/* (Relay has no duty panel since Nov 5, but a Mercenary Relay still blocks: its Block button on its own.) */}
+        {d && m.state === "half" && m.format === "relay" && canBlock && (
+          <div class="sq-duty move sq-relay-block">
+            <BlockBar client={client} m={m} block={{ on: blocking, bank, toggle: () => setBlockMode(!blocking), shields: mySide === null ? 0 : (m.shields?.[mySide === 0 ? 1 : 0] ?? 0) }} />
+          </div>
+        )}
         {d && m.state === "half" && m.format !== "relay" && (
           <DutyPanel
             client={client}
@@ -963,6 +969,40 @@ function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client:
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * Blocks (Mercenary): the blocks placed on your board this half, the Block button (Done blocking; "No block points left")
+ * and a shield's note. In a duty's panel; in Relay (whose panel is gone, Nov 5) on its own beside the board.
+ */
+function BlockBar({ client, m, block }: { client: SquadsClient; m: LocalMatch; block: { on: boolean; bank: number; toggle: () => void; shields: number } | null }) {
+  const blockButton = block && (
+    <button type="button" class={`fd-btn sq-block-btn${block.on ? " on" : ""}`} aria-pressed={block.on} disabled={block.bank <= 0 && !block.on} onClick={block.toggle}>
+      <LockIcon size={16} />
+      {block.on ? "Done blocking" : block.bank > 0 ? `Block · ${block.bank} ${block.bank === 1 ? "point" : "points"}` : "No block points left"}
+    </button>
+  );
+  // (Mercenary: their shield cancels your next block that would take effect; you still pay for it.)
+  const shieldLine = block && block.shields > 0 && (
+    <span class="mc-shield-note">
+      <ItemIcon item="shield" size={12} />
+      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} canceled, still paid
+    </span>
+  );
+  const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);
+  const placedLine = placed.length > 0 && (
+    <span class="sq-placed">
+      <LockIcon size={12} />
+      Blocked: {placed.map((b) => blockName(b)).join(", ")}
+    </span>
+  );
+  return (
+    <>
+      {placedLine}
+      {blockButton}
+      {shieldLine}
+    </>
   );
 }
 
@@ -1204,34 +1244,13 @@ function DutyPanel({
   noTokens: boolean;
 }) {
   const san = (mv: string) => safeSan(fen, mv);
-  const blockButton = block && (
-    <button type="button" class={`fd-btn sq-block-btn${block.on ? " on" : ""}`} aria-pressed={block.on} disabled={block.bank <= 0 && !block.on} onClick={block.toggle}>
-      <LockIcon size={16} />
-      {block.on ? "Done blocking" : block.bank > 0 ? `Block · ${block.bank} ${block.bank === 1 ? "point" : "points"}` : "No block points left"}
-    </button>
-  );
-  // (Mercenary: their shield cancels your next block that would take effect; you still pay for it.)
-  const shieldLine = block && block.shields > 0 && (
-    <span class="mc-shield-note">
-      <ItemIcon item="shield" size={12} />
-      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} canceled, still paid
-    </span>
-  );
-  const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);
-  const placedLine = placed.length > 0 && (
-    <span class="sq-placed">
-      <LockIcon size={12} />
-      Blocked: {placed.map((b) => blockName(b)).join(", ")}
-    </span>
-  );
+  const blockBar = <BlockBar client={client} m={m} block={block} />;
   if (role === "move") {
     return (
       <div class="sq-duty move">
         <strong>{mine ? `You played ${san(mine)}` : "Your move"}</strong>
         <span class="muted small">{mine ? "Tap a tiny board to watch it." : freeLine(m, client.myId)}</span>
-        {placedLine}
-        {blockButton}
-        {shieldLine}
+        {blockBar}
       </div>
     );
   }
@@ -1264,9 +1283,7 @@ function DutyPanel({
         <button type="button" class="fd-btn primary sq-lockin" disabled={!mine || locked} onClick={() => client.lock(m.key)}>
           {locked ? "Locked in" : "Lock in my vote"}
         </button>
-        {placedLine}
-        {blockButton}
-        {shieldLine}
+        {blockBar}
         <span class="muted small">The most picked move plays; a tie, a coin. You can change until you lock in.</span>
       </div>
     );
@@ -1294,9 +1311,7 @@ function DutyPanel({
       </button>
       {same && <span class="sq-same">Same move: it plays for sure, and uses a token.</span>}
       {noTokens && <span class="sq-same none">No same-move tokens left: pick a different move.</span>}
-      {placedLine}
-      {blockButton}
-      {shieldLine}
+      {blockBar}
       <span class="muted small">{noTokens ? "You can change until you lock in." : "Pick your partner's move too and it plays for sure (a token). You can change until you lock in."}</span>
     </div>
   );
