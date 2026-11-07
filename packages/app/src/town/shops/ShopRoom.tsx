@@ -3277,7 +3277,7 @@ function startRoom(
       drawTag(youName(), "you", youHead.x, youHead.y);
       g.globalAlpha = 1;
       // (Away: the town's "zzz" over your tag, at the town's tag size.)
-      if (zzz()) drawZzz(g, youHead.x + 4, youHead.y - 18, 1, now, tagA);
+      if (zzz()) drawZzz(g, youHead.x + 9, youHead.y + 10, 1, now, tagA);
     }
     if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);

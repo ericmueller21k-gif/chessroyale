@@ -1294,9 +1294,9 @@ export class Renderer {
     if (this.nZzz >= ZZZ_MAX) return;
     const n = this.nZzz++;
     const s = size / 11;
-    // (Over the name tag, a little to the right: it starts where the tag's top right corner is and drifts off up and right.)
-    this.zX[n] = x + 4 * s;
-    this.zY[n] = hy - 2 - 16 * s;
+    // (Beside the head, to its right, so it's this pawn's and no neighbor's; it drifts off up and right, past its own tag.)
+    this.zX[n] = x + 9 * s;
+    this.zY[n] = hy + 10 * s;
     this.zS[n] = s;
     this.zA[n] = alpha;
     this.zP[n] = i;
