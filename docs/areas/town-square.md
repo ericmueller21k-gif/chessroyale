@@ -69,8 +69,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   screen), and the bots. **Everyone in the square is a `Person`** (`{ id, name, look, you, walker }`) in one list,
   `town.people`; the bots are one source that moves its people. The drawing and the taps read only that list, so real
   players (rooms of up to about 75 to 100, fed by a server, later) can replace the bots without touching either.
-- **Away (Nov 7; [2026-11-07-town-afk.md](../decisions/2026-11-07-town-afk.md)).** No input for 3 min (`TOWN_AFK`): a pixel "zzz" over your pawn (`zzz.ts`), in the town and a shop; 10 min idle or hidden: home with "You were away" (`afk.ts`, `here-net.ts`). A boss challenge and the claw machine hold the clock.
-  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town as plain pawns, and the server drops an away one itself (`server/src/town-here.ts`). Test switches `?townafk=off|zzz,boot,hidden`, `?townroom=`; hook `__townHere()`.
+- **Away and guests (Nov 7, #542; [2026-11-07-town-afk.md](../decisions/2026-11-07-town-afk.md)).** No input for 1 min (`TOWN_AFK`): a pixel "zzz" by your pawn (`zzz.ts`), town and shops; 5 min idle or hidden: home, "You've been dropped from the town" (`afk.ts`, `here-net.ts`, `AwayNote.tsx`). A challenge and the claw machine hold the clock.
+  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring". Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).

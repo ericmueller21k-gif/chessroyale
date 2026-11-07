@@ -1086,7 +1086,7 @@ test("a guest taps the box and gets the typing line greyed, saying how to chat (
   await expect(box).toHaveAttribute("data-blur", "1");
   await expect(field).toBeVisible();
   await expect(field).toBeDisabled();
-  await expect(field).toHaveAttribute("placeholder", "Sign in to chat with other players.");
+  await expect(field).toHaveAttribute("placeholder", "Make a free account to chat.");
   expect(await colorOf(page, ".tc-form input", "::placeholder"), "greyed: the softer ink").toMatch(/^rgba\(29, 31, 36, 0\.6\d*\)$/);
   await page.evaluate(() => (window as any).__townSay?.("Hollow", "hello", "boss"));
   await page.waitForTimeout(400);
@@ -1272,7 +1272,7 @@ test("the keyboard opening doesn't resize or move the town: while the typing lin
 const rot13 = (t: string) => t.replace(/[a-z]/gi, (c) => String.fromCharCode(((c.charCodeAt(0) - (c <= "Z" ? 65 : 97) + 13) % 26) + (c <= "Z" ? 65 : 97)));
 const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasText: text });
 
-test("two signed-in players see each other's lines within a few seconds; a guest sees none, its typing line greyed, and never asks for them", { tag: "@phone-only" }, async ({ page, browser }, info) => {
+test("two signed-in players see each other's lines within a few seconds; a guest reads them too (Eric, on #542), its typing line greyed with the way to an account", { tag: "@phone-only" }, async ({ page, browser }, info) => {
   test.setTimeout(150_000);
   const phone = info.project.name === "phone";
   await openSignedIn(page);
@@ -1284,7 +1284,7 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   await open(guest);
   await openTyping(guest);
   await expect(guest.locator(".tc-form input"), "a guest's typing line: greyed, saying how").toBeDisabled();
-  await expect(guest.locator(".tc-form input")).toHaveAttribute("placeholder", "Sign in to chat with other players.");
+  await expect(guest.locator(".tc-form input")).toHaveAttribute("placeholder", "Make a free account to chat.");
 
   await send(page, `hello from Ann ${run}`);
   // Mine, from the server's answer at once; Bo's within a few seconds (the live poll every 5 s).
@@ -1316,10 +1316,10 @@ test("two signed-in players see each other's lines within a few seconds; a guest
   expect(annOnBo, "Ann looks the same on Bo's screen").toEqual(annOnAnn);
   expect(boOnAnn, "Bo looks the same on Ann's screen").toEqual(boOnBo);
 
-  // The guest: none of it, ever asked for, and only the bosses' chatter in the log.
-  await guest.waitForTimeout(6_000);
-  await expect(guest.locator(".tc-player")).toHaveCount(0);
-  expect(asked, "a guest never asks for players' lines").toEqual([]);
+  // The guest reads both lines (Eric, on #542: "They should be able to see the chat. They just can't type in it").
+  await expect(lineOf(guest, `hello from Ann ${run}`)).toHaveCount(1, { timeout: 10_000 });
+  await expect(lineOf(guest, `hi back from Bo ${run}`)).toHaveCount(1, { timeout: 10_000 });
+  expect(asked.length, "a guest asks for players' lines").toBeGreaterThan(0);
   await guest.evaluate(() => (window as any).__townSay("Hollow", "The park gets quiet after dark.", "boss"));
   await expect(guest.locator(".tc-boss")).toHaveCount(1);
 });
