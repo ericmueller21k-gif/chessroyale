@@ -96,6 +96,22 @@ describe("the street town's layout is the plan's (Nov 5)", () => {
     expect(STREET_LOTS.filter((l) => l.kind === "home")).toHaveLength(16);
   });
 
+  it("no lamp stands in front of a boss's home (Eric, Nov 7: \"lamp posts right in front of Big Boy's Crib and Dash's Kicks… it just looks bad\"): none in any home's frontage box, its lot's width (its picture's, shifted) and half a square either side, from its front to the street's walking line", () => {
+    const MARGIN = 0.5;
+    const homes = STREET_LOTS.filter((l) => l.kind === "home");
+    expect(homes).toHaveLength(16);
+    for (const h of homes) {
+      // (Every home's front faces south, onto the sidewalk row just south of it: the walking line is that row's street edge.)
+      expect(h.facing, h.id).toBe("S");
+      const s = h.shift ?? 0;
+      const x0 = h.c0 - 0.5 + Math.min(0, s) - MARGIN;
+      const x1 = h.c0 + h.w - 0.5 + Math.max(0, s) + MARGIN;
+      const y0 = h.r0 - 1.5;
+      const y1 = h.r0 - 0.5 + h.inset;
+      for (const l of LAMPS) expect(l.c >= x0 && l.c <= x1 && l.r >= y0 && l.r <= y1, `the lamp at ${at(l.c, l.r)} is in ${h.id}'s frontage`).toBe(false);
+    }
+  });
+
   it("walks on the streets, sidewalks and the park, round everything standing there, never on a lot, a garden or the Colosseum", () => {
     const solid = new Set<string>();
     for (const p of PLAN.props) if (["tree", "bench", "lamp", "table", "shed"].includes(p.kind)) solid.add(at(Math.round(p.x), Math.round(p.y)));
