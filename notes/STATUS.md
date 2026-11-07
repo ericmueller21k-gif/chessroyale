@@ -398,3 +398,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Haiku now: claude/fix-timber-tap), then squads-watch:167, squads-three-boards:152, dash.spec:241 (flaky), town-leave:143 (flaky).
 - Auto chess mockup v3 sent (square thin double borders, hex border, line work, players top-left with big pawns + HP/XP like today,
   gear top-right, no title/back for now). Waiting on Eric's go.
+- Eric APPROVED auto chess redesign (brief-autochess-redesign.md). QUEUED as the next Opus job after typed chat + right column.
