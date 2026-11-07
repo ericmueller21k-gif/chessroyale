@@ -338,3 +338,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   - It fires with no warning. Treat it like the other ults: when he plays it at the start of his turn, the banner comes up, then
     "Next turn: Scramble Rush", and he says a line (e.g. "Hope you were watching."). The put-back starts the turn after.
   - The put-back can be spammed: a hard cap of 2 moves per piece. A third try shakes the piece, with small fading text "No more tries".
+- **Nov 7 ~00:20 UTC: MISS.** Squads three boards (built Nov 5, held for Eric's look at stills) was never chased or merged; Eric
+  noticed. Merged main into it (squads specs: new titles + @phone-only), stills moved out of the repo, PR #538 (full-e2e),
+  CI watcher. Merge on green (Eric expects it live). Lesson: every "waiting on Eric" item goes in the one-message list each time.
+- Waiting on Eric now: #538 Squads (merging on green), #537 Boingo stills, the settings mockup, Smudgy pilot stills (coming),
+  the ledger backfill run (admin).
