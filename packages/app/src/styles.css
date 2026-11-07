@@ -22269,9 +22269,11 @@ button.sq-tiny {
     width: 0;
     height: 0;
   }
+  /* (In front of him, over his edge, on his feet's line: Nov 7. He stands `--side-lift` higher where he comes over the board's corner.) */
   .tg-side-pump {
     position: absolute;
-    bottom: 0;
+    z-index: 1;
+    bottom: var(--side-lift, 0px);
     width: calc(34px * var(--tg-s));
     height: calc(36px * var(--tg-s));
     pointer-events: none;

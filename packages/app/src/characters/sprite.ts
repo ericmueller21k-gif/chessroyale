@@ -90,6 +90,11 @@ export interface Character {
    * specks stay as the art has them; only the finished picture is turned round.
    */
   mirror?: boolean;
+  /**
+   * Parts with writing on them (Big Boy's shirt's "BIG BOY"): drawn mirrored, the character draws each of these unmirrored where it
+   * stands, so it still reads (sprite-kit.ts `turned`).
+   */
+  reads?: readonly string[];
 }
 
 /**
@@ -216,7 +221,8 @@ export function frameKeys(ch: Character, frame: Frame): Cells {
   for (const layer of frame.layers) {
     const part = ch.parts[layer.part];
     if (!part) throw new Error(`${ch.id}: no part "${layer.part}"`);
-    const { cells, dx, dy } = placed(part, layer);
+    // (Writing drawn mirrored: its own pixels turned back where it stands, so the whole picture's mirror leaves it reading.)
+    const { cells, dx, dy } = placed(part, ch.mirror && ch.reads?.includes(layer.part) ? { ...layer, flipX: !layer.flipX } : layer);
     const outlined = part.outline !== false;
     const ox = layer.x + dx;
     const oy = layer.y + dy;

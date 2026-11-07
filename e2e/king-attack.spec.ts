@@ -41,7 +41,8 @@ async function sample(page: Page) {
         on: !!a?.classList.contains("on"),
         hit: a ? Number(a.getAttribute("data-hit")) : null,
         boss: !!document.querySelector(".ka-boss canvas"),
-        flip: !!document.querySelector(".ka-boss.flip"),
+        // (Mirrored: flipped, or for a figure with writing on it (Big Boy) drawn turned, its writing reading: `data-mirrored`.)
+        flip: document.querySelector(".ka-boss")?.getAttribute("data-mirrored") === "1",
         hp: [...document.querySelectorAll(".ka-hp")].map((e) => e.textContent),
         lashes: [...document.querySelectorAll(".ka-hp")].map((e) => Number(e.getAttribute("data-lash"))),
         red: document.querySelectorAll(".ls-dmg").length,

@@ -12,7 +12,7 @@
  *   keeps the old layout.
  * - Boss alone's empty left column (`.tower-space`, kept for the boss and Babur's pump) is 196 px (Nov 1; 216 before): room for
  *   the widest boss beside the board and for his words (his text box, up to 220 px, right-aligned on him, its left edge at the
- *   window's content edge), the rest to the board. Babur's grows with the board, for his pump.
+ *   window's content edge), the rest to the board. Babur's is the same since Nov 7 (his pump in front of him).
  * - The column beside the board is 340 px where the window has the room for the board's height, 280 px where the board is
  *   width-bound (`--side-w`); a leaderboard beside a board is 340 px (was 360). Nov 1: the side menu's width comes out of these.
  * - A computer is a window 900 × 600 and up with a mouse (`pointer: fine`): a tablet on its side (a touch screen as wide) keeps
@@ -104,9 +104,9 @@
     --scr: min(var(--win-w) - var(--ts-w, 196px) - 20px, max(1000px, var(--scr-need)));
   }
   /* (With no eval bar, every player's board, the board takes the bar's 24 px and the boss stands 24 px further out: his column is
-     24 px wider, so his words keep their room. Round 2 (Nov 1): not Babur's, whose column is his formula below with or without the bar:
-     at 240 px his pump didn't fit beside him at 1440 and 1920, so it went in the taller bar and the board shrank.) */
-  .arena:not(:has(.board-row > .eval-bar)):not(:has(.tg-pump-slot)) {
+     24 px wider, so his words keep their room. Babur's too since Nov 7: his pump stands in front of him, over his edge, so his column,
+     his board and every figure's size are everyone's: characters/side-size.ts, Tiger.tsx `sidePump`.) */
+  .arena:not(:has(.board-row > .eval-bar)) {
     --ts-w: 240px;
   }
   /* His words (Nov 1): his text box is no wider than his column, so its left edge stays in the window (boss alone's column is
@@ -119,15 +119,6 @@
      at 340 px (the window's height is the limit) that's 242 px. (Nov 1: at 1440 × 900 they ran 44 px off the window.) */
   .screen.game:has(> .boss-dock):has(.you-pawn) > .boss-dock .gk-bubble {
     max-width: min(250px, calc(var(--side-w) - 98px));
-  }
-  /* Babur: his pump stands beside him (docs/decisions/2026-10-24-babur-desktop-pump.md) and grows with the board (a stage-4 queen
-     on it as tall as her piece: up to 0.177 of the board wide), so his column grows with the board's height bound too: room for
-     him, the pump and the gap at any size, where the window has it. Round 2 (Nov 1, the eval bar off for everyone): with no bar this
-     is his column too (the 240 px above is not Babur's). It's 240 px at 1280 × 800 (the board 600, as a player's was) and 338 at
-     1920 × 1080: at 1440 × 900 and 1920 × 1080 his pump stands beside him at the board's size, not in the taller bar (that took the
-     board to 832 at 1920). Was 153 px + 0.175 of the window's height less 200 (with the bar), 170 before: the side menu's 80 px. */
-  .arena:has(.ch-tiger, .tg-pump-slot) {
-    --ts-w: clamp(240px, calc(0.35 * var(--app-h) - 40px), 340px);
   }
   .arena .screen.game:has(> .boss-dock) {
     --gk-screen: var(--scr);

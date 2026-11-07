@@ -53,7 +53,7 @@ test.beforeEach(async ({ page }) => {
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
 type Wood = { move: string | null; log: string | null; fog: string | null; ring: boolean; stumps: string | null };
 type Dark = { move: string | null; bulbs: number; lanterns: number; run: number; tree: number; tag: number; level: number; black: number; pool: number; iris: number };
-type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; looks: number | null; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null; chant: string | null; dark: Dark | null };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; looks: number | null; mirrored: boolean; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null; chant: string | null; dark: Dark | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -959,10 +959,13 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   const seen = new Set<string>();
   // (His attack, seen at any look before the swirl covers: a slow phone's screenshots for the GIF can make the looks far apart.)
   let attacked = false;
+  // (Eric, Nov 7: his shirt read "OIB YOB" in here. Drawn facing front (sprite-kit.ts), never mirrored: standing, and swinging.)
+  const turned: string[] = [];
   const step = async () => {
     const i = await intro(page);
     const s = i?.step ?? "";
     seen.add(s);
+    if (i && (i.mirrored || (i.looks !== 0 && i.looks !== null))) turned.push(`${s}${i.attack ? " (his attack)" : ""}: looks ${i.looks}, mirrored ${i.mirrored}`);
     if (i?.attack && (await storm(page).getAttribute("data-covered", { timeout: 50 }).catch(() => null)) !== "1") attacked = true;
     return s;
   };
@@ -1003,6 +1006,8 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   if (SHOTS) writeFileSync(`${SHOTS}/bigboy-timing-${project}.txt`, `Fight to covered: ${coveredMs} ms\n`);
   for (const [i, f] of frames.entries()) writeFileSync(`${SHOTS}/bigboy-gif-${String(i).padStart(3, "0")}-${String(f.at).padStart(6, "0")}.png`, f.png);
   expect([...seen].filter((s) => ["line", "build", "drop", "plop", "chairs", "table"].includes(s)).length).toBeGreaterThanOrEqual(4);
+  expect(turned, "Big Boy never drawn mirrored in his Crib (his shirt reads BIG BOY)").toEqual([]);
+  expect(atLine.looks, "drawn as his art faces: front").toBe(0);
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
   await expect(storm(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Big Boy's Crib" })).toHaveCount(0);

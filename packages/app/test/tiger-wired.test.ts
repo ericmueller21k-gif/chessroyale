@@ -11,7 +11,7 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength, cueAt } from "../src/characters/power-art.ts";
-import { HOP_TRIP_MS, PUMP_BAR_SHARE, PUMP_FIT, TIGER_UI, blockCell, pumpScale, sidePump, tripMove } from "../src/components/Tiger.tsx";
+import { HOP_TRIP_MS, PUMP_BAR_SHARE, PUMP_FIT, PUMP_OVER, PUMP_OVER_MAX, TIGER_UI, blockCell, pumpScale, sidePump, tripMove } from "../src/components/Tiger.tsx";
 import { POOF_AT, balloonFen, landBeats, noteTiger, pumpShows, resetTiger, ringShows, ringState, type TigerShow } from "../src/tiger-show.ts";
 import { REFUSED } from "../src/refused.ts";
 
@@ -293,7 +293,7 @@ describe("the pump's size and place on a computer", () => {
     const desk = readFileSync(new URL("../src/board-size.css", import.meta.url), "utf8");
     expect(desk).toContain(`--bd-h: calc((var(--app-h) - var(--bd-room) + 38px) / ${(1 + PUMP_BAR_SHARE).toFixed(4)});`);
   });
-  it("stands left of his figure on his baseline, clear of everything, or nowhere (then the taller bar)", () => {
+  it("stands in front of his figure, over his left edge by 10 px (Eric, Nov 7), on his baseline, clear of everything, or nowhere (then the taller bar)", () => {
     // At 1280 x 800 (Boss alone: the leaderboard one row): his 2x sprite from x 250, his feet on the board's bottom at 577.
     const fig = { left: 250, top: 377, right: 402, bottom: 589 };
     const tower = { left: 10, top: 0, right: 370, bottom: 110 };
@@ -304,8 +304,17 @@ describe("the pump's size and place on a computer", () => {
     expect(box.bottom).toBe(577);
     expect(box.bottom - box.top).toBeCloseTo(36 * s, 6);
     expect(box.right - box.left).toBeCloseTo(34 * s, 6);
-    // (Its drawn right edge, column 33 of 34, 6 px left of his drawn left edge, column 4 of his.)
-    expect(box.left + 33 * s).toBeCloseTo(250 + 4 * 2 - 6, 6);
+    // (Its drawn right edge, column 33 of 34, 10 px over his drawn left edge, column 4 of his.)
+    expect(PUMP_OVER).toBe(10);
+    expect(box.left + 33 * s).toBeCloseTo(250 + 4 * 2 + PUMP_OVER, 6);
+    // A side menu in the way left of him: slid toward him, over him further, up to PUMP_OVER_MAX of its drawn width; past that, nowhere.
+    const menu = (right: number) => ({ left: 0, top: 0, right, bottom: 800 });
+    const room = 250 + 8 + PUMP_OVER - 33 * s;
+    const slid = sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [menu(room + 20), evalBar])!;
+    expect(slid.left).toBeCloseTo(room + 20, 6);
+    expect(slid.left + 33 * s - 258).toBeCloseTo(PUMP_OVER + 20, 6);
+    expect(sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [menu(room + PUMP_OVER_MAX * 32 * s - 1), evalBar])).not.toBeNull();
+    expect(sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [menu(room + PUMP_OVER_MAX * 32 * s + 1), evalBar])).toBeNull();
     // A raid's leaderboard down the whole column: no room.
     expect(sidePump(fig, 2, 577, s, { w: 1280, h: 800 }, [{ ...tower, bottom: 800 }, evalBar])).toBeNull();
     // From 900 to 1099 px he's drawn at 1x by the window's edge: no room.

@@ -2034,7 +2034,9 @@ function startRoom(
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false, px: 0 };
   /** Which way the boss's town figure faced on the screen as last drawn (1 east, -1 west), where its art's facing is data (sprites.ts); else null. */
-  let bossLooks: 1 | -1 | null = null;
+  let bossLooks: 1 | 0 | -1 | null = null;
+  /** Whether the boss's figure, or its attack, was drawn mirrored, as last drawn. */
+  let bossMirrored = false;
   /**
    * The boss's God King attack, at the boss's own size in the room: its lashes swung in place (no drop-in, no leap off), its feet
    * where the boss stands (clear of its stool, Nov 2), facing you. Turned to face the way it should (the art faces right, or left
@@ -2050,7 +2052,9 @@ function startRoom(
     const k = (ci!.boss.squares * pt.k) / ci!.boss.ch.h;
     // (Its feet where the boss stands, clear of its stool: Nov 2, "make sure they're not standing where the chair blocks are".)
     const fx = pt.x;
-    const flip = (face < 0) !== a.facesLeft;
+    // (A boss drawn facing front, Big Boy, swings as his figure stands: never mirrored, his shirt reading.)
+    const flip = artFacing(ci!.boss.ch.id) === "front" ? false : (face < 0) !== a.facesLeft;
+    bossMirrored = flip;
     const y0 = pt.y - a.ch.foot[1] * k;
     g.save();
     // (Mirrored about its feet: they stay where they are.)
@@ -2531,11 +2535,12 @@ function startRoom(
     g.save();
     // (Turned to face `facing`, by the way its art faces: its sprite's (sprite-kit.ts, sprites.ts: Smudgy's left); a boss not on the
     // kit yet as its attack's art faces, as its kit says (Babur's and Puddles' left), or one without one as its intro says (Dash's left).)
+    // (Art drawn facing front, Big Boy's, is never mirrored: Nov 7, his shirt read "OIB YOB".)
     const art = artFacing(b.ch.id);
-    const artLeft = art ? art === "left" : !!(ci.attack ? ci.attack.facesLeft : ci.def.facesLeft);
-    const flip = mirrorFor(artLeft ? "left" : "right", boss.facing < 0 ? "left" : "right");
-    // (Which way its drawing faces on the screen, where its art's facing is data: the test hook's.)
-    bossLooks = art ? ((art === "left") !== flip ? -1 : 1) : null;
+    const flip = mirrorFor(art ?? ((ci.attack ? ci.attack.facesLeft : ci.def.facesLeft) ? "left" : "right"), boss.facing < 0 ? "left" : "right");
+    // (Which way its drawing faces on the screen, where its art's facing is data (0: front), and whether it was mirrored: the test hook's.)
+    bossLooks = art === "front" ? 0 : art ? ((art === "left") !== flip ? -1 : 1) : null;
+    bossMirrored = flip;
     if (flip) {
       g.translate(pt.x, 0);
       g.scale(-1, 1);
@@ -3611,6 +3616,7 @@ function startRoom(
       facing: { you: you.facing, boss: own ? (own.flip ? -1 : 1) : boss.facing },
       // (Which way the boss's figure was drawn facing on the screen, by its sprite's facing data: null where that isn't known.)
       looks: bossLooks,
+      mirrored: bossMirrored,
       line: !!introNow?.line && bossHead.on,
       // (Ginger's own: his move, the blast, the icicle, the table, the crack, the door, the carriers, the board, the light, the pieces.)
       ice: iceNow

@@ -2,6 +2,7 @@ import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { hoopStops, hoopsValid } from "@chessroyale/chess";
+import { PUMP_OVER, PUMP_OVER_MAX } from "../packages/app/src/characters/side-size.ts";
 import { test, bossAloneFromHome, createLobbyFromHome, submitMove } from "./helpers.ts";
 
 /**
@@ -350,6 +351,20 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
   expect(errors).toEqual([]);
 });
 
+/**
+ * Babur's pump on a computer stands in front of him (Eric, Nov 7: "slightly overlapping … like just 10 pixels even is enough"): its drawn
+ * right edge (column 33 of 34) over his drawn left edge (column 4 of his 76) by PUMP_OVER px, up to PUMP_OVER_MAX of its drawn width, and
+ * drawn over him (its layer above his).
+ */
+async function inFrontOfHim(page: Page, pump: { x: number; width: number }, at: string) {
+  const fig = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
+  const s = pump.width / 34;
+  const over = pump.x + 33 * s - (fig.x + (4 * fig.width) / 76);
+  expect(over, `${at}: over his left edge by ${PUMP_OVER} px or more`).toBeGreaterThanOrEqual(PUMP_OVER - 1);
+  expect(over, `${at}: by at most ${PUMP_OVER_MAX} of its width`).toBeLessThanOrEqual(PUMP_OVER + PUMP_OVER_MAX * 32 * s + 1);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector(".boss-side > .tg-side-pump")!).zIndex), `${at}: drawn over him`).toBe("1");
+}
+
 test("Babur's pump at 320 in the bar's free room, at its right end, clear of the status; at 1280 beside him by the board, the bar's room left empty; nothing sideways", async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
@@ -370,12 +385,11 @@ test("Babur's pump at 320 in the bar's free room, at its right end, clear of the
   const room = (await page.locator(".boss-prop").boundingBox())!;
   const status = (await page.locator(".boss-next").boundingBox())!;
   if (desktop()) {
-    // A computer's (docs/decisions/2026-10-24-babur-desktop-pump.md): beside his figure, on the board's bottom, left of him; none in the bar.
+    // A computer's (docs/decisions/2026-10-24-babur-desktop-pump.md): in front of his figure, on the board's bottom, over his left edge; none in the bar.
     await expect(page.locator(".tg-pump-slot")).toHaveAttribute("data-place", "side");
     await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);
-    const fig = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
     const feet = (await page.locator(".boss-char.place-side").boundingBox())!;
-    expect(pump.x + pump.width, "left of him").toBeLessThanOrEqual(fig.x + 12);
+    await inFrontOfHim(page, pump, "1280");
     expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), "on his baseline, by the board's bottom").toBeLessThan(1.5);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
     expect(errors).toEqual([]);
@@ -549,10 +563,9 @@ test("Babur's pump on a computer at 1280 × 800, 1440 × 900, 1920 × 1080 and 1
     expect(clear, `${at}: over nothing`).toEqual([]);
     if (place === "side") {
       // (His baseline: his box's bottom, where his feet are, by the board's bottom; the board's row can be a few px taller than the board.)
-      const fig = (await page.locator(".boss-char.place-side .boss-char-sprite").boundingBox())!;
       const feet = (await page.locator(".boss-char.place-side").boundingBox())!;
       const board = (await page.locator(".hb-board").boundingBox())!;
-      expect(pump.x + pump.width, `${at}: left of him`).toBeLessThanOrEqual(fig.x + 12);
+      await inFrontOfHim(page, pump, at);
       expect(Math.abs(pump.y + pump.height - (feet.y + feet.height)), `${at}: on his baseline`).toBeLessThan(1.5);
       expect(Math.abs(pump.y + pump.height - (board.y + board.height)), `${at}: by the board's bottom`).toBeLessThan(6);
       await expect(page.locator(".boss-bar .tg-pump")).toHaveCount(0);

@@ -3,6 +3,7 @@ import { BoardTurn, viewSquare } from "../board-view.ts";
 import { KING_ATTACK, kingAttackHits, lastStandHits, mateAttackDue } from "@chessroyale/chess";
 import { bossKit, type KingAttackKit } from "../characters/kits.ts";
 import { partSize } from "../characters/sprite.ts";
+import { turned } from "../characters/sprite-kit.ts";
 import { EFFECTS, darkItem, type SquareItem } from "../characters/power-art.ts";
 import { pickLine } from "../characters/boss-beats.ts";
 import type { BossView } from "../game.ts";
@@ -48,6 +49,8 @@ export function prewarmKingAttack(name: string): void {
   if (!ka || warmed.has(key)) return;
   warmed.add(key);
   prewarmSprite(ka.ch, ka.ch.anims[ka.anim]?.frames ?? []);
+  // (Big Boy's turned one too, for a king to his right: his writing still reads.)
+  if (ka.ch.reads?.length) prewarmSprite(turned(ka.ch), ka.ch.anims[ka.anim]?.frames ?? []);
   attackTop(ka);
   // (Its hits' effect: Hollow's lash, Alfil's jab.)
   const fx = ka.hit("a1", 0, "L", 0).name;
@@ -193,7 +196,9 @@ export function KingAttack({
   const row = orientation === "white" ? 7 - r : r;
   // He stands on the side toward the board's middle, facing the king; smaller near the board's top (kingAttackPlace).
   const { left, from, mirrored, box, clipTop } = kingAttackPlace(ka, col, row);
-  const { ch } = ka;
+  // (A figure with writing on it, Big Boy's shirt, is drawn turned rather than flipped, so it still reads: sprite-kit.ts `turned`.)
+  const reads = mirrored && !!ka.ch.reads?.length;
+  const ch = reads ? turned(ka.ch) : ka.ch;
   const sq = (v: number) => `calc(var(--board-size, 100%) * ${v.toFixed(4)} / 8)`;
   const hits = kingAttackHits();
   const beat = kingAttackBeat(t);
@@ -226,7 +231,7 @@ export function KingAttack({
         </span>
       )}
       {him && (
-        <span class={`ka-boss${mirrored ? " flip" : ""}`} style={{ left: sq(box.x), top: sq(box.y), width: sq(box.w), aspectRatio: `${ch.w} / ${ch.h}`, ...(clipTop > 0 ? { clipPath: `inset(${(clipTop * 100).toFixed(2)}% 0 0 0)` } : {}) }}>
+        <span class={`ka-boss${mirrored && !reads ? " flip" : ""}`} data-mirrored={mirrored ? "1" : "0"} style={{ left: sq(box.x), top: sq(box.y), width: sq(box.w), aspectRatio: `${ch.w} / ${ch.h}`, ...(clipTop > 0 ? { clipPath: `inset(${(clipTop * 100).toFixed(2)}% 0 0 0)` } : {}) }}>
           {/* (Moo's attack during his Full Moon is drawn powered up: the kit's `poweredAnim`.) */}
           <SpriteAnim ch={ch} anim={ka.poweredAnim && kit.powered?.on(boss, now, "bossMove") ? ka.poweredAnim : ka.anim} since={startAt} sounds={ka.sounds ?? kit.sounds} id={`attack-${seed}`} />
         </span>

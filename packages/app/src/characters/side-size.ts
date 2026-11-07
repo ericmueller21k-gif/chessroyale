@@ -12,11 +12,16 @@
  * wide up (from 900 to 1099 px he stays at 1×: no room).
  */
 export const SIDE_FEEL = {
-  /** The figures' wanted size by the board's: the boss's screen px a sprite px is the board's side over this, at most `max`. */
-  boardPerPx: 170,
-  /** Never smaller than they were (2 px a sprite px; the God King 1×), never past this (twice as big). */
+  /**
+   * One size for every boss (Eric, Nov 7: "how are the king and the pawn so different sized … shrink the ones that are currently larger …
+   * about a 15% shrink"; docs/decisions/2026-11-07-one-side-size.md): the screen px a sprite px is the board's side over this, at most
+   * `max` (each 15% under Nov 4's 170 and 4), and no more than the widest and tallest boss (SIDE_REACH) fits in the room, so every boss,
+   * Babur too, is drawn at the same size at a window size.
+   */
+  boardPerPx: 200,
+  /** Never smaller than they were (2 px a sprite px; the God King 1×), never past this. */
   min: 2,
-  max: 4,
+  max: 3.4,
   /** In steps of this, so a window's small change doesn't redraw the figure. */
   step: 0.05,
   /** Room kept free between a figure and the window's edge, or the menu beside an empty column, px. */
@@ -26,15 +31,25 @@ export const SIDE_FEEL = {
   /** How far a figure may come over the board's outer edge where its room doesn't (a share of the board's side: 0.05, 0.4 of a square). */
   over: 0.05,
   /**
-   * Bosses that keep their old size and place (2): Babur, whose pump stands beside him in that room at the board's scale (else it goes into
-   * a taller bar and the board shrinks: docs/decisions/2026-10-24-babur-desktop-pump.md).
+   * Bosses that stand as far toward the board as `over` lets them, at the same size: Babur, whose pump stands in front of him, left of
+   * him, overlapping him a little (components/Tiger.tsx `sidePump`; docs/decisions/2026-10-24-babur-desktop-pump.md, Nov 7).
    */
-  keep: ["tiger"] as readonly string[],
-  /** The God King and your pawn grow to the boss's wanted size over 2, at most this. */
-  kingMax: 2,
+  lean: ["tiger"] as readonly string[],
+  /** The God King and your pawn: the bosses' size over 2, at most this (15% under Nov 4's 2), the same in every fight. */
+  kingMax: 1.7,
+  /** The share of the room right of the board they fill at most (Nov 7: 15% smaller than they were, "so then the king fits"). */
+  kingFill: 0.85,
   /** Your pawn's drawing, half its width: a share of its art's box (`--pw`; a pawn fills about 0.68 of its square). */
   pawnHalf: 0.34,
 } as const;
+
+/**
+ * Babur's pump stands in front of him on a computer (Eric, Nov 7: "the pump can just be sitting in front of him, slightly overlapping, and
+ * he's kind of standing behind it a little bit, like just 10 pixels even is enough"): over his drawn left edge by PUMP_OVER px, more where
+ * the room left of him is short, up to PUMP_OVER_MAX of the pump's drawn width (components/Tiger.tsx `sidePump`).
+ */
+export const PUMP_OVER = 10;
+export const PUMP_OVER_MAX = 0.4;
 
 /**
  * How far each boss's drawing reaches from its feet, left, up, right and down (sprite px; down: the rows drawn from the one its feet
@@ -96,8 +111,12 @@ export type SideRoom = {
 /** The sizes, and the middles (page x) the boss's box and the first figure right of the board stand at (null: where they were). */
 export type SidePlace = { s: number; k: number; bossMid: number | null; firstMid: number | null };
 
+/** The widest and the tallest any boss's drawing reaches (SIDE_REACH): what the one size must fit (sprite px). */
+export const SIDE_WIDEST = Math.max(...Object.values(SIDE_REACH).map(([l, , r]) => l + r));
+export const SIDE_TALLEST = Math.max(...Object.values(SIDE_REACH).map(([, u]) => u));
+
 export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss = ""): SidePlace {
-  if (r.fixed || feel.keep.includes(boss)) return { s: feel.min, k: 1, bossMid: null, firstMid: null };
+  if (r.fixed) return { s: feel.min, k: 1, bossMid: null, firstMid: null };
   const down = (v: number, step: number) => Math.round(Math.floor(v / step + 1e-6) * step * 100) / 100;
   const r1 = (v: number) => Math.round(v * 10) / 10;
   const want = Math.min(feel.max, r.board / feel.boardPerPx);
@@ -107,19 +126,25 @@ export function sideSizes(r: SideRoom, feel: typeof SIDE_FEEL = SIDE_FEEL, boss 
   const lc = (r.bossMid - r.bossLeft) / r.s;
   const rc = (r.bossRight - r.bossMid) / r.s;
   const up = (r.boardBottom - r.bossTop) / r.s;
-  const fitLeft = (r.boardLeft + over - r.leftLimit - feel.margin) / (lc + rc);
-  const fitUp = up > 0 ? (r.boardBottom - feel.margin) / up : Infinity;
-  const s = r.bossFixed ? feel.min : Math.max(feel.min, down(Math.min(want, fitLeft, fitUp), feel.step));
-  // (His drawing's right edge a gap off the board, or as far over it as his room needs, never further.)
-  const bossRight = Math.min(r.boardLeft + over, Math.max(r.boardLeft - feel.gap, r.leftLimit + feel.margin + (lc + rc) * s));
+  // The one size: what the widest and the tallest boss would fit in this room (his own reach swapped for theirs), whoever stands here.
+  const reach = SIDE_REACH[boss];
+  const wider = reach ? Math.max(0, SIDE_WIDEST - reach[0] - reach[2]) : 0;
+  const taller = reach ? Math.max(0, SIDE_TALLEST - reach[1]) : 0;
+  const fitLeft = (r.boardLeft + over - r.leftLimit - feel.margin) / (lc + rc + wider);
+  const fitUp = up > 0 ? (r.boardBottom - feel.margin) / (up + taller) : Infinity;
+  const shared = Math.max(feel.min, down(Math.min(want, fitLeft, fitUp), feel.step));
+  const s = r.bossFixed ? feel.min : shared;
+  // (His drawing's right edge a gap off the board, or as far over it as his room needs, never further; a boss who leans, over it by `over`.)
+  const lean = feel.lean.includes(boss);
+  const bossRight = lean ? r.boardLeft + over : Math.min(r.boardLeft + over, Math.max(r.boardLeft - feel.gap, r.leftLimit + feel.margin + (lc + rc) * s));
   const bossMid = r.bossFixed ? null : r1(bossRight - rc * s);
   if (!r.right) return { s, k: 1, bossMid, firstMid: null };
-  // Right of the board: the figures there as big as the boss's wanted size over 2, as far as their room allows.
+  // Right of the board: your pawn and the God King the one size over 2, filling at most `kingFill` of their room.
   const ri = (r.right.mid - r.right.inner) / r.k;
   const ro = (r.right.outer - r.right.mid) / r.k;
   const lo = r.boardRight - (r.right.over ? over : 0);
   const edge = r.rightLimit - feel.margin;
-  const k = Math.max(1, Math.min(feel.kingMax, down(Math.min(want / 2, (edge - lo) / (ri + ro)), feel.step)));
+  const k = Math.max(1, Math.min(feel.kingMax, down(Math.min(shared / 2, (feel.kingFill * (edge - lo)) / (ri + ro)), feel.step)));
   const inner = Math.max(lo, Math.min(r.boardRight + feel.gap, edge - (ri + ro) * k));
   return { s, k, bossMid, firstMid: r1(inner + ri * k) };
 }

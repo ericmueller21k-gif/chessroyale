@@ -671,8 +671,12 @@ build): online, phase 1 won is the crowd's victory):
   drawing at rest and where each beat ends is `SIDE_REACH` / `KING_REACH` (measured by a test). BossSide sets `--side-s`, `--side-d`,
   `--king-k`, `--first-d` and `--king-room` (the God King's words and menu fit it) on the screen; the God King's frame past the window's
   edge is clipped (`.gm-main`), never scrolled to. The mirror (your pawn's middle as far from the board as the boss's) gave way to this:
-  each side by its own room. Babur and a party's battle keep 2 and their places. The board, a phone and 900 to 1099 px are unchanged.
+  each side by its own room. A party's battle keeps 2 and its places. The board, a phone and 900 to 1099 px are unchanged.
   Decision: [2026-11-04-bigger-side-figures.md](../decisions/2026-11-04-bigger-side-figures.md).
+- **One size (Nov 7).** Every boss, Babur too, the same screen px a sprite px at a window size: the board over 200, at most 3.4, no more
+  than the widest and tallest boss (`SIDE_WIDEST`, `SIDE_TALLEST`) fit; your pawn and the God King half that, at most 1.7, filling 85% of
+  their room. Babur leans to the board (`SIDE_FEEL.lean`), his pump in front of him over his edge (`PUMP_OVER`), in everyone's column.
+  Guard: `e2e/side-same-size.spec.ts`. Decision: [2026-11-07-one-side-size.md](../decisions/2026-11-07-one-side-size.md).
 - **Eric's rule (Nov 4):** every figure whole on screen at rest and where each beat ends (docs/rules/eric.md); guard
   `e2e/boss-side.spec.ts`. Stills: `scripts/stills-battle-desktop.mjs` (sides, cast, cave). Decision:
   [2026-11-04-battle-desktop-fixes.md](../decisions/2026-11-04-battle-desktop-fixes.md).
@@ -710,7 +714,7 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 character, the way its art faces, anchors, ramps, frame templates) and the shared rules (ink outline, ramps of 3+ steps, crisp from 1.5x, `TEXEL`).
 Facing is data: callers ask for a facing (`facingAs`, `mirrorFor`, `artFacing`), never guess. A kit's `sprite` makes its `ch` that sprite turned to
 face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next
-touched. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
+touched. Big Boy (Nov 7) faces `front`: never mirrored; his attack on a king to his right is drawn `turned`, his shirt's word (`reads`) reading. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
 
 ### The base boss (`packages/chess/src/bosses/base.ts`)
 

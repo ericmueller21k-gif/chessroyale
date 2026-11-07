@@ -16,6 +16,7 @@ import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Can
 import { BOUNCE, KING_ATTACK, SNACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
 import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import type { Sprite } from "./sprite-kit.ts";
 
 export const BIGBOY_PALETTE: Record<string, string> = {
   k: "#2a1712", // outline
@@ -213,8 +214,8 @@ function word(cv: Canvas, text: string, cx: number, y0: number): void {
   for (const [px, py] of ink) cv[py]![px] = "r";
 }
 
-/** The shirt's grid: 29 x 16, at (20, 26) in his drawing space (its top two rows under his chin). */
-function shirt(): Part {
+/** The shirt's grid: 29 x 16, at (20, 26) in his drawing space (its top two rows under his chin); `words`: with its letters. */
+function shirtCanvas(words: boolean): Canvas {
   const cv = canvas(29, 16);
   const outline: Pt[] = [[4, 0], [25, 0], [28.6, 3], [28.4, 15.6], [0.6, 15.6], [0.4, 3]];
   shade(cv, inPoly(outline), "TtuU", (x, y) => 0.95 - 0.022 * x - 0.03 * y);
@@ -222,9 +223,22 @@ function shirt(): Part {
   for (const [x, y] of [[3, 9], [4, 10], [4, 11], [25, 9], [24, 10], [24, 11]] as const) cv[y]![x] = "T";
   // The neckline (mostly under his chin).
   for (let x = 9; x <= 19; x++) cv[0]![x] = x < 14 ? "u" : "t";
-  word(cv, "BIG", 14.5, 3);
-  word(cv, "BOY", 14.5, 9);
-  return { grid: toGrid(cv) };
+  if (words) {
+    word(cv, "BIG", 14.5, 3);
+    word(cv, "BOY", 14.5, 9);
+  }
+  return cv;
+}
+const shirt = (): Part => ({ grid: toGrid(shirtCanvas(false)) });
+/**
+ * The shirt's "BIG BOY" (its letters and their shadow) on their own, drawn over the shirt where it stands: the part that keeps reading
+ * when he's drawn mirrored (BIGBOY's `reads`; Eric, Nov 7: "OIB YOB"). The shirt is symmetric about the word's middle, so it lies on it.
+ */
+function shirtWord(): Part {
+  const all = shirtCanvas(true);
+  const cv = canvas(29, 16);
+  all.forEach((row, y) => row.forEach((k, x) => (k === "r" || k === "R") && (cv[y]![x] = k)));
+  return { grid: toGrid(cv), outline: false };
 }
 
 /** His belly between the shirt and the diaper, with a navel. */
@@ -362,6 +376,7 @@ function stick(from: Pt, to: Pt): Part {
 const { parts: PARTS, add } = lazyParts();
 add("hair", () => hair);
 add("shirt", shirt);
+add("shirtWord", shirtWord);
 add("belly", belly);
 add("diaper", diaper);
 add("shadow", shadow);
@@ -531,6 +546,7 @@ export function bigBoyLayers(p: BigBoyPose): Layer[] {
     at("belly", 22 + sway, 37 + bob),
     at("diaper", 20 + sway, 45 + bob),
     at("shirt", 20 + sway, 26 + bob),
+    at("shirtWord", 20 + sway, 26 + bob),
     at("hair", 29 + sway + (p.headDx ?? 0), -3 + bob + (p.headDy ?? 0)),
     at(`head:${p.mood ?? "blank"}`, 17 + sway + (p.headDx ?? 0), 3 + bob + (p.headDy ?? 0)),
     ...(behindFree ? held : [L(free), ...held]),
@@ -825,6 +841,21 @@ export const BIGBOY: Character = {
   looks: LOOKS,
   parts: PARTS,
   anims: { idle, swing, tantrum, snack, toss, bigBounce, lick, giggle, wail },
+  reads: ["shirtWord"],
+};
+
+/**
+ * Big Boy on the sprite kit (sprite-kit.ts; Nov 7, Eric: "just make him face the right way"): drawn facing front, so he's never
+ * mirrored to face a way (his room, the town, the board), and his shirt reads "BIG BOY" and his lollipop stays in his right hand. His
+ * attack on a king to his right is drawn `turned`, its writing still reading (`reads`).
+ */
+export const BIGBOY_SPRITE: Sprite = {
+  ch: BIGBOY,
+  facing: "front",
+  anchors: { feet: BIGBOY.foot, head: [OX + 30, OY + 14], hands: { lolly: [OX + LOLLY.hold.fist[0], OY + LOLLY.hold.fist[1]], free: [OX + FREE.hang[2]![0], OY + FREE.hang[2]![1]] } },
+  ramps: { skin: "dcCh", shirt: "TtuU", diaper: "PpqQ", lips: "MLN" },
+  frames: { idle: "idle", attack: "swing", talk: "giggle", hurt: "wail" },
+  unlined: "nyzsSj123456F",
 };
 
 /**
