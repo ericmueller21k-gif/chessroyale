@@ -399,3 +399,12 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Auto chess mockup v3 sent (square thin double borders, hex border, line work, players top-left with big pawns + HP/XP like today,
   gear top-right, no title/back for now). Waiting on Eric's go.
 - Eric APPROVED auto chess redesign (brief-autochess-redesign.md). QUEUED as the next Opus job after typed chat + right column.
+- **Eric, Nov 7 ~20:30:**
+  - Haiku NOW: boss result screen (no record text, no trophy/skull, styled Victory/Defeat, your pawn beside the God King, 2+ win and
+    2+ loss lines per boss) + each boss's goodbye line when you return to town (claude/result-screen, 9001).
+  - Haiku NOW: Dash clock: multi-hit (~5 smacks) every 4–5 of his moves with a line each time; once per game a "pop off" beat
+    (a few hits, line, 10 fast hits, "love my clock" line); 8–12 new clock lines (claude/dash-clock, 9002).
+  - LATER: Dash's clock as a legendary item.
+  - Opus QUEUE (before the auto chess redesign): Smudgy's ult announced "next turn" (~turn 6-7) but never fired: find what blocks it and
+    guarantee it fires once a game even in an odd position. Also look into whether our own engine lets Smudgy really paint a piece
+    (e.g. pawn → rook swap, the back-rank case) instead of today's workaround, and what that costs (Maia can't); report, don't build.
