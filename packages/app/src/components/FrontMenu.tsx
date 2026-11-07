@@ -5,6 +5,7 @@ import { useLive, type PlayingNow } from "../live.ts";
 import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo } from "./FrontDoor.tsx";
 import { GlobalChat } from "./GlobalChat.tsx";
 import { FriendsPanel, InviteToast } from "./Friends.tsx";
+import { AwayNote } from "./AwayNote.tsx";
 import { Pic } from "../home-art/Pic.tsx";
 import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
@@ -177,6 +178,8 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
       {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home" || page === "town"} onSignIn={nav.signIn} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
+      {/* Back from the town for being away (town/afk.ts): "You've been dropped from the town" on home. */}
+      {page === "home" && <AwayNote />}
     </div>
   );
 }

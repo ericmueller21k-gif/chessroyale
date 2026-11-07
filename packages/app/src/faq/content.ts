@@ -45,6 +45,7 @@ import {
   RANKING,
   RECLUSE_PHASE2,
   TOWN_CHAT,
+  TOWN_AFK,
   RATING_MIN_MOVES,
   SHOP_FREE,
   SQUADS,
@@ -1101,6 +1102,7 @@ function fairPlay(): FaqSection {
 - **What happens:** while an account is under review, its online results are held off the rankings. A confirmed cheater is banned from online play (solo stays open). Borderline cases go to a person, never straight to a ban, and a ban can be appealed.
 - **Reporting:** tap a player's name to report them. A report never bans anyone by itself: it puts their games in front of a reviewer sooner.
 - **Chat** is preset lines and emoji, except in the town square, where signed-in players type: up to ${TOWN_CHAT.maxChars} characters, one message every ${TOWN_CHAT.gapMs / 1000} seconds. Slurs, swearing, links and contact details are refused, and messages aren't kept (if someone reports one, the report keeps its words and when it was said, for a moderator to read). Tap a name in a chat to mute that player on your device, or to open their profile and report an offensive name or icon; tap a message in the town square to report it. A moderator can turn a player's chat off, take a town square message down, or reset their name and icon. Names with slurs or hate in them aren't allowed.
+- **Away in the town square:** after ${TOWN_AFK.zzzAfterSec / 60} minute without a tap, drag or key, a "zzz" floats over your pawn for everyone; after ${TOWN_AFK.bootAfterSec / 60} minutes, or ${TOWN_AFK.hiddenBootAfterSec / 60} with the app in the background, you're dropped from the town and back on the home page. A boss challenge or the claw machine never counts as away. Guests can look round the town for ${TOWN_AFK.guestTownSec} seconds and read its chat; walking on and chatting need a free account.
 - **Practice mode** is for our testers: unlimited power-ups, in the open. A tester practicing is marked 💡 on the leaderboard, and practice never counts toward any ranking.
 `,
   };

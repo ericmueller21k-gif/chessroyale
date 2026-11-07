@@ -14,13 +14,18 @@ test.use({ actionTimeout: 15_000 });
 test.skip(({ isMobile }) => !isMobile, "the phone project only: the wait is the same on a computer, whose chat town-chat.spec.ts covers");
 
 const run = Date.now().toString(36).slice(-5);
+/** This test's own town and chat (`?townroom=`): no other test's lines reach it. Set before every test. */
+let room = "";
+test.beforeEach(() => {
+  room = `hist${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+});
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
 const lineOf = (p: Page, text: string) => p.locator(".tc-player").filter({ hasText: text });
 
 /** The town, open, signed in (as `asSignedIn` makes an account; a moderator's address with `admin`), with the bosses' chatter stopped. */
 async function openSignedIn(page: Page, admin = false) {
   const open = async () => {
-    await page.goto("/town?sky=day");
+    await page.goto(`/town?sky=day&townroom=${room}`);
     await expect(canvas(page)).toHaveAttribute("data-ready", "1");
     await page.waitForFunction(() => typeof (window as any).__townSay === "function");
     await page.evaluate(() => (window as any).__townChatter(false));
