@@ -346,3 +346,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **Eric, Nov 7 ~00:45 (QUEUED, after the current queue): town AFK.** Today the town only pauses drawing while the tab is hidden and
   resumes on return; nobody is removed. Proposal sent: hidden 10 min, or visible with no input 15 min → your pawn leaves the town for
   everyone (server presence), and on return you land on the home page with a small "You were away" note. Numbers in settings.ts.
+  **Eric's call (Nov 7):** after a few min idle (3 min) a "zzz" floats over the pawn (no text box; others see it too). Boot at 10 min
+  of either: no movement while visible, OR in the background. Then: pawn leaves for everyone; on return, home page + "You were away".
