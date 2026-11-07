@@ -343,3 +343,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   CI watcher. Merge on green (Eric expects it live). Lesson: every "waiting on Eric" item goes in the one-message list each time.
 - Waiting on Eric now: #538 Squads (merging on green), #537 Boingo stills, the settings mockup, Smudgy pilot stills (coming),
   the ledger backfill run (admin).
+- **Eric, Nov 7 ~00:45 (QUEUED, after the current queue): town AFK.** Today the town only pauses drawing while the tab is hidden and
+  resumes on return; nobody is removed. Proposal sent: hidden 10 min, or visible with no input 15 min → your pawn leaves the town for
+  everyone (server presence), and on return you land on the home page with a small "You were away" note. Numbers in settings.ts.
