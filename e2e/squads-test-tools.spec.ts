@@ -52,7 +52,9 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   });
   expect(lobby).toEqual({ people: 1, bots: 31, vote: 0 });
   await page.getByRole("button", { name: "Skip votes" }).click();
-  // Relay: your move. The switch shows; nothing drawn until it's on.
+  // Relay: your move. The switch shows; nothing drawn until it's on. (A phone's Relay, Nov 5: a tiny icon in the top
+  // line, always there, its lines the arrows on the board; a computer: the button and the lines beside the board.)
+  const phone = test.info().project.name === "phone";
   const first = await nextDuty(page, null);
   expect(first.role).toBe("move");
   const cheat = page.getByRole("button", { name: "Cheat lines" });
@@ -63,13 +65,18 @@ test("the start link seats you with bots at once at the first vote; Skip votes; 
   await expect(arrows(page)).toHaveCount(3, { timeout: 30_000 });
   await expect(labels(page)).toHaveCount(3);
   for (const t of await labels(page).allTextContents()) expect(t).toMatch(/^([+−]\d\.\d|0\.0|#-?\d+)$/);
-  await expect(page.locator(".sq-cheat-lines li")).toHaveCount(3);
-  await expect(page.locator(".sq-cheat-lines li").first()).toContainText(/^1 · /);
-  // Your move made: nothing left to choose here, so the switch and its arrows go until your next choice.
+  if (!phone) {
+    await expect(page.locator(".sq-cheat-lines li")).toHaveCount(3);
+    await expect(page.locator(".sq-cheat-lines li").first()).toContainText(/^1 · /);
+  }
+  // Your move made: nothing left to choose here, so the arrows go until your next choice (and the switch: grayed on a
+  // phone, gone on a computer).
   const move = new Chess(first.fen).moves({ verbose: true }).map((m) => m.from + m.to + (m.promotion ?? "")).find((m) => m.length === 4)!;
   await tapSquare(page, move.slice(0, 2));
   await tapSquare(page, move.slice(2, 4));
-  await expect(cheat).toHaveCount(0);
+  if (phone) await expect(cheat).toBeDisabled();
+  else await expect(cheat).toHaveCount(0);
+  await expect(arrows(page)).toHaveCount(0);
   // Your next move: still on, worked out again for the new position.
   const second = await nextDuty(page, first.at);
   expect(second.fen).not.toBe(first.fen);
@@ -102,7 +109,7 @@ test("a player (not a test player) never gets Cheat lines: no button, and switch
   await page.evaluate(() => (window as any).squads.nextRound());
   const d = await nextDuty(page, null);
   expect(d.role).toBe("move");
-  await expect(page.locator(".sq-duty.move")).toBeVisible();
+  await expect(page.locator(".sq-to-row.you.lit")).toBeVisible();
   await expect(page.getByRole("button", { name: "Cheat lines" })).toHaveCount(0);
   await page.evaluate(() => (window as any).squads.toggleCheatLines());
   expect(await page.evaluate(() => (window as any).squads.cheatLines)).toBe(false);

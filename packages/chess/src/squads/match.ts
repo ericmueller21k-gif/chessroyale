@@ -63,13 +63,16 @@ export interface MatchResult {
   winner: Side | null;
   points: readonly [number, number];
   /**
-   * clinch: passed half the points with boards still going; boards: won on points with every board finished; time:
-   * level on points, more team bank left (rounds 1 and 2); coin: level on points and bank; armageddon: the Armageddon
-   * board; admin: the test-only "Next round".
+   * clinch: passed half the points with boards still going (on 3 boards, 2 of 3); boards: won on points with every
+   * board finished; black_draws: level on points, more boards drawn as Black (rounds 1 and 2, Nov 5); time: level on
+   * those too, more team bank left; coin: level on all three; armageddon: the Armageddon board; admin: the test-only
+   * "Next round".
    */
-  how: "clinch" | "boards" | "time" | "coin" | "armageddon" | "admin";
-  /** Each side's team bank left (ms), when it decided a tie. */
+  how: "clinch" | "boards" | "black_draws" | "time" | "coin" | "armageddon" | "admin";
+  /** Each side's team bank left (ms), when it came to a tie. */
   timeLeft?: readonly [number, number];
+  /** Each side's drawn boards as Black, when they decided a tie. */
+  blackDraws?: readonly [number, number];
 }
 
 export interface SquadsMatch {
@@ -313,7 +316,7 @@ export function matchClocks(m: SquadsMatch): [TeamClock, TeamClock] {
 }
 
 /**
- * A bracket match ready to play: round 1 Relay on 4 boards, round 2 Pairs on 2, the final on 1. Each squad brings its
+ * A bracket match ready to play: round 1 Relay on 3 boards (Nov 5; 4 before), round 2 Pairs on 2, the final on 1. Each squad brings its
  * team bank, topped up if this is a later round (it advanced). Classic has no blocks (a block bank of 0); Mercenary the
  * bank for a match, and the items each squad bought come in as its kit (`applyKit`) when the match starts.
  */
@@ -412,7 +415,8 @@ const seatsOf = (m: SquadsMatch, side: Side, seats: readonly number[]) => seats.
  */
 function dutyFor(m: SquadsMatch, b: SquadsBoard, side: Side, role: Role, seats: readonly number[]): Duty {
   const black = m.half === "b";
-  const replay = m.armageddon ? seats.map(() => 0) : seats.map((seat) => movesSinceLastPlayed(m.format, m.boards.length, seat, b.id, m.turn, black, b.moves.length));
+  const size = m.sides[side].seats.length;
+  const replay = m.armageddon ? seats.map(() => 0) : seats.map((seat) => movesSinceLastPlayed(m.format, m.boards.length, seat, b.id, m.turn, black, b.moves.length, side, size));
   const freeMs = m.delayMs + Math.max(0, ...replay) * (m.replayMsPerMove ?? 0);
   return { board: b.id, side, role, players: seatsOf(m, side, seats), deadlineMs: m.banks[side] > 0 ? m.capMs : freeMs, freeMs, replay };
 }
@@ -425,7 +429,8 @@ export function halfDuties(m: SquadsMatch, s: SquadsSettings = SQUADS): HalfDuti
   for (const b of m.boards) {
     const side = sideOf(b, m.half);
     if (m.format === "relay") {
-      const duty = dutyFor(m, b, side, "move", [relaySeat(n, b.id, m.turn)]);
+      // (On 3 boards the ring, a seat's place in it fixed; on 4, a match stored before Nov 5, one board along a turn.)
+      const duty = dutyFor(m, b, side, "move", [relaySeat(n, b.id, m.turn, m.sides[side].seats.length, side)]);
       (b.result ? out.scouts : out.duties).push(duty);
       continue;
     }
@@ -1079,7 +1084,7 @@ function payMatch(c: Ctx, result: MatchResult) {
 /** Mercenary: a finished board's coins (a win and any mate bonus, or a draw for each side). */
 function payBoard(c: Ctx, b: SquadsBoard) {
   if (c.m.mode !== "mercenary" || !b.result) return;
-  for (const x of boardCoins(b.result, c.m.round, c.s)) pay(c, sideOf(b, x.colour), x.coins, x.why, b.id);
+  for (const x of boardCoins(b.result, c.m.round, c.s, c.m.boards.length)) pay(c, sideOf(b, x.colour), x.coins, x.why, b.id);
 }
 
 function play(c: Ctx, board: number, move: string) {
@@ -1088,7 +1093,7 @@ function play(c: Ctx, board: number, move: string) {
   const taken = c.m.mode === "mercenary" ? capturedPiece(b.fen, move) : null;
   const next = playOnBoard(b, move);
   c.boards[board] = next;
-  if (taken) pay(c, sideOf(b, c.m.half), captureCoins(taken, c.m.round, c.s), "capture", board, { move, piece: taken });
+  if (taken) pay(c, sideOf(b, c.m.half), captureCoins(taken, c.m.round, c.s, c.m.boards.length), "capture", board, { move, piece: taken });
   if (next.result) {
     c.events.push({ kind: "board_end", board, result: next.result });
     payBoard(c, next);
@@ -1245,17 +1250,34 @@ export function matchPoints(boards: readonly SquadsBoard[], s: SquadsSettings = 
   return pts;
 }
 
-/** A level match (rounds 1 and 2): more team bank left wins; exactly level, a seeded coin. */
-function tiebreak(m: Pick<SquadsMatch, "seed" | "key" | "banks">, points: readonly [number, number], admin: boolean): MatchResult {
-  const left = m.banks;
-  if (left[0] !== left[1]) return { winner: left[0] > left[1] ? 0 : 1, points, how: admin ? "admin" : "time", timeLeft: [left[0], left[1]] };
-  return { winner: coin(squadsRng(m.seed, m.key, "tiebreak")), points, how: admin ? "admin" : "coin", timeLeft: [left[0], left[1]] };
+/** Each side's drawn boards played as Black (a level match's first tiebreak: Armageddon gives a draw to Black). */
+export function blackDraws(boards: readonly SquadsBoard[]): [number, number] {
+  const out: [number, number] = [0, 0];
+  for (const b of boards) if (b.result && b.result.winner === null) out[otherSide(b.white)]++;
+  return out;
 }
 
 /**
- * The match's result, if it's decided. A squad with more than half the points has won (clinched, if boards are
- * still going: the match ends at once). Every board finished and level: in rounds 1 and 2, the squad with more team
- * bank left (a coin if exactly level); a drawn final has no winner yet (Armageddon). Armageddon: a draw is Black's.
+ * A level match (rounds 1 and 2; the director's call on Eric's Nov 5 "black gets an extra point for a draw or
+ * whatever", Eric's to change): the squad with more drawn boards as Black (Armageddon gives a draw to Black); level
+ * there too, more team bank left; exactly level, a seeded coin. (In Pairs the first never decides: a level score there
+ * is a win each, or both boards drawn, one as Black each.)
+ */
+function tiebreak(m: Pick<SquadsMatch, "seed" | "key" | "banks" | "boards">, points: readonly [number, number], admin: boolean): MatchResult {
+  const left = m.banks;
+  const timeLeft: [number, number] = [left[0], left[1]];
+  const black = blackDraws(m.boards);
+  if (black[0] !== black[1]) return { winner: black[0] > black[1] ? 0 : 1, points, how: admin ? "admin" : "black_draws", timeLeft, blackDraws: black };
+  if (left[0] !== left[1]) return { winner: left[0] > left[1] ? 0 : 1, points, how: admin ? "admin" : "time", timeLeft };
+  return { winner: coin(squadsRng(m.seed, m.key, "tiebreak")), points, how: admin ? "admin" : "coin", timeLeft };
+}
+
+/**
+ * The match's result, if it's decided. A squad the other can't catch up even by winning every board left has won
+ * (clinched, if boards are still going: the match ends at once; Relay's 3 boards: 2 of 3, best 2 out of 3, or 1½–0
+ * with one board left). Every board finished and level: in
+ * rounds 1 and 2, `tiebreak` (more draws as Black, then more team bank left, then a coin); a drawn final has no winner
+ * yet (Armageddon). Armageddon: a draw is Black's.
  */
 export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "armageddon" | "boards" | "banks">, s: SquadsSettings = SQUADS): MatchResult | null {
   const { boards } = m;
@@ -1266,8 +1288,11 @@ export function matchResultOf(m: Pick<SquadsMatch, "seed" | "key" | "format" | "
     return { winner: b.result.winner === "w" ? b.white : otherSide(b.white), points, how: "armageddon" };
   }
   const all = boards.every((b) => b.result);
+  // (Nov 5: decided as soon as the other squad can't catch up even winning every board left, e.g. 1½–0 with one left;
+  // more than half the points, best 2 of 3, is the usual way. A level finish still possible: played out, the tie order.)
+  const left = boards.filter((b) => !b.result).length * s.winPoints;
   for (const side of [0, 1] as const) {
-    if (points[side] > (boards.length * s.winPoints) / 2) return { winner: side, points, how: all ? "boards" : "clinch" };
+    if (points[side] > points[otherSide(side)] + left) return { winner: side, points, how: all ? "boards" : "clinch" };
   }
   if (!all) return null;
   return m.format === "final" ? { winner: null, points, how: "boards" } : tiebreak(m, points, false);
@@ -1344,11 +1369,11 @@ export function endByMaterial(m: SquadsMatch, s: SquadsSettings = SQUADS): { mat
     if (b.result) return b;
     const done = decideByMaterial(b, "admin", s);
     events.push({ kind: "board_end", board: b.id, result: done.result! });
-    for (const x of boardCoins(done.result!, m.round, s)) pay(sideOf(b, x.colour), x.coins, x.why, b.id);
+    for (const x of boardCoins(done.result!, m.round, s, m.boards.length)) pay(sideOf(b, x.colour), x.coins, x.why, b.id);
     return done;
   });
   const decided = matchResultOf({ ...m, boards }, s)!;
-  const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak(m, decided.points, true);
+  const result: MatchResult = decided.winner !== null ? { ...decided, how: "admin" } : tiebreak({ ...m, boards }, decided.points, true);
   if (!m.armageddon) for (const side of [0, 1] as const) pay(side, s.mercenary.played, "played", null);
   if (result.winner !== null) pay(result.winner, s.mercenary.matchWin, "match_win", null);
   events.push({ kind: "match_end", result });

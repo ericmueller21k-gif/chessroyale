@@ -3,6 +3,12 @@ import type { NetDuty, NetSquadsLobby, NetSquadsHalf, NetTeamClock, SquadsBlock,
 import { START_FEN, applyMove, inCheck } from "@chessroyale/chess";
 import {
   SQUAD_NAMES,
+  lastMovesBy,
+  relayMover,
+  boardQueue,
+  foldedRows,
+  queueLine,
+  queuePlace,
   bankText,
   cheatArrows,
   cheatEval,
@@ -470,5 +476,68 @@ describe("Mercenary on screen", () => {
     expect(canTapChip({ ...m, visible: { a0: "e2e4" } }, "a0", 1_000)).toBe(false);
     expect(canTapChip({ ...m, mode: "classic" }, "a0", 1_000)).toBe(false);
     expect(canTapChip({ ...m, current: half(m.current!.duties, [{ board: 0, by: "a0", at: 500 }]) }, "a0", 1_000)).toBe(false);
+  });
+});
+
+describe("The turn order under the board (Relay on 3 boards; Eric, Nov 5: one queue for the board on screen)", () => {
+  const sides = [
+    { squadId: 0, seats: ["a0", "a1", "a2", "a3"] },
+    { squadId: 1, seats: ["b0", "b1", "b2", "b3"] },
+  ];
+  const board = (id: number, moves: string[]) => ({ id, white: (id % 2) as 0 | 1, moves, startFen: START_FEN, fen: START_FEN, lastMove: null, result: null });
+  const at = (moves: string[][], duties: { board: number; side: 0 | 1; players: string[] }[] = [], locked: string[] = []) =>
+    ({
+      sides,
+      turn: moves[0]!.length >> 1,
+      state: "half",
+      locked,
+      boards: moves.map((mv, i) => board(i, mv)),
+      current: { seq: 1, turn: 0, half: "w", startedAt: 0, duties: duties.map((d) => ({ ...d, role: "move", deadline: 1 })), scouts: [], forced: [], chips: [] },
+    }) as unknown as LocalMatch;
+  const ids = (m: LocalMatch, b: number, me: string | null = null) => boardQueue(m, b, me).map((r) => r.id);
+
+  it("all 8 players, both squads interleaved, in the order they'll move on this board: the next there on top", () => {
+    const m = at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]);
+    // Board 3 (side 0 White): a0, then b1 (side 1's Black there), then each squad's player there a turn on (the ring
+    // brings each squad's seats to a board one turn apart: 1, 4, 3, 2).
+    expect(ids(m, 2)).toEqual(["a0", "b1", "a3", "b0", "a2", "b3", "a1", "b2"]);
+    for (const b of [0, 1, 2]) expect(new Set(ids(m, b)).size).toBe(8);
+    expect(boardQueue(m, 2, "a0")[0]).toMatchObject({ id: "a0", lit: true, you: true });
+    expect(boardQueue(m, 2, "a0").filter((r) => r.lit)).toHaveLength(1);
+  });
+
+  it("whoever moves drops to the bottom and everyone moves up", () => {
+    const before = ids(at([[], [], []]), 2);
+    const after = ids(at([[], [], ["e2e4"]]), 2);
+    expect(after).toEqual([...before.slice(1), before[0]]);
+  });
+
+  it("your row: \"Your turn · play now\" only on top (Eric: nothing lower down); your place for screen readers; a phone's folded 4 keep your row", () => {
+    const m = at([[], [], []]);
+    const q = (me: string) => boardQueue(m, 2, me);
+    // On top with your move on now: "Your turn · play now"; on top before it's on (no move asked yet): nothing yet.
+    expect(queueLine(boardQueue(at([[], [], []], [{ board: 2, side: 0, players: ["a0"] }]), 2, "a0"))).toBe("Your turn · play now");
+    expect(queueLine(q("a0"))).toBeNull();
+    expect(queueLine(q("a3"))).toBeNull();
+    expect(queueLine(q("zz"))).toBeNull();
+    expect(queuePlace(q("a0"))).toBe(0);
+    expect(queuePlace(q("a3"))).toBe(2);
+    expect(queuePlace(q("b2"))).toBe(7);
+    expect(queuePlace(q("zz"))).toBeNull();
+    expect(foldedRows(q("a3")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b0"]);
+    // Further down: the top 3, then you.
+    expect(foldedRows(q("b2")).map((r) => r.id)).toEqual(["a0", "b1", "a3", "b2"]);
+  });
+
+  it("each player's last move, from the schedule: its board and ply (a row's tap shows the position after it)", () => {
+    const m = at([["e2e4", "e7e5"], ["d2d4", "d7d5"], ["c2c4", "c7c5"]]);
+    expect(relayMover(m, 2, 0)).toBe("a0");
+    expect(relayMover(m, 0, 0)).toBe("a1");
+    expect(relayMover(m, 1, 1)).toBe("a2");
+    expect(relayMover(m, 1, 0)).toBe("b0");
+    const last = lastMovesBy(m);
+    expect(last.get("a0")).toEqual({ board: 2, ply: 0 });
+    expect(last.get("b2")).toEqual({ board: 0, ply: 1 });
+    expect(last.get("a3")).toBeUndefined();
   });
 });

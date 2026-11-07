@@ -556,13 +556,20 @@ describe("the FAQ on Squads (v2: tokens, blocks, the team vote)", () => {
   });
 });
 
-describe("the FAQ on Squads' screens (Oct 14: jump to my next board, who's watching)", () => {
-  it("names the switch as the screen does, and says whether it starts on from the setting", () => {
+describe("the FAQ on Squads' screens (Oct 14: jump to my next board, who's watching; Nov 5: Relay on 3 boards)", () => {
+  it("names the setting as the screen does, and says whether it starts on from the setting", () => {
     const t = section("modes");
-    expect(t).toContain("Jump to my next board (on unless you switch it off, under the board) takes you straight to the board you play next turn");
+    expect(t).toContain("Quick board jump (on unless you switch it off, in the gear's list and Settings) takes you straight to the board you play next");
     expect(t).toContain("An eye and pawns over a board show who else is watching it.");
     const off = section("modes", { ...FAQ_DEFAULTS, squadsWatching: { jumpToNext: false } });
-    expect(off).toContain("Jump to my next board (off unless you switch it on, under the board)");
+    expect(off).toContain("Quick board jump (off unless you switch it on, in the gear's list and Settings)");
+  });
+
+  it("Relay: 3 boards and 4 of you in a fixed order, best 2 of 3, the tie, and the turn order's words", () => {
+    const t = section("modes");
+    expect(t).toContain("Round 1, Relay: 3 boards and 4 of you");
+    expect(t).toContain("Best 2 of 3 boards wins; a level score goes to the squad with more boards drawn as Black, then more team clock left.");
+    expect(t).toContain('"Your turn · play now"');
   });
 });
 

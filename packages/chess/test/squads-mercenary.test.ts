@@ -117,7 +117,7 @@ function match(format: "relay" | "pairs" | "final", starts: string[], o: Partial
     s,
   );
 }
-const relay = (starts = Array(4).fill(START_FEN), o: Partial<MatchSetup> = {}) => match("relay", starts, o);
+const relay = (starts = Array(3).fill(START_FEN), o: Partial<MatchSetup> = {}) => match("relay", starts, o);
 const pairs = (starts = Array(2).fill(START_FEN), o: Partial<MatchSetup> = {}) => match("pairs", starts, o);
 const final = (fen = START_FEN, o: Partial<MatchSetup> = {}) => match("final", [fen], o);
 const kit = (k: Partial<ItemCounts>): ItemCounts => ({ ...NO_ITEMS, ...k });
@@ -228,15 +228,19 @@ describe("Mercenary: earning coins", () => {
     expect(capturedPiece(BG5, "g5f6")).toBe("n");
     expect(capturedPiece(EN_PASSANT, "e5f6")).toBe("p");
     expect(capturedPiece(START_FEN, "e2e4")).toBeNull();
-    const m = relay([BG5, START_FEN, START_FEN, START_FEN]);
+    const m = relay([BG5, START_FEN, START_FEN]);
     const out = resolveHalf(m, inputs(m, rest(m, { [moverOn(m, 0)]: "g5f6" })));
-    expect(ofKind(out.events, "coins")).toEqual([{ kind: "coins", turn: 0, half: "w", side: 0, coins: M.capture.n * M.roundScale[0], why: "capture", board: 0, move: "g5f6", piece: "n" }]);
-    expect(out.match.coins).toEqual([M.capture.n * M.roundScale[0], 0]);
+    const knight = Math.round(M.capture.n * M.roundScale[0]);
+    expect(ofKind(out.events, "coins")).toEqual([{ kind: "coins", turn: 0, half: "w", side: 0, coins: knight, why: "capture", board: 0, move: "g5f6", piece: "n" }]);
+    expect(out.match.coins).toEqual([knight, 0]);
   });
 
   it("fewer boards, more a board: Pairs and the final multiply a board's coins, so every round pays about the same", () => {
-    // Relay plays 4 boards, Pairs 2, the final 1: the scale makes up for it (Eric, Oct 13: 500-800 a squad a round).
-    expect(M.roundScale[0]).toBe(1);
+    // Relay plays 3 boards (Nov 5; 4 before), Pairs 2, the final 1: the scale makes up for it (Eric, Oct 13: 500-800 a
+    // squad a round). Three boards at ×4/3 pay what four did at ×1.
+    expect(SQUADS.boards.relay).toBe(3);
+    expect(M.roundScale[0]).toBeCloseTo(4 / 3);
+    expect(SQUADS.boards.relay * M.roundScale[0]).toBeCloseTo(4);
     expect(M.roundScale[1]).toBeGreaterThan(M.roundScale[0]);
     expect(M.roundScale[2]).toBeGreaterThan(M.roundScale[1]);
     for (const r of [0, 1, 2] as const) {
@@ -252,22 +256,24 @@ describe("Mercenary: earning coins", () => {
   });
 
   it("a board won pays its winner (more for a checkmate); a drawn board pays both", () => {
-    expect(boardCoins({ winner: "w", reason: "checkmate" }, 0)).toEqual([
-      { colour: "w", coins: M.boardWin, why: "board_win" },
-      { colour: "w", coins: M.mate, why: "mate" },
+    // (Pairs' rates: ×2.)
+    expect(boardCoins({ winner: "w", reason: "checkmate" }, 1)).toEqual([
+      { colour: "w", coins: M.boardWin * 2, why: "board_win" },
+      { colour: "w", coins: M.mate * 2, why: "mate" },
     ]);
-    expect(boardCoins({ winner: "b", reason: "safety_cap" }, 0)).toEqual([{ colour: "b", coins: M.boardWin, why: "board_win" }]);
-    expect(boardCoins({ winner: null, reason: "stalemate" }, 0).map((x) => [x.colour, x.coins])).toEqual([
-      ["w", M.boardDraw],
-      ["b", M.boardDraw],
+    expect(boardCoins({ winner: "b", reason: "safety_cap" }, 1)).toEqual([{ colour: "b", coins: M.boardWin * 2, why: "board_win" }]);
+    expect(boardCoins({ winner: null, reason: "stalemate" }, 1).map((x) => [x.colour, x.coins])).toEqual([
+      ["w", M.boardDraw * 2],
+      ["b", M.boardDraw * 2],
     ]);
-    const m = relay([SCHOLAR, START_FEN, START_FEN, START_FEN]);
+    const m = relay([SCHOLAR, START_FEN, START_FEN]);
     const out = resolveHalf(m, inputs(m, rest(m, { [moverOn(m, 0)]: "h5f7" })));
     const coins = ofKind(out.events, "coins").filter((e) => e.board === 0);
+    const k = M.roundScale[0];
     expect(coins.map((e) => [e.side, e.why, e.coins])).toEqual([
-      [0, "capture", M.capture.p],
-      [0, "board_win", M.boardWin],
-      [0, "mate", M.mate],
+      [0, "capture", Math.round(M.capture.p * k)],
+      [0, "board_win", Math.round(M.boardWin * k)],
+      [0, "mate", Math.round(M.mate * k)],
     ]);
   });
 
@@ -507,7 +513,8 @@ describe("Mercenary: the items", () => {
     const all = rest(m, {});
     const think = Object.fromEntries(Object.keys(all).map((p) => [p, 5_000]));
     const bank = ofKind(resolveHalf(m, inputs(m, all), think).events, "bank");
-    expect(bank.map((e) => e.drainedMs)).toEqual([2 * (5_000 - DELAY), 2 * (5_000 - DELAY)]);
+    // (Relay on 3 boards: two of squad 0's moves this half, one of squad 1's.)
+    expect(bank.map((e) => e.drainedMs)).toEqual([2 * (5_000 - DELAY), 5_000 - DELAY]);
   });
 
   it("a match stored with a breather's free seconds plays on with the match's own; nothing else changes", () => {

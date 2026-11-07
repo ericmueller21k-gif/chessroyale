@@ -16,7 +16,7 @@ import { MercenaryShop } from "../components/MercenaryShop.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
-import { ReplayButton, ReplayTip } from "../components/MoveReplay.tsx";
+import { ReplayButton } from "../components/MoveReplay.tsx";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -197,10 +197,9 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
       below={<StandingsStrip client={client} onLeave={onLeave} exit={exit} />}
       menu={
         <>
-          {/* Move replay's button by the gear, as in a match, and its first-time tip (Eric, Nov 5). */}
+          {/* Move replay's button by the gear, as in a match (Eric, Nov 5; its tips: the match's coach marks). */}
           <ReplayButton />
           <MatchMenu exit={exit} />
-          <ReplayTip code={client.code} />
         </>
       }
     />

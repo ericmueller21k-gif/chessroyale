@@ -94,9 +94,19 @@ move.
   forced moves; the mercy rule), `choose` / `lockIn` / `halfReady` while the clocks run, `visibleChoices` for what each
   viewer may see, then `resolveHalf` with each player's thinking time: it drains the banks, plays the half, and returns
   the events, who acted, who missed and who ran out of time. Then the safety cap, the result, the next half.
-  - **Relay** (round 1, 4 boards): seat i is on board (i + turn) mod 4 (`relaySeat`). Side 0 is White on boards 1 and
-    3, so every player alternates colors turn by turn and each half two of a squad move. A finished board: whoever's
-    turn it would be there scouts.
+  - **Relay** (round 1, 3 boards since Nov 5; docs/decisions/2026-11-05-squads-three-boards.md): squads stay 4, so each
+    squad has one more player than boards. **The ring** (`relayRing`, `relaySeat`, `relayBoardOf`, `relayMovesOf` in
+    schedule.ts): a squad's moves are numbered in the order they're played (its White boards in the first half, its
+    Black ones in the second, each half's in ring order, so the whole runs one board along: side 0 boards 3, 1, 2; side 1
+    boards 2, 3, 1), and move k is seat k mod 4's. Seats 1-3 start on the boards, seat 4 waits and takes the first board
+    to come free (a tie in a half: the ring's order); one seat a squad sits out each turn (4, 3, 2, 1, 4...); each of
+    your moves is one board along from your last; every place is fixed for the match. Side 0 is White on boards 1 and 3,
+    side 1 on board 2, so a squad moves on two boards in one half and one in the other (the drain counts who's thinking
+    at once). Colors: every player plays each board once every three of their moves, so each has their squad's split
+    (side 0: 2 White to 1 Black) and never 3 of a color running. A finished board: whoever's place in the ring it is
+    scouts. Random openings: boards 1-2 share one (colors swapped), board 3 has its own. A match stored on 4 boards (a
+    lobby in play across the deploy) finishes on 4: seat i on board (i + turn) mod 4, as before (`relaySeat` picks the
+    rule by the match's board count).
   - **Pairs** (round 2, 2 boards): `pairSchedule`: partners 1+2, 1+3, 1+4 (and the other two), player 1's pair
     alternating slots; slot 0 plays board 1, slot 1 board 2. Each picks; a coin plays one. A missed pick is a random
     move other than the partner's. One move to play: it plays itself.
@@ -121,8 +131,12 @@ move.
     in effect on the other squad's next turn there (`m.blocks`: `choose` refuses them, "blocked"; misses, forced moves
     and bots never play them), then gone.
   - **The safety cap** (120 moves per side) is the only cap: material decides a board still going then.
-  - **Clinch**: more than half the points ends the match at once. **Ties** in rounds 1 and 2: the squad with more
-    team bank left at the end of the match, a seeded coin if exactly level; no Armageddon. **A drawn final**: one
+  - **Clinch**: the match ends at once when the other squad can't catch up even winning every board left; each
+    finished board shares out one point, so that is exactly more than half the points (Relay: 2 of 3, best 2 out of 3).
+    **Ties** in rounds 1 and 2 (`tiebreak`; Nov 5, the director's call on Eric's "black gets an extra point for a draw
+    or whatever", Eric's to change): the squad with more boards drawn as Black (`blackDraws`, as Armageddon gives a draw
+    to Black; "black_draws"), then more team bank left ("time"), then a seeded coin ("coin"); no Armageddon. (In Pairs
+    the first never decides: a level score there is a win each, or both drawn, one as Black each.) **A drawn final**: one
     Armageddon board, a vote too, on its own fixed clocks (`startArmageddon`: White 1:30, Black 1:00, +1 s, by
     team-clock rules with the lobby's free seconds; a draw is Black's), each squad keeping the block bank the final
     left it. The squad with more team bank left picks its color (`armageddonChooser`). `endByMaterial` is the
@@ -134,7 +148,8 @@ move.
     rules emit "coins" events (a Mercenary match only): the base, `played`, to both squads as a match ends (most of the
     coins; a drawn final's Armageddon doesn't pay it again) and the match won; on top, a capture by the piece taken (en
     passant a pawn), a board won and more for a mate, a drawn board to each side. A board's coins are
-    multiplied by `roundScale` (Relay ×1, Pairs ×2, the final ×4: fewer boards, more each), so every round pays a
+    multiplied by `roundScale` (Relay ×4/3 on its 3 boards since Nov 5, a stored 4-board match ×1; Pairs ×2, the final
+    ×4: fewer boards, more each), so every round pays a
     squad about the same (Eric, Oct 13: 500-800 a round on average). A **brilliant move**
     (`brilliantCandidate`, then `isBrilliant` over the judge's top moves): a quiet move (no capture, not out of check),
     from ply `brilliant.fromPly`, the best by `brilliant.gap` of expected score over every other move in a position
@@ -471,14 +486,15 @@ door's look; every class is `sq-`.
     accent frame, as its tiny board's ring in the strip, and the line above it starts with the board's number
     (`.sq-board-no`; more than one board only), white or black as you play that board (neutral if you aren't in the
     match).
-  - **Jump to my next board** (Relay; Eric, Oct 14): a switch in the panel (after your move's panel), with an (i) that
-    says in a sentence what it does (`JUMP_NEXT_LABEL`, `JUMP_NEXT_INFO`). On (the default, `watching.jumpToNext`;
+  - **Quick board jump** (Relay; Eric, Oct 14 as "Jump to my next board"; Nov 5: an on/off row in the gear's list,
+    `QuickJumpRow`, and in Settings → Squads with its line, `JUMP_NEXT_LABEL`, `JUMP_NEXT_INFO`; nothing of it under
+    the board). On (the default, `watching.jumpToNext`;
     remembered on the device, `brc.squads.jumpNext`, `squadsJumpNext` in prefs.ts), once you've made your Relay move the
     big board goes to the board you play next turn, `watching.jumpAfterMs` (600 ms) later so your piece lands first
     (your move shows nowhere else until the half ends), unless you've opened another board meanwhile. Next turn's board
     finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
-    above the board says "Watching Board 3 · your next board"; "Back to my board" works as before, and the jump comes
-    once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
+    above the board says "Watching Board 3 · your next board"; a tap on your own tiny board brings you back ("Back to
+    my board" is gone, Nov 5), and the jump comes once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
     The half ending at once with your move (you were the last to move) doesn't call the jump off (Eric, Oct 18: it
     waited for the other half instead; `squads-watch.spec.ts` covers it).
   - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
@@ -489,6 +505,32 @@ door's look; every class is `sq-`.
     go. Static, and it listens for who's watching itself (`client.onViewers`): a `viewers` message redraws these pawns
     and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.
   - **Relay:** your move shows on your board at once and stays (no snap-back); "Moved · waiting for the half to end".
+  - **Relay's match screen** (Eric, Nov 5; docs/decisions/2026-11-05-squads-three-boards.md):
+    - **The tiny boards**: each match's 3 side by side, centered. A finished board isn't grayed: a border and a check
+      mark in the winning squad's color (`wonBy`, `.sq-done`); a drawn one a neutral border and "½".
+    - **The top line**: the test-only "Next round" a tiny icon hard left (admins and test lobbies), and on a phone's
+      Relay Cheat lines a tiny icon beside it (grayed when there's nothing to choose; its lines the arrows on the board).
+    - **Under the board** only the move arrows (with the clocks' line) and **the turn order** (`TurnOrderBox`,
+      `boardQueue`, `queueLine`, `foldedRows` in squads-view.ts; Eric's correction): one queue for the board on screen,
+      all 8 players in the order they'll move on it, the next there on top (lit while it's their move now), each with
+      their squad's color and the move they last played (`lastMovesBy`, from the schedule); a tap on a row shows that
+      board at the position after it. Whole names, cut with an ellipsis, the move column in one place. Your row: a bold
+      "You" and your move, and "Your turn · play now" while you're on top and your move there is on (nothing else,
+      Eric). A phone shows 4 rows (you further down: the top 3 and yours), the strip at its right opens all 8 over the
+      board (upward, nothing below moves); a computer all 8, in the column beside the board. Never rebuilt (`Island`):
+      its element is made once and moved into each board's view before paint, its rows kept by player and gliding to
+      their new places (`useGlide`, FLIP, about 220 ms). No "Your move" box, no "Back to my board", no
+      jump switch, no rules line there; whose turn it is shows in the queue. Pairs and the final keep their panel.
+    - **Nothing cut off at the bottom** with a phone's browser bar (390 × 664, 393 × 659, 428 × 746, a short Android
+      360 × 560: the tiny boards and rows a little smaller under 620 px).
+    - **The coach marks** (`CoachMarks`, `COACH_MARKS` in move-replay.ts; replaced the replay tip): at a Relay in a
+      lobby joined from the queue (a test link: `?coach`; `?coachat=N` starts at the Nth), three tips one at a time, the
+      rest dimmed, a ring and a short line to the thing: "Tap here for settings, like Quick board jump.", "Tap to replay
+      moves: the last 2, all of them, or off.", "Tap a board to watch it. Tap yours to come back." A tap anywhere or OK
+      goes on; the last has "Don't show these again" (Eric): ticked, never again on this device (`brc.squads.coach`);
+      not ticked, again at the next lobby's Relay.
+    - **The tick** (`tickSecond`): only while your squad's real bank is in its last `SQUADS_LOBBY.tickBankSeconds` (5)
+      and you still have a move to make, never in the free seconds (Eric: it "makes you panic").
   - **Move replay** (Eric, Nov 5; `move-replay.ts`, `components/MoveReplay.tsx`): back on a board (Relay, Pairs), the
     moves played there since you last played it land one by one on a board drawn over the big board (from and to marked,
     a name tag over each moved piece: who played it, one box size, a long name smaller, over 12 letters cut with "…"),
@@ -496,11 +538,14 @@ door's look; every class is `sq-`.
     stands. The line above the board: "Your move · Board 2 · replay 2 of 3"; the free pill shows the replay icon in
     place of "free" while the extra lasts; your move's panel: "4.5 s free (+1.5 s for 3 moves missed), then your
     squad's clock runs.". A tap on the board skips it (the same tap reaches the real board under it). **The replay
-    button** (left of the gear in the match's and the votes' top lines): on (a dot trail runs round it) or off (no
-    replay; the extra time stays), per account on this device (`brc.squads.replay.<id>`). **The first-time tip**: the
-    first time an account queues (solo PLAY or a party's; a test link with `?replaytip`), over its lobby's votes, the
-    screen dimmed but for the button and the gear, a box saying what each does, "Don't show this again" and OK
-    (`brc.squads.tip.<id>`; not ticked: again next queue).
+    button** (left of the gear in the match's and the votes' top lines; Nov 5, round 2: no box, only the drawn ring):
+    a tap steps off (grayed, still) → the last 2 moves (your teammate's there and the reply; dots chase round it at the
+    first button's pace, a short trail) → all since you last played there (twice as fast, a longer trail) → off. Off on
+    a device's first match (`SQUADS_LOBBY.replay.mode`); per account on this device (`brc.squads.replay.<id>`: "off",
+    "two", "all"; the first button's "1" reads as all, "0" as off). **When it plays** (Eric, Nov 5; `replayMoves`): as
+    your move on the board starts, none if you were viewing that board when both of its last two moves landed (you saw
+    them live; the board's move count when it came on screen tells it); otherwise the replay as set, never a partial
+    rewind. The extra free time is the rule's, replay or not. The old first-time tip is gone: the coach marks say it.
   - **Pairs:** your pick green, your partner's live in blue; lock in. Their move too: "Same move: it plays for sure,
     and uses a token"; with none left the board won't take it ("No same-move tokens left: pick a different move").
     The reveal is Crowd's ghost-move reveal (`ShadeMoves`): both picks slide in with their pickers' names, a reel steps
@@ -637,19 +682,19 @@ No engine in the game: no move scoring, no God King, no power-ups. Playing to wi
    still going is decided by material count (no engine); level material is a draw. The final is always played to the
    end. A silent safety cap at move 120 (material) guards against endless games in "to the end" (director's call).
 
-### Round 1, Relay (4 boards per match, one player per move)
-- Your squad is White on 2 boards and Black on 2. Every turn you make one move, each turn on the next board along
-  (board 1, 2, 3, 4, 1...); each board gets exactly one of you per turn.
-- A turn has two halves: every board's White move, then every board's Black move (so in each half two of your squad
-  move and two wait). A half ends when everyone has moved or the timer runs out; after both halves everyone shifts one
-  board.
+### Round 1, Relay (3 boards per match since Nov 5, 4 before; one player per move)
+- Your squad is White on 2 boards and Black on 1 (or the reverse). Your squad's moves go round the ring of 4, each of
+  your moves one board along from your last; one of you waits each turn (the original 4-board text: each turn one
+  move, boards 1, 2, 3, 4, 1...).
+- A turn has two halves: every board's White move, then every board's Black move. A half ends when everyone has moved
+  or the timer runs out.
 - If a board has finished, whoever's turn it would be on it sits that turn out (they scout).
 - Screen: tiny boards across the top for every board in the lobby (the old TinyBoard/MiniBoard), your squad's 4
   highlighted, YOU and NEXT marked; your board full size; « » keep stepping through that board's moves. The tiny
   boards become tappable only after you have moved: tap to watch one full size, "Back to my board".
 - Missed move: a random legal move is played (Eric: not playing must always hurt), logged on the player's record;
   repeat no-shows are replaced by a bot.
-- Board win 1, draw ½. A squad that passes half the points (2.5 of 4) has clinched: the match ends at once.
+- Board win 1, draw ½. A squad that passes half the points (2 of 3) has clinched: the match ends at once.
 
 ### Round 2, Pairs (2 boards per match, two players per move)
 - The pair rule: both pick, each sees the other's pick, you can't pick the same move, a coin flip picks which plays

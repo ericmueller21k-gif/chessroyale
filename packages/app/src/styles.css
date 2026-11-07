@@ -16340,6 +16340,43 @@ button.sq-tiny {
   opacity: 0.4;
   filter: grayscale(1);
 }
+/* A finished board (Nov 5, round 2): not grayed, a border in the winning squad's color and its check mark in a corner;
+   a drawn board a neutral border and "½". */
+.sq-tiny.is-won .tiny-board,
+.sq-tiny.is-draw .tiny-board {
+  opacity: 1;
+  filter: none;
+  box-shadow: 0 0 0 2px var(--sq-won, var(--muted));
+}
+.sq-tiny.is-draw .tiny-board {
+  box-shadow: 0 0 0 2px var(--muted);
+}
+.sq-tiny.is-won.on .tiny-board,
+.sq-tiny.is-draw.on .tiny-board {
+  outline-offset: 3px;
+}
+.sq-done {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--sq-won, var(--muted));
+  color: #fff;
+  box-shadow: 0 0 0 1.5px var(--surface);
+  pointer-events: none;
+}
+.sq-done.draw {
+  background: var(--surface-2);
+  color: var(--text);
+  box-shadow: 0 0 0 1.5px var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
 .sq-mark {
   position: absolute;
   left: 50%;
@@ -16412,9 +16449,31 @@ button.sq-tiny {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The test-only "Next round" (admins and test lobbies): a tiny icon squeezed hard left of the top line (Nov 5, round 2). */
 .sq-next {
   flex: none;
   align-self: center;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 28px;
+  margin-right: -2px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px dashed var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+/* Cheat lines (test controls only): the switch, and the engine's top moves beside it while it's on. */
+.sq-cheat {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.sq-cheat-btn {
+  flex: none;
   min-height: 36px;
   padding: 0 10px;
   border-radius: 10px;
@@ -16426,14 +16485,8 @@ button.sq-tiny {
   font-weight: 800;
   cursor: pointer;
 }
-/* Cheat lines (test controls only): the switch, and the engine's top moves beside it while it's on. */
-.sq-cheat {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-}
-.sq-cheat-btn.on {
+.sq-cheat-btn.on,
+.sq-cheat-mini.on {
   border-style: solid;
   background: var(--accent);
   color: var(--accent-text);
@@ -16606,7 +16659,9 @@ button.sq-tiny {
   color: #fff;
 }
 .sq-game.sq-relay .board-area .board-wrap {
-  width: min(100%, calc(var(--app-h) - 362px));
+  width: min(100%, calc(var(--app-h) - 366px));
+  /* (The turn order under it: a short phone's least, 360 × 560 with its bars, keeps everything on screen.) */
+  min-width: 240px;
 }
 .sq-clockline {
   display: inline-flex;
@@ -23694,40 +23749,47 @@ button.sq-tiny {
 /* ---- Move replay in Squads (Eric, Nov 5; components/MoveReplay.tsx, docs/decisions/2026-11-05-move-replay.md) ---- */
 /* The replay button, next to the gear in Squads' top line: the gear's size and look. On, three dots chase slowly round its
    edge (a toggled-on ability); off, the plain icon. */
+/* Nov 5, round 2: no box, only the drawn ring; a tap steps off (grayed, still), the last 2 moves (dots chasing round it at
+   the first button's pace, a short trail), all moves (twice as fast, a longer trail). */
 .rp-btn {
   position: relative;
   flex: none;
-  width: 44px;
-  min-height: 42px;
+  width: 40px;
+  min-height: 40px;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--muted);
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
   font: inherit;
   display: grid;
   place-items: center;
   cursor: pointer;
 }
-.rp-btn.on {
-  color: var(--text);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+.rp-btn.is-off {
+  color: var(--muted);
+  opacity: 0.55;
 }
 .rp-icon {
   display: block;
 }
 .rp-trail {
   position: absolute;
-  inset: -1px;
-  width: calc(100% + 2px);
-  height: calc(100% + 2px);
+  left: 50%;
+  top: 50%;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
   pointer-events: none;
   overflow: visible;
 }
 .rp-trail-spin {
   fill: var(--accent);
-  transform-origin: 22px 21px;
+  transform-origin: 20px 20px;
   animation: rp-spin 2.8s linear infinite;
+}
+.rp-btn.is-all .rp-trail-spin {
+  animation-duration: 1.4s;
 }
 @keyframes rp-spin {
   to {
@@ -23735,7 +23797,8 @@ button.sq-tiny {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .rp-trail-spin {
+  .rp-trail-spin,
+  .rp-btn.is-all .rp-trail-spin {
     animation-duration: 8s;
   }
 }
@@ -23799,80 +23862,248 @@ button.sq-tiny {
     opacity: 0;
   }
 }
-/* The first-time tip: the screen dimmed but for rings round the replay button and the gear, and a small box under them. */
-.rp-tip {
+
+/* ---- Squads: Relay on 3 boards and a cleaner match screen (Eric, Nov 5, round 2; docs/decisions/2026-11-05-squads-three-boards.md) ---- */
+/* The turn order under the board (Eric's correction, Nov 5): one queue for the board on screen, all 8 players in the order
+   they'll move on it, the next there on top; each with their squad's color, your row saying where you stand, and the move
+   they last played on the right. A phone: 4 rows (a fixed box), a tap on the strip at the right opens all 8 over the board
+   (upward, so nothing below moves); a computer: all 8 in the column beside the board. */
+/* (The turn order's slot in each board's view, and its own element, made once and moved into it: no box of their own.) */
+.sq-island-slot,
+.sq-island {
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+}
+.sq-to {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 4px;
+  width: 100%;
+  height: calc(4 * 19px + 3 * 1px + 8px);
+  box-sizing: border-box;
+}
+.sq-to.computer {
+  grid-template-columns: minmax(0, 1fr);
+  height: auto;
+}
+.sq-to-list {
+  display: grid;
+  grid-auto-rows: 19px;
+  gap: 1px;
+  align-content: start;
+  min-width: 0;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-sizing: border-box;
+}
+.sq-to.open .sq-to-list {
+  position: absolute;
+  left: 0;
+  right: 34px;
+  bottom: 0;
+  z-index: 6;
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.28);
+}
+.sq-to-row {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto 4.6em;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 19px;
+  padding: 0 6px 0 3px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+}
+.sq-to-row:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.sq-to-mark {
+  width: 4px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--sq, var(--line));
+}
+.sq-to-row.top {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  font-weight: 800;
+}
+.sq-to-row.lit {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+.sq-to-row.you .sq-to-name {
+  font-weight: 800;
+}
+.sq-to-row.skip {
+  border-top: 1px dashed var(--line);
+  border-radius: 0 0 6px 6px;
+}
+.sq-to-row.shown {
+  outline: 1.5px solid var(--accent);
+  outline-offset: -1.5px;
+}
+.sq-to-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sq-to-where {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.sq-to-row.lit .sq-to-where {
+  color: inherit;
+}
+.sq-to-move {
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+.sq-to-row.lit .sq-to-move {
+  color: inherit;
+}
+.sq-to-more {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
+  z-index: 7;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.sq-to.open .sq-to-more {
+  color: var(--accent);
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .sq-to-list {
+    grid-auto-rows: 26px;
+    gap: 2px;
+  }
+  .sq-to-row {
+    height: 26px;
+    font-size: 14px;
+  }
+  .sq-to-where {
+    font-size: 12px;
+  }
+}
+
+/* The first-time tips (coach marks): the screen dimmed but for one thing, a ring round it, a short line from it to a small
+   box with its words, a step count and OK. A tap anywhere goes to the next. */
+.cm {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: 90;
+  cursor: pointer;
 }
-.rp-tip-dim {
+.cm-dim {
   position: absolute;
   left: 0;
   top: 0;
 }
-.rp-tip-ring {
+.cm-ring {
   fill: none;
   stroke: var(--accent);
   stroke-width: 2.5;
 }
-.rp-tip-box {
+.cm-line {
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+.cm-dot {
+  fill: var(--accent);
+}
+.cm-box {
   position: absolute;
-  left: 16px;
-  right: 16px;
-  max-width: 380px;
-  margin-left: auto;
   box-sizing: border-box;
-  padding: 14px 16px 12px;
+  padding: 12px 14px 10px;
   border-radius: 14px;
   background: var(--surface);
   color: var(--text);
-  border: 1px solid var(--line);
+  border: 2px solid var(--accent);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
   display: grid;
   gap: 8px;
 }
-.rp-tip-title {
+.cm-text {
   margin: 0;
   font-size: 16px;
-}
-.rp-tip-line {
-  margin: 0;
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 8px;
-  align-items: start;
-  font-size: 14px;
+  font-weight: 700;
   line-height: 1.35;
 }
-.rp-tip-line .rp-icon,
-.rp-tip-line .mm-gear-icon {
-  display: inline-block;
-  vertical-align: -2px;
-}
-.rp-tip-icon {
-  color: var(--accent);
-  padding-top: 1px;
-}
-.rp-tip-foot {
+.cm-foot {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 2px;
 }
-.rp-tip-never {
+.cm-step {
+  font-size: 12px;
+}
+.cm-never {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
   min-height: 44px;
+  font-size: 14px;
+  cursor: pointer;
 }
-.rp-tip-never input {
+.cm-never input {
   width: 20px;
   height: 20px;
 }
-.rp-tip-ok {
-  min-width: 88px;
+.cm-ok {
+  min-width: 80px;
+}
+/* A short phone (a small Android with its browser bars, 360 × 560): the tiny boards and the turn order's rows a little
+   smaller, the board the rest, so nothing is cut off at the bottom. */
+@media (max-height: 620px) and (max-width: 899px) {
+  .sq-relay .sq-boards {
+    --tb: 33px;
+  }
+  .sq-relay .sq-to {
+    height: calc(4 * 16px + 3 * 1px + 8px);
+  }
+  .sq-relay .sq-to-list {
+    grid-auto-rows: 16px;
+  }
+  .sq-relay .sq-to-row {
+    height: 16px;
+    font-size: 11px;
+  }
+  .sq-game.sq-relay .board-area .board-wrap {
+    width: min(100%, calc(var(--app-h) - 338px));
+    min-width: 200px;
+  }
 }
 
 /* ---------------- The HunChess Welcome Crate (Nov 6: docs/decisions/2026-11-06-welcome-crate.md) ---------------- */
