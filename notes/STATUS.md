@@ -408,3 +408,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   - Opus QUEUE (before the auto chess redesign): Smudgy's ult announced "next turn" (~turn 6-7) but never fired: find what blocks it and
     guarantee it fires once a game even in an odd position. Also look into whether our own engine lets Smudgy really paint a piece
     (e.g. pawn → rook swap, the back-rank case) instead of today's workaround, and what that costs (Maia can't); report, don't build.
+- **#550 typed chat + right column (computer)**: PR open, full-e2e, CI running (head b3c7cb25). Merge when green.
+  Follow-up (same Opus, claude/typed-chat-2, /home/user/cr-chat2): typed chat in match + lobby chat and on phone (brief required it).
+  Opus queue after that: Smudgy ult fix + engine paint report, then auto chess redesign.
