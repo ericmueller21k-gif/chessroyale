@@ -389,3 +389,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   boss-challenge.spec:1135 Timber card tap (phone; also seen on #541's CI: recurring), squads-watch:167 (phone), squads-three-boards:152
   (desktop); flaky: dash.spec:241 Scramble Rush 4 of 6 (both projects), town-leave:143 (phone). #549 (hold-to-run test fix) merged
   after it (1f57f9af); waiting on its main run to see which repeat. Then root-cause each (helpers).
+- **Eric, Nov 7 ~20:00: Auto chess redesign (MOCKUP SENT, waiting on OK):** computer left menu shifts on /autochess (left and right
+  columns must never move: find why). New look (gold/black/white, gold frame, our real square board): both players top right;
+  benches vertical beside the board (ours from our corner upward, theirs kitty-corner downward); no green timer bars; the timer is the
+  whole middle HUD piece; "Round N" + big phase (PLANNING / FIGHT) top left; "Income +N" opens a breakdown (base, interest, streak,
+  round). Phone version too. Assets: notes/briefs/assets/autochess-*.
