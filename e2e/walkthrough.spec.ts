@@ -59,7 +59,8 @@ async function expectSlide(page: Page, testInfo: TestInfo, i: number) {
         x: Number(h.getAttribute("x")), y: Number(h.getAttribute("y")),
         w: Number(h.getAttribute("width")), h: Number(h.getAttribute("height")),
       }));
-      const b = document.querySelector<HTMLElement>(".wt-bubble")!.getBoundingClientRect();
+      // (The dock: the box with its "Tap anywhere" line above it, so the dock's edge is the screen's edge margin.)
+      const b = document.querySelector<HTMLElement>(".wt-dock")!.getBoundingClientRect();
       // Each lit element sits inside a glow box, and its cut-out is that same box.
       const inside = lits.every((l) => spots.some((s) => l.left >= s.left - 1 && l.right <= s.right + 1 && l.top >= s.top - 1 && l.bottom <= s.bottom + 1));
       const cut = lits.every((l) => holes.some((h) => Math.abs(h.x - l.left) <= 1.5 && Math.abs(h.y - l.top) <= 1.5 && Math.abs(h.w - l.width) <= 1.5 && Math.abs(h.h - l.height) <= 1.5));
@@ -75,6 +76,64 @@ async function expectSlide(page: Page, testInfo: TestInfo, i: number) {
     expect(r).toEqual({ inside: true, cut: true, bubbleOk: true });
   }).toPass({ timeout: 3000 });
 }
+
+// The compact box (Eric, Nov 7: "make it way less wide … a lot less height … measure the space"). Today's heights on main, at the
+// box's own size (1280 × 800 and 390 × 844): 135 px for a spot slide (PLAY, the modes, the Handbook), 167 px for "Play anywhere",
+// 323 px for the crates slide. The limit is half of each. Exception: on a phone the two centered slides' copy is long (the
+// Handbook's 68 characters, "Play anywhere"'s 130), so they run 97 and 115 px there, about 70% of today's; their limits are
+// the measured heights, with a little room. (Cutting the copy would bring them under half: Eric's call.)
+const MAX_HEIGHT = {
+  computer: { spot: 67, handbook: 67, anywhere: 83, crates: 161 },
+  phone: { spot: 67, handbook: 100, anywhere: 120, crates: 161 },
+};
+const MAX_WIDTH_DESKTOP = 520;
+const slideKind = (i: number) => (i <= 9 ? "spot" : i === 10 ? "handbook" : i === 11 ? "anywhere" : "crates");
+
+test("the box is compact: at most half today's height (the phone's two centered slides about 70%), 520 px wide on a computer, no overflow; Tap anywhere sits above it, centered, with no glow; the last slide has none", async ({ page }, testInfo) => {
+  await page.goto("/");
+  const desktop = testInfo.project.name === "desktop";
+  for (let i = 0; i <= LAST; i++) {
+    await expect(dialogOf(page).locator(".wt-count")).toHaveText(`${i + 1} of ${SLIDES.length}`);
+    await page.waitForTimeout(260);
+    const m = await page.evaluate(() => {
+      const box = document.querySelector<HTMLElement>(".wt-bubble")!;
+      const r = box.getBoundingClientRect();
+      const tapEl = document.querySelector<HTMLElement>(".wt-tap");
+      const tap = tapEl?.getBoundingClientRect() ?? null;
+      return {
+        width: r.width,
+        height: r.height,
+        overflowY: box.scrollHeight - box.clientHeight,
+        overflowX: box.scrollWidth - box.clientWidth,
+        tapBottom: tap ? tap.bottom : null,
+        tapCenter: tap ? tap.left + tap.width / 2 : null,
+        boxCenter: r.left + r.width / 2,
+        tapShadow: tapEl ? getComputedStyle(tapEl).textShadow : null,
+        boxTop: r.top,
+        tapColor: tapEl ? getComputedStyle(tapEl).color : null,
+        tapText: tapEl?.textContent ?? null,
+      };
+    });
+    const limit = MAX_HEIGHT[desktop ? "computer" : "phone"][slideKind(i) as keyof typeof MAX_HEIGHT.computer];
+    expect(m.height, `slide ${i + 1} height`).toBeLessThanOrEqual(limit);
+    if (desktop) expect(m.width, `slide ${i + 1} width (computer)`).toBeLessThanOrEqual(MAX_WIDTH_DESKTOP);
+    else expect(m.width, `slide ${i + 1} width (phone)`).toBeLessThanOrEqual(390 - 24);
+    expect(m.overflowY, `slide ${i + 1} text overflow (down)`).toBeLessThanOrEqual(0);
+    expect(m.overflowX, `slide ${i + 1} text overflow (across)`).toBeLessThanOrEqual(0);
+    if (i < LAST) {
+      // The gold line: outside the box, just above it, centered over the box, plain text (no glow) in PLAY's gold.
+      expect(m.tapText).toBe("Tap anywhere to continue");
+      expect(m.tapBottom!).toBeLessThanOrEqual(m.boxTop + 0.5);
+      expect(Math.abs(m.tapCenter! - m.boxCenter)).toBeLessThanOrEqual(2);
+      expect(m.tapShadow).toBe("none");
+      expect(m.tapColor).toBe("rgb(242, 193, 78)");
+    } else {
+      expect(m.tapText).toBeNull();
+      await expect(dialogOf(page).getByText("Tap anywhere to continue")).toHaveCount(0);
+    }
+    if (i < LAST) await tapOn(page);
+  }
+});
 
 /** Taps to the next slide (the corner is the dimmed screen, so a tap there moves on). */
 async function tapOn(page: Page) {
