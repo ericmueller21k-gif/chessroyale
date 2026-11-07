@@ -207,7 +207,8 @@ describe("town chat in the app", () => {
     close = openTownFeed(sink);
     takeTownSlice({ n: 2, lines: [line(1, "troll"), line(2, "ann")] });
     expect(await reportTownLine(lines[0]!)).toBe("Thanks, we'll look into it.");
-    expect(who.reports).toEqual([["troll", "Offensive chat", undefined, 1]]);
+    // (The line's number, and no test room: production's town chat.)
+    expect(who.reports).toEqual([["troll", "Offensive chat", undefined, 1, undefined]]);
     expect(await removeTownLine(1, answer(200, { ok: true }))).toBe("Removed for everyone.");
     expect(lines.map((l) => l.n)).toEqual([2]);
     expect(await removeTownLine(2, answer(403, { message: "Only a moderator can do that." }))).toBe("Only a moderator can do that.");

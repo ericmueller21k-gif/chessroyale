@@ -1,6 +1,7 @@
 import { FAIRPLAY, TOWN_CHAT } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { account, onAccountChange, reportPlayer, tooYoung } from "../account.ts";
+import { testSwitchesAllowed } from "../test-switches.ts";
 import { chatBlockNow, chatBlockText, mutes, setChatBlock } from "../chat-mod.ts";
 import { isBlocked, onFriendsChange } from "../friends.ts";
 import { rideLive, watchLive } from "../live.ts";
@@ -52,6 +53,20 @@ export interface TownSink {
   /** The chat was paused or came back (the switch: "Chat is paused."). */
   paused?(on: boolean): void;
 }
+
+/**
+ * `?townroom=` as the town opened: a test's own town and its own chat (here-net.ts; the server keeps the room apart only where
+ * the test switches are on: town-chat-api.ts `chatRoomOf`). Read once, as the page opens, like the other test switches.
+ */
+const ROOM_ASKED = (() => {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("townroom");
+  } catch {
+    return null;
+  }
+})();
+/** The test room this page's chat uses, where the test switches count (null: the town's own chat). */
+export const chatTestRoom = (): string | null => (ROOM_ASKED && testSwitchesAllowed() ? ROOM_ASKED : null);
 
 /** Whether this device chats with other players in the town: a signed-in account, not on a device answered "too young". */
 export const mayTownChat = () => !!account().profile?.user.signedIn && !tooYoung();
@@ -111,7 +126,8 @@ class TownFeed {
     this.last = 0;
     this.room = null;
     this.pausedSaid = false;
-    const unride = rideLive({ query: () => `town=${this.last}${this.room ? `&room=${this.room}` : ""}`, take: (b) => this.take((b as { town?: unknown }).town) });
+    const testRoom = chatTestRoom();
+    const unride = rideLive({ query: () => `town=${this.last}${this.room ? `&room=${this.room}` : ""}${testRoom ? `&townroom=${testRoom}` : ""}`, take: (b) => this.take((b as { town?: unknown }).town) });
     const unwatch = watchLive();
     // (Someone muted, here or in another chat, or blocked: their lines leave the log at once.)
     const unmute = mutes.on(() => sink.drop((l) => mutes.has(l.from)));
@@ -209,12 +225,13 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
   if (townChars(text) > TOWN_CHAT.maxChars || [...text].length > TOWN_MAX_PARTS) return { ok: false, reason: "refused", waitMs: 0, message: `Messages are at most ${TOWN_CHAT.maxChars} characters.` };
   const waitMs = townSendWaitMs();
   if (waitMs > 0) return { ok: false, reason: "wait", waitMs };
+  const testRoom = chatTestRoom();
   try {
     const res = await fetcher("/api/town/chat", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, since: feed.last, color: feed.color, ...(feed.room ? { room: feed.room } : {}) }),
+      body: JSON.stringify({ text, since: feed.last, color: feed.color, ...(feed.room ? { room: feed.room } : {}), ...(testRoom ? { townroom: testRoom } : {}) }),
     });
     const body = (await res.json().catch(() => ({}))) as { town?: unknown; waitMs?: number; retryMs?: number; reason?: string; message?: string; block?: ChatBlock; paused?: string };
     feed.take(body.town);
@@ -237,12 +254,13 @@ export async function sendTownChat(raw: string, fetcher: typeof fetch = fetch): 
 }
 
 /** Report on a player's line: fair play's report, reason "Offensive chat", with the line (the server reads its words). */
-export const reportTownLine = (l: Pick<TownLine, "from" | "n">) => reportPlayer(l.from, FAIRPLAY.reports.chatReason, undefined, l.n);
+export const reportTownLine = (l: Pick<TownLine, "from" | "n">) => reportPlayer(l.from, FAIRPLAY.reports.chatReason, undefined, l.n, chatTestRoom() ?? undefined);
 
 /** A moderator takes a line out of everyone's log. Answers what to say. */
 export async function removeTownLine(n: number, fetcher: typeof fetch = fetch): Promise<string> {
   try {
-    const res = await fetcher("/api/town/chat/remove", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ n }) });
+    const testRoom = chatTestRoom();
+    const res = await fetcher("/api/town/chat/remove", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ n, ...(testRoom ? { townroom: testRoom } : {}) }) });
     if (res.ok) {
       feed.take({ n: feed.last, lines: [], gone: [n] });
       return "Removed for everyone.";

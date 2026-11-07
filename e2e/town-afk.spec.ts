@@ -195,7 +195,7 @@ test("a guest watches (Eric, on #542): another player in their outfit, no name t
     return b && [b.here, b.look, b.dressed, b.name, b.tag];
   }, { timeout: 15_000, message: "the guest sees Bo dressed, unnamed" }).toEqual([true, { head: "beanie" }, true, "", false]);
   // Bo says something; the guest reads it.
-  const said = await bo.evaluate(async (t) => (await fetch("/api/town/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: t }) })).status, `hello guests ${run}`);
+  const said = await bo.evaluate(async ([t, r]) => (await fetch("/api/town/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: t, townroom: r }) })).status, [`hello guests ${run}`, r] as const);
   expect(said).toBe(200);
   await expect(page.locator(".tc-player", { hasText: `hello guests ${run}` })).toHaveCount(1, { timeout: 12_000 });
   // The guest can't type: the typing line is greyed with the way to an account, and nothing types into it.

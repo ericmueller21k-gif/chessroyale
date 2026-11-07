@@ -33,6 +33,14 @@ test.use({ actionTimeout: 15_000 });
 
 /** This run's mark in the messages it sends (players in other tests share the room). */
 const run = Date.now().toString(36).slice(-5);
+/**
+ * Each test's own town and chat (`?townroom=`, the test switch: the server keeps its chat room apart from the others', and no other
+ * test's players or lines reach it). Set before every test; a worker runs one test at a time, so this one is the running test's.
+ */
+let room = "";
+test.beforeEach(() => {
+  room = `chat${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+});
 
 type Box = { x: number; y: number; w: number; h: number };
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
@@ -125,7 +133,7 @@ const scrollOf = (p: Page) => p.locator(".tc-log").evaluate((el) => ({ top: el.s
  * unless told (`sky`: the town's own `?sky=` override: day, dawn, dusk or night).
  */
 async function open(page: Page, query = "", sky = "day") {
-  await page.goto(`/town?sky=${sky}${query}`);
+  await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
@@ -879,7 +887,7 @@ test("\"Chat background\": off by default; on, the faint tint stays behind the b
 test("always on never fades: after the wait, after minutes, with the lines still taking the touches; a line 4 minutes old is still there, and one is gone for good at 5 minutes", async ({ page }) => {
   // (Eric, Oct 28: "both chat is green, yet it disappears still". The page's clock, so the minutes pass at once.)
   await page.clock.install({ time: new Date(2026, 9, 28, 12, 0, 0) });
-  await page.goto("/town?sky=day");
+  await page.goto(`/town?sky=day&townroom=${room}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
@@ -939,7 +947,7 @@ test("the text's tone flips with the clock when the sky does: ink before 19:30 a
   // The device's clock: just before dusk's blend is half through; the town reads the sky from it (no ?sky=).
   await page.clock.install({ time: new Date(2026, 9, 28, 19, 28, 0) });
   // (?townafk=off: the clock jumps hours, and the away rule would send this idle page home: town/afk.ts.)
-  await page.goto("/town?townafk=off");
+  await page.goto(`/town?townafk=off&townroom=${room}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   const box = page.locator(".town-chat");
   await expect(box).toHaveAttribute("data-tone", "day");
@@ -1074,7 +1082,7 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
 
 test("a guest taps the box and gets the typing line greyed, saying how to chat (nothing hidden); the box and the blur are the same; without the test switches no hooks either", async ({ page }) => {
   await page.route("**/api/auth/config", (route) => route.fulfill({ json: { accounts: false, google: false, email: false } }));
-  await page.goto("/town?sky=day");
+  await page.goto(`/town?sky=day&townroom=${room}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect(page.locator(".town-chat")).toHaveCount(1);
   const box = page.locator(".town-chat");

@@ -203,6 +203,22 @@ describe("town chat: the live hub holds it in memory only", () => {
     expect((await hub.townRead()).lines).toEqual([]);
   });
 
+  it("a test's own room keeps its lines apart from the town's (each test its own chat, where the test switches are on)", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, ready } = hubWith();
+    await ready();
+    await hub.townPost(ann, "in the town");
+    await hub.townPost(bo, "in a test's room", "test:chat1");
+    expect((await hub.townRead("test:chat1")).lines.map((l) => l.text)).toEqual(["in a test's room"]);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["in the town"]);
+    // A moderator's Remove and a Report's line number go to the room they name.
+    expect(await hub.townLine(1, "test:chat1")).toMatchObject({ text: "in a test's room" });
+    expect(await hub.townLine(1)).toMatchObject({ text: "in the town" });
+    expect((await hub.townRemove(1, "test:chat1")).removed).toBe(true);
+    expect((await hub.townRead("test:chat1")).lines).toEqual([]);
+    expect((await hub.townRead()).lines).toHaveLength(1);
+  });
+
   it("a deleted account's lines and a reset player's lines leave the town too", async () => {
     vi.useFakeTimers({ now: T0 });
     const { hub, ready } = hubWith();
@@ -623,11 +639,11 @@ describe("town chat: after the review", () => {
     expect(alarm.at).toBe(T0 + TOWN_CHAT.repeatMs);
     vi.setSystemTime(T0 + TOWN_CHAT.repeatMs);
     await hub.alarm();
-    expect((hub as unknown as { town: TownChat }).town.empty).toBe(false);
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(false);
     expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs);
     vi.setSystemTime(T0 + TOWN_CHAT.lineMs);
     await hub.alarm();
-    expect((hub as unknown as { town: TownChat }).town.empty).toBe(true);
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(true);
     expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs); // (nothing left to ring for, and nobody online)
     // An instance's copy of the room goes once it's a moment old.
     const room = new TownChat();
