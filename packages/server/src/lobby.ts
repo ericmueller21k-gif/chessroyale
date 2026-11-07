@@ -342,7 +342,7 @@ export interface LobbyRecord {
    */
   lights?: { key: string; at: number; ended: number; endedAt?: number[]; taps: Record<string, string[][]>; tapAt?: Record<string, number[][]> };
   /** Dash's Scramble Rush in progress (the crowd's turn waits; the phase "boss"): when it began, each person's placements, and once judged, its verdict's end. */
-  rush?: { key: string; at: number; places: Record<string, Record<string, string>>; judged?: boolean };
+  rush?: { key: string; at: number; places: Record<string, Record<string, string>>; moved?: Record<string, Record<string, number>>; judged?: boolean };
   /**
    * Matchmade ("Play now"): starts by itself when full or at `fillAt`, bots filling the rest. `filledAt`: the seats
    * were filled then (bots pop in on the queue screen) and the match begins FRONT_DOOR.fillShowMs later; `waitMs`:

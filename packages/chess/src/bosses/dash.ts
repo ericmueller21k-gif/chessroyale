@@ -26,7 +26,8 @@
  * 3 s, a slapped move's shorter clock and the bank are the server's, never a device's word; a pick after the deadline is refused.
  *
  * Test switches (solo): `?power=clockslap`: his first move slaps as a capture would, whatever it is (then only his captures);
- * `?power=scramble` warns as the second turn begins; `?power=rush` brings his Scramble Rush as the second turn begins.
+ * `?power=scramble` warns as the second turn begins; `?power=rush` warns of his Scramble Rush as the second turn begins (it comes
+ * as the third does).
  *
  * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); a clock fit
  * at most twice (`clockFit`: 3 to 5 quick smacks and a line); and once a battle his **Scramble Rush** (below): a memory test over a
@@ -121,6 +122,8 @@ export const DASH: BossRules = {
   // Time Scramble: the usual warning as a turn begins; the next turn, it comes (the admins' trigger: at once).
   ultimate(next, t) {
     if (next.warnAt === undefined && (next.ults ?? 0) >= scrambleMax(t.s)) return false;
+    // (Not while his Scramble Rush is warned and still to come: it waits until after it.)
+    if (next.warnAt === undefined && !t.ultNext && rushWarned(next.dash)) return false;
     if (!warnThenUnleash(next, t)) return false;
     t.events.push({ kind: "scramble", turn: t.turn, count: t.s.scrambleMoves, seconds: t.s.scrambleSeconds });
     return true;
@@ -133,10 +136,16 @@ export const DASH: BossRules = {
     if (!d) return;
     if (d.flag && d.flag.at + 1 === t.turn) t.events.push({ kind: "flag", turn: t.turn, move: d.flag.move });
     if (d.slap && d.slap.at + 1 === t.turn) t.events.push({ kind: "slap", turn: t.turn, ms: d.slap.ms, bank: d.slap.bank });
-    // His Scramble Rush, once a battle: the crowd's turn waits for it (the runner's rushDue), the board as it is.
-    if (!d.rush && rushNow(next, t)) {
+    // His Scramble Rush, once a battle, warned a turn ahead as an ultimate is (Eric, Nov 6: RAGE!, "Next turn: Scramble Rush",
+    // his line); as the next crowd turn begins it comes, the crowd's turn waiting for it (the runner's rushDue), the board as it is.
+    if (rushWarned(d) && t.turn > d.rushWarn!) {
       const moves = chooseRush(t.fen, t.crowd, t.seed, t.turn, t.s.dashScramble);
       if (moves.length) next.dash = { ...d, rush: { at: t.turn - 1, moves } };
+      return;
+    }
+    if (!d.rush && d.rushWarn === undefined && rushNow(next, t)) {
+      next.dash = { ...d, rushWarn: t.turn };
+      t.events.push({ kind: "rushWarn", turn: t.turn });
       return;
     }
     // A clock fit (at most dashClockFit.max a battle, on turns from the seed), on a turn with nothing else of his.
@@ -189,9 +198,13 @@ export function fitSmacks(seed: number, turn: number, s: FitSettings = BOSS_POWE
 
 type RushSettings = BossPowerSettings["dashScramble"];
 
+/** His Scramble Rush is warned and still to come (it comes as the crowd turn after its warning begins). */
+const rushWarned = (d: DashState | null | undefined): boolean => !!d && d.rushWarn !== undefined && !d.rush;
+
 /**
- * His Scramble Rush comes as this crowd turn begins: never before turn dashScramble.from, never with Time Scramble's warning or
- * effect out, and only once his meter is dashScramble.atMeter full (the test switch `?power=rush`: as the second turn begins).
+ * His Scramble Rush is warned as this crowd turn begins (it comes the next): never before turn dashScramble.from, never with Time
+ * Scramble's warning or effect out, and only once his meter is dashScramble.atMeter full (the test switch `?power=rush`: as the
+ * second turn begins).
  */
 function rushNow(next: BossPowerState, t: { turn: number; test: string; rageSpeed: number; s: BossPowerSettings }): boolean {
   if (t.test === "rush") return t.turn >= 2;
@@ -319,6 +332,36 @@ export function botRushCorrect(seed: number, botId: string, rush: Pick<DashRush,
 /** The crowd held: its mean put back (people's and bots' alike) at least dashScramble.needCorrect, or all of them when fewer were swept. */
 export const rushHeld = (correct: readonly number[], swept: number, s: RushSettings = BOSS_POWERS.dashScramble): boolean =>
   !correct.length || correct.reduce((a, b) => a + b, 0) / correct.length >= Math.min(s.needCorrect, swept) - 1e-9;
+
+/** A swept piece's moves left in the put-back (`moved`: each piece's moves so far, by its square before the sweep). */
+export const rushMovesLeft = (moved: Readonly<Record<string, number>> | undefined, from: string, s: Pick<RushSettings, "movesPerPiece"> = BOSS_POWERS.dashScramble): number =>
+  Math.max(0, s.movesPerPiece - (moved?.[from] ?? 0));
+
+/**
+ * A player's placements as they send them (whole, as each is made: `next`), against those kept so far (`prev`) and each swept
+ * piece's moves so far (`moved`): a piece's square changes only while it has moves left (dashScramble.movesPerPiece; Eric, Nov 6:
+ * "you can only move a piece up to 2 times"). A piece is counted by its square before the sweep, wherever it stands now, never
+ * by the square it's on. Junk is dropped. The server keeps what this keeps; every screen asks rushMovesLeft first.
+ */
+export function rushKeep(
+  rush: Pick<DashRush, "moves">,
+  prev: Readonly<Record<string, string>>,
+  moved: Readonly<Record<string, number>>,
+  next: Readonly<Record<string, unknown>>,
+  s: Pick<RushSettings, "movesPerPiece"> = BOSS_POWERS.dashScramble,
+): { places: Record<string, string>; moved: Record<string, number> } {
+  const places: Record<string, string> = {};
+  const count: Record<string, number> = { ...moved };
+  for (const m of rush.moves) {
+    const want = next[m.from];
+    const was = prev[m.from];
+    if (typeof want === "string" && /^[a-h][1-8]$/.test(want) && want !== was && rushMovesLeft(count, m.from, s) > 0) {
+      places[m.from] = want;
+      count[m.from] = (count[m.from] ?? 0) + 1;
+    } else if (was !== undefined) places[m.from] = was;
+  }
+  return { places, moved: count };
+}
 
 /**
  * The Rush's beats (ms from its start; the server and every screen alike). Nobody's clock runs.

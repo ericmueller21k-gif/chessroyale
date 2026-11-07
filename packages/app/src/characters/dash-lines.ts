@@ -37,8 +37,9 @@ export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
 /**
  * Dash v2's lines (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md), in his voice:
  * - `fit`: his clock fit (at most twice a battle, a few quick smacks): a quirk, he just loves that clock (Eric's two, and three more);
- * - his Scramble Rush: as the sweep ends (`done`), a piece put down one square off (`close`) or further (`far`), and the crowd too
- *   few back, as he moves again (`fail`). The God King's are his (godKing.ts: rushAsk, rushWell).
+ * - his Scramble Rush: its warning a turn ahead (`warn`, with RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6: "hope you were
+ *   watching"), as the sweep ends (`done`), a piece put down one square off (`close`) or further (`far`), and the crowd too few
+ *   back, as he moves again (`fail`). The God King's are his (godKing.ts: rushAsk, rushWell).
  */
 export const DASH_FIT_LINES: readonly string[] = [
   "Nothing beats that click. I love this clock.",
@@ -48,6 +49,7 @@ export const DASH_FIT_LINES: readonly string[] = [
   "Can't help it, cuz. This clock is my therapy.",
 ];
 export const DASH_RUSH_LINES = {
+  warn: ["Hope you were watching.", "Eyes on the board, fam. Trust me.", "Take a good look, cuz. Real good.", "Memorize it, my guy. No cap."],
   done: ["Hope I wasn't too quick for you.", "Blink and you missed it, fam.", "Too fast? My bad, cuz. Not really."],
   close: ["Close, but not quite!"],
   far: ["Not even close."],

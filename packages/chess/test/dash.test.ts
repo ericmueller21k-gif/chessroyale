@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, fitSmacks, fitTurns, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, fitSmacks, fitTurns, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -179,6 +179,9 @@ describe("Dash v2: his numbers", () => {
     }
     expect(POWER_FX.clockFit).toBe(DASH_FX.clockFit);
     expect(POWER_FX.rushExtra).toBe(DASH_FX.rushExtra);
+    // (Eric, Nov 6: each piece moved at most twice in the put-back; the Rush's warning as long as every ultimate's.)
+    expect(S.dashScramble.movesPerPiece).toBe(2);
+    expect(POWER_FX.rushWarn).toBe(POWER_FX.warn);
   });
 });
 
@@ -254,6 +257,68 @@ describe("Dash v2: the Scramble Rush's scoring", () => {
     expect(j.marks.map((m) => m.square).sort()).toEqual(["a4", "c3", "c4", "d6", "f5", "h3"].sort());
     expect(j.correct).toBe(0);
   });
+  /** Your moves one by one, as a screen sends them (rushKeep): each the whole placements with one piece moved. */
+  const putAll = (steps: [string, string][]) => {
+    let kept = { places: {} as Record<string, string>, moved: {} as Record<string, number> };
+    const refused: number[] = [];
+    for (const [i, [from, to]] of steps.entries()) {
+      const next = rushKeep(rush, kept.places, kept.moved, { ...kept.places, [from]: to });
+      if (next.places[from] !== to) refused.push(i);
+      kept = next;
+    }
+    return { ...kept, refused };
+  };
+  it("Eric, Nov 6: each swept piece moves at most movesPerPiece (2) times; a third is refused, the piece where it was; counted by the piece, not the square", () => {
+    // (The knight: twice, then a third refused; it stays on its second square. Each other piece has its own two.)
+    const k = putAll([
+      ["b1", "a3"],
+      ["b1", "c3"],
+      ["b1", "b1"],
+      ["a2", "b1"],
+      ["a2", "a2"],
+      ["b2", "c3"],
+    ]);
+    expect(k.refused).toEqual([2]);
+    expect(k.places.b1).toBe("c3");
+    expect(k.moved).toMatchObject({ b1: 2, a2: 2 });
+    expect(rushMovesLeft(k.moved, "b1")).toBe(0);
+    expect(rushMovesLeft(k.moved, "a2")).toBe(0);
+    // (The pawn from a2 stood on b1 for a move: b1's count is still the knight's alone, by where each piece came from.)
+    expect(rushMovesLeft(k.moved, "g8")).toBe(2);
+    // (Sent whole again, or with an out-of-moves piece changed: nothing changes, nothing counted.)
+    expect(rushKeep(rush, k.places, k.moved, { ...k.places })).toEqual({ places: k.places, moved: k.moved });
+    expect(rushKeep(rush, k.places, k.moved, { ...k.places, b1: "b1", a2: "e2" }).places).toEqual(k.places);
+    // (Junk never counts as a move.)
+    expect(rushKeep(rush, {}, {}, { g8: "zz", d8: 4 }).moved).toEqual({});
+  });
+  it("with the cap: green, red, a square off or more as ever; out of moves on one piece, the rest still go back and count", () => {
+    // The knight put a square off, then two off: out of moves, it stays red; the other five go home, five right.
+    const k = putAll([
+      ["b1", "a2"],
+      ["b1", "a3"],
+      ["b1", "b1"],
+      ...rush.moves.filter((m) => m.from !== "b1").map((m) => [m.from, m.from] as [string, string]),
+    ]);
+    expect(k.refused).toEqual([2]);
+    const j = rushJudge(fen, rush, k.places);
+    expect(j.marks.find((m) => m.square === "a3")).toMatchObject({ right: false, placed: true, off: 2 });
+    expect(j.correct).toBe(5);
+    expect(rushHeld([j.correct], 6)).toBe(true);
+    // (Its first move: a square off, "Close, but not quite!".)
+    expect(rushJudge(fen, rush, { b1: "a2" }).marks.find((m) => m.square === "a2")).toMatchObject({ right: false, off: 1 });
+    // Three home and the rest out of moves on wrong squares: three, too few (his extra move).
+    const f = putAll([
+      ["b1", "b1"],
+      ["a2", "a2"],
+      ["b2", "b2"],
+      ["g8", "g6"],
+      ["g8", "h6"],
+      ["g8", "g8"],
+    ]);
+    expect(f.refused).toEqual([5]);
+    expect(rushJudge(fen, rush, f.places).correct).toBe(3);
+    expect(rushHeld([3], 6)).toBe(false);
+  });
   it("the crowd holds at needCorrect back on average (people's and bots'); bots each piece with botHit's chance, seeded", () => {
     expect(rushHeld([4], 6)).toBe(true);
     expect(rushHeld([3], 6)).toBe(false);
@@ -273,9 +338,12 @@ describe("Dash v2: the Scramble Rush's scoring", () => {
 });
 
 describe("Dash v2: the Scramble Rush in a battle", () => {
-  /** Plays to the Rush (the test switch: as the second turn begins); returns the position it froze. */
+  /** Plays to the Rush (the test switch: warned as the second turn begins, it comes as the third does); returns the position it froze. */
   async function toRush(seed: number) {
     const r = battle(seed, { test: "rush" });
+    await crowdMove(r);
+    await r.playBoss(fakeEngine());
+    expect(r.rushDue()).toBe(false);
     await crowdMove(r);
     await r.playBoss(fakeEngine());
     expect(r.rushDue()).toBe(true);
@@ -317,11 +385,32 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
       expect(r.isOver()).toBe(false);
     });
 
+  it("Eric, Nov 6: warned a turn ahead (RAGE!, \"Next turn: Scramble Rush\"), your one move as ever in between, then it comes", async () => {
+    const r = battle(4, { test: "rush" });
+    await crowdMove(r);
+    await r.playBoss(fakeEngine());
+    // As your second turn begins: the warning, and nothing swept; your turn as ever (nobody's clock waits on a Rush).
+    expect(r.boss!.powers!.events.map((e) => e.kind)).toContain("rushWarn");
+    const warnedAt = r.boss!.powers!.dash!.rushWarn!;
+    expect(warnedAt).toBe(r.boss!.crowdMoves + 1);
+    expect(r.boss!.powers!.dash!.rush ?? null).toBeNull();
+    expect(r.rushDue()).toBe(false);
+    const { move } = await crowdMove(r);
+    expect(move).toBeTruthy();
+    await r.playBoss(fakeEngine());
+    // As the next begins: the Rush (after his move), no second warning; your turn waits for it.
+    expect(r.boss!.powers!.events.some((e) => e.kind === "rushWarn")).toBe(false);
+    expect(r.boss!.powers!.dash!.rush!.at).toBe(warnedAt);
+    expect(r.boss!.crowdMoves).toBe(warnedAt);
+    expect(r.rushDue()).toBe(true);
+  });
+
   it("in a battle without the switch: never before turn 7, at most once; Time Scramble at most twice; a clock fit at most twice", async () => {
     let came = 0;
     for (const seed of [2, 5]) {
       const r = battle(seed);
       const rushes: number[] = [];
+      const warns: number[] = [];
       let scrambles = 0;
       let fits = 0;
       for (let i = 0; i < 45 && !r.isOver(); i++) {
@@ -331,6 +420,7 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
           if (r.extraMoveDue()) await r.playExtraMove(fakeEngine());
         }
         r.deal();
+        if (r.boss!.powers!.events.some((e) => e.kind === "rushWarn")) warns.push(r.boss!.crowdMoves + 1);
         scrambles += r.boss!.powers!.events.filter((e) => e.kind === "scramble").length;
         fits += r.boss!.powers!.events.filter((e) => e.kind === "clockFit").length;
         const f = fenOf(r);
@@ -340,6 +430,9 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
         await r.playBoss(fakeEngine());
       }
       expect(rushes.length).toBeLessThanOrEqual(1);
+      // (Each Rush warned as the turn before it began, and only once.)
+      expect(warns.length).toBeLessThanOrEqual(1);
+      for (const t of rushes) expect(warns).toEqual([t - 1]);
       came += rushes.length;
       for (const t of rushes) expect(t).toBeGreaterThanOrEqual(S.dashScramble.from);
       expect(scrambles).toBeLessThanOrEqual(2);

@@ -23664,6 +23664,60 @@ button.sq-tiny {
 .rush-banner.big .rb-count {
   font-size: 30px;
 }
+/* A piece out of moves (dashScramble.movesPerPiece): a short shake, sideways (`translate`, so its place, `transform`, stays), and
+   "No more tries" fading up over its square. */
+.hb piece.rush-shake {
+  animation: rush-shake 360ms ease-in-out;
+}
+@keyframes rush-shake {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  20%,
+  60% {
+    translate: -9% 0;
+  }
+  40%,
+  80% {
+    translate: 9% 0;
+  }
+}
+.rush-nope {
+  position: absolute;
+  width: 12.5%;
+  height: 12.5%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 7;
+  animation: rush-nope 1300ms ease-out forwards;
+}
+.rush-nope.at-left {
+  justify-content: flex-start;
+}
+.rush-nope.at-right {
+  justify-content: flex-end;
+}
+@keyframes rush-nope {
+  0% {
+    opacity: 1;
+    translate: 0 -10%;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: 0 -45%;
+  }
+}
 .rush-taps {
   position: absolute;
   inset: 0;

@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { boardPieces, rushFen, rushJudge, rushSquares, rushTimeline, withPieces, type DashView } from "@chessroyale/chess";
+import { boardPieces, rushFen, rushJudge, rushMovesLeft, rushSquares, rushTimeline, withPieces, type DashView } from "@chessroyale/chess";
 import { BOSS_POWERS } from "@chessroyale/core";
 import { hash } from "../characters/boss-beats.ts";
 import { DASH_FIGURE, DASH_RUN } from "../characters/dash-figure.ts";
@@ -21,7 +21,8 @@ import { InPlace } from "./PowerParts.tsx";
  *   there: no piece slides (`rushRuns`, `rushShownFen`).
  * - His line ("Hope I wasn't too quick for you."), then the God King's ("Put the pieces back…"), alive or fallen.
  * - Ten seconds, the same banner at the board's top (taps go through it): drag or tap the swept pieces (orange edges) to any free
- *   square, again and again; a piece on a square where one like it stood gets a green edge (a soft blip), anywhere else a red edge
+ *   square, each at most dashScramble.movesPerPiece times (Eric, Nov 6; a try after that: the piece shakes, "No more tries" fades
+ *   over it, it stays); a piece on a square where one like it stood gets a green edge (a soft blip), anywhere else a red edge
  *   (a buzz) and his word ("Close, but not quite!" a square off, else "Not even close."). He smacks his clock, impatient.
  * - Time's up: the board as it was, and the verdict (the crowd's, once judged): enough back, the God King's "Well remembered!";
  *   else his extra move follows, with his line.
@@ -200,6 +201,11 @@ const cell = (square: string, orientation: "white" | "black") => {
   const { x, y } = squareXY(square, orientation);
   return { left: `${(x - 50) / 8}%`, top: `${(y - 50) / 8}%` };
 };
+/** "No more tries" over a square at the board's left or right edge: kept to the board's side, so it never runs off the page. */
+const nopeEdge = (square: string, orientation: "white" | "black") => {
+  const { x } = squareXY(square, orientation);
+  return x < 100 ? " at-left" : x > 700 ? " at-right" : "";
+};
 /** What this device has played or said once (a sound, a line), by key: a screen drawn again doesn't repeat it. */
 const done = new Set<string>();
 const once = (key: string, f: () => void) => {
@@ -217,6 +223,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
   const stage = rush ? rushStage(rush, view, now) : "done";
   const [sel, setSel] = useState<string | null>(null);
   const [drag, setDrag] = useState<{ from: string; x: number; y: number; moved: boolean; id: number } | null>(null);
+  const [nope, setNope] = useState<{ square: string; n: number } | null>(null);
   const layer = useRef<HTMLDivElement>(null);
   const runs = rush ? rushRuns(rush).runs : [];
   const fen = boss.board.fen;
@@ -269,6 +276,16 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
   const put = (from: string, to: string | null) => {
     if (to && at.get(from) !== to) onPlace(from, to);
   };
+  // (A piece out of moves: it shakes where it stands, the board's own piece, and "No more tries" fades over it; it stays.)
+  const refuse = (square: string) => {
+    setNope({ square, n: (nope?.n ?? 0) + 1 });
+    const el = layer.current?.closest(".board-wrap")?.querySelector<HTMLElement>(`piece[data-square="${square}"]`);
+    if (!el) return;
+    el.classList.remove("rush-shake");
+    void el.offsetWidth;
+    el.classList.add("rush-shake");
+    el.addEventListener("animationend", () => el.classList.remove("rush-shake"), { once: true });
+  };
   return (
     <div ref={layer} class={`rush-layer rush-${stage}`} data-stage={stage} data-right={right} data-of={rush.moves.length} data-key={view.key}>
       {/* (His copies, only while they run: drawn over the pieces, never taking a tap.) */}
@@ -298,6 +315,10 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
             const s = squareAtPoint(e.currentTarget as HTMLElement, e.clientX, e.clientY, orientation);
             if (!s) return;
             const o = originAt(s);
+            if (o && rushMovesLeft(view.moved, o) <= 0) {
+              setSel(null);
+              return refuse(s);
+            }
             if (o) {
               setSel(o);
               setDrag({ from: o, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId });
@@ -323,6 +344,11 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
           }}
           onPointerCancel={() => setDrag(null)}
         />
+      )}
+      {stage === "place" && nope && (
+        <span key={nope.n} class={`rush-nope${nopeEdge(nope.square, orientation)}`} data-square={nope.square} style={cell(nope.square, orientation)} onAnimationEnd={() => setNope(null)}>
+          No more tries
+        </span>
       )}
       {drag?.moved && layer.current && (
         <div class="hb-pieces rush-ghost" aria-hidden="true">

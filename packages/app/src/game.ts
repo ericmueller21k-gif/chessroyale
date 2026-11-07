@@ -168,13 +168,15 @@ export type LightsView = NetLightsOut;
 
 /**
  * Dash's Scramble Rush as the screens see it: its key, when it began (local time; every beat follows from it: rushTimeline), and
- * your placements so far (each swept piece's square before the sweep → the square you put it on). The swept pieces and, once
- * it's over, the verdict are the boss view's (`powers.dash.rush`).
+ * your placements so far (each swept piece's square before the sweep → the square you put it on) and each piece's moves so far
+ * (by the same square: at most dashScramble.movesPerPiece). The swept pieces and, once it's over, the verdict are the boss view's
+ * (`powers.dash.rush`).
  */
 export interface RushView {
   key: string;
   at: number;
   places: Record<string, string>;
+  moved: Record<string, number>;
 }
 
 /** The reveal: your group's picks and scores (same shape the server sends). */
