@@ -4,8 +4,9 @@ Lane: `social`.
 
 ## How it works today
 
-- **No free text in chat, except the town square's and the global chat's** (Eric, Oct 28: "I think it actually is totally fine to allow
-  typing"; Nov 7 for the global chat; below). Everywhere else a message is the id of a line from a fixed list (a phrase or an emoji). The server
+- **Typed chat** in the town square (Oct 28), the global chat and, since Nov 7, every match's and lobby's chat for a player who may type
+  (signed in, chat on, not too young; `typed-chat.ts`, [docs/decisions/2026-11-07-typed-chat-everywhere.md](../decisions/2026-11-07-typed-chat-everywhere.md)):
+  the field and our `:name:` emoji replace their quick lines; anyone else keeps the preset lines below. Everywhere else a message is the id of a line from a fixed list (a phrase or an emoji). The server
   relays only known lines the sender owns, within the limits; names come from the lobby or the account, never from the
   message. What players can abuse is how they use the lines (spam, taunts), their name and their icon: see
   Moderation below. Squads has no chat. Ranked 1 v 1 has the match's quick chat, one channel for its two players

@@ -24688,3 +24688,14 @@ button.sq-tiny {
   height: 1.35em;
   vertical-align: -0.32em;
 }
+/* (A phone's chat tab: the picker in one row of eight over the field, so both fit the box's foot.) */
+.qchat-tab .qpop .qtype .chat-emo-picker {
+  align-self: stretch;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  padding: 3px;
+}
+.qchat-tab .qpop .qtype .chat-emo-pick {
+  width: auto;
+  height: 32px;
+}
