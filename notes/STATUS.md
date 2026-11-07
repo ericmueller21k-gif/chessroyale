@@ -368,3 +368,10 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   as data, #545 lamps off boss fronts, #546 one side size + Babur pump in front + Big Boy unmirrored. Shelved by Eric: ledger
   backfill. Waiting on Eric: the settings mockup. Later (Eric's notes): spread boss homes across the town; other bosses face away from
   the board on the board screen (Babur, Moo, Sawyer, Wrangler, Chub & Chirp, Puddles, Alfil, Folio) until each moves to the kit.
+- **Eric, Nov 7 ~07:30: chat + right column redesign (MOCKUP SENT, waiting on his OK):** free-typed chat (filter, report, age gate
+  exist), quick chat/emoji kept behind a flag (easy flip back), chat OFF by default with an opt-in notice, custom Twitch-style emoji
+  (placeholder set). Global chat hard cap ~5 msg/s server-wide with a backlog (a message may show ~10 s late). Computer right column:
+  no top-right avatar, no "Playing now", chat fixed in the same place on every screen and mode (nothing shifts; the Lobby/Yours
+  height jump goes away with quick chat). Town on computer: no "‹ Town…" header; a TOWN row with map / town chat / gear in the
+  column's fixed top slot. Open: the 1v1 view hides global chat (check why; a match chat tab in the same box?).
+  Mockup: scratchpad/chatmock/p1-p3.png.
