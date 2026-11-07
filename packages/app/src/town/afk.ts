@@ -83,3 +83,35 @@ export class AwayClock {
     return idle >= L.zzzMs ? "zzz" : "here";
   }
 }
+
+/**
+ * A guest's time in the town (Eric, on #542: "guests should only be able to run around the town for like 30 seconds. And then it
+ * just asks them to sign up"): counted only while the page is visible, the rooms inside included, and carried across visits in one
+ * page load (`used` from the last visit); a reload starts it again. TOWN_AFK.guestTownSec.
+ */
+export class GuestTime {
+  private at: number | null = null;
+  constructor(private used = 0) {}
+  /** The page is visible (`on`) or not, at `now`. */
+  visible(on: boolean, now: number): void {
+    if (on) this.at ??= now;
+    else if (this.at !== null) {
+      this.used += Math.max(0, now - this.at);
+      this.at = null;
+    }
+  }
+  usedMs(now: number): number {
+    return this.used + (this.at === null ? 0 : Math.max(0, now - this.at));
+  }
+}
+
+/**
+ * The test switch `?townguest=` (test switches only): seconds a guest gets in the town (1 to 3600), which also turns the rule on where
+ * no account can be made (local, e2e), or `off`. Null: off; undefined: no switch (or a bad value).
+ */
+export function readGuestSwitch(v: string | null): number | null | undefined {
+  if (v === null) return undefined;
+  if (v === "off" || v === "0") return null;
+  const s = Number(v);
+  return Number.isFinite(s) && s > 0 && s <= 3600 ? s * 1000 : undefined;
+}

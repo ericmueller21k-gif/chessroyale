@@ -1,40 +1,40 @@
 import { describe, expect, it } from "vitest";
-import { TOWN_AFK } from "@chessroyale/core";
-import { AWAY_LIMITS, AwayClock, readAwaySwitch } from "../src/town/afk.ts";
+import { ITEM_COLORS, TOWN_AFK, cleanLook } from "@chessroyale/core";
+import { AWAY_LIMITS, AwayClock, GuestTime, readAwaySwitch, readGuestSwitch } from "../src/town/afk.ts";
 import { applyHere } from "../src/town/here-net.ts";
 import { START, createTown, taken, tick, walkable, type Town } from "../src/town/world.ts";
 
 const S = 1000;
 
-describe("the town's away rule (Eric, Nov 7: zzz after a few minutes, out after 10 of no input or in the background)", () => {
-  it("the numbers are settings.ts's: zzz at 180 s, out at 600 s idle and 600 s hidden", () => {
-    expect([TOWN_AFK.zzzAfterSec, TOWN_AFK.bootAfterSec, TOWN_AFK.hiddenBootAfterSec]).toEqual([180, 600, 600]);
-    expect(AWAY_LIMITS).toEqual({ zzzMs: 180 * S, bootMs: 600 * S, hiddenBootMs: 600 * S });
+describe("the town's away rule (Eric, Nov 7; on #542: zzz after 1 minute, out after 5 of no input or in the background)", () => {
+  it("the numbers are settings.ts's: zzz at 60 s, out at 300 s idle and 300 s hidden; a guest's 30 s", () => {
+    expect([TOWN_AFK.zzzAfterSec, TOWN_AFK.bootAfterSec, TOWN_AFK.hiddenBootAfterSec, TOWN_AFK.guestTownSec]).toEqual([60, 300, 300, 30]);
+    expect(AWAY_LIMITS).toEqual({ zzzMs: 60 * S, bootMs: 300 * S, hiddenBootMs: 300 * S });
   });
 
-  it("no input: here, then the zzz at 3 minutes, then out at 10", () => {
+  it("no input: here, then the zzz at 1 minute, then out at 5", () => {
     const c = new AwayClock(0);
-    expect(c.state(179.9 * S)).toBe("here");
-    expect(c.state(180 * S)).toBe("zzz");
-    expect(c.state(599.9 * S)).toBe("zzz");
-    expect(c.state(600 * S)).toBe("out");
+    expect(c.state(59.9 * S)).toBe("here");
+    expect(c.state(60 * S)).toBe("zzz");
+    expect(c.state(299.9 * S)).toBe("zzz");
+    expect(c.state(300 * S)).toBe("out");
     expect(c.idleMs(200 * S)).toBe(200 * S);
   });
 
   it("any input clears the zzz at once and starts the clock again", () => {
     const c = new AwayClock(0);
-    expect(c.state(300 * S)).toBe("zzz");
-    c.act(300 * S);
-    expect(c.state(300 * S)).toBe("here");
-    expect(c.state(479 * S)).toBe("here");
-    expect(c.state(480 * S)).toBe("zzz");
-    expect(c.state(900 * S)).toBe("out");
+    expect(c.state(200 * S)).toBe("zzz");
+    c.act(200 * S);
+    expect(c.state(200 * S)).toBe("here");
+    expect(c.state(259 * S)).toBe("here");
+    expect(c.state(260 * S)).toBe("zzz");
+    expect(c.state(500 * S)).toBe("out");
     // (An input stamped earlier than the last never turns the clock back.)
     c.act(100 * S);
-    expect(c.idleMs(300 * S)).toBe(0);
+    expect(c.idleMs(200 * S)).toBe(0);
   });
 
-  it("in the background 10 minutes without a break: out, the moment the page is back (a phone ran no timer meanwhile)", () => {
+  it("in the background for the limit without a break: out, the moment the page is back (a phone ran no timer meanwhile)", () => {
     const c = new AwayClock(0, { zzzMs: 180 * S, bootMs: 3600 * S, hiddenBootMs: 600 * S });
     c.hidden(true, 10 * S);
     expect(c.state(609 * S)).toBe("zzz");
@@ -61,8 +61,8 @@ describe("the town's away rule (Eric, Nov 7: zzz after a few minutes, out after 
     expect(c.state(9000 * S)).toBe("here");
     c.hidden(false, 9000 * S);
     c.setBusy(false, 9000 * S);
-    expect(c.state(9179 * S)).toBe("here");
-    expect(c.state(9180 * S)).toBe("zzz");
+    expect(c.state(9059 * S)).toBe("here");
+    expect(c.state(9060 * S)).toBe("zzz");
   });
 
   it("off (the test switch ?townafk=off): always here", () => {
@@ -94,8 +94,8 @@ describe("other players in the town from the server's list (applyHere)", () => {
     const t = createTown(0);
     const n0 = t.people.length;
     const sq = free(t, START);
-    const gone = applyHere(t, [{ id: "u1", name: "Ann", c: sq.c, r: sq.r, zzz: true }], 500);
-    expect(gone).toEqual([]);
+    const { gone, dressed } = applyHere(t, [{ id: "u1", name: "Ann", c: sq.c, r: sq.r, zzz: true }], 500);
+    expect([gone, dressed]).toEqual([[], []]);
     expect(t.people.length).toBe(n0 + 1);
     const ann = t.people.at(-1)!;
     expect([ann.uid, ann.name, ann.remote, ann.zzz, ann.home, ann.came]).toEqual(["u1", "Ann", true, true, false, 500]);
@@ -125,7 +125,7 @@ describe("other players in the town from the server's list (applyHere)", () => {
     applyHere(t, [{ id: "u1", name: "Ann", c: a.c, r: a.r, zzz: true }], 0);
     const ann = t.people.at(-1)!;
     const n = t.people.length;
-    const gone = applyHere(t, [], 100);
+    const { gone } = applyHere(t, [], 100);
     expect(gone).toEqual([ann]);
     expect([ann.home, ann.zzz]).toEqual([true, false]);
     expect(t.all).not.toContain(ann.walker);
@@ -149,5 +149,44 @@ describe("other players in the town from the server's list (applyHere)", () => {
     const n = t.people.length;
     applyHere(t, [{ id: "u9", name: "X", c: -1, r: 3, zzz: false }, { id: "u8", name: "Y", c: 9999, r: 0, zzz: false }], 0);
     expect(t.people.length).toBe(n);
+  });
+  it("what they wear, as the server says: dressed when it's new or changed (and only then), a plain pawn again with nothing on", () => {
+    const t = createTown(0);
+    const a = free(t, START);
+    const hat = { head: { def: "beanie", color: ITEM_COLORS[0]!.id, blemish: 0, seed: 1 } };
+    const look = cleanLook(hat);
+    expect(Object.keys(look)).toEqual(["head"]);
+    const slot = "head";
+    const first = applyHere(t, [{ id: "u1", name: "Ann", c: a.c, r: a.r, zzz: false, look: hat }], 0);
+    const ann = t.people.at(-1)!;
+    if (slot) {
+      expect(first.dressed).toEqual([ann]);
+      expect("wear" in ann.look && ann.look.wear).toEqual(look);
+      expect(applyHere(t, [{ id: "u1", name: "Ann", c: a.c, r: a.r, zzz: false, look: hat }], 10).dressed).toEqual([]);
+      expect(applyHere(t, [{ id: "u1", name: "Ann", c: a.c, r: a.r, zzz: false }], 20).dressed).toEqual([ann]);
+    }
+    expect("wear" in ann.look && ann.look.wear).toBeNull();
+  });
+});
+
+describe("a guest's town time (Eric, on #542: \"like 30 seconds\", then make an account)", () => {
+  it("counts only while the page is visible, and carries on from the last visit's time", () => {
+    const g = new GuestTime();
+    g.visible(true, 0);
+    expect(g.usedMs(10 * S)).toBe(10 * S);
+    g.visible(false, 10 * S);
+    expect(g.usedMs(500 * S)).toBe(10 * S);
+    g.visible(true, 500 * S);
+    g.visible(true, 505 * S);
+    expect(g.usedMs(520 * S)).toBe(30 * S);
+    const next = new GuestTime(g.usedMs(520 * S));
+    expect(next.usedMs(0)).toBe(30 * S);
+  });
+
+  it("the test switch ?townguest=: seconds, or off; anything else is ignored", () => {
+    expect(readGuestSwitch(null)).toBeUndefined();
+    expect(readGuestSwitch("off")).toBeNull();
+    expect(readGuestSwitch("3")).toBe(3 * S);
+    for (const bad of ["x", "-1", "99999", ""]) expect(readGuestSwitch(bad)).toBeUndefined();
   });
 });

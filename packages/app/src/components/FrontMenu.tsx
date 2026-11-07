@@ -178,7 +178,7 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
       {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home" || page === "town"} onSignIn={nav.signIn} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
-      {/* Back from the town for being away (town/afk.ts): a small note on home. */}
+      {/* Back from the town for being away (town/afk.ts): "You've been dropped from the town" on home. */}
       {page === "home" && <AwayNote />}
     </div>
   );

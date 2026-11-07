@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, FRIENDS, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRIENDS, FRONT_DOOR, type ItemLook } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
@@ -228,15 +228,21 @@ export class LiveHub extends DurableObject<Env> {
    * A device in the town square says where its player is (`beat`), or that it left (null). Answers everyone else in its room's
    * town square (not in a shop), each with their "zzz", after dropping every pawn past its limit (town-here.ts).
    */
-  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits): Promise<HereOther[]> {
+  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null): Promise<HereOther[]> {
     countCall("hub.townHere");
     const now = Date.now();
     if (!beat) {
       this.here.leave(id);
       return [];
     }
-    this.here.beat(id, name, room, beat, now, limits);
+    this.here.beat(id, name, room, beat, now, limits, look ?? null);
     return this.here.view(room, now, id);
+  }
+
+  /** A guest watching the town square (no pawn of their own): everyone there, their looks and "zzz"s, no names. */
+  async townWatch(room: string): Promise<HereOther[]> {
+    countCall("hub.townWatch");
+    return this.here.view(room, Date.now(), null, undefined, false);
   }
 
   /** One line still in the town's room (a report reads what was said from here). */

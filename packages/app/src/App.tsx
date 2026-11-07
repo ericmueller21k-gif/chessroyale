@@ -1494,13 +1494,22 @@ export function App() {
             setTownStand(null);
             history.replaceState(null, "", "/");
           }}
-          // Away too long (town/afk.ts): home (one replaceState, no reload), with a small "You were away" there.
+          // Away too long (town/afk.ts): home (one replaceState, no reload), with "You've been dropped from the town" there.
           onAway={() => {
             showAwayNote();
             setShowTown(false);
             setTownSeat(null);
             setTownStand(null);
             history.replaceState(null, "", "/");
+          }}
+          // A guest's town time is up (town/afk.ts), Sign up: out of the town to the app's own sign-in (the landing page, as
+          // nav.signIn does from the chat).
+          onSignIn={() => {
+            setShowTown(false);
+            setTownSeat(null);
+            setTownStand(null);
+            history.replaceState(null, "", "/");
+            chooseGuest(false);
           }}
           // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
           // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it

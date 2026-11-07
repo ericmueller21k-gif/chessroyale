@@ -1,4 +1,4 @@
-import { TOWN_AFK } from "@chessroyale/core";
+import { TOWN_AFK, type ItemLook } from "@chessroyale/core";
 
 /**
  * Who's in the town square now, as pure logic (the live hub keeps one, in memory only: a restart forgets it, and each device's
@@ -47,6 +47,8 @@ export interface HereOther {
   r: number;
   /** Away (no input for TOWN_AFK.zzzAfterSec): a "zzz" over their pawn. */
   zzz: boolean;
+  /** What they wear (their equipped items, as every other screen draws them: Eric, on #542); absent: nothing on. */
+  look?: ItemLook;
 }
 
 interface Entry {
@@ -60,6 +62,7 @@ interface Entry {
   hiddenSince: number | null;
   beatAt: number;
   limits: HereLimits;
+  look: ItemLook | null;
 }
 
 /** The most rooms' worth of players held (a guard: a test makes a room per run). */
@@ -73,12 +76,12 @@ export class TownHere {
   }
 
   /** A device's beat: where its player is now. */
-  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS): void {
+  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null): void {
     const was = this.here.get(id);
     const hiddenSince = b.hidden ? (was?.hiddenSince ?? now) : null;
     if (!was && this.here.size >= HOLD_MAX) this.sweep(now);
     if (!was && this.here.size >= HOLD_MAX) return;
-    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits });
+    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look });
   }
 
   /** A device left the town (back home, out to a game, the page closed). */
@@ -110,13 +113,16 @@ export class TownHere {
     return this.here.has(id);
   }
 
-  /** Everyone else in the town square of `room` (not in a shop), after the sweep: at most TOWN_AFK.maxShown. */
-  view(room: string, now: number, except: string | null, max: number = TOWN_AFK.maxShown): HereOther[] {
+  /**
+   * Everyone else in the town square of `room` (not in a shop), after the sweep: at most TOWN_AFK.maxShown. `names` false (a guest
+   * watching: Eric, on #542, "maybe nothing" over their heads): no names, their looks still.
+   */
+  view(room: string, now: number, except: string | null, max: number = TOWN_AFK.maxShown, names = true): HereOther[] {
     this.sweep(now);
     const out: HereOther[] = [];
     for (const e of this.here.values()) {
       if (e.room !== room || e.id === except || e.shop) continue;
-      out.push({ id: e.id, name: e.name, c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs });
+      out.push({ id: e.id, name: names ? e.name : "", c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs, ...(e.look ? { look: e.look } : {}) });
       if (out.length >= max) break;
     }
     return out;

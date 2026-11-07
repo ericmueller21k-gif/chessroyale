@@ -1,7 +1,9 @@
-import { TOWN_AFK } from "@chessroyale/core";
+import { TOWN_AFK, cleanLook, type ItemLook } from "@chessroyale/core";
+import { lookKey } from "./you-look.ts";
 import { testParams } from "../test-switches.ts";
-import { AWAY_LIMITS, AwayClock, readAwaySwitch, type AwayLimits, type AwayState } from "./afk.ts";
-import { mayTownChat } from "./chat-net.ts";
+import { account } from "../account.ts";
+import { AWAY_LIMITS, AwayClock, GuestTime, readAwaySwitch, readGuestSwitch, type AwayLimits, type AwayState } from "./afk.ts";
+import { mayReadTownChat, mayTownChat } from "./chat-net.ts";
 import { N } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { Walker, spotNear, taken, walkWalker, walkable, type Person, type Sq, type Town } from "./world.ts";
@@ -22,6 +24,8 @@ export interface HereOther {
   c: number;
   r: number;
   zzz: boolean;
+  /** What they wear (absent: nothing on). */
+  look?: ItemLook;
 }
 
 const isOther = (o: unknown): o is HereOther => {
@@ -32,9 +36,11 @@ const isOther = (o: unknown): o is HereOther => {
 /**
  * The server's list, into the town: a newcomer stands on their square (or the nearest free one) and fades in; someone already here
  * walks to their new square; someone no longer listed leaves (`home`: not drawn, not tapped, off every square). Each one's "zzz"
- * as said. Answers those who left. (Your own pawn is never in the list: the server leaves you out.)
+ * and look as said (an empty name: a guest's view, no name tag). Answers those who left, and those whose look is new (to dress:
+ * Town.tsx `dressPerson`, the bots' way). (Your own pawn is never in the list: the server leaves you out.)
  */
-export function applyHere(t: Town, others: readonly HereOther[], now: number): Person[] {
+export function applyHere(t: Town, others: readonly HereOther[], now: number): { gone: Person[]; dressed: Person[] } {
+  const dressed: Person[] = [];
   const listed = new Set<string>();
   for (const o of others) {
     if (o.c < 0 || o.r < 0 || o.c >= N || o.r >= N || !walkable(o.c, o.r)) continue;
@@ -63,6 +69,12 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): P
     }
     p.name = o.name;
     p.zzz = o.zzz;
+    const wear = o.look ? cleanLook(o.look) : null;
+    const was = "sprite" in p.look ? null : p.look.wear;
+    if (lookKey(wear) !== lookKey(was)) {
+      p.look = { side: "light", tint: null, wear: lookKey(wear) ? wear : null };
+      dressed.push(p);
+    }
   }
   const gone: Person[] = [];
   for (const p of t.people) {
@@ -73,7 +85,7 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): P
     if (i >= 0) t.all.splice(i, 1);
     gone.push(p);
   }
-  return gone;
+  return { gone, dressed };
 }
 
 /** What a beat says about you. */
@@ -111,12 +123,14 @@ export function watchAway(o: {
   busy: () => boolean;
   onState: (s: AwayState) => void;
   onOut: () => void;
-  onOthers?: (gone: Person[]) => void;
+  onOthers?: (gone: Person[], dressed: Person[]) => void;
 }): () => void {
   const limits = awayLimits();
   const clock = new AwayClock(Date.now(), limits);
   const extras = testExtras(limits);
   const online = mayTownChat();
+  // (A guest, Eric on #542: sees everyone, dressed, with no names; sends no beat of their own, so nobody sees them.)
+  const watching = !online && mayReadTownChat();
   let state: AwayState = "here";
   let done = false;
   let inFlight = false;
@@ -130,18 +144,18 @@ export function watchAway(o: {
   const post = (body: Record<string, unknown>, keepalive: boolean) =>
     fetch("/api/town/here", { method: "POST", credentials: "same-origin", keepalive, headers: { "content-type": "application/json" }, body: JSON.stringify({ ...body, ...extras }) });
   const beat = () => {
-    if (!online || done) return;
+    if ((!online && !watching) || done) return;
     if (inFlight) return void (again = true);
     inFlight = true;
     const me = self();
     beatAt = Date.now();
     sent = `${me.c},${me.r},${state},${me.shop}`;
-    void post({ ...me }, false)
+    void post(online ? { ...me } : { watch: true }, false)
       .then((res) => (res.ok ? res.json() : null))
       .then((b: { others?: unknown } | null) => {
         if (done || !b || !Array.isArray(b.others)) return;
-        const gone = applyHere(o.town, b.others.filter(isOther), performance.now());
-        o.onOthers?.(gone);
+        const { gone, dressed } = applyHere(o.town, b.others.filter(isOther), performance.now());
+        o.onOthers?.(gone, dressed);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -177,7 +191,7 @@ export function watchAway(o: {
     if (document.hidden) return;
     const h = o.town.you.walker.here();
     const key = `${h.c},${h.r},${state},${o.shop()}`;
-    if (key !== sent || now - beatAt >= TOWN_AFK.beatSec * 1000) beat();
+    if ((online && key !== sent) || now - beatAt >= TOWN_AFK.beatSec * 1000) beat();
   };
   const onInput = () => {
     clock.act(Date.now());
@@ -213,5 +227,45 @@ export function watchAway(o: {
     document.removeEventListener("visibilitychange", onVisibility);
     removeEventListener("pagehide", onPageHide);
     leave();
+  };
+}
+
+/** A guest's town time used so far in this page load (afk.ts GuestTime): a reload starts it again. */
+let guestUsed = 0;
+
+/**
+ * How long a guest may walk round the town (ms), or null: signed in, or nowhere to make an account (no accounts, or no way to sign
+ * in: local and e2e, where `?townguest=` turns it on for a test). TOWN_AFK.guestTownSec.
+ */
+export function guestLimitMs(): number | null {
+  const a = account();
+  if (!a.config?.accounts || !a.profile || a.profile.user.signedIn) return null;
+  const sw = readGuestSwitch(testParams().get("townguest"));
+  if (sw !== undefined) return sw;
+  return a.config.onlineNeedsSignIn ? TOWN_AFK.guestTownSec * 1000 : null;
+}
+
+/** A guest's clock in the town until the returned function is called; `onOut` once their time is up (at once if it already was). */
+export function watchGuest(limitMs: number, onOut: () => void): () => void {
+  const t = new GuestTime(guestUsed);
+  let done = false;
+  const check = () => {
+    if (done || t.usedMs(Date.now()) < limitMs) return;
+    done = true;
+    onOut();
+  };
+  const onVisibility = () => {
+    t.visible(!document.hidden, Date.now());
+    check();
+  };
+  t.visible(!document.hidden, Date.now());
+  const timer = setInterval(check, 250);
+  document.addEventListener("visibilitychange", onVisibility);
+  check();
+  return () => {
+    clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisibility);
+    t.visible(false, Date.now());
+    guestUsed = t.usedMs(Date.now());
   };
 }

@@ -1,22 +1,23 @@
 import { useEffect, useState } from "preact/hooks";
-import { TOWN_AFK } from "@chessroyale/core";
+import { FdButton } from "./FrontDoor.tsx";
 
 /**
- * "You were away": the small note on home after the town sent you out for being away (town/afk.ts; Eric, Nov 7). At the top, in
- * the invite toast's style; it stays for TOWN_AFK.awayNoteSec of the page being visible (a phone coming back from the background
- * sees it for that long), and a tap takes it away sooner. Shown once per time out.
+ * "You've been dropped from the town": the pop-up on home after the town sent you out for being away (town/afk.ts; Eric, on #542:
+ * "it just sends you a pop-up and just says like, you've been dropped out of the town… we don't want AFK players sitting in there").
+ * The app's sheet (`fd-sheet`: from the foot on a phone, in the middle on a wide screen), one OK. Shown once per time out.
  */
 
 let pending = false;
 const subs = new Set<() => void>();
 
-/** The town sent you out for being away: home shows the note. */
+/** The town sent you out for being away: home shows the pop-up. */
 export function showAwayNote() {
   pending = true;
   subs.forEach((f) => f());
 }
 
-export const AWAY_NOTE = "You were away";
+export const DROPPED_TITLE = "You've been dropped from the town";
+export const DROPPED_TEXT = "You were away for a while. Come back any time.";
 
 export function AwayNote() {
   const [on, setOn] = useState(pending);
@@ -26,36 +27,24 @@ export function AwayNote() {
     sync();
     return () => void subs.delete(sync);
   }, []);
-  useEffect(() => {
-    if (!on) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const done = () => {
-      pending = false;
-      setOn(false);
-    };
-    // (Its time counts only while the page is visible: a phone that comes back later still sees it.)
-    const arm = () => {
-      clearTimeout(timer);
-      if (!document.hidden) timer = setTimeout(done, TOWN_AFK.awayNoteSec * 1000);
-    };
-    arm();
-    document.addEventListener("visibilitychange", arm);
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", arm);
-    };
-  }, [on]);
   if (!on) return null;
+  const ok = () => {
+    pending = false;
+    setOn(false);
+  };
   return (
-    <div
-      class="fr-toast away-note"
-      role="status"
-      onClick={() => {
-        pending = false;
-        setOn(false);
-      }}
-    >
-      <span class="fr-toast-text">{AWAY_NOTE}</span>
+    <div class="fd-sheet-scrim away-scrim" onClick={(e) => e.target === e.currentTarget && ok()}>
+      <div class="fd-sheet away-note" role="alertdialog" aria-modal="true" aria-labelledby="away-title" aria-describedby="away-text">
+        <div class="fd-sheet-head">
+          <h2 id="away-title">{DROPPED_TITLE}</h2>
+        </div>
+        <p class="fd-sub" id="away-text">
+          {DROPPED_TEXT}
+        </p>
+        <FdButton primary onClick={ok}>
+          OK
+        </FdButton>
+      </div>
     </div>
   );
 }

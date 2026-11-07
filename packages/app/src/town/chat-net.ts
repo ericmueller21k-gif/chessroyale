@@ -55,6 +55,13 @@ export interface TownSink {
 
 /** Whether this device chats with other players in the town: a signed-in account, not on a device answered "too young". */
 export const mayTownChat = () => !!account().profile?.user.signedIn && !tooYoung();
+/**
+ * Whether this device reads other players' lines (Eric, on #542: guests "should be able to see the chat. They just can't type in
+ * it"): anyone with an account here, a guest's too, not on a device answered "too young".
+ */
+export const mayReadTownChat = () => !!account().profile && !tooYoung();
+/** A guest's typing line (greyed; a tap on it is the app's sign-in). */
+export const GUEST_CHAT = "Make a free account to chat.";
 
 const isLine = (l: unknown): l is TownLine => {
   const x = l as TownLine;
@@ -98,7 +105,7 @@ class TownFeed {
 
   /** The town opened its log: players' lines flow into `sink` until the returned function is called. */
   open(sink: TownSink): () => void {
-    if (!mayTownChat()) return () => undefined;
+    if (!mayReadTownChat()) return () => undefined;
     this.sink = sink;
     this.color = pickNameColor();
     this.last = 0;
@@ -111,7 +118,7 @@ class TownFeed {
     const unblock = onFriendsChange(() => sink.drop((l) => isBlocked(l.from)));
     // (Signed out, or the device marked too young: every player's line leaves the log at once.)
     const unaccount = onAccountChange(() => {
-      if (!mayTownChat()) sink.drop(() => true);
+      if (!mayReadTownChat()) sink.drop(() => true);
     });
     return () => {
       unride();
@@ -145,7 +152,7 @@ export const takeTownSlice = (slice: unknown) => feed.take(slice);
  * switch, your chat ban.
  */
 export function townChatOff(now = Date.now()): string | null {
-  if (!account().profile?.user.signedIn) return "Sign in to chat with other players.";
+  if (!account().profile?.user.signedIn && !tooYoung()) return GUEST_CHAT;
   if (tooYoung()) return "Chat with other players is for accounts 13 and older.";
   if (feed.pausedSaid || isPaused("town-chat")) return "Chat is paused.";
   const block = chatBlockNow(now);

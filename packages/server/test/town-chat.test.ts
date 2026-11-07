@@ -295,7 +295,7 @@ describe("town chat: the API", () => {
     expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);
   });
 
-  it("signed-in players send and read each other's lines with the live poll; a guest gets none and can't send", async () => {
+  it("signed-in players send and read each other's lines with the live poll; a guest reads them too (Eric, on #542) but can't send", async () => {
     const { sql, call, signedIn } = await setup();
     const a = await signedIn("Ann");
     const b = await signedIn("Bo");
@@ -310,8 +310,8 @@ describe("town chat: the API", () => {
     expect(read.town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
     expect(JSON.stringify(read.town)).not.toMatch(/example\.com|email/);
     expect((await live(await call(`/api/live?town=${read.town!.n}`, b.token))).town!.lines).toEqual([]);
-    // The guest: no players' lines at all (no `town` in the answer), and sending is refused.
-    expect("town" in (await live(await call("/api/live?town=0", guest.token)))).toBe(false);
+    // The guest reads the same lines (Eric, on #542: "they should be able to see the chat. They just can't type in it"); sending is refused.
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
     const g = await call("/api/town/chat", guest.token, { text: "hi" });
     expect(g.status).toBe(401);
     expect(await g.json()).toEqual({ message: SIGN_IN_TO_TOWN_CHAT });
@@ -333,12 +333,12 @@ describe("town chat: the API", () => {
     expect("color" in ((await bad.json()) as { line: object }).line).toBe(false);
   });
 
-  it("a guest gets none even where signing in isn't set up (local runs): the town's chat is for accounts", async () => {
+  it("a guest reads but can't send even where signing in isn't set up (local runs): sending is for accounts", async () => {
     const { sql, call, signedIn } = await setup({ GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" });
     const a = await signedIn("Ann");
     const guest = await createGuest(sql, Date.now(), "Guesty");
     expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
-    expect("town" in (await live(await call("/api/live?town=0", guest.token)))).toBe(false);
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toHaveLength(1);
     expect((await call("/api/town/chat", guest.token, { text: "hi" })).status).toBe(401);
   });
 

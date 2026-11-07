@@ -81,12 +81,12 @@ describe("town chat in the app", () => {
     vi.useRealTimers();
   });
 
-  it("a guest, or a device marked too young, never asks for players' lines", () => {
+  it("a guest reads players' lines but can't type (Eric, on #542); a device marked too young never asks for them", () => {
     who.signedIn = false;
     close = openTownFeed(log().sink);
-    expect(live.rider).toBeNull();
-    expect(live.watching).toBe(0);
-    expect(townChatOff()).toBe("Sign in to chat with other players.");
+    expect(live.rider).not.toBeNull();
+    expect(townChatOff()).toBe("Make a free account to chat.");
+    close();
     who.signedIn = true;
     who.young = true;
     close = openTownFeed(log().sink);
@@ -236,7 +236,7 @@ describe("town chat in the app, after the review", () => {
     expect(lines.map((l) => l.from)).toEqual(["cy", "di"]);
   });
 
-  it("players' lines leave at once when access ends: signed out, a device marked too young, the chat paused, or a block (a nit)", () => {
+  it("players' lines leave at once when access ends: a device marked too young, the chat paused, or a block (a nit); signed out they stay (a guest reads them: Eric, on #542)", () => {
     const { lines, sink } = log();
     close = openTownFeed(sink);
     const fill = (from: number) => takeTownSlice({ room: "r", n: from + 1, lines: [line(from, "ann"), line(from + 1, "troll")] });
@@ -253,7 +253,7 @@ describe("town chat in the app, after the review", () => {
     expect(lines).toHaveLength(2);
     who.signedIn = false;
     who.accountHeard.at(-1)!();
-    expect(lines).toEqual([]);
+    expect(lines).toHaveLength(2);
     who.signedIn = true;
     fill(7);
     who.young = true;
@@ -263,7 +263,7 @@ describe("town chat in the app, after the review", () => {
 
   it("the field's reason for a guest and for a young device (a nit: the field shows to everyone, greyed)", () => {
     who.signedIn = false;
-    expect(townChatOff()).toBe("Sign in to chat with other players.");
+    expect(townChatOff()).toBe("Make a free account to chat.");
     who.signedIn = true;
     who.young = true;
     expect(townChatOff()).toBe("Chat with other players is for accounts 13 and older.");

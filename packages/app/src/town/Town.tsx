@@ -66,7 +66,9 @@ import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
-import { watchAway } from "./here-net.ts";
+import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
+import { FdButton } from "../components/FrontDoor.tsx";
+import { tooYoung } from "../account.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -125,8 +127,11 @@ export function TownScreen({
   stand = null,
   framed = false,
   onAway,
+  onSignIn,
 }: {
   onBack: () => void;
+  /** A guest's "Sign up" (their town time is up): the app's sign-in, out of the town. */
+  onSignIn?: () => void;
   /** Away too long (afk.ts): out of the town to home, with "You were away". */
   onAway?: () => void;
   onBossAlone?: (id: HomeId) => void;
@@ -156,6 +161,17 @@ export function TownScreen({
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
   const shopIn = useRef<string | null>(null);
   shopIn.current = inside?.room.def.home ?? null;
+  /** A guest's town time is up: "Make an account to keep exploring" over the town, which takes no more steps. */
+  const [gated, setGated] = useState(false);
+  useLayoutEffect(() => {
+    if (!gated) return;
+    // (No key reaches the town or a room under the pop-up: the arrow keys would walk you on.)
+    const stopKeys = (e: KeyboardEvent) => {
+      if (!(e.target instanceof Element && e.target.closest(".town-gate"))) e.stopImmediatePropagation();
+    };
+    addEventListener("keydown", stopKeys, true);
+    return () => removeEventListener("keydown", stopKeys, true);
+  }, [gated]);
   const awayOut = useRef(() => {});
   awayOut.current = () => (onAway ?? onBack)();
   /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
@@ -280,9 +296,16 @@ export function TownScreen({
       busy: () => flow.current !== "town" || !!shopCtl.current?.busy?.(),
       onState: (st) => void (t.town.you.zzz = st === "zzz"),
       onOut: () => awayOut.current(),
-      onOthers: t.gone,
+      onOthers: t.others,
+    });
+    // A guest's town time (Eric, on #542: 30 s, then "make an account"): the town stops under the pop-up; its rooms count too.
+    const guestMs = guestLimitMs();
+    const stopGuest = guestMs === null ? () => {} : watchGuest(guestMs, () => {
+      if (!shopIn.current) t.pause();
+      setGated(true);
     });
     return () => {
+      stopGuest();
       stopAway();
       t.stop();
     };
@@ -348,7 +371,7 @@ export function TownScreen({
         )}
         <div class="town-overlay">
           {/* The chat log, top left (its own file): under the cards; while it shows it takes every touch on its own area (the map under it gets none), faded none; the chips keep off its box (CHAT_BOX). */}
-          <TownChat tone={inside?.room.def.chatTone} />
+          <TownChat tone={inside?.room.def.chatTone} onSignIn={onSignIn} />
           {/* The card: over the boss's head or the home's top, its tail pointing there (placed every frame). Dark, with a gold border
               (Eric's mockup, Oct 28); a person's is one row at one size (`town-person`). */}
           <div class={card?.kind === "person" ? "town-card town-person" : card?.kind === "home" && !card.confirm && home && shopOf(home.id) ? "town-card town-door" : "town-card"} ref={cardEl} role="dialog" aria-label={label} style={{ display: card ? "" : "none" }}>
@@ -549,9 +572,31 @@ export function TownScreen({
           </div>
         </div>
       </div>
+      {/* A guest's town time is up (Eric, on #542): the app's sheet over the town; Sign up is the app's own sign-in, Back goes home.
+          A device the age gate marked too young can't make an account: Sign up greyed, and why. */}
+      {gated && (
+        <div class="fd-sheet-scrim town-gate-scrim">
+          <div class="fd-sheet town-gate" role="alertdialog" aria-modal="true" aria-labelledby="town-gate-title" aria-describedby="town-gate-text">
+            <div class="fd-sheet-head">
+              <h2 id="town-gate-title">{GATE_TITLE}</h2>
+            </div>
+            <p class="fd-sub" id="town-gate-text">
+              {tooYoung() ? GATE_YOUNG : GATE_FREE}
+            </p>
+            <FdButton primary disabled={tooYoung()} onClick={() => (onSignIn ?? onBack)()}>
+              Sign up
+            </FdButton>
+            <FdButton onClick={onBack}>Back</FdButton>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+export const GATE_TITLE = "Make an account to keep exploring";
+export const GATE_FREE = "It's free.";
+export const GATE_YOUNG = "Accounts are for players 13 and older.";
 
 /** The on-screen arrows: their directions, and their chevrons (12 × 12, the stroke in the key's color). */
 const ARROW_KEYS: readonly Dir[] = ["up", "left", "down", "right"];
@@ -1668,10 +1713,23 @@ function startTown(
   const hookHere = () => {
     if (!testSwitchesAllowed()) return null;
     const drawn = new Set(r.zzzList());
+    const tagged = new Set(r.tagList().map((t) => t.text));
     return town.people
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => p.remote || p.you)
-      .map(({ p, i }) => ({ uid: p.uid ?? null, you: p.you, name: p.name, at: [p.walker.hereC(), p.walker.hereR()], here: !p.home, zzz: !!p.zzz, drawn: drawn.has(i) }));
+      .map(({ p, i }) => ({
+        uid: p.uid ?? null,
+        you: p.you,
+        name: p.name,
+        at: [p.walker.hereC(), p.walker.hereR()],
+        here: !p.home,
+        zzz: !!p.zzz,
+        drawn: drawn.has(i),
+        // (What they wear as the town has it, and whether the renderer has their dressed picture: drawn in it, not a plain pawn.)
+        look: isSprite(p.look) ? null : p.look.wear ? Object.fromEntries(Object.entries(p.look.wear).map(([k, v]) => [k, v?.def])) : null,
+        dressed: r.botArt.has(p.id) || r.riders.has(p.id),
+        tag: tagged.has(p.name) && !!p.name,
+      }));
   };
   const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr] } : null);
   // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure
@@ -1756,9 +1814,19 @@ function startTown(
   draw(performance.now()); // the first frame, before the screen shows
 
   return {
-    /** Real players who left the town (here-net.ts): a card open on one of them closes. */
-    gone: (left: Person[]) => {
+    /**
+     * The server's list put in the town (here-net.ts): a card open on someone who left closes; someone in new clothes is dressed as
+     * the bots are (their pictures made once, off the frame loop).
+     */
+    others: (left: Person[], dressed: Person[]) => {
       if (card?.kind === "person" && left.includes(town.people[card.i]!)) setCard(null);
+      for (const p of dressed) {
+        r.botArt.delete(p.id);
+        r.riders.delete(p.id);
+        r.ridersSoon.delete(p.id);
+        p.walker.stepMs = TOWN_FEEL.botStepMs;
+        dressPerson(p);
+      }
     },
     zoom: setZoom,
     recenter: () => {

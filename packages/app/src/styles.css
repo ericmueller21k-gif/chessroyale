@@ -18927,12 +18927,6 @@ button.sq-tiny {
   flex: none;
   background: var(--fd-panel);
 }
-/* Home's "You were away" (town/afk.ts): the toast's look, as small as its words. */
-.fr-toast.away-note {
-  width: auto;
-  padding: 8px 16px;
-  cursor: pointer;
-}
 .fr-invite-friends {
   width: 100%;
 }

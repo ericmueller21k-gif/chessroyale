@@ -13,7 +13,7 @@ import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcom
 import { requestId } from "./ledger.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
 import { townHereResponse } from "./town-here-api.ts";
-import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
@@ -254,11 +254,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
     const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
-    // ?town=N (the town square is open): the town chat's lines after N, for a signed-in account only and never on a device
-    // the age gate marked too young (town-chat-api.ts); while its switch is off, only that it's paused.
+    // ?town=N (the town square is open): the town chat's lines after N, for anyone (a guest reads it too: Eric, on #542, "they
+    // should be able to see the chat. They just can't type in it") but never on a device the age gate marked too young
+    // (town-chat-api.ts); while its switch is off, only that it's paused. Sending stays signed-in only (townPostResponse).
     const townSince = url.searchParams.get("town");
     let town: unknown = null;
-    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under" && (await signedInReader(sql, token, now).catch(() => null))) {
+    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under") {
       town = isPaused(env, "town-chat", now)
         ? { paused: true }
         : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil).catch(() => null);
@@ -276,7 +277,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // there, each with their "zzz" (town-here-api.ts; the away rule, TOWN_AFK). No session lookup past the cached ones.
   if (path === "/api/town/here" && request.method === "POST") {
     if (!env.LIVE) return json({ others: [] });
-    return townHereResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
+    return townHereResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }) }, now);
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).

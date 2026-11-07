@@ -1658,7 +1658,8 @@ export class Renderer {
           // `nameRadius` squares of you in both directions, fading over the last square (tags.ts; "Everyone" in Town settings: no near rule).
           // A figure whose card is open, one at a table with you and one walking to or from a game with you keep theirs wherever they are.
           const far = farOf(v, it.dz);
-          if (it.on && far < f.tagFar && this.fade > 0.02) {
+          // (A real player with no name: a guest's view, Eric on #542, "maybe nothing" over their heads.)
+          if (it.on && far < f.tagFar && this.fade > 0.02 && !(person.remote && !person.name)) {
             const always = person === town.hold || person === town.meet?.bot || person === town.leave?.bot || (!!table && table === this.youTable);
             const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
             // (Eased toward it over about 150 ms, so a slow frame doesn't pop it: tags.ts easeTag.)
