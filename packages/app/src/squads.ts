@@ -29,7 +29,7 @@ import { showBanNotice } from "./components/FairPlay.tsx";
 import { play } from "./sound.ts";
 import { testParams } from "./test-switches.ts";
 import { byOfHalf } from "./move-replay.ts";
-import { LOW_BANK_MS, blockName, coinText, dutyOf, freeMs, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, type LocalBoard, type LocalMatch } from "./squads-view.ts";
+import { LOW_BANK_MS, blockName, coinText, dutyOf, itemText, liveBank, movesOfHalf, sideIn, squadName, squadOf, tickSecond, type LocalBoard, type LocalMatch } from "./squads-view.ts";
 
 /**
  * Squads on this device (docs/areas/squads.md, "The screens"): the lobby's socket and everything the screens draw from
@@ -319,6 +319,10 @@ export class SquadsClient {
   }
   isBot(id: string): boolean {
     return !!this.lobby?.players.find((p) => p.id === id)?.isBot;
+  }
+  /** A signed-in person's badge (their 1 v 1 tier's emblem and their rating); null for a bot or a guest. */
+  badgeOf(id: string): { emblem: string | null; rating: number | null } | null {
+    return this.lobby?.players.find((p) => p.id === id)?.badge ?? null;
   }
 
   connect() {
@@ -939,8 +943,9 @@ export class SquadsClient {
   }
 
   /**
-   * Every tenth of a second while a half is live: a short tick in the last seconds of your free time (only while you
-   * still have a choice to make), and the sting the moment a squad on the big board runs out of bank.
+   * Every tenth of a second while a half is live: a short tick each second your squad's real bank is running out
+   * (`tickSecond`: never in the free seconds, Eric, Nov 5: it "makes you panic"; only while you still have a choice
+   * to make), and the sting the moment a squad on the big board runs out of bank.
    */
   private tick() {
     const now = Date.now();
@@ -953,12 +958,8 @@ export class SquadsClient {
       if (out && !this.heard.get(id) && m.banks[side] > 0) this.stingFor(id, m.key);
       else if (!out && m.banks[side] >= LOW_BANK_MS) this.heard.set(id, false);
     }
-    const d = this.myId ? dutyOf(m, this.myId) : null;
-    if (!d || m.locked.includes(this.myId!)) return;
-    const free = freeMs(m, d.duty.board);
-    const left = m.current.startedAt + free - now;
-    const secs = Math.ceil(left / 1000);
-    if (left <= 0 || secs > TICK_FREE_FROM || secs >= Math.ceil(free / 1000)) return;
+    const secs = tickSecond(m, this.myId, now);
+    if (secs === null) return;
     const mark = `${m.key}/${m.current.seq}/${secs}`;
     if (this.lastTick === mark) return;
     this.lastTick = mark;
@@ -1013,8 +1014,6 @@ export class SquadsClient {
   }
 }
 
-/** Ticks in the last this-many seconds of your free time. */
-export const TICK_FREE_FROM = 3;
 
 /** A block's identity on screen (its arrow's beat is kept by it). */
 export const blockKey = (b: Pick<SquadsBlock, "board" | "move">) => `${b.board}/${b.move}`;

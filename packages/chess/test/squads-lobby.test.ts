@@ -262,8 +262,9 @@ describe("Squads: the schedules", () => {
       const seats = [0, 1, 2, 3].map((board) => relaySeat(4, board, turn));
       expect([...seats].sort()).toEqual([0, 1, 2, 3]);
       for (let seat = 0; seat < 4; seat++) {
-        expect(relaySeat(4, relayBoardOf(seat, turn), turn)).toBe(seat);
-        expect(relayBoardOf(seat, turn + 1)).toBe((relayBoardOf(seat, turn) + 1) % 4);
+        // (Four boards: a match stored before Nov 5. Three, the ring: squads-three-boards.test.ts.)
+        expect(relaySeat(4, relayBoardOf(seat, turn)!, turn)).toBe(seat);
+        expect(relayBoardOf(seat, turn + 1)).toBe((relayBoardOf(seat, turn)! + 1) % 4);
       }
     }
     // One board (Armageddon): the seats take turns in order.

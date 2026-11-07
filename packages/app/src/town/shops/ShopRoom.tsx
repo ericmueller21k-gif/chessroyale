@@ -60,9 +60,14 @@ import { paintTable, playCue, slabFrontY, type Emis, type LoadedIntro } from "./
 import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
+import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
+import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
+import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
 /** A room's art, as its file exports it. */
 interface RoomArt {
+  /** Its size in squares, each way (20 unless the art says: Boingo's Funhouse is 24). */
+  n?: number;
   layout: readonly ShopPlace[];
   pieces: Readonly<Record<string, Character>>;
   /** Where the crate sits on the counter, in the counter's pixels. */
@@ -92,6 +97,13 @@ interface RoomArt {
   icePool?: { readonly at: readonly [number, number]; readonly rx: number; readonly ry: number; readonly color: string; readonly strength: number };
   /** Ginger's elves at work (his igloo): the walkers' loops and the dispensing pair's, and their sprites. */
   elves?: ElvesArt;
+  /**
+   * A claw machine (Boingo's Funhouse, Nov 6): its square and the square in front where you play it. Standing there, a tap on the
+   * machine calls `openClawMachine()` (claw/index.ts, loaded only then); from anywhere else the tap walks you up to it.
+   */
+  /** Words written on a piece's face, crisp at the screen's pixels (Boingo's price sign): its face's box in the piece's pixels, its lines. */
+  sign?: { readonly piece: string; readonly face: { readonly x: number; readonly y: number; readonly w: number; readonly h: number }; readonly lines: readonly string[] };
+  claw?: { readonly at: { readonly col: number; readonly row: number; readonly w: number; readonly d: number }; readonly spot: Sq };
 }
 /** Ginger's elves, as his art has them (shops/ginger-art.ts, shops/ginger-elves-art.ts). */
 interface ElvesArt {
@@ -146,6 +158,9 @@ const ART: Partial<Record<HomeId, () => Promise<RoomArt>>> = {
     import("./smudgy-art.ts").then((m) => ({ layout: m.SHOP_SMUDGY_LAYOUT, pieces: m.SHOP_SMUDGY_PIECES, crateAt: m.SHOP_SMUDGY_CRATE_AT, lights: m.SHOP_SMUDGY_LIGHTS, pools: m.SHOP_SMUDGY_POOLS, marks: m.SHOP_SMUDGY_MARKS })),
   folio: () =>
     import("./folio-art.ts").then((m) => ({ layout: m.SHOP_FOLIO_LAYOUT, pieces: m.SHOP_FOLIO_PIECES, crateAt: m.SHOP_FOLIO_CRATE_AT, lights: m.SHOP_FOLIO_LIGHTS, pools: m.SHOP_FOLIO_POOLS, marks: m.SHOP_FOLIO_MARKS, poolBlend: "multiply" as const })),
+  // (Boingo's Funhouse, Nov 6: an arcade, a box room of 24 x 24; the play structure stands up whole at its foot.)
+  clown: () =>
+    import("./boingo-art.ts").then((m) => ({ n: m.SHOP_BOINGO_N, layout: m.SHOP_BOINGO_LAYOUT, pieces: m.SHOP_BOINGO_PIECES, crateAt: m.SHOP_BOINGO_CRATE_AT, lights: m.SHOP_BOINGO_LIGHTS, pools: m.SHOP_BOINGO_POOLS, upright: ["play", "claw"], marks: m.SHOP_BOINGO_MARKS, claw: { at: m.SHOP_BOINGO_CLAW_AT, spot: m.SHOP_BOINGO_CLAW_SPOT }, sign: { piece: "price-sign", face: m.SIGN_FACE, lines: m.SIGN_LINES() } })),
   // (An igloo with a round floor's shape, as Hollow's cave, but not a cave; its catwalk and staircases, a second walking level; the
   // elves at work.)
   gingerbread: () =>
@@ -435,8 +450,8 @@ function startRoom(
   const SQ = f.housePxPerSquare;
   const { def, art, frames } = loaded;
   // (Ginger's igloo: its catwalk and staircases, a second walking level: levels.ts.)
-  const lv = art.levels ? makeLevels(art.levels, 20) : null;
-  const room: Room = makeRoom(art.layout, def.keeper, 20, art.floor, def.talk, lv);
+  const lv = art.levels ? makeLevels(art.levels, art.n ?? 20) : null;
+  const room: Room = makeRoom(art.layout, def.keeper, art.n ?? 20, art.floor, def.talk, lv);
   // (Jefferson's idle crew stand on their squares: nobody walks through them. His machines and the floor pallet block where they are
   // now: crewTakes.)
   if (art.crew) for (const k of ["leaner-a", "leaner-b", "crew-c", "crew-d"] as const) room.blocked[art.crew.places[k].at[1] * room.n + art.crew.places[k].at[0]] = 1;
@@ -1085,6 +1100,49 @@ function startRoom(
       }
       return;
     }
+    if (def.roof === "arcade") {
+      // An arcade's ceiling (Boingo's Funhouse, Nov 6): deep night purple, black-light stars and swirls, and strings of colored
+      // bulbs swagging across it in rows, as the old kind of kids' arcade had. Drawn once for the box's size.
+      const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
+      sky.addColorStop(0, "#0d0820");
+      sky.addColorStop(1, "#2a1450");
+      rg.fillStyle = sky;
+      rg.fillRect(0, 0, W, H);
+      const hash = (a: number, b: number) => {
+        const x = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      for (let i = 0; i < 90; i++) {
+        rg.fillStyle = ["#7affc6", "#ff8fe0", "#62bdf5", "#f2c14e"][i % 4]!;
+        rg.globalAlpha = 0.35 + 0.4 * hash(i, 2);
+        rg.fillRect(hash(i, 0) * W, hash(i, 1) * H * 0.45, 2, 2);
+      }
+      rg.globalAlpha = 1;
+      const bulbs = ["#ff4434", "#f2c14e", "#62d06a", "#4aa3ff", "#ff8fe0"];
+      for (let row = 0; row < 4; row++) {
+        const y0 = H * (0.03 + row * 0.085);
+        const sag = H * (0.025 + row * 0.006);
+        const span = W / (3 + row);
+        rg.strokeStyle = "#15101e";
+        rg.lineWidth = 1.5;
+        for (let x = -span * (row & 1 ? 0.5 : 0); x < W + span; x += span) {
+          rg.beginPath();
+          rg.moveTo(x, y0);
+          rg.quadraticCurveTo(x + span / 2, y0 + sag * 2, x + span, y0);
+          rg.stroke();
+          for (let k = 1; k < 8; k++) {
+            const t = k / 8;
+            const bx = x + span * t;
+            const by = y0 + sag * 4 * t * (1 - t);
+            rg.fillStyle = bulbs[(k + row) % bulbs.length]!;
+            rg.beginPath();
+            rg.arc(bx, by + 3, 2.6 + row * 0.3, 0, Math.PI * 2);
+            rg.fill();
+          }
+        }
+      }
+      return;
+    }
     if (def.roof === "warehouse") {
       // A warehouse's roof (as the mockup drew it): dark steel trusses over the high-bay lamps, a pale corrugated deck between them.
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
@@ -1708,6 +1766,19 @@ function startRoom(
     const half = (youFig.x1 - youFig.x0) / 6;
     return Object.assign(youCore, { x0: m - half, x1: m + half, y0: youFig.y0, y1: youFig.y1 });
   };
+  // ---- Boingo's claw machine (Nov 6): the cabinet, its claw's pose this frame, its coin slot's box on screen.
+  const cab = art.claw ? cabinetOf(art.claw.at.col, art.claw.at.row, art.claw.at.w, art.claw.at.d) : null;
+  const clawNow = newClawPose();
+  /** The close-up on the cabinet (the statue's): gliding in (0 to 1) while you stand still at its spot, eased into `clawE`. */
+  let clawT = 0;
+  let clawE = 0;
+  const cabHits = newHits();
+  const p3 = (x: number, z: number, y: number, out: typeof pt) => proj(v, x - camX, camY - z, y, out);
+  const drawClaw = (now: number) => {
+    if (!cab) return;
+    clawPose(CLAW_PLAY, now, clawNow);
+    drawCabinet(g, p3, camX, cab, clawNow, now, cabHits, clawE > 0.5 && !CLAW_PLAY.open, DPR);
+  };
   const drawUp = (u: Up, now: number) => {
     // (Wrangler's intro: from the yank, the board on its stand is his bale, drawn as it's dragged: drawRopeCenter.)
     if (introNow?.rope?.bale && u.name === "board-stand") return;
@@ -1715,6 +1786,8 @@ function startRoom(
     if (cw && ci?.crew && u.name === "board-stand") return;
     // (Smudgy's challenge: his intro draws the covered table in its place from the walk in, then whips the cloth off: drawCenter.)
     if (ci?.cloth && u.name === "table") return;
+    // (Boingo's claw machine: a solid cabinet in 3D, its own claw posed from the play: claw-cabinet.ts.)
+    if (cab && u.name === "claw") return drawClaw(now);
     if (!P(u.c, u.r)) return;
     // Near the camera (between it and you, up close: the front wall as you stand at the door) a piece fades out, so it never fills
     // the screen in front of you.
@@ -1745,7 +1818,36 @@ function startRoom(
       g.drawImage(img, 0, 0, img.width, h, 0, 0, w, h * s);
       g.restore();
     } else g.drawImage(img, 0, 0, img.width, h, x, y, w, h * s);
+    if (art.sign && u.name === art.sign.piece) signWords(x, y, s);
     g.globalAlpha = 1;
+  };
+  /**
+   * A sign's words (Boingo's price sign: "BOINGO'S POGO", "3 Boingo tokens"), written on its face in the room's own font, sized to fit
+   * the face as drawn this frame (the art's pixels are too few for letters).
+   */
+  const signWords = (x: number, y: number, s: number) => {
+    const sg = art.sign!;
+    const fx = x + sg.face.x * s;
+    const fy = y + sg.face.y * s;
+    const fw = sg.face.w * s;
+    const fh = sg.face.h * s;
+    const n = sg.lines.length;
+    const lineH = fh / n;
+    const size = Math.max(4, lineH * 0.62);
+    g.font = `800 ${size}px system-ui, sans-serif`;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillStyle = "#4b2161";
+    for (let i = 0; i < n; i++) {
+      const t = sg.lines[i]!;
+      const tw = g.measureText(t).width;
+      const k = Math.min(1, (fw * 0.92) / Math.max(1, tw));
+      g.save();
+      g.translate(fx + fw / 2, fy + lineH * (i + 0.5));
+      g.scale(k, 1);
+      g.fillText(t, 0, 0);
+      g.restore();
+    }
   };
   /** Where an upright piece's top is on screen this frame, as drawUp places it; Infinity when it isn't drawn (off screen, faded out). */
   const upTop = (u: Up): number => {
@@ -3036,13 +3138,36 @@ function startRoom(
     drawMotes(introT);
   };
 
+  /**
+   * The close-up's lens (the statue's longer lens, camera.ts `mag` and `oy`): the cabinet `SHOP_FEEL.claw.tall` of the screen's height
+   * (or `wide` of its width), its middle `atY` down the screen, blended in by `clawE`. Worked out from the cabinet as the plain camera
+   * sees it this frame, so it frames the same on every screen.
+   */
+  const lensA = newPt();
+  const lensB = newPt();
+  const clawLens = () => {
+    const c = cab!;
+    const mx = (c.x0 + c.x1) / 2;
+    // (Its whole extent on screen: from the front's foot up to the back of its glass ceiling.)
+    if (!p3(mx, c.z1 + 0.2, 0, lensA) || !p3(mx, c.z0, CAB_H.top, lensB)) return;
+    const tall = Math.max(1, lensA.y - lensB.y);
+    const wide = Math.max(1, (c.x1 - c.x0) * lensA.k);
+    const magT = Math.max(1, Math.min(S.claw.maxMag, (S.claw.tall * H) / tall, (S.claw.wide * W) / wide));
+    const mag = 1 + (magT - 1) * clawE;
+    setView(v, W, H, 0, mag, 0, 0, sets);
+    if (!p3(mx, c.z1 + 0.2, 0, lensA) || !p3(mx, c.z0, CAB_H.top, lensB)) return;
+    setView(v, W, H, 0, mag, (S.claw.atY * H - (lensA.y + lensB.y) / 2) * clawE, 0, sets);
+  };
   const draw = (now: number) => {
     emN = 0;
+    // (Closing in on the claw machine, the camera comes down to the Close camera too, so you look at the cabinet, not down into it.)
+    const zoomNow = cab ? zoomCur * (1 - clawE) : zoomCur;
     for (const k of CAM_KEYS) {
-      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomCur;
-      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomCur;
+      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomNow;
+      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomNow;
     }
     setView(v, W, H, 0, 1, 0, 0, sets);
+    if (cab && clawE > 0) clawLens();
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
@@ -3265,11 +3390,23 @@ function startRoom(
     stepCrew(dt * 1000, now);
     stepElves(dt * 1000);
     stepCards();
+    // Boingo's claw machine: standing still at its spot (and the view on you), the camera glides in on the cabinet; out as you leave.
+    if (cab) {
+      const h = you.here();
+      const at = !ci && follow && !you.moving() && h.c === art.claw!.spot.c && h.r === art.claw!.spot.r;
+      clawT = Math.max(0, Math.min(1, clawT + ((at ? 1 : -1) * dt * 1000) / S.claw.glideMs));
+      clawE = clawT * clawT * (3 - 2 * clawT);
+    }
     if (follow) {
       // A critically damped spring toward you (the town's), solved exactly for the frame; in a challenge, toward its framing.
       you.pose(now, pose);
-      const gx = marks ? marks.table.c - cam!.west : pose.x;
-      const gy = marks ? marks.table.r + cam!.south : pose.y;
+      let gx = marks ? marks.table.c - cam!.west : pose.x;
+      let gy = marks ? marks.table.r + cam!.south : pose.y;
+      // (Closing in on the claw machine: toward the cabinet's front middle.)
+      if (cab && clawE > 0) {
+        gx += ((cab.x0 + cab.x1) / 2 - gx) * clawE;
+        gy += (cab.z1 - gy) * clawE;
+      }
       const w = f.followSpring;
       const e = Math.exp(-w * dt);
       const x = camX - gx;
@@ -3317,14 +3454,33 @@ function startRoom(
   /** (x, y) is on the Shopkeeper's picture. */
   const onKid = (x: number, y: number): boolean => kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1;
   /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
-  const keyAt = (x: number, y: number): string => (onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
+  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
     if (onKid(x, y)) return tapTarget(room, here, def.keeper[0]!.c, def.keeper[0]!.r);
     const sq = squareAt(x, y);
     if (!sq) return null;
+    if (onCabinet(sq)) return { kind: "square" as const, dest: { c: art.claw!.spot.c, r: art.claw!.spot.r } };
     return tapTarget(room, here, sq.c, sq.r);
+  };
+  /**
+   * On the claw machine's coin slot (Boingo's Funhouse), zoomed in at it: its box on screen as drawn this frame, grown to a finger's
+   * 44 px at least.
+   */
+  const onSlot = (x: number, y: number): boolean => {
+    const b = cabHits.slot;
+    if (!cab || !b.on || clawE < 0.5 || ci) return false;
+    const cx = (b.x0 + b.x1) / 2;
+    const cy = (b.y0 + b.y1) / 2;
+    const hw = Math.max(22, (b.x1 - b.x0) / 2);
+    const hh = Math.max(22, (b.y1 - b.y0) / 2);
+    return Math.abs(x - cx) <= hw && Math.abs(y - cy) <= hh;
+  };
+  /** A square of the claw machine's (a tap there walks you up to it, to its spot). */
+  const onCabinet = (sq: Sq | null): boolean => {
+    const cl = art.claw;
+    return !!cl && !!sq && sq.c >= cl.at.col && sq.c < cl.at.col + cl.at.w && sq.r > cl.at.row - cl.at.d && sq.r <= cl.at.row;
   };
   const local = (e: PointerEvent) => {
     const rc = box.getBoundingClientRect();
@@ -3364,6 +3520,10 @@ function startRoom(
     }
     const xy = local(e);
     if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
+    if (onSlot(xy.x, xy.y)) {
+      openClawMachine();
+      return;
+    }
     const p = plan(xy.x, xy.y);
     if (!p?.dest) return;
     // (Round Jefferson's machines where they are now; round Ginger's elves, or wait where you are while they're in the way.)
@@ -3405,8 +3565,13 @@ function startRoom(
 
   // ---- Test hooks (e2e, with the test switches on).
   cv.dataset.room = def.home;
-  const hookAt = (kind: "keeper" | "door" | "square", sq?: readonly [number, number]) => {
+  const hookAt = (kind: "keeper" | "door" | "square" | "slot", sq?: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return null;
+    // (Boingo's claw machine's coin slot, as drawn this frame: null unless you're zoomed in at it.)
+    if (kind === "slot") {
+      const b = cabHits.slot;
+      return cab && b.on && clawE >= 0.5 ? { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 } : null;
+    }
     if (kind === "keeper") {
       const x = (kidBox.x0 + kidBox.x1) / 2;
       const y = kidBox.y0 + (kidBox.y1 - kidBox.y0) * 0.7;
@@ -3418,7 +3583,11 @@ function startRoom(
     if (isUp(lv, s.c, s.r)) pt.y -= (liftAt(lv, s.c, s.r) * pt.k) / SQ;
     return pt.x >= 0 && pt.x <= W && pt.y >= 0 && pt.y <= H ? { x: pt.x, y: pt.y } : null;
   };
-  const hookCam = () => (testSwitchesAllowed() ? { zoom: zoomCur, zoomTarget, room: def.home, follow, focus: [camX, camY] } : null);
+  /** (Tests) The camera: its zoom, where it looks, and the claw machine's close-up (0 to 1), with the claw's pose and the play's stage. */
+  const hookCam = () =>
+    testSwitchesAllowed()
+      ? { zoom: zoomCur, zoomTarget, room: def.home, follow, focus: [camX, camY], claw: Math.round(clawE * 1000) / 1000, clawPlay: cab ? { stage: CLAW_PLAY.stage, held: clawNow.held, fall: clawNow.fall?.into ?? null, inTray: clawNow.inTray, down: Math.round(clawNow.down * 100) / 100 } : null }
+      : null;
   const hookRide = () => (testSwitchesAllowed() ? { ...seen, stepMs: you.stepMs, foot: youFoot.on ? [youFoot.x, youFoot.y] : null } : null);
   /** (Tests) A challenge's state: its step ("walk" until you're both on your marks), where you and the boss stand, the line and the board showing. */
   const hookIntro = () => {
@@ -3605,6 +3774,8 @@ function startRoom(
     },
     stop: () => {
       alive = false;
+      // (Out of the Funhouse: its claw machine's controls close; any play is already done on the server.)
+      if (cab) closeClawMachine();
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);

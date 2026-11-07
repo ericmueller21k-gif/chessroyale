@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { FRONT_DOOR, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, voteResultMs } from "@chessroyale/core";
-import { SQUADS_PROTOCOL, dutyOf, halfDuties, squadsLegalMoves, squadsVotes, type NetSquadsMatch } from "@chessroyale/chess/squads";
+import { SQUADS_PROTOCOL, blackDraws, dutyOf, halfDuties, squadsLegalMoves, squadsVotes, type NetSquadsMatch } from "@chessroyale/chess/squads";
 import { clearTopCache, parseTestClock, partiesFit, squadsClosing, squadsTestAllowed, testLobbyOptions, type LiveMatch } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
 import { squadsLobby } from "./squads-fixture.ts";
@@ -11,7 +11,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 /** The votes before the bracket: Mode, Start and Clock. */
-const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
+const VOTES_MS = (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
 
 beforeEach(() => clearTopCache());
@@ -57,6 +57,16 @@ describe("squads lobby: seats, parties, the fill", () => {
     expect(L.core.connect(undefined, { name: "Late", v: SQUADS_PROTOCOL })).toMatchObject({ ok: false, message: "This match has already started." });
   });
 
+  it("a signed-in person's badge (their 1 v 1 tier's emblem and rating, Eric, Nov 7) goes to everyone with the lobby; none for a guest or a bot", () => {
+    const L = squadsLobby();
+    const res = L.core.connect(undefined, { name: "Ann", v: SQUADS_PROTOCOL, userId: "u1", badge: { emblem: "gold-d3", rating: 1612 } });
+    const guest = L.join("Bo");
+    const a = (res as { playerId: string }).playerId;
+    const lobby = L.last(guest, "lobby")!.lobby;
+    expect(lobby.players.find((p) => p.id === a)!.badge).toEqual({ emblem: "gold-d3", rating: 1612 });
+    expect(lobby.players.find((p) => p.id === guest)!.badge).toBeUndefined();
+  });
+
   it("the matchmaker stops seating a lobby just before it fills; a lobby nobody is in waits, then fills when someone comes back", () => {
     const L = squadsLobby();
     L.advance(57_000);
@@ -88,7 +98,7 @@ describe("squads lobby: votes and the bracket", () => {
   it("everyone votes (bots too), the rules follow, the bracket is drawn and round 1's four matches begin", () => {
     const L = squadsLobby();
     const a = L.join("Ann");
-    L.advance(60_000 + FRONT_DOOR.fillShowMs);
+    L.advance(60_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000));
     // The Mode vote first: "Coming soon" can't be voted for (the bots don't either); Ann votes Mercenary.
     const mode = L.last(a, "vote")!.vote;
     expect(mode).toMatchObject({ id: "mode", index: 0, count: 3, result: null });
@@ -127,7 +137,7 @@ describe("squads lobby: votes and the bracket", () => {
     ]);
     const matches = L.all(a, "match").map((m) => m.match);
     expect(matches.map((m) => m.format)).toEqual(["relay", "relay", "relay", "relay"]);
-    expect(matches.every((m) => m.boards.length === 4 && m.boards.every((b) => b.moves?.length === 0))).toBe(true);
+    expect(matches.every((m) => m.boards.length === SQUADS.boards.relay && m.boards.every((b) => b.moves?.length === 0))).toBe(true);
     L.advance(SQUADS_LOBBY.bracketIntroSeconds * 1000);
     expect(L.all(a, "turn").map((t) => t.key).sort()).toEqual(["r0m0", "r0m1", "r0m2", "r0m3"]);
   });
@@ -150,9 +160,9 @@ describe("squads lobby: votes and the bracket", () => {
     // reaches its results before the lobby's safety close for a lobby nobody is in. With devices: about 30 minutes.)
     expect(minutes).toBeGreaterThan(15);
     expect(minutes).toBeLessThan(LOBBY_LIFE.lobbyAbandonedMinutes);
-    // Squads v2: the bots match a partner on an only move; with no device, no refunds.
+    // Squads v2: with no device, no refunds. (That bots match a partner on an only move: "bots use a same-move token on
+    // an only move" below, from a position that has one, not left to how a bracket happens to go.)
     const pairs = L.core.allMatches().filter((m) => m.round === 1);
-    expect(pairs.flatMap((m) => m.m.tokenLog).length).toBeGreaterThan(0);
     expect(pairs.flatMap((m) => m.m.tokenLog).every((u) => u.verdict?.why === "no_judge")).toBe(true);
     // No block points to start (Eric, Oct 19): round 1, before any shop, has no blocks; a later match's come from its kit.
     expect(L.core.allMatches().filter((m) => m.round === 0).every((m) => m.m.blockBanks.every((b) => b === 0) && m.m.blocks.length === 0)).toBe(true);
@@ -276,25 +286,27 @@ describe("squads lobby: playing a half", () => {
     const turn = L.last(party[0]!, "turn")!;
     expect(turn.banks[side]).toBe(4_000);
     const mine = turn.current.duties.filter((d) => d.side === side);
-    expect(mine).toHaveLength(2);
+    // (Relay on 3 boards: side 0 moves on two boards in White's half, side 1 on one.)
+    expect(mine).toHaveLength(side === 0 ? 2 : 1);
     // The cap bounds a move while the bank lasts (a test clock of four numbers: the ceiling every clock had before the
     // time controls, so older test links keep their meaning).
     expect(mine.every((d) => d.deadline - turn.current.startedAt === SQUADS.legacyCapSeconds * 1000)).toBe(true);
-    // One mover chooses at 5 s, after the bank ran out (at 4 s): too late, a miss, but not a no-show. The other is gone
+    // One mover chooses after the bank ran out: too late, a miss, but not a no-show. The other (side 0 has two) is gone
     // (disconnected) and never moves: a no-show.
-    const [late, absent] = [mine[0]!.players[0]!, mine[1]!.players[0]!];
-    L.core.disconnect(absent);
-    L.advance(5_000);
+    const [late, absent] = [mine[0]!.players[0]!, mine[1]?.players[0] ?? null];
+    if (absent) L.core.disconnect(absent);
+    // (Two moves drain it twice as fast: out at 4 s; one move alone, at 6 s, the 2 free seconds and the 4.)
+    L.advance(absent ? 5_000 : 7_000);
     L.core.message(late, { t: "choose", key: lm.key, seq: turn.current.seq, move: squadsLegalMoves(lm.m.boards[mine[0]!.board]!.fen)[0]! });
     L.runUntil(() => L.all(party[0]!, "half").some((h) => h.key === lm.key && h.seq === 0), 60_000, "the first half");
     const half = L.all(party[0]!, "half").find((h) => h.key === lm.key && h.seq === 0)!;
     expect(half.events).toContainEqual(expect.objectContaining({ kind: "sudden_death", side }));
     expect(half.events.some((e) => e.kind === "board_end" && (e.result.reason as string) === "flag")).toBe(false);
-    expect(half.missed).toEqual(expect.arrayContaining([late, absent]));
+    expect(half.missed).toEqual(expect.arrayContaining(absent ? [late, absent] : [late]));
     expect(half.match.banks[side]).toBe(0);
     const seat = (id: string) => L.core.record.squads.flatMap((sq) => sq.players).find((p) => p.id === id)!;
     expect(seat(late)).toMatchObject({ misses: 1, missStreak: 0 });
-    expect(seat(absent)).toMatchObject({ misses: 1, missStreak: 1 });
+    if (absent) expect(seat(absent)).toMatchObject({ misses: 1, missStreak: 1 });
     // Everyone sees that squad in sudden death; its next moves have only the free seconds.
     expect(L.last(party[3]!, "clocks")!.clocks.find((c) => c.squadId === squadId)).toMatchObject({ bankMs: 0, suddenDeath: true, key: lm.key });
     L.runUntil(() => L.all(party[0]!, "turn").some((t) => t.key === lm.key && t.current.seq >= 1 && t.current.duties.some((d) => d.side === side)), 120_000, "its next move");
@@ -302,7 +314,7 @@ describe("squads lobby: playing a half", () => {
     for (const d of next.current.duties.filter((x) => x.side === side)) expect(d.deadline - next.current.startedAt).toBe(2_000);
   });
 
-  it("ties: a level match goes to the squad with more team bank left (then a coin); banks carry into the next round, topped up", () => {
+  it("ties: a level match goes to the squad with more boards drawn as Black, then more team bank left (then a coin); banks carry into the next round, topped up", () => {
     // ("Next round" settles the matches level on material: the banks decide, as for a tie in rounds 1 and 2.)
     const L = squadsLobby({ test: { start: 0 }, fillInMs: 5_000 });
     const a = L.join("Ann", { test: true });
@@ -313,8 +325,11 @@ describe("squads lobby: playing a half", () => {
       const r = lm.m.result!;
       expect(r.how).toBe("admin");
       if (r.points[0] === r.points[1]) {
+        // (Level: more boards drawn as Black first, Nov 5; then more team bank left.)
         expect(r.timeLeft).toEqual([lm.m.banks[0], lm.m.banks[1]]);
-        if (r.timeLeft![0] !== r.timeLeft![1]) expect(r.winner).toBe(r.timeLeft![0] > r.timeLeft![1] ? 0 : 1);
+        const black = blackDraws(lm.m.boards);
+        if (black[0] !== black[1]) expect(r.winner).toBe(black[0] > black[1] ? 0 : 1);
+        else if (r.timeLeft![0] !== r.timeLeft![1]) expect(r.winner).toBe(r.timeLeft![0] > r.timeLeft![1] ? 0 : 1);
       }
     }
     // Each winner's bank goes into round 2, topped up (the rules' planMatch).
@@ -452,7 +467,7 @@ describe("squads lobby: the test controls", () => {
   it('"Next round" in the votes closes them; the switch off removes the controls', () => {
     const L = squadsLobby();
     const tester = L.join("Tess", { test: true });
-    L.advance(60_000 + FRONT_DOOR.fillShowMs + 1_000);
+    L.advance(60_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 1_000);
     L.core.message(tester, { t: "nextRound" });
     expect(L.core.record.phase).toBe("bracket");
     const was = SQUADS_LOBBY.testControls;
@@ -461,7 +476,7 @@ describe("squads lobby: the test controls", () => {
       const M = squadsLobby();
       const t = M.join("Tess", { test: true });
       expect(M.last(t, "welcome")!.test).toBe(false);
-      M.advance(60_000 + FRONT_DOOR.fillShowMs + 1_000);
+      M.advance(60_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 1_000);
       M.core.message(t, { t: "nextRound" });
       expect(M.core.record.phase).toBe("vote");
     } finally {
@@ -501,7 +516,7 @@ describe("squads lobby: the test lobby from the first vote (/squads/test)", () =
     expect(seats).toHaveLength(SQUADS.squadCount * SQUADS.squadSize);
     expect(seats.filter((p) => p.isBot)).toHaveLength(seats.length - 1);
     expect(seats.find((p) => !p.isBot)!.id).toBe(eric);
-    L.advance(FRONT_DOOR.fillShowMs);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000));
     expect(L.core.record.phase).toBe("vote");
     expect(L.last(eric, "vote")!.vote).toMatchObject({ index: 0, id: "mode" });
     expect(L.last(eric, "welcome")!.test).toBe(true);
@@ -739,3 +754,26 @@ function dutyBoard(lm: LiveMatch, id: string): number | null {
   for (const d of lm.half ? halfDuties(lm.m).duties : []) if (d.players.includes(id)) return d.board;
   return null;
 }
+
+describe("squads lobby: bots and same-move tokens", () => {
+  it("bots use a same-move token on an only move (Pairs): both partners pick it, it plays, a token burns", () => {
+    // Every Pairs board from a position with one move far better than the rest: a queen left hanging (exd5); strong bots
+    // (the test link's bots=strong) see it as the only move.
+    const fen = "4k3/8/8/3q4/4P3/8/8/4K3 w - - 0 1";
+    const L = squadsLobby({ seed: 11, test: { start: 1, fen, strong: true }, fillInMs: 5_000 });
+    const a = L.join("Ann");
+    L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+    const bots = L.core.allMatches().filter((m) => m.round === 1 && !mineIn(m, a));
+    expect(bots.length).toBeGreaterThan(0);
+    L.runUntil(() => bots.every((m) => m.m.turn > 0 || !!m.m.result), 120_000, "Pairs' first turn");
+    for (const lm of bots) {
+      // White's move on each board: the pair of bots both picked exd5, so it played on a token.
+      const used = lm.m.tokenLog.filter((u) => u.turn === 0 && u.half === "w");
+      expect(used.map((u) => [u.board, u.move])).toEqual([
+        [0, "e4d5"],
+        [1, "e4d5"],
+      ]);
+      for (const side of [0, 1] as const) expect(lm.m.tokens![side]).toBe(SQUADS.tokens.perMatch - lm.m.tokenLog.filter((u) => u.side === side).length);
+    }
+  });
+});

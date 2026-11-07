@@ -1,5 +1,5 @@
 import { BOSS_ROSTER, adminFirstBosses, bossDef, isPlayable, type BossDef } from "./boss.ts";
-import { BOSS_TOKENS } from "./settings.ts";
+import { BOSS_TOKENS, CLAW } from "./settings.ts";
 
 /**
  * Boss tokens' rules (Eric, Nov 2; BOSS_TOKENS in settings.ts; docs/decisions/2026-11-02-boss-tokens.md). Pure: the server decides
@@ -36,3 +36,9 @@ export function tokenGotLine(id: string): string {
   const n = tokenBossName(id);
   return `You got ${/^[aeiou]/i.test(n) ? "an" : "a"} ${n} token!`;
 }
+
+/** The claw machine's rule (CLAW): a roll (0 to 1, the server's) under CLAW.winChance wins that boss's crate. */
+export const clawWins = (roll: number): boolean => roll < CLAW.winChance;
+
+/** The claw machine's win line: "You won Folio's Boss Crate!". */
+export const clawWonLine = (crateName: string): string => `You won ${crateName}!`;

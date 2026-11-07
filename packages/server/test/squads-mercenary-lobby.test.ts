@@ -25,7 +25,7 @@ describe("squads modes on the server: the Mode vote", () => {
   it("a test lobby holds the Mode vote first, its bots sitting it out: its opener's vote decides (Coming soon refused)", () => {
     const L = squadsLobby({ test: { start: 0 }, fillInMs: 0 });
     const eric = L.join("Eric", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000));
     const vote = L.last(eric, "vote")!.vote;
     expect(vote).toMatchObject({ id: "mode", index: 0, count: squadsVotes().length });
     expect(vote.votes).toEqual([]);
@@ -43,7 +43,7 @@ describe("squads modes on the server: the Mode vote", () => {
   it("nobody voting is Classic: no wallets, no blocks", () => {
     const L = squadsLobby({ test: { start: 0 }, fillInMs: 0 });
     const eric = L.join("Eric", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs + 3 * VOTE_MS + 1);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 3 * VOTE_MS + 1);
     expect(L.core.record.rules?.mode).toBe("classic");
     const lobby = L.last(eric, "lobby")!.lobby;
     expect(lobby.wallets).toEqual([]);
@@ -58,7 +58,7 @@ describe("squads modes on the server: the Mode vote", () => {
   it("a test lobby's mode=mercenary holds no Mode vote: Start first", () => {
     const L = squadsLobby({ test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
     const eric = L.join("Eric", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000));
     expect(L.last(eric, "vote")!.vote).toMatchObject({ id: "start", index: 0, count: 2 });
   });
 });
@@ -69,7 +69,7 @@ function pairsLobby(seed = 7) {
   L.core.reserve([{ size: 4, pass: "four" }], 60_000);
   const party = ["A", "B", "C", "D"].map((n) => L.join(n, { party: "four" }));
   const solo = L.join("Sol");
-  L.advance(5_000 + FRONT_DOOR.fillShowMs + 2 * VOTE_MS + 1);
+  L.advance(5_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * VOTE_MS + 1);
   const lm = L.core.allMatches().find((m) => mineIn(m, party[0]!))!;
   const squad = L.core.record.squads.find((sq) => sq.players.some((p) => p.id === party[0]))!.id;
   return { L, party, solo, lm, squad };
@@ -212,7 +212,7 @@ describe("Mercenary on the server: items in a match", () => {
       L.core.reserve([{ size: 4, pass: "red" }, { size: 4, pass: "blue" }], 60_000);
       const red = ["R1", "R2", "R3", "R4"].map((n) => L.join(n, { party: "red" }));
       const blue = ["B1", "B2", "B3", "B4"].map((n) => L.join(n, { party: "blue" }));
-      L.advance(5_000 + FRONT_DOOR.fillShowMs + 2 * VOTE_MS + 1);
+      L.advance(5_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * VOTE_MS + 1);
       const lm = L.core.allMatches().find((m) => mineIn(m, red[0]!));
       if (!lm || !mineIn(lm, blue[0]!)) continue;
       L.core.message(red[0]!, { t: "buy", item: "shield" });
@@ -344,7 +344,7 @@ describe("Mercenary on the server: earning and catch-up", () => {
   it("every coin a half pays goes into its squad's wallet (catch-up as the next match is set: a share of the gap)", () => {
     const L = squadsLobby({ seed: 5, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
     const eric = L.join("Eric", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs + 2 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
     // A few minutes of Relay, then "Next round" (material decides what's left).
     L.advance(4 * 60_000);
     const halves = L.all(eric, "half").filter((h) => h.match.round === 0);
@@ -387,8 +387,7 @@ describe("Mercenary on the server: earning and catch-up", () => {
       expect(w.chips).toBe(w.bought.chip - tapped);
       expect(w.chips).toBeLessThanOrEqual(M.items.chip.cap);
     }
-    // The bots tapped some of their chips (in sudden death, or low on time).
-    expect(L.all(ann, "chip").length).toBeGreaterThan(0);
+    // (That bots tap their chips in sudden death or low on time: "bots tap a Time chip" below, from banks set that low.)
     // Every match from round 2 on brought a kit; tokens used only by bot squads, never more than bought.
     const later = L.core.allMatches().filter((m) => m.round > 0);
     for (const lm of later) {
@@ -402,6 +401,27 @@ describe("Mercenary on the server: earning and catch-up", () => {
     // The finalists shopped for the final (or saved nothing: in the final the bots spend all they can).
     const finalists = L.core.allMatches().find((m) => m.round === 2)!.m.sides.map((x) => x.squadId);
     expect(finalists.some((id) => MERC_ITEMS.some((it) => wallets.find((w) => w.squadId === id)!.bought[it] > 0))).toBe(true);
+  }, 120_000);
+});
+
+describe("Mercenary on the server: bots and Time chips", () => {
+  it("bots tap a Time chip on a move that needs time (in sudden death, or low on bank), never with a full bank; never a squad of people's", () => {
+    const L = squadsLobby({ seed: 13, test: { start: 1, mode: "mercenary" }, fillInMs: 0 });
+    const ann = L.join("Ann", { test: true });
+    L.runUntil(() => L.core.allMatches().some((m) => m.round === 1 && m.state === "half"), 600_000, "Pairs");
+    const pairs = L.core.allMatches().filter((m) => m.round === 1);
+    // Full banks: no taps, whatever chips they hold.
+    for (const lm of pairs) lm.m = { ...lm.m, chips: [3, 3] };
+    L.runUntil(() => pairs.every((m) => m.m.turn >= 1 || !!m.m.result), 120_000, "a turn on full banks");
+    expect(L.all(ann, "chip")).toEqual([]);
+    // Every squad in sudden death (no bank): bots tap (60% a move), people's squads never by a bot.
+    for (const lm of pairs) lm.m = { ...lm.m, chips: [3, 3], banks: [0, 0] };
+    L.runUntil(() => L.all(ann, "chip").length > 0, 120_000, "a bot's chip");
+    for (const c of L.all(ann, "chip")) {
+      const lm = L.core.allMatches().find((m) => m.key === c.key)!;
+      expect(lm.m.sides[c.chip.side].seats.includes(ann)).toBe(false);
+      expect(L.core.record.squads.flatMap((sq) => sq.players).find((p) => p.id === c.chip.by)!.isBot).toBe(true);
+    }
   }, 120_000);
 });
 
@@ -421,7 +441,7 @@ describe("Mercenary on the server: brilliant moves", () => {
   it("pays its squad 25, at most twice a match: the third still announced, with no coins; a fresh cap the next match", () => {
     const L = squadsLobby({ seed: 5, test: { start: 0, mode: "mercenary" }, fillInMs: 0 });
     const eric = L.join("Eric", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs + 2 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
     const lm = L.core.allMatches().find((x) => x.round === 0)!;
     const [a, b] = lm.m.sides.map((x) => x.squadId) as [number, number];
     const earned = (id: number) => L.core.walletsView().find((w) => w.squadId === id)!.earned;
@@ -458,7 +478,7 @@ describe("squads modes on the server: a lobby in play across the deploy", () => 
   it("a match stored before the modes (no mode, free seconds, kits, coins) is read as Classic and plays on", () => {
     const L = squadsLobby({ seed: 3, test: { start: 1 }, fillInMs: 5_000 });
     const tess = L.join("Tess");
-    L.advance(5_000 + FRONT_DOOR.fillShowMs + 3 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
+    L.advance(5_000 + (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 3 * VOTE_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000 + 1);
     const live = L.core.allMatches();
     expect(live.length).toBeGreaterThan(0);
     // What the Durable Object would have stored before: no Mercenary fields at all.
@@ -487,7 +507,7 @@ describe("squads modes on the server: a lobby in play across the deploy", () => 
   it("a lobby stored with the Breather (before Oct 13): a breather in an open shop's cart refunded, nothing crashes", () => {
     const L = squadsLobby({ seed: 3, test: { start: 1, mode: "mercenary" }, fillInMs: 0 });
     const tess = L.join("Tess", { test: true });
-    L.advance(FRONT_DOOR.fillShowMs + 2 * VOTE_MS + 1);
+    L.advance((FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * VOTE_MS + 1);
     expect(L.core.walletsView().some((w) => w.shop)).toBe(true);
     // What the Durable Object would have stored: Tess's squad with a breather in its cart (150, before the step), a
     // match carrying the old per-side free seconds.

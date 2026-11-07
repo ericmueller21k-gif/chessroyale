@@ -495,9 +495,7 @@ export async function ledgerCheck(sql: Sql, limit: number): Promise<Disagreement
 }
 
 /**
- * TODO(claw, part II): Boingo's claw machine (server/claw.ts) is on claude/claw-machine and claude/boingo-home, not on main yet, and
- * writes boss_tokens and boss_crates itself. When it lands, its playClaw keeps its claw_plays row and its answers and hands its
- * balance writes to this op instead: `applyOp(sql, me, clawOp(me, {...}))`. ledger.test.ts's guard fails on claw.ts until it does.
+ * Boingo's claw machine (claw.ts, playClaw: `applyOp(sql, me, clawOp(me, {...}))`, its claw_plays row as `log`).
  *
  * One play: a token of `boss` in (only when one is there), and on a win its crate in, unopened (`crateRow`: the new boss_crates row),
  * keyed by the app's id for the play (`claw:<ledger id>:<request>`: a retry or a double tap plays once); `log`, the play's own row,

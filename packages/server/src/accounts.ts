@@ -31,6 +31,7 @@ import {
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
+import { CLAW_SCHEMA } from "./claw.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
 import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
@@ -151,6 +152,8 @@ const SCHEMA = [
   ...WELCOME_SCHEMA,
   // The ledger (Nov 6): every change to a balance or an inventory, append-only (ledger.ts).
   ...LEDGER_SCHEMA,
+  // Boingo's claw machine (Nov 6): one row a play (claw.ts).
+  ...CLAW_SCHEMA,
   // The live line: running lobbies, queue waits (live.ts).
   ...LIVE_SCHEMA,
   // Reports about players (the profile's Report button), for a person to read.

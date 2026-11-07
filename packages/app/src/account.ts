@@ -328,6 +328,36 @@ export async function buyBossCrateOnServer(crate: string, way: "tokens" | "key")
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
 }
 
+/** The claw machine's answer (server/claw.ts): won or not, the crate it won (a BOSS_CRATES id), the boss, and whether it repeats a play. */
+export interface ClawAnswer {
+  won: boolean;
+  crate?: string;
+  boss: string;
+  again?: boolean;
+}
+
+/**
+ * Boingo's claw machine (Nov 6): one of `boss`'s tokens in, and the server decides at once whether it won that boss's crate (one
+ * transaction: server/claw.ts). `request`: this play's own id, made once per coin, so asking again after a hiccup (no answer, or the
+ * server's own error) answers the same play and never spends a second token. Your locker comes back with it. `seed`: the e2e's hook
+ * (`?clawSeed=`), which the server honors only where TEST_SWITCHES is on. Throws the server's message (no token, a guest, resting).
+ */
+export async function playClawOnServer(boss: string, request: string, seed?: number): Promise<ClawAnswer> {
+  const body = JSON.stringify({ boss, request, ...(seed !== undefined ? { seed } : {}) });
+  const ask = () => api<ClawAnswer & { locker: Locker }>("/api/shop/claw", { method: "POST", body });
+  let r: ClawAnswer & { locker: Locker };
+  try {
+    r = await ask();
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && status < 500) throw e;
+    await new Promise((done) => setTimeout(done, 800));
+    r = await ask();
+  }
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
+  return { won: r.won === true, ...(r.won === true && r.crate ? { crate: r.crate } : {}), boss: r.boss, ...(r.again ? { again: true } : {}) };
+}
+
 /** How many of a boss crate ("boss-tiger") you hold, unopened, as your locker has it now. */
 export const bossCrateCount = (crate: string): number => state.profile?.locker?.bossCrates?.[crate] ?? 0;
 

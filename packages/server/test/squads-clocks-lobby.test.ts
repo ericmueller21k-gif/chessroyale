@@ -11,7 +11,7 @@ import { library, squadsLobby } from "./squads-fixture.ts";
  * controls keeps playing on the clock it voted.
  */
 
-const VOTES_MS = FRONT_DOOR.fillShowMs + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
+const VOTES_MS = (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 
 beforeEach(() => clearTopCache());
 

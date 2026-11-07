@@ -104,6 +104,7 @@ import {
   type NetTeamClock,
   type NetWallet,
   type Party,
+  type PlayerBadge,
   type Side,
   type Squad,
   type SquadPlayer,
@@ -176,6 +177,8 @@ export interface SquadsHuman {
   /** How they left and what went on their record (told again if they come back with their seat's token). */
   leftAs?: SquadsLeft;
   look?: ItemLook;
+  /** A signed-in person's badge as they connected (the turn order shows it). */
+  badge?: PlayerBadge;
   /** May use the test controls (an admin, or SQUADS_TEST where it's on). */
   test?: true;
 }
@@ -637,7 +640,7 @@ export class SquadsCore {
 
   connect(
     token: string | undefined,
-    opts: { name?: string; device?: "phone" | "computer"; party?: string; look?: unknown; userId?: string; test?: boolean; v?: number },
+    opts: { name?: string; device?: "phone" | "computer"; party?: string; look?: unknown; userId?: string; test?: boolean; v?: number; badge?: PlayerBadge },
   ): { ok: true; playerId: string } | { ok: false; message: string; ended?: true; left?: SquadsLeft } {
     const now = this.io.now();
     this.r.activeAt = now;
@@ -648,6 +651,7 @@ export class SquadsCore {
       existing.connected = true;
       delete existing.goneAt;
       if (opts.look !== undefined) existing.look = cleanLook(opts.look);
+      if (opts.badge) existing.badge = opts.badge;
       if (opts.userId) this.r.accounts[existing.id] = opts.userId;
       if (opts.test) existing.test = true;
       this.resendTo(existing.id);
@@ -689,6 +693,7 @@ export class SquadsCore {
       partyId,
       joinedAt: now,
       ...(opts.look !== undefined ? { look: cleanLook(opts.look) } : {}),
+      ...(opts.badge ? { badge: opts.badge } : {}),
       ...(opts.test ? { test: true as const } : {}),
     });
     if (opts.userId) this.r.accounts[id] = opts.userId;
@@ -895,7 +900,8 @@ export class SquadsCore {
     this.r.phase = "filled";
     this.r.filledAt = now;
     this.r.solos = [];
-    this.r.timer = { kind: "begin", at: now + FRONT_DOOR.fillShowMs };
+    // (The first vote opens a little after the full lobby shows, Eric, Nov 5: its timer and the bots' votes with it.)
+    this.r.timer = { kind: "begin", at: now + FRONT_DOOR.fillShowMs + this.s.firstVoteDelaySeconds * 1000 };
     this.sendAll({ t: "lobby", lobby: this.lobbyView(null) });
   }
 
@@ -1049,6 +1055,14 @@ export class SquadsCore {
     const opener = this.r.humans[0]?.id;
     if (this.r.test?.white && round === this.r.test.start && opener && mineIn(planned, opener) && !halfDuties(planned, this.s).duties.some((d) => d.players.includes(opener))) {
       planned = planMatch(this.r.plan!, round, index, [this.r.squads[b]!, this.r.squads[a]!], this.library, this.s);
+      // (Relay on 3 boards: the opener may be the squad's waiting seat either way; then their squad's seats start with them.)
+      if (!halfDuties(planned, this.s).duties.some((d) => d.players.includes(opener))) {
+        const side = planned.sides[0].seats.includes(opener) ? 0 : 1;
+        const seats = planned.sides[side].seats;
+        const i = seats.indexOf(opener);
+        const turned = { ...planned.sides[side], seats: [...seats.slice(i), ...seats.slice(0, i)] };
+        planned = { ...planned, sides: side === 0 ? [turned, planned.sides[1]] : [planned.sides[0], turned] };
+      }
     }
     // A test lobby's own position for its first round (tests).
     const fen = this.r.test?.fen && round === this.r.test.start ? this.r.test.fen : null;
@@ -2294,6 +2308,7 @@ export class SquadsCore {
         misses: p?.misses ?? 0,
         ...(uid(h.id) ? { uid: uid(h.id) } : {}),
         ...(withLook ? { look: h.look } : {}),
+        ...(h.badge ? { badge: h.badge } : {}),
       };
     });
     const bots = this.r.bots.map((b) => ({ id: b.id, name: b.name, isBot: true, connected: true, partyId: null, botPlays: true, misses: this.player(b.id)?.misses ?? 0 }));

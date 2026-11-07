@@ -12,7 +12,7 @@ import { squadsLobby } from "./squads-fixture.ts";
  */
 
 /** The votes before the bracket: a test lobby whose mode is set holds Start and Clock only (no Mode vote). */
-const VOTES_MS = FRONT_DOOR.fillShowMs + 2 * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
+const VOTES_MS = (FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000) + 2 * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 /** The bracket's intro: a Mercenary test lobby that skips rounds has a longer one, to shop in. */
 const introMs = (start: number, mode: "classic" | "mercenary") => (start > 0 && mode === "mercenary" ? Math.max(SQUADS_LOBBY.bracketIntroSeconds, SQUADS_LOBBY.testShopSeconds) : SQUADS_LOBBY.bracketIntroSeconds) * 1000;
 const mineIn = (lm: LiveMatch, id: string) => lm.m.sides.some((x) => x.seats.includes(id));
@@ -263,6 +263,15 @@ describe("squads v2 server: test lobbies and views", () => {
       const pairs = L.core.allMatches().filter((m) => m.round === 1);
       expect(pairs.every((m) => m.m.boards.every((b) => b.fen === fen))).toBe(true);
       const mine = pairs.find((m) => mineIn(m, tess))!;
+      expect(halfDuties(mine.m).duties.some((d) => d.players.includes(tess))).toBe(true);
+    }
+    // Relay on 3 boards (Nov 5): never the squad's waiting seat either, whatever the seed.
+    for (let seed = 1; seed < 9; seed++) {
+      const L = squadsLobby({ seed, test: { start: 0, white: true, mode: "classic" }, fillInMs: 5_000 });
+      const tess = L.join("Tess");
+      L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+      const mine = L.core.allMatches().find((m) => m.round === 0 && mineIn(m, tess))!;
+      expect(mine.m.boards).toHaveLength(3);
       expect(halfDuties(mine.m).duties.some((d) => d.players.includes(tess))).toBe(true);
     }
   });

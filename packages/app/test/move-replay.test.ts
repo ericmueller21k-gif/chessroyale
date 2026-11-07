@@ -2,8 +2,24 @@ import { describe, expect, it } from "vitest";
 import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { START_FEN, applyMove } from "@chessroyale/chess";
 import type { NetDuty, NetSquadsHalf, SquadsEvent } from "@chessroyale/chess/squads";
-import { byOfHalf, replayFrameAt, replayFrames, replayOn, replayTimes, setReplayOn, tagText } from "../src/move-replay.ts";
-import { drainRate, freeMs, liveBank, replayCount, type LocalMatch } from "../src/squads-view.ts";
+import {
+  COACH_MARKS,
+  byOfHalf,
+  coachDone,
+  coachDue,
+  nextCoachMark,
+  queuedSquads,
+  nextReplayMode,
+  readReplayMode,
+  replayFrameAt,
+  replayFrames,
+  replayMode,
+  replayMoves,
+  replayTimes,
+  setReplayMode,
+  tagText,
+} from "../src/move-replay.ts";
+import { drainRate, freeMs, liveBank, replayCount, tickSecond, type LocalMatch } from "../src/squads-view.ts";
 
 /**
  * Move replay on screen (Eric, Nov 5; src/move-replay.ts): the moves you missed in order, paced inside the extra free
@@ -97,14 +113,102 @@ describe("Move replay's free time: the server's, the same with the replay on or 
     expect(drainRate(m, 0, 6_000)).toBe(2);
   });
 
-  it("turning the replay off changes nothing on the clock", () => {
+  it("the replay button's setting changes nothing on the clock", () => {
     const m = match([duty(0, 0, ["a0"], 5_500, [7])]);
-    const was = replayOn();
+    const was = replayMode();
     const clock = () => [freeMs(m, 0), liveBank(m, 0, 6_000), drainRate(m, 0, 6_000)];
-    setReplayOn(true);
+    setReplayMode("all");
     const on = clock();
-    setReplayOn(false);
-    expect(clock()).toEqual(on);
-    setReplayOn(was);
+    for (const mode of ["two", "off"] as const) {
+      setReplayMode(mode);
+      expect(clock()).toEqual(on);
+    }
+    setReplayMode(was);
+  });
+
+  it("the countdown tick: only while your squad's real bank runs out (its last 5 s), never in the free seconds", () => {
+    expect(SQUADS_LOBBY.tickBankSeconds).toBe(5);
+    const low = (bank: number, free = 2_000): LocalMatch => ({ ...match([duty(0, 0, ["a0"], free, [0])]), banks: [bank, 60_000] }) as LocalMatch;
+    // A bank of 4 s: the free 2 s pass silently, then a tick each whole second it runs down.
+    expect(tickSecond(low(4_000), "a0", 0)).toBeNull();
+    expect(tickSecond(low(4_000), "a0", 1_999)).toBeNull();
+    expect(tickSecond(low(4_000), "a0", 2_100)).toBe(4);
+    expect(tickSecond(low(4_000), "a0", 3_500)).toBe(3);
+    // Coming back to a board (more free seconds): still none until they're over.
+    expect(tickSecond(low(4_000, 5_500), "a0", 4_000)).toBeNull();
+    expect(tickSecond(low(4_000, 5_500), "a0", 5_600)).toBe(4);
+    // A full bank: no tick; sudden death (no bank to run out): none; not your move, or made: none.
+    expect(tickSecond(low(60_000), "a0", 8_000)).toBeNull();
+    expect(tickSecond(low(0), "a0", 1_000)).toBeNull();
+    expect(tickSecond(low(4_000), "b1", 2_500)).toBeNull();
+    expect(tickSecond({ ...low(4_000), locked: ["a0"] } as LocalMatch, "a0", 2_500)).toBeNull();
+  });
+});
+
+describe("The replay button's three settings (Eric, Nov 5, round 2)", () => {
+  it("a tap steps off → the last 2 moves → all moves → off", () => {
+    expect(nextReplayMode("off")).toBe("two");
+    expect(nextReplayMode("two")).toBe("all");
+    expect(nextReplayMode("all")).toBe("off");
+  });
+
+  it("off on a device's first match; the first button's stored on/off read as all/off", () => {
+    expect(SQUADS_LOBBY.replay.mode).toBe("off");
+    expect(readReplayMode(null)).toBeNull();
+    expect(readReplayMode("1")).toBe("all");
+    expect(readReplayMode("0")).toBe("off");
+    for (const m of ["off", "two", "all"] as const) expect(readReplayMode(m)).toBe(m);
+    expect(readReplayMode("junk")).toBeNull();
+  });
+
+  it("as set: the last 2 (your teammate's move there and the opponent's reply), all since you last played there, or none", () => {
+    // Back on a board 7 moves after you last played it, arriving as your move starts.
+    const back = { total: 8, missed: 7, arrivedAt: 8 };
+    expect(replayMoves({ mode: "all", ...back })).toBe(7);
+    expect(replayMoves({ mode: "two", ...back })).toBe(2);
+    expect(replayMoves({ mode: "off", ...back })).toBe(0);
+    const f = replayFrames(START_FEN, MOVES.slice(0, 8), [], 2);
+    expect(f.slice(1).map((x) => x.lastMove)).toEqual(MOVES.slice(6, 8));
+    // Not your move there (nothing since you last played it): none.
+    expect(replayMoves({ mode: "all", total: 8, missed: 0, arrivedAt: 8 })).toBe(0);
+  });
+
+  it("none if you watched both of the last two moves land; arrived after your teammate's move, or as your turn began: the whole replay", () => {
+    // Sat at the board through both (it came on screen with 6 moves, now 8): none.
+    expect(replayMoves({ mode: "all", total: 8, missed: 7, arrivedAt: 6 })).toBe(0);
+    expect(replayMoves({ mode: "two", total: 8, missed: 7, arrivedAt: 3 })).toBe(0);
+    // Arrived after your teammate's move (7), saw only the reply: the replay as set, never just the part you missed.
+    expect(replayMoves({ mode: "all", total: 8, missed: 7, arrivedAt: 7 })).toBe(7);
+    expect(replayMoves({ mode: "two", total: 8, missed: 7, arrivedAt: 7 })).toBe(2);
+    // Arrived as your turn began (Quick board jump off, or a tap): the replay.
+    expect(replayMoves({ mode: "two", total: 8, missed: 7, arrivedAt: 8 })).toBe(2);
+  });
+});
+
+describe("The first-time tips: three coach marks, one at a time", () => {
+  it("settings, then the replay button, then the tiny boards; then done", () => {
+    expect(COACH_MARKS.map((c) => c.id)).toEqual(["settings", "replay", "boards"]);
+    expect(COACH_MARKS.map((c) => c.text)).toEqual(["Tap here for settings, like Quick board jump.", "Tap to replay moves: the last 2, all of them, or off.", "Tap a board to watch it. Tap yours to come back."]);
+    expect([0, 1, 2].map(nextCoachMark)).toEqual([1, 2, null]);
+  });
+
+  it("run once a lobby; \"Don't show these again\" unticked, they come back at the next lobby; ticked, never again", () => {
+    const store = new Map<string, string>();
+    const was = (globalThis as { localStorage?: unknown }).localStorage;
+    (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    try {
+      expect(coachDue("abcde")).toBe(false);
+      queuedSquads("ABCDE");
+      expect(coachDue("abcde")).toBe(true);
+      coachDone(false);
+      expect(coachDue("ABCDE")).toBe(false);
+      queuedSquads("FGHJK");
+      expect(coachDue("FGHJK")).toBe(true);
+      coachDone(true);
+      queuedSquads("LMNPQ");
+      expect(coachDue("LMNPQ")).toBe(false);
+    } finally {
+      (globalThis as { localStorage?: unknown }).localStorage = was;
+    }
   });
 });

@@ -2622,10 +2622,16 @@ export const SQUADS_LOBBY = {
    * Move replay on screen (Eric, Nov 5; the rule's free time: SQUADS.replaySecondsPerMove). Coming back to a board, the
    * moves played there since you last played it land one by one: the first `firstMs` after your half begins, then one
    * every `stepMs`, the last held until the extra free time is over (SQUADS.replaySecondsPerMove a move, so it always fits).
-   * `on`: the replay button's setting on a device (an account) that hasn't set it. A name tag over each moved piece:
-   * `tagChars` letters at most, then "…".
+   * `mode`: the replay button's setting on a device (an account) that hasn't set it: off (Eric, Nov 5, round 2: the
+   * button steps off, the last 2 moves, all of them). A name tag over each moved piece: `tagChars` letters at most,
+   * then "…".
    */
-  replay: { on: true, firstMs: 150, stepMs: 450, tagChars: 12 },
+  replay: { mode: "off" as "off" | "two" | "all", firstMs: 150, stepMs: 450, tagChars: 12 },
+  /**
+   * The countdown tick (Eric, Nov 5: in the free seconds it "makes you panic"): once a second while your squad's real
+   * bank has this many seconds or fewer left and you still have a move to make; never in the free seconds.
+   */
+  tickBankSeconds: 5,
   /** A party (an invite code or link, up to SQUADS.partyMax): closes after this long with nobody in it. */
   partyIdleMinutes: 60,
   /** A party in line asks the matchmaker again this often while it's busy. */
@@ -3035,6 +3041,22 @@ export const BOSS_TOKENS = {
 } as const;
 
 /**
+ * Boingo's claw machine (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md): one boss token in, a chance at that boss's Boss
+ * Crate. Decided by the server as the coin goes in (server/claw.ts): `winChance` of the time the crate goes into your inventory,
+ * unopened. The claw's ride on screen only shows that answer: the stop tap never changes it. At 0.25 a crate costs 4 tokens on
+ * average, against BOSS_CRATE_PRICE's 3 tokens (or 1 token and a key): a use for extra tokens, not a cheaper crate.
+ *   - `roamSeconds`: how long the claw roams on its own before it drops anyway (no tap needed);
+ *   - `dropMs`, `liftMs`, `carryMs`: the claw going down, coming up and carrying over the chute (a loss slips at the top of the lift).
+ */
+export const CLAW = {
+  winChance: 0.25,
+  roamSeconds: 8,
+  dropMs: 900,
+  liftMs: 900,
+  carryMs: 1100,
+} as const;
+
+/**
  * Fair play (the `fairplay` delegate): reports, cases and what each level does. See DECISIONS.md, "Fair play".
  *   - watch: recorded only (the player's moves are kept as evidence);
  *   - review: a person (or the automated reviewer) looks; meanwhile their results are held off ranking (the rating,
@@ -3332,6 +3354,11 @@ export interface SquadsSettings {
   partyMax: number;
   /** Boards in a match: round 1 (Relay), round 2 (Pairs), the final (the majority vote). Armageddon is always one. */
   boards: { relay: number; pairs: number; final: number };
+  /**
+   * Seconds between the full lobby showing and its first pre-game vote opening (Eric, Nov 5: players reading the intro
+   * missed the vote). The vote, its timer and the bots' votes all start after it.
+   */
+  firstVoteDelaySeconds: number;
   /** The pre-game votes (Start, Clock): seconds each is open, the result's showing, bots that don't vote. */
   voteSeconds: number;
   voteResultSeconds: number;
@@ -3501,7 +3528,10 @@ export const SQUADS: SquadsSettings = {
   squadSize: 4,
   squadCount: 8,
   partyMax: 4,
-  boards: { relay: 4, pairs: 2, final: 1 },
+  // Eric, Nov 5: Relay on 3 boards, each squad's fourth player waiting to slot in (the ring: squads/schedule.ts); 4 before.
+  boards: { relay: 3, pairs: 2, final: 1 },
+  // Eric, Nov 5: 3 s more before the first vote opens, so players reading the intro don't miss it.
+  firstVoteDelaySeconds: 3,
   voteSeconds: 8,
   // (4.2 s: the winner's banner a second longer, as every banner since Eric, Oct 15; was 3.2.)
   voteResultSeconds: 4.2,
@@ -3578,7 +3608,8 @@ export const SQUADS: SquadsSettings = {
     boardWin: 40,
     mate: 25,
     boardDraw: 15,
-    roundScale: [1, 2, 4],
+    // (Relay ×4/3 since its 3 boards, Nov 5: three boards pay what four did at ×1; Pairs' 2 and the final's 1 as before.)
+    roundScale: [4 / 3, 2, 4],
     matchWin: 150,
     // A brilliant move: 25, never more than a board won (Eric, Oct 13); twice per squad per match at most.
     brilliant: { coins: 25, capPerMatch: 2, gap: 0.5, fromPly: 16, decided: 0.1 },

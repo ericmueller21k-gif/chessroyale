@@ -336,7 +336,7 @@ describe("part II's keys: each replayed, or raced, changes a balance once", () =
     expect(await ledgerMismatches(sql, a.id)).toEqual([]);
   });
 
-  it("the claw's adapter (clawOp, for claw.ts on its branch): a token in, its crate on a win, once per request id; none to spend, refused", async () => {
+  it("the claw's op (clawOp, claw.ts's): a token in, its crate on a win, once per request id; none to spend, refused", async () => {
     const { sql, db } = await world();
     const a = await signedIn(sql, "a@example.com", T0);
     const me = (await ledgerAccount(sql, a.id))!;
@@ -545,19 +545,16 @@ const WRITE = new RegExp(`\\b(?:INSERT(?:\\s+OR\\s+\\w+)?\\s+INTO|UPDATE|DELETE\
 const NOT_YET: Record<string, Record<string, { n: number; why: string }>> = {
   "welcome.ts": { welcome_crates: { n: 1, why: "not a balance: the notice closed (seen_at)" } },
 };
-/**
- * TODO(claw): files on other branches that write balances themselves, and what they move to when they land. The guard fails on them
- * until they do.
- */
-const ON_A_BRANCH: Record<string, string> = {
-  "claw.ts": "Boingo's claw (claude/claw-machine, claude/boingo-home): its playClaw's token and crate writes go through ledger.ts's clawOp, its claw_plays row as the op's `log`",
+/** Files that once wrote balances themselves, and what they write through now. The guard fails if one does again. */
+const MOVED: Record<string, string> = {
+  "claw.ts": "Boingo's claw: its playClaw's token and crate writes go through ledger.ts's clawOp, its claw_plays row as the op's `log`",
 };
 const SRC = join(dirname(fileURLToPath(import.meta.url)), "../src");
 const sources = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => (statSync(join(dir, f)).isDirectory() ? sources(join(dir, f)) : f.endsWith(".ts") ? [join(dir, f)] : []));
 
 describe("the static guard", () => {
-  it("no write to a balance table outside ledger.ts (the claw's, on its branch, has its TODO); none to the ledger but INSERT, anywhere", () => {
+  it("no write to a balance table outside ledger.ts (the claw's included); none to the ledger but INSERT, anywhere", () => {
     const found: Record<string, Record<string, number>> = {};
     for (const f of sources(SRC)) {
       const name = f.slice(SRC.length + 1);
@@ -570,7 +567,7 @@ describe("the static guard", () => {
         for (const t of BALANCE_TABLES) expect(line.includes(`"${t}"`), `${name}: ${line.trim()}`).toBe(false);
       }
     }
-    for (const [f, todo] of Object.entries(ON_A_BRANCH)) expect(found[f], `${f} writes balances itself. TODO: ${todo}`).toBeUndefined();
+    for (const [f, todo] of Object.entries(MOVED)) expect(found[f], `${f} writes balances itself. TODO: ${todo}`).toBeUndefined();
     const allowed = Object.fromEntries(Object.entries(NOT_YET).map(([f, ts]) => [f, Object.fromEntries(Object.entries(ts).map(([t, v]) => [t, v.n]))]));
     expect(found, "a balance changes only through ledger.ts").toEqual(allowed);
     // (The guard sees ledger.ts's own writes, so it would see one anywhere.)

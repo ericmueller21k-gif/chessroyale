@@ -1,19 +1,22 @@
-import type { ComponentChildren } from "preact";
+import { render, type ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { SQUADS, SQUADS_LOBBY, bannerPlusMs } from "@chessroyale/core";
-import { applyMove, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
+import { applyMove, fenAtPly, inCheck, legalMoves, toSan, type MoveScore } from "@chessroyale/chess";
 import { matchClockLine, minutesName, tokenLines, type Colour, type Side, type SquadsEvent } from "@chessroyale/chess/squads";
 import { Board, type Arrow } from "../components/Board.tsx";
 import { TimerBar, useFrameNow } from "../components/Countdown.tsx";
 import { HistoryNav, useHistoryView } from "../components/HistoryNav.tsx";
-import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
+import { COMPUTER_LAYOUT, MatchMenu, SwitchRow, type MatchExit } from "../components/MatchMenu.tsx";
+import { useMedia } from "../components/QuickChat.tsx";
 import { ShadeMoves, type ShadeMove } from "../components/ShadeMoves.tsx";
 import { ClockText, Member, SquadTag, SquadsBoards, StandingsStrip, Watchers, shownTurn, useNow } from "../components/SquadsParts.tsx";
+import { testParams } from "../test-switches.ts";
 import { BlockArrows, BlockPicker, ChipIcon, LockIcon, PickTags, SquadResources, TokenBreakdown, squareAt } from "../components/SquadsBlocks.tsx";
 import { Coins, ItemIcon, KitIcons } from "../components/MercenaryShop.tsx";
-import { ReplayButton, ReplayIcon, ReplayTag, ReplayTip, useReplayOn } from "../components/MoveReplay.tsx";
-import { replayFrameAt, replayFrames, replayTimes, type ReplayFrame } from "../move-replay.ts";
+import { CoachMarks, ReplayButton, ReplayIcon, ReplayTag, useReplayMode } from "../components/MoveReplay.tsx";
+import { replayFrameAt, replayFrames, replayMoves, replayTimes, type ReplayFrame } from "../move-replay.ts";
 import { ownEngine } from "../engine.ts";
+import { RankEmblem } from "../components/RankEmblem.tsx";
 import { onPrefsChange, setSquadsJumpNext, squadsJumpNext } from "../prefs.ts";
 import type { SquadsClient } from "../squads.ts";
 import {
@@ -23,6 +26,12 @@ import {
   JUMP_NEXT_LABEL,
   ROUND_NAME,
   bankText,
+  squadColour,
+  boardQueue,
+  queueLine,
+  queuePlace,
+  whenText,
+  type TurnRow,
   blockBankNow,
   hasBlocks,
   blockCheatFen,
@@ -72,10 +81,13 @@ import {
  * The same screen watches any board (spectating): nothing to choose, every board tappable.
  */
 
-/** A board on screen: a match's key and the board's number. */
+/** A board on screen: a match's key and the board's number; `ply`: a position on it to show (a turn order row's tap). */
 export interface BoardRef {
   key: string;
   board: number;
+  ply?: number;
+  /** (Each tap anew, so the same row twice shows it twice.) */
+  at?: number;
 }
 
 const sideWord = (c: Colour) => (c === "w" ? "White" : "Black");
@@ -304,21 +316,25 @@ function Banner({ title, sub, until, children }: { title: string; sub?: Componen
 }
 
 /**
- * Move replay (Eric, Nov 5; move-replay.ts): at the start of your move on a board the rotation brings you back to, the
- * moves played there since you last played it, one by one, within the extra free time they gave you (the server's
- * `freeMs`), then the board as it stands. Not with the replay button off, while you browse the moves, or once skipped
- * (a tap on the board). `me`: you, on your own board (null: nothing to replay).
+ * Move replay (Eric, Nov 5; move-replay.ts): when your move on a board starts, the last 2 moves there or all since you
+ * last played it (the replay button), one by one, within the extra free time the rule gave you (the server's `freeMs`;
+ * the last 2 sooner done), then the board as it stands. None if you were watching this board when both of its last two
+ * moves landed (`replayMoves`). Not while you browse the moves, or once skipped (a tap on the board). `me`: you, on your
+ * own board (null: nothing to replay).
  */
-function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void } {
-  const on = useReplayOn();
+function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing: boolean): { frame: ReplayFrame | null; step: number; count: number; skip: () => void; arrivedAt: number } {
+  const mode = useReplayMode();
   const d = me && m.state === "half" && m.current ? m.current.duties.find((x) => x.board === b.id && x.players.includes(me)) : undefined;
-  const n = replayCount(d, me);
-  const total = d ? freeMs(m, b.id) - m.delayMs : 0;
+  // (The board's move count when it came on screen: this view is drawn afresh for each board, and kept while it shows.)
+  const arrivedAt = useRef(b.moves.length);
+  const n = d ? replayMoves({ mode, total: b.moves.length, missed: replayCount(d, me), arrivedAt: arrivedAt.current }) : 0;
+  const extra = d ? freeMs(m, b.id) - m.delayMs : 0;
+  const total = mode === "two" ? Math.min(extra, SQUADS_LOBBY.replay.firstMs + (n + 1) * SQUADS_LOBBY.replay.stepMs) : extra;
   const half = m.current ? `${m.key}/${m.current.seq}` : "";
   const [skipped, setSkipped] = useState<string | null>(null);
   const frames = useMemo(() => (n > 0 && total > 0 ? replayFrames(b.startFen, b.moves, b.by ?? [], n) : []), [half, n, total, b.moves.length]);
   const startedAt = m.current?.startedAt ?? 0;
-  const frame = on && !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
+  const frame = !browsing && skipped !== half && frames.length > 1 ? replayFrameAt(frames, total, Date.now() - startedAt) : null;
   // (Drawn again as each move lands, and as it ends.)
   const [, redraw] = useState(0);
   useEffect(() => {
@@ -328,7 +344,7 @@ function useMoveReplay(m: LocalMatch, b: LocalBoard, me: string | null, browsing
     const t = setTimeout(() => redraw((k) => k + 1), next - Date.now() + 5);
     return () => clearTimeout(t);
   });
-  return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half) };
+  return { frame, step: frame ? frames.indexOf(frame) : 0, count: frames.length - 1, skip: () => setSkipped(half), arrivedAt: arrivedAt.current };
 }
 
 /**
@@ -366,7 +382,8 @@ export function freeLine(m: LocalMatch, me: string | null): string {
 /** One line of plain-language rules for each format. */
 function rulesLine(m: LocalMatch): string {
   // (Relay: no blocks, Mercenary too; they come from the shop, after round 1: Eric, Oct 19.)
-  if (m.format === "relay") return "Each turn you make one move, one board along.";
+  // (3 boards and 4 a squad since Nov 5: the ring. A match stored on 4 boards keeps its line.)
+  if (m.format === "relay") return m.boards.length < 4 ? "Your squad moves in turn, each move one board along; one of you waits to slot in. Best 2 of 3 boards." : "Each turn you make one move, one board along.";
   if (m.format === "pairs") return "You and your partner each pick; a coin plays one. Pick the same move and it plays for sure: a token.";
   return "Your whole squad votes: the most picked move plays (a tie: a coin). Copy a teammate with a tap.";
 }
@@ -453,8 +470,10 @@ export function SquadsMatchScreen({
       watching={!!watch && !onMine}
       studying={!onMine && !!mine && vm.key === mine.key && vb.id === studyBoard({ ...mine, turn: shownTurn(mine) }, me)}
       canWatch={!duty || myLocked || vm.state !== "half"}
-      onWatch={(key, board) => setWatch({ key, board })}
-      onBack={() => setWatch(null)}
+      onWatch={(key, board) => setWatch(mine && key === mine.key && board === myBoard ? null : { key, board })}
+      onShow={(board, ply) => setWatch({ key: vm.key, board, ply, at: Date.now() })}
+      showAt={viewing.ply !== undefined ? { ply: viewing.ply, at: viewing.at ?? 0 } : null}
+      canShow={!duty || myLocked || vm.state !== "half"}
       panel={panel}
       onNextRound={onNextRound}
       onLeave={onLeave}
@@ -473,7 +492,9 @@ function MatchView({
   studying,
   canWatch,
   onWatch,
-  onBack,
+  onShow,
+  showAt,
+  canShow,
   panel,
   onNextRound,
   onLeave,
@@ -489,7 +510,10 @@ function MatchView({
   studying: boolean;
   canWatch: boolean;
   onWatch: (key: string, board: number) => void;
-  onBack: () => void;
+  /** The turn order's row tapped: that board at that position (`canShow`: not while you have a move to make elsewhere). */
+  onShow: (board: number, ply: number) => void;
+  showAt: { ply: number; at: number } | null;
+  canShow: boolean;
   panel?: ComponentChildren;
   onNextRound?: () => void;
   onLeave?: () => void;
@@ -499,6 +523,10 @@ function MatchView({
   const b = m.boards[boardId]!;
   const now = Date.now();
   const history = useHistoryView(b.moves, [{ ply: 0, fen: b.startFen }]);
+  // (A turn order row's tap: this board at the position after that move.)
+  useLayoutEffect(() => {
+    if (showAt) history.go(showAt.ply);
+  }, [showAt?.at]);
   // Move replay (Eric, Nov 5): back on a board, the moves you missed land first (a tap on the board skips it).
   const replay = useMoveReplay(m, b, onMine && !client.me?.botPlays ? me : null, history.browsing);
   // (A bot plays your seat after repeated misses: nothing to choose until you take it back.)
@@ -605,9 +633,27 @@ function MatchView({
     return () => clearTimeout(t);
   }, [banner?.at]);
   const sideTag = (s: Side) => <SquadTag id={m.sides[s].squadId} you={s === mySide} />;
+  const computer = useMedia(COMPUTER_LAYOUT);
+  const turnBox = m.format === "relay" ? <TurnOrderBox client={client} m={m} board={boardId} computer={computer} onRow={canShow ? onShow : null} shownPly={history.browsing ? history.ply : null} /> : null;
   return (
     <div class={`screen game sq-game sq-${m.format}${m.round === 2 ? " sq-is-final" : ""}`}>
       <div class="hud-row">
+        {/* (The test-only "Next round": a tiny icon hard left, admins and test lobbies only; Nov 5, round 2.) */}
+        {client.test && onNextRound && (
+          <button type="button" class="sq-next" onClick={onNextRound} aria-label="Next round (test)" title="Next round (test)">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M2.5 3.2v9.6l6-4.8zM8.5 3.2v9.6l6-4.8z" fill="currentColor" />
+            </svg>
+          </button>
+        )}
+        {/* (Cheat lines, test controls only: on a phone's Relay a tiny switch here, its lines the arrows on the board.) */}
+        {client.test && m.format === "relay" && !computer && (
+          <button type="button" disabled={cheatFen === null} class={`sq-next sq-cheat-mini${client.cheatLines ? " on" : ""}`} aria-pressed={client.cheatLines} aria-label="Cheat lines (test)" title="Cheat lines (test)" onClick={() => client.toggleCheatLines()}>
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path d="M2 13L13 2M9 2h4v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        )}
         <div class="hud sq-hud">
           <span class="sq-hud-vs">
             {sideTag(mySide === 1 ? 1 : 0)}
@@ -618,16 +664,12 @@ function MatchView({
             {round} · T{m.turn + 1}
           </span>
         </div>
-        {client.test && onNextRound && (
-          <button type="button" class="sq-next" onClick={onNextRound}>
-            Next round
-          </button>
-        )}
-        {/* Move replay's button, then the gear (its list has Sound, Animations, Resign and Report a bug). */}
+        {/* Move replay's button, then the gear (its list has Sound, Animations, Quick board jump, Resign and Report a bug). */}
         <ReplayButton />
-        <MatchMenu exit={exit} />
+        <MatchMenu exit={exit} extra={<QuickJumpRow />} />
       </div>
-      <ReplayTip code={client.code} />
+      {/* The first-time tips (Nov 5, round 2): at a player's first Relay, once per device. */}
+      {m.format === "relay" && mySide !== null && <CoachMarks code={client.code} at={coachStart()} />}
       <StandingsStrip client={client} onLeave={onLeave} exit={exit} />
       <SquadsBoards client={client} watching={`${m.key}/${boardId}`} onWatch={canWatch ? onWatch : null} />
       <div class="board-area">
@@ -652,7 +694,8 @@ function MatchView({
           <Watchers client={client} board={`${m.key}/${boardId}`} hide={notWatching} colours={colours} />
         </div>
         {/* (During a move replay, a tap on the board skips it; the tap goes on to the board under it, so a move can start with it.) */}
-        <div class="board-row" onPointerDownCapture={replay.frame ? replay.skip : undefined}>
+        {/* (data-arrived: the board's move count when it came on screen, which decides a replay; tests read it.) */}
+        <div class="board-row" data-arrived={replay.arrivedAt} onPointerDownCapture={replay.frame ? replay.skip : undefined}>
           <Board fen={fen} orientation={orientation} lastMove={lastMove} interactive={choosing && !blocking} moves={allowed} onMove={(mv) => client.choose(m.key, mv)} arrows={boardArrows}>
             {replay.frame && <ReplayLayer client={client} m={m} frame={replay.frame} orientation={orientation} />}
             {(choosing || canBlock) && myDeadline && m.current && <TimerBar startsAt={m.current.startedAt} deadline={myDeadline} total={Math.max(1, myDeadline - m.current.startedAt)} quiet />}
@@ -715,14 +758,13 @@ function MatchView({
           </Board>
         </div>
         <HistoryNav view={history} total={b.moves.length} clock={<ClockLine client={client} m={m} board={boardId} />} />
+        {/* Relay (Nov 5, round 2): under the board only the move arrows and the turn order; whose turn it is shows there.
+            (A computer: in the column beside the board, at its top.) */}
+        {m.format === "relay" && !computer && <Island id="sq-turn-order">{turnBox}</Island>}
       </div>
       <div class="sq-panel">
-        {watching && (
-          <button type="button" class="fd-btn small sq-back" onClick={onBack}>
-            Back to my board
-          </button>
-        )}
-        {cheatFen !== null && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
+        {m.format === "relay" && computer && <Island id="sq-turn-order">{turnBox}</Island>}
+        {cheatFen !== null && !(m.format === "relay" && !computer) && <CheatLines on={client.cheatLines} top={cheat} fen={cheatFen} onToggle={() => client.toggleCheatLines()} />}
         {m.mode === "mercenary" && d && m.state === "half" && d.duty.board === boardId && (
           <StockfishToken
             left={mySide === null ? 0 : stockfishLeft(m, mySide)}
@@ -735,7 +777,13 @@ function MatchView({
             onUse={() => client.useStockfish(m.key)}
           />
         )}
-        {d && m.state === "half" && (
+        {/* (Relay has no duty panel since Nov 5, but a Mercenary Relay still blocks: its Block button on its own.) */}
+        {d && m.state === "half" && m.format === "relay" && canBlock && (
+          <div class="sq-duty move sq-relay-block">
+            <BlockBar client={client} m={m} block={{ on: blocking, bank, toggle: () => setBlockMode(!blocking), shields: mySide === null ? 0 : (m.shields?.[mySide === 0 ? 1 : 0] ?? 0) }} />
+          </div>
+        )}
+        {d && m.state === "half" && m.format !== "relay" && (
           <DutyPanel
             client={client}
             m={m}
@@ -750,11 +798,9 @@ function MatchView({
             noTokens={noTokens}
           />
         )}
-        {/* (After your move's panel, so it never pushes the move or Block down.) */}
-        {m.format === "relay" && mySide !== null && <JumpNextSwitch />}
         {m.format === "pairs" && m.tokenLog.length > 0 && (m.state === "over" || !!m.result) && <TokenBreakdown log={m.tokenLog} sides={m.sides} mine={mySide} />}
         {m.mode === "mercenary" && <KitLine client={client} m={m} mine={mySide} />}
-        {!d && <p class="sq-explain">{rulesLine(m)}</p>}
+        {!d && m.format !== "relay" && <p class="sq-explain">{rulesLine(m)}</p>}
         {client.me?.botPlays && !client.me.isBot && !client.me.left && mySide !== null && (
           <div class="sq-card">
             <div class="sq-card-title">A bot is playing your seat</div>
@@ -783,23 +829,187 @@ function useJumpNext(): boolean {
 }
 
 /**
- * "Jump to my next board" (Relay; Eric, Oct 14): the switch, and an (i) that says what it does in a sentence or two.
- * On by default, remembered on this device.
+ * Quick board jump (Relay; Eric, Oct 14 as "Jump to my next board"; Nov 5, round 2: in the Squads settings, the gear's
+ * list, not under the board): on or off, the same choice as before (`brc.squads.jumpNext`), and Settings → Squads.
  */
-function JumpNextSwitch() {
+function QuickJumpRow() {
   const on = useJumpNext();
-  const [info, setInfo] = useState(false);
+  return <SwitchRow icon="⤳" label={JUMP_NEXT_LABEL} on={on} onClick={() => setSquadsJumpNext(!on)} />;
+}
+
+/** A test switch for the stills: `?coachat=N` starts the coach marks at the Nth (from 1). */
+function coachStart(): number {
+  const n = Number(testParams().get("coachat"));
+  return Number.isInteger(n) && n >= 1 && n <= 3 ? n - 1 : 0;
+}
+
+/**
+ * A part of the screen that is never rebuilt (Eric, Nov 5: the turn order "is never rebuilt or redrawn"): the match view
+ * is drawn afresh for each board (its board, moves and replay are the board's), but this part's element is made once and
+ * moved into each new view's slot before the screen is painted, its contents updated in place. So tapping another tiny
+ * board, or a move landing, changes only what's in it: the same element, the same size, the same rows. Gone (emptied)
+ * once no view holds it.
+ */
+const islands = new Map<string, HTMLElement>();
+function Island({ id, children }: { id: string; children: ComponentChildren }) {
+  const slot = useRef<HTMLDivElement>(null);
+  let el = islands.get(id);
+  if (!el && typeof document !== "undefined") {
+    el = document.createElement("div");
+    el.className = "sq-island";
+    islands.set(id, el);
+  }
+  useLayoutEffect(() => {
+    if (el && slot.current && el.parentNode !== slot.current) slot.current.appendChild(el);
+    return () => {
+      // (Another view takes it in the same commit; only if none has, it's emptied.)
+      setTimeout(() => {
+        if (el && !el.isConnected && islands.get(id) === el) {
+          render(null, el);
+          islands.delete(id);
+        }
+      }, 0);
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (el) render(<>{children}</>, el);
+  });
+  return <div class="sq-island-slot" ref={slot} />;
+}
+
+/**
+ * Rows that glide to their new places (FLIP, about 220 ms) when their order changes, as the scoreboards do: each row
+ * (`data-id`) kept by player, so its element is reused; where it was is measured before and after, and it slides from
+ * there. Nothing else moves.
+ */
+function useGlide(list: { current: HTMLElement | null }, order: string) {
+  const tops = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const root = list.current;
+    if (!root) return;
+    const rows = [...root.querySelectorAll<HTMLElement>("[data-id]")];
+    for (const row of rows) {
+      const id = row.dataset.id!;
+      const was = tops.current.get(id);
+      const now = row.offsetTop;
+      if (was !== undefined && was !== now && typeof row.animate === "function" && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        row.animate([{ transform: `translateY(${was - now}px)` }, { transform: "translateY(0)" }], { duration: 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+      }
+    }
+    tops.current = new Map(rows.map((r) => [r.dataset.id!, r.offsetTop]));
+  }, [order]);
+}
+
+/**
+ * The turn order (Relay; Eric, Nov 5: "you know when you look down right away, being like, oh, I've got 2 turns left";
+ * his correction: one queue for the board on screen): all 8 players in the order they'll move on this board, the next
+ * there on top (lit while it's their move now), each with their squad's color, their badge, when they move there
+ * ("next", "in 3"; yours "Your turn · play now" while it's on) and, on the right, the move they last played (a tap shows
+ * that position). Eric, Nov 7: a phone shows all 8 too, the box filling the screen down to its bottom and scrolling
+ * inside itself when they don't fit (the page never scrolls); a computer all 8 in the column beside the board.
+ */
+function TurnOrderBox({ client, m, board, computer, onRow, shownPly }: { client: SquadsClient; m: LocalMatch; board: number; computer: boolean; onRow: ((board: number, ply: number) => void) | null; shownPly: number | null }) {
+  const queue = boardQueue(m, board, client.myId);
+  const line = queueLine(queue);
+  const place = queuePlace(queue);
+  const waiting = place ? `Waiting for ${place} ${place === 1 ? "player" : "players"}` : null;
+  const finished = !!m.boards[board]?.result;
+  const key = m.boards.map((b) => b.moves.length).join();
+  const sans = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const r of queue) {
+      if (!r.last) continue;
+      const b = m.boards[r.last.board]!;
+      out.set(r.id, safeSan(fenAtPly(b.moves, r.last.ply, [{ ply: 0, fen: b.startFen }]), b.moves[r.last.ply]!));
+    }
+    return out;
+  }, [key, board]);
+  const listRef = useRef<HTMLDivElement>(null);
+  useGlide(listRef, queue.map((r) => r.id).join());
+  // (Whole names, cut with an ellipsis by the row's width, never wrapped: the badge and the move's column keep their places.)
+  const nameOf = (r: TurnRow) => (r.you ? "You" : client.nameOf(r.id));
   return (
-    <div class="sq-jump">
-      <label class="sq-jump-switch">
-        <input type="checkbox" role="switch" checked={on} onChange={(e) => setSquadsJumpNext(e.currentTarget.checked)} />
-        <span>{JUMP_NEXT_LABEL}</span>
-      </label>
-      <button type="button" class={`sq-info${info ? " on" : ""}`} aria-expanded={info} aria-label={`What "${JUMP_NEXT_LABEL}" does`} onClick={() => setInfo(!info)}>
-        <span aria-hidden="true">i</span>
-      </button>
-      {info && <p class="sq-jump-info">{JUMP_NEXT_INFO}</p>}
+    <div class={`sq-to${computer ? " computer" : ""}`} role="group" aria-label="Turn order">
+      <div class="sq-to-list" ref={listRef} role="list" aria-label={`Turn order on board ${board + 1}`}>
+        {queue.map((r, i) => {
+          const shown = !!r.last && shownPly !== null && r.last.board === board && r.last.ply + 1 === shownPly;
+          const when = whenText(r, finished);
+          const badge = client.badgeOf(r.id);
+          const bot = client.isBot(r.id);
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="listitem"
+              class={`sq-to-row${i === 0 ? " top" : ""}${r.lit ? " lit" : ""}${r.you ? " you" : ""}${shown ? " shown" : ""}`}
+              data-place={i}
+              data-ahead={r.ahead}
+              data-id={r.id}
+              style={{ "--sq": squadColour(m.sides[r.side].squadId) }}
+              disabled={!r.last || !onRow}
+              onClick={() => r.last && onRow?.(r.last.board, r.last.ply + 1)}
+              aria-label={`${nameOf(r)}${bot ? " (bot)" : badge?.rating ? `, rated ${badge.rating}` : ""}${r.you && (line ?? waiting) ? `, ${line ?? waiting}` : when && !r.you ? `, ${when}` : ""}${r.last ? `, last played ${sans.get(r.id)} on board ${r.last.board + 1}` : ""}`}
+            >
+              <span class="sq-to-mark" aria-hidden="true" />
+              <span class="sq-to-who">
+                <span class="sq-to-name">{nameOf(r)}</span>
+                {/* (The badge, as on profiles: the 1 v 1 tier's emblem and the rating; a bot's 🤖, as in the squads' lists.) */}
+                {bot ? (
+                  <small class="sq-to-badge bot" aria-hidden="true">
+                    🤖
+                  </small>
+                ) : badge ? (
+                  <span class="sq-to-badge" aria-hidden="true">
+                    {badge.emblem && (
+                      <span class="sq-to-emblem">
+                        <RankEmblem id={badge.emblem} />
+                      </span>
+                    )}
+                    {badge.rating !== null && <span class="sq-to-rating">{badge.rating}</span>}
+                  </span>
+                ) : null}
+              </span>
+              <span class="sq-to-where">{when}</span>
+              <span class="sq-to-move">{r.last ? sans.get(r.id) : "—"}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+/**
+ * Blocks (Mercenary): the blocks placed on your board this half, the Block button (Done blocking; "No block points left")
+ * and a shield's note. In a duty's panel; in Relay (whose panel is gone, Nov 5) on its own beside the board.
+ */
+function BlockBar({ client, m, block }: { client: SquadsClient; m: LocalMatch; block: { on: boolean; bank: number; toggle: () => void; shields: number } | null }) {
+  const blockButton = block && (
+    <button type="button" class={`fd-btn sq-block-btn${block.on ? " on" : ""}`} aria-pressed={block.on} disabled={block.bank <= 0 && !block.on} onClick={block.toggle}>
+      <LockIcon size={16} />
+      {block.on ? "Done blocking" : block.bank > 0 ? `Block · ${block.bank} ${block.bank === 1 ? "point" : "points"}` : "No block points left"}
+    </button>
+  );
+  // (Mercenary: their shield cancels your next block that would take effect; you still pay for it.)
+  const shieldLine = block && block.shields > 0 && (
+    <span class="mc-shield-note">
+      <ItemIcon item="shield" size={12} />
+      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} canceled, still paid
+    </span>
+  );
+  const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);
+  const placedLine = placed.length > 0 && (
+    <span class="sq-placed">
+      <LockIcon size={12} />
+      Blocked: {placed.map((b) => blockName(b)).join(", ")}
+    </span>
+  );
+  return (
+    <>
+      {placedLine}
+      {blockButton}
+      {shieldLine}
+    </>
   );
 }
 
@@ -920,7 +1130,7 @@ function KitLine({ client, m, mine }: { client: SquadsClient; m: LocalMatch; min
 function CheatLines({ on, top, fen, onToggle }: { on: boolean; top: MoveScore[] | null; fen: string; onToggle: () => void }) {
   return (
     <div class="sq-cheat">
-      <button type="button" class={`sq-next sq-cheat-btn${on ? " on" : ""}`} aria-pressed={on} onClick={onToggle}>
+      <button type="button" class={`sq-cheat-btn${on ? " on" : ""}`} aria-pressed={on} onClick={onToggle}>
         Cheat lines
       </button>
       {on &&
@@ -1005,7 +1215,7 @@ function statusLine(
   if (onMine && side !== null) {
     const toMove = m.current ? (m.current.duties.find((x) => x.board === boardId)?.side ?? null) : null;
     if (m.format === "final") return toMove === side ? "Your squad is voting" : "They're voting";
-    return toMove === side ? "Your squad's move here" : "Their move · you play next half";
+    return toMove === side ? "Your squad's move here" : "Their move here";
   }
   return `${where} · ${squadName(m.sides[0].squadId)} v ${squadName(m.sides[1].squadId)}`;
 }
@@ -1041,34 +1251,13 @@ function DutyPanel({
   noTokens: boolean;
 }) {
   const san = (mv: string) => safeSan(fen, mv);
-  const blockButton = block && (
-    <button type="button" class={`fd-btn sq-block-btn${block.on ? " on" : ""}`} aria-pressed={block.on} disabled={block.bank <= 0 && !block.on} onClick={block.toggle}>
-      <LockIcon size={16} />
-      {block.on ? "Done blocking" : block.bank > 0 ? `Block · ${block.bank} ${block.bank === 1 ? "point" : "points"}` : "No block points left"}
-    </button>
-  );
-  // (Mercenary: their shield cancels your next block that would take effect; you still pay for it.)
-  const shieldLine = block && block.shields > 0 && (
-    <span class="mc-shield-note">
-      <ItemIcon item="shield" size={12} />
-      They have {block.shields === 1 ? "a shield" : `${block.shields} shields`}: your next block {block.shields === 1 ? "is" : "blocks are"} canceled, still paid
-    </span>
-  );
-  const placed = m.placed.filter((b) => b.board === m.current?.duties.find((d) => d.players.includes(client.myId ?? ""))?.board);
-  const placedLine = placed.length > 0 && (
-    <span class="sq-placed">
-      <LockIcon size={12} />
-      Blocked: {placed.map((b) => blockName(b)).join(", ")}
-    </span>
-  );
+  const blockBar = <BlockBar client={client} m={m} block={block} />;
   if (role === "move") {
     return (
       <div class="sq-duty move">
         <strong>{mine ? `You played ${san(mine)}` : "Your move"}</strong>
         <span class="muted small">{mine ? "Tap a tiny board to watch it." : freeLine(m, client.myId)}</span>
-        {placedLine}
-        {blockButton}
-        {shieldLine}
+        {blockBar}
       </div>
     );
   }
@@ -1101,9 +1290,7 @@ function DutyPanel({
         <button type="button" class="fd-btn primary sq-lockin" disabled={!mine || locked} onClick={() => client.lock(m.key)}>
           {locked ? "Locked in" : "Lock in my vote"}
         </button>
-        {placedLine}
-        {blockButton}
-        {shieldLine}
+        {blockBar}
         <span class="muted small">The most picked move plays; a tie, a coin. You can change until you lock in.</span>
       </div>
     );
@@ -1131,9 +1318,7 @@ function DutyPanel({
       </button>
       {same && <span class="sq-same">Same move: it plays for sure, and uses a token.</span>}
       {noTokens && <span class="sq-same none">No same-move tokens left: pick a different move.</span>}
-      {placedLine}
-      {blockButton}
-      {shieldLine}
+      {blockBar}
       <span class="muted small">{noTokens ? "You can change until you lock in." : "Pick your partner's move too and it plays for sure (a token). You can change until you lock in."}</span>
     </div>
   );
