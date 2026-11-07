@@ -1,6 +1,6 @@
 import { TOWN_AFK, cleanLook, type ItemLook } from "@chessroyale/core";
 import { lookKey } from "./you-look.ts";
-import { testParams } from "../test-switches.ts";
+import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { account } from "../account.ts";
 import { AWAY_LIMITS, AwayClock, GuestTime, readAwaySwitch, readGuestSwitch, type AwayLimits, type AwayState } from "./afk.ts";
 import { mayReadTownChat, mayTownChat } from "./chat-net.ts";
@@ -97,10 +97,23 @@ export interface HereSelf {
   shop: string | null;
 }
 
+/**
+ * The town's test switches (`?townafk=`, `?townroom=`, `?townguest=`) from the address now, or as the town first opened in this page
+ * load: home's Chess Town button opens it again at /town without them, and a test's numbers must hold for the whole page load.
+ * Honored only with the test switches on.
+ */
+const ASKED = (() => {
+  try {
+    return new URLSearchParams(location.search);
+  } catch {
+    return new URLSearchParams();
+  }
+})();
+const asked = (k: string): string | null => (testSwitchesAllowed() ? (testParams().get(k) ?? ASKED.get(k)) : null);
+
 /** The test switches' room (`?townroom=`: a test's own town, so other tests' players never walk in it) and shortened numbers. */
 function testExtras(limits: AwayLimits | null): Record<string, unknown> {
-  const q = testParams();
-  const room = q.get("townroom");
+  const room = asked("townroom");
   const out: Record<string, unknown> = room ? { room } : {};
   if (limits && limits !== AWAY_LIMITS) out.limits = { zzz: limits.zzzMs / 1000, boot: limits.bootMs / 1000, hidden: limits.hiddenBootMs / 1000 };
   return out;
@@ -108,7 +121,7 @@ function testExtras(limits: AwayLimits | null): Record<string, unknown> {
 
 /** The away rule's numbers on this page: settings.ts's, or the test switch's (`?townafk=`; null: off). */
 export function awayLimits(): AwayLimits | null {
-  const v = readAwaySwitch(testParams().get("townafk"));
+  const v = readAwaySwitch(asked("townafk"));
   return v === undefined ? AWAY_LIMITS : v;
 }
 
@@ -240,7 +253,7 @@ let guestUsed = 0;
 export function guestLimitMs(): number | null {
   const a = account();
   if (!a.config?.accounts || !a.profile || a.profile.user.signedIn) return null;
-  const sw = readGuestSwitch(testParams().get("townguest"));
+  const sw = readGuestSwitch(asked("townguest"));
   if (sw !== undefined) return sw;
   return a.config.onlineNeedsSignIn ? TOWN_AFK.guestTownSec * 1000 : null;
 }

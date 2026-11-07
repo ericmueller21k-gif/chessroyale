@@ -1713,7 +1713,7 @@ function startTown(
   const hookHere = () => {
     if (!testSwitchesAllowed()) return null;
     const drawn = new Set(r.zzzList());
-    const tagged = new Set(r.tagList().map((t) => t.text));
+    const tagged = new Set(r.tagList().map((t) => t.who));
     return town.people
       .map((p, i) => ({ p, i }))
       .filter(({ p }) => p.remote || p.you)
@@ -1728,7 +1728,7 @@ function startTown(
         // (What they wear as the town has it, and whether the renderer has their dressed picture: drawn in it, not a plain pawn.)
         look: isSprite(p.look) ? null : p.look.wear ? Object.fromEntries(Object.entries(p.look.wear).map(([k, v]) => [k, v?.def])) : null,
         dressed: r.botArt.has(p.id) || r.riders.has(p.id),
-        tag: tagged.has(p.name) && !!p.name,
+        tag: tagged.has(i),
       }));
   };
   const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr] } : null);
