@@ -363,3 +363,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Plan: 3 now (Haiku); 1+2 the next Opus after intros as data.
   Eric on Babur (Nov 7): make him the new default size on the computer; his pump stands in front of him, slightly overlapping
   (him behind it by ~10 px), scooted toward him, so it no longer pushes the board smaller.
+- **Nov 7 ~07:10 UTC: queue cleared.** Merged and live today: #537 Boingo, #538/#540 Squads 3 boards + turn order, #539 Smudgy on
+  the sprite kit, #541 Scramble Rush warning + cap, #542 town AFK + shared town + guests, #543 walkthrough v2 (?tour=1), #544 intros
+  as data, #545 lamps off boss fronts, #546 one side size + Babur pump in front + Big Boy unmirrored. Shelved by Eric: ledger
+  backfill. Waiting on Eric: the settings mockup. Later (Eric's notes): spread boss homes across the town; other bosses face away from
+  the board on the board screen (Babur, Moo, Sawyer, Wrangler, Chub & Chirp, Puddles, Alfil, Folio) until each moves to the kit.
