@@ -411,3 +411,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **#550 typed chat + right column (computer)**: PR open, full-e2e, CI running (head b3c7cb25). Merge when green.
   Follow-up (same Opus, claude/typed-chat-2, /home/user/cr-chat2): typed chat in match + lobby chat and on phone (brief required it).
   Opus queue after that: Smudgy ult fix + engine paint report, then auto chess redesign.
+- **Eric OK'd #550 to merge** (merge when CI green).
+- Haiku NOW: Locker default pawn (claude/locker-default, 9003, xhigh: stored pref): no "Shop" title, preview box 2× tall, one pawn,
+  W/B toggle in a thin rounded square bottom-right + gray "default"; saved per account (device for guests); applies in town, home,
+  locker, profile (never in matches). Other pawn colors: Eric said stick to white and black.
+- Haiku NOW: home card taps (claude/home-name-tap, 9004): icon → icon editor; name → your public profile; rest of card inert.
