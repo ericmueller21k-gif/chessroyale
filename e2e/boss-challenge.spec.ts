@@ -53,7 +53,7 @@ test.beforeEach(async ({ page }) => {
 type Stand = { c: number; r: number; facing: number; view: number; moving: boolean };
 type Wood = { move: string | null; log: string | null; fog: string | null; ring: boolean; stumps: string | null };
 type Dark = { move: string | null; bulbs: number; lanterns: number; run: number; tree: number; tag: number; level: number; black: number; pool: number; iris: number };
-type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null; chant: string | null; dark: Dark | null };
+type Intro = { step: string; layout: string; attack: boolean; you: [number, number]; boss: [number, number]; facing: { you: number; boss: number }; looks: number | null; line: boolean; table: boolean; stools: [number, number][]; pyramid: { anim: string; frame: number } | null; blocks: { anim: string; frame: number } | null; drop: number; wood: Wood | null; chant: string | null; dark: Dark | null };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
@@ -592,6 +592,9 @@ async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
   expect(atLine.layout).toBe("across");
   expect(where(atLine)).toEqual([12, 14, Math.round((9.5 - CHALLENGE_FEEL.clear.boss) * 100) / 100, 14]);
   expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  // (His drawing faces east too, toward the table and you: his art faces our left, so he's drawn mirrored. Eric, Nov 6: "in the battle
+  // intro he's facing the wrong way when the match starts".)
+  expect(atLine.looks, "he's drawn facing the table").toBe(1);
   expect(atLine.line).toBe(true);
   expect(atLine.cloth).toBe("covered");
   await shot("smudgy-line");
@@ -608,6 +611,7 @@ async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
   for (const i of looks.slice(looks.indexOf(atLine))) {
     expect(where(i), `at ${i.step}: in their places`).toEqual(where(atLine));
     expect(i.attack, `at ${i.step}: no attack`).toBe(false);
+    expect(i.looks, `at ${i.step}: drawn facing the table`).toBe(1);
   }
   // The splatter: in, covered, out (the stroke), gone; the match there.
   const phases = new Set<string>();
@@ -631,6 +635,12 @@ async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
     .toBe(true);
   expect([...phases]).toEqual(expect.arrayContaining(["in", "out"]));
   await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 10_000 });
+  // The match: his figure (the bar on a phone, by the board's corner on a computer) left of the board, drawn facing it.
+  const fig = page.locator(".boss-char:visible").first();
+  await expect(fig).toHaveAttribute("data-faces", "right");
+  const [fb, bb] = [(await fig.boundingBox())!, (await page.locator(BOARD_SEL.squares).first().boundingBox())!];
+  expect(fb.x + fb.width / 2, "he stands left of the board's middle").toBeLessThan(bb.x + bb.width / 2);
+  await shot("smudgy-match");
   if (caster) {
     await page.waitForTimeout(1500);
     await caster.send("Page.stopScreencast");

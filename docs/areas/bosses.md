@@ -706,6 +706,12 @@ Each boss lives in its own files, one per layer, on a shared base. The shared fi
 | The boss menu's power words | `packages/app/src/power-words.ts` (`Record<PowerId, …>`) | |
 | A boss's attack on a king (the Last Stand, its mate) | `components/KingAttack.tsx`, `KING_ATTACK`, `KING_ATTACKERS`, `bossTurnShowMs` (`boss-timing.ts`), `KingAttackKit` (`kits.ts`), `LastStand.tsx`, `screens/Boss.tsx` | its kit's `kingAttack` (Hollow: `HOLLOW_ATTACK` in `hollow.ts`, `lashHit` in `effects/hollow.ts`, `hollowLash`; Alfil: `ALFIL_ATTACK`, `ankusHit`; Sawyer: `SAWYER_ATTACK`, `sawHit` in `effects/sawyer.ts`; Wrangler: `PIG_ATTACK`, `lassoHit` in `effects/pig.ts`; Boingo: `CLOWN_ATTACK`, `pieHit` in `effects/boingo.ts`; Big Boy: `BIGBOY_ATTACK`, `bonkHit` in `effects/bigboy.ts`; Ginger: `GINGER_ATTACK`, `frostHit` in `effects/ginger.ts`; Jefferson: `GREX_ATTACK`, `popHit` in `effects/grex.ts`; Chub & Chirp: `HOPPER_ATTACK`, `carrotHit` in `effects/hopper.ts`; Puddles: `GARDENER_ATTACK`, `waterHit` (`waterItem`) in `effects/gardener.ts`; Timber: `BOSS_BEAVER_ATTACK` in `timber.ts`, `chipHit` (`chipItem`) in `effects/timber.ts`; their frames: `attack-frame.ts`; each hit's frames: `hitAnims` in `effects/common.ts`) |
 
+**The sprite kit** (Nov 6, `characters/sprite-kit.ts`, registry `sprites.ts`; docs/decisions/2026-11-06-sprite-kit.md): a figure as data (`Sprite`: its
+character, the way its art faces, anchors, ramps, frame templates) and the shared rules (ink outline, ramps of 3+ steps, crisp from 1.5x, `TEXEL`).
+Facing is data: callers ask for a facing (`facingAs`, `mirrorFor`, `artFacing`), never guess. A kit's `sprite` makes its `ch` that sprite turned to
+face the board (`BOARD_FACING`, our right); portraits and the select stage draw the art (`artOf`). Smudgy is the pilot; others move when next
+touched. Tests: `test/sprite-kit.test.ts`; facing at the battle's start: `e2e/smudgy.spec.ts`, `e2e/boss-challenge.spec.ts` (`looks`).
+
 ### The base boss (`packages/chess/src/bosses/base.ts`)
 
 A boss's rules are a `BossRules` object; every hook sees only its own boss's battles and its own state:
