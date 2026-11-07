@@ -16,8 +16,8 @@ describe("who's in the town square (town-here.ts): the server drops an away pawn
     h.beat("bo", "Bo", "town", at(3, 4, 70 * S), 0);
     h.beat("cy", "Cy", "other", at(5, 6), 0);
     h.beat("di", "Di", "town", at(7, 8, 0, false, "babur"), 0);
-    expect(h.view("town", 0, "ann")).toEqual([{ id: "bo", name: "Bo", c: 3, r: 4, zzz: true }]);
-    expect(h.view("town", 0, "bo")).toEqual([{ id: "ann", name: "Ann", c: 1, r: 2, zzz: false }]);
+    expect(h.view("town", 0, "ann")).toEqual([{ id: "bo", name: "Bo", c: 3, r: 4, zzz: true, pawn: "white" }]);
+    expect(h.view("town", 0, "bo")).toEqual([{ id: "ann", name: "Ann", c: 1, r: 2, zzz: false, pawn: "white" }]);
   });
 
   it("the zzz from the idle time a beat says, and gone the beat after an input", () => {
@@ -26,7 +26,7 @@ describe("who's in the town square (town-here.ts): the server drops an away pawn
     expect(h.view("town", 9 * S, null)[0]!.zzz).toBe(false);
     expect(h.view("town", 10 * S, null)[0]!.zzz).toBe(true);
     h.beat("bo", "Bo", "town", at(3, 5, 0), 11 * S);
-    expect(h.view("town", 11 * S, null)[0]).toEqual({ id: "bo", name: "Bo", c: 3, r: 5, zzz: false });
+    expect(h.view("town", 11 * S, null)[0]).toEqual({ id: "bo", name: "Bo", c: 3, r: 5, zzz: false, pawn: "white" });
   });
 
   it("no input for 5 minutes: dropped for everyone, beats or not", () => {
@@ -87,14 +87,26 @@ describe("who's in the town square (town-here.ts): the server drops an away pawn
     expect(readLimits({ zzz: 0, boot: "x" })).toEqual(HERE_LIMITS);
   });
 
+  it("a player's default pawn color goes with them in the town (Eric, Nov 7): black, or white (the default) when none is said", () => {
+    const h = new TownHere();
+    h.beat("bo", "Bo", "town", at(3, 4), 0, undefined, null, "black");
+    h.beat("cy", "Cy", "town", at(5, 6), 0, undefined, null, "white");
+    h.beat("di", "Di", "town", at(7, 8), 0);
+    expect(h.view("town", 0, null).map((o) => [o.id, o.pawn])).toEqual([
+      ["bo", "black"],
+      ["cy", "white"],
+      ["di", "white"],
+    ]);
+  });
+
   it("what each one wears goes with them (Eric, on #542); a guest watching gets the looks and no names", () => {
     const h = new TownHere();
     const look = { head: { def: "beanie", color: "red", blemish: 0, seed: 1 } };
     h.beat("bo", "Bo", "town", at(3, 4), 0, undefined, look);
     h.beat("cy", "Cy", "town", at(5, 6), 0);
     expect(h.view("town", 0, null)).toEqual([
-      { id: "bo", name: "Bo", c: 3, r: 4, zzz: false, look },
-      { id: "cy", name: "Cy", c: 5, r: 6, zzz: false },
+      { id: "bo", name: "Bo", c: 3, r: 4, zzz: false, pawn: "white", look },
+      { id: "cy", name: "Cy", c: 5, r: 6, zzz: false, pawn: "white" },
     ]);
     expect(h.view("town", 0, null, undefined, false).map((o) => [o.name, o.look ?? null])).toEqual([
       ["", look],

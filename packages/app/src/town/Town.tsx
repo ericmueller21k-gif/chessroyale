@@ -35,7 +35,7 @@
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
-import { account, onAccountChange, playerName } from "../account.ts";
+import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
@@ -58,7 +58,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { secondColor } from "@chessroyale/core";
+import { secondColor, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -768,14 +768,18 @@ function startTown(
   let sky = pinned ?? clock();
   let skyAt = performance.now();
   r.setSky(sky);
-  // Your pawn as your profile shows it (your crate items), drawn again only when your look changes; plain meanwhile. On your
-  // ride if you wear one (Oct 31): its frames with you on them composed once (rides.ts), the last ones kept until they're ready.
+  // Your pawn as your profile shows it (your crate items), drawn again only when your look or your default pawn color changes
+  // (pawn-color.ts); plain meanwhile. On your ride if you wear one (Oct 31): its frames with you on them composed once (rides.ts),
+  // the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
     const look = account().profile?.locker?.look;
-    const key = lookKey(look);
+    const color = myPawnColor();
+    const side = color === "black" ? "dark" : "light";
+    const key = `${side}|${lookKey(look)}`;
     if (key === youLook) return;
     youLook = key;
+    town.you.look = { side, tint: null, wear: null };
     const wear = offRide(look);
     // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
     town.you.walker.stepMs = f.youStepMs / rideSpeed(look?.ride?.def);
@@ -783,7 +787,7 @@ function startTown(
     const mount = (art: YouArt | null, back: YouArt | null) => {
       const prev = youRide;
       youRide = look?.ride
-        ? ride(look.ride, art, back, pawnImage("light", null), "w", `light||${lookKey(wear)}`, (rd) => {
+        ? ride(look.ride, art, back, pawnImage(side, null), sideOfPawn(color), `${side}||${lookKey(wear)}`, (rd) => {
             if (rd !== youRide || !alive) return;
             if (youShown && youShown !== rd) leaveRider(youShown);
             youShown = r.youRider = rd;
@@ -801,7 +805,7 @@ function startTown(
       r.youArt = null;
       mount(null, null);
     } else
-      void dressed(wear, pawnImage("light", null), !!look?.ride).then(([art, back]) => {
+      void dressed(wear, pawnImage(side, null), !!look?.ride, sideOfPawn(color)).then(([art, back]) => {
         if (youLook !== key || !alive) return;
         r.youArt = art;
         mount(art, back);
@@ -811,10 +815,10 @@ function startTown(
    * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
    * rides v2, the director's call: from behind a face item doesn't show, a hat does).
    */
-  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean): Promise<[YouArt | null, YouArt | null]> => {
-    const front = dressedPawn(wear, plain, PAWN_PX);
+  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
+    const front = dressedPawn(wear, plain, PAWN_PX, side);
     if (!riding || !wear?.face) return front.then((a) => [a, a]);
-    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX)]);
+    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
   };
   /**
    * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
@@ -845,7 +849,7 @@ function startTown(
     };
     if (!lookKey(wear)) mount(null, null);
     else
-      void dressed(wear, plain, !!on).then(([art, back]) => {
+      void dressed(wear, plain, !!on, lk.side === "dark" ? "b" : "w").then(([art, back]) => {
         if (!alive) return;
         if (art) r.botArt.set(p.id, art);
         mount(art, back);

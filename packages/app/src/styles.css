@@ -6395,10 +6395,6 @@ button.history-label {
   align-items: center;
   gap: 10px;
 }
-.shop-head h1 {
-  margin: 0;
-  text-align: center;
-}
 .shop-coins {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -7791,16 +7787,69 @@ button.history-label {
   margin-top: 6px;
 }
 /* A shiny item: its shine rolls across the drawing itself (Items.tsx). */
-/* The locker. */
+/* The locker. The preview is one pawn in a box twice its old height (Eric, Nov 7: 96 px pawn, 120 px box with its frame
+   before; 222 px of content plus padding and frame now, 252 px in all). The W and B picker sits in its bottom-right corner. */
 .locker-preview {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 18px;
+  height: 222px;
   padding: 12px;
 }
 .locker-avatar {
-  width: 96px;
-  height: 96px;
+  width: 192px;
+  height: 192px;
+}
+.locker-pawn-pick {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+.locker-pawn-square {
+  display: flex;
+  width: 64px;
+  height: 64px;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+}
+.locker-pawn-letter {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.8;
+  cursor: pointer;
+}
+.locker-pawn-letter.on {
+  font-size: 24px;
+  opacity: 1;
+}
+/* A white W on the blue, outlined dark; a black B outlined light, so both read. */
+.locker-pawn-letter.white {
+  color: #fff;
+  text-shadow: -1px 0 #0b1230, 1px 0 #0b1230, 0 -1px #0b1230, 0 1px #0b1230;
+}
+.locker-pawn-letter.black {
+  color: #000;
+  text-shadow: -1px 0 #fff, 1px 0 #fff, 0 -1px #fff, 0 1px #fff;
+}
+.locker-pawn-letter:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -5px;
+}
+.locker-pawn-default {
+  font-size: 11px;
+  color: #aeb4c6;
 }
 .locker-grid {
   display: grid;

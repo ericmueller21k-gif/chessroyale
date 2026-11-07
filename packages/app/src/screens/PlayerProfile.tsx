@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { BOSS_TIERS, rankView } from "@chessroyale/core";
+import { BOSS_TIERS, pawnColorOf, rankView, sideOfPawn } from "@chessroyale/core";
 import { BackButton, DressedPawn, FdButton, GearIcon, RatingPill } from "../components/FrontDoor.tsx";
 import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { RankEmblem } from "../components/RankEmblem.tsx";
@@ -358,7 +358,7 @@ function OwnProfileScreen({
         {head}
         {viewPublic}
         <div class="fd-card">
-          <DressedPawn size="profile" shadow ride look={own ? me?.locker?.look : undefined} />
+          <DressedPawn size="profile" shadow ride look={own ? me?.locker?.look : undefined} own={own} />
           <div class="fd-card-name">{own ? (me?.user.name ?? target.name) : target.name}</div>
           <p class="fd-sub">{error ?? "Loading…"}</p>
         </div>
@@ -374,7 +374,7 @@ function OwnProfileScreen({
       {/* Two columns on a computer: who they are and what they wear; then their numbers. One column on a phone. */}
       <div class="fd-profile-col">
       <div class="fd-card">
-        <DressedPawn size="profile" shadow ride look={p.look} />
+        <DressedPawn size="profile" shadow ride look={p.look} side={sideOfPawn(pawnColorOf(p.pawn))} own={own} />
         <h1 class="fd-card-name">{p.name}</h1>
         <div class="fd-seen">
           <span class={`fd-dot small${p.online ? "" : " off"}`} />

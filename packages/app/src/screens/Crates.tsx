@@ -6,7 +6,9 @@ import {
   CRATES_FREE,
   FISCHER,
   ITEM_COLORS,
+  PAWN_COLORS,
   PURITY_BANDS,
+  sideOfPawn,
   SHOP_ITEMS,
   SLOT_NAMES,
   TIERS,
@@ -46,9 +48,10 @@ import {
   type ItemInstance,
   type ItemSlot,
   type ItemStack,
+  type PawnColor,
   type PresentTier,
 } from "@chessroyale/core";
-import { deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, openCrate } from "../account.ts";
+import { deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, setPawnColor } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
@@ -863,9 +866,9 @@ function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; 
 
 // ---------------- Locker ----------------
 
-type LockerTab = ItemSlot | "all" | "king";
-const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride", "king"];
-const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God King" : SLOT_NAMES[t]);
+type LockerTab = ItemSlot | "all";
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride"];
+const tabName = (t: LockerTab) => (t === "all" ? "All" : SLOT_NAMES[t]);
 
 /**
  * What you own, and the one place to wear it. Crate items, rarest first, with copies of an item in the same color
@@ -874,6 +877,7 @@ const tabName = (t: LockerTab) => (t === "all" ? "All" : t === "king" ? "God Kin
  * if you wear one: Oct 31, in the same box).
  * (The pawn hats are crate items now, from the Beta crate.) An admin's locker has one of everything: an admin copy
  * (core/admin-copies.ts) carries an "Admin" tag, wears like any item and can't be deleted (there's nothing stored).
+ * The preview is one pawn in your default color (W or B, bottom right: pawn-color.ts; Eric, Nov 7).
  */
 export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const { profile } = useAccount();
@@ -881,15 +885,16 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const [deleting, setDeleting] = useState<ItemStack | null>(null);
   const locker = profile?.locker;
   const shop = profile?.shop;
+  const pawn = myPawnColor();
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
   // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
   const stacks = stackItems(locker.items)
     .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
-  // What you got in the shop: God King effects.
+  // What you got in the shop: God King effects (under All; the God King tab is gone, Eric, Nov 7).
   const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id));
-  const shopTab = tab === "all" || tab === "king";
+  const shopTab = tab === "all";
   const wornIn = (s: ItemStack) => {
     const slot = itemDef(top(s).def)!.slot;
     return s.items.some((i) => i.id === locker.equipped[slot]);
@@ -898,11 +903,25 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side="w" ride />
+          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride />
         </span>
-        <span class="locker-avatar">
-          <Avatar look={locker.look} side="b" ride />
-        </span>
+        <div class="locker-pawn-pick">
+          <div class="locker-pawn-square" role="group" aria-label="Your default pawn color">
+            {PAWN_COLORS.map((c) => (
+              <button
+                type="button"
+                key={c}
+                class={`locker-pawn-letter ${c}${pawn === c ? " on" : ""}`}
+                aria-pressed={pawn === c}
+                aria-label={c === "white" ? "White" : "Black"}
+                onClick={() => pickPawnColor(c)}
+              >
+                {c === "white" ? "W" : "B"}
+              </button>
+            ))}
+          </div>
+          <span class="locker-pawn-default">default</span>
+        </div>
       </div>
       <div class="shop-tabs locker-tabs" role="tablist">
         {LOCKER_TABS.map((t) => (
@@ -911,7 +930,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
           </button>
         ))}
       </div>
-      {tab !== "king" && !stacks.length && <p class="muted">No crate items here yet. Open a crate!</p>}
+      {!stacks.length && <p class="muted">No crate items here yet. Open a crate!</p>}
       {stacks.length > 0 && (
         <div class="locker-grid">
           {stacks.map((s) => {
@@ -1005,6 +1024,13 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
       {deleting && <DeleteDialog stack={deleting} wornId={locker.equipped[itemDef(top(deleting).def)!.slot]} onClose={() => setDeleting(null)} />}
     </div>
   );
+}
+
+/** The locker's W or B: your default pawn color, saved (the account, or this device as a guest). A tap on the color you have does nothing. */
+function pickPawnColor(c: PawnColor) {
+  if (c === myPawnColor()) return;
+  play("menuSelect");
+  void setPawnColor(c).catch(() => undefined);
 }
 
 /**

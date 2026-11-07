@@ -1,9 +1,9 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef } from "preact/hooks";
-import { FRONT_DOOR, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { useEffect, useRef, useState } from "preact/hooks";
+import { FRONT_DOOR, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
-import { account } from "../account.ts";
+import { account, myPawnColor, onAccountChange } from "../account.ts";
 import type { LiveCounts } from "../live.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
@@ -32,7 +32,8 @@ export function Logo({ onClick }: { onClick?: () => void }) {
 /**
  * A dressed pawn (the item-builder's Avatar) in a box with room for what sticks out (a weapon, a crown), and an
  * optional shadow under it. `size` picks the box from the stylesheet. `ride` (the profiles, Oct 31; home's pawn and your ring,
- * Nov 1): on its ride, if it has one on, its idle playing, fitted into the same box.
+ * Nov 1): on its ride, if it has one on, its idle playing, fitted into the same box. `side` is its color (white unless said);
+ * `own` (your pawn outside a match, Nov 7): your default color (pawn-color.ts), kept up to date as you change it.
  */
 /** One hop of the hero pawn (styles.css, `fd-hop`: 1.8 s). */
 const HOP_MS = 1800;
@@ -42,6 +43,7 @@ export function DressedPawn({
   size,
   shadow,
   side = "w",
+  own = false,
   ride = false,
   onTap,
   tapLabel,
@@ -50,12 +52,17 @@ export function DressedPawn({
   size: "hero" | "profile" | "ring" | "card" | "seat" | "side" | "stage" | "avatar";
   shadow?: boolean;
   side?: "w" | "b";
+  /** Your pawn: drawn in your default color (pawn-color.ts), which it follows as you change it. */
+  own?: boolean;
   ride?: boolean;
   /** A tap on the pawn (Home's card: your inventory). Its own root takes the tap, so the layout is the same. */
   onTap?: () => void;
   tapLabel?: string;
 }) {
   const pawn = useRef<HTMLSpanElement>(null);
+  const [, redraw] = useState(0);
+  useEffect(() => (own ? onAccountChange(() => redraw((n) => n + 1)) : undefined), [own]);
+  const pawnSide = own ? sideOfPawn(myPawnColor()) : side;
   // Home's hero pawn hops, on a computer as on a phone, not under reduced motion (Eric: "add the bounce effect every 30
   // seconds like we have in autochess"; Oct 24: it never hopped on a computer, because this check and the hop's CSS were
   // phone-only): the first hop FRONT_DOOR.heroHopFirstSec after it shows, then one every FRONT_DOOR.heroHopEverySec. The
@@ -80,7 +87,7 @@ export function DressedPawn({
   }, [size]);
   const box = (
     <span class="fd-pawn-box">
-      <Avatar look={look} side={side} ride={ride} />
+      <Avatar look={look} side={pawnSide} ride={ride} />
     </span>
   );
   const cls = `fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}${onTap ? " fd-tap" : ""}`;
@@ -105,7 +112,7 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
   const p = account().profile;
   return (
     <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} size="ring" ride />
+      <DressedPawn look={p?.locker?.look} size="ring" ride own />
     </button>
   );
 }

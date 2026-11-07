@@ -55,7 +55,6 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
     <div class="screen shop">
       <div class="shop-head">
         <BackButton onClick={onBack} />
-        <h1>Shop</h1>
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
           🪙 {shop?.coins ?? 0}
         </span>
