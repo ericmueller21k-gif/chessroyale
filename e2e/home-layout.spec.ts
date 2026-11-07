@@ -524,7 +524,9 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   await town.click();
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
   expect(new URL(page.url()).pathname).toBe("/town");
+  // (Back asks first: "Leave Chess Town?", Leave goes home; e2e/town-leave.spec.ts.)
   await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   // Boss Battle: its screen, titled so, with START (no list of options). Back is home.
