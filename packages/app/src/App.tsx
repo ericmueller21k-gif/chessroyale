@@ -40,6 +40,7 @@ import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
+import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
@@ -1488,6 +1489,14 @@ export function App() {
             history.replaceState(null, "", "/colosseum");
           }}
           onBack={() => {
+            setShowTown(false);
+            setTownSeat(null);
+            setTownStand(null);
+            history.replaceState(null, "", "/");
+          }}
+          // Away too long (town/afk.ts): home (one replaceState, no reload), with a small "You were away" there.
+          onAway={() => {
+            showAwayNote();
             setShowTown(false);
             setTownSeat(null);
             setTownStand(null);

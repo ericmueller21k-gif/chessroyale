@@ -2787,6 +2787,29 @@ export const TOWN_CHAT = {
 } as const;
 
 /**
+ * Away in the town square and its rooms (Eric, Nov 7: "after a few min put zzz with no text box… then boot after 10 min of not
+ * moving or in the background either one"). Any input counts as being there (a tap, a drag, a key, the wheel, walking). The
+ * server keeps who's in the town (live hub, town-here.ts) from each device's beat and drops a pawn by the same numbers, so a
+ * hidden phone that runs no timers still leaves. docs/decisions/2026-11-07-town-afk.md.
+ */
+export const TOWN_AFK = {
+  /** A "zzz" floats over your pawn, for everyone, after this long with no input. */
+  zzzAfterSec: 180,
+  /** Out of the town (home, "You were away") after this long with no input. */
+  bootAfterSec: 600,
+  /** Out after the page has been in the background this long without a break. */
+  hiddenBootAfterSec: 600,
+  /** A device in the town tells the server where it is this often while it's visible (and at once on a change). */
+  beatSec: 5,
+  /** No beat for this long: the server counts the device as in the background since its last beat (a hidden phone sends none). */
+  silentAfterSec: 20,
+  /** The most other players one device is told about. */
+  maxShown: 100,
+  /** Home's "You were away" stays this long while the page is visible (a tap takes it away sooner). */
+  awayNoteSec: 6,
+} as const;
+
+/**
  * Chat moderation (docs/decisions/2026-10-16-chat-moderation.md; docs/areas/chat.md): a moderator's chat bans and how
  * long their decisions are kept. Chat is preset lines only; the free text players see is display names, which the
  * server's filter checks (server/src/text-filter.ts).

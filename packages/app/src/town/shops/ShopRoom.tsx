@@ -61,6 +61,7 @@ import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
+import { drawZzz } from "../zzz.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
@@ -270,6 +271,8 @@ export type ShopCard = "talk" | "crate" | "door";
 export interface ShopCtl {
   zoom: (out: boolean) => void;
   recenter: () => void;
+  /** The claw machine's controls are open (the away rule's clock holds: afk.ts). */
+  busy?: () => boolean;
 }
 
 /**
@@ -283,7 +286,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null }: { room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false }: { /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -295,7 +298,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro));
+    }, intro, zzz));
     ctl.current = r;
     onReady();
     return () => {
@@ -444,6 +447,7 @@ function startRoom(
   onZoom: (out: boolean) => void,
   onCard: (c: ShopCard | null) => void,
   challenge: RoomIntro | null = null,
+  zzz: () => boolean = () => false,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -3272,6 +3276,8 @@ function startRoom(
       g.globalAlpha = tagA;
       drawTag(youName(), "you", youHead.x, youHead.y);
       g.globalAlpha = 1;
+      // (Away: the town's "zzz" over your tag, at the town's tag size.)
+      if (zzz()) drawZzz(g, youHead.x + 4, youHead.y - 18, 1, now, tagA);
     }
     if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
@@ -3772,6 +3778,7 @@ function startRoom(
     recenter: () => {
       follow = true;
     },
+    busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;
       // (Out of the Funhouse: its claw machine's controls close; any play is already done on the server.)

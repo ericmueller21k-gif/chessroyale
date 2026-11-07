@@ -6,6 +6,7 @@ import { countCall } from "./ops.ts";
 import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import { TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
+import { TownHere, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -29,6 +30,8 @@ export class LiveHub extends DurableObject<Env> {
   private chat = new GlobalChat();
   /** The town square's typed chat (town-chat.ts): in memory only, never in storage (a restart forgets it). */
   private town = new TownChat();
+  /** Who's in the town square now (town-here.ts): in memory only, from each device's beat; a restart forgets it. */
+  private here = new TownHere();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -177,6 +180,7 @@ export class LiveHub extends DurableObject<Env> {
   async forgetAccount(id: string): Promise<void> {
     this.board.forgetSeen(id);
     this.town.dropAccount(id, Date.now(), true);
+    this.here.leave(id);
     if (this.chat.forgetAccount(id)) await this.saveChat();
   }
 
@@ -218,6 +222,21 @@ export class LiveHub extends DurableObject<Env> {
     if (at === null) return;
     const cur = await this.ctx.storage.getAlarm();
     if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
+  }
+
+  /**
+   * A device in the town square says where its player is (`beat`), or that it left (null). Answers everyone else in its room's
+   * town square (not in a shop), each with their "zzz", after dropping every pawn past its limit (town-here.ts).
+   */
+  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits): Promise<HereOther[]> {
+    countCall("hub.townHere");
+    const now = Date.now();
+    if (!beat) {
+      this.here.leave(id);
+      return [];
+    }
+    this.here.beat(id, name, room, beat, now, limits);
+    return this.here.view(room, now, id);
   }
 
   /** One line still in the town's room (a report reads what was said from here). */

@@ -938,7 +938,8 @@ test("the chat text follows the town's sky: near-black ink by day, dawn and dusk
 test("the text's tone flips with the clock when the sky does: ink before 19:30 and white after, ink again from 5:30 (the town's own blend), changing one attribute on the box, once a minute", async ({ page }) => {
   // The device's clock: just before dusk's blend is half through; the town reads the sky from it (no ?sky=).
   await page.clock.install({ time: new Date(2026, 9, 28, 19, 28, 0) });
-  await page.goto("/town");
+  // (?townafk=off: the clock jumps hours, and the away rule would send this idle page home: town/afk.ts.)
+  await page.goto("/town?townafk=off");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   const box = page.locator(".town-chat");
   await expect(box).toHaveAttribute("data-tone", "day");

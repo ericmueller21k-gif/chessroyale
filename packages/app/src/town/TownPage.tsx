@@ -25,6 +25,8 @@ export interface BotGameAsk {
 
 type Props = {
   onBack: () => void;
+  /** Away too long (town/afk.ts): out of the town, home, with "You were away". */
+  onAway: () => void;
   onBossAlone: (id: string) => void;
   /** A boss with an intro challenged (Alfil, Big Boy, Babur, Puddles): start its battle under its transition; resolves once the battle shows. */
   onBossChallenge: (id: string, stand: Stand | null) => Promise<void>;

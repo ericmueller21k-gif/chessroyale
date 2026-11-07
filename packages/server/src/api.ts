@@ -12,6 +12,7 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
+import { townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
@@ -189,6 +190,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     !path.startsWith("/api/chat/icon/") &&
     path !== "/api/town/chat" &&
     path !== "/api/town/chat/remove" &&
+    path !== "/api/town/here" &&
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
     path !== "/api/boss/token"
@@ -268,6 +270,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       ...(town ? { town } : {}),
       ...(inbox ? { inbox } : {}),
     });
+  }
+
+  // POST /api/town/here: a device in the town square says where its player is (or that it left); the answer is everyone else
+  // there, each with their "zzz" (town-here-api.ts; the away rule, TOWN_AFK). No session lookup past the cached ones.
+  if (path === "/api/town/here" && request.method === "POST") {
+    if (!env.LIVE) return json({ others: [] });
+    return townHereResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).

@@ -66,6 +66,7 @@ import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
 import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
+import { watchAway } from "./here-net.ts";
 import { dressedPawn, lookKey, offFace, offRide } from "./you-look.ts";
 import type { ItemLook } from "@chessroyale/core";
 import type { BotGameAsk } from "./TownPage.tsx";
@@ -123,8 +124,11 @@ export function TownScreen({
   seat = null,
   stand = null,
   framed = false,
+  onAway,
 }: {
   onBack: () => void;
+  /** Away too long (afk.ts): out of the town to home, with "You were away". */
+  onAway?: () => void;
   onBossAlone?: (id: HomeId) => void;
   /**
    * A boss with an intro challenged (shops/challenge.ts): its transition covers the screen; start its battle (Boss alone, as its
@@ -149,6 +153,11 @@ export function TownScreen({
   // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
   const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null } | null>(null);
+  /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
+  const shopIn = useRef<string | null>(null);
+  shopIn.current = inside?.room.def.home ?? null;
+  const awayOut = useRef(() => {});
+  awayOut.current = () => (onAway ?? onBack)();
   /** A boss's challenge (shops/challenge.ts), where it is: "town" when there's none. */
   const flow = useRef<ChallengeFlow>("town");
   const step = (e: ChallengeEvent) => (flow.current = nextFlow(flow.current, e));
@@ -262,7 +271,21 @@ export function TownScreen({
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
     }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"));
     ctl.current = t;
-    return t.stop;
+    // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
+    // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
+    // machine hold the clock: they aren't idle presence.
+    const stopAway = watchAway({
+      town: t.town,
+      shop: () => shopIn.current,
+      busy: () => flow.current !== "town" || !!shopCtl.current?.busy?.(),
+      onState: (st) => void (t.town.you.zzz = st === "zzz"),
+      onOut: () => awayOut.current(),
+      onOthers: t.gone,
+    });
+    return () => {
+      stopAway();
+      t.stop();
+    };
   }, []);
   const home = card && (card.kind === "boss" || card.kind === "home") ? HOMES[card.i]! : null;
   const people = ctl.current?.town.people;
@@ -320,6 +343,7 @@ export function TownScreen({
             onReady={shopReady}
             ctl={shopCtl}
             intro={inside.intro}
+            zzz={() => !!ctl.current?.town.you.zzz}
           />
         )}
         <div class="town-overlay">
@@ -434,7 +458,7 @@ export function TownScreen({
                   <p class="town-sub town-fit">{bot ? sidekickText(bot) : "Coming soon"}</p>
                   <p class="town-rate">
                     <BarsIcon />
-                    <span>{bot ? ratingText(bot) : ratingLine(person.rating ?? 0)}</span>
+                    <span>{bot ? ratingText(bot) : person.rating !== undefined ? ratingLine(person.rating) : ""}</span>
                   </p>
                 </div>
                 <button
@@ -1639,6 +1663,16 @@ function startTown(
   // "move" ("" on foot), the frame, which way it faced; your box, foot and head on screen, your square; Nov 1, `coming`: the ride whose
   // frames are on their way, its drawing loading or its frames being composed, while you walk on foot in its box) and each other rider's.
   /** (Tests) Where you stand (your square, the way you face) and whether you're walking: a boss's challenge brings you back here. */
+  // ... `__townHere()`: the real players in the town (here-net.ts) and you: each one's account id, name, square, whether they're
+  // still here (not left), their "zzz" as told, and whether the last frame drew one over them.
+  const hookHere = () => {
+    if (!testSwitchesAllowed()) return null;
+    const drawn = new Set(r.zzzList());
+    return town.people
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => p.remote || p.you)
+      .map(({ p, i }) => ({ uid: p.uid ?? null, you: p.you, name: p.name, at: [p.walker.hereC(), p.walker.hereR()], here: !p.home, zzz: !!p.zzz, drawn: drawn.has(i) }));
+  };
   const hookYou = () => (testSwitchesAllowed() ? { ...standOf(town.you.walker), moving: town.you.walker.moving(), way: [town.you.walker.wdc, town.you.walker.wdr] } : null);
   // ... `__townWalk([c, r])`: you walk to that square (or the free one nearest it) as a tap on it would, the camera following (to measure
   // the frame rate walking a set route, Nov 5). True if there's a way.
@@ -1694,7 +1728,7 @@ function startTown(
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townHere?: typeof hookHere };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1716,11 +1750,16 @@ function startTown(
   hooks.__townHush = hookHush;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
+  hooks.__townHere = hookHere;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
 
   return {
+    /** Real players who left the town (here-net.ts): a card open on one of them closes. */
+    gone: (left: Person[]) => {
+      if (card?.kind === "person" && left.includes(town.people[card.i]!)) setCard(null);
+    },
     zoom: setZoom,
     recenter: () => {
       leaveClose();
@@ -1870,6 +1909,7 @@ function startTown(
       delete hooks.__townHush;
       delete hooks.__townRide;
       delete hooks.__townYou;
+      delete hooks.__townHere;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
