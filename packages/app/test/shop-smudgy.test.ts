@@ -7,7 +7,9 @@ import { SMUDGY_LINES } from "../src/characters/smudgy.ts";
 import { SMUDGY_SOUNDS, smudgySound } from "../src/characters/smudgy-sounds.ts";
 import { findPath, inTalkRange, isFloor, lightsAt, makeRoom, tapTarget, walkable } from "../src/town/shops/room.ts";
 import { SHOPS, holdLine, priceLine, prizeRows } from "../src/town/shops/shops.ts";
-import { CHALLENGE_FEEL, chantOf, clothAnims, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, seatedMarks, type IntroStep } from "../src/town/shops/challenge.ts";
+import { CHALLENGE_FEEL, chantOf, introLength, introOf, marksOf, seatedMarks } from "../src/town/shops/challenge.ts";
+import { SMUDGY_INTRO } from "../src/town/shops/intros/smudgy.ts";
+import { beatsOf, cuesOf, hopStartOf, nowOf } from "./intro-views.ts";
 import { splatTimes, strokeAt } from "../src/town/shops/smudgy-splatter.ts";
 import { SIDEKICK_SHEETS } from "../src/town/sidekick-sheets.ts";
 import { ADMIN_BOTS, BOTS, TOWN_BOTS, isSprite } from "../src/town/world.ts";
@@ -175,9 +177,9 @@ describe("Smudgy's Boss Crate and the Brush Ride", () => {
 });
 
 describe("his challenge intro (Nov 6: the cloth)", () => {
-  const anims = clothAnims({ cloth: INTRO_SMUDGY_CLOTH, boardFrame: WHIP_BOARD_FRAME });
-  const beats = introBeats(anims);
-  const at = (s: IntroStep) => beats.find((b) => b.step === s)!.at;
+  const anims = { whip: INTRO_SMUDGY_CLOTH.anims.whip!.frames.map((f) => f.ms) };
+  const beats = beatsOf(SMUDGY_INTRO);
+  const at = (s: string) => beats.find((b) => b.step === s)!.at;
   const K = CHALLENGE_FEEL.smudgy;
   const whip = anims.whip.reduce((a, b) => a + b, 0);
 
@@ -185,7 +187,7 @@ describe("his challenge intro (Nov 6: the cloth)", () => {
     const ci = introOf("smudgy")!;
     expect(ci).toMatchObject({ custom: true, layout: "across", seated: true, line: SMUDGY_LINES.entrance![0] });
     expect(chantOf(ci)).toBe("Careful, don't get any paint on the pieces!");
-    expect(hopStart(beats, anims)).toBe(Infinity);
+    expect(hopStartOf(SMUDGY_INTRO)).toBe(Infinity);
     expect(beats.some((b) => b.step === "swing")).toBe(false);
   });
 
@@ -197,7 +199,7 @@ describe("his challenge intro (Nov 6: the cloth)", () => {
   });
 
   it("the cloth before the board, the board before the reveal line: covered, whipped off (the board showing once it's off the top), in its heap to the end", () => {
-    const now = (t: number) => introAt(beats, anims, t);
+    const now = (t: number) => nowOf(SMUDGY_INTRO, t);
     expect(now(0).cloth).toEqual({ anim: "covered", frame: 0 });
     expect(now(at("whip") - 1)).toMatchObject({ cloth: { anim: "covered" }, table: false, line: false });
     expect(now(at("line") + 10)).toMatchObject({ line: true, chant: false });
@@ -215,7 +217,7 @@ describe("his challenge intro (Nov 6: the cloth)", () => {
   });
 
   it("every cue a sound of his own: the whoosh as it lifts, the flop as it lands; the splatter's splat and swipe; every sound in his pack and finite", () => {
-    const cues = introCues(beats, anims);
+    const cues = cuesOf(SMUDGY_INTRO);
     expect(cues.map((c) => c.cue)).toEqual(["whoosh", "flop"]);
     expect(cues[0]!.at).toBe(at("whip"));
     expect(cues[1]!.at).toBeLessThan(at("reveal"));

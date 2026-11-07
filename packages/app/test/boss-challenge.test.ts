@@ -15,7 +15,11 @@ import { INTRO_BIGBOY_BLOCKS, INTRO_BIGBOY_STOOL_B, INTRO_BIGBOY_STOOL_SEAT_H, I
 import { TABLE_BOARD } from "../src/town/houses/park.ts";
 import { renderFrame } from "../src/characters/sprite.ts";
 import { DARK_MOVES, caveLight, chantOf, darkAnims, drainAt, seatedMarks, type DarkAnims, type IntroStep } from "../src/town/shops/challenge.ts";
-import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, logAnims, logWalks, marksFeel, woodAt, isLog, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type BlocksAnims, type LogAnims, type ChallengeEvent, type ChallengeFlow, type IntroAnims, type IntroBeat } from "../src/town/shops/challenge.ts";
+import { BOSS_INTROS, CHALLENGE_FEEL, attackStart, marksFeel, attackTime, boardSquare, coverMs, frameAt, hopStart, introAt, introBeats, introCues, introLength, introOf, marksOf, nextFlow, stormEdge, wipeAt, type ChallengeEvent, type ChallengeFlow, type IntroBeat } from "../src/town/shops/challenge.ts";
+import { ALFIL_INTRO } from "../src/town/shops/intros/alfil.ts";
+import { BIGBOY_INTRO } from "../src/town/shops/intros/bigboy.ts";
+import { TIMBER_BACK, TIMBER_INTRO, TIMBER_REACH } from "../src/town/shops/intros/timber.ts";
+import { beatsOf, cuesOf, hopStartOf, nowOf, woodOf } from "./intro-views.ts";
 import { PARK_TABLE } from "../src/town/houses/park.ts";
 import { INTRO_ALFIL_TABLE } from "../src/town/shops/alfil-intro-art.ts";
 import { BOSS_BEAVER_INTRO, INTRO_TIMBER_FRONT, INTRO_TIMBER_LOG, INTRO_TIMBER_SHAVINGS, INTRO_TIMBER_STORM, INTRO_TIMBER_STUMP, INTRO_TIMBER_STUMP_SEAT_H, INTRO_TIMBER_TABLE, INTRO_TIMBER_TABLE_PALETTE, TIMBER_INTRO_LIFT_AT, TIMBER_INTRO_REACH } from "../src/town/shops/timber-intro-art.ts";
@@ -34,10 +38,17 @@ import type { Character } from "../src/characters/sprite.ts";
  * intro (Babur's and Puddles': the table pops in, the attack swung in place, a flash and a wipe).
  */
 const ms = (a: "rise" | "idle" | "crack" | "crumble") => INTRO_ALFIL_PYRAMID.anims[a]!.frames.map((f) => f.ms);
-/** Timber's log (Nov 3), as shops/intro.ts makes it from his art: his pixels his town figure's, `bossSquares` tall. */
+/** Timber's log (Nov 3): his pixels his town figure's, `bossSquares` tall; his moves' and props' frames (each frame's ms), as his intro's data reads them. */
 const TIMBER_PER_SQ = BOSS_ART.timber.h / (TOWN_FEEL.bossSquares * (TOWN_FEEL.bossScale.timber ?? 1));
-const TIMBER: LogAnims = logAnims({ mover: BOSS_BEAVER_INTRO, log: INTRO_TIMBER_LOG, fog: INTRO_TIMBER_SHAVINGS, stump: INTRO_TIMBER_STUMP, reach: TIMBER_INTRO_REACH }, TIMBER_PER_SQ);
-const ALFIL: IntroAnims = { rise: ms("rise"), idle: ms("idle"), crack: ms("crack"), crumble: ms("crumble"), tableFrame: INTRO_ALFIL_PYRAMID.anims.crumble!.frames.findIndex((f) => f.cue === "table") };
+const msOf = (ch: Character, a: string) => ch.anims[a]!.frames.map((f) => f.ms);
+const TIMBER = {
+  moves: Object.fromEntries((["walk", "lift", "carry", "setDown", "gnaw", "done"] as const).map((m) => [m, msOf(BOSS_BEAVER_INTRO, m)])) as Record<"walk" | "lift" | "carry" | "setDown" | "gnaw" | "done", number[]>,
+  props: { gnawed: msOf(INTRO_TIMBER_LOG, "gnawed"), rise: msOf(INTRO_TIMBER_SHAVINGS, "rise"), hold: msOf(INTRO_TIMBER_SHAVINGS, "hold"), settle: msOf(INTRO_TIMBER_SHAVINGS, "settle"), pop: msOf(INTRO_TIMBER_STUMP, "pop") },
+  reach: TIMBER_REACH,
+  back: TIMBER_BACK,
+};
+/** Alfil's pyramid's frames (each frame's ms) and the crumble frame the table shows on (its art's "table" cue). */
+const ALFIL = { rise: ms("rise"), idle: ms("idle"), crack: ms("crack"), crumble: ms("crumble"), tableFrame: INTRO_ALFIL_PYRAMID.anims.crumble!.frames.findIndex((f) => f.cue === "table") };
 
 describe("the challenge's flow", () => {
   const run = (events: ChallengeEvent[], from: ChallengeFlow = "town") => events.reduce<ChallengeFlow>((s, e) => nextFlow(s, e), from);
@@ -265,8 +276,8 @@ describe("the board on the table, turned to the layout", () => {
 });
 
 describe("the intro's timeline (Alfil's art)", () => {
-  const beats = introBeats(ALFIL);
-  const at = (t: number) => introAt(beats, ALFIL, t);
+  const beats = beatsOf(ALFIL_INTRO);
+  const at = (t: number) => nowOf(ALFIL_INTRO, t);
 
   it("the art's frames: rise 8, idle 2 (looping), crack 6, crumble 8; the table shows from the crumble's third frame", () => {
     expect([ALFIL.rise.length, ALFIL.idle.length, ALFIL.crack.length, ALFIL.crumble.length]).toEqual([8, 2, 6, 8]);
@@ -301,7 +312,7 @@ describe("the intro's timeline (Alfil's art)", () => {
 
   it("the cues (their sounds) come on their beats: rumble as it rises, crack, crumble, and table on the clear frame", () => {
     const crumble = beats.find((b) => b.step === "crumble")!;
-    expect(introCues(beats, ALFIL)).toEqual([
+    expect(cuesOf(ALFIL_INTRO)).toEqual([
       { cue: "rumble", at: beats.find((b) => b.step === "rise")!.at },
       { cue: "crack", at: beats.find((b) => b.step === "crack")!.at },
       { cue: "crumble", at: crumble.at },
@@ -321,7 +332,7 @@ describe("the intro's timeline (Alfil's art)", () => {
 });
 
 /** Big Boy's toy blocks' frames, as shops/intro.ts reads them from his art. */
-const blocksOf = (): BlocksAnims => {
+const blocksOf = () => {
   const A = INTRO_BIGBOY_BLOCKS.anims;
   const ms = (a: "build" | "plop" | "chairs") => A[a]!.frames.map((f) => f.ms);
   const cues = (a: "build" | "plop" | "chairs") => A[a]!.frames.map((f) => f.cue);
@@ -330,8 +341,8 @@ const blocksOf = (): BlocksAnims => {
 
 describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
   const B = blocksOf();
-  const beats = introBeats(B);
-  const at = (t: number) => introAt(beats, B, t);
+  const beats = beatsOf(BIGBOY_INTRO);
+  const at = (t: number) => nowOf(BIGBOY_INTRO, t);
   const F = CHALLENGE_FEEL;
   const beat = (s: string) => beats.find((b) => b.step === s)!;
 
@@ -406,7 +417,7 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
   });
 
   it("the cues (his sounds) come on the art's frames: a clack as each block lands, a bonk for the top one, his toss as the board drops, a poof as it plops on, a clack for each stool", () => {
-    const cues = introCues(beats, B);
+    const cues = cuesOf(BIGBOY_INTRO);
     const frameAtMs = (anim: "build" | "plop" | "chairs", i: number) => beat(anim).at + B[anim].slice(0, i).reduce((a, b) => a + b, 0);
     expect(cues).toEqual([
       ...[3, 6, 9, 12, 15].map((i) => ({ cue: "block", at: frameAtMs("build", i) })),
@@ -431,14 +442,14 @@ describe("the intro's timeline (Big Boy's toy blocks, Nov 2)", () => {
 
 describe("the intro's timeline (Timber's log, Nov 3)", () => {
   const T = TIMBER;
-  const beats = introBeats(T);
-  const at = (t: number) => introAt(beats, T, t);
+  const beats = beatsOf(TIMBER_INTRO);
+  const at = (t: number) => nowOf(TIMBER_INTRO, t);
   const F = CHALLENGE_FEEL;
   const beat = (s: string) => beats.find((b) => b.step === s)!;
   const PX = TOWN_FEEL.housePxPerSquare;
 
   it("the art: his moves (walk 6, lift 6, carry 6, setDown 5, gnaw 8, done 6) facing east, the log's gnawing 6, the fog's rise 8, hold 4 and settle 10, a stump's pop 6; the log stands about a square in front of him as he works; his table the park table's geometry, its stumps apart; the sweep tiles as Alfil's", () => {
-    expect(isLog(T)).toBe(true);
+    expect(TIMBER_INTRO.mover).toBe(BOSS_BEAVER_INTRO);
     expect(Object.fromEntries(Object.entries(T.moves).map(([k, v]) => [k, v.length]))).toEqual({ walk: 6, lift: 6, carry: 6, setDown: 5, gnaw: 8, done: 6 });
     expect(Object.fromEntries(Object.entries(T.props).map(([k, v]) => [k, v.length]))).toEqual({ gnawed: 6, rise: 8, hold: 4, settle: 10, pop: 6 });
     // (TIMBER_INTRO_REACH: 34 of his pixels east of his foot, his town size: about 1.16 squares; his dusting off steps him 3 back.)
@@ -464,12 +475,12 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
   });
 
   it("his room's marks are the timeline's: his `standOff` from the table's middle, his clear place `log.clear`; the log lies west of his mark, clear of it and on the circle's floor", () => {
-    const m = marksOf(SHOP_TIMBER_LAYOUT, "across", SHOP_TIMBER_MARKS, marksFeel(T))!;
+    const m = marksOf(SHOP_TIMBER_LAYOUT, "across", SHOP_TIMBER_MARKS, marksFeel(null, F, TIMBER_INTRO.clear))!;
     expect(m.table.c - m.boss.c).toBe(F.standOff.across);
     expect(m.table.c - m.bossClear.c).toBeCloseTo(F.log.clear);
     // (His own clear place, a touch further out than the others': every other boss's stays `clear.boss`.)
     expect(F.log.clear).toBeGreaterThanOrEqual(F.clear.boss);
-    expect(marksFeel(ALFIL)).toBe(F);
+    expect(marksFeel(null, F, ALFIL_INTRO.clear)).toBe(F);
     expect(marksFeel(null)).toBe(F);
     expect(F.log.at).toBeGreaterThan(F.standOff.across);
     // (The log lies a whole square and more past his mark; it's 64 of his pixels long, half of it each side of its middle.)
@@ -479,7 +490,7 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
     // He works where the log he sets down stands on the table's place: his reach west of it, between his mark and the table.
     expect(m.table.c - T.reach).toBeGreaterThan(m.boss.c);
     expect(m.table.c - T.reach).toBeLessThan(m.table.c);
-    const w = logWalks(T);
+    const w = { toLog: F.log.at - F.standOff.across, carry: F.log.at - T.reach, toMark: F.log.clear - T.reach - T.back };
     expect(w.toLog).toBeCloseTo(F.log.at - F.standOff.across);
     expect(w.carry).toBeCloseTo(F.log.at - T.reach);
     expect(w.toMark).toBeGreaterThan(0);
@@ -522,7 +533,7 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
   });
 
   it("where he is and how he faces: his town figure on his mark for the line's lead; walking west (mirrored) to the log; facing east (the art's way) to heave, carry, set down, gnaw and dust off; west again to his place; his town figure there to swing", () => {
-    const w = (t: number) => woodAt(beats, T, t);
+    const w = (t: number) => woodOf(TIMBER_INTRO, t);
     expect(w(beat("line").at)).toMatchObject({ move: null, from: "mark", to: "mark" });
     expect(w(beat("toLog").at + 1)).toMatchObject({ move: { anim: "walk", flip: true }, from: "mark", to: "log" });
     expect(w((beat("toLog").at + beat("toLog").end) / 2).u).toBeCloseTo(0.5, 1);
@@ -541,7 +552,7 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
   });
 
   it("the log: lying on the floor from the walk in, hidden the moment the heave starts (it's in his paws, his own frames); standing in front of him from the set-down's last frame (the first without it in his paws); gnawed through the gnaw and the fog's rise; gone under the fog's hold", () => {
-    const w = (t: number) => woodAt(beats, T, t);
+    const w = (t: number) => woodOf(TIMBER_INTRO, t);
     expect(w(0).log).toEqual({ anim: "lying", frame: 0 });
     expect(w(beat("lift").at - 1).log).toEqual({ anim: "lying", frame: 0 });
     expect(w(beat("lift").at).log).toBeNull();
@@ -577,7 +588,7 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
     expect(at(beat("pop").at)).toMatchObject({ table: true, stools: true });
     expect(at(beat("dust").at).wood!.stumps).toEqual({ anim: "idle", frame: 0 });
     expect(at(introLength(beats) + 500).wood).toMatchObject({ ring: true, stumps: { anim: "idle" } });
-    expect(hopStart(beats, T)).toBe(beat("pop").at);
+    expect(hopStartOf(TIMBER_INTRO)).toBe(beat("pop").at);
   });
 
   it("the stumps sit at the table's foot ± 37 (the stools' places: `stoolOff` a side, a square of the room's 37 pixels), on its row; the table's middle on the drawn marks' midpoint", () => {
@@ -590,7 +601,7 @@ describe("the intro's timeline (Timber's log, Nov 3)", () => {
 
   it("every cue on his frames and the props' has a sound of his own (characters/timber-sounds.ts), on its beat: his hup as he heaves, the thump as it stands, his gnaws and chomps, the fog's clatter, saw and slide, a knock as the stumps pop, his pat and chitter; the sweep's swoosh", () => {
     const def = introOf("timber")!;
-    const cues = introCues(beats, T);
+    const cues = cuesOf(TIMBER_INTRO);
     for (const c of cues) expect(def.cues[c.cue], c.cue).toMatch(/^timber[A-Z]/);
     expect(def.cues.storm).toBe("timberSwoosh");
     // (Every cue the art has, played: none left out.)
@@ -828,14 +839,14 @@ describe("back to the town", () => {
 });
 
 describe("the boss's attack in its intro (its God King attack)", () => {
-  const beats = introBeats(ALFIL);
+  const beats = beatsOf(ALFIL_INTRO);
   const beat = { lashAt: 560, leaveAt: 2380 };
 
   it("starts after the table's beat, swingMs before the storm has covered the screen, and keeps on until the battle shows", () => {
     const at = attackStart(beats);
     expect(at).toBe(beats.find((b) => b.step === "swing")!.at);
     expect(introLength(beats) + coverMs(true) - at).toBe(CHALLENGE_FEEL.swingMs);
-    expect(introAt(beats, ALFIL, at)).toMatchObject({ step: "swing", table: true, stools: true, back: 1 });
+    expect(nowOf(ALFIL_INTRO, at)).toMatchObject({ step: "swing", table: true, stools: true, back: 1 });
     expect(attackTime(0, beat)).toBe(0);
     expect(attackTime(1000, beat)).toBe(1000);
     // (Where it would leap off, its lashes again, over and over.)
@@ -866,9 +877,9 @@ describe("the default intro (Babur's and Puddles')", () => {
     expect(F.swingMs).toBeLessThanOrEqual(3500);
   });
 
-  it("the table pops in after the line and its pause (growing past its size and back), a dust puff round its foot; no pyramid", () => {
+  it("the table pops in after the line and its pause (growing past its size and back), a dust puff round its foot; no props of its own (no cast)", () => {
     const pop = beats.find((b) => b.step === "pop")!.at;
-    expect(at(F.faceMs)).toMatchObject({ step: "line", line: true, table: false, pyramid: null, puff: -1 });
+    expect(at(F.faceMs)).toMatchObject({ step: "line", line: true, table: false, cast: null, puff: -1 });
     expect(at(pop - 1)).toMatchObject({ step: "pause", line: false, table: false });
     expect(at(pop)).toMatchObject({ table: true, puff: 0 });
     expect(at(pop).pop).toBeCloseTo(0);
@@ -877,7 +888,7 @@ describe("the default intro (Babur's and Puddles')", () => {
     expect(at(pop + F.popMs).pop).toBeCloseTo(1);
     expect(at(pop + F.puffMs).puff).toBe(-1);
     // It swings with the table in.
-    expect(at(attackStart(beats))).toMatchObject({ step: "swing", line: false, table: true, pop: 1, pyramid: null });
+    expect(at(attackStart(beats))).toMatchObject({ step: "swing", line: false, table: true, pop: 1, cast: null });
     expect(at(introLength(beats))).toMatchObject({ step: "done", table: true });
     expect(introCues(beats, null)).toEqual([{ cue: "table", at: pop }]);
   });
@@ -923,16 +934,15 @@ describe("the default transition: a flash, then a wipe to black", () => {
  */
 describe("the challenge's pacing (Nov 2)", () => {
   const F = CHALLENGE_FEEL;
-  const BB = blocksOf();
   /** From Fight to covered, ms: the walk to the door (`door` squares), the zoom in, a beat inside, the walk up (`walk` squares, the rooms' 7), the settle, the intro, the cover. */
   const whole = (beats: IntroBeat[], custom: boolean, door = 3, walk = 7): number =>
     door * F.doorStepMs + SHOP_FEEL.doorZoomMs + F.insideMs + walk * F.walkStepMs + F.settleMs + introLength(beats) + coverMs(custom);
 
   it("about 10 to 12 s from Fight to the cover (it was about 5 to 6): Big Boy's and Alfil's 11 to 12.5, the default's (the fewest steps) 8.5 to 11", () => {
-    expect(whole(introBeats(BB), true)).toBeGreaterThanOrEqual(11_000);
-    expect(whole(introBeats(BB), true)).toBeLessThanOrEqual(12_500);
-    expect(whole(introBeats(ALFIL), true)).toBeGreaterThanOrEqual(11_000);
-    expect(whole(introBeats(ALFIL), true)).toBeLessThanOrEqual(12_500);
+    expect(whole(beatsOf(BIGBOY_INTRO), true)).toBeGreaterThanOrEqual(11_000);
+    expect(whole(beatsOf(BIGBOY_INTRO), true)).toBeLessThanOrEqual(12_500);
+    expect(whole(beatsOf(ALFIL_INTRO), true)).toBeGreaterThanOrEqual(11_000);
+    expect(whole(beatsOf(ALFIL_INTRO), true)).toBeLessThanOrEqual(12_500);
     expect(whole(introBeats(null), false)).toBeGreaterThanOrEqual(8_500);
     expect(whole(introBeats(null), false)).toBeLessThanOrEqual(11_000);
   });
@@ -950,10 +960,11 @@ describe("the challenge's pacing (Nov 2)", () => {
   });
 
   it("the hop back: as the stools come in (the default's pop, Big Boy's stools dropping, Alfil's table showing, Timber's stumps popping up), over hopMs, up and down again", () => {
-    for (const a of [null, BB, ALFIL, TIMBER] as const) {
-      const beats = introBeats(a);
-      const h = hopStart(beats, a);
-      const at = (t: number) => introAt(beats, a, t);
+    const cases = [
+      { beats: introBeats(null), h: hopStart(introBeats(null), null), at: (t: number) => introAt(introBeats(null), null, t) },
+      ...[BIGBOY_INTRO, ALFIL_INTRO, TIMBER_INTRO].map((d) => ({ beats: beatsOf(d), h: hopStartOf(d), at: (t: number) => nowOf(d, t) })),
+    ];
+    for (const { beats, h, at } of cases) {
       expect(at(h - 1)).toMatchObject({ back: 0, hop: 0 });
       expect(at(h - 1).stools).toBe(false);
       expect(at(h).stools).toBe(true);
@@ -1012,7 +1023,7 @@ describe("the challenge's pacing (Nov 2)", () => {
     for (const id of ["alfil", "tiger", "gardener", "bigboy", "timber", "dash", "hollow", "pig"] as const) {
       // (Timber's clear place his own, from his log intro; Hollow's his own, BOSS_INTROS' `clear`: his lash reaches
       // further.)
-      const m = marksOf(LAYOUTS[id], "across", id === "pig" ? SHOP_PIG_MARKS : null, id === "timber" ? marksFeel(TIMBER) : marksFeel(null, F, introOf(id)!.clear))!;
+      const m = marksOf(LAYOUTS[id], "across", id === "pig" ? SHOP_PIG_MARKS : null, id === "timber" ? marksFeel(null, F, TIMBER_INTRO.clear) : marksFeel(null, F, introOf(id)!.clear))!;
       const st = id === "timber" ? stumps() : id === "pig" ? buckets() : id === "dash" ? shoeBoxes() : stools(TABLES[id]);
       // (The stools' outer edges, in the room's columns: the boss's west of the table, yours east; up to their tops.)
       const bossEdge = m.table.c - st.west;
