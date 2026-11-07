@@ -120,7 +120,7 @@ export function RightPanel({ onProfile, onFriends, chat, onSignIn }: { onProfile
   const now = Date.now();
   return (
     <aside class="fd-right" aria-label="Live">
-      <AccountBar onProfile={onProfile} />
+      <AccountBar onProfile={onProfile} tourId="profile" />
       <FriendsPanel onOpen={onFriends} />
       <LiveLine live={live} stacked />
       <section class="fd-section">

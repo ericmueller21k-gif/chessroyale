@@ -3,20 +3,43 @@ import {
   TUTORIAL_CRATE_GOALS,
   TUTORIAL_SPOTS,
   crateBars,
+  TUTORIAL_ANYWHERE_SLIDE,
   shouldSaveSeen,
   shouldShowTutorial,
   slideSpotId,
+  tourRequested,
   tutorialSlides,
   TUTORIAL_CRATE_LABEL,
 } from "../src/tutorial.ts";
 
 describe("tutorial slides", () => {
-  it("runs the home spots in order, then the Handbook, then the crates slide last", () => {
+  it("runs PLAY, then the three modes, then the rest of the home spots, the Handbook, Play anywhere, and the crates slide last", () => {
     const slides = tutorialSlides();
     expect(slides.map((s) => (s.kind === "spot" ? s.spot.id : s.kind))).toEqual([
-      "play", "chess-town", "boss-battle", "play-with-friends", "shop", "profile", "settings", "handbook", "crates",
+      "play", "mode-crowd", "mode-1v1", "mode-squads",
+      "chess-town", "boss-battle", "play-with-friends", "shop", "profile", "settings",
+      "handbook", "anywhere", "crates",
     ]);
-    expect(TUTORIAL_SPOTS).toHaveLength(7);
+    expect(slides).toHaveLength(13);
+    expect(TUTORIAL_SPOTS).toHaveLength(10);
+  });
+
+  it("gives the mode slides their short titles and one-line bodies", () => {
+    expect(TUTORIAL_SPOTS.slice(1, 4).map((s) => [s.title, s.body])).toEqual([
+      ["50 v 50", "Two teams of 50 vote on every move."],
+      ["1 v 1", "You against one player, ranked."],
+      ["Squads", "4-player teams across several boards."],
+    ]);
+  });
+
+  it("has a Play anywhere slide with no spot, after the Handbook", () => {
+    expect(TUTORIAL_ANYWHERE_SLIDE.title).toBe("Play anywhere");
+    expect(TUTORIAL_ANYWHERE_SLIDE.body).toBe(
+      "HunChess runs right from the website, on both computer and phone. No download needed. You can also add it to your home screen.",
+    );
+    const slides = tutorialSlides();
+    expect(slides[slides.length - 2]).toEqual({ kind: "anywhere" });
+    expect(slideSpotId({ kind: "anywhere" })).toBeNull();
   });
 });
 
@@ -49,20 +72,28 @@ describe("stored dismissal", () => {
     expect(shouldShowTutorial("0")).toBe(true);
     expect(shouldShowTutorial("1")).toBe(false);
   });
+
+  it("opens from the first slide on ?tour=1, whatever the flag", () => {
+    expect(tourRequested("?tour=1")).toBe(true);
+    expect(tourRequested("?x=2&tour=1")).toBe(true);
+    expect(tourRequested("?tour=0")).toBe(false);
+    expect(tourRequested("?tour=true")).toBe(false);
+    expect(tourRequested("")).toBe(false);
+  });
 });
 
 describe("the crates slide and finishing", () => {
-  it("lights up the shop on the crates slide, its own spot on a spot slide, and nothing on the Handbook slide", () => {
+  it("lights up the mode tab on a mode slide, the shop on the crates slide, and nothing on the Handbook slide", () => {
     const slides = tutorialSlides();
     expect(slideSpotId(slides[0])).toBe("play");
-    expect(slideSpotId(slides[7])).toBeNull();
-    expect(slideSpotId(slides[8])).toBe("shop");
+    expect(slideSpotId(slides[1])).toBe("mode-crowd");
+    expect(slideSpotId(slides[10])).toBeNull();
+    expect(slideSpotId(slides[12])).toBe("shop");
   });
 
-  it("saves the flag when all nine are finished, and on Skip only if the box is ticked", () => {
-    expect(shouldSaveSeen(true, false)).toBe(true);
-    expect(shouldSaveSeen(false, true)).toBe(true);
-    expect(shouldSaveSeen(false, false)).toBe(false);
+  it("saves the flag only when the OK's box is ticked", () => {
+    expect(shouldSaveSeen(true)).toBe(true);
+    expect(shouldSaveSeen(false)).toBe(false);
   });
 
   it("labels each crate by its goal", () => {

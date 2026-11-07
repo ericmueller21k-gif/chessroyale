@@ -925,7 +925,7 @@ export function HomeScreen({
       </h2>
       <div class="fd-modes" role="radiogroup" aria-labelledby="fd-ranked-label">
         {MODES.map((m) => (
-          <button type="button" role="radio" key={m.id} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
+          <button type="button" role="radio" key={m.id} data-tour={`mode-${m.id}`} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
             {m.label}
             <br />
             <span>{m.sub}</span>
