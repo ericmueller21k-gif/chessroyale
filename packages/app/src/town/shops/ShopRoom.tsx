@@ -31,6 +31,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { onAccountChange } from "../../account.ts";
 import { renderFrame, type Character } from "../../characters/sprite.ts";
+import { mirrorFor } from "../../characters/sprite-kit.ts";
+import { artFacing } from "../../characters/sprites.ts";
 import { testSwitchesAllowed } from "../../test-switches.ts";
 import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
@@ -2024,6 +2026,8 @@ function startRoom(
   };
   /** The boss (in a challenge): its town sprite, its idle playing, at the town's size, its shadows as the town draws a boss's. */
   const bossHead = { x: 0, y: 0, on: false, px: 0 };
+  /** Which way the boss's town figure faced on the screen as last drawn (1 east, -1 west), where its art's facing is data (sprites.ts); else null. */
+  let bossLooks: 1 | -1 | null = null;
   /**
    * The boss's God King attack, at the boss's own size in the room: its lashes swung in place (no drop-in, no leap off), its feet
    * where the boss stands (clear of its stool, Nov 2), facing you. Turned to face the way it should (the art faces right, or left
@@ -2518,9 +2522,14 @@ function startRoom(
     const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift() * pt.k;
     drawShadows(pt.x, pt.y, w);
     g.save();
-    // (Its town figure faces the way its attack's art does, as its kit says: Babur's and Puddles' left; a boss without one as its
-    // intro says, Dash's left. Turned to face `facing`.)
-    if ((boss.facing < 0) !== !!(ci.attack ? ci.attack.facesLeft : ci.def.facesLeft)) {
+    // (Turned to face `facing`, by the way its art faces: its sprite's (sprite-kit.ts, sprites.ts: Smudgy's left); a boss not on the
+    // kit yet as its attack's art faces, as its kit says (Babur's and Puddles' left), or one without one as its intro says (Dash's left).)
+    const art = artFacing(b.ch.id);
+    const artLeft = art ? art === "left" : !!(ci.attack ? ci.attack.facesLeft : ci.def.facesLeft);
+    const flip = mirrorFor(artLeft ? "left" : "right", boss.facing < 0 ? "left" : "right");
+    // (Which way its drawing faces on the screen, where its art's facing is data: the test hook's.)
+    bossLooks = art ? ((art === "left") !== flip ? -1 : 1) : null;
+    if (flip) {
       g.translate(pt.x, 0);
       g.scale(-1, 1);
       g.translate(-pt.x, 0);
@@ -3610,6 +3619,8 @@ function startRoom(
       you: [pose.x + youOx(now), pose.y + youOy(now)],
       boss: wat ? [wat.c, wat.r] : [bossPose.x + bossOx(now), bossPose.y + bossOy(now)],
       facing: { you: you.facing, boss: w?.move ? (w.move.flip ? -1 : 1) : boss.facing },
+      // (Which way the boss's figure was drawn facing on the screen, by its sprite's facing data: null where that isn't known.)
+      looks: bossLooks,
       // (Timber's own: his move, the log, the fog, the shavings' ring, the stumps.)
       wood: w ? { move: w.move?.anim ?? null, log: w.log?.anim ?? null, fog: w.fog?.anim ?? null, ring: w.ring, stumps: w.stumps?.anim ?? null } : null,
       line: !!introNow?.line && bossHead.on,

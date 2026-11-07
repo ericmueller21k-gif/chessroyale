@@ -52,7 +52,7 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   pig: [39, 70, 38, 2],
   alfil: [46, 82, 32, 3],
   hopper: [37, 78, 34, 1],
-  smudgy: [50, 77, 37, 1],
+  smudgy: [37, 77, 50, 1],
   moo: [34, 93, 34, 4],
   gardener: [46, 78, 28, 2],
   tiger: [31, 89, 31, 2],

@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { bossBeat, type Beat, type BeatResult, type Stage } from "../characters/boss-beats.ts";
-import { bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
+import { artOf, bossKit, poweredKit, type BossKit } from "../characters/kits.ts";
 import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
+import { drawnFacing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
@@ -397,7 +398,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the
@@ -427,8 +428,8 @@ export function BossFace({ boss, class: cls = "", label }: { boss: Pick<BossView
   useLayoutEffect(() => {
     if (!kit || !cv.current) return;
     const p = kit.portrait;
-    const frame = kit.ch.anims[p.anim]!.frames[p.frame]!;
-    cv.current.getContext("2d")?.putImageData(frameImage(kit.ch, frame), -p.x, -p.y, p.x, p.y, p.w, p.h);
+    const art = artOf(kit);
+    cv.current.getContext("2d")?.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
   }, [kit]);
   // (A boss with no drawing shows nothing here: no emoji stands in for a boss, Eric, Nov 5; BossTag says his name.)
   if (!kit) return null;
@@ -449,7 +450,8 @@ export function bossPortraitUrl(name: string): string | null {
     cv.height = p.h;
     const g = cv.getContext("2d");
     if (g) {
-      g.putImageData(frameImage(kit.ch, kit.ch.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
+      const art = artOf(kit);
+      g.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), -p.x, -p.y, p.x, p.y, p.w, p.h);
       url = cv.toDataURL();
     }
   }
@@ -469,11 +471,13 @@ export function BossArt({ boss, class: cls = "" }: { boss: { id: string; name: s
   useLayoutEffect(() => {
     if (!kit || !cv.current) return;
     const p = kit.portrait;
-    cv.current.getContext("2d")?.putImageData(frameImage(kit.ch, kit.ch.anims[p.anim]!.frames[p.frame]!), 0, 0);
+    const art = artOf(kit);
+    cv.current.getContext("2d")?.putImageData(frameImage(art, art.anims[p.anim]!.frames[p.frame]!), 0, 0);
   }, [kit]);
   if (!kit || !fit) return <>{boss.icon}</>;
-  const style = { "--ax": fit.neck[0], "--ay": fit.neck[1], "--aw": kit.ch.w, "--ah": kit.ch.h, "--span": fit.span, "--at": fit.at };
-  return <canvas ref={cv} class={`bs-art ${cls}`} width={kit.ch.w} height={kit.ch.h} aria-hidden="true" style={style} />;
+  const art = artOf(kit);
+  const style = { "--ax": fit.neck[0], "--ay": fit.neck[1], "--aw": art.w, "--ah": art.h, "--span": fit.span, "--at": fit.at };
+  return <canvas ref={cv} class={`bs-art ${cls}`} width={art.w} height={art.h} aria-hidden="true" style={style} />;
 }
 
 /**

@@ -209,6 +209,8 @@
         "packages/app/src/characters/boss-sounds.ts",
         "packages/app/src/characters/attack-frame.ts",
         "packages/app/src/characters/sprite.ts",
+        "packages/app/src/characters/sprite-kit.ts",
+        "packages/app/src/characters/sprites.ts",
         "packages/app/src/characters/synth.ts",
         "packages/app/src/characters/paint.ts",
         "packages/app/src/characters/black-knight.ts",

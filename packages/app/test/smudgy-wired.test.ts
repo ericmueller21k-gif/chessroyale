@@ -3,7 +3,8 @@ import { BOSS_POWERS, BOSS_ROSTER, isPlayable, menuBosses, playableBosses, type 
 import { KING_ATTACKERS, POWER_FX, SMUDGY_BEATS, START_FEN, pieceAt } from "@chessroyale/chess";
 import { momentsOf, noMoveLine, powerLine } from "../src/components/BossPowers.tsx";
 import { REPAINT_LINE, SMUDGY_UI, TAKEN_LINE, UNMASK_LINE, pawnSquares, rookTakenMoment, smudgyFen, splashItems, splashRow } from "../src/components/Smudgy.tsx";
-import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES } from "../src/characters/smudgy.ts";
+import { SMUDGY, SMUDGY_ATTACK, SMUDGY_CHANCE, SMUDGY_LINES, SMUDGY_SPRITE } from "../src/characters/smudgy.ts";
+import { BOARD_FACING, facingAs } from "../src/characters/sprite-kit.ts";
 import { SMUDGY_SOUNDS, smudgySound } from "../src/characters/smudgy-sounds.ts";
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
@@ -40,7 +41,9 @@ describe("Smudgy is live", () => {
     expect(playableBosses().map((b) => b.id)).toContain("smudgy");
     expect(menuBosses({ admin: false, raid: true }).map((b) => b.id)).toContain("smudgy");
     const kit = bossKit(NAME)!;
-    expect(kit.ch).toBe(SMUDGY);
+    // (On the sprite kit since Nov 6: his art as drawn, and his board figure that art turned to face the board.)
+    expect(kit.sprite!.ch).toBe(SMUDGY);
+    expect(kit.ch).toBe(facingAs(SMUDGY_SPRITE, BOARD_FACING).ch);
     expect(CHARACTERS).toContain(SMUDGY);
     // (`strike` the beat is his periodic strike on a piece: his capture cheer; his reveal is `powerHit`'s animation.)
     expect(kit.anims).toMatchObject({ strike: "capture", power: "camouflage", powerHit: "strike", ultimateWarn: "check", ultimate: "repaint", ultimateHit: "hurt" });

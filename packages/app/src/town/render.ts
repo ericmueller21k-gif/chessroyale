@@ -10,6 +10,8 @@
  * once with renderFrame the first time they show, the pawns), so a frame allocates nothing on its hot path.
  */
 import { frameKeys, renderFrame, type Character } from "../characters/sprite.ts";
+import { mirrorFor } from "../characters/sprite-kit.ts";
+import { artFacing } from "../characters/sprites.ts";
 import { GINGERBREAD } from "../characters/gingerbread.ts";
 import { GREX } from "../characters/grex.ts";
 import { HOLLOW } from "../characters/hollow.ts";
@@ -1588,7 +1590,11 @@ export class Renderer {
         this.fade = this.edgeFade(it, (f.bossSquares * (f.bossScale[b.home.id] ?? 1) * ch.w) / ch.h / 2);
         it.faded = this.fade < 0.5;
         this.bossAlpha[it.i] = this.fade;
-        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, this.faceOf(b.walker), 1.6);
+        // (Turned to face the way it walks: mirrored when its art faces the other way. Its art's facing from the sprite kit, where it's
+        // data (sprites.ts: Smudgy's, Alfil's left); else drawn as facing our right, as before.)
+        const face = this.faceOf(b.walker);
+        const flip = mirrorFor(artFacing(ch.id) ?? "right", face < 0 ? "left" : "right") ? -1 : 1;
+        if (this.fade > 0.004) this.drawSprite(it, img, f.bossSquares * (f.bossScale[b.home.id] ?? 1), ch.foot[0] / ch.w, ch.foot[1] / ch.h, ch.w / ch.h, 0, 0, flip, 1.6);
         b.onScreen = !it.faded && it.fx > -40 && it.fx < this.W + 40 && it.fy > 0 && it.hy < this.H && bandOf(v, it.dx, it.dz) < 0.6; // (a boss deep in the haze doesn't talk)
         this.fade = 1;
         if (town.speech.boss === b) {

@@ -1,5 +1,5 @@
 import { POWER_FX, SMUDGY_BEATS, pieceAt, withPiece } from "@chessroyale/chess";
-import { bossKit } from "../characters/kits.ts";
+import { BOSS_KITS, bossKit } from "../characters/kits.ts";
 import { EFFECTS, type SquareItem } from "../characters/power-art.ts";
 import type { BossView } from "../game.ts";
 import { seenFen } from "../camo.ts";
@@ -45,10 +45,14 @@ export const TAKEN_LINE = "That was his rook!";
 
 /**
  * Where his casting figure stands (the board's top-left corner, in % of the board: CSS .pm-by-smudgy) and where the blob
- * of paint leaves his brush at the `splash` cue (frame pixels 8, 20 of his 94 x 84 frame, measured on that frame's specks).
+ * of paint leaves his brush at the `splash` cue (frame pixels 8, 20 of his 94 x 84 frame as drawn, measured on that frame's
+ * specks; his board figure faces the board, mirrored from his art, so it's 8 px in from its right edge: sprite-kit.ts).
  */
 export const SMUDGY_CASTER = { left: -5, top: -14, width: 28 } as const;
-const BRUSH: Pt = { x: SMUDGY_CASTER.left + (SMUDGY_CASTER.width * 8) / 94, y: SMUDGY_CASTER.top + (SMUDGY_CASTER.width * 20) / 94 };
+const BRUSH: Pt = (() => {
+  const ch = BOSS_KITS.Smudgy!.ch;
+  return { x: SMUDGY_CASTER.left + (SMUDGY_CASTER.width * (ch.mirror ? ch.w - 8 : 8)) / ch.w, y: SMUDGY_CASTER.top + (SMUDGY_CASTER.width * 20) / ch.w };
+})();
 
 /** The squares holding a side's pawns in a position, in file order. */
 export function pawnSquares(fen: string, side: "w" | "b"): string[] {
