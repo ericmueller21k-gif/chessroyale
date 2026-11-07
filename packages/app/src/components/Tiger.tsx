@@ -6,6 +6,7 @@ import { pickLine } from "../characters/boss-beats.ts";
 import { bossKit, type BossKit } from "../characters/kits.ts";
 import { EFFECTS } from "../characters/power-art.ts";
 import { HOP_AIR_AT, HOP_AIR_MS } from "../characters/tiger-figure.ts";
+import { PUMP_OVER, PUMP_OVER_MAX } from "../characters/side-size.ts";
 import { BALLOON_SHAPES, PUMP_FOOT, PUMP_H, PUMP_PALETTE, PUMP_W, RELEASE_KNOT, TIGER_PUMP, balloonDrawing, balloonLooks, balloonPartOf } from "../characters/tiger-bar.ts";
 import { LAND_Y } from "../characters/effects/tiger.ts";
 import type { Character } from "../characters/sprite.ts";
@@ -205,20 +206,27 @@ export type Box = { left: number; top: number; right: number; bottom: number };
 const FIG_LEFT = 4;
 /** The pump's drawn right edge in its frame (its barrel's base: columns 1 to 32 of 34 are ever drawn, the pop's swell at 1). */
 const PUMP_RIGHT = 33;
-/** Between the pump and him, and the least room from the window's edge (px). */
-const PUMP_GAP = 6;
+/** (The pump in front of him, over his edge: characters/side-size.ts.) The least room from the window's edge (px). */
+export { PUMP_OVER, PUMP_OVER_MAX };
 const PUMP_EDGE = 4;
 const overlaps = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
 /**
- * The pump's frame beside his figure by the board's bottom left (a computer): standing on his baseline, its drawn right edge PUMP_GAP
- * px left of his drawn left edge, at scale `s` (screen px). `fig` is his sprite's box at `figScale` screen px per art px. Null where
- * it would leave the window or overlap any of `keepClear` (the leaderboard, the eval bar, the board, the status): the pump then goes
- * in a taller bar.
+ * The pump's frame in front of his figure by the board's bottom left (a computer): standing on his baseline, its drawn right edge
+ * PUMP_OVER px over his drawn left edge, or further over him where the window's edge or a box left of him (the side menu, a
+ * leaderboard) is in the way, at scale `s` (screen px). `fig` is his sprite's box at `figScale` screen px per art px. Null where it
+ * would cover him by more than PUMP_OVER_MAX of its width, leave the window or overlap any of `keepClear` (the leaderboard, the eval
+ * bar, the board, the status): the pump then goes in a taller bar.
  */
 export function sidePump(fig: Box, figScale: number, baseline: number, s: number, win: { w: number; h: number }, keepClear: readonly Box[]): Box | null {
-  const left = fig.left + FIG_LEFT * figScale - PUMP_GAP - PUMP_RIGHT * s;
-  const box = { left, top: baseline - PUMP_H * s, right: left + PUMP_W * s, bottom: baseline };
+  const figLeft = fig.left + FIG_LEFT * figScale;
+  const top = baseline - PUMP_H * s;
+  // (Slid toward him past anything left of him in its rows, and the window's edge.)
+  const blocked = keepClear.filter((k) => k.right > k.left && k.bottom > k.top && k.left < figLeft && k.top < baseline && top < k.bottom);
+  const least = Math.max(PUMP_EDGE, ...blocked.map((k) => k.right));
+  const left = Math.max(figLeft + PUMP_OVER - PUMP_RIGHT * s, least);
+  const box = { left, top, right: left + PUMP_W * s, bottom: baseline };
+  if (left + PUMP_RIGHT * s - figLeft > PUMP_OVER + PUMP_OVER_MAX * (PUMP_RIGHT - 1) * s) return null;
   if (box.left < PUMP_EDGE || box.top < PUMP_EDGE || box.right > win.w - PUMP_EDGE || box.bottom > win.h) return null;
   return keepClear.some((k) => k.right > k.left && k.bottom > k.top && overlaps(k, box)) ? null : box;
 }
@@ -328,18 +336,25 @@ export function TigerPump({ boss, moments }: { boss: BossView; moments: () => Mo
       lastPlace = p;
       setPlace((old) => (samePlace(old, p) ? old : p));
     };
-    run();
     let frame = 0;
-    const ro = new ResizeObserver(() => {
+    const later = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(run);
-    });
-    for (const t of [el.closest(".screen")?.querySelector(".board-wrap"), document.querySelector(".tower-side")]) if (t) ro.observe(t);
-    addEventListener("resize", run);
+    };
+    // (Now, and again a frame later: his own size and place by the board (BossSide's, side-size.ts) are set as the window changes too.)
+    const now = () => {
+      run();
+      later();
+    };
+    now();
+    const ro = new ResizeObserver(later);
+    const screen = el.closest(".screen");
+    for (const t of [screen?.querySelector(".board-wrap"), screen?.querySelector(".boss-side .boss-char"), document.querySelector(".tower-side")]) if (t) ro.observe(t);
+    addEventListener("resize", now);
     return () => {
       ro.disconnect();
       cancelAnimationFrame(frame);
-      removeEventListener("resize", run);
+      removeEventListener("resize", now);
     };
   }, []);
   const sized = place.at === "side" || place.at === "tall" ? { "--tg-s": place.scale.toFixed(4) } : undefined;

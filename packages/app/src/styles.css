@@ -22269,8 +22269,10 @@ button.sq-tiny {
     width: 0;
     height: 0;
   }
+  /* (In front of him, over his edge: Nov 7.) */
   .tg-side-pump {
     position: absolute;
+    z-index: 1;
     bottom: 0;
     width: calc(34px * var(--tg-s));
     height: calc(36px * var(--tg-s));

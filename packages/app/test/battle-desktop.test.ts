@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { KING_REACH, SIDE_FEEL, SIDE_REACH, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
+import { KING_REACH, SIDE_FEEL, SIDE_REACH, SIDE_TALLEST, SIDE_WIDEST, sideSizes, type SideRoom } from "../src/characters/side-size.ts";
 import { GOD_KING } from "../src/characters/god-king.ts";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { BOSS_INTROS, CHALLENGE_FEEL, bubbleSize, drawnTop } from "../src/town/shops/challenge.ts";
@@ -64,15 +64,22 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
       k: 1, right: { mid: right + 86, inner: right + 86 - 57, outer: right + 86 + 188, over: true },
     };
   };
+  // What each window gives today (Nov 7, 15% under Nov 4's: Big Boy was 4 at 1440 and 1920, the pawn and the God King 1.45 and 1.9):
+  // the one size `s` (1440: the widest boss's room, 3.25), and your pawn's and the God King's `k`.
+  const expected: Record<string, { s: number; k: number }> = {
+    "1280x800": { s: 3, k: 1.2 },
+    "1440x900": { s: 3.25, k: 1.25 },
+    "1920x1080": { s: 3.4, k: 1.6 },
+    "2000x1250": { s: 3.4, k: 1.4 },
+  };
   for (const [size, r] of Object.entries(rooms))
-    it(`${size}: toward twice as big, each in its room, over the board's edge by at most ${SIDE_FEEL.over} of its side, whole in the window`, () => {
+    it(`${size}: one size for every boss (the widest and tallest fit), each in its room, over the board's edge by at most ${SIDE_FEEL.over} of its side, whole in the window`, () => {
       const over = r.board * SIDE_FEEL.over;
-      for (const [id, reach] of Object.entries(bosses)) {
-        const room = roomOf(r, reach);
-        const p = sideSizes(room, SIDE_FEEL, id);
-        expect(p.s, id).toBeGreaterThanOrEqual(3);
+      const all = Object.entries(SIDE_REACH).map(([id, reach]) => [id, reach, sideSizes(roomOf(r, reach), SIDE_FEEL, id)] as const);
+      for (const [id, reach, p] of all) {
+        // The same size and the same pawn and God King in every fight (Eric, Nov 7), Babur's too.
+        expect({ s: p.s, k: p.k }, id).toEqual(expected[size]);
         expect(p.s).toBeLessThanOrEqual(SIDE_FEEL.max);
-        expect(p.k, "the God King and your pawn").toBeGreaterThanOrEqual(1.4);
         // His drawing: in his room, under the window's top, and over the board's edge by at most `over`.
         const lc = reach[0]!, rc = reach[2]!;
         expect(p.bossMid! - lc * p.s, `${id}: in his room`).toBeGreaterThanOrEqual(r.limit + SIDE_FEEL.margin - 0.2);
@@ -82,14 +89,28 @@ describe("the figures beside the board on a computer (sideSizes)", () => {
         expect(p.firstMid! - 57 * p.k, "your pawn").toBeGreaterThanOrEqual(r.left + r.board - over - 0.2);
         expect(p.firstMid! + 188 * p.k, "the God King").toBeLessThanOrEqual(r.win - SIDE_FEEL.margin + 0.2);
       }
-      // Babur keeps his size and place (his pump's room beside him), and a party's battle too (its figures stacked by the corner).
-      expect(sideSizes(roomOf(r, SIDE_REACH.tiger!), SIDE_FEEL, "tiger")).toEqual({ s: 2, k: 1, bossMid: null, firstMid: null });
+      // Babur leans toward the board as far as `over` lets him (his pump in front of him, left of him).
+      const tiger = all.find(([id]) => id === "tiger")![2];
+      expect(tiger.bossMid! + SIDE_REACH.tiger![2] * tiger.s).toBeCloseTo(r.left + over, 0);
+      // A party's battle keeps them as they were (its figures stacked by the corner).
       expect(sideSizes({ ...roomOf(r, bosses.hollow), fixed: true }, SIDE_FEEL, "hollow")).toEqual({ s: 2, k: 1, bossMid: null, firstMid: null });
-      // A raid's boss keeps his size and place (over its scoreboard's edge); the God King still grows.
+      // A raid's boss keeps his size and place (over its scoreboard's edge); the God King and your pawn are the one size's still.
       const raid = sideSizes({ ...roomOf(r, bosses.hollow), bossFixed: true }, SIDE_FEEL, "hollow");
-      expect([raid.s, raid.bossMid]).toEqual([2, null]);
-      expect(raid.k).toBeGreaterThanOrEqual(1.4);
+      expect([raid.s, raid.bossMid, raid.k]).toEqual([2, null, expected[size]!.k]);
     });
+  it("the one size: the board's side over 200, at most 3.4 (15% under 170 and 4), no more than the widest and tallest boss fit; the pawn and the God King half of it, at most 1.7, filling 85% of their room", () => {
+    expect([SIDE_FEEL.boardPerPx, SIDE_FEEL.max, SIDE_FEEL.kingMax, SIDE_FEEL.kingFill]).toEqual([200, 3.4, 1.7, 0.85]);
+    expect([SIDE_WIDEST, SIDE_TALLEST]).toEqual([87, 135]);
+    // Endless room: the board's side alone (in steps of 0.05), up to the cap; never under 2.
+    const r = rooms["1920x1080"]!;
+    const at = (board: number) => sideSizes({ ...roomOf({ ...r, board, bottom: 4000 }, bosses.hollow), leftLimit: -4000, rightLimit: 9000 }, SIDE_FEEL, "hollow");
+    expect([300, 500, 600, 640, 680, 1000].map((b) => at(b).s)).toEqual([2, 2.5, 3, 3.2, 3.4, 3.4]);
+    expect([300, 500, 600, 680, 1000].map((b) => at(b).k)).toEqual([1, 1.25, 1.5, 1.7, 1.7]);
+    // A narrow room: what the widest boss fits, whoever stands there (Big Boy, 59 wide, as Smudgy, 87).
+    const narrow = (id: string) => sideSizes({ ...roomOf(r, SIDE_REACH[id]!), leftLimit: r.left - 250 }, SIDE_FEEL, id).s;
+    expect(narrow("bigboy")).toBe(narrow("smudgy"));
+    expect(narrow("bigboy")).toBe(Math.floor(((250 + r.board * SIDE_FEEL.over - SIDE_FEEL.margin) / SIDE_WIDEST) * 20) / 20);
+  });
   it("where there's room the figures stand a small gap off the board, not over it", () => {
     const r = rooms["1920x1080"]!;
     const p = sideSizes({ ...roomOf(r, bosses.hollow), leftLimit: 0, rightLimit: 4000 }, SIDE_FEEL, "hollow");
