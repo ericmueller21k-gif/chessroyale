@@ -1,5 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
+import { relaySeat } from "@chessroyale/chess/squads";
 import { BOARD_SEL, named, test } from "./helpers.ts";
 
 /**
@@ -104,6 +105,50 @@ const rowsLaidOut = (page: Page) =>
 const queue = (page: Page) =>
   page.locator(".sq-to-row").evaluateAll((rows) => rows.map((r) => ({ name: r.querySelector(".sq-to-name")?.textContent ?? "", lit: r.classList.contains("lit"), where: r.querySelector(".sq-to-where")?.textContent ?? null })));
 
+/**
+ * The words each row's middle should say on the board on screen, worked out here from the rules' schedule (relaySeat):
+ * the next 8 moves there, by ply, each to its player; the first move a player has there: "now" (or "Your turn · play
+ * now") while it's asked, "next", then "in N".
+ */
+async function scheduleWhen(page: Page): Promise<Record<string, string>> {
+  const m = await page.evaluate(() => {
+    const s = (window as any).squads;
+    const m = [...s.matches.values()].find((x: any) => x.sides.some((sd: any) => sd.seats.includes(s.myId)));
+    const board = Number(document.querySelector(".sq-to-list")!.getAttribute("aria-label")!.match(/(\d+)$/)![1]) - 1;
+    const lit = [...document.querySelectorAll<HTMLElement>(".sq-to-row.lit")].map((r) => r.dataset.id);
+    return { me: s.myId, n: m.boards.length, board, white: m.boards[board].white, moves: m.boards[board].moves.length, seats: m.sides.map((sd: any) => sd.seats), lit };
+  });
+  const out: Record<string, string> = {};
+  for (let k = 0; Object.keys(out).length < 8 && k < 32; k++) {
+    const ply = m.moves + k;
+    const side = (ply % 2 === 0 ? m.white : 1 - m.white) as 0 | 1;
+    const seats: string[] = m.seats[side];
+    const id = seats[relaySeat(m.n, m.board, ply >> 1, seats.length, side)]!;
+    if (id in out) continue;
+    out[id] = k === 0 && m.lit.includes(id) ? (id === m.me ? "Your turn · play now" : "now") : k === 0 ? "next" : `in ${k + 1}`;
+  }
+  return out;
+}
+
+/** What the rows' middles say, by player. */
+const shownWhen = (page: Page) =>
+  page.locator(".sq-to-row").evaluateAll((rows) => Object.fromEntries(rows.map((r) => [(r as HTMLElement).dataset.id, r.querySelector(".sq-to-where")?.textContent ?? ""])));
+
+/** The move column's width, and the widest of the longest SANs set in its own font. */
+const moveRoom = (page: Page) =>
+  page.evaluate(() => {
+    const cell = document.querySelector<HTMLElement>(".sq-to-row .sq-to-move")!;
+    const probe = document.createElement("span");
+    probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+    // (Each part of the font: with tabular numbers the "font" shorthand reads empty.)
+    const cs = getComputedStyle(cell);
+    for (const k of ["fontFamily", "fontSize", "fontWeight", "fontStyle", "fontVariantNumeric", "letterSpacing"] as const) probe.style[k] = cs[k];
+    document.body.appendChild(probe);
+    const widths = ["exd8=Q+", "Nbxd7#", "O-O-O+"].map((t) => ((probe.textContent = t), probe.getBoundingClientRect().width));
+    probe.remove();
+    return { column: cell.getBoundingClientRect().width, longest: Math.max(...widths) };
+  });
+
 test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished ones checked in the winner's color", async ({ page }) => {
   test.setTimeout(240_000);
   // Every board from a mate in one for White (Qxf7#): the first half decides every board.
@@ -141,22 +186,20 @@ test("the turn order: one queue for the board on screen, one size on every board
   // Real-length names (up to 20 letters): one row height, the move column in one place, nothing wrapped.
   await page.waitForTimeout(300);
   expect(await rowsLaidOut(page)).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
-  const phone = test.info().project.name === "phone";
-  // A phone: 4 rows, a tap for all 8 (over the board: nothing below moves), and back; a computer: all 8.
-  expect(q0).toHaveLength(phone ? 4 : 8);
+  // All 8, phone and computer (Eric, Nov 7: no fold, no button for the rest).
+  expect(q0).toHaveLength(8);
+  expect(new Set(q0.map((r) => r.name)).size).toBe(8);
+  await expect(page.locator(".sq-to-more")).toHaveCount(0);
+  // Each middle says when that player moves on this board, as the rules' schedule has it ("next", "in 2" … "in 8").
+  expect(await shownWhen(page)).toEqual(await scheduleWhen(page));
+  // The move column fits the longest SANs ("exd8=Q+", "Nbxd7#", "O-O-O+"); before a player's first move: "—".
+  const room = await moveRoom(page);
+  expect(room.column).toBeGreaterThanOrEqual(room.longest);
+  expect(await page.locator(".sq-to-move", { hasText: "—" }).count()).toBeGreaterThan(0);
+  // Every bot's row has its 🤖 badge after the name (you're the one person here).
+  await expect(page.locator(".sq-to-row .sq-to-badge.bot")).toHaveCount(7);
   const box = page.locator(".sq-to");
   const size = (await box.boundingBox())!;
-  if (phone) {
-    const nav = (await page.locator(".history-nav").boundingBox())!;
-    await page.locator(".sq-to-more").click();
-    expect(await queue(page)).toHaveLength(8);
-    expect(new Set((await queue(page)).map((r) => r.name)).size).toBe(8);
-    const open = (await box.boundingBox())!;
-    expect(open.height).toBeCloseTo(size.height, 0);
-    expect((await page.locator(".history-nav").boundingBox())!.y).toBeCloseTo(nav.y, 0);
-    await page.locator(".sq-to-more").click();
-    expect(await queue(page)).toHaveLength(4);
-  }
   await play(page, quiet(s.fen!));
   // Moved: you're no longer lit; each board of your match in turn, the box the same size, you on it somewhere.
   await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(0);
@@ -166,9 +209,9 @@ test("the turn order: one queue for the board on screen, one size on every board
     const b = (await box.boundingBox())!;
     expect(b.height).toBeCloseTo(size.height, 0);
     expect(b.width).toBeCloseTo(size.width, 0);
-    // Your row: nothing but "You" and your move (you've moved: no "Your turn · play now" anywhere; Eric).
+    // Your row: you've moved, so no "Your turn · play now" anywhere (Eric); when you move here next, as every row's.
     expect(Number(await page.locator(".sq-to-row.you").getAttribute("data-place"))).toBeGreaterThanOrEqual(0);
-    expect(await page.locator(".sq-to-row.you .sq-to-where").textContent()).toBe("");
+    expect(await page.locator(".sq-to-row.you .sq-to-where").textContent()).toMatch(/^(next|in [2-8])$/);
     expect(await rowsLaidOut(page)).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }
   // A few halves on, a row with a last move: its tap shows that board at the position after it.
@@ -187,8 +230,7 @@ test("the turn order is never rebuilt (Eric): tapping each tiny board in turn ke
   const s = await nextDuty(page);
   await realNames(page);
   await play(page, quiet(s.fen!));
-  // (A phone: all 8 open, so every player's row is there on every board; it stays open across boards.)
-  if (test.info().project.name === "phone") await page.locator(".sq-to-more").click();
+  // (All 8 on a phone too: every player's row is there on every board.)
   await expect(page.locator(".sq-to-row")).toHaveCount(8);
   const box = page.locator(".sq-to");
   const before = (await box.boundingBox())!;
@@ -249,7 +291,7 @@ test("the coach marks: three, one at a time, a tap goes on; unticked they come b
   await expect(marks).toHaveCount(0);
 });
 
-test("nothing below the screen's bottom edge at the phone sizes with their browser bars", async ({ page }) => {
+test("nothing below the screen's bottom edge at the phone sizes with their browser bars; the turn order's 8 rows fill the rest and scroll inside their box, never the page", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "a phone's sizes");
   test.setTimeout(240_000);
   await relayLobby(page);
@@ -267,7 +309,7 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
     const out = await page.evaluate(() => {
       const h = innerHeight;
       const past: string[] = [];
-      if (document.scrollingElement!.scrollHeight > h + 1) past.push(`scrolls ${document.scrollingElement!.scrollHeight - h}`);
+      if (document.scrollingElement!.scrollHeight !== h) past.push(`page ${document.scrollingElement!.scrollHeight} tall`);
       for (const sel of [".board-area", ".history-nav", ".sq-to"]) {
         const r = document.querySelector(sel)!.getBoundingClientRect();
         if (r.bottom > h + 0.5) past.push(`${sel} ${Math.round(r.bottom - h)} px`);
@@ -275,6 +317,30 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
       return past;
     });
     expect(out, `${w}×${h}`).toEqual([]);
+    // All 8 rows; the box from under the arrows to the screen's foot; the rows it shows whole (6 at the iPhones with
+    // their bars; Eric: "most phones we can squeeze in 6 or 7"); past that it scrolls inside, the page staying put.
+    const list = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>(".sq-to-list")!;
+      const r = el.getBoundingClientRect();
+      const nav = document.querySelector(".history-nav")!.getBoundingClientRect();
+      const whole = [...el.querySelectorAll(".sq-to-row")].filter((x) => x.getBoundingClientRect().bottom <= r.bottom + 0.5).length;
+      const over = el.scrollHeight > el.clientHeight + 1;
+      el.scrollTop = 1000;
+      const scrolled = el.scrollTop;
+      el.scrollTop = 0;
+      return { rows: el.querySelectorAll(".sq-to-row").length, top: r.top - nav.bottom, bottom: innerHeight - r.bottom, whole, over, scrolled, pageY: scrollY, overflow: getComputedStyle(el).overflowY };
+    });
+    expect(list.rows, `${w}×${h}`).toBe(8);
+    expect(list.top, `${w}×${h}`).toBeGreaterThanOrEqual(0);
+    expect(list.top, `${w}×${h}`).toBeLessThan(12);
+    expect(list.bottom, `${w}×${h}`).toBeGreaterThanOrEqual(0);
+    expect(list.bottom, `${w}×${h}`).toBeLessThan(24);
+    expect(list.whole, `${w}×${h}`).toBeGreaterThanOrEqual(h >= 600 ? 6 : 4);
+    expect(list.overflow).toBe("auto");
+    expect(list.pageY).toBe(0);
+    if (list.whole < 8) expect([list.over, list.scrolled > 0], `${w}×${h}: scrolls inside`).toEqual([true, true]);
+    test.info().annotations.push({ type: "rows", description: `${w}×${h}: ${list.whole} of 8 whole` });
+    expect((await moveRoom(page)).column, `${w}×${h}`).toBeGreaterThanOrEqual((await moveRoom(page)).longest);
     // The turn order's long names at every width: cut, never wrapped, the move column in place.
     expect(await rowsLaidOut(page), `${w}×${h}`).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }

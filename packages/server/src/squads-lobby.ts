@@ -104,6 +104,7 @@ import {
   type NetTeamClock,
   type NetWallet,
   type Party,
+  type PlayerBadge,
   type Side,
   type Squad,
   type SquadPlayer,
@@ -176,6 +177,8 @@ export interface SquadsHuman {
   /** How they left and what went on their record (told again if they come back with their seat's token). */
   leftAs?: SquadsLeft;
   look?: ItemLook;
+  /** A signed-in person's badge as they connected (the turn order shows it). */
+  badge?: PlayerBadge;
   /** May use the test controls (an admin, or SQUADS_TEST where it's on). */
   test?: true;
 }
@@ -637,7 +640,7 @@ export class SquadsCore {
 
   connect(
     token: string | undefined,
-    opts: { name?: string; device?: "phone" | "computer"; party?: string; look?: unknown; userId?: string; test?: boolean; v?: number },
+    opts: { name?: string; device?: "phone" | "computer"; party?: string; look?: unknown; userId?: string; test?: boolean; v?: number; badge?: PlayerBadge },
   ): { ok: true; playerId: string } | { ok: false; message: string; ended?: true; left?: SquadsLeft } {
     const now = this.io.now();
     this.r.activeAt = now;
@@ -648,6 +651,7 @@ export class SquadsCore {
       existing.connected = true;
       delete existing.goneAt;
       if (opts.look !== undefined) existing.look = cleanLook(opts.look);
+      if (opts.badge) existing.badge = opts.badge;
       if (opts.userId) this.r.accounts[existing.id] = opts.userId;
       if (opts.test) existing.test = true;
       this.resendTo(existing.id);
@@ -689,6 +693,7 @@ export class SquadsCore {
       partyId,
       joinedAt: now,
       ...(opts.look !== undefined ? { look: cleanLook(opts.look) } : {}),
+      ...(opts.badge ? { badge: opts.badge } : {}),
       ...(opts.test ? { test: true as const } : {}),
     });
     if (opts.userId) this.r.accounts[id] = opts.userId;
@@ -2303,6 +2308,7 @@ export class SquadsCore {
         misses: p?.misses ?? 0,
         ...(uid(h.id) ? { uid: uid(h.id) } : {}),
         ...(withLook ? { look: h.look } : {}),
+        ...(h.badge ? { badge: h.badge } : {}),
       };
     });
     const bots = this.r.bots.map((b) => ({ id: b.id, name: b.name, isBot: true, connected: true, partyId: null, botPlays: true, misses: this.player(b.id)?.misses ?? 0 }));

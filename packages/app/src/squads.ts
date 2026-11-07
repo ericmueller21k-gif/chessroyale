@@ -320,6 +320,10 @@ export class SquadsClient {
   isBot(id: string): boolean {
     return !!this.lobby?.players.find((p) => p.id === id)?.isBot;
   }
+  /** A signed-in person's badge (their 1 v 1 tier's emblem and their rating); null for a bot or a guest. */
+  badgeOf(id: string): { emblem: string | null; rating: number | null } | null {
+    return this.lobby?.players.find((p) => p.id === id)?.badge ?? null;
+  }
 
   connect() {
     if (this.closed) return;

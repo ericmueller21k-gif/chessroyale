@@ -511,13 +511,16 @@ door's look; every class is `sq-`.
     - **The top line**: the test-only "Next round" a tiny icon hard left (admins and test lobbies), and on a phone's
       Relay Cheat lines a tiny icon beside it (grayed when there's nothing to choose; its lines the arrows on the board).
     - **Under the board** only the move arrows (with the clocks' line) and **the turn order** (`TurnOrderBox`,
-      `boardQueue`, `queueLine`, `foldedRows` in squads-view.ts; Eric's correction): one queue for the board on screen,
+      `boardQueue`, `queueLine`, `whenText` in squads-view.ts; Eric's correction): one queue for the board on screen,
       all 8 players in the order they'll move on it, the next there on top (lit while it's their move now), each with
-      their squad's color and the move they last played (`lastMovesBy`, from the schedule); a tap on a row shows that
-      board at the position after it. Whole names, cut with an ellipsis, the move column in one place. Your row: a bold
-      "You" and your move, and "Your turn · play now" while you're on top and your move there is on (nothing else,
-      Eric). A phone shows 4 rows (you further down: the top 3 and yours), the strip at its right opens all 8 over the
-      board (upward, nothing below moves); a computer all 8, in the column beside the board. Never rebuilt (`Island`):
+      their squad's color, a badge after the name (a person's 1 v 1 tier emblem and rating, read as they connect,
+      `badgeOf` in squads-do.ts; a bot's 🤖), when they move there ("now", "next", "in 2" … "in 8": `TurnRow.ahead`, from
+      the schedule) and the move they last played (`lastMovesBy`; "—" before their first; a column wide enough for
+      "exd8=Q+"); a tap on a row shows that board at the position after it. Whole names, cut with an ellipsis. Your row:
+      a bold "You", "Your turn · play now" while your move there is on, else "next" / "in N". All 8 everywhere (Eric,
+      Nov 7): a phone's box fills the screen from under the arrows to its foot (the screen exactly `--app-h` tall, the
+      board 26 px smaller for 6 whole rows at 390 × 664) and scrolls inside itself (`overscroll-behavior: contain`),
+      never the page; a computer all 8, in the column beside the board. Never rebuilt (`Island`):
       its element is made once and moved into each board's view before paint, its rows kept by player and gliding to
       their new places (`useGlide`, FLIP, about 220 ms). No "Your move" box, no "Back to my board", no
       jump switch, no rules line there; whose turn it is shows in the queue. Pairs and the final keep their panel.
