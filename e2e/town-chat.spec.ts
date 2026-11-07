@@ -287,8 +287,9 @@ test("the chat box (always on, the default): one see-through box flush in the ma
   const field = await page.locator(".tc-form input").evaluate((el) => { const c = getComputedStyle(el); return { w: [c.borderTopWidth, c.borderLeftWidth, c.borderRightWidth, c.borderBottomWidth], radius: c.borderTopLeftRadius }; });
   expect(field.w, "no box round the typing line").toEqual(["0px", "0px", "0px", "0px"]);
   await expect(page.locator(".tc-rule"), "no bar under the field").toHaveCount(0);
-  await expect(page.locator(".tc-form > *"), "nothing in the typing line's strip but the input (and its count)").toHaveCount(1);
-  await expect(page.locator(".town-chat button"), "no send button").toHaveCount(0);
+  // (A guest's typing line has the one tap that is the app's sign-in, "Make a free account to chat."; that's no send button.)
+  await expect(page.locator(".tc-form > :not(.tc-signup)"), "nothing in the typing line's strip but the input (and its count)").toHaveCount(1);
+  await expect(page.locator(".town-chat button:not(.tc-signup)"), "no send button").toHaveCount(0);
   await expect(page.locator(".town-chat [type=submit], .town-chat svg"), "no send icon").toHaveCount(0);
 
   // A long message wraps to two lines at most, then "…"; the box keeps its place and size whatever it holds.
@@ -486,6 +487,8 @@ test("a tap on the box anywhere but a player's name opens typing: the blur behin
   expect(await rectOf(page, ".town-chat"), "the box keeps its place and size").toEqual(b0);
   expect(await rects(), "the typing line appearing moved no line").toEqual(before);
   // The background is one rounded rectangle behind the whole box, the stream and the typing line together, with a slight blur and a faint light tint by day.
+  // (The tint eases in over 160 ms: wait for it, then read it.)
+  await expect(page.locator(".tc-back")).toHaveCSS("background-color", /^rgba\(255, 255, 255, 0\.(1\d*|2\d*|3\d*)\)$/);
   const back = await page.locator(".tc-back").evaluate((el) => { const c = getComputedStyle(el); const r = el.getBoundingClientRect(); return { bg: c.backgroundColor, blur: c.backdropFilter || (c as any).webkitBackdropFilter, radius: parseFloat(c.borderTopLeftRadius), rect: [r.left, r.top, r.width, r.height] }; });
   expect(back.blur, "a slight blur").toMatch(/^blur\((\d|\d\.\d+)px\)$/);
   expect(parseFloat(back.blur.slice(5)), "very slight").toBeLessThanOrEqual(4);
@@ -887,7 +890,8 @@ test("\"Chat background\": off by default; on, the faint tint stays behind the b
 test("always on never fades: after the wait, after minutes, with the lines still taking the touches; a line 4 minutes old is still there, and one is gone for good at 5 minutes", async ({ page }) => {
   // (Eric, Oct 28: "both chat is green, yet it disappears still". The page's clock, so the minutes pass at once.)
   await page.clock.install({ time: new Date(2026, 9, 28, 12, 0, 0) });
-  await page.goto(`/town?sky=day&townroom=${room}`);
+  // (The away rule off: these jumps are 5 minutes of no input, which would send the player home; town-afk.spec.ts has that rule.)
+  await page.goto(`/town?sky=day&townroom=${room}&townafk=off`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
@@ -1385,7 +1389,7 @@ test("the server decides: a refused message says why in a gray line only you see
   await expect(lineOf(page, `all good ${run}`)).toHaveCount(1);
   await expect(field).toBeEnabled();
   await expect(field).not.toHaveAttribute("placeholder", /./);
-  const again = await page.request.post("/api/town/chat", { data: { text: "and again" } });
+  const again = await page.request.post("/api/town/chat", { data: { text: "and again", townroom: room } });
   expect(again.status()).toBe(429);
   expect(((await again.json()) as { message: string }).message).toBe("One message every 15 s.");
 });
