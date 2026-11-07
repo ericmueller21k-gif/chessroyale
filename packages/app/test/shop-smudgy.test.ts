@@ -160,7 +160,8 @@ describe("the life class", () => {
 describe("Smudgy's Boss Crate and the Brush Ride", () => {
   it("in BOSS_CRATES with his ride, the Brush Ride, first; sold to everyone (Smudgy is live); its words as the others'", () => {
     const crate = bossCrateOf("smudgy")!;
-    expect(BOSS_CRATES.at(-1)).toBe(crate);
+    // (Listed among the boss crates; a newer boss's crate, Boingo's, now comes after it.)
+    expect(BOSS_CRATES).toContain(crate);
     expect([crate.id, crate.name, crate.ride]).toEqual(["boss-smudgy", "Smudgy's Boss Crate", "smudgy-brush"]);
     expect(crate.items).toContain("smudgy-brush");
     expect(adminFirst(bossDef("smudgy")!)).toBe(false);

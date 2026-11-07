@@ -22,7 +22,7 @@ export interface ShopDef {
   /** Its crate's name, word for word ("Babur's Boss Crate"). */
   crate: string;
   /** The Shopkeeper: the boss's kid (its sheet's name in town/sidekicks/), drawn at `at` (a square, fractions allowed). */
-  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper";
+  kid: "babur" | "puddles" | "alfil" | "bigboy" | "timber" | "blitz" | "hollowdog" | "rooster" | "dealer" | "elf" | "folioturtle" | "smudgykeeper" | "funkeeper";
   at: readonly [number, number];
   /**
    * Drawn at the art's own size, this many of the room's pixels (37 a square) from its feet to the top of its idle, rather than the
@@ -46,10 +46,10 @@ export interface ShopDef {
    * Above the walls: a tent's canvas, a greenhouse's glass, a pyramid's sandstone, a nursery's sky-blue ceiling with clouds and
    * stars, a lodge's dark planks between heavy beams, a store's white ceiling tiles and light panels, a cave's dark stone and
    * stalactites, a barn's dark rafters and cross beams, a warehouse's dark steel trusses, an igloo's dome of ice blocks arching overhead, or a
-   * sanctuary's pale folded paper, its pleats running up to a fold overhead, or a studio's dark beams over a skylight (drawn by
-   * the game, not the art: as the mockup did).
+   * sanctuary's pale folded paper, its pleats running up to a fold overhead, a studio's dark beams over a skylight, or an arcade's
+   * night-purple ceiling hung with strings of bulbs (drawn by the game, not the art: as the mockup did).
    */
-  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio";
+  roof: "tent" | "glass" | "stone" | "nursery" | "lodge" | "store" | "cave" | "barn" | "warehouse" | "igloo" | "paper" | "studio" | "arcade";
   /**
    * The chat log's text over the room (Eric, Nov 2: "white, or black, depending on darkness of background in the shop"): "night" for
    * a dark room (white words on a dark tint: Babur's tent), "day" for a light one (dark words on a light tint: Puddles' greenhouse),
@@ -99,6 +99,10 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // Smudgy's studio (Nov 6): its gallery owner (an older chameleon in a smock and glasses) behind the middle of the low counter, as
   // Folio's turtle. It has no name: "Shopkeeper". A dark room of deep paint: the night tone. His Brush Ride first in his crate (his ride).
   smudgy: { home: "smudgy", boss: "Smudgy", crate: "Smudgy's Boss Crate", kid: "smudgykeeper", at: [9.5, 2.4], keeper: [{ c: 9, r: 2 }, { c: 10, r: 2 }], prizes: ["smudgy-brush"], roof: "studio", chatTone: "night" },
+  // Boingo's Funhouse (Nov 6): the clown attendant behind the middle of the glass prize counter (columns 9-12 of row 3, its
+  // squares 10 and 11 of row 2), the pogo on its pedestal beside him. He has no name: "Shopkeeper". A dark arcade full of lights:
+  // the night tone. His pogo first in his crate (his ride). The room is 24 x 24 (boingo-art.ts SHOP_BOINGO_N).
+  clown: { home: "clown", boss: "Boingo", crate: "Boingo's Boss Crate", kid: "funkeeper", at: [10.5, 2.2], keeper: [{ c: 10, r: 2 }, { c: 11, r: 2 }], prizes: ["boingo-pogo"], roof: "arcade", chatTone: "night" },
   grex: { home: "grex", boss: "Jefferson", crate: "Jefferson's Boss Crate", kid: "dealer", at: [16.8, 3.2], tall: 79, flip: true, talk: ["crate", "corner-shop"], keeper: [{ c: 16, r: 3 }, { c: 17, r: 3 }], prizes: ["jefferson-giraffe"], roof: "warehouse", chatTone: "day" },
 };
 

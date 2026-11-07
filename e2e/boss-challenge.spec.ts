@@ -1239,3 +1239,52 @@ test("challenging Timber in an admin's town: his own intro (his line, the log ca
   await backAt(page, stood);
   expect(errors).toEqual([]);
 });
+
+test("challenging Boingo in the town (Nov 6): into his Funhouse, the default intro on his carnival mat (his line, the table pops in, his attack, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  const project = test.info().project.name;
+  if (SHOTS) mkdirSync(SHOTS, { recursive: true });
+  const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
+  await page.goto("/town");
+  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  const { confirm, stood } = await toConfirm(page, "clown", "Boingo");
+  await confirm.getByRole("button", { name: "Fight" }).click();
+  await expect(room(page)).toHaveAttribute("data-room", "clown", { timeout: 20_000 });
+  await expect(page.getByRole("heading", { name: "Boingo's Funhouse" })).toBeVisible();
+  const step = async () => (await intro(page))?.step ?? "";
+  await expect.poll(step, { message: "on their marks: his line", timeout: 20_000, intervals: [50] }).toBe("line");
+  const atLine = (await intro(page))!;
+  expect(atLine.layout).toBe("across");
+  expect(atLine.line).toBe(true);
+  // On his mat (columns 9-14, rows 9-14): Boingo west, you east, facing each other.
+  for (const [c, r] of [atLine.you, atLine.boss]) expect(c >= 9 && c <= 14 && r >= 9 && r <= 14, `${c},${r} on the mat`).toBe(true);
+  expect(atLine.boss[0]).toBeLessThan(atLine.you[0]);
+  expect(atLine.facing).toEqual({ you: -1, boss: 1 });
+  expect(introOf("clown")).toMatchObject({ custom: false, line: "Step right up! Honk honk!" });
+  await shot("boingo-line");
+  await expect.poll(async () => (await intro(page))?.table, { message: "the table pops in", intervals: [50] }).toBe(true);
+  // (You both step back clear of the stools, about his table's middle: halfway between his mat's marks, column 11.5.)
+  const r = atLine.you[1];
+  await expect
+    .poll(async () => {
+      const i = (await intro(page))!;
+      return [i.you[0], i.you[1], i.boss[0], i.boss[1]].map((v) => Math.round(v * 100) / 100);
+    }, { message: "stepped back clear of the stools", intervals: [50] })
+    .toEqual([11.5 + CHALLENGE_FEEL.clear.you, r, 11.5 - CHALLENGE_FEEL.clear.boss, r]);
+  await shot("boingo-table");
+  await expect.poll(step, { message: "he swings", intervals: [50] }).toBe("swing");
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveAttribute("data-boss", "clown");
+  await expect(page.locator(BOARD_SEL.wrap).first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator("canvas.boss-wipe")).toHaveCount(0, { timeout: 10_000 });
+  await page.getByRole("button", { name: "Match options" }).click();
+  const quit = page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /^(Leave|Resign)$/ });
+  const how = (await quit.textContent())!.trim();
+  await quit.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: how, exact: true }).click();
+  if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
+  await backAt(page, stood);
+  expect(errors).toEqual([]);
+});

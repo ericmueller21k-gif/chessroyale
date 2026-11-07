@@ -338,6 +338,14 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
       storm: "grexFizz",
     },
   },
+  // (Nov 6: Boingo's Funhouse; no custom intro this round (Eric): the default on his carnival mat, his slide whistle as the wipe.)
+  clown: {
+    name: "Boingo",
+    line: "Step right up! Honk honk!",
+    layout: "across",
+    custom: false,
+    cues: { table: "pop", wipe: "clownSlideUp" },
+  },
 };
 
 /** The boss's intro, or null: challenged as before (no intro yet). */
