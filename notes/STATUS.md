@@ -382,3 +382,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   the town; one line each on the Colosseum, the park, the boss houses; the town is still under construction; the Handbook explains
   more. Slide 2: lights the TOWN tools (map on/off, town chat on/off or fade, settings gear). "Tap anywhere to continue". Computer
   and phone (phone: its header icons).
+- OPEN BUG (recurring): e2e/town-controls.spec.ts:163 "hold to run" (phone) — "right runs you 1,0" got -1,0. Seen on #545's CI
+  (both tries), locally on #545's old base (even with main's lamp plan), and twice in combined runs by the leave-confirm helper; passes
+  alone. Root-cause it (not a flake): next free helper slot.
