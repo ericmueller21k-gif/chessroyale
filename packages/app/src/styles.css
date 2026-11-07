@@ -23930,7 +23930,7 @@ button.sq-tiny {
 }
 .sq-to-row {
   display: grid;
-  grid-template-columns: 4px minmax(0, 1fr) auto 5.6em;
+  grid-template-columns: 4px minmax(0, 1fr) auto 6.3em;
   align-items: center;
   gap: 6px;
   min-width: 0;
