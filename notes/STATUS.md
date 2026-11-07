@@ -353,3 +353,11 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **Nov 7 ~03:00, Eric on #542 town AFK:** keep the shared town (real players see each other). zzz at 60 s idle; boot at 5 min
   idle or hidden, with a pop-up "You've been dropped from the town". NEW: guests get 30 s in the town, then a pop-up "Make an
   account to keep exploring · It's free" (sign-up). Sent to the AFK helper (same PR). Smudgy (#539) LIVE 8038b612.
+- **Eric, Nov 7 ~04:20 (screenshots):**
+  1. Big Boy's shirt text is mirrored (and hands look wrong) where he's drawn flipped (his room). Make him face the right way; text never mirrored.
+  2. Boss-battle side figures unequal: Babur (SIDE_FEEL.keep ["tiger"], his pump) stays at the old 2 px size and the pawn + God King
+     follow the boss's size, so his fight's figures are small while Big Boy's are big. Eric: one size for all, about 15% smaller than
+     today's large ones; the pawn and King the same in every fight. (Root cause: the Nov 4 bigger-figures change exempted Babur.)
+  3. Street town lamps stand in front of boss homes' fronts: move them (Haiku, claude/street-lamps).
+  4. LATER (mental note, with the 3D/sprite work): boss homes are bunched; spread them evenly across the town.
+  Plan: 3 now (Haiku); 1+2 the next Opus after intros as data.
