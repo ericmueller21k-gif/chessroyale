@@ -3,19 +3,26 @@ import { WELCOME_GIFT } from "@chessroyale/core";
 /**
  * The first-time walkthrough's words and order, as pure data (no UI, no storage in here).
  *
- * Slides run in this order: the seven home-screen spots, then the Handbook, then the crates slide with the
- * welcome progress (the 5-game and 25-game Welcome Crates).
+ * Slides run in this order: PLAY, the three RANKED modes, the rest of the home spots, the Handbook, "Play anywhere" (no spot),
+ * then the crates slide with the welcome progress (the 5-game and 25-game Welcome Crates), which is the last slide: only it has
+ * the OK button and the "Don't show me this again" box.
  */
 
 export interface TutorialSpot {
-  /** The `data-tour` value on the home-screen element the slide points at. */
-  id: "play" | "chess-town" | "boss-battle" | "play-with-friends" | "shop" | "profile" | "settings";
+  /**
+   * The `data-tour` value on the elements the slide points at: every visible one (a computer has some of them twice, in its
+   * side menu and on the home screen).
+   */
+  id: "play" | "mode-crowd" | "mode-1v1" | "mode-squads" | "chess-town" | "boss-battle" | "play-with-friends" | "shop" | "profile" | "settings";
   title: string;
   body: string;
 }
 
 export const TUTORIAL_SPOTS: readonly TutorialSpot[] = [
   { id: "play", title: "PLAY", body: "Tap here to start a match." },
+  { id: "mode-crowd", title: "50 v 50", body: "Two teams of 50 vote on every move." },
+  { id: "mode-1v1", title: "1 v 1", body: "You against one player, ranked." },
+  { id: "mode-squads", title: "Squads", body: "4-player teams across several boards." },
   { id: "chess-town", title: "Chess Town", body: "Your town of chess games and rewards." },
   { id: "boss-battle", title: "Boss Battle", body: "Team up against a boss." },
   { id: "play-with-friends", title: "Play with friends", body: "Invite a friend to a match." },
@@ -28,6 +35,13 @@ export const TUTORIAL_HANDBOOK_SLIDE = {
   id: "handbook" as const,
   title: "HunChess Handbook",
   body: "Every rule and number, in one place. Open it any time from Settings.",
+};
+
+/** The no-spot slide: the game runs in a browser, and the app can also go on the home screen (the install card). */
+export const TUTORIAL_ANYWHERE_SLIDE = {
+  id: "anywhere" as const,
+  title: "Play anywhere",
+  body: "HunChess runs right from the website, on both computer and phone. No download needed. You can also add it to your home screen.",
 };
 
 /** The Welcome Crates' goals (5 games, then 25): the crates slide shows both, as the Crates tab does. */
@@ -55,12 +69,14 @@ export function crateBars(games: number, goals: readonly number[] = TUTORIAL_CRA
 export type TutorialSlide =
   | { kind: "spot"; spot: TutorialSpot }
   | { kind: "handbook" }
+  | { kind: "anywhere" }
   | { kind: "crates" };
 
 export function tutorialSlides(): TutorialSlide[] {
   return [
     ...TUTORIAL_SPOTS.map((spot) => ({ kind: "spot" as const, spot })),
     { kind: "handbook" as const },
+    { kind: "anywhere" as const },
     { kind: "crates" as const },
   ];
 }
@@ -73,7 +89,12 @@ export function shouldShowTutorial(stored: string | null | undefined): boolean {
   return stored !== "1";
 }
 
-/** The `data-tour` spot a slide lights up: its own spot, the shop on the crates slide, none on the Handbook slide. */
+/** Whether the URL asks for the walkthrough (`?tour=1` on any home URL): it opens from the first slide, whatever the flag. */
+export function tourRequested(search: string): boolean {
+  return new URLSearchParams(search).get("tour") === "1";
+}
+
+/** The `data-tour` spot a slide lights up: its own spot, the shop on the crates slide, none on the Handbook or Play anywhere. */
 export function slideSpotId(slide: TutorialSlide): TutorialSpot["id"] | null {
   if (slide.kind === "spot") return slide.spot.id;
   if (slide.kind === "crates") return "shop";
@@ -81,11 +102,11 @@ export function slideSpotId(slide: TutorialSlide): TutorialSpot["id"] | null {
 }
 
 /**
- * Whether ending the walkthrough saves "don't show again". Finishing every slide always does (the player has seen it all);
- * Skip saves only when the box is ticked. Unticked, a tap-through that stops early shows again next visit.
+ * Whether the OK on the last slide saves "don't show again": only when the box is ticked. Unticked, the walkthrough closes for
+ * now and shows again next visit. (Skip and Escape, on any slide, save only when the box is ticked too.)
  */
-export function shouldSaveSeen(completed: boolean, dontShowAgain: boolean): boolean {
-  return completed || dontShowAgain;
+export function shouldSaveSeen(dontShowAgain: boolean): boolean {
+  return dontShowAgain;
 }
 
 /** The crate rows on the last slide: each Welcome Crate's goal, with its label. */

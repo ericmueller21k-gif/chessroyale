@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { HunchessCrateArt } from "./Items.tsx";
 import {
+  TUTORIAL_ANYWHERE_SLIDE,
   TUTORIAL_CRATE_LABEL,
   TUTORIAL_HANDBOOK_SLIDE,
   TUTORIAL_SEEN_KEY,
@@ -8,19 +9,22 @@ import {
   shouldSaveSeen,
   shouldShowTutorial,
   slideSpotId,
+  tourRequested,
   tutorialSlides,
   type TutorialSlide,
 } from "../tutorial.ts";
 import { account } from "../account.ts";
 
 /**
- * The first-time walkthrough over the home screen. A slide's spot (its `data-tour` element) is cut out of the dim: the spot
- * is the element's exact box and radius, transparent inside, its box-shadow dimming everything outside. A soft gold glow
- * starts at the element's edge and pulses; the element is lifted slightly (scaled from its centre). The highlight glides to the next spot; the
- * bubble is docked at the bottom of the screen while the spot's centre is in the top half, and at the top once it is past
- * halfway, fading when it moves. A slide with no spot (the Handbook) dims the whole screen. Tap anywhere to go on. The last
- * slide shows both Welcome Crates and a "Go to your inventory" button (the shop's Crates tab). "Don't show this tutorial
- * again" starts unticked: finishing every slide saves it; Skip saves it only when ticked. Storage is read and written in try/catch.
+ * The first-time walkthrough over the home screen. A slide's spots (every visible `data-tour` element for it: a computer has
+ * some twice, in its side menu and on the home screen) are cut out of one dim layer: each cut-out is the element's exact box and
+ * radius (a mask over the dim, so no page colour shows round it and the dim never covers a spot). A soft gold glow starts at each
+ * element's edge and pulses; each element is lifted slightly (scaled from its centre). The highlights glide to the next slide's
+ * spots; the bubble is docked at the bottom of the screen while the spots' centre is in the top half, and at the top once it is
+ * past halfway, fading when it moves. A slide with no spot (the Handbook, Play anywhere) dims the whole screen. Tap anywhere to go on,
+ * except on the last slide: there only the OK button finishes it, with "Don't show me this again" under it (ticked, OK saves
+ * the flag; unticked, it closes for now). Skip (on the other slides) and Escape close without saving. `?tour=1` opens it from
+ * the first slide whatever the flag says. Storage is read and written in try/catch.
  */
 
 /** Settings' "Show the walkthrough again": a one-shot session flag (for when Home mounts) and an event (when it's mounted). */
@@ -79,15 +83,14 @@ function reducedMotion(): boolean {
   }
 }
 
-/** The element a slide lights up: the first one on screen (a computer has some spots twice, one of them hidden). */
-function spotElement(slide: TutorialSlide): HTMLElement | null {
+/** The elements a slide lights up: every one on screen with its `data-tour` id (a computer has some twice). */
+function spotElements(slide: TutorialSlide): HTMLElement[] {
   const id = slideSpotId(slide);
-  if (!id) return null;
-  for (const el of document.querySelectorAll<HTMLElement>(`[data-tour="${id}"]`)) {
+  if (!id) return [];
+  return [...document.querySelectorAll<HTMLElement>(`[data-tour="${id}"]`)].filter((el) => {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) return el;
-  }
-  return null;
+    return r.width > 0 && r.height > 0;
+  });
 }
 
 /** How much a lit spot grows: a little more for the small top-bar icons. */
@@ -137,17 +140,27 @@ function goToCrates(onShop: () => void): void {
   }
 }
 
+/** The cut-out's box with the lift on (the scaled box, about the centre): where the dim has its hole. */
+function holeOf(s: SpotBox) {
+  const w = s.width * s.scale;
+  const h = s.height * s.scale;
+  return { x: s.left + (s.width - w) / 2, y: s.top + (s.height - h) / 2, width: w, height: h, rx: s.radius * s.scale };
+}
+
 export function Walkthrough({ onShop }: { onShop: () => void }) {
-  const [open, setOpen] = useState<boolean>(() => takeReplay() || shouldShowTutorial(readSeen()));
+  const [open, setOpen] = useState<boolean>(
+    () => takeReplay() || tourRequested(location.search) || shouldShowTutorial(readSeen()),
+  );
   const [step, setStep] = useState(0);
   const [dontShow, setDontShow] = useState(false);
-  const [spot, setSpot] = useState<SpotBox | null>(null);
+  const [spots, setSpots] = useState<SpotBox[]>([]);
   const [gliding, setGliding] = useState(false);
   const [dock, setDock] = useState<"top" | "bottom">("bottom");
   const [moving, setMoving] = useState(false);
-  const target = useRef<HTMLElement | null>(null);
+  const targets = useRef<HTMLElement[]>([]);
   const slides = tutorialSlides();
   const slide = slides[step];
+  const isLast = step === slides.length - 1;
   const reduce = reducedMotion();
 
   useEffect(() => {
@@ -160,15 +173,14 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
     return () => removeEventListener(WALKTHROUGH_REPLAY_EVENT, again);
   }, []);
 
-  // Light up the slide's spot: the old one's lift comes off (it fades back, its transition stays), the new one lifts, and the
-  // cut-out glides to it. Measured with the new lift already in place (its centre doesn't move, so the box is the same).
+  // Light up the slide's spots: the old ones' lift comes off (it fades back, its transition stays), the new ones lift, and the
+  // cut-outs glide to them. Measured with the new lift already in place (its centre doesn't move, so the box is the same).
   useLayoutEffect(() => {
     if (!open || !slide) return;
-    const el = spotElement(slide);
-    const prev = target.current;
-    if (prev && prev !== el) prev.classList.remove("wt-lit");
-    target.current = el;
-    if (el) {
+    const els = spotElements(slide);
+    for (const prev of targets.current) if (!els.includes(prev)) prev.classList.remove("wt-lit");
+    targets.current = els;
+    for (const el of els) {
       el.classList.add("wt-track");
       if (reduce) el.classList.remove("wt-lit");
       else {
@@ -176,20 +188,17 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
         el.classList.add("wt-lit");
       }
     }
-    setSpot(el ? boxOf(el, !reduce) : null);
+    setSpots(els.map((el) => boxOf(el, !reduce)));
     if (reduce) return;
     setGliding(true);
     const t = setTimeout(() => setGliding(false), GLIDE_MS + 50);
     return () => clearTimeout(t);
   }, [open, step]);
 
-  // Follow the target on resize and scroll (the cut-out follows at once; only a slide change glides).
+  // Follow the targets on resize and scroll (the cut-outs follow at once; only a slide change glides).
   useEffect(() => {
     if (!open) return;
-    const follow = () => {
-      const el = target.current;
-      setSpot(el ? boxOf(el, el.classList.contains("wt-lit")) : null);
-    };
+    const follow = () => setSpots(targets.current.map((el) => boxOf(el, el.classList.contains("wt-lit"))));
     addEventListener("resize", follow);
     addEventListener("scroll", follow, true);
     return () => {
@@ -201,14 +210,16 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
   // Take the lift off when the walkthrough closes or the screen goes.
   useEffect(() => {
     if (open) return;
-    target.current?.classList.remove("wt-lit");
-    target.current = null;
+    for (const el of targets.current) el.classList.remove("wt-lit");
+    targets.current = [];
   }, [open]);
-  useEffect(() => () => target.current?.classList.remove("wt-lit"), []);
+  useEffect(() => () => { for (const el of targets.current) el.classList.remove("wt-lit"); }, []);
 
-  // The bubble docks at the bottom while the spot's centre is in the top half, else at the top. It fades out, jumps and fades in
+  // The bubble docks at the bottom while the spots' centre is in the top half, else at the top. It fades out, jumps and fades in
   // only when it has to move.
-  const wantDock: "top" | "bottom" = spot && spot.top + spot.height / 2 >= innerHeight / 2 ? "top" : "bottom";
+  const top = spots.length ? Math.min(...spots.map((s) => s.top)) : 0;
+  const bottom = spots.length ? Math.max(...spots.map((s) => s.top + s.height)) : 0;
+  const wantDock: "top" | "bottom" = spots.length && (top + bottom) / 2 >= innerHeight / 2 ? "top" : "bottom";
   useEffect(() => {
     if (wantDock === dock) {
       setMoving(false);
@@ -222,20 +233,21 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
     return () => clearTimeout(t);
   }, [wantDock, dock]);
 
-  const finish = (completed: boolean) => {
-    if (shouldSaveSeen(completed, dontShow)) saveSeen();
+  /** Closes it. It's saved as seen only if the box is ticked (the last slide's OK, Skip, Escape, Go to your inventory). */
+  const close = (dontShowAgain: boolean) => {
+    if (shouldSaveSeen(dontShowAgain)) saveSeen();
     setOpen(false);
   };
+  // Tapping goes on, but never past the last slide: there only its OK (or Escape) closes it.
   const next = () => {
-    if (step + 1 >= slides.length) finish(true);
-    else setStep(step + 1);
+    if (!isLast) setStep(step + 1);
   };
 
   useEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") finish(false);
-      if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") next();
+      if (e.key === "Escape") close(dontShow);
+      if (!isLast && (e.key === "Enter" || e.key === " " || e.key === "ArrowRight")) next();
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
@@ -243,32 +255,61 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
 
   if (!open || !slide) return null;
 
+  const title =
+    slide.kind === "spot" ? slide.spot.title
+    : slide.kind === "handbook" ? TUTORIAL_HANDBOOK_SLIDE.title
+    : slide.kind === "anywhere" ? TUTORIAL_ANYWHERE_SLIDE.title
+    : "Your welcome crates";
+  const body =
+    slide.kind === "spot" ? slide.spot.body
+    : slide.kind === "handbook" ? TUTORIAL_HANDBOOK_SLIDE.body
+    : slide.kind === "anywhere" ? TUTORIAL_ANYWHERE_SLIDE.body
+    : null;
   const isCrates = slide.kind === "crates";
-  const title = slide.kind === "spot" ? slide.spot.title : slide.kind === "handbook" ? TUTORIAL_HANDBOOK_SLIDE.title : "Your welcome crates";
-  const body = slide.kind === "spot" ? slide.spot.body : slide.kind === "handbook" ? TUTORIAL_HANDBOOK_SLIDE.body : null;
   const bars = isCrates ? crateBars(account().profile?.locker?.welcome?.games ?? 0) : null;
-  const spotClass = ["wt-spot", spot && spot.scale !== 1 ? "wt-spot-lit" : "", gliding ? "wt-glide" : ""].join(" ").trim();
+  const holes = spots.map(holeOf);
+  const spotClass = (s: SpotBox) => ["wt-spot", s.scale !== 1 ? "wt-spot-lit" : "", gliding ? "wt-glide" : ""].join(" ").trim();
 
   return (
-    <div class="wt-root" role="dialog" aria-modal="true" aria-label="Welcome walkthrough" onClick={next}>
-      {spot ? (
-        // (Keyed by step under reduced motion, so each slide's spot fades in rather than gliding.)
+    <div class="wt-root" role="dialog" aria-modal="true" aria-label="Welcome walkthrough" onClick={isLast ? undefined : next}>
+      {/* The dim, with a hole for each lit element (a mask: the holes never dim, whatever overlaps them). */}
+      <svg class="wt-dim" aria-hidden="true">
+        <defs>
+          <mask id="wt-holes" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+            <rect x="0" y="0" width="100%" height="100%" fill="#fff" />
+            {holes.map((h, i) => (
+              <rect
+                key={i}
+                class={`wt-hole${gliding ? " wt-glide" : ""}`}
+                x={h.x}
+                y={h.y}
+                width={h.width}
+                height={h.height}
+                rx={h.rx}
+                style={`x:${h.x}px;y:${h.y}px;width:${h.width}px;height:${h.height}px`}
+                fill="#000"
+              />
+            ))}
+          </mask>
+        </defs>
+        <rect x="0" y="0" width="100%" height="100%" fill="rgba(8, 10, 14, 0.62)" mask="url(#wt-holes)" />
+      </svg>
+      {spots.map((s, i) => (
+        // (Keyed by step under reduced motion, so each slide's spots fade in rather than gliding.)
         <div
-          key={reduce ? step : "spot"}
-          class={spotClass}
+          key={reduce ? `${step}-${i}` : `spot-${i}`}
+          class={spotClass(s)}
           aria-hidden="true"
           style={{
-            top: `${spot.top}px`,
-            left: `${spot.left}px`,
-            width: `${spot.width}px`,
-            height: `${spot.height}px`,
-            borderRadius: `${spot.radius}px`,
-            transform: spot.scale !== 1 ? `scale(${spot.scale})` : undefined,
+            top: `${s.top}px`,
+            left: `${s.left}px`,
+            width: `${s.width}px`,
+            height: `${s.height}px`,
+            borderRadius: `${s.radius}px`,
+            transform: s.scale !== 1 ? `scale(${s.scale})` : undefined,
           }}
         />
-      ) : (
-        <div class="wt-dim" aria-hidden="true" />
-      )}
+      ))}
       <div
         class={`wt-bubble wt-dock-${dock}${moving ? " wt-moving" : ""}`}
         onClick={(e) => e.stopPropagation()}
@@ -292,19 +333,25 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
             </ul>
           )}
           {isCrates && (
-            <button type="button" class="wt-inventory" onClick={(e) => { e.stopPropagation(); finish(true); goToCrates(onShop); }}>
+            <button type="button" class="wt-inventory" onClick={(e) => { e.stopPropagation(); close(dontShow); goToCrates(onShop); }}>
               Go to your inventory
             </button>
           )}
         </div>
-        <label class="wt-check" onClick={(e) => e.stopPropagation()}>
-          <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow((e.target as HTMLInputElement).checked)} />
-          Don't show this tutorial again
-        </label>
-        <div class="wt-actions">
-          <button type="button" class="wt-skip" onClick={(e) => { e.stopPropagation(); finish(false); }}>Skip</button>
-          <span class="wt-tap">Tap anywhere to continue</span>
-        </div>
+        {isLast ? (
+          <div class="wt-finish">
+            <button type="button" class="wt-ok" onClick={(e) => { e.stopPropagation(); close(dontShow); }}>OK</button>
+            <label class="wt-check" onClick={(e) => e.stopPropagation()}>
+              <input type="checkbox" checked={dontShow} onChange={(e) => setDontShow((e.target as HTMLInputElement).checked)} />
+              Don't show me this again
+            </label>
+          </div>
+        ) : (
+          <div class="wt-actions">
+            <button type="button" class="wt-skip" onClick={(e) => { e.stopPropagation(); close(false); }}>Skip</button>
+            <span class="wt-tap">Tap anywhere to continue</span>
+          </div>
+        )}
       </div>
     </div>
   );
