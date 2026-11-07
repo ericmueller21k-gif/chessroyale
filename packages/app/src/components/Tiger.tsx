@@ -270,7 +270,9 @@ function pumpPlace(slot: HTMLElement, figW: number): PumpPlace {
     const s = pumpScale(drawn);
     const at = side.getBoundingClientRect();
     const keep = [...document.querySelectorAll(KEEP_CLEAR)].map((e) => e.getBoundingClientRect());
-    const box = sidePump(fig, fig.width / figW, at.bottom, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
+    // (On his feet's line: his box's bottom, which stands `--side-lift` over the side's where he comes over the board's corner.)
+    const feet = side.querySelector(".boss-char")?.getBoundingClientRect().bottom ?? at.bottom;
+    const box = sidePump(fig, fig.width / figW, feet, s * zoom, { w: document.documentElement.clientWidth, h: innerHeight }, keep);
     if (box) return { at: "side", scale: s, x: (box.left - at.left) / zoom, side };
   }
   slot.classList.add("tg-tall");
