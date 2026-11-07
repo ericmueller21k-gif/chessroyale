@@ -1,6 +1,7 @@
 import { hollowLobby } from "./bosses/hollow.ts";
 import { dashLobby } from "./bosses/dash.ts";
 import type { BossLobby } from "./bosses/base.ts";
+import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { BOSS_BRAIN, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
@@ -135,6 +136,8 @@ interface ChatRecord {
   bots: number[];
   /** Chat moderation: accounts with a chat ban in force (they can't send), as the Durable Object last read them. */
   blocked?: Record<string, ChatBlock>;
+  /** Typed chat (Nov 7, typed-chat.ts): who may type, who reads typed lines, who's too young, and when each last typed. */
+  typed?: TypedSeats;
 }
 
 export interface Human {
@@ -1319,9 +1322,9 @@ export class LobbyCore {
       case "resign":
         return this.resign(playerId);
       case "chat":
-        return this.chatSay(playerId, msg.say, msg.to);
+        return this.chatSay(playerId, msg.say, msg.to, msg.text);
       case "chatPrefs":
-        return this.chatPrefs(playerId, msg.off, msg.muted);
+        return this.chatPrefs(playerId, msg.off, msg.muted, msg.typed);
       case "speed":
         return this.speed(playerId, msg.nps);
       case "judged":
@@ -3514,11 +3517,12 @@ export class LobbyCore {
     return this.runner?.boss ? null : this.chatSide(id);
   }
 
-  /** Whether a player is sent a line: chat on, sender not muted, and the line to everyone or to their team. */
+  /** Whether a player is sent a line: chat on, sender not muted, a typed line only if they read them, and the line to everyone or to their team. */
   private chatHears(id: string, line: NetChatLine): boolean {
     const c = this.chat;
     if (c.off[id]) return false;
     if (line.from === id) return true;
+    if (!hearsTyped(c.typed ?? {}, id, line)) return false;
     if (c.muted[id]?.includes(line.from)) return false;
     return line.to === "all" || line.team === null || this.chatSide(id) === line.team;
   }
@@ -3569,15 +3573,23 @@ export class LobbyCore {
    * lines show as buttons is their profile's picks: the app's business. Any line they own may go.) In the lobby
    * before the match, every line goes to everyone there (no teams yet), with the same checks.
    */
-  private chatSay(playerId: string, say: unknown, to: unknown) {
+  private chatSay(playerId: string, say: unknown, to: unknown, text?: unknown) {
     const now = this.io.now();
     const c = this.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
-      this.io.send(playerId, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock, message?: string) =>
+      this.io.send(playerId, { t: "chatNo", say: String(say ?? "").slice(0, 40), reason, retryAt, ...(block ? { block } : {}), ...(message ? { message } : {}) });
     if (!this.chatOpen() || !this.human(playerId)) return refuse("closed");
     if (c.off[playerId]) return refuse("off");
     const block = this.chatBlockOf(playerId, now);
     if (block) return refuse("mod", block.until ?? now, block);
+    // Typed (CHAT_TYPED, typed-chat.ts): may they type, the filter, the length, one every 5 s. To their team, or everyone with the
+    // switch on All (no teams before the match).
+    if (typeof text === "string") {
+      const t = typedSay((c.typed ??= {}), playerId, this.chatKey(playerId), text, now);
+      if (!t.ok) return refuse(t.reason, t.retryAt, undefined, t.message);
+      const toAll = !this.chatInLobby() && to === "all";
+      return this.chatPost({ ...this.chatLine(playerId, "", toAll ? "all" : "team", now), text: t.text });
+    }
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, c.owned[playerId])) return refuse("locked");
@@ -3618,10 +3630,19 @@ export class LobbyCore {
     return { from, say, to, team: this.chatTeam(from), at };
   }
 
-  /** This device's chat choices: chat off, and who it muted for the match (their lines aren't sent to it). */
-  private chatPrefs(playerId: string, off: unknown, muted: unknown) {
+  /**
+   * Typed chat for a player as they join (or turn chat on): may they type (signed in, the account's chat on, not too young: the
+   * Durable Object read them), and is their device too young (never sent typed lines).
+   */
+  chatTyping(playerId: string, o: { may: boolean; young: boolean }) {
+    typedSeat((this.chat.typed ??= {}), playerId, o);
+  }
+
+  /** This device's chat choices: chat off, who it muted for the match (their lines aren't sent to it), and typed lines on or off. */
+  private chatPrefs(playerId: string, off: unknown, muted: unknown, typed?: unknown) {
     if (!this.human(playerId)) return;
     const c = this.chat;
+    if (typeof typed === "boolean" && typedReads((c.typed ??= {}), playerId, typed) && !c.off[playerId] && off !== true) this.sendChatLog(playerId, false);
     const wasOff = !!c.off[playerId];
     const wasMuted = c.muted[playerId] ?? [];
     if (off === true) c.off[playerId] = true;

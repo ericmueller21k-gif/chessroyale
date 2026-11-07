@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { CHAT_MOD } from "@chessroyale/core";
 import { DUEL_PROTOCOL, DUEL_UPDATE, type Color, type DuelClientMessage, type DuelOutcome, type DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, RECORD_RETRY_MS, newDuelRecord, type DuelRecord } from "./duel-room.ts";
-import { accountOf } from "./api.ts";
+import { accountOf, ageAnswer, isSignedIn } from "./api.ts";
 import { d1Sql, ensureSchema, shopState } from "./accounts.ts";
 import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
@@ -16,6 +16,9 @@ import type { Env } from "./index.ts";
 interface Attached {
   color: Color | null;
   uid?: string;
+  /** Typed chat (typed-chat.ts): a signed-in account (may type once its chat is on), or a device the age gate marked too young. */
+  typer?: boolean;
+  young?: boolean;
 }
 
 /**
@@ -179,7 +182,8 @@ export class DuelGame extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ color, uid: account!.id } satisfies Attached);
+    const young = ageAnswer(request) === "under";
+    server.serializeAttachment({ color, uid: account!.id, ...(isSignedIn(account) && !young ? { typer: true } : {}), ...(young ? { young } : {}) } satisfies Attached);
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -208,11 +212,16 @@ export class DuelGame extends DurableObject<Env> {
         return;
       }
       // Their chat packs (shop items) and any chat ban, read as they connect: never per move. Each fails on its own.
-      const [owned, block] = sql
-        ? await Promise.all([shopState(sql, attached.uid!).then((s) => s.owned).catch(() => null), chatBlock(sql, attached.uid!, now).catch(() => undefined)])
-        : [null, undefined];
+      const [owned, block, chatOn] = sql
+        ? await Promise.all([
+            shopState(sql, attached.uid!).then((s) => s.owned).catch(() => null),
+            chatBlock(sql, attached.uid!, now).catch(() => undefined),
+            attached.typer ? sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", attached.uid!).then((r) => r?.chat_on === 1).catch(() => false) : false,
+          ])
+        : [null, undefined, false];
       if (!this.record) return;
       const core = this.core();
+      core.chatTyping(color, { may: !!attached.typer && chatOn, young: !!attached.young });
       if (owned) core.chatOwned(color, owned);
       if (block !== undefined) {
         this.chatChecked.set(color, now);
@@ -222,12 +231,15 @@ export class DuelGame extends DurableObject<Env> {
       await this.persist(core);
       return;
     }
+    // Chat turned on during the game (its opt-in): may they type now? The account's switch, read again.
+    const typing = msg.t === "chatPrefs" && msg.typed === true && attached.typer && sql ? (await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", attached.uid!).catch(() => null))?.chat_on === 1 : null;
     // A chatting player's chat ban, read again at most every CHAT_MOD.recheckMs.
     const recheck = msg.t === "chat" && sql && now - (this.chatChecked.get(color) ?? -Infinity) >= CHAT_MOD.recheckMs;
     const block = recheck ? await chatBlock(sql!, attached.uid!, now).catch(() => undefined) : undefined;
     if (!this.record) return;
     const core = this.core();
     await this.change(core, () => {
+      if (typing !== null) core.chatTyping(color, { may: typing, young: false });
       if (block !== undefined) {
         this.chatChecked.set(color, now);
         core.chatStanding(color, block);

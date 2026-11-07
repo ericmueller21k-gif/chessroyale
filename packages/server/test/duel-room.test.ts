@@ -308,6 +308,32 @@ describe("1 v 1's room: quick chat", () => {
     expect(r.last("w", "chatNo")).toMatchObject({ reason: "off" });
   });
 
+  it("typed chat (Nov 7): White may type (signed in, chat on); Black reads typed lines only with chat on, never on a device too young", () => {
+    const r = started();
+    pack(r);
+    r.core().chatTyping("w", { may: true, young: false });
+    r.core().chatTyping("b", { may: false, young: false });
+    r.send("w", { t: "chat", say: "", text: "good luck  :knight:" });
+    // Black hasn't turned chat on: not sent; on, the log brings it.
+    expect(r.last("b", "chat")).toBeUndefined();
+    expect(r.last("w", "chat")?.line).toMatchObject({ from: "w", say: "", text: "good luck :knight:" });
+    r.send("b", { t: "chatPrefs", typed: true });
+    expect(r.last("b", "chatLog")?.lines.map((l) => l.text)).toEqual(["good luck :knight:"]);
+    r.send("b", { t: "chat", say: "", text: "thanks" });
+    expect(r.last("b", "chatNo")).toMatchObject({ reason: "typed", message: "Turn on chat to type." });
+    r.send("w", { t: "chat", say: "", text: "add me on snapchat" });
+    expect(r.last("w", "chatNo")).toMatchObject({ reason: "text", message: "No links or contact details in chat." });
+    r.send("w", { t: "chat", say: "", text: "again" });
+    expect(r.last("w", "chatNo")).toMatchObject({ reason: "gap" });
+    // A device too young: never sent typed lines, whatever it asks.
+    r.core().chatTyping("b", { may: false, young: true });
+    r.send("b", { t: "chatPrefs", typed: true });
+    const before = r.inbox.b.length;
+    r.set(r.now() + 6_000);
+    r.send("w", { t: "chat", say: "", text: "still there?" });
+    expect(r.inbox.b.slice(before).filter((m) => m.t === "chat")).toEqual([]);
+  });
+
   it("a chat ban in force: refused with the ban (they still read); lifted, they can send", () => {
     const r = started();
     pack(r);

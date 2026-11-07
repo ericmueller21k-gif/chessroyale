@@ -1,7 +1,6 @@
 import { CHAT_TYPED, GLOBAL_CHAT, GLOBAL_CHAT_BOTS, canSayHome, chatSay, homeBotLine } from "@chessroyale/core";
 import { BOT_NAMES } from "@chessroyale/chess";
-import { chatRefusal } from "./text-filter.ts";
-import { charCount, tidyMessage } from "./town-chat.ts";
+import { TYPED_AGE, TYPED_EMPTY, typedText, typedTooLong } from "./typed-chat.ts";
 
 /**
  * The global chat (the computer's right column), as pure logic (the live hub, live-hub.ts, keeps one and stores what it holds).
@@ -57,10 +56,7 @@ export type GlobalPost =
 
 /** What the sender hears when the server-wide line is longer than GLOBAL_CHAT.queueMs. */
 export const CHAT_BUSY = "Chat is busy, try again.";
-/** A device the age gate marked too young (signed in there all the same): the quick chips only. */
-export const TYPED_AGE = "Typing in chat is for players 13 and older. You can still send the quick chat lines.";
-export const TYPED_EMPTY = "Type a message first.";
-export const typedTooLong = (max: number) => `Messages are at most ${max} characters.`;
+export { TYPED_AGE, TYPED_EMPTY, typedTooLong };
 export const globalWait = (gapMs: number) => `One message every ${Math.round(gapMs / 1000)} s.`;
 
 export interface GlobalChatSnapshot {
@@ -166,12 +162,9 @@ export class GlobalChat {
   postText(sender: GlobalSender, text: unknown, now: number): GlobalPost {
     if (!(this.o.typed ?? CHAT_TYPED)) return { ok: false, reason: "unknown", message: "Only the preset lines can go in the chat." };
     if (!sender.typed) return { ok: false, reason: "typed", message: TYPED_AGE };
-    const said = tidyMessage(text);
-    if (!said) return { ok: false, reason: "text", message: TYPED_EMPTY };
-    if (charCount(said) > this.o.maxChars || [...said].length > 3 * this.o.maxChars) return { ok: false, reason: "text", message: typedTooLong(this.o.maxChars) };
-    const refused = chatRefusal(said);
-    if (refused) return { ok: false, reason: "text", message: refused };
-    return this.send(sender, { text: said }, now);
+    const t = typedText(text, this.o.maxChars);
+    if (!t.ok) return { ok: false, reason: "text", message: t.message };
+    return this.send(sender, { text: t.text }, now);
   }
 
   /**

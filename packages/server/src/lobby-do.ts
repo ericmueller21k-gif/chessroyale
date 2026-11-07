@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
 import { LobbyCore, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
-import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
+import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { forgetLobby, recordWait, reportLobby, type LiveMode } from "./live.ts";
@@ -86,18 +86,18 @@ export class Lobby extends DurableObject<Env> {
    * Also their name (the seat's, so a name a moderator reset stays reset whatever the device sends; null: unread) and
    * any chat ban (chat moderation; undefined: unread).
    */
-  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined }> {
+  private async joiningProfileOf(userId: string): Promise<{ name: string | null; icon: string | null; owned: string[] | null; rating: number | null; block: ChatBlock | null | undefined; chatOn: boolean }> {
     const sql = d1Sql(this.env.DB!);
     const now = Date.now();
     const [row, shop, block] = await Promise.all([
-      sql.first<{ name: string; icon: string; rating: number | null }>("SELECT name, icon, rating FROM users WHERE id = ?", userId).catch(() => null),
+      sql.first<{ name: string; icon: string; rating: number | null; chat_on: number | null }>("SELECT name, icon, rating, chat_on FROM users WHERE id = ?", userId).catch(() => null),
       shopState(sql, userId).catch(() => null),
       chatBlock(sql, userId, now).catch(() => undefined),
     ]);
     if (block !== undefined) this.chatChecked.set(userId, now);
     const icon = row && (isPixelIcon(row.icon) || (ICONS as readonly string[]).includes(row.icon)) ? row.icon : null;
     const rating = typeof row?.rating === "number" && Number.isFinite(row.rating) ? row.rating : null;
-    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block };
+    return { name: typeof row?.name === "string" ? row.name : null, icon, owned: shop?.owned ?? null, rating, block, chatOn: row?.chat_on === 1 };
   }
 
   private core(code: string): LobbyCore {
@@ -441,7 +441,10 @@ export class Lobby extends DurableObject<Env> {
         : false;
     // (Admins, ADMIN_EMAILS as for the fair-play review: the boss battle's test trigger.)
     const admin = !guest && isAdmin(await withSecrets(this.env), account);
-    server.serializeAttachment({ userId: account?.id, guest, banned, ...(admin ? { admin } : {}) });
+    // Typed chat (typed-chat.ts): a signed-in account may type, never from a device the age gate marked too young.
+    const young = ageAnswer(request) === "under";
+    const typer = !!account && isSignedIn(account) && !young;
+    server.serializeAttachment({ userId: account?.id, guest, banned, ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}) });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -453,7 +456,7 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
@@ -496,7 +499,8 @@ export class Lobby extends DurableObject<Env> {
         ws.close(1008, result.message);
         return;
       }
-      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}) });
+      ws.serializeAttachment({ playerId: result.playerId, userId: attached?.userId, ...(attached?.admin ? { admin: true } : {}), ...(attached?.typer ? { typer: true } : {}), ...(attached?.young ? { young: true } : {}) });
+      core.chatTyping(result.playerId, { may: !!attached?.typer && !!joining?.chatOn, young: !!attached?.young });
       if (joining) {
         if (joining.owned) core.chatOwned(result.playerId, joining.owned);
         if (joining.block !== undefined) core.chatStanding(attached!.userId!, joining.block);
@@ -513,6 +517,12 @@ export class Lobby extends DurableObject<Env> {
     const playerId = attached?.playerId;
     if (!playerId) return;
     if (uid && block !== undefined) core.chatStanding(uid, block);
+    // Chat turned on during the match (its opt-in): may they type now? The account's switch, read again.
+    if (msg.t === "chatPrefs" && msg.typed === true && attached?.typer && uid && this.env.DB) {
+      const on = (await d1Sql(this.env.DB).first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", uid).catch(() => null))?.chat_on === 1;
+      if (!this.record) return;
+      core.chatTyping(playerId, { may: on, young: false });
+    }
     if (msg.t === "ultimate") core.ultimateTrigger(playerId, !!attached?.admin);
     else core.message(playerId, msg);
     await this.persist(core);
