@@ -1,5 +1,7 @@
 import { isBlocked } from "./friends.ts";
 import {
+  CHAT_TYPED,
+  GLOBAL_CHAT,
   QUICK_CHAT,
   botChatLines,
   canSay,
@@ -21,6 +23,8 @@ import {
 } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, ClientMessage, NetChatLine } from "@chessroyale/chess";
 import { chatBlockNow, mutes, setChatBlock } from "./chat-mod.ts";
+import { account, tooYoung } from "./account.ts";
+import { chatOn, onChatOn } from "./chat-on.ts";
 import { chatOff, onPrefsChange, setChatOff } from "./prefs.ts";
 import { play } from "./sound.ts";
 
@@ -80,6 +84,11 @@ export class MatchChat {
    */
   menuFor: string | null = null;
   optionsOpen = false;
+  /** Why the last typed message didn't go (the server's words: the filter, the age gate), shown a moment over the field. */
+  note: string | null = null;
+  /** When this device last typed (local time): one typed message every GLOBAL_CHAT.gapMs, as the server holds it. */
+  private typedAt = -Infinity;
+  private offTyped: (() => void) | null = null;
   private list: ChatLine[] = [];
   private mutedSet: Set<string> | null = null;
   private sent: ChatSent = noChatSent();
@@ -134,7 +143,9 @@ export class MatchChat {
   }
 
   /** The server dropped a line: gray the buttons until it says (or, your chat banned, say why instead of them). */
-  onRefused(say: string, reason: ChatRefusal, retryAt: number, block?: ChatBlock) {
+  onRefused(say: string, reason: ChatRefusal, retryAt: number, block?: ChatBlock, message?: string) {
+    if (message && (reason === "typed" || reason === "text" || (reason === "gap" && !say))) this.setNote(message);
+    if (reason === "gap" && !say) this.typedAt = this.host.local(retryAt) - GLOBAL_CHAT.gapMs;
     if (reason === "mod") setChatBlock(block ? { ...block, until: block.until === null ? null : this.host.local(block.until) } : { until: null });
     if (reason === "gap" || reason === "burst") this.blockedUntil = Math.max(this.blockedUntil, this.host.local(retryAt));
     if (reason === "repeat") this.sent = { ...this.sent, last: { say, at: this.host.local(retryAt) - QUICK_CHAT.repeatMs } };
@@ -145,7 +156,60 @@ export class MatchChat {
   /** Once welcomed: tell the server this device's choices (chat off, who's muted). */
   onWelcome() {
     const muted = [...this.muted];
-    if (chatOff() || muted.length) this.host.send({ t: "chatPrefs", ...(chatOff() ? { off: true } : {}), ...(muted.length ? { muted } : {}) });
+    const typed = this.readsTyped();
+    if (chatOff() || muted.length || typed) this.host.send({ t: "chatPrefs", ...(chatOff() ? { off: true } : {}), ...(muted.length ? { muted } : {}), ...(typed ? { typed } : {}) });
+    // (Chat turned on or off later, here or elsewhere: the server sends typed lines, or stops.)
+    this.offTyped ??= onChatOn(() => {
+      const now = this.readsTyped();
+      if (now === this.typedSent) return;
+      this.typedSent = now;
+      this.host.send({ t: "chatPrefs", typed: now });
+      this.host.emit();
+    });
+    this.typedSent = typed;
+  }
+  private typedSent = false;
+
+  // ---------------- Typed chat (Nov 7, CHAT_TYPED) ----------------
+
+  /** This device gets players' typed lines: chat on (its opt-in), not a device the age gate marked too young. */
+  readsTyped(): boolean {
+    return CHAT_TYPED && chatOn() && !tooYoung();
+  }
+
+  /** This player types instead of the quick lines: signed in, chat on, not too young (a guest reads; a young device keeps the chips). */
+  mayType(): boolean {
+    return this.readsTyped() && !!account().profile?.user.signedIn;
+  }
+
+  /** When a typed message can go again (local time). */
+  typedReadyAt(): number {
+    return Math.max(this.typedAt + GLOBAL_CHAT.gapMs, this.blockedUntil);
+  }
+
+  /** Sends what you typed (to your team, or everyone with the switch on All). False when it can't go now. */
+  type(text: string, now = Date.now()): boolean {
+    const t = text.trim();
+    if (!this.enabled || !t || !this.mayType() || chatOff() || this.banned(now) || now < this.typedReadyAt()) return false;
+    const to: ChatTo = this.to === "all" && this.host.teams() ? "all" : "team";
+    this.host.send({ t: "chat", say: "", text: t, to });
+    this.typedAt = now;
+    this.note = null;
+    this.wakeAt(this.typedReadyAt());
+    this.host.emit();
+    return true;
+  }
+
+  private setNote(message: string) {
+    this.note = message;
+    const t = setTimeout(() => {
+      this.timers.delete(t);
+      if (this.note === message) {
+        this.note = null;
+        this.host.emit();
+      }
+    }, 4000);
+    this.timers.add(t);
   }
 
   // ---------------- Saying things ----------------
@@ -301,6 +365,8 @@ export class MatchChat {
     for (const t of this.timers) clearTimeout(t);
     this.timers.clear();
     this.offPrefs?.();
+    this.offTyped?.();
+    this.offTyped = null;
   }
 
   /** Chat is over here (Solo's queue, as its match begins: solo matches have no chat). */
@@ -497,6 +563,15 @@ export class SoloLobbyChat {
   private receive(m: ClientMessage) {
     if (m.t !== "chat" || !this.chat.enabled) return;
     const now = Date.now();
+    // Typed (only you see it here: the bots don't read): the length and the 5 s wait, as online.
+    if (typeof m.text === "string") {
+      const text = m.text.replace(/\s+/g, " ").trim();
+      if (chatOff()) return this.chat.onRefused("", "off", now);
+      if (!text || [...text].length > GLOBAL_CHAT.maxChars) return this.chat.onRefused("", "text", now, undefined, text ? `Messages are at most ${GLOBAL_CHAT.maxChars} characters.` : "Type a message first.");
+      const side = this.sideOf?.(this.me) ?? null;
+      if (!this.sideOf) return this.chat.onLine({ n: ++this.n, from: this.me, say: "", text, to: "all", team: null, at: now, lobby: true });
+      return this.chat.onLine({ n: ++this.n, from: this.me, say: "", text, to: side && m.to !== "all" ? "team" : "all", team: side, at: now });
+    }
     const say = String(m.say);
     if (chatOff()) return this.chat.onRefused(say, "off", now);
     const line = chatSay(say);

@@ -24609,3 +24609,82 @@ button.sq-tiny {
   .wt-spot.wt-glide, .wt-hole.wt-glide, .wt-track, .wt-bar > span { transition: none; }
 }
 
+
+/* -- Typing in a match's or a lobby's chat (QuickChat.tsx TypeBar; Nov 7, CHAT_TYPED): in the quick lines' place, or in a phone tab's
+   pop over the feed's foot. The field (no box), the emoji button and Send; our pixel emoji's picker above, in the flow (never clipped). -- */
+.qtype {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--qc-rule);
+  padding: 4px 8px 6px;
+}
+.qchat-tab .qpop .qtype {
+  border-top: 0;
+}
+.qtype .chat-emo-picker {
+  position: static;
+  align-self: flex-end;
+  box-shadow: none;
+  border-color: var(--qc-edge);
+  background: var(--qc-head);
+}
+.qtype .chat-emo-pick:hover {
+  background: var(--qc-chip);
+}
+.qtype-note {
+  margin: 0;
+  color: #f2a3a3;
+  font-size: 12.5px;
+}
+.qtype-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+.qtype-field {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 2px;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--qc-text);
+  font: 400 14px Archivo, system-ui, sans-serif;
+}
+.qtype-field::placeholder {
+  color: var(--qc-muted);
+}
+.qtype-emo,
+.qtype-send {
+  flex: none;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--qc-chip);
+  color: var(--qc-text);
+  cursor: pointer;
+}
+.qtype-emo {
+  width: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.qtype-send {
+  padding: 0 10px;
+  font: 700 13px Archivo, system-ui, sans-serif;
+}
+.qtype-emo:disabled,
+.qtype-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.qline .chat-emo {
+  width: 1.35em;
+  height: 1.35em;
+  vertical-align: -0.32em;
+}
