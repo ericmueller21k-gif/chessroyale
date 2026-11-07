@@ -19,6 +19,6 @@ export const FOLIO_LINES: Partial<Record<Beat, readonly string[]>> = {
   fold: ["Folded. It'll keep."],
   ultimateWarn: ["Mind the crease."],
   revision: ["Let me write that again."],
-  victory: ["Well played. Keep the crane.", "Every fold landed right where I wanted."],
+  victory: ["Well played. Keep the crane.", "Every fold landed just right."],
   defeat: ["Lovely prose. I'll fold this away.", "Crumpled. Smooth it out and try again."],
 };
