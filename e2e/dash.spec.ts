@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { BOSS_CLOCK, BOSS_POWERS } from "@chessroyale/core";
+import { DASH_RUSH_LINES } from "../packages/app/src/characters/dash-lines.ts";
 import { BOARD_SEL, asAdmin, openBossRaid, submitMove, test } from "./helpers.ts";
 
 /**
@@ -173,16 +174,17 @@ test.describe("Dash", () => {
 
 /**
  * Dash v2's Scramble Rush (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md), Boss alone on a phone and a computer with real taps
- * and a drag (`&power=rush`: it comes as your second turn begins): "1.00" counting down while his five copies sweep the board, then
- * ten seconds to put the six swept pieces back: green edges where right, a red one and his word where wrong. 4 back: the God King's
- * word and your turn on the board as it was; 3 or none: his extra move at once. Read from the page: the board's own pieces (the DOM)
- * against the game's position.
+ * and a drag (`&power=rush`: warned as your second turn begins, it comes as your third does; Eric, Nov 6: RAGE!, "Next turn:
+ * Scramble Rush" and his line, your one move as ever between): "1.00" counting down while his five copies sweep the board, then
+ * ten seconds to put the six swept pieces back: green edges where right, a red one and his word where wrong; each piece at most
+ * movesPerPiece times (a third try: it shakes, "No more tries", it stays). 4 back: the God King's word and your turn on the board
+ * as it was; 3 or none: his extra move at once. Read from the page: the board's own pieces (the DOM) against the game's position.
  */
-type RushSeen = { stages: string[]; copies: number; counts: string[]; doneBoards: string[]; said: string[] };
+type RushSeen = { stages: string[]; copies: number; counts: string[]; doneBoards: string[]; said: string[]; banners: string[]; warnAt: number; rushAt: number; playAfterWarn: boolean; shook: string[]; nope: string[] };
 async function watchRush(page: Page) {
   await page.evaluate((pieceSel) => {
     const w = window as any;
-    w.__rush = { stages: [], copies: 0, counts: [], doneBoards: [], said: [] } as RushSeen;
+    w.__rush = { stages: [], copies: 0, counts: [], doneBoards: [], said: [], banners: [], warnAt: 0, rushAt: 0, playAfterWarn: false, shook: [], nope: [] } as RushSeen;
     const add = (a: string[], v: string | null | undefined) => v && !a.includes(v) && a.push(v);
     const look = () => {
       const r = w.__rush as RushSeen;
@@ -191,6 +193,13 @@ async function watchRush(page: Page) {
       r.copies = Math.max(r.copies, document.querySelectorAll(".rush-copy:not(.ghost)").length);
       add(r.counts, document.querySelector(".rb-count")?.textContent?.slice(0, 3));
       add(r.said, document.querySelector(".bc-bubble")?.textContent?.trim());
+      // (The warning: its banner's words, when it first showed; your move after it, before the Rush; the Rush's start.)
+      for (const b of document.querySelectorAll(".fight-banner")) add(r.banners, (b.textContent ?? "").replace(/\s+/g, " ").trim());
+      if (!r.warnAt && r.banners.some((b) => b.includes("Next turn: Scramble Rush"))) r.warnAt = performance.now();
+      if (r.warnAt && !r.rushAt && w.match?.phase?.kind === "play") r.playAfterWarn = true;
+      if (!r.rushAt && layer) r.rushAt = performance.now();
+      for (const p of document.querySelectorAll("piece.rush-shake")) add(r.shook, (p as HTMLElement).dataset.square);
+      for (const n of document.querySelectorAll(".rush-nope")) add(r.nope, `${(n as HTMLElement).dataset.square}:${n.textContent}`);
       if (layer?.dataset.stage === "done") {
         // The board as drawn: each piece's square (by its box in the squares' box, either way up) and kind.
         const box = document.querySelector(".hb-board")!.getBoundingClientRect();
@@ -240,6 +249,14 @@ for (const [right, held] of [
     await yourMove(page);
     await watchRush(page);
     await playOne(page);
+    // His move, then the warning a turn ahead: RAGE!, "Next turn: Scramble Rush", his line; nothing swept, your move as ever.
+    await yourMove(page);
+    expect(await page.evaluate(() => (window as any).match.boss.powers.dash.rush ?? null)).toBeNull();
+    const early = (await page.evaluate(() => (window as any).__rush)) as RushSeen;
+    expect(early.banners.some((b) => /RAGE!/.test(b) && /Next turn: Scramble Rush/.test(b))).toBe(true);
+    await expect.poll(async () => ((await page.evaluate(() => (window as any).__rush)) as RushSeen).said.some((x) => (DASH_RUSH_LINES.warn as readonly string[]).includes(x)), { timeout: 10_000 }).toBe(true);
+    expect(early.rushAt).toBe(0);
+    await playOne(page);
     // His move, then the Rush: the game's position frozen as it began.
     await expect.poll(() => page.evaluate(() => !!(window as any).match.phase.rush), { timeout: 60_000 }).toBe(true);
     const start = await page.evaluate(() => {
@@ -256,6 +273,27 @@ for (const [right, held] of [
       const row = white ? 8 - Number(sq[1]) : Number(sq[1]) - 1;
       return { x: box.x + (col + 0.5) * (box.width / 8), y: box.y + (row + 0.5) * (box.height / 8) };
     };
+    const free = (except: string[]) => {
+      const taken = new Set([...new Chess(start.fen).board().flat().filter(Boolean).map((p) => p!.square), ...start.moves.map((x) => x.to), ...except]);
+      return ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6", "a4", "h4", "a5", "h5"].filter((s) => !taken.has(s));
+    };
+    if (held) {
+      // The last piece (not one of the 4 put back): moved twice to wrong squares, then a third try (to its own square) refused:
+      // it shakes, "No more tries" over it, and it stays. Then the 4 still go back.
+      const m = start.moves[5]!;
+      const [w1, w2] = free([]);
+      await page.mouse.click(at(m.to).x, at(m.to).y);
+      await page.mouse.click(at(w1!).x, at(w1!).y);
+      await page.mouse.click(at(w1!).x, at(w1!).y);
+      await page.mouse.click(at(w2!).x, at(w2!).y);
+      await expect.poll(() => page.evaluate((f) => (window as any).match.phase.rush.moved[f] ?? 0, m.from)).toBe(BOSS_POWERS.dashScramble.movesPerPiece);
+      await page.mouse.click(at(w2!).x, at(w2!).y);
+      await expect(page.locator(`.rush-nope[data-square="${w2}"]`)).toHaveText("No more tries");
+      await page.mouse.click(at(m.from).x, at(m.from).y);
+      const after = await page.evaluate((f) => ({ to: (window as any).match.phase.rush.places[f], moved: (window as any).match.phase.rush.moved[f] }), m.from);
+      expect(after).toEqual({ to: w2, moved: BOSS_POWERS.dashScramble.movesPerPiece });
+      expect(((await page.evaluate(() => (window as any).__rush)) as RushSeen).shook).toContain(w2);
+    }
     for (const [i, m] of start.moves.slice(0, right).entries()) {
       const a = at(m.to);
       const b = at(m.from);
@@ -271,13 +309,13 @@ for (const [right, held] of [
       }
     }
     await expect(page.locator(".rush-edge.right")).toHaveCount(right);
+    if (held) await expect(page.locator(".rush-edge.wrong")).toHaveCount(1);
     if (right === 3) {
       // One more, put down on a wrong square (a free one of the middle ranks): a red edge, and his word.
       const m = start.moves[3]!;
-      const taken = new Set([...new Chess(start.fen).board().flat().filter(Boolean).map((p) => p!.square), ...start.moves.map((x) => x.to)]);
-      const free = ["a3", "b3", "c3", "d3", "e3", "f3", "g3", "h3", "a6", "b6", "c6", "d6", "e6", "f6", "g6", "h6"].find((s) => !taken.has(s) && s !== m.from)!;
+      const sq = free([m.from])[0]!;
       await page.mouse.click(at(m.to).x, at(m.to).y);
-      await page.mouse.click(at(free).x, at(free).y);
+      await page.mouse.click(at(sq).x, at(sq).y);
       await expect(page.locator(".rush-edge.wrong")).toHaveCount(1);
       await expect(page.locator(".rush-edge.right")).toHaveCount(3);
     }
@@ -298,6 +336,11 @@ for (const [right, held] of [
     }
     const seen = (await page.evaluate(() => (window as any).__rush)) as RushSeen;
     expect(seen.stages).toEqual(expect.arrayContaining(["sweep", "place", "done"]));
+    // (The warning came first, your move after it, then the Rush: never at once.)
+    expect(seen.warnAt).toBeGreaterThan(0);
+    expect(seen.playAfterWarn).toBe(true);
+    expect(seen.rushAt).toBeGreaterThan(seen.warnAt);
+    if (held) expect(seen.nope.length).toBeGreaterThan(0);
     // (Five copies of him running, the countdown from "1.0" or "0.9…" down; the board drawn as the game's, piece for piece, once time's up.)
     expect(seen.copies).toBeGreaterThanOrEqual(3);
     expect(seen.copies).toBeLessThanOrEqual(5);
