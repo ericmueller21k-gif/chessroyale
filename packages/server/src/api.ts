@@ -8,6 +8,7 @@ import { chatNoticeSeen } from "./chat-mod.ts";
 import { isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { isPaused, pausedBosses, pausedResponse } from "./kill-switches.ts";
 import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate, startSoloBattle } from "./boss-tokens.ts";
+import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
@@ -392,7 +393,19 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // The shop. GET /api/shop: your coins, items and what's equipped. POST /api/shop/buy {item}, /api/shop/equip {item}.
   if (path === "/api/shop" && request.method === "GET") return json(await shopState(sql, current.id, admin));
   // (The shop resting, a kill switch: nothing new from it. Equipping what you have still works.)
-  if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/shop/boss-crate") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
+  if ((path === "/api/shop/buy" || path === "/api/locker/open" || path === "/api/shop/boss-crate" || path === "/api/shop/claw") && request.method === "POST" && isPaused(env, "shop")) return pausedResponse("shop");
+  // POST /api/shop/claw {boss, request, seed?}: Boingo's claw machine (Nov 6; claw.ts, playClaw): one of the boss's tokens in, and a
+  // chance (CLAW.winChance) at its Boss Crate, into your inventory unopened. The server rolls it now, in one transaction with the
+  // token and the crate; `request` is the app's id for the play, so a retry answers the first play and spends nothing again.
+  // Signed-in accounts only (a guest: refused, nothing spent). `seed` (the e2e's hook) only where TEST_SWITCHES is "1", never in
+  // production and never an admin's. Answers {won, crate?, boss, again?, locker}.
+  if (path === "/api/shop/claw" && request.method === "POST") {
+    if (!isSignedIn(current)) return json({ message: "Sign in to play the claw machine." }, 403);
+    const b = (await request.json().catch(() => ({}))) as { boss?: unknown; request?: unknown; seed?: unknown };
+    const seed = (env as AdminEnv).TEST_SWITCHES === "1" && typeof b?.seed === "number" && Number.isInteger(b.seed) ? b.seed : undefined;
+    const r = await playClaw(sql, current.id, b?.boss, b?.request, now, { admin, ...(seed !== undefined ? { seed } : {}) });
+    return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
   // POST /api/shop/boss-crate {crate, way, request}: buys a boss's crate inside its shop, with 3 of the boss's tokens ("tokens") or a
   // token and a crate key ("key"), into your inventory, unopened (Nov 2): one transaction (boss-tokens.ts, buyBossCrate). Answers
   // {crate, locker}. (The Crates tab opens it: /api/locker/open.) `request`: the app's id for the buy (a retry buys it once).

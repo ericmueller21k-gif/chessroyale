@@ -398,6 +398,7 @@ export const BOSS_CRATES: readonly BossCrateDef[] = [
   bossCrate("gingerbread", "Ginger's Boss Crate", "ginger-sled"),
   bossCrate("folio", "Folio's Boss Crate", "folio-crane"),
   bossCrate("smudgy", "Smudgy's Boss Crate", "smudgy-brush"),
+  bossCrate("clown", "Boingo's Boss Crate", "boingo-pogo"),
 ];
 
 export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id);

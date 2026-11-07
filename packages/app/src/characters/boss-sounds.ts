@@ -17,6 +17,7 @@ import { tigerSound } from "./tiger-sounds.ts";
 import { folioSound } from "./folio-sounds.ts";
 import { timberSound } from "./timber-sounds.ts";
 import { dashSound } from "./dash-sounds.ts";
+import { clawSound } from "../claw/sounds.ts";
 
 /**
  * The bosses' synthesized sounds by module, each name its cache's (synth.ts, soundCache): one table for the page and
@@ -44,6 +45,8 @@ const MAKERS = {
   folio: folioSound,
   timber: timberSound,
   dash: dashSound,
+  // (Boingo's claw machine's, not a boss's: the same cache, worker and ahead-of-time making.)
+  claw: clawSound,
 } as const;
 
 /** One boss sound: its module and its name there. */

@@ -145,6 +145,13 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u, { now }) => eraseMoves(u.id, now),
   },
   {
+    // Boingo's claw machine (claw.ts, Nov 6): every play the player made (which boss's token, won or not, the crate it won, when).
+    name: "claw",
+    tables: ["claw_plays"],
+    export: async (sql, u) => ({ plays: await all(sql, "SELECT boss, won, crate, at FROM claw_plays WHERE user_id = ? ORDER BY at", u.id) }),
+    erase: (u) => [stmt("DELETE FROM claw_plays WHERE user_id = ?", u.id)],
+  },
+  {
     // Reports about players (fair play's sheet). The download has the ones the player made; deleting removes those
     // and the ones about them. A report of a town chat line keeps the line's text and time (`line`, `line_at`): they're
     // the reported player's words, so the reporter's download leaves them out, and they go with either account.

@@ -26,6 +26,7 @@ import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
 import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
+import { clawSound, type ClawSound } from "./claw/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
 import { makeBossSound, type BossSound } from "./characters/boss-sounds.ts";
@@ -481,6 +482,7 @@ const gardenerBoss = (name: GardenerSound) => (t: number) => buffer(gardenerSoun
 const tigerBoss = (name: TigerSound) => (t: number) => buffer(tigerSound(name, ctx!.sampleRate), t);
 const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, ctx!.sampleRate), t);
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
+const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
 const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
@@ -1068,7 +1070,12 @@ export type SoundName =
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
   | "sqSting"
-  | "colosseumCheer";
+  | "colosseumCheer"
+  // Boingo's claw machine (Nov 6): synthesized, see claw/sounds.ts. The coin in the slot, the claw's whir, its grab, a prize's thud.
+  | "clawCoin"
+  | "clawWhir"
+  | "clawGrab"
+  | "clawThud";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => pieceSample("move", t),
@@ -1111,6 +1118,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The Colosseum's crowd cheering a queen taken (sounds/colosseum/CREDITS.md): fetched when the Colosseum opens, not
   // with the samples every screen loads.
   colosseumCheer: (t) => fileSample(COLOSSEUM_CHEER, t, 0.9),
+  clawCoin: clawPlay("coin"),
+  clawWhir: clawPlay("whir"),
+  clawGrab: clawPlay("grab"),
+  clawThud: clawPlay("thud"),
   gkLeave: (t) => sample("gkLeave", t, 0.6),
   // The judge's gavel at a cut: two heavy wooden knocks (the classic capture and move sounds, pitched down to about
   // half, whatever the pick: as it was before Oct 12, the classics being the defaults again).
@@ -1704,6 +1715,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashThud: [["dash", "thud"]],
   dashBrush: [["dash", "brush"]],
   kingCant: [["godKing", "cant"]],
+  clawCoin: [["claw", "coin"]],
+  clawWhir: [["claw", "whir"]],
+  clawGrab: [["claw", "grab"]],
+  clawThud: [["claw", "thud"]],
 };
 /** The sound worker (sound-worker.ts), started with the first warmSounds; null where there's none (or it failed). */
 let worker: Worker | null | undefined;
