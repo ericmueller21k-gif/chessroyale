@@ -385,3 +385,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - OPEN BUG (recurring): e2e/town-controls.spec.ts:163 "hold to run" (phone) — "right runs you 1,0" got -1,0. Seen on #545's CI
   (both tries), locally on #545's old base (even with main's lamp plan), and twice in combined runs by the leave-confirm helper; passes
   alone. Root-cause it (not a flake): next free helper slot.
+- **Nov 7 ~19:45: main 83aa78f5 (#548 leave confirm) e2e RED** (all intermittent-looking, both tries failed):
+  boss-challenge.spec:1135 Timber card tap (phone; also seen on #541's CI: recurring), squads-watch:167 (phone), squads-three-boards:152
+  (desktop); flaky: dash.spec:241 Scramble Rush 4 of 6 (both projects), town-leave:143 (phone). #549 (hold-to-run test fix) merged
+  after it (1f57f9af); waiting on its main run to see which repeat. Then root-cause each (helpers).
