@@ -80,3 +80,11 @@ point 2): a stage-4 queen on it was 20 px tall, against a queen piece of 44 px a
 
 **Files.** `packages/app/src/components/Tiger.tsx`, `packages/app/src/styles.css`, `packages/app/test/tiger-wired.test.ts`,
 `e2e/tiger.spec.ts`, `docs/areas/bosses.md`.
+
+**Update (Nov 7, 2026): in front of him.** Eric: "make him bigger, and then the pump can just be sitting in front of him, slightly
+overlapping … like just 10 pixels even is enough … he can grow considerably in size … to match our new size default." Babur is now
+everyone's size (docs/decisions/2026-11-07-one-side-size.md: 3.25 at 1440 × 900, 3.4 at 1920 × 1080; was 2), leaning to the board,
+in everyone's column (his own wider one is gone, so his board is everyone's: 760 at 1440, was 728). The pump is drawn over him
+(z 1), its drawn right edge 10 px over his drawn left edge (`PUMP_OVER`), slid further onto him only where the side menu is in the way,
+up to 0.4 of its width (`PUMP_OVER_MAX`; 42 px at 1440, 50 at 1920); past that, the taller bar as before. Point 2's "6 px left of
+him" and point 4's sizes are superseded; the pump's scale is unchanged. Tests: `tiger-wired.test.ts`, `e2e/tiger.spec.ts` (over him).
