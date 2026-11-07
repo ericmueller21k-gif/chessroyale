@@ -24321,12 +24321,13 @@ button.sq-tiny {
   color: #f2c14e;
 }
 
-/* The first-time walkthrough (components/Walkthrough.tsx): the spot is cut out of the dim (its box-shadow), with a gold ring and a
-   pulsing glow; the bubble docks at the top or bottom. */
+/* The first-time walkthrough (components/Walkthrough.tsx): each lit element is cut out of one dim (an SVG mask, a hole per element),
+   with a gold glow at its edge and a pulsing glow; the bubble docks at the top or bottom. */
 .wt-root { position: fixed; inset: 0; z-index: 900; cursor: pointer; }
-.wt-dim { position: absolute; inset: 0; background: rgba(8, 10, 14, 0.62); animation: wt-fade-in 250ms ease; }
-/* The spot is the element's exact box, transparent inside: only its box-shadow dims the outside. No ring and no padding. */
-.wt-spot { position: absolute; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6); pointer-events: none; }
+.wt-dim { position: absolute; inset: 0; width: 100%; height: 100%; animation: wt-fade-in 250ms ease; }
+.wt-hole.wt-glide { transition: x 250ms ease, y 250ms ease, width 250ms ease, height 250ms ease; }
+/* The glow box is the element's exact box, transparent inside. No ring and no padding. */
+.wt-spot { position: absolute; border-radius: 14px; pointer-events: none; }
 /* The gold glow starts at the element's edge (no spread gap) and fades outward; only its opacity pulses. */
 .wt-spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 14px 4px rgba(245, 197, 66, 0.75); animation: wt-glow 1.6s ease-in-out infinite; }
 .wt-spot.wt-glide { transition: top 250ms ease, left 250ms ease, width 250ms ease, height 250ms ease, transform 250ms ease, border-radius 250ms ease; }
@@ -24352,7 +24353,9 @@ button.sq-tiny {
 .wt-bar > span { display: block; height: 100%; background: #f5c542; transition: width 260ms ease; }
 .wt-progress { font-size: 13px; opacity: 0.8; }
 .wt-inventory { display: block; width: 100%; margin: 0 0 10px; padding: 10px 14px; border: 0; border-radius: 10px; background: #1d2230; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
-.wt-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 6px 0 10px; }
+.wt-finish { display: grid; gap: 8px; }
+.wt-ok { display: block; width: 100%; padding: 10px 14px; border: 0; border-radius: 10px; background: #1d2230; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.wt-check { display: flex; gap: 8px; align-items: center; font-size: 14px; margin: 2px 0 0; }
 .wt-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .wt-skip { background: none; border: 1px solid currentColor; color: inherit; border-radius: 10px; padding: 8px 14px; cursor: pointer; }
 .wt-tap { font-size: 13px; opacity: 0.8; }
@@ -24362,6 +24365,6 @@ button.sq-tiny {
   .wt-spot { animation: wt-fade-in 250ms ease; }
   .wt-spot::after { animation: none; opacity: 1; }
   .wt-lit { transform: none; }
-  .wt-spot.wt-glide, .wt-track, .wt-bar > span { transition: none; }
+  .wt-spot.wt-glide, .wt-hole.wt-glide, .wt-track, .wt-bar > span { transition: none; }
 }
 

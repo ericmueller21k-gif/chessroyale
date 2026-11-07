@@ -4,6 +4,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **The first-time walkthrough** (`components/Walkthrough.tsx`, slides in `tutorial.ts`): 13 slides; each lights every visible
+  `data-tour` element (a computer's side menu and home button both). Only the last slide has OK and "Don't show me this again";
+  `?tour=1` reopens it. Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).
+
 - **Kill switches and the maintenance banner** ([ops.md](ops.md) "Kill switches"): a mode, Solo and Boss alone, or
   Squads resting disables its way in on the home screen with its line ("Squads is resting for a bit. Back soon.": under
   PLAY, in the Party sheet, in Play with friends, on the Boss raid screen under its choices); the boss menu hides a resting
