@@ -194,3 +194,28 @@ export const SELECT_TINT: Readonly<Record<string, string>> = {
   // (A deep violet, across the wheel from his gold fur and orange cap and away from his teal jacket.)
   dash: "#5a3f8e",
 };
+
+/**
+ * Each boss's goodbye in the town, after a battle it fought from there (Eric, Nov 7: "that boss says one goodbye line in their
+ * personality"): one line, by its roster id, said as you walk back into the square (its bubble, and the town's chat). In its own
+ * voice, short, no emoji; under 60 characters (a test checks: it fits the bubble's two rows).
+ */
+export const GOODBYE_LINES: Readonly<Record<string, string>> = {
+  gingerbread: "That was fun! Come back soon, it's cool in here.",
+  clown: "That was a blast! Honk honk, come back anytime!",
+  grex: "That was hot! Come back and play again soon!",
+  hollow: "Good game. The dark will keep your seat warm.",
+  bigboy: "That was fun! Big boy wants a rematch. Come back!",
+  sawyer: "Good game. Come back, the table will hold up.",
+  pig: "That was fun, partner. Come back anytime!",
+  alfil: "Good game! The Pyramid door stays open for you.",
+  hopper: "That was fun! Hop back soon, friend!",
+  smudgy: "That was fun! Come back, I've got a new painting.",
+  moo: "That was fun! Come back anytime! (Moo!)",
+  gardener: "That was fun. Mind the flower beds on your way out.",
+  tiger: "That was fun! Come back anytime, no roaring needed.",
+  folio: "That was a good read. Come back for another draft.",
+  timber: "That was fun! Come back anytime, the sawdust is fresh.",
+  dash: "That was fun, fam. Come back anytime. No cap.",
+  recluse: "Good game. Come back and bring a better opening.",
+};

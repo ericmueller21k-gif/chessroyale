@@ -6,7 +6,7 @@
  * square-to-square walk, the same hobble, the same pauses. Every number that shapes the feel is in feel.ts.
  */
 import { adminFirst, type ItemLook } from "@chessroyale/core";
-import { SELECT_LINES } from "../characters/boss-select.ts";
+import { GOODBYE_LINES, SELECT_LINES } from "../characters/boss-select.ts";
 import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { ADMIN_TOWN, STREET_TOWN } from "./admin-town.ts";
 import { STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
@@ -930,6 +930,15 @@ export function seatOf(text: string | null | undefined): Seat | null {
  * you sit on your stool at that table and the bot across (it gets up after `botLeaveAfterGameMs`). `outN`: how many bots
  * are out in the square (`botsOut`; the tests may have them all out).
  */
+/**
+ * Back from a boss's battle that it fought from the town: that boss (its home's id) says its goodbye as the town opens (Eric,
+ * Nov 7), once, in its bubble. Set by the app as it leaves the battle; taken (and cleared) by the next createTown.
+ */
+let goodbyeFrom: string | null = null;
+export function setGoodbyeFrom(id: string | null): void {
+  goodbyeFrom = id;
+}
+
 export function createTown(now: number, seed = 20261025, seat: Seat | null = null, outN = TOWN_FEEL.botsOut, stand: Stand | null = null): Town {
   const rnd = lcg(seed);
   const f = TOWN_FEEL;
@@ -980,6 +989,12 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     homeQueue: order.filter((i) => !out.has(i)).map((i) => bots[i]!),
     crowd: [],
   };
+  // (Its goodbye, in its bubble: the same bubble its own lines use, for the time they stay up.)
+  const bye = goodbyeFrom ? bosses.find((b) => b.home.id === goodbyeFrom) : undefined;
+  goodbyeFrom = null;
+  if (bye && GOODBYE_LINES[bye.home.id]) {
+    t.speech = { boss: bye, line: GOODBYE_LINES[bye.home.id]!, until: now + f.speechMs, next: now + f.speechMs + f.speechGapMs[0] };
+  }
   return t;
 }
 
