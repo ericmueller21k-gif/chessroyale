@@ -2723,8 +2723,21 @@ export const GLOBAL_CHAT_BOTS: boolean = true;
  * See DECISIONS.md, "Global chat on the home page".
  */
 export const GLOBAL_CHAT = {
-  /** One message per account every this long (the server enforces it; the app only mirrors it). */
-  gapMs: 30_000,
+  /**
+   * One message per account every this long (the server enforces it; the app only mirrors it). 5 s since typed chat (Eric, Nov 7;
+   * it was 30 s for the quick chips).
+   */
+  gapMs: 5_000,
+  /**
+   * The global chat's server-wide cap (Eric, Nov 7): at most `capCount` messages in any `capWindowMs` across every player. A message
+   * past it waits its turn in line (it shows a moment late, never out of order) for at most `queueMs`; past that the sender hears
+   * "Chat is busy, try again." and nothing is kept.
+   */
+  capCount: 5,
+  capWindowMs: 1_000,
+  queueMs: 10_000,
+  /** A typed message's most characters, after tidying (the town square's count: an emoji is one, a `:name:` code its letters). */
+  maxChars: 80,
   /** The server keeps this many lines for newcomers, and the panel shows at most this many. */
   keep: 50,
   /** Lines older than this aren't shown any more. */
@@ -2741,8 +2754,16 @@ export const GLOBAL_CHAT = {
 } as const;
 
 /**
- * The town square's chat (Eric, Oct 28: "I think it actually is totally fine to allow typing"): the one chat with typed
- * messages; every other chat stays preset lines. Signed-in players only (accounts are 13 and older); the server enforces
+ * Typed chat (Eric, Nov 7; docs/decisions/2026-11-07-typed-chat-column.md): players type in the global chat and in a match's and its
+ * lobby's chat, under the age gate (a device answered "too young" keeps the quick chips; guests read), each player's opt-in (off by
+ * default) and the filter. **The one switch back:** false brings the quick chips back everywhere (the global chat's Lobby / Yours /
+ * Emoji tabs, a match chat's phrase picks) and the server takes preset lines only, as before Nov 7.
+ */
+export const CHAT_TYPED: boolean = true;
+
+/**
+ * The town square's chat (Eric, Oct 28: "I think it actually is totally fine to allow typing"): typed messages (the other chats too
+ * since Nov 7: CHAT_TYPED). Signed-in players only (accounts are 13 and older); the server enforces
  * every number here and the app mirrors them. The room holds its lines in memory only (the live hub), never stored.
  * The kill switch is the Worker variable PAUSE_TOWN_CHAT (pauses.ts). docs/decisions/2026-10-28-town-chat-typing.md.
  */
