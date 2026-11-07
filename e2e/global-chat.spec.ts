@@ -175,6 +175,18 @@ test("a device the age gate marked too young keeps the quick chips (typed text r
   for (const p of [ann, kid, guest]) await p.context().close();
 });
 
+test("a phone has no right column: no global chat is drawn or polled there", async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "a phone's");
+  const asked: string[] = [];
+  page.on("request", (r) => r.url().includes("/api/live") && asked.push(r.url()));
+  await named(page, `Phone${run}`);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Global chat" })).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  expect(asked.filter((u) => /[?&]chat=/.test(u))).toEqual([]);
+});
+
 // ---------------- The column: the same place on every screen ----------------
 
 type Spots = { colX: number; colW: number; friends: number; chat: number; band: number; bandH: number; slotH: number };

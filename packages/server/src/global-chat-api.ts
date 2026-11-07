@@ -76,7 +76,6 @@ export interface ChatAsker {
  */
 export async function chatPostResponse(request: Request, sql: Sql, hub: ChatHub, a: ChatAsker, now: number): Promise<Response> {
   const { user } = a;
-  if (!mayTownChat(user)) return json({ message: SIGN_IN_TO_CHAT }, 401);
   if (Number(request.headers.get("content-length")) > TOWN_BODY_MAX) return json({ message: typedTooLong(GLOBAL_CHAT.maxChars) }, 413);
   const raw = await request.text().catch(() => "");
   if (raw.length > TOWN_BODY_MAX) return json({ message: typedTooLong(GLOBAL_CHAT.maxChars) }, 413);
@@ -95,6 +94,8 @@ export async function chatPostResponse(request: Request, sql: Sql, hub: ChatHub,
   // A moderator's chat ban (chat-mod.ts): reading only.
   const block = await chatBlock(sql, user.id, now);
   if (block) return json({ message: CHAT_OFF, block }, 403);
+  // (Guests read, always: after the bans, so a guest with a moderator's chat ban hears why.)
+  if (!mayTownChat(user)) return json({ message: SIGN_IN_TO_CHAT }, 401);
   const row = await sql.first<{ name: string; icon: string | null; rating: number | null; chat_on: number | null }>("SELECT name, icon, rating, chat_on FROM users WHERE id = ?", user.id);
   if (row?.chat_on !== 1) return json({ message: CHAT_NOT_ON, chatOff: true }, 403);
   // (A name from before the name filter that it refuses goes out as "Player".)
