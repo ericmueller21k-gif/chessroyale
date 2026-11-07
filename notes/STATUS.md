@@ -348,3 +348,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   everyone (server presence), and on return you land on the home page with a small "You were away" note. Numbers in settings.ts.
   **Eric's call (Nov 7):** after a few min idle (3 min) a "zzz" floats over the pawn (no text box; others see it too). Boot at 10 min
   of either: no movement while visible, OR in the background. Then: pawn leaves for everyone; on return, home page + "You were away".
+- Nov 7 ~02:00: Eric OK'd Boingo (#537, MERGED fae97429) and Smudgy/sprite kit (#539: main merged in, CI rerun, merge on green).
+  Item ledger backfill SHELVED by Eric ("will pick that up another day"): don't list it as waiting.
