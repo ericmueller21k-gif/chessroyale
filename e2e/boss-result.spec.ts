@@ -1,5 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
-import { bossAloneFromHome } from "./helpers.ts";
+import { expect, type Page } from "@playwright/test";
+import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
 
 /**
  * Eric, Nov 7: a boss battle's result screen has no trophy or skull above its title, its title in the God King's pixel type,
@@ -39,6 +39,9 @@ test("a boss battle won: Victory!, no trophy or skull, no record text, the boss'
   // You mate the boss at once (?win=1): Victory!, and the boss's defeat line.
   await page.goto("/?debug&pace=quick&win=1");
   await bossAloneFromHome(page);
+  // Your move (?win=1: Qxf7 mates him, from h5).
+  await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+  await submitMove(page, "h5f7");
   await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
   await resultOf(page, testInfo.project.name, "victory");
 });
