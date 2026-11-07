@@ -23,7 +23,9 @@ async function openIn(page: Page, room: string, afk: string) {
   const id = await asSignedIn(page, "afk");
   await page.goto(`/town?sky=day&townroom=${room}&townafk=${afk}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
-  await page.waitForFunction(() => typeof (window as any).__townHere === "function");
+  await page.waitForFunction(() => typeof (window as any).__townHere === "function" && typeof (window as any).__townChatter === "function");
+  // (The bosses' own chatter stopped: the log holds only what this test makes.)
+  await page.evaluate(() => (window as any).__townChatter(false));
   await expect(page.locator(".tc-form input")).toBeEnabled();
   return id;
 }
@@ -47,16 +49,18 @@ const room = () => `afk${Date.now().toString(36)}${Math.random().toString(36).sl
 test("after the zzz wait with no input a \"zzz\" floats over your pawn, for you and another player (no bubble or words); your next input clears it for both", async ({ page, browser }, info) => {
   test.setTimeout(120_000);
   const r = room();
-  // (Ann: the zzz after 3 s; Bo watches, his own numbers long.)
+  // (Ann: the zzz after 10 s; Bo watches, his own numbers long.)
   const bo = await another(browser, info.project.name === "phone");
   const boId = await openIn(bo, r, "600,900,900");
-  const annId = await openIn(page, r, "3,600,600");
-  // Both in the town for each other, neither away.
+  const annId = await openIn(page, r, "10,600,600");
+  // Both in the town for each other; Ann taps a key (her clock starts again) and Bo sees her not away.
   await expect.poll(async () => (await them(bo, annId))?.here, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => (await them(page, boId))?.here, { timeout: 15_000 }).toBe(true);
-  expect((await them(bo, annId))!.zzz).toBe(false);
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(async () => (await them(bo, annId))?.zzz, { timeout: 8_000 }).toBe(false);
+  expect((await them(bo, annId))!.drawn).toBe(false);
   // Ann leaves it alone: her zzz, on her screen (over her own pawn) and on Bo's (drawn over hers).
-  await expect.poll(async () => (await me(page)).drawn, { timeout: 10_000 }).toBe(true);
+  await expect.poll(async () => (await me(page)).drawn, { timeout: 15_000 }).toBe(true);
   await expect.poll(async () => {
     const a = await them(bo, annId);
     return a ? [a.zzz, a.drawn] : null;
