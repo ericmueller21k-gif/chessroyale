@@ -229,6 +229,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await shot("07-result");
   await back.click();
   await backAt(page, stood);
+  // Alfil's goodbye (Eric, Nov 7), in his bubble as you walk back in: the town's own speech, read from its state (the bubble is canvas).
+  await expect.poll(() => page.evaluate(() => (window as any).__townCam().speechLine as string), { timeout: 3_000, intervals: [100] }).toBe("Good game! The Pyramid door stays open for you.");
   // The server's lines: still the one start line (the quit left it open: no second), and this battle's outcome (?mate=1 plays
   // your moves for you, none of them yours: no count; the counts are packages/server/test/town-chat.test.ts's).
   await expect

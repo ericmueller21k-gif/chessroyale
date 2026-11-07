@@ -261,6 +261,13 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // The result screen: he rises if the crowd won, otherwise he stays down. Beside him, the Last Stand's card: one
   // line, and tapped open, your move, the best move, your chances and the position with both arrows.
   await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
+  // Eric, Nov 7: your pawn stands beside him (his feet level with yours, on his right), and no trophy above the title.
+  await expect(page.locator(".results .trophy")).toHaveCount(0);
+  const god = await page.locator(".gk-epilogue .god-king").boundingBox();
+  const mine = await page.locator(".gk-epilogue-you .you-pawn").boundingBox();
+  expect(mine, "your pawn beside him").not.toBeNull();
+  expect(mine!.x, "to his right").toBeGreaterThan(god!.x + god!.width / 2);
+  expect(Math.abs(mine!.y + mine!.height - (god!.y + god!.height)), "feet level").toBeLessThan(24);
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

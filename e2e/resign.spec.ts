@@ -72,7 +72,8 @@ test("Boss alone: Cancel keeps playing; Resign ends the game at once, a loss (\"
   await expect.poll(() => phase(page), { timeout: 5_000 }).toBe("results");
   await expect(page.locator(".results h1")).toHaveText("You resigned");
   await expect(page.locator(".results .team-result").first()).toHaveText(/Ginger won\./);
-  await expect(page.locator(".results")).toContainText("It counts as a loss.");
+  // (A boss battle's result says no record, win or loss, in words: Eric, Nov 7; its counts just move.)
+  await expect(page.locator(".results")).not.toContainText("It counts as a loss.");
   // The boss battle's result page (Nov 2): no stage table or best and worst boards, no "Your game, move by move" button; the
   // review is on the page, one board with its stepper (◀ ▶, round 2), and the stepper and board are the same width, centered
   // (the top part's way).
