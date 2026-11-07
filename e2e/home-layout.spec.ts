@@ -218,11 +218,10 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     await page.setViewportSize({ width: w, height: h });
     await page.goto(`/?debug&pool=inplace-${w}-${run}`);
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    // Your coins and pawn: the top right of the page, in the live panel.
-    await expect(panel.getByRole("button", { name: "Your profile" })).toBeVisible();
-    const ring = (await panel.getByRole("button", { name: "Your profile" }).boundingBox())!;
-    expect(ring.y).toBeLessThan(40);
-    expect(ring.x + ring.width).toBeGreaterThan(w - 40);
+    // The right column (Eric's mockup, Nov 7): its top slot empty off the town, then FRIENDS; no pawn at the top right any more
+    // (Profile is the side menu's).
+    await expect(panel.getByRole("button", { name: /^FRIENDS/ })).toBeVisible();
+    await expect(panel.getByRole("button", { name: "Your profile" })).toHaveCount(0);
     // Your card starts at the top (level with the logo), not low with space above it.
     const hero = (await page.locator(".fd-hero").boundingBox())!;
     expect(hero.y).toBeLessThan(40);
@@ -490,7 +489,8 @@ test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Set
     await expect(play).toBeVisible();
     await expect(page.locator(".fd-top-gear")).toBeHidden();
     await expect(page.locator(".fd-side").getByRole("button", { name: "Settings" })).toBeVisible();
-    await expect(page.locator(".fd-right > .fd-top-right .fd-ring")).toBeVisible();
+    // (The right column's pawn went with Eric's mockup, Nov 7: Profile is the side menu's.)
+    await expect(page.locator(".fd-right .fd-ring")).toHaveCount(0);
     const name = page.locator(".fd-hero-name");
     await expect(name).toHaveText("Columned");
     expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth), `${w}×${h}`).toBe(true);
@@ -520,11 +520,12 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   expect(Math.abs(s.width - a.width), "the two half cards the same width").toBeLessThan(1);
   expect(Math.abs(s.height - a.height), "the two half cards the same height").toBeLessThan(1);
   expect(Math.abs(s.width * 2 + 10 - t.width), "two half cards and their gap are Chess Town's width").toBeLessThan(1);
-  // Chess Town: the town square (/town), drawn; Back is home.
+  // Chess Town: the town square (/town), drawn; Back is home (a computer has no Back since Nov 7: the side menu's Play).
   await town.click();
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
   expect(new URL(page.url()).pathname).toBe("/town");
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  if (test.info().project.name === "desktop") await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play", exact: true }).click();
+  else await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
   // Boss Battle: its screen, titled so, with START (no list of options). Back is home.

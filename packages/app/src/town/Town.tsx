@@ -342,7 +342,11 @@ export function TownScreen({
       {/* On a computer (in the frame) the bar is gone (Eric, Nov 7): the map, chat and settings buttons are in the right column's top slot,
           under "TOWN" (FrontMenu.tsx RightPanel), in the town and in its rooms; a room's door card (Go out) and the side menu lead out. */}
       {framed ? (
-        slot && createPortal(<TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />, slot)
+        <>
+          {/* (The page's title stays for screen readers.) */}
+          <h1 class="town-sr-title">{inside ? (HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square") : "Town square"}</h1>
+          {slot && createPortal(<TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />, slot)}
+        </>
       ) : (
         <header class="town-bar">
           {/* (Inside a shop, back takes you out to the town square.) */}

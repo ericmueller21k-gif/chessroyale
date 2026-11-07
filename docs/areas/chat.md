@@ -4,8 +4,8 @@ Lane: `social`.
 
 ## How it works today
 
-- **No free text in chat, except the town square's** (Eric, Oct 28: "I think it actually is totally fine to allow
-  typing"; below). Everywhere else a message is the id of a line from a fixed list (a phrase or an emoji). The server
+- **No free text in chat, except the town square's and the global chat's** (Eric, Oct 28: "I think it actually is totally fine to allow
+  typing"; Nov 7 for the global chat; below). Everywhere else a message is the id of a line from a fixed list (a phrase or an emoji). The server
   relays only known lines the sender owns, within the limits; names come from the lobby or the account, never from the
   message. What players can abuse is how they use the lines (spam, taunts), their name and their icon: see
   Moderation below. Squads has no chat. Ranked 1 v 1 has the match's quick chat, one channel for its two players
@@ -45,9 +45,13 @@ Lane: `social`.
   (`QUICK_CHAT.bot*`), never more than `botMaxPerMinute`.
 - **Lobby chat:** the same quick chat while a match fills (the queue's grid), one channel for everyone waiting; its
   lines stay in the match's feed once teams begin.
-- **Global chat on the home page** (a computer's right column): one shared room, preset lines only, one message per
-  account every `GLOBAL_CHAT.gapMs`, the last `keep` lines kept for newcomers. Reading rides on the live line's poll
-  (`/api/live?chat=N`): no socket or poll of its own. Posting is POST `/api/chat`; guests read only. With
+- **Global chat** (a computer's right column on every framed page; typed since Nov 7, [docs/decisions/2026-11-07-typed-chat-column.md](../decisions/2026-11-07-typed-chat-column.md)):
+  one shared room. Off until you turn it on (the gear or Settings; "Turn on chat?" once; `users.chat_on`, a guest's on the device).
+  Signed-in players type (the town square's tidy and filter, `GLOBAL_CHAT.maxChars`, `:name:` pixel emoji from `chat-emoji.tsx`); a device
+  answered "too young" keeps the quick chips and never gets typed lines; guests read. One message every `gapMs` (5 s), and server-wide
+  `capCount` a `capWindowMs` with a line up to `queueMs`, then "Chat is busy, try again." `CHAT_TYPED` false brings the chips back.
+  The last `keep` lines kept for newcomers. Reading rides on the live line's poll
+  (`/api/live?chat=N`): no socket or poll of its own. Posting is POST `/api/chat`. With
   `GLOBAL_CHAT_BOTS` on, a bot line now and then while someone has it open (made when someone asks, never on a timer).
   A deleted account's lines leave it (`GlobalChat.forgetAccount`, through the live hub), and a player's own lines are
   in their data download ([accounts.md](accounts.md)).

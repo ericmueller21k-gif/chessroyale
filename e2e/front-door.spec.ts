@@ -8,7 +8,9 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await page.goto("/");
   // The logo you can see: the top bar's on a phone, the side menu's on a computer (both are in the page).
   await expect(page.locator(".fd-logo").filter({ visible: true })).toHaveText("HunChess");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  // Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer (the right column's pawn went, Nov 7).
+  if (test.info().project.name === "desktop") await expect(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).toBeVisible();
+  else await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   // The live line: you're online (the app told the server you're here).
   const line = page.getByRole("status").filter({ hasText: "online" });
@@ -68,7 +70,8 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // (Friends and Account show once accounts are on, Friends right after Quick chat; the order is the same either way.)
   const labels = async () => (await page.locator(".fd-settings .fd-label").allTextContents()).filter((l) => l !== "ACCOUNT" && l !== "FRIENDS");
   // (SQUADS, Nov 5: Quick board jump, always there, after the board's choices.)
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
+  // (CHAT, Nov 7: the chat's opt-in, before Quick chat.)
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS"]);
   // Gone (Eric, Oct 15): practice mode and the eval bar for players, the pre-game votes' and Classic's opening moves'
   // switches, the sound lab (its choice is the Reveal sound picker).
   await expect(page.getByRole("switch", { name: /Practice mode|Eval bar|Pre-game votes/ })).toHaveCount(0);
@@ -89,7 +92,7 @@ test("settings: the sections in order, the board's choices stick, and Testing (p
   // shown, switched off and not tappable).
   await asAdmin(page);
   await page.reload();
-  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
+  await expect.poll(labels).toEqual(["THEME", "SOUND", "BOARD", "SQUADS", "CHAT", "QUICK CHAT", "HOW TO PLAY", "HELP", "PRIVACY AND TERMS", "TESTING"]);
   const practice = page.getByRole("switch", { name: /Practice mode/ });
   await expect(practice).not.toBeChecked();
   await expect(page.getByRole("switch", { name: /Eval bar/ })).not.toBeChecked();
@@ -183,12 +186,12 @@ test("computer: a side menu, the center and a live panel; the phone keeps one co
   const hero = (await page.locator(".fd-hero").boundingBox())!;
   const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
   expect(play.x).toBeGreaterThan(hero.x + hero.width - 1);
-  // A match being played shows on the panel's list (no names, just the mode and who's left).
+  // A match being played counts on the column's live line under FRIENDS (its "Playing now" list went, Nov 7: Eric's mockup).
   const other = await (await browser.newContext()).newPage();
   await other.goto("/?pool=panel");
   await pickMode(other);
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect(panel.locator(".fd-playing").filter({ hasText: "Crowd · 50 v 50" }).first()).toBeVisible({ timeout: 40_000 });
+  await expect(panel.locator(".rc-online")).toContainText(/ · [1-9]\d* match(es)? · /, { timeout: 40_000 });
   await other.close();
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
