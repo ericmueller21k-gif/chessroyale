@@ -40,6 +40,7 @@ import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
+import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
 import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
@@ -1492,6 +1493,23 @@ export function App() {
             setTownSeat(null);
             setTownStand(null);
             history.replaceState(null, "", "/");
+          }}
+          // Away too long (town/afk.ts): home (one replaceState, no reload), with "You've been dropped from the town" there.
+          onAway={() => {
+            showAwayNote();
+            setShowTown(false);
+            setTownSeat(null);
+            setTownStand(null);
+            history.replaceState(null, "", "/");
+          }}
+          // A guest's town time is up (town/afk.ts), Sign up: out of the town to the app's own sign-in (the landing page, as
+          // nav.signIn does from the chat).
+          onSignIn={() => {
+            setShowTown(false);
+            setTownSeat(null);
+            setTownStand(null);
+            history.replaceState(null, "", "/");
+            chooseGuest(false);
           }}
           // A boss's "Challenge alone", confirmed: out of the town square to the Solo Boss Mode screen (the solo form, as the
           // side menu opens it; Eric, Oct 26), that boss's tile picked (the screen reads its pick from rememberBossPick as it

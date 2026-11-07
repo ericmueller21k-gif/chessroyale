@@ -5,7 +5,7 @@ import { CHAT_OFF, chatBlock } from "./chat-mod.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { cachedUserId } from "./presence.ts";
 import { BANNED_FROM_CHAT } from "./global-chat-api.ts";
-import { TOWN_INPUT_MAX, TOWN_TOO_LONG, tidyColor, townSince, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
+import { TOWN_CHAT_ROOM, TOWN_INPUT_MAX, TOWN_TOO_LONG, tidyColor, townSince, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSlice, type TownSnapshot } from "./town-chat.ts";
 import type { LiveHub } from "./live-hub.ts";
 
 /**
@@ -26,16 +26,23 @@ export const SIGN_IN_TO_TOWN_CHAT = "Sign in to chat with other players.";
 export const TOWN_CHAT_AGE = "Chat with other players is for accounts 13 and older.";
 export const TOWN_CHAT_PAUSED = pausedLine("town-chat");
 
-/** The room as this Worker instance last read it, shared by every reader on it for TOWN_CHAT.readCacheMs. */
-let cache: { at: number; snap: TownSnapshot } | null = null;
+/**
+ * The chat room a request means: a test's own (`townroom`, the name the town square uses too: town-here-api.ts) where the test
+ * switches are on, so each test's lines stay in its own room; else the town's one room, as production has it.
+ */
+export const chatRoomOf = (room: unknown, testSwitches: boolean): string =>
+  testSwitches && typeof room === "string" && /^[\w-]{1,40}$/.test(room) ? `test:${room}` : TOWN_CHAT_ROOM;
+
+/** The rooms as this Worker instance last read them, each shared by every reader on it for TOWN_CHAT.readCacheMs. */
+const caches = new Map<string, { at: number; snap: TownSnapshot }>();
 /** Accounts this instance has found signed in (by id, for a minute): a reader's poll is usually no D1 read. */
 const signed = new Map<string, number>();
 const SIGNED_MS = 60_000;
 const SIGNED_MAX = 20_000;
 /** Forgets the cached room and sign-ins (tests). */
 export const forgetTownCache = () => {
-  cache = null;
-  forcedAt = -Infinity;
+  caches.clear();
+  forced.clear();
   signed.clear();
 };
 /**
@@ -44,11 +51,11 @@ export const forgetTownCache = () => {
  * instance's memory past a moment.
  */
 export function expireTownCache(now: number) {
-  if (cache && now - cache.at > TOWN_CHAT.readCacheMs) cache = null;
+  for (const [room, c] of caches) if (now - c.at > TOWN_CHAT.readCacheMs) caches.delete(room);
 }
 /** Keeps a fresh copy of the room, and lets it go TOWN_CHAT.readCacheMs later (the request's waitUntil keeps the timer). */
-function keep(snap: TownSnapshot, now: number, waitUntil?: (p: Promise<unknown>) => void) {
-  cache = { at: now, snap };
+function keep(snap: TownSnapshot, now: number, waitUntil: ((p: Promise<unknown>) => void) | undefined, room: string) {
+  caches.set(room, { at: now, snap });
   waitUntil?.(new Promise((r) => setTimeout(r, TOWN_CHAT.readCacheMs + 50)).then(() => expireTownCache(Date.now())));
 }
 /**
@@ -56,7 +63,7 @@ function keep(snap: TownSnapshot, now: number, waitUntil?: (p: Promise<unknown>)
  * turn every poll into a read of the hub).
  */
 const FORCE_MS = 250;
-let forcedAt = -Infinity;
+const forced = new Map<string, number>();
 /** The most a send's body may be (bytes): an 80-character message is far less; anything bigger never reaches the hub. */
 export const TOWN_BODY_MAX = 8192;
 
@@ -80,17 +87,18 @@ export async function signedInReader(sql: Sql, token: string | null | undefined,
  * TOWN_CHAT.readCacheMs, and at once when the reader is ahead of the copy: it saw a newer one, from its own send or another
  * instance, so the copy is stale, not the room reset).
  */
-export async function townSlice(hub: TownHub, since: number, now: number, room?: string | null, waitUntil?: (p: Promise<unknown>) => void): Promise<TownSlice> {
-  const old = !cache || now - cache.at > TOWN_CHAT.readCacheMs;
-  const ahead = !!cache && (since > cache.snap.n || (!!room && room !== cache.snap.room));
-  if (old || (ahead && now - forcedAt >= FORCE_MS)) {
-    if (!old) forcedAt = now;
-    keep(await hub.townRead(), now, waitUntil);
+export async function townSlice(hub: TownHub, since: number, now: number, room?: string | null, waitUntil?: (p: Promise<unknown>) => void, chat = TOWN_CHAT_ROOM): Promise<TownSlice> {
+  const hit = caches.get(chat);
+  const old = !hit || now - hit.at > TOWN_CHAT.readCacheMs;
+  const ahead = !!hit && (since > hit.snap.n || (!!room && room !== hit.snap.room));
+  if (old || (ahead && now - (forced.get(chat) ?? -Infinity) >= FORCE_MS)) {
+    if (!old) forced.set(chat, now);
+    keep(await hub.townRead(chat), now, waitUntil, chat);
   } else if (ahead) {
     // (Asked again within FORCE_MS, a bogus `since` or `room` say: nothing new, and the reader keeps what it has.)
-    return { room: room || cache!.snap.room, n: since, lines: [] };
+    return { room: room || hit!.snap.room, n: since, lines: [] };
   }
-  const snap = cache!.snap;
+  const snap = caches.get(chat)!.snap;
   return townSince(snap, since, TOWN_CHAT.keep, room);
 }
 
@@ -102,6 +110,8 @@ export interface TownAsker {
   user: User;
   tooYoung: boolean;
   paused: boolean;
+  /** The test switches are on here (TEST_SWITCHES): a body's `townroom` picks the test's own room. */
+  testSwitches?: boolean;
 }
 
 /** Why this asker can't send or read players' lines (a response to give), or null when they may. */
@@ -125,7 +135,7 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   if (Number(request.headers.get("content-length")) > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
   const raw = await request.text().catch(() => "");
   if (raw.length > TOWN_BODY_MAX) return json({ message: TOWN_TOO_LONG }, 413);
-  const body = ((): { text?: unknown; since?: unknown; room?: unknown; color?: unknown } => {
+  const body = ((): { text?: unknown; since?: unknown; room?: unknown; color?: unknown; townroom?: unknown } => {
     try {
       return JSON.parse(raw) ?? {};
     } catch {
@@ -140,8 +150,9 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   const name = row?.name ?? a.user.name;
   const color = tidyColor(body.color);
   const sender: TownSender = { id: a.user.id, name: isBlockedText(name) ? "Player" : name, ...(color !== undefined ? { color } : {}) };
-  const { post, town } = (await hub.townPost(sender, typeof body.text === "string" ? body.text.slice(0, TOWN_INPUT_MAX) : "")) as { post: TownPost; town: TownSnapshot };
-  keep(town, now, waitUntil);
+  const chat = chatRoomOf(body.townroom, !!a.testSwitches);
+  const { post, town } = (await hub.townPost(sender, typeof body.text === "string" ? body.text.slice(0, TOWN_INPUT_MAX) : "", chat)) as { post: TownPost; town: TownSnapshot };
+  keep(town, now, waitUntil, chat);
   const since = Number(body.since);
   const slice = townSince(town, Number.isFinite(since) ? since : 0, TOWN_CHAT.keep, typeof body.room === "string" ? body.room : null);
   if (post.ok) return json({ ok: true, line: post.line, town: slice, waitMs: TOWN_CHAT.gapMs });
@@ -149,14 +160,15 @@ export async function townPostResponse(request: Request, sql: Sql, hub: TownHub,
   return json({ ok: false, reason: post.reason, message: post.message, retryMs: post.retryMs, town: slice }, 429, { "retry-after": String(Math.ceil(post.retryMs / 1000)) });
 }
 
-/** POST /api/town/chat/remove {n}: a moderator (`admin`: ADMIN_EMAILS) takes one line out of everyone's log. */
-export async function townRemoveResponse(request: Request, hub: TownHub, admin: boolean, now: number, waitUntil?: (p: Promise<unknown>) => void): Promise<Response> {
+/** POST /api/town/chat/remove {n, townroom?}: a moderator (`admin`: ADMIN_EMAILS) takes one line out of everyone's log. */
+export async function townRemoveResponse(request: Request, hub: TownHub, admin: boolean, now: number, waitUntil?: (p: Promise<unknown>) => void, testSwitches = false): Promise<Response> {
   if (!admin) return json({ message: "Only a moderator can do that." }, 403);
-  const body = (await request.json().catch(() => ({}))) as { n?: unknown };
+  const body = (await request.json().catch(() => ({}))) as { n?: unknown; townroom?: unknown };
   const n = Number(body.n);
   if (!Number.isSafeInteger(n) || n < 1) return json({ message: "No such line." }, 400);
-  const { removed, town } = (await hub.townRemove(n)) as { removed: boolean; town: TownSnapshot };
-  keep(town, now, waitUntil);
+  const chat = chatRoomOf(body.townroom, testSwitches);
+  const { removed, town } = (await hub.townRemove(n, chat)) as { removed: boolean; town: TownSnapshot };
+  keep(town, now, waitUntil, chat);
   return removed ? json({ ok: true }) : json({ message: "That line has already gone." }, 404);
 }
 
@@ -176,8 +188,8 @@ export async function townChallengeNote(sql: Sql, hub: TownHub, a: TownAsker, bo
   const row = await sql.first<{ name: string }>("SELECT name FROM users WHERE id = ?", a.user.id);
   const name = row?.name ?? a.user.name;
   const line = (await hub.townChallenge({ id: a.user.id, name: isBlockedText(name) ? "Player" : name }, tokenBossName(boss), note)) as TownLine | null;
-  // (This instance's copy of the room is stale now: the next read asks the hub.)
-  if (line) cache = null;
+  // (This instance's copy of the town's room is stale now: the next read asks the hub.)
+  if (line) caches.delete(TOWN_CHAT_ROOM);
   return line;
 }
 
@@ -186,9 +198,9 @@ export async function townChallengeNote(sql: Sql, hub: TownHub, a: TownAsker, bo
  * player. Null when it has gone (each lasts TOWN_CHAT.lineMs, 5 minutes) or isn't theirs: the report is refused, so a report can only ever
  * carry words the player really sent.
  */
-export async function reportedLine(hub: TownHub, n: unknown, target: unknown): Promise<TownLine | null> {
+export async function reportedLine(hub: TownHub, n: unknown, target: unknown, chat = TOWN_CHAT_ROOM): Promise<TownLine | null> {
   const k = Number(n);
   if (!Number.isSafeInteger(k) || k < 1) return null;
-  const line = (await hub.townLine(k).catch(() => null)) as TownLine | null;
+  const line = (await hub.townLine(k, chat).catch(() => null)) as TownLine | null;
   return line && line.from === target ? line : null;
 }

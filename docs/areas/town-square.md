@@ -69,6 +69,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   screen), and the bots. **Everyone in the square is a `Person`** (`{ id, name, look, you, walker }`) in one list,
   `town.people`; the bots are one source that moves its people. The drawing and the taps read only that list, so real
   players (rooms of up to about 75 to 100, fed by a server, later) can replace the bots without touching either.
+- **Away and guests (Nov 7, #542; [2026-11-07-town-afk.md](../decisions/2026-11-07-town-afk.md)).** No input for 1 min (`TOWN_AFK`): a pixel "zzz" by your pawn (`zzz.ts`), town and shops; 5 min idle or hidden: home, "You've been dropped from the town" (`afk.ts`, `here-net.ts`, `AwayNote.tsx`). A challenge and the claw machine hold the clock.
+  Signed-in devices beat `POST /api/town/here`: real players walk in each other's town in their outfits; the server drops away ones itself (`server/src/town-here.ts`). Guests watch (outfits, no names), read the chat (typing greyed: "Make a free account to chat."), and after 30 s get "Make an account to keep exploring". Switches `?townafk=`, `?townroom=`, `?townguest=`; hook `__townHere()`.
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
@@ -492,7 +494,7 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
       Oct 29 with the card's size.)
     - **A real player's card** is the same row: no "(bot)", "Coming soon" in the line's row (challenging a player isn't built), their
       rating, Play greyed. Only the e2e test player has one (`addTestPlayer`, the `__townPlayer` hook): `Person.uid`
-      (their account id), `icon` and `rating`; no real players walk in the town yet.
+      (their account id), `icon` and `rating`; real players (below, "Away") get it too, with no rating row.
   - **A bot sitting alone at a table** (`waitingBot`): a tap on the table walks you to its free stool, as before, and its
     card's first button is **"Play <name> (bot) · <rating>"**, Casual and Ranked greyed under it; the bot stays while the card
     is open; the game opens once you sit.
@@ -1258,5 +1260,4 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
 
 The bottom strip, a player's card's Play and "Invite to party" (their card has the row, with Play greyed: Oct 28), the other homes'
 insides (and their crates), battles in a shop's circle, your ride inside a shop, the Colosseum's menu (raids with people,
-party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, real players and
-rooms, sounds.
+party), the park's matchmaking (sitting at a table queues you: `ROADMAP.md`, "The park"), quick chats, other people's dressed pawns, the Simple map setting, rooms (one shared town today), sounds.

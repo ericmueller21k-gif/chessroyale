@@ -602,7 +602,11 @@
     },
     "the town square (/town)": {
       "paths": ["packages/app/src/town/**", "packages/app/src/stale.ts", "packages/app/src/characters/sidekicks/**", "packages/app/src/characters/ginger-intro.ts", "packages/app/src/characters/dash-intro.ts"],
-      "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts"]
+      "specs": ["e2e/town.spec.ts", "e2e/town-street.spec.ts", "e2e/town-rows.spec.ts", "e2e/town-fixed.spec.ts", "e2e/town-controls.spec.ts", "e2e/town-chat.spec.ts", "e2e/town-chat-history.spec.ts", "e2e/town-desktop.spec.ts", "e2e/town-tags.spec.ts", "e2e/colosseum.spec.ts", "e2e/shop.spec.ts", "e2e/boss-challenge.spec.ts", "e2e/town-afk.spec.ts"]
+    },
+    "away in the town (the zzz, out to home after 10 minutes, the server's town presence)": {
+      "paths": ["e2e/town-afk.spec.ts", "packages/server/src/town-here.ts", "packages/server/src/town-here-api.ts", "packages/app/src/components/AwayNote.tsx"],
+      "specs": ["e2e/town-afk.spec.ts"]
     },
     "Boingo's claw machine in his Funhouse (the play on the server, the cabinet in the room)": {
       "paths": ["packages/server/src/claw.ts", "packages/app/src/town/shops/boingo-art.ts", "packages/app/src/town/shops/claw-cabinet.ts", "packages/app/src/town/kit/models/claw-cabinet.ts"],
