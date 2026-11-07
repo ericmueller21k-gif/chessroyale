@@ -304,8 +304,9 @@ test("a computer: Babur's pump beside him at every size, as big as the board's b
   // (His column grows with the board, so the pump has room beside him. Nov 1, the eval bar off for everyone: the boards are a player's
   // now, 1280 × 800 600 (was 536), 1366 × 768 640 (was 624). Round 2 (Nov 1): the pump is beside him at 1440 × 900 and 1920 × 1080 too,
   // so the board is 728 at 1440 (was 680) and 952 at 1920 (was 832, the taller bar's): his column is 240 to 340 px by the window's
-  // height (board-size.css), and the side menu is icons only below 1800 px.)
-  for (const [size, board] of [["1280x800", 600], ["1920x1080", 952], ["1366x768", 640], ["1440x900", 728], ["1280x800", 600]] as const) {
+  // height (board-size.css), and the side menu is icons only below 1800 px. Nov 7: his pump stands in front of him, so his column and
+  // board are everyone's: 760 at 1440 (was 728).)
+  for (const [size, board] of [["1280x800", 600], ["1920x1080", 952], ["1366x768", 640], ["1440x900", 760], ["1280x800", 600]] as const) {
     const [w, h] = dims(size);
     await page.setViewportSize({ width: w, height: h });
     await page.waitForTimeout(800);
