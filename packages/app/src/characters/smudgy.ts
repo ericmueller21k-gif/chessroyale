@@ -1348,6 +1348,6 @@ export const SMUDGY_SPRITE: Sprite = {
   },
   ramps: { green: "abcde", throat: "lmn", orange: "pqrs", teal: "tuvx", iris: "EFG", apron: "HIJ", wood: "LMNQ", board: "BCD", gold: "OYy", silver: "fgij", bristles: "UVW", paint: "PRK", beret: "ATZo" },
   frames: { idle: "idle", attack: "camouflage", hurt: "hurt" },
-  // (His ground shadow, sweat and dust: drawn without an outline.)
-  unlined: "z~90",
+  // (Drawn without an outline: his ground shadow, sweat and dust, the paint's drips and flecks, and the gold sparkles.)
+  unlined: "z~90PRKyYO",
 };

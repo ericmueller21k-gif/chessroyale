@@ -5,6 +5,7 @@ import { SELECT_FRAMING } from "../characters/boss-select.ts";
 import { stanceAt } from "../characters/stance.ts";
 import { resetMoo } from "../characters/moo-state.ts";
 import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
+import { drawnFacing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
@@ -397,7 +398,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the

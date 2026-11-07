@@ -99,6 +99,9 @@ export function facingAs(s: Sprite, want: Facing): Sprite {
   return m;
 }
 
+/** Which way a character drawn from a sprite faces on the screen: the sprite's art facing, turned round if one is mirrored and not the other. */
+export const drawnFacing = (s: Sprite, ch: Character): Facing => (!!ch.mirror !== !!s.ch.mirror ? (s.facing === "left" ? "right" : "left") : s.facing);
+
 /**
  * The board figure (a phone's boss bar, a computer's side figure, the result screen): the boss stands left of the board on
  * both, the God King and your pawn on its right, so it faces our right, toward the board and its opponent.
