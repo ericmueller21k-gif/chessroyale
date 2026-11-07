@@ -790,6 +790,18 @@ boss is `noTimeLoss` with an `outOfTime` move, never a loss.
 **A power on real time** (Puddles' seeds, Babur's pump, Timber's scraps): count it with `ticksAt` (`base.ts`) on `Battle.now`, as a
 pure function of the state's numbers and the clock, and draw it on a timer set for the next tick (`gardenNow()`), never per frame.
 
+**His challenge intro, as data** (Nov 7; town-square.md, "Challenging a boss"): one file, `town/shops/intros/<boss>.ts`, no edits to
+challenge.ts, intro.ts or ShopRoom.tsx. Start from the closest (`alfil.ts` props only, `bigboy.ts` a drop, `timber.ts` his own moves,
+a carry and a fog, `smudgy.ts` a cast from the walk in and a second line). `defineIntro({ props, mover?, table?, palette?, storm? |
+splatter?, noAttack?, stands?, clear?, cast?, beats, view? })`: each prop its art (`ch`), where (`at` places, or moved by its acts
+from the table), its scale (`room` or `boss` pixels), `off` per animation, `over` to draw over everyone; "table", "board" and "stools"
+are the room's. Each beat `{ step, ms, acts }`; each act `{ actor, at?, play?, loop?, frame?, flip?, show? | hide? | for?, move?: { from?,
+to, ms, ease, hop }, lift?, cue?, quiet? }` (shops/timeline.ts; `intros/common.ts` has the line, the pause, the hop back, the table
+and the swing). Its frames' cues play by themselves; name each in `BOSS_INTROS[id].cues` with its sound. Export it as the file's
+default (intro.ts finds it by the file's name), give it its `BOSS_INTROS` entry (`custom: true`), and a check in
+`test/intro-timeline.test.ts` or its own test (beats, cues, who is where). What the player can't do yet (a route with waypoints, lights going out, a crew walking): still code, in its own branch of the
+engine, until it is a beat.
+
 **An opt-out:** only where his sheet says a power may hand him a promotion for his very next move: his id and the
 sheet's words in `PROMOTION_OPT_OUT` (`boss-kit-lib.ts`), with the decision file. It's empty.
 

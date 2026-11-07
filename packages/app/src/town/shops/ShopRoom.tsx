@@ -49,7 +49,8 @@ import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRa
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, shopOf, wayText, type CrateWay, type ShopDef } from "./shops.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
 import type { BlitzNow } from "./challenge.ts";
-import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, introAt, introCues, introLength, isDark, isLog, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow, type LogPlace } from "./challenge.ts";
+import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, castIntroAt, introAt, introCues, introLength, isDark, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow } from "./challenge.ts";
+import { castBefore, placeOf, standAt, timelineCues, type ActorNow } from "./timeline.ts";
 import { CREW_D_SEAT, CREW_FORK_AT, CREW_SHEETS, CREW_STEP_OFF, type CrewName } from "./grex-crew-sheets.ts";
 import { Machine, along, forkLegs, frameOf, liftLegs, routeLength, type MachinePose, type Sq as CrewSq, type Waypoint } from "./grex-crew.ts";
 import type { CrewKey } from "./intro.ts";
@@ -63,6 +64,7 @@ import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
 import { TABLE_BOARD } from "../houses/park.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
+import { drawZzz } from "../zzz.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
 import { closeClawMachine, openClawMachine } from "../../claw/index.ts";
 
@@ -272,6 +274,8 @@ export type ShopCard = "talk" | "crate" | "door";
 export interface ShopCtl {
   zoom: (out: boolean) => void;
   recenter: () => void;
+  /** The claw machine's controls are open (the away rule's clock holds: afk.ts). */
+  busy?: () => boolean;
 }
 
 /**
@@ -285,7 +289,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null }: { room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false }: { /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -297,7 +301,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro));
+    }, intro, zzz));
     ctl.current = r;
     onReady();
     return () => {
@@ -446,6 +450,7 @@ function startRoom(
   onZoom: (out: boolean) => void,
   onCard: (c: ShopCard | null) => void,
   challenge: RoomIntro | null = null,
+  zzz: () => boolean = () => false,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -474,7 +479,7 @@ function startRoom(
   // circle, side by side, at the challenge's pace; each settles onto its mark's middle; facing each other, the intro plays.
   const C = CHALLENGE_FEEL;
   const ci = challenge?.intro ?? null;
-  const found = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear)) : null;
+  const found = ci ? marksOf(art.layout, ci.def.layout, art.marks, marksFeel(ci.anims, CHALLENGE_FEEL, ci.def.clear ?? ci.cast?.data.clear)) : null;
   // (Hollow's: you both walk on straight to your seats and stay there.)
   const marks = found && ci?.def.seated ? seatedMarks(found) : found;
   /** Its channel line this time (Hollow's: one of four, at random), or null. */
@@ -517,7 +522,9 @@ function startRoom(
   let cueN = 0;
   let said = false;
   let introDone = false;
-  const cues = ci ? introCues(ci.beats, ci.anims) : [];
+  /** An intro as data (shops/timeline.ts: its actors' art and its beats), or null. */
+  const ca = ci?.cast ?? null;
+  const cues = ci ? (ca ? timelineCues(ca.data.timeline) : introCues(ci.beats, ci.anims)) : [];
   const introEnd = ci ? introLength(ci.beats) : 0;
   /** Its God King attack (its kit's), from `attackAt` into the intro on: the frame showing (-1: not attacking), its last cue's frame. */
   const attackAt = ci ? attackStart(ci.beats) : Infinity;
@@ -531,26 +538,30 @@ function startRoom(
   const settle = (at: number, half: number, now: number) => (at < 0 ? 0 : half * Math.min(1, (now - at) / C.settleMs));
   /** The hop back clear of the stools (from the mark to its clear place, as the intro says: `introNow.back`). */
   const back = () => introNow?.back ?? 0;
-  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) + back() * (marks.youClear.c - marks.you.c) : 0);
-  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) + back() * (marks.youClear.r - marks.you.r) : 0);
-  const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) + back() * (marks.bossClear.c - marks.boss.c) : 0);
-  const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + back() * (marks.bossClear.r - marks.boss.r) : 0);
-  /** How high the hop back lifts you both now, in squares. */
-  const hopLift = () => (introNow?.hop ?? 0) * C.hopUp;
+  /** Your own mark and clear place, or the boss's (an intro as data's places: shops/timeline.ts placeOf). */
+  const mineOf = (who: "you" | "boss") => (who === "you" ? { mark: marks!.you, clear: marks!.youClear } : { mark: marks!.boss, clear: marks!.bossClear });
+  /** An intro as data: how far from your mark (or the boss's) it has you now (squares), or null: no such intro, or not on the marks yet. */
+  const castOff = (who: "you" | "boss"): { c: number; r: number } | null => {
+    const a = introNow?.cast?.[who];
+    if (!a || !marks) return null;
+    const m = mineOf(who);
+    const at = standAt(a, marks, m);
+    return { c: at.c - m.mark.c, r: at.r - m.mark.r };
+  };
+  const youOx = (now: number) => (marks ? settle(youAt, marks.you.c - marks.youSq.c, now) + (castOff("you")?.c ?? back() * (marks.youClear.c - marks.you.c)) : 0);
+  const youOy = (now: number) => (marks ? settle(youAt, marks.you.r - marks.youSq.r, now) + (castOff("you")?.r ?? back() * (marks.youClear.r - marks.you.r)) : 0);
+  const bossOx = (now: number) => (marks ? settle(bossAt, marks.boss.c - marks.bossSq.c, now) + (castOff("boss")?.c ?? back() * (marks.bossClear.c - marks.boss.c)) : 0);
+  const bossOy = (now: number) => (marks ? settle(bossAt, marks.boss.r - marks.bossSq.r, now) + (castOff("boss")?.r ?? back() * (marks.bossClear.r - marks.boss.r)) : 0);
+  /** How high the hop back lifts you (or the boss) now, in squares. */
+  const hopLift = (who: "you" | "boss") => (introNow?.cast ? (introNow.cast[who]?.hop ?? 0) : (introNow?.hop ?? 0) * C.hopUp);
   /**
-   * Timber's own intro (his log): where he is while he plays his own moves (`introNow.wood.move`), on his row: his foot `u` of the way
-   * between two places, each a column (his mark; the log, `log.at` west of the table's middle; where he works, his art's `reach` west of
-   * it, so the log he sets down stands on the table's place; a step back from there, his dusting off's; where he swings). Null: his town
-   * figure, where the walk in and the hop back put him.
+   * An intro as data: where the boss stands while it plays its own moves (`cast.boss.anim`: Timber's walk to his log, the carry, the
+   * gnaw, the dusting off), on the room's floor. Null: its town figure, where the walk in and the intro put it.
    */
-  const woodAt = (): { c: number; r: number } | null => {
-    const w = introNow?.wood;
-    if (!w?.move || !marks || !ci?.anims || !isLog(ci.anims)) return null;
-    const a = ci.anims;
-    const place = (p: LogPlace) =>
-      p === "mark" ? marks.boss.c : p === "log" ? marks.table.c - C.log.at : p === "work" ? marks.table.c - a.reach : p === "stepped" ? marks.table.c - a.reach - a.back : marks.bossClear.c;
-    const from = place(w.from);
-    return { c: from + (place(w.to) - from) * w.u, r: marks.boss.r };
+  const castMoveAt = (): { c: number; r: number } | null => {
+    const a = introNow?.cast?.boss;
+    if (!a?.anim || !marks || !ca?.mover) return null;
+    return standAt(a, marks, mineOf("boss"));
   };
   /** The challenge, a frame on: the walk in, then the intro's beats (its line said once, in the bubble by his head; its cues' sounds). */
   const stepIntro = (now: number) => {
@@ -587,7 +598,7 @@ function startRoom(
     }
     const t = now - onMarksAt;
     introT = t;
-    introNow = introAt(ci.beats, ci.anims, t);
+    introNow = ca ? castIntroAt(ca.data.timeline, t) : introAt(ci.beats, ci.anims, t);
     darkNow = introNow.dark;
     // (Folio's: once its quiet line has gone nothing on the page changes until the crumple, so its DOM layer is taken now.)
     if (foT && !crumpleReady && t >= foT.quietEnd) {
@@ -1786,8 +1797,8 @@ function startRoom(
     if (introNow?.rope?.bale && u.name === "board-stand") return;
     // (Jefferson's challenge: his intro's crate stack stands in its place from the walk in, the same picture: drawCrewCenter.)
     if (cw && ci?.crew && u.name === "board-stand") return;
-    // (Smudgy's challenge: his intro draws the covered table in its place from the walk in, then whips the cloth off: drawCenter.)
-    if (ci?.cloth && u.name === "table") return;
+    // (An intro as data that stands in for a room's piece (Smudgy's covered table, from the walk in): drawCast draws it there.)
+    if (ca?.data.stands?.includes(u.name)) return;
     // (Boingo's claw machine: a solid cabinet in 3D, its own claw posed from the play: claw-cabinet.ts.)
     if (cab && u.name === "claw") return drawClaw(now);
     if (!P(u.c, u.r)) return;
@@ -1931,7 +1942,7 @@ function startRoom(
       img = rv.frames.move[i]!;
       lift = (rv.lift[i]! * box) / 100;
     } else img = rv.frames.idle[(i = rv.idleIndex(now))]!;
-    lift += hopLift();
+    lift += hopLift("you");
     Object.assign(seen, { ride: rd.id, anim: pose.step ? "move" : "idle", frame: i, facing: flip, view: rv === rd.views[0] ? 0 : view });
     const h = ((box * rv.h) / 100) * pt.k;
     const w = (h * rv.w) / rv.h;
@@ -1992,7 +2003,7 @@ function startRoom(
     const h = f.youSquares * kk * pt.k;
     const fy = (pad + PAWN_FOOT) / kk;
     const head = Math.min(a?.top ?? 1, (pad + PAWN_HEAD) / kk);
-    const lift = (pose.hop * f.youHop + hopLift()) * pt.k;
+    const lift = (pose.hop * f.youHop + hopLift("you")) * pt.k;
     shadows(pt.x, pt.y, pt.k, h / kk);
     const y0 = pt.y - fy * h - lift;
     g.save();
@@ -2051,17 +2062,17 @@ function startRoom(
     g.imageSmoothingEnabled = false;
   };
   /**
-   * Timber's own moves (his log intro): his frame (BOSS_BEAVER_INTRO, drawn facing east; mirrored about his foot to walk west) at his
-   * town size, his foot at `at`, the town's shadows under him; his head (for his line's bubble) where his town figure's is.
+   * An intro as data: the boss's own move's frame (its data's `mover`, drawn facing east; mirrored about its foot with `flip`) at its
+   * town size, its foot at `at`, the town's shadows under it; its head (for its line's bubble) where its town figure's is.
    */
-  const drawWoodMove = (at: { c: number; r: number }) => {
-    const wd = ci!.wood!;
-    const mv = introNow!.wood!.move!;
+  const drawCastMove = (at: { c: number; r: number }) => {
+    const mv = introNow!.cast!.boss!;
+    const mover = ca!.mover!;
     if (!P(at.c, at.r)) return;
     const b = ci!.boss;
     const k = (b.squares * pt.k) / b.ch.h;
-    const ch = wd.mover.ch;
-    const img = wd.mover.frames[mv.anim][mv.frame]!;
+    const ch = mover.ch;
+    const img = mover.frames[mv.anim!]![mv.frame]!;
     drawShadows(pt.x, pt.y, b.ch.w * k);
     g.save();
     g.translate(pt.x, 0);
@@ -2492,8 +2503,8 @@ function startRoom(
     fist1.on = fist2.on = false;
     if (!ci || !boss) return;
     if (fo) return drawFolioBoss(now);
-    const wat = woodAt();
-    if (wat) return drawWoodMove(wat);
+    const own = castMoveAt();
+    if (own) return drawCastMove(own);
     if (dk && darkNow && (darkNow.move || darkNow.bulbs < 3)) return drawDarkBoss(now, darkNow);
     if (rp && introNow?.rope && attackFrame < 0) return drawRopeBoss(now);
     if (ci.crew && introNow?.crew?.move && attackFrame < 0) return drawCrewBoss(now, introNow.crew.move);
@@ -2515,7 +2526,7 @@ function startRoom(
     const h = b.squares * pt.k;
     const w = (h * b.ch.w) / b.ch.h;
     const x0 = pt.x - (b.ch.foot[0] / b.ch.w) * w;
-    const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift() * pt.k;
+    const y0 = pt.y - (b.ch.foot[1] / b.ch.h) * h - hopLift("boss") * pt.k;
     drawShadows(pt.x, pt.y, w);
     g.save();
     // (Turned to face `facing`, by the way its art faces: its sprite's (sprite-kit.ts, sprites.ts: Smudgy's left); a boss not on the
@@ -2538,42 +2549,22 @@ function startRoom(
     Object.assign(hisFoot, { x: pt.x, y: pt.y, k: h / b.ch.h, on: true });
   };
   /**
-   * Between you (in a challenge): the pyramid's frame, or the table with its board (the crumble's last frames over it). The table's
-   * picture is three squares across, a stool in each outer one: across, the stools are where you and the boss stand, so it's drawn
-   * whole; facing, its middle (the leg) alone, the stools drawn on their own (`drawStool`). The default intro's table pops in (grows
-   * from its foot, a touch past its size and back) in a puff of dust. Toy blocks (Big Boy's) are the table and its stools: their frame,
-   * and the board on the top block once it drops (falling from above it, `drop` squares up, then on it).
+   * Between you (in a challenge): the table with its board. The table's picture is three squares across, a stool in each outer one:
+   * across, the stools are where you and the boss stand, so it's drawn whole; facing, its middle (the leg) alone, the stools drawn on
+   * their own (`drawStool`). The default intro's table pops in (grows from its foot, a touch past its size and back) in a puff of dust.
+   * An intro as data draws its own (`drawCast`).
    */
   const drawCenter = () => {
     const n = introNow;
-    if (!ci || !marks || !(n || ci.wood || ci.cloth) || !P(marks.table.c, marks.table.r)) return;
+    if (ca) return drawCast(false);
+    if (!ci || !marks || !n || !P(marks.table.c, marks.table.r)) return;
     const s = pt.k / SQ;
     const x = pt.x;
     const y = pt.y;
     const put = (img: HTMLCanvasElement, ch: Character, fx = ch.foot[0]) => g.drawImage(img, x - fx * s, y - ch.foot[1] * s, img.width * s, img.height * s);
     g.imageSmoothingEnabled = false;
-    if (ci.wood) return drawWood(x, y, s);
-    if (ci.cloth) return drawClothCenter(n, x, y, s);
-    if (!n) return;
     if (ci.dash) return drawBlitzCenter(n, x, y, s);
     if (fo) return drawFolioCenter(x, y, s);
-    const bl = ci.blocks;
-    if (bl) {
-      if (n.blocks) put(bl.frames[n.blocks.anim][n.blocks.frame]!, bl.ch);
-      if (n.table) {
-        // (Lifted until the slab's front rests on the top block, its foot TABLE_BOARD.top over the table's: else the slab, reaching
-        // toward you, would hide the pyramid's upper blocks. Then `drop` squares higher while it falls.)
-        const dx = marks.table.c - camX;
-        const dz = camY - marks.table.r;
-        const front = slabFrontY(v, dx, dz);
-        const rest = front === null ? 0 : Math.max(0, front - (y - TABLE_BOARD.top * s));
-        g.save();
-        g.translate(0, -rest - n.drop * pt.k);
-        paintTable(g, v, dx, dz, ci.table.palette, marks.layout);
-        g.restore();
-      }
-      return;
-    }
     if (n.table) {
       const T = ci.table;
       const popping = n.pop < 1;
@@ -2589,23 +2580,67 @@ function startRoom(
       if (popping) g.restore();
     }
     if (n.puff >= 0) drawPuff(x, y, n.puff);
-    const py = ci.pyramid;
-    if (!py) return;
-    if (n.pyramid) put(py.frames[n.pyramid.anim][n.pyramid.frame]!, py.ch);
-    else if (n.drift) put(py.frames.crumble[py.frames.crumble.length - 1]!, py.ch);
+  };
+  /** An intro as data's cast now: as the intro has it, or (walking in) who is there from the walk in. */
+  const castNow = (): Readonly<Record<string, ActorNow>> | null => (ca ? (introNow?.cast ?? castBefore(ca.data.timeline)) : null);
+  /** Some prop drawn over everyone shows now (Timber's fog). */
+  const castOver = () => {
+    const c = castNow();
+    return !!c && Object.entries(ca!.data.props).some(([k, p]) => p.over && c[k]?.on);
   };
   /**
-   * Smudgy's table (his intro), its foot at (x, y), `s` a room pixel: the round table and its stools (there all along), the game's own
-   * board on it once the cloth is off its top (`n.table`), and the cloth over it: covered from the walk in, whipped off, in its heap.
+   * An intro as data's props (shops/timeline.ts IntroData `props`), in their order: with the table (by its row), or over everyone
+   * (`over`: Timber's fog). Each is drawn where it stands (its `at` places, one drawing each, or where its acts move it, from the
+   * table's middle), its foot `off` its pixels from there, at the room's scale or the boss's. "table": the table's picture (across
+   * whole; facing its leg alone). "board": its slab, board and pieces (`paintTable`), `lift` squares up, resting on the art under it
+   * with `rest` (Big Boy's blocks: lifted until the slab's front rests on the top block, its foot TABLE_BOARD.top over the table's,
+   * or the slab, reaching toward you, would hide the blocks under it).
    */
-  const drawClothCenter = (n: IntroNow | null, x: number, y: number, s: number) => {
-    const T = ci!.table;
-    const C = ci!.cloth!;
-    const put = (img: HTMLCanvasElement, ch: Character) => g.drawImage(img, x - ch.foot[0] * s, y - ch.foot[1] * s, img.width * s, img.height * s);
-    put(T.img, T.ch);
-    if (n?.table) paintTable(g, v, marks!.table.c - camX, camY - marks!.table.r, T.palette, marks!.layout);
-    const z = n?.cloth ?? { anim: "covered" as const, frame: 0 };
-    put(C.frames[z.anim][z.frame]!, C.ch);
+  const drawCast = (over: boolean) => {
+    const c = castNow();
+    if (!ci || !ca || !marks || !c) return;
+    const s = pt.k / SQ;
+    const b = ci.boss;
+    const kb = (b.squares * pt.k) / b.ch.h;
+    const T = ci.table;
+    const atTable = { mark: marks.table, clear: marks.table };
+    g.imageSmoothingEnabled = false;
+    for (const [who, p] of Object.entries(ca.data.props)) {
+      const a = c[who];
+      if (!!p.over !== over || !a?.on) continue;
+      if (who === "board") {
+        if (!P(marks.table.c, marks.table.r)) continue;
+        const dx = marks.table.c - camX;
+        const dz = camY - marks.table.r;
+        const front = p.rest ? slabFrontY(v, dx, dz) : null;
+        const rest = front === null ? 0 : Math.max(0, front - (pt.y - TABLE_BOARD.top * s));
+        const up = rest + a.lift * pt.k;
+        if (up) {
+          g.save();
+          g.translate(0, -up);
+        }
+        paintTable(g, v, dx, dz, T.palette, marks.layout);
+        if (up) g.restore();
+        continue;
+      }
+      if (who === "table") {
+        if (!P(marks.table.c, marks.table.r)) continue;
+        const [img, fx] = across ? [T.img, T.ch.foot[0]] : [T.leg, T.ch.foot[0] - T.leg.width];
+        g.drawImage(img, pt.x - fx * s, pt.y - T.ch.foot[1] * s, img.width * s, img.height * s);
+        continue;
+      }
+      if (!p.ch || !a.anim) continue;
+      const img = ca.frames[who]?.[a.anim]?.[a.frame];
+      if (!img) continue;
+      const k = p.scale === "boss" ? kb : s;
+      const off = p.off?.[a.anim] ?? [0, 0];
+      for (const at of p.at ? p.at.map((q) => placeOf(q, marks, atTable)) : [standAt(a, marks, atTable)]) {
+        if (!P(at.c, at.r)) continue;
+        const x = pt.x + off[0] * k;
+        const y = pt.y + off[1] * k - a.lift * pt.k;
+        g.drawImage(img, x - p.ch.foot[0] * k, y - p.ch.foot[1] * k, img.width * k, img.height * k);
+      }
+    }
   };
   /**
    * Dash's table (his intro), the table's foot at (x, y), `s` a room pixel: the shoe-box stack as it lands (its `land`, then its `idle`:
@@ -2678,47 +2713,6 @@ function startRoom(
     const s = q.k / SQ;
     g.imageSmoothingEnabled = false;
     g.drawImage(img, q.x - L.ch.foot[0] * s, q.y - L.ch.foot[1] * s, img.width * s, img.height * s);
-  };
-  /**
-   * Timber's props between you (his log intro; from the walk in), the table's foot at (x, y), `s` a room pixel: the log lying where it waits (at his
-   * size: it's the log he lifts, its foot where his art's `liftAt` puts it from his foot as he lifts it); the ring of shavings left on
-   * the floor; the stumps at the stools' places (popping up, then standing); his table (a gnawed pedestal, its middle alone: no stools
-   * in its picture) and its slab and board (`paintTable`, in his table's woods); the log standing and gnawed in front of him (his art's
-   * `reach` from his foot, behind him). The fog itself is drawn over you both (`drawFog`).
-   */
-  const drawWood = (x: number, y: number, s: number) => {
-    const wd = ci!.wood!;
-    // (Walking in, before the intro: the log lies there already.)
-    const w = introNow?.wood ?? { log: { anim: "lying", frame: 0 }, ring: false, stumps: null };
-    const b = ci!.boss;
-    const kb = (b.squares * pt.k) / b.ch.h;
-    const L = wd.log;
-    const putAt = (img: HTMLCanvasElement, ch: Character, fx: number, fy: number, k: number) => g.drawImage(img, fx - ch.foot[0] * k, fy - ch.foot[1] * k, img.width * k, img.height * k);
-    if (w.log?.anim === "lying" && P(marks!.table.c - C.log.at, marks!.boss.r)) putAt(L.frames.lying[0]!, L.ch, pt.x + wd.liftAt[0] * kb, pt.y + wd.liftAt[1] * kb, kb);
-    if (w.ring) {
-      const fr = wd.fog.frames.settle;
-      putAt(fr[fr.length - 1]!, wd.fog.ch, x, y, s);
-    }
-    const st = wd.stump;
-    if (w.stumps)
-      for (const at of [marks!.bossStool, marks!.youStool]) if (P(at.c, at.r)) putAt(st.frames[w.stumps.anim][w.stumps.frame]!, st.ch, pt.x, pt.y, s);
-    if (introNow?.table && P(marks!.table.c, marks!.table.r)) {
-      const T = ci!.table;
-      putAt(T.img, T.ch, pt.x, pt.y, s);
-      paintTable(g, v, marks!.table.c - camX, camY - marks!.table.r, T.palette, marks!.layout);
-    }
-    const me = woodAt();
-    if ((w.log?.anim === "standing" || w.log?.anim === "gnawed") && me && P(me.c, me.r)) putAt(L.frames[w.log.anim][w.log.frame]!, L.ch, pt.x + wd.reach[0] * kb, pt.y + wd.reach[1] * kb, kb);
-  };
-  /** Timber's shavings' fog (rising, holding, settling), over the table's place and over you both: its foot is the table's. */
-  const drawFog = () => {
-    const fog = introNow?.wood?.fog;
-    if (!ci?.wood || !fog || !marks || !P(marks.table.c, marks.table.r)) return;
-    const F = ci.wood.fog;
-    const s = pt.k / SQ;
-    const img = F.frames[fog.anim][fog.frame]!;
-    g.imageSmoothingEnabled = false;
-    g.drawImage(img, pt.x - F.ch.foot[0] * s, pt.y - F.ch.foot[1] * s, img.width * s, img.height * s);
   };
   // ---- Folio's intro (Nov 5): its own moves, the sheets folding up into its stools and table, the plane, the board.
   /** A flat picture laid on the room, its middle at (c, r), `w` x `d` squares, `h` squares up: its whole picture on that rectangle. */
@@ -2860,7 +2854,7 @@ function startRoom(
     figK[i] = k;
   };
   const drawFigure = (k: number, now: number) =>
-    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawFog() : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+    k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
   /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /**
@@ -3241,7 +3235,7 @@ function startRoom(
     addFig(levelZ(pose.y + youOy(now), liftAt(lv, pose.x, pose.y)) + (ci ? 0.002 : 0), 1);
     if (boss && marks) {
       boss.pose(now, bossPose);
-      addFig(woodAt()?.r ?? bossPose.y + bossOy(now), 2);
+      addFig(castMoveAt()?.r ?? bossPose.y + bossOy(now), 2);
       if (rp && introNow) {
         // (Wrangler's: the bale where it's dragged (the loop on the stand before), the buckets where they tumble: each by its row.)
         addFig(ropeBale().r - 0.01, 3);
@@ -3249,11 +3243,11 @@ function startRoom(
           addFig(bucketAt("b").r, 4);
           addFig(bucketAt("w").r, 5);
         }
-      } else if (introNow || ci?.wood || ci?.cloth || (cw && ci?.crew)) {
-        // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. Timber's log
-        // lies there from the walk in; his fog over him, as it boils up round where he works.)
+      } else if (introNow || ca || (cw && ci?.crew)) {
+        // (Across, you and the boss stand on the table's row, at its stools: the table first, you in front of yours. An intro as data's
+        // props from the walk in (Timber's log lying there); its `over` ones over everyone (his fog, as it boils up round where he works).)
         addFig(across ? marks.table.r - 0.01 : marks.table.r, 3);
-        if (introNow?.wood?.fog) addFig(marks.table.r + 0.001, 6);
+        if (castOver()) addFig(marks.table.r + 0.001, 6);
         if (!across) {
           addFig(marks.bossStool.r, 4);
           addFig(marks.youStool.r, 5);
@@ -3281,6 +3275,8 @@ function startRoom(
       g.globalAlpha = tagA;
       drawTag(youName(), "you", youHead.x, youHead.y);
       g.globalAlpha = 1;
+      // (Away: the town's "zzz" over your tag, at the town's tag size.)
+      if (zzz()) drawZzz(g, youHead.x + 9, youHead.y + 10, 1, now, tagA);
     }
     if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
@@ -3604,19 +3600,17 @@ function startRoom(
     const now = performance.now();
     you.pose(now, pose);
     boss.pose(now, bossPose);
-    const wat = woodAt();
-    const w = introNow?.wood ?? null;
+    const wat = castMoveAt();
+    const own = introNow?.cast?.boss?.anim ? introNow.cast.boss : null;
     return {
       step: introNow?.step ?? "walk",
       layout: marks!.layout,
       attack: attackFrame >= 0,
       you: [pose.x + youOx(now), pose.y + youOy(now)],
       boss: wat ? [wat.c, wat.r] : [bossPose.x + bossOx(now), bossPose.y + bossOy(now)],
-      facing: { you: you.facing, boss: w?.move ? (w.move.flip ? -1 : 1) : boss.facing },
+      facing: { you: you.facing, boss: own ? (own.flip ? -1 : 1) : boss.facing },
       // (Which way the boss's figure was drawn facing on the screen, by its sprite's facing data: null where that isn't known.)
       looks: bossLooks,
-      // (Timber's own: his move, the log, the fog, the shavings' ring, the stumps.)
-      wood: w ? { move: w.move?.anim ?? null, log: w.log?.anim ?? null, fog: w.fog?.anim ?? null, ring: w.ring, stumps: w.stumps?.anim ?? null } : null,
       line: !!introNow?.line && bossHead.on,
       // (Ginger's own: his move, the blast, the icicle, the table, the crack, the door, the carriers, the board, the light, the pieces.)
       ice: iceNow
@@ -3635,8 +3629,6 @@ function startRoom(
             crewLine: !!iceNow.line,
           }
         : null,
-      // (Smudgy's own: the cloth (covered, whip, heap).)
-      cloth: introNow?.cloth?.anim ?? null,
       // (Folio's own: its move, the stools' and table's folding (sheet, fold, idle), the plane, the packet, the board on the table, the
       // game's own board.)
       folio: introNow?.folio
@@ -3713,9 +3705,14 @@ function startRoom(
         : null,
       table: !!introNow?.table,
       stools: introNow?.stools ? [[marks!.bossStool.c, marks!.bossStool.r], [marks!.youStool.c, marks!.youStool.r]] : [],
-      pyramid: introNow?.pyramid ?? null,
-      blocks: introNow?.blocks ?? null,
-      drop: introNow?.drop ?? 0,
+      // (An intro as data's own, in the names its e2e reads (its data's `view`: Alfil's pyramid, Big Boy's blocks and the board's
+      // drop, Timber's wood, Smudgy's cloth); none of them for any other.)
+      pyramid: null,
+      blocks: null,
+      drop: 0,
+      wood: null,
+      cloth: null,
+      ...(introNow?.cast ? ca?.data.view?.(introNow.cast) : null),
     };
   };
   /** (Tests) The crew drawn last frame: each one's sheet's row's animation, where (squares), mirrored, raised. */
@@ -3783,6 +3780,7 @@ function startRoom(
     recenter: () => {
       follow = true;
     },
+    busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;
       // (Out of the Funhouse: its claw machine's controls close; any play is already done on the server.)

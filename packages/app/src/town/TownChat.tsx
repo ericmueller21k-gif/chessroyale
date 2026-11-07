@@ -49,13 +49,13 @@ import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 import { CHAT, CHAT_BOX, ChatLog, Stick, chatBlurs, chatShows, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
 import type { SkyTone } from "./sky.ts";
-import { cutTownText, mayTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
+import { GUEST_CHAT, cutTownText, mayReadTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
 import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
 
-export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone } = {}) {
+export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void } = {}) {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLInputElement>(null);
@@ -68,7 +68,7 @@ export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (s
   modeNow.current = mode;
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
   /** Whether this device chats with other players (a signed-in account, not marked too young): players' lines come in. */
-  const [mayChat, setMayChat] = useState(mayTownChat);
+  const [mayChat, setMayChat] = useState(mayReadTownChat);
   /** Typing is open: a tap on the box opened it; a send, a press on the map or Escape closes it. (`typingNow`: the same, for the handlers set up once.) */
   const [typing, setTyping] = useState(false);
   const typingNow = useRef(false);
@@ -131,7 +131,7 @@ export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (s
     const mq = matchMedia(CHAT.computerQuery);
     const on = () => setComputer(mq.matches);
     mq.addEventListener("change", on);
-    const off = onAccountChange(() => setMayChat(mayTownChat()));
+    const off = onAccountChange(() => setMayChat(mayReadTownChat()));
     return () => {
       mq.removeEventListener("change", on);
       off();
@@ -441,6 +441,8 @@ export function TownChat({ tone: room }: { /** Inside a shop: its room's tone (s
           onBlur={unpin}
         />
         {left <= CHAT.nearEnd && !off && <span class="tc-left">{left} left</span>}
+        {/* A guest (Eric, on #542): the greyed line says "Make a free account to chat." and a tap on it is the app's sign-in. */}
+        {off === GUEST_CHAT && onSignIn && <button type="button" class="tc-signup" aria-label={GUEST_CHAT} onClick={onSignIn} />}
       </form>
       <LineMenu box={wrap} log={log} />
     </div>

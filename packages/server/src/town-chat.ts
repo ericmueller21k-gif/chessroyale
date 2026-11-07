@@ -17,6 +17,9 @@ import { FILLERS, chatRefusal } from "./text-filter.ts";
  * See docs/decisions/2026-10-28-town-chat-typing.md.
  */
 
+/** The town's own chat room, its key in the live hub (a test's own room is `test:<name>`: town-chat-api.ts `chatRoomOf`). */
+export const TOWN_CHAT_ROOM = "town";
+
 export interface TownLine {
   /** Its number, counting up (the app asks for the lines after the last one it has). */
   n: number;

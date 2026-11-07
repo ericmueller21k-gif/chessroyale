@@ -12,7 +12,8 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
-import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, mayTownChat, reportedLine, signedInReader, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
+import { townHereResponse } from "./town-here-api.ts";
+import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
 import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
@@ -189,6 +190,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     !path.startsWith("/api/chat/icon/") &&
     path !== "/api/town/chat" &&
     path !== "/api/town/chat/remove" &&
+    path !== "/api/town/here" &&
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
     path !== "/api/boss/token"
@@ -252,14 +254,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
     const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
-    // ?town=N (the town square is open): the town chat's lines after N, for a signed-in account only and never on a device
-    // the age gate marked too young (town-chat-api.ts); while its switch is off, only that it's paused.
+    // ?town=N (the town square is open): the town chat's lines after N, for anyone (a guest reads it too: Eric, on #542, "they
+    // should be able to see the chat. They just can't type in it") but never on a device the age gate marked too young
+    // (town-chat-api.ts); while its switch is off, only that it's paused. Sending stays signed-in only (townPostResponse).
     const townSince = url.searchParams.get("town");
     let town: unknown = null;
-    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under" && (await signedInReader(sql, token, now).catch(() => null))) {
+    if (townSince !== null && env.LIVE && ageAnswer(request) !== "under") {
       town = isPaused(env, "town-chat", now)
         ? { paused: true }
-        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil).catch(() => null);
+        : await townSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(townSince), now, url.searchParams.get("room"), waitUntil, chatRoomOf(url.searchParams.get("townroom"), (env as AdminEnv).TEST_SWITCHES === "1")).catch(() => null);
     }
     return json({
       ...liveCache.body,
@@ -268,6 +271,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       ...(town ? { town } : {}),
       ...(inbox ? { inbox } : {}),
     });
+  }
+
+  // POST /api/town/here: a device in the town square says where its player is (or that it left); the answer is everyone else
+  // there, each with their "zzz" (town-here-api.ts; the away rule, TOWN_AFK). No session lookup past the cached ones.
+  if (path === "/api/town/here" && request.method === "POST") {
+    if (!env.LIVE) return json({ others: [] });
+    return townHereResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { token, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1", admin: (email) => isAdmin(env as AdminEnv, { email }) }, now);
   }
 
   // GET /api/chat/icon/KEY: a drawn icon on a line in the global chat (anyone may read the chat).
@@ -470,12 +480,12 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // POST /api/report {target, reason, match?}: a report about a player (a profile's Report button; `match`: the lobby
   // code when made during a match). One per player per match (outside a match, one a day); see fairplay.ts.
   if (path === "/api/report" && request.method === "POST") {
-    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown; line?: unknown };
+    const b = (await request.json().catch(() => ({}))) as { target?: unknown; reason?: unknown; match?: unknown; line?: unknown; townroom?: unknown };
     // A line of the town's chat (`line`: its number): the words are read from the room, never taken from the request; only
     // someone who may read the town's chat can report a line of it (a guest or a young device can't probe who spoke).
     const chatReport = b.reason === FAIRPLAY.reports.chatReason;
     if (chatReport && (!mayTownChat(current) || ageAnswer(request) === "under")) return json({ message: mayTownChat(current) ? TOWN_CHAT_AGE : SIGN_IN_TO_TOWN_CHAT }, 403);
-    const line = chatReport && env.LIVE ? await reportedLine(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), b.line, b.target) : null;
+    const line = chatReport && env.LIVE ? await reportedLine(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), b.line, b.target, chatRoomOf(b.townroom, (env as AdminEnv).TEST_SWITCHES === "1")) : null;
     const r = await reportPlayer(sql, current, b.target, b.reason, b.match, now, line);
     if (!r.ok) return json({ message: r.message }, 400);
     const already = typeof b.match === "string" ? "You've already reported this player in this match." : "You've already reported this player today.";
@@ -507,8 +517,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if ((path === "/api/town/chat" || path === "/api/town/chat/remove") && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
     const hub = liveHub(env as Required<Pick<AccountEnv, "LIVE">>);
-    if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now, waitUntil);
-    return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now) }, now, waitUntil);
+    if (path === "/api/town/chat/remove") return townRemoveResponse(request, hub, isAdmin(env as AdminEnv, current), now, waitUntil, (env as AdminEnv).TEST_SWITCHES === "1");
+    return townPostResponse(request, sql, hub, { user: current, tooYoung: ageAnswer(request) === "under", paused: isPaused(env, "town-chat", now), testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now, waitUntil);
   }
 
   // Boss tokens (boss-tokens.ts). A solo boss battle is counted by the server's clock: POST /api/boss/solo/start as it begins
