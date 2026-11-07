@@ -4,7 +4,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { BOSS_KITS, bossKit } from "../src/characters/kits.ts";
 import { BOSS_BLITZ } from "../src/characters/boss-blitz.ts";
 import { DASH_FIGURE, DASH_ROOM } from "../src/characters/dash-figure.ts";
-import { DASH_CHANCE, DASH_LINES } from "../src/characters/dash-lines.ts";
+import { DASH_CHANCE, DASH_LINES, DASH_RUSH_LINES } from "../src/characters/dash-lines.ts";
 import { DASH_SOUNDS, dashSound, type DashSound } from "../src/characters/dash-sounds.ts";
 import { sidekickBlitz } from "../src/characters/sidekicks/blitz.ts";
 import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
@@ -82,6 +82,21 @@ describe("Dash's wiring", () => {
       expect(v.props.class, kind).toMatch(/\bpm-stay\b/);
       expect(cast, `${kind} casts at the board's corner`).toBe(0);
     }
+  });
+
+  it("Eric, Nov 6: his Scramble Rush warned a turn ahead as any ultimate: RAGE!, \"Next turn: Scramble Rush\", his clock held up, his line", () => {
+    const boss = { id: "dash", name: "Dash", crowdSide: "w", crowdMoves: 2, startMove: 1, board: { id: 0, fen: "", history: [], ply: 0, lastMove: null }, powers: { events: [], turn: 2 } } as unknown as MomentProps["boss"];
+    const banners: string[][] = [];
+    const ui = DASH_UI.moments.rushWarn;
+    const props = { boss, moment: { kind: "rushWarn", key: "dash:rushWarn:2", at: 0, ms: 1700 }, now: 0, t: 0, orientation: "white", side: "w", kit, banner: (a: string, b: string, tone: string) => (banners.push([a, b, tone]), null), cast: () => null, anim: () => "scrambleWarn" } as unknown as MomentProps;
+    ui.view(props);
+    expect(banners).toEqual([["RAGE!", "Next turn: Scramble Rush", "rage"]]);
+    // (The same order and kit moment as every boss's warning, so it plays where and when theirs do.)
+    expect([ui.order, ui.kit]).toEqual([WARN.order, WARN.kit]);
+    const line = ui.line!(kit, { kind: "rushWarn", key: "dash:rushWarn:2" })!;
+    expect(DASH_RUSH_LINES.warn).toContain(line);
+    expect(DASH_RUSH_LINES.warn).toContain("Hope you were watching.");
+    for (const l of DASH_RUSH_LINES.warn) expect(l.length, l).toBeLessThanOrEqual(36);
   });
 
   it("no frame of any of his animations drops below his feet by more than the boss bar's padding: in his slot, never over the board", () => {

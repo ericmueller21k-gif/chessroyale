@@ -919,6 +919,8 @@ export interface DashState {
   flags: number;
   /** His Scramble Rush (once a battle; Eric, Nov 6), once it has come. */
   rush?: DashRush | null;
+  /** The crowd turn his Scramble Rush was warned as it began (RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6): it comes the next. */
+  rushWarn?: number;
 }
 
 /**
@@ -1403,8 +1405,10 @@ export type PowerEventKind =
   | "slap"
   | "scramble"
   | "flag"
-  // Dash's clock fit (at most twice a battle: `count` quick smacks) and his extra move after a failed Scramble Rush.
+  // Dash's clock fit (at most twice a battle: `count` quick smacks), his Scramble Rush's warning a turn ahead (RAGE!, "Next
+  // turn: Scramble Rush") and his extra move after a failed Scramble Rush.
   | "clockFit"
+  | "rushWarn"
   | "rushExtra";
 export interface PowerEvent {
   kind: PowerEventKind;

@@ -56,6 +56,8 @@ import {
   judgeTaps,
   lightsDeadline,
   lightsOutTimeline,
+  rushKeep,
+  rushMovesLeft,
   rushSquares,
   rushTimeline,
   brainLine as brainWords,
@@ -734,9 +736,9 @@ export class NetMatch implements GameView {
         this.currentBoard = m.boss.board;
         this.lights = null;
         // (Dash's Scramble Rush: its beats on this device's clock, your placements kept through the server's verdict.)
-        this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), places: this.rush?.key === m.rush.key ? this.rush.places : {} } : null;
+        this.rush = m.rush ? { key: m.rush.key, at: this.local(m.rush.at), ...(this.rush?.key === m.rush.key ? { places: this.rush.places, moved: this.rush.moved } : { places: {}, moved: {} }) } : null;
         // (`fall`: beaten, the Hidden Boss collapses on the board until the results come.)
-        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places } } } : {}) });
+        return this.setPhase({ kind: "boss", boss: this.boss, until: m.until ? this.local(m.until) : 0, thinking: m.thinking, intro: m.intro, ...(m.fall ? { fall: true } : {}), ...(this.rush ? { rush: { ...this.rush, places: { ...this.rush.places }, moved: { ...this.rush.moved } } } : {}) });
       case "darkTry": {
         if (m.key !== this.key || this.phase.kind !== "play") return;
         if (m.ok) {
@@ -1244,12 +1246,15 @@ export class NetMatch implements GameView {
     // (Your ten seconds, as the server counts them: it checks the same.)
     const t = Date.now() - r.at;
     const tl = rushTimeline();
-    if (t < tl.placeAt - 300 || t > tl.placeUntil) return;
+    if (t < tl.placeAt - 300 || t > tl.placeUntil || rushMovesLeft(r.moved, from) <= 0) return;
     const places = { ...r.places, [from]: to };
     if (rushSquares(this.boss.board.fen, rush, places).get(from) !== to) return;
-    r.places = places;
-    this.send({ t: "rushPlace", key: r.key, places });
-    this.setPhase({ kind: "boss", boss: this.boss, until: 0, rush: { ...r, places: { ...places } } });
+    // (Each piece at most movesPerPiece times: the server keeps the same, rushKeep.)
+    const kept = rushKeep(rush, r.places, r.moved, places);
+    r.places = kept.places;
+    r.moved = kept.moved;
+    this.send({ t: "rushPlace", key: r.key, places: kept.places });
+    this.setPhase({ kind: "boss", boss: this.boss, until: 0, rush: { ...r, places: { ...kept.places }, moved: { ...kept.moved } } });
   }
 
   submit(move: string | null, premove = false) {
