@@ -394,3 +394,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   benches vertical beside the board (ours from our corner upward, theirs kitty-corner downward); no green timer bars; the timer is the
   whole middle HUD piece; "Round N" + big phase (PLANNING / FIGHT) top left; "Income +N" opens a breakdown (base, interest, streak,
   round). Phone version too. Assets: notes/briefs/assets/autochess-*.
+- Main 1f57f9af (#549) e2e GREEN: the 83aa78f5 failures were intermittent. Root-causing anyway, in order: Timber card tap (recurring,
+  Haiku now: claude/fix-timber-tap), then squads-watch:167, squads-three-boards:152, dash.spec:241 (flaky), town-leave:143 (flaky).
+- Auto chess mockup v3 sent (square thin double borders, hex border, line work, players top-left with big pawns + HP/XP like today,
+  gear top-right, no title/back for now). Waiting on Eric's go.
