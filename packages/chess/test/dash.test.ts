@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, fitSmacks, fitTurns, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -156,7 +156,7 @@ describe("Dash: in a battle", () => {
  * back, under needCorrect back and he moves again at once.
  */
 describe("Dash v2: his numbers", () => {
-  it("Eric's: Time Scramble at most twice, the Rush's 4 of 6, its 1.00 over five seconds and its ten seconds; a fit at most twice, 3 to 5 smacks", () => {
+  it("Eric's: Time Scramble at most twice, the Rush's 4 of 6, its 1.00 over five seconds and its ten seconds; the clock's multi-hit every 4 or 5 of his moves (dash-clock.test.ts)", () => {
     expect(S.maxUltimates["dash"]).toBe(2);
     expect(S.dashScramble).toMatchObject({ needCorrect: 4, pieces: 3, ranks: [3, 6], countdownMs: 5000, placeMs: 10000, from: 7 });
     const tl = rushTimeline();
@@ -165,18 +165,7 @@ describe("Dash v2: his numbers", () => {
     expect(tl.scatterUntil - tl.scatterAt).toBeLessThanOrEqual(4000);
     expect(tl.scatterUntil).toBeLessThanOrEqual(tl.countdownMs);
     expect(tl.placeUntil - tl.placeAt).toBe(10000);
-    expect(S.dashClockFit).toMatchObject({ max: 2, smacks: [3, 5] });
-    for (let seed = 0; seed < 300; seed++) {
-      const turns = fitTurns(seed);
-      expect(turns).toHaveLength(2);
-      expect(new Set(turns).size).toBe(2);
-      for (const t of turns) {
-        expect(t).toBeGreaterThanOrEqual(S.dashClockFit.from);
-        expect(t).toBeLessThanOrEqual(S.dashClockFit.to);
-        expect(fitSmacks(seed, t)).toBeGreaterThanOrEqual(3);
-        expect(fitSmacks(seed, t)).toBeLessThanOrEqual(5);
-      }
-    }
+    expect(S.dashClockFit).toMatchObject({ every: [4, 5], smacks: 5 });
     expect(POWER_FX.clockFit).toBe(DASH_FX.clockFit);
     expect(POWER_FX.rushExtra).toBe(DASH_FX.rushExtra);
     // (Eric, Nov 6: each piece moved at most twice in the put-back; the Rush's warning as long as every ultimate's.)
@@ -405,7 +394,7 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
     expect(r.rushDue()).toBe(true);
   });
 
-  it("in a battle without the switch: never before turn 7, at most once; Time Scramble at most twice; a clock fit at most twice", async () => {
+  it("in a battle without the switch: never before turn 7, at most once; Time Scramble at most twice; the clock's multi-hits every 4 or 5 of his moves", async () => {
     let came = 0;
     for (const seed of [2, 5]) {
       const r = battle(seed);
@@ -436,7 +425,9 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
       came += rushes.length;
       for (const t of rushes) expect(t).toBeGreaterThanOrEqual(S.dashScramble.from);
       expect(scrambles).toBeLessThanOrEqual(2);
-      expect(fits).toBeLessThanOrEqual(2);
+      // (Every 4 or 5 of his moves: 45 turns at most, so at most 11 multi-hits; the schedule's own count.)
+      expect(fits).toBeGreaterThan(0);
+      expect(fits).toBeLessThanOrEqual(Math.ceil(45 / 4));
     }
     // (It came in these battles: his meter half full by about turn 13.)
     expect(came).toBeGreaterThan(0);

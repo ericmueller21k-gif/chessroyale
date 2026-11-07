@@ -27,11 +27,13 @@
  *
  * Test switches (solo): `?power=clockslap`: his first move slaps as a capture would, whatever it is (then only his captures);
  * `?power=scramble` warns as the second turn begins; `?power=rush` warns of his Scramble Rush as the second turn begins (it comes
- * as the third does).
+ * as the third does); `?power=clockfit` adds a multi-hit on his second turn; `?power=popoff` has his pop-off on his second turn.
  *
- * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); a clock fit
- * at most twice (`clockFit`: 3 to 5 quick smacks and a line); and once a battle his **Scramble Rush** (below): a memory test over a
- * frozen position, whose only outcome is his extra move or not.
+ * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); and once a
+ * battle his **Scramble Rush** (below): a memory test over a frozen position, whose only outcome is his extra move or not.
+ * Dash v3 (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): his clock multi-hit every 4 or 5 of his moves (`clockFit`: 5
+ * quick smacks and always a line, clockHitTurns), and once a battle his pop-off (popOff: state, not an event; popOffMs holds his
+ * thinking for its two beats, 3 smacks and a pop-off line, then 10 fast smacks and a love line).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type DashRush, type DashState } from "@chessroyale/core";
 import { playOnBoard, type BoardState } from "../boards.ts";
@@ -55,7 +57,16 @@ export const DASH_ANIM = { clockSlap: 1130, slapHitAt: 270, stealAt: 690, scramb
  * starts after them): the slap (his clock slap, your time flying to him), the Time Scramble (its banner's 1500 ms, then his
  * spin) and his flag (your time ran out: his finger gun and his jab).
  */
-export const DASH_FX = { slap: DASH_ANIM.clockSlap, scramble: 1500 + DASH_ANIM.timeScramble, flag: DASH_ANIM.check, clockFit: 1500, rushExtra: 2200 } as const;
+export const DASH_FX = {
+  slap: DASH_ANIM.clockSlap,
+  scramble: 1500 + DASH_ANIM.timeScramble,
+  flag: DASH_ANIM.check,
+  clockFit: 1500,
+  rushExtra: 2200,
+  // (His pop-off's two beats, while he thinks: dashPopOff's popMs and loveMs.)
+  popOff: BOSS_POWERS.dashPopOff.popMs,
+  popOffFast: BOSS_POWERS.dashPopOff.loveMs,
+} as const;
 
 type DashSettings = Pick<BossPowerSettings, "slapBankSeconds" | "slapMoveSeconds" | "slapMoveMin" | "scrambleMoves" | "scrambleSeconds">;
 
@@ -132,10 +143,15 @@ export const DASH: BossRules = {
   ultimateRunning: (p, turn, s) => scrambleOn(p, turn, s),
   // As the crowd's turn after his turn's end begins: your flag's jab, then his slap.
   everyTurn(next, t) {
+    // His pop-off, once a battle, on one of his turns (from the seed; the test switch: his second turn). It is state, not an
+    // event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
+    if (next.dash && !next.dash.popOff && (t.test === "popoff" ? t.turn === 2 : t.turn === popOffTurn(t.seed, t.s.dashPopOff))) next.dash = { ...next.dash, popOff: { at: t.turn } };
     const d = next.dash;
     if (!d) return;
     if (d.flag && d.flag.at + 1 === t.turn) t.events.push({ kind: "flag", turn: t.turn, move: d.flag.move });
     if (d.slap && d.slap.at + 1 === t.turn) t.events.push({ kind: "slap", turn: t.turn, ms: d.slap.ms, bank: d.slap.bank });
+    // His clock multi-hit: every 4 or 5 of his moves, always with a line (never dropped for another of his moves this turn).
+    if (clockHitOn(t.seed, t.turn, t.s.dashClockFit, t.test)) t.events.push({ kind: "clockFit", turn: t.turn, count: t.s.dashClockFit.smacks });
     // His Scramble Rush, once a battle, warned a turn ahead as an ultimate is (Eric, Nov 6: RAGE!, "Next turn: Scramble Rush",
     // his line); as the next crowd turn begins it comes, the crowd's turn waiting for it (the runner's rushDue), the board as it is.
     if (rushWarned(d) && t.turn > d.rushWarn!) {
@@ -148,8 +164,6 @@ export const DASH: BossRules = {
       t.events.push({ kind: "rushWarn", turn: t.turn });
       return;
     }
-    // A clock fit (at most dashClockFit.max a battle, on turns from the seed), on a turn with nothing else of his.
-    if (!t.events.length && fitTurns(t.seed, t.s.dashClockFit).includes(t.turn)) t.events.push({ kind: "clockFit", turn: t.turn, count: fitSmacks(t.seed, t.turn, t.s.dashClockFit) });
   },
   // (His slaps come at his turn's end, after a capture: afterBossMove.)
   passive() {},
@@ -173,26 +187,38 @@ export const DASH: BossRules = {
   view: (p) => ({ dash: dashView(p) }),
 };
 
-// ---------------- His clock fits ----------------
+// ---------------- His clock: the multi-hit and the pop-off ----------------
 
-type FitSettings = BossPowerSettings["dashClockFit"];
-
-/** The crowd turns his clock fits come on (dashClockFit.max of them, different, between `from` and `to`), from the battle's seed. */
-export function fitTurns(seed: number, s: FitSettings = BOSS_POWERS.dashClockFit): number[] {
-  const span = Math.max(1, s.to - s.from + 1);
+/**
+ * The turns of his clock multi-hits up to `upTo` (dashClockFit.every: each 4 or 5 of his own moves after the last, from the
+ * battle's seed, so the same on every device). The first comes after 4 or 5 of his moves, too.
+ */
+export function clockHitTurns(seed: number, upTo: number, s: BossPowerSettings["dashClockFit"] = BOSS_POWERS.dashClockFit): number[] {
+  const [lo, hi] = s.every;
   const out: number[] = [];
-  for (let i = 0; out.length < Math.min(s.max, span) && i < 50; i++) {
-    const turn = s.from + Math.floor(powerRoll(seed, "fit", i) * span);
-    if (!out.includes(turn)) out.push(turn);
+  let at = 0;
+  for (let i = 0; at < upTo && i < 1000; i++) {
+    at += lo + Math.floor(powerRoll(seed, "hit", i) * (hi - lo + 1));
+    if (at <= upTo) out.push(at);
   }
-  return out.sort((a, b) => a - b);
+  return out;
 }
 
-/** How many smacks a clock fit has (dashClockFit.smacks: 3 to 5), from the seed. */
-export function fitSmacks(seed: number, turn: number, s: FitSettings = BOSS_POWERS.dashClockFit): number {
-  const [lo, hi] = s.smacks;
-  return lo + Math.floor(powerRoll(seed, "fit-n", turn) * (hi - lo + 1));
+/** Whether his turn `turn` is a multi-hit turn (the test switch ?power=clockfit: his second turn too). */
+export const clockHitOn = (seed: number, turn: number, s: BossPowerSettings["dashClockFit"] = BOSS_POWERS.dashClockFit, test = ""): boolean =>
+  (test === "clockfit" && turn === 2) || clockHitTurns(seed, turn, s).includes(turn);
+
+/** His pop-off's turn: one of his turns from dashPopOff.from to dashPopOff.to, from the battle's seed. */
+export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff): number {
+  return s.from + Math.floor(powerRoll(seed, "popoff") * (s.to - s.from + 1));
 }
+
+/**
+ * How long his pop-off holds his thinking, ms (its two beats, DASH_FX.popOff), on the turn it comes; else 0. The turn's think
+ * waits for it (bossThinkMs, the solo and the server alike), so his move lands after it and no crowd clock runs meanwhile.
+ */
+export const popOffMs = (boss: { id?: string; crowdMoves: number; powers?: { dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
+  boss?.id === "dash" && boss.powers?.dash?.popOff?.at === turnOf(boss) ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
 
 // ---------------- Scramble Rush ----------------
 
@@ -391,6 +417,8 @@ export interface DashView {
   scramble: { at: number; moves: number; seconds: number } | null;
   /** His Scramble Rush, once it has come (the swept pieces, and once it's over how many the crowd put back and his extra move). */
   rush?: DashRush | null;
+  /** His pop-off (Eric, Nov 7): his turn it comes on, so his screen plays it while he thinks. */
+  popOff?: { at: number } | null;
 }
 
 export function dashView(p: BossPowerState, s: DashSettings = BOSS_POWERS): DashView | null {
@@ -404,6 +432,7 @@ export function dashView(p: BossPowerState, s: DashSettings = BOSS_POWERS): Dash
     flags: d.flags,
     scramble: p.ultAt !== undefined && scrambleOn(p, p.turn, s) ? { at: p.ultAt, moves: s.scrambleMoves, seconds: s.scrambleSeconds } : null,
     ...(d.rush ? { rush: { ...d.rush, moves: d.rush.moves.map((m) => ({ ...m })) } } : {}),
+    ...(d.popOff ? { popOff: { ...d.popOff } } : {}),
   };
 }
 

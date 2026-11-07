@@ -43,6 +43,8 @@ export const POWER_WORDS: Record<PowerId, string> = {
   clockslap: "steals your time when he takes a piece, Clock Slap",
   scramble: "Time Scramble",
   rush: "Scramble Rush",
+  clockfit: "taps his clock (a multi-hit)",
+  popoff: "pops off, then hits his clock ten times",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

@@ -77,7 +77,7 @@ export interface BossInfo {
 }
 
 /** The boss powers there are: a passive (or opening) and an ultimate per boss. */
-export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush";
+export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | "candle" | "dark" | "lightsout" | "blocks" | "bounce" | "cuts" | "boardsaw" | "drag" | "showdown" | "nohelp" | "bullet" | "tusks" | "slam" | "leapfrog" | "carrotpatch" | "camouflage" | "repaint" | "moonbeam" | "fullmoon" | "seeds" | "water" | "balloons" | "hoops" | "draft" | "crease" | "revision" | "scraps" | "gnaw" | "clockslap" | "scramble" | "rush" | "clockfit" | "popoff";
 /**
  * Every power, for the test switch (?power=<id>: a boss's ultimate comes early; its passive as usual, but for Wrangler's
  * drag and Alfil's Tusks, which come sooner and more often, the hopper's Leapfrog, whose battle starts with a hop due
@@ -93,7 +93,7 @@ export type PowerId = "freeze" | "blizzard" | "pie" | "funhouse" | "sparkler" | 
  * the first crowd move it may follow (turn 5 on), whatever the evaluation says. Dash's ?power=rush, his once-a-battle Scramble
  * Rush (not on his BOSS_ROSTER line either), comes as the second turn begins.
  */
-export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush"];
+export const POWER_IDS: readonly PowerId[] = ["freeze", "blizzard", "pie", "funhouse", "sparkler", "candle", "dark", "lightsout", "blocks", "bounce", "cuts", "boardsaw", "drag", "showdown", "nohelp", "bullet", "tusks", "slam", "leapfrog", "carrotpatch", "camouflage", "repaint", "moonbeam", "fullmoon", "seeds", "water", "balloons", "hoops", "draft", "crease", "revision", "scraps", "gnaw", "clockslap", "scramble", "rush", "clockfit", "popoff"];
 
 /**
  * A raid boss: the base template every boss fills in. Its powers' rules (which moves are allowed, what happens after
@@ -921,6 +921,8 @@ export interface DashState {
   rush?: DashRush | null;
   /** The crowd turn his Scramble Rush was warned as it began (RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6): it comes the next. */
   rushWarn?: number;
+  /** His pop-off (once a battle; Eric, Nov 7): his turn `at`, it plays before his move lands, while he thinks. */
+  popOff?: { at: number } | null;
 }
 
 /**
@@ -1408,6 +1410,9 @@ export type PowerEventKind =
   // Dash's clock fit (at most twice a battle: `count` quick smacks), his Scramble Rush's warning a turn ahead (RAGE!, "Next
   // turn: Scramble Rush") and his extra move after a failed Scramble Rush.
   | "clockFit"
+  // (His pop-off, Eric, Nov 7: no event; it plays while he thinks, from DashState.popOff, as two beats.)
+  | "popOff"
+  | "popOffFast"
   | "rushWarn"
   | "rushExtra";
 export interface PowerEvent {
