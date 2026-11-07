@@ -361,3 +361,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   3. Street town lamps stand in front of boss homes' fronts: move them (Haiku, claude/street-lamps).
   4. LATER (mental note, with the 3D/sprite work): boss homes are bunched; spread them evenly across the town.
   Plan: 3 now (Haiku); 1+2 the next Opus after intros as data.
+  Eric on Babur (Nov 7): make him the new default size on the computer; his pump stands in front of him, slightly overlapping
+  (him behind it by ~10 px), scooted toward him, so it no longer pushes the board smaller.
