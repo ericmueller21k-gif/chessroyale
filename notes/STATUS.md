@@ -375,3 +375,10 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   height jump goes away with quick chat). Town on computer: no "‹ Town…" header; a TOWN row with map / town chat / gear in the
   column's fixed top slot. Open: the 1v1 view hides global chat (check why; a match chat tab in the same box?).
   Mockup: scratchpad/chatmock/p1-p3.png.
+- **Nov 7 ~08:30:** Eric APPROVED right-column mockup v5. Running: Opus "typed chat + right column" (brief-chat-column.md,
+  claude/chat-column, 8996); Haiku "compact walkthrough box" (claude/walkthrough-compact, 8995; mock t1 sent); Haiku "leave Chess
+  Town? confirm" (claude/leave-town-confirm, 8997).
+  QUEUED after chat-column + compact box land: **town intro** (first visit, compact box): slide 1 "Welcome to Chess Town": explore
+  the town; one line each on the Colosseum, the park, the boss houses; the town is still under construction; the Handbook explains
+  more. Slide 2: lights the TOWN tools (map on/off, town chat on/off or fade, settings gear). "Tap anywhere to continue". Computer
+  and phone (phone: its header icons).
