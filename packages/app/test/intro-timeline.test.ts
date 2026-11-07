@@ -106,6 +106,15 @@ describe("intros as data: each moved intro plays as it did on main (its beat log
       expect(Math.max(...off), "no frame off at all").toBe(0);
     });
   }
+  it("every intro as data is found by its home's name (shops/intros/<home>.ts, its default export: intro.ts loads it so) and is a custom intro's", () => {
+    const files = import.meta.glob<IntroData>(["../src/town/shops/intros/*.ts", "!../src/town/shops/intros/common.ts"], { eager: true, import: "default" });
+    const homes = Object.keys(files).map((f) => f.replace(/^.*\/|\.ts$/g, "")).sort();
+    expect(homes).toEqual(Object.keys(ROOMS).sort());
+    for (const h of homes) {
+      expect(files[`../src/town/shops/intros/${h}.ts`], h).toBe(ROOMS[h]!.data);
+      expect(introOf(h as HomeId)?.custom, h).toBe(true);
+    }
+  });
   it("who is there from the walk in: Timber's log lying, Smudgy's covered table; nothing of Alfil's or Big Boy's", () => {
     const on = (d: IntroData) => Object.entries(castBefore(d.timeline)).filter(([, a]) => a.on).map(([k, a]) => `${k}:${a.anim ?? ""}`);
     expect(on(TIMBER_INTRO)).toEqual(["log:lying"]);

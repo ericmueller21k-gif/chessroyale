@@ -78,10 +78,6 @@ interface IceMods {
   elves: typeof import("./ginger-elves-art.ts");
 }
 const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
-  // (As data, each a chunk with its art: shops/intros/<boss>.ts.)
-  alfil: () => import("./intros/alfil.ts").then((m) => ({ data: m.ALFIL_INTRO })),
-  bigboy: () => import("./intros/bigboy.ts").then((m) => ({ data: m.BIGBOY_INTRO })),
-  timber: () => import("./intros/timber.ts").then((m) => ({ data: m.TIMBER_INTRO })),
   hollow: () => import("./hollow-intro-art.ts").then((m) => ({ dark: m })),
   // (Wrangler's: his moves, the lasso's loop, the bale (his table: the barn's board stand), the buckets, his wipe; one chunk.)
   pig: () => import("./pig-intro-art.ts").then((m) => ({ rope: m, table: m.INTRO_PIG_TABLE, palette: m.INTRO_PIG_TABLE_PALETTE, storm: m.INTRO_PIG_STORM, front: m.INTRO_PIG_FRONT })),
@@ -96,8 +92,6 @@ const ART: Partial<Record<HomeId, () => Promise<IntroArt>>> = {
   // kit. The table's slab is its folded table's top (paper), the board the park table's ink, as the art's board is.)
   folio: () =>
     Promise.all([import("./folio-intro-art.ts"), import("../../characters/folio-intro.ts")]).then(([props, moves]) => ({ folio: { props, moves }, table: props.INTRO_FOLIO_TABLE, palette: FOLIO_TABLE_PALETTE })),
-  // (Smudgy's: his round table under its cloth, the cloth's whip; one small chunk with the paint kit.)
-  smudgy: () => import("./intros/smudgy.ts").then((m) => ({ data: m.SMUDGY_INTRO })),
   gingerbread: () =>
     Promise.all([import("./ginger-intro-art.ts"), import("../../characters/ginger-intro.ts"), import("./ginger-elves-art.ts")]).then(([props, moves, elves]) => ({
       ice: { props, moves, elves },
@@ -335,11 +329,21 @@ const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
   return c;
 };
 
+/**
+ * Every intro as data (shops/intros/<home>.ts, its default export: Alfil's, Big Boy's, Timber's, Smudgy's), found by its file's name,
+ * each a chunk with its art loaded when you challenge that boss. A new one is its file alone.
+ */
+const DATA = import.meta.glob<IntroData>(["./intros/*.ts", "!./intros/common.ts"], { import: "default" });
+const artOf = (home: HomeId): (() => Promise<IntroArt>) | undefined => {
+  const d = DATA[`./intros/${home}.ts`];
+  return d ? () => d().then((data) => ({ data })) : ART[home];
+};
+
 const loading = new Map<HomeId, Promise<LoadedIntro>>();
 /** Loads a boss's intro (its art's chunk, if it has its own, every frame drawn), once; null for a boss without one. */
 export function loadIntro(home: HomeId): Promise<LoadedIntro> | null {
   const def = introOf(home);
-  const load = ART[home];
+  const load = artOf(home);
   if (!def || (def.custom && !load)) return null;
   let p = loading.get(home);
   if (p) return p;

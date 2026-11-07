@@ -96,3 +96,5 @@ export const TIMBER_INTRO = defineIntro({
     return { wood: { move: c.boss?.on ? c.boss.anim : null, log: on("log") ?? on("worked"), fog: on("fog"), ring: !!c.ring?.on, stumps: on("stumps") } };
   },
 });
+/** (Its intro as data, by its home: shops/intro.ts finds it by its file's name.) */
+export default TIMBER_INTRO;

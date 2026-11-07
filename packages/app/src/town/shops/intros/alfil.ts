@@ -31,3 +31,5 @@ export const ALFIL_INTRO = defineIntro({
   // (The test hook's: the pyramid while it plays, none once it has crumbled to its drift.)
   view: (c) => ({ pyramid: c.pyramid?.on && !(c.pyramid.anim === "crumble" && c.pyramid.ended) ? { anim: c.pyramid.anim, frame: c.pyramid.frame } : null }),
 });
+/** (Its intro as data, by its home: shops/intro.ts finds it by its file's name.) */
+export default ALFIL_INTRO;

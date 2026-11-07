@@ -32,3 +32,5 @@ export const BIGBOY_INTRO = defineIntro({
   ],
   view: (c) => ({ blocks: c.blocks?.on ? { anim: c.blocks.anim, frame: c.blocks.frame } : null, drop: c.board?.lift ?? 0 }),
 });
+/** (Its intro as data, by its home: shops/intro.ts finds it by its file's name.) */
+export default BIGBOY_INTRO;

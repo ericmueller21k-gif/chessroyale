@@ -29,3 +29,5 @@ export const SMUDGY_INTRO = defineIntro({
   ],
   view: (c) => ({ cloth: c.cloth?.on ? c.cloth.anim : null }),
 });
+/** (Its intro as data, by its home: shops/intro.ts finds it by its file's name.) */
+export default SMUDGY_INTRO;

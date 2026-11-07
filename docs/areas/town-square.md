@@ -706,6 +706,10 @@ on right, not vertical… just be sure the table and chairs and pieces all are l
 [2026-11-02-boss-challenge.md](../decisions/2026-11-02-boss-challenge.md), [2026-11-02-boss-challenge-r2.md](../decisions/2026-11-02-boss-challenge-r2.md),
 the pacing and standing clear of the stools (Eric, Nov 2, after Big Boy's live: "it all happens so quick"; "make sure they're not
 standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decisions/2026-11-02-challenge-pacing.md).
+- **Intros as data (Nov 7, the audit's §5):** Alfil's, Big Boy's, Timber's and Smudgy's intros are a timeline of beats in their own file
+  (`shops/intros/<boss>.ts`), played by one player (`shops/timeline.ts`) and drawn by ShopRoom's `drawCast`; the others are still their own
+  state machines in challenge.ts. Each moved intro's beat log matches main's (`test/intro-timeline.test.ts`). How to write one:
+  bosses.md, "Adding a boss". Decision: [2026-11-07-intros-as-data.md](../decisions/2026-11-07-intros-as-data.md).
 
 - **Wrangler's challenge (Nov 4, his own; Eric's design, intro-pig-nov4.md):** you both walk on straight to where you stand (`seated`,
   the usual clear places: at the art's 7.2 his rope coil hung in front of his bucket), and nobody moves after. His line (a placeholder
@@ -753,7 +757,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   stool), the game's board on the table from its second frame; his reveal line "Careful, don't get any paint on the pieces!"
   (`BossIntro.chant`); then **the splatter** (`shops/smudgy-splatter.ts`, `canvas.boss-splatter`): splats in the room's deep paints land
   faster and faster until the screen is covered (1.2 s), held while the battle loads (at least 0.25 s), and a brush stroke sweeps it away
-  onto the match (0.5 s); every phase by the clock. No attack. Every beat in `CHALLENGE_FEEL.smudgy`; `clothAnims`, `clothCues`. Four new
+  onto the match (0.5 s); every phase by the clock. No attack. Every beat in `CHALLENGE_FEEL.smudgy`; its data `shops/intros/smudgy.ts`. Four new
   sounds (`smudgyWhoosh`, `smudgyFlop`, `smudgySplat`, `smudgySwipe`).
 - **Folio's challenge (Nov 5, its own; the art's timeline, intro-folio-nov5.md):** you both walk on to the clean page's marks (it glides,
   its intro's own frames, `BOSS_FOLIO_INTRO` in `characters/folio-intro.ts`, mirrored to face east; its shadow the art's warm see-through
@@ -813,7 +817,7 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   sides: across, the picture as drawn; facing, its middle square alone and a stool north and south. The board (`paintTable`) is
   turned to the layout (`boardSquare`): white's ranks nearest you, black's nearest the boss, the a-file on your left; across, the
   knights face the other side. You and the boss walk to and talk on your marks, just past your stools; as the stools come in (the
-  default's pop, Big Boy's stools dropping, Alfil's table showing through the crumble: `hopStart`) you each take a little hop back
+  default's pop, Big Boy's stools dropping, Alfil's table showing through the crumble: `hopStart`, or `hopBack` in its data) you each take a little hop back
   (`hopMs`, `hopUp`) to `clear` (you 2.2, the boss 2.6 squares from the table's middle: `Marks.youClear` / `bossClear`), so no part
   of either near the floor stands in front of a stool (a unit test measures every boss's drawing, its attack's feet and the pawn).
 - **The flow** (`nextFlow`, pure): the boss's card's **"Challenge alone"**, its confirm **"Challenge Babur?"** / "You'll fight Babur in
@@ -823,21 +827,21 @@ standing where the chair blocks are"): [2026-11-02-challenge-pacing.md](../decis
   `characters/timber-intro.ts`). Inside (the room in challenge mode: no cards, no walking by tap, its own framing per layout,
   `CHALLENGE_FEEL.cam`, at zoom 1 since Nov 3: the further-out camera, everything in view), you both stand just inside a beat (`insideMs`, from the room's first frame), then walk up to your marks, side
   by side at `walkStepMs` (a slow walk), settle onto their middles and turn to face each other. Every beat is one number in
-  `CHALLENGE_FEEL`, laid out by `introBeats`: facing each other `faceMs`; the line alone in a speech bubble over its head for `lineMs`
+  `CHALLENGE_FEEL`, laid out by `introBeats` (an intro as data: its file's beats): facing each other `faceMs`; the line alone in a speech bubble over its head for `lineMs`
   (2.5 s; not the chat log; `BOSS_INTROS[id].line`, placeholders until Gemini's lines); a pause (`afterLineMs`); then:
-  - **Alfil's own:** the pyramid rising, holding `holdMs` (its idle), cracking, crumbling, the table and its board (`introAt`), his
+  - **Alfil's own:** the pyramid rising, holding `holdMs` (its idle), cracking, crumbling, the table and its board (`shops/intros/alfil.ts`), his
     cues' sounds; then the sandstorm (`startStorm`).
-  - **Big Boy's own** (Nov 2, toy blocks: `BlocksAnims`, `isBlocks`): six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y:
+  - **Big Boy's own** (Nov 2, toy blocks: `shops/intros/bigboy.ts`): six alphabet blocks drop in and stack 3-2-1 (B-I-G, B-O, Y:
     `build`, a wooden clack as each lands, a bonk for the top one); a gap (`gapMs`); the board drops onto the top block
     (`boardDropMs` from `dropFrom` squares up, his toss) and plops on (`plop`: dust and stars, a poof); a gap; the two stool blocks drop
     in at your sides (`chairs`, a clack each: a dark gray B on his side, black's, a bone W on yours, white's). The blocks are his table
     and stools (their own picture, no park table); the board is lifted until its slab's front rests on the top block (`slabFrontY`),
     so the slab doesn't hide the upper blocks. Then his lollipop swirl (`INTRO_BIGBOY_SWIRL` and its front), played as Alfil's
     sandstorm (`startStorm`), his swish.
-  - **Timber's own** (Nov 3, a log: `LogAnims`, `isLog`, `woodAt`; Eric: "When he walks in, to the left there's a giant thick wooden
+  - **Timber's own** (Nov 3, a log: `shops/intros/timber.ts`; Eric: "When he walks in, to the left there's a giant thick wooden
     log. He picks it up and walks it over… sets it in the middle where the chessboard goes. Then he starts gnawing at it… a big storm of
     wood shavings and sawdust comes up like a fog… you see he's chewed it into a board… The seats are little wooden stumps"). His own
-    beats replace the line, pause and table beats (`introBeats`, every number in `CHALLENGE_FEEL.log` or the art's frames; about 12 s
+    beats replace the line, pause and table beats (his data's, every number in `CHALLENGE_FEEL.log` or the art's frames; about 12 s
     from the marks to the sweep): the giant log lies on the floor `log.at` (3.3) squares west of the table's middle from the walk in;
     his line shows `log.lineLeadMs` alone, then he walks west to the log (his own moves, `BOSS_BEAVER_INTRO`, drawn at his town size,
     mirrored to walk west; `log.walkMs` a square) while the bubble stays its `lineMs` over his head; he heaves it up (the lying log hidden
