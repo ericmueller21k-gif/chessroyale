@@ -350,3 +350,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   of either: no movement while visible, OR in the background. Then: pawn leaves for everyone; on return, home page + "You were away".
 - Nov 7 ~02:00: Eric OK'd Boingo (#537, MERGED fae97429) and Smudgy/sprite kit (#539: main merged in, CI rerun, merge on green).
   Item ledger backfill SHELVED by Eric ("will pick that up another day"): don't list it as waiting.
+- **Nov 7 ~03:00, Eric on #542 town AFK:** keep the shared town (real players see each other). zzz at 60 s idle; boot at 5 min
+  idle or hidden, with a pop-up "You've been dropped from the town". NEW: guests get 30 s in the town, then a pop-up "Make an
+  account to keep exploring · It's free" (sign-up). Sent to the AFK helper (same PR). Smudgy (#539) LIVE 8038b612.
