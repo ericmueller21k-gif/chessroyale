@@ -4,7 +4,7 @@
  * late grace) the runner judges them with the same code the screens use (rushJudge, bots' from the seed), everyone sees the
  * verdict, then the match goes on: his extra move if the crowd failed it, else the crowd's turn. The game's board never changes.
  */
-import { rushTimeline } from "@chessroyale/chess";
+import { rushKeep, rushTimeline } from "@chessroyale/chess";
 import type { BossLobby } from "./base.ts";
 
 /** The Rush begins: the boss's screen with it to everyone, its end timed here. */
@@ -33,7 +33,8 @@ function rushStep(lobby: BossLobby) {
 
 /**
  * A player's placements so far, while the second countdown is on for them (and the late grace): kept as sent, only each swept
- * piece's square before the sweep to a square name (rushJudge checks each against the board as it judges).
+ * piece's square before the sweep to a square name (rushJudge checks each against the board as it judges), and each piece at most
+ * movesPerPiece times (rushKeep).
  */
 function rushPlace(lobby: BossLobby, playerId: string, key: string, places: unknown) {
   const r = lobby.r.rush;
@@ -43,12 +44,10 @@ function rushPlace(lobby: BossLobby, playerId: string, key: string, places: unkn
   const t = lobby.now() - r.at;
   const tl = rushTimeline();
   if (t < tl.placeAt - 300 || t > tl.placeUntil + lobby.settings.lateGraceMs) return;
-  const mine: Record<string, string> = {};
-  for (const m of rush.moves) {
-    const sq = (places as Record<string, unknown>)[m.from];
-    if (typeof sq === "string" && /^[a-h][1-8]$/.test(sq)) mine[m.from] = sq;
-  }
-  r.places[playerId] = mine;
+  // (Each swept piece moves at most dashScramble.movesPerPiece times: a change past that is refused, the rules' own rushKeep.)
+  const kept = rushKeep(rush, r.places[playerId] ?? {}, r.moved?.[playerId] ?? {}, places as Record<string, unknown>);
+  r.places[playerId] = kept.places;
+  r.moved = { ...r.moved, [playerId]: kept.moved };
 }
 
 /** His part on the lobby server. */

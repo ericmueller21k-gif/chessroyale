@@ -71,7 +71,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX } as const;
+export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
@@ -133,8 +133,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   gnaw: [[0, 1500]],
   // (Dash's TIME SCRAMBLE!, Nov 3: off the board as he tosses his clock up. His slap and his flag have none.)
   scramble: [[0, 1500]],
-  // (His extra move after a failed Scramble Rush: "TWICE!", as Hollow's. His clock fit has none.)
+  // (His extra move after a failed Scramble Rush: "TWICE!", as Hollow's. His clock fit has none. The Rush's warning: the warning's.)
   rushExtra: [[0, 1500]],
+  rushWarn: [[0, 1500]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */

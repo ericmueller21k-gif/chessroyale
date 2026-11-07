@@ -1702,7 +1702,10 @@ export const BOSS_POWERS = {
    * `pieces` of yours and `pieces` of his (never a king) to empty squares of ranks `ranks`. His line and the God King's
    * (`linesMs`), then `placeMs` to put them back; then the board as it was, and `resultMs` for the verdict. Under `needCorrect`
    * of the six back (the crowd's people's mean, its bots' too: each bot puts each back with `botHit`), he moves again at once
-   * (Hollow's quiet extra move). The game's position never changes: only what the screens show.
+   * (Hollow's quiet extra move). The game's position never changes: only what the screens show. Warned a turn ahead as any
+   * ultimate is (Eric, Nov 6, playtesting: "there's no warning"): RAGE!, "Next turn: Scramble Rush", then it comes as the next crowd turn
+   * begins. In the put-back each swept piece moves at most `movesPerPiece` times (Eric, Nov 6: "you can only move a piece up
+   * to 2 times"); a try after that shakes it, "No more tries".
    */
   dashScramble: {
     from: 7,
@@ -1717,6 +1720,7 @@ export const BOSS_POWERS = {
     resultMs: 2400,
     needCorrect: 4,
     botHit: 0.6,
+    movesPerPiece: 2,
   },
 } as const;
 

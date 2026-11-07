@@ -228,6 +228,20 @@ export const PIECE_WORD: Record<string, string> = { p: "pawn", n: "knight", b: "
 /** A small, stable hash, for picking a line the same everywhere. */
 export const hash = (s: string) => [...s].reduce((a, c) => Math.imul(a ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
 
+/**
+ * The rage warning on screen (every boss's: BossPowers.tsx's WARN; Dash's Scramble Rush's too): RAGE!, "Next turn: <its name>",
+ * and the boss's warning cast, at the board's corner or where it stands (`inPlace`).
+ */
+export function rageWarn({ moment, banner, cast, anim }: MomentProps, name: string, when = "Next turn", inPlace = false) {
+  const a = inPlace ? anim() : null;
+  return (
+    <div class={`power-moment pm-warn${inPlace ? " pm-stay" : ""}`}>
+      {banner("RAGE!", `${when}: ${name}`, "rage")}
+      {inPlace ? a && <InPlace runKey={moment.key} anims={[a]} since={moment.at} /> : cast("", 0)}
+    </div>
+  );
+}
+
 /** A line from a boss kit's lines for one of its moments, picked by the moment's key (the same everywhere); null without one. */
 export function kitLine(kit: BossKit | null, moment: KitMoment, key: string): string | null {
   const lines = (kit?.lines as Partial<Record<string, readonly string[]>> | undefined)?.[moment];

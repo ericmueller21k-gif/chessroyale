@@ -142,9 +142,14 @@ describe("Dash online: the server's clocks", () => {
  * crowd's mean under needCorrect, his extra move asked of the host before the crowd's turn. The game's board never changes.
  */
 describe("Dash online: the Scramble Rush", () => {
-  /** To the Rush (the test switch: as the second turn begins): its message and the position it froze. */
+  /** To the Rush (the test switch: warned as the second turn begins, it comes as the third does): its message and the position it froze. */
   function toRush() {
     const L = dashLobby("rush");
+    L.crowdPlays();
+    // (The warning a turn ahead: the second turn's round as ever, its event out, nothing swept.)
+    const warned = L.toRound();
+    expect(warned.boss?.powers?.events.some((e) => e.kind === "rushWarn")).toBe(true);
+    expect(L.runner().boss!.powers!.dash!.rush ?? null).toBeNull();
     L.crowdPlays();
     for (let i = 0; i < 20 && !L.last("p1", "boss")?.rush; i++) {
       if (L.runner().bossToMove()) {
@@ -179,6 +184,24 @@ describe("Dash online: the Scramble Rush", () => {
     expect(L.last("p1", "boss")!.boss.powers!.dash!.rush!.correct).toBe(4);
     L.advance(tl.total - tl.placeUntil + 10);
     expect(L.toRound().board!.fen).toBe(fen);
+  });
+
+  it("Eric, Nov 6: each piece moved at most movesPerPiece (2) times, kept by the server: a third move of one is refused", () => {
+    const { L, rush, moves } = toRush();
+    const tl = rushTimeline();
+    L.advance(tl.placeAt + 500 - (L.now() - rush.at));
+    const [a, b, c] = moves;
+    // p1: the first piece onto b's old square, then c's, then home (refused: a third move); p2 puts it home on its first.
+    const sends = [{ [a!.from]: b!.from }, { [a!.from]: c!.from }, { [a!.from]: a!.from }];
+    for (const places of sends) L.core.message("p1", { t: "rushPlace", key: rush.key, places });
+    L.core.message("p2", { t: "rushPlace", key: rush.key, places: { [a!.from]: a!.from } });
+    const kept = (L.core as unknown as { r: { rush: { places: Record<string, Record<string, string>>; moved: Record<string, Record<string, number>> } } }).r.rush;
+    expect(kept.places.p1![a!.from]).toBe(c!.from);
+    expect(kept.moved.p1![a!.from]).toBe(BOSS_POWERS.dashScramble.movesPerPiece);
+    expect(kept.places.p2![a!.from]).toBe(a!.from);
+    // (Its other pieces still move: p1 puts b home.)
+    L.core.message("p1", { t: "rushPlace", key: rush.key, places: { ...kept.places.p1, [b!.from]: b!.from } });
+    expect(kept.places.p1![b!.from]).toBe(b!.from);
   });
 
   it("3 back on average (one 6, one 0), or a late placement: he moves again, asked of the host as his extra move, before the crowd's turn", () => {

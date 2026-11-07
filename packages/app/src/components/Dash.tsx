@@ -2,13 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
 import { hash, pickLine } from "../characters/boss-beats.ts";
-import { DASH_FIT_LINES } from "../characters/dash-lines.ts";
+import { DASH_FIT_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
 import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
 import { BOSS_POWERS } from "@chessroyale/core";
 import type { BossView } from "../game.ts";
-import { InPlace, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { InPlace, rageWarn, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Dash's powers on screen (his rules: packages/chess/src/bosses/dash.ts; docs/decisions/2026-11-03-dash.md). "Your time" is the
@@ -22,6 +22,7 @@ import { InPlace, type BossUi, type Moment, type MomentProps, type MomentUi } fr
  * - **Time Scramble** (`scramble`, after the RAGE warning a turn before): banner TIME SCRAMBLE! ("Your next 5 moves: 3 seconds
  *   each"), his clock tossed and spun. Then on each scrambled move a big 3-2-1 over the board (`ScrambleCount`, Play.tsx: drawn
  *   again only as the second shown changes, never per frame, and never in the way of a tap), its moves left in Tick's tally.
+ * - **Scramble Rush's warning** (`rushWarn`, a turn before it, as any ultimate's): RAGE!, "Next turn: Scramble Rush", his line.
  * - **His flag** (`flag`, as your turn after it begins): your time ran out, a random move was played for you: his finger gun and
  *   his jab, the dock says what happened.
  * - **Tick**, his tortoise, in the boss bar's prop slot (fixed): asleep on his clock; he wakes with a bob at a slap and rattles
@@ -138,13 +139,15 @@ function rushExtraMoment({ boss, banner }: MomentProps) {
 /** One of his lines for a moment, the same on every screen (by the moment's key). */
 const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
 
-const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "rushExtra", MomentUi> = {
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "rushWarn" | "rushExtra", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
   scramble: { order: 3, kit: "ultimate", lineAt: B.scramble.castAt, view: (p) => scrambleMoment(p) },
   // (A quirk, not a power: no banner, nothing for you to do; the dock keeps the turn's line.)
   clockFit: { order: 4, kit: "power", view: fitMoment, line: (_kit, m) => lineOf(DASH_FIT_LINES, m.key) },
+  // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
+  rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },
 };
 
@@ -226,7 +229,7 @@ export function TickTally({ boss, moments }: { boss: BossView; moments: () => Mo
 
 export const DASH_UI = {
   id: "dash",
-  // (Time Scramble's warning: RAGE!, "Next turn: Time Scramble". His Scramble Rush has none: its countdown is its start.)
+  // (Time Scramble's warning: RAGE!, "Next turn: Time Scramble". His Scramble Rush's: "Next turn: Scramble Rush", `rushWarn`.)
   // (Every moment where he stands, the warning's too: never over the board.)
   inPlace: true,
   ultimate: { name: "Time Scramble" },
