@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useContext, useEffect, useMemo, useState } from "preact/hooks";
 import { BoardTurn } from "../board-view.ts";
 import { LAST_STAND, lastStandAttackHits, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
@@ -248,7 +249,7 @@ export function LastStandCutIn({ side, line, ms }: { side: "w" | "b"; line: stri
  * The result screen after his Last Stand. The crowd won: his fallen figure rises again in holy light ("A god
  * does not stay down."). Otherwise he stays down, grayed, without a word.
  */
-export function GodKingEpilogue({ side, rises }: { side: "w" | "b"; rises: boolean }) {
+export function GodKingEpilogue({ side, rises, children }: { side: "w" | "b"; rises: boolean; /** Beside him (the result screen: your pawn). */ children?: ComponentChildren }) {
   const now = useFrameNow();
   const [start] = useState(Date.now());
   const t = now - start;
@@ -264,6 +265,7 @@ export function GodKingEpilogue({ side, rises }: { side: "w" | "b"; rises: boole
     <div class={`gk-epilogue${rises ? " rises" : " down"}${up ? " up" : ""}`} aria-label={rises ? `The God King rises: ${words}` : "The God King stays down"}>
       {rises && t >= 600 && <span class="gk-epilogue-beam" aria-hidden="true" />}
       {up ? <GodKingSprite side={side} anim="rise" since={start + 1500} then="raised" /> : <GodKingFallen side={side} />}
+      {children}
       {shown > 0 && (
         <span class="gk-bubble gk-epilogue-bubble" role="status">
           <span aria-hidden="true">{words.slice(0, shown)}</span>

@@ -24382,3 +24382,19 @@ button.sq-tiny {
   .wt-spot.wt-glide, .wt-hole.wt-glide, .wt-track, .wt-bar > span { transition: none; }
 }
 
+
+/* ---- A boss battle's result (Eric, Nov 7): its title in the God King's pixel type; your pawn stands beside him ---- */
+.results .boss-title {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #1a1406;
+  text-shadow: 3px 3px 0 #e8b84a;
+  margin: 12px 0 14px;
+}
+.gk-epilogue-you {
+  position: absolute;
+  left: calc(50% + 44px);
+  bottom: 0;
+  pointer-events: none;
+}
