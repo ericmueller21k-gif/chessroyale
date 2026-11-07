@@ -168,13 +168,24 @@ test("Cheat lines while blocking: the other squad's best moves (after yours, or 
   await testLobby(page, "relay", "mercenary");
   const s = await nextDuty(page, null);
   await page.getByRole("button", { name: /^Block · / }).click();
+  // (A phone's Relay since Nov 5: Cheat lines is a tiny icon in the top line, its lines the arrows on the board.)
   const cheat = page.getByRole("button", { name: "Cheat lines" });
   await cheat.click();
-  await expect(page.locator(".sq-cheat-lines li")).toHaveCount(3, { timeout: 30_000 });
-  // No move of yours yet: the move handed over, so the lines are Black's moves here.
+  const lines = page.locator(`.board-area ${BOARD_SEL.arrowLine}`);
+  await expect(lines).toHaveCount(3, { timeout: 30_000 });
+  // No move of yours yet: the move handed over, so the lines are Black's moves here. (Each arrow read back to its move:
+  // it starts at its square's center and ends short of the other's, in squares from the board's center.)
   const black = new Chess(s.fen!.replace(" w ", " b ").replace(/ [a-h]\d /, " - "));
-  const legal = black.moves({ verbose: true }).map((m) => m.san);
-  const sans = (await page.locator(".sq-cheat-lines li strong").allTextContents()).map((t) => t.replace(/^\d · /, ""));
-  expect(sans).toHaveLength(3);
-  for (const san of sans) expect(legal).toContain(san);
+  const legal = black.moves({ verbose: true }).map((m) => m.from + m.to);
+  const flipped = await page.locator(`.board-area ${BOARD_SEL.wrap}`).first().evaluate((el) => el.classList.contains("orientation-black"));
+  const moves = await lines.evaluateAll((ls, flip) => {
+    const sq = (x: number, y: number) => {
+      const col = Math.round(x + 3.5);
+      const row = Math.round(y + 3.5);
+      return String.fromCharCode(97 + (flip ? 7 - col : col)) + (flip ? row + 1 : 8 - row);
+    };
+    return ls.map((l) => sq(Number(l.getAttribute("x1")), Number(l.getAttribute("y1"))) + sq(Number(l.getAttribute("x2")), Number(l.getAttribute("y2"))));
+  }, flipped);
+  expect(moves).toHaveLength(3);
+  for (const mv of moves) expect(legal).toContain(mv);
 });
