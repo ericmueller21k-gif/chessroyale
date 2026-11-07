@@ -203,6 +203,22 @@ describe("town chat: the live hub holds it in memory only", () => {
     expect((await hub.townRead()).lines).toEqual([]);
   });
 
+  it("a test's own room keeps its lines apart from the town's (each test its own chat, where the test switches are on)", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, ready } = hubWith();
+    await ready();
+    await hub.townPost(ann, "in the town");
+    await hub.townPost(bo, "in a test's room", "test:chat1");
+    expect((await hub.townRead("test:chat1")).lines.map((l) => l.text)).toEqual(["in a test's room"]);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["in the town"]);
+    // A moderator's Remove and a Report's line number go to the room they name.
+    expect(await hub.townLine(1, "test:chat1")).toMatchObject({ text: "in a test's room" });
+    expect(await hub.townLine(1)).toMatchObject({ text: "in the town" });
+    expect((await hub.townRemove(1, "test:chat1")).removed).toBe(true);
+    expect((await hub.townRead("test:chat1")).lines).toEqual([]);
+    expect((await hub.townRead()).lines).toHaveLength(1);
+  });
+
   it("a deleted account's lines and a reset player's lines leave the town too", async () => {
     vi.useFakeTimers({ now: T0 });
     const { hub, ready } = hubWith();
@@ -295,7 +311,7 @@ describe("town chat: the API", () => {
     expect(read.town!.lines.every((l) => l.from === "" && l.name === "")).toBe(true);
   });
 
-  it("signed-in players send and read each other's lines with the live poll; a guest gets none and can't send", async () => {
+  it("signed-in players send and read each other's lines with the live poll; a guest reads them too (Eric, on #542) but can't send", async () => {
     const { sql, call, signedIn } = await setup();
     const a = await signedIn("Ann");
     const b = await signedIn("Bo");
@@ -310,8 +326,8 @@ describe("town chat: the API", () => {
     expect(read.town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
     expect(JSON.stringify(read.town)).not.toMatch(/example\.com|email/);
     expect((await live(await call(`/api/live?town=${read.town!.n}`, b.token))).town!.lines).toEqual([]);
-    // The guest: no players' lines at all (no `town` in the answer), and sending is refused.
-    expect("town" in (await live(await call("/api/live?town=0", guest.token)))).toBe(false);
+    // The guest reads the same lines (Eric, on #542: "they should be able to see the chat. They just can't type in it"); sending is refused.
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toMatchObject([{ name: "Ann", text: "hello town", from: a.user.id }]);
     const g = await call("/api/town/chat", guest.token, { text: "hi" });
     expect(g.status).toBe(401);
     expect(await g.json()).toEqual({ message: SIGN_IN_TO_TOWN_CHAT });
@@ -333,12 +349,12 @@ describe("town chat: the API", () => {
     expect("color" in ((await bad.json()) as { line: object }).line).toBe(false);
   });
 
-  it("a guest gets none even where signing in isn't set up (local runs): the town's chat is for accounts", async () => {
+  it("a guest reads but can't send even where signing in isn't set up (local runs): sending is for accounts", async () => {
     const { sql, call, signedIn } = await setup({ GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "" });
     const a = await signedIn("Ann");
     const guest = await createGuest(sql, Date.now(), "Guesty");
     expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
-    expect("town" in (await live(await call("/api/live?town=0", guest.token)))).toBe(false);
+    expect((await live(await call("/api/live?town=0", guest.token))).town!.lines).toHaveLength(1);
     expect((await call("/api/town/chat", guest.token, { text: "hi" })).status).toBe(401);
   });
 
@@ -623,11 +639,11 @@ describe("town chat: after the review", () => {
     expect(alarm.at).toBe(T0 + TOWN_CHAT.repeatMs);
     vi.setSystemTime(T0 + TOWN_CHAT.repeatMs);
     await hub.alarm();
-    expect((hub as unknown as { town: TownChat }).town.empty).toBe(false);
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(false);
     expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs);
     vi.setSystemTime(T0 + TOWN_CHAT.lineMs);
     await hub.alarm();
-    expect((hub as unknown as { town: TownChat }).town.empty).toBe(true);
+    expect((hub as unknown as { towns: Map<string, TownChat> }).towns.get("town")!.empty).toBe(true);
     expect(alarm.at).toBe(T0 + TOWN_CHAT.lineMs); // (nothing left to ring for, and nobody online)
     // An instance's copy of the room goes once it's a moment old.
     const room = new TownChat();

@@ -429,3 +429,14 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* A guest's greyed typing line is a button for the app's sign-in (Eric, on #542): over the whole strip, nothing drawn of its own. */
+.tc-signup {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}

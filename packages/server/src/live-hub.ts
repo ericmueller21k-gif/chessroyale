@@ -1,11 +1,12 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, FRIENDS, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRIENDS, FRONT_DOOR, type ItemLook } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
 import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
-import { TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
+import { TOWN_CHAT_ROOM, TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
+import { TownHere, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
 import type { Env } from "./index.ts";
 
 /** The one live hub (its name). */
@@ -27,8 +28,13 @@ export class LiveHub extends DurableObject<Env> {
   private prunedAt = 0;
   /** The home page's global chat (global-chat.ts), kept in this object's storage too ("chat", and its drawn icons). */
   private chat = new GlobalChat();
-  /** The town square's typed chat (town-chat.ts): in memory only, never in storage (a restart forgets it). */
-  private town = new TownChat();
+  /**
+   * The town square's typed chat (town-chat.ts), one room per key (town-chat-api.ts `chatRoomOf`): the town's own, and a test's own
+   * under the test switches. In memory only, never in storage (a restart forgets it).
+   */
+  private towns = new Map<string, TownChat>();
+  /** Who's in the town square now (town-here.ts): in memory only, from each device's beat; a restart forgets it. */
+  private here = new TownHere();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -176,7 +182,8 @@ export class LiveHub extends DurableObject<Env> {
   /** A deleted account (account-data.ts): no longer online, and its lines leave the global chat and the town's. */
   async forgetAccount(id: string): Promise<void> {
     this.board.forgetSeen(id);
-    this.town.dropAccount(id, Date.now(), true);
+    for (const t of this.towns.values()) t.dropAccount(id, Date.now(), true);
+    this.here.leave(id);
     if (this.chat.forgetAccount(id)) await this.saveChat();
   }
 
@@ -185,50 +192,89 @@ export class LiveHub extends DurableObject<Env> {
    * Nothing else about them changes (online, in a match, their friends' news, their wait to post again).
    */
   async dropChatLines(id: string): Promise<void> {
-    this.town.dropAccount(id, Date.now());
+    for (const t of this.towns.values()) t.dropAccount(id, Date.now());
     if (this.chat.dropLines(id)) await this.saveChat();
   }
 
+  /** The chat room `room` (created on first use): the town's own, or a test's. */
+  private townIn(room: string): TownChat {
+    let t = this.towns.get(room);
+    if (!t) this.towns.set(room, (t = new TownChat()));
+    return t;
+  }
+
   /** The town square's chat for a signed-in reader (each Worker instance asks at most every TOWN_CHAT.readCacheMs). */
-  async townRead(): Promise<TownSnapshot> {
+  async townRead(room = TOWN_CHAT_ROOM): Promise<TownSnapshot> {
     countCall("hub.town");
-    return this.town.snapshot(Date.now());
+    return this.townIn(room).snapshot(Date.now());
   }
 
   /** Someone signed in sends a message in the town (the Worker has checked their account); the room as it is after it. */
-  async townPost(sender: TownSender, text: string): Promise<{ post: TownPost; town: TownSnapshot }> {
+  async townPost(sender: TownSender, text: string, room = TOWN_CHAT_ROOM): Promise<{ post: TownPost; town: TownSnapshot }> {
     countCall("hub.townPost");
     const now = Date.now();
-    const post = this.town.post(sender, text, now);
+    const t = this.townIn(room);
+    const post = t.post(sender, text, now);
     if (post.ok) await this.townAlarm();
-    return { post, town: this.town.snapshot(now) };
+    return { post, town: t.snapshot(now) };
   }
 
   /** A boss challenged from the town: its battle started or finished (town-chat.ts `challenge`); the line it posted, or null. */
   async townChallenge(sender: Pick<TownSender, "id" | "name">, bossName: string, note: ChallengeNote): Promise<TownLine | null> {
     countCall("hub.townChallenge");
-    const line = this.town.challenge(sender, bossName, note, Date.now());
+    const line = this.townIn(TOWN_CHAT_ROOM).challenge(sender, bossName, note, Date.now());
     if (line) await this.townAlarm();
     return line;
   }
 
-  /** The alarm rings by the time the town's next line (or kept send) is `TOWN_CHAT.lineMs` (5 minutes) old, so it goes then, visitors or not. */
+  /** The alarm rings by the time the next line (or kept send) of any town room is `TOWN_CHAT.lineMs` (5 minutes) old, so it goes then, visitors or not. */
+  private townNext(): number | null {
+    let at: number | null = null;
+    for (const t of this.towns.values()) {
+      const e = t.nextExpiry();
+      if (e !== null && (at === null || e < at)) at = e;
+    }
+    return at;
+  }
+
   private async townAlarm() {
-    const at = this.town.nextExpiry();
+    const at = this.townNext();
     if (at === null) return;
     const cur = await this.ctx.storage.getAlarm();
     if (cur === null || cur > at) await this.ctx.storage.setAlarm(at);
   }
 
+  /**
+   * A device in the town square says where its player is (`beat`), or that it left (null). Answers everyone else in its room's
+   * town square (not in a shop), each with their "zzz", after dropping every pawn past its limit (town-here.ts).
+   */
+  async townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null): Promise<HereOther[]> {
+    countCall("hub.townHere");
+    const now = Date.now();
+    if (!beat) {
+      this.here.leave(id);
+      return [];
+    }
+    this.here.beat(id, name, room, beat, now, limits, look ?? null);
+    return this.here.view(room, now, id);
+  }
+
+  /** A guest watching the town square (no pawn of their own): everyone there, their looks and "zzz"s, no names. */
+  async townWatch(room: string): Promise<HereOther[]> {
+    countCall("hub.townWatch");
+    return this.here.view(room, Date.now(), null, undefined, false);
+  }
+
   /** One line still in the town's room (a report reads what was said from here). */
-  async townLine(n: number): Promise<TownLine | null> {
-    return this.town.line(n, Date.now());
+  async townLine(n: number, room = TOWN_CHAT_ROOM): Promise<TownLine | null> {
+    return this.townIn(room).line(n, Date.now());
   }
 
   /** A moderator takes a line out of the town's chat; the room as it is after it. */
-  async townRemove(n: number): Promise<{ removed: boolean; town: TownSnapshot }> {
+  async townRemove(n: number, room = TOWN_CHAT_ROOM): Promise<{ removed: boolean; town: TownSnapshot }> {
     const now = Date.now();
-    return { removed: this.town.remove(n, now), town: this.town.snapshot(now) };
+    const t = this.townIn(room);
+    return { removed: t.remove(n, now), town: t.snapshot(now) };
   }
 
   /** A drawn icon on a line still in the chat (null for any other key). */
@@ -263,9 +309,9 @@ export class LiveHub extends DurableObject<Env> {
     const gone = this.board.prune(now);
     if (gone.length) await this.ctx.storage.delete(gone.map((c) => `lobby:${c}`));
     // The town's chat: what's 5 minutes old goes now; the next ring is the sooner of the presence's and the town's.
-    this.town.sweep(now);
+    for (const t of this.towns.values()) t.sweep(now);
     const { seen, lobbies } = this.board.size;
-    const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.town.nextExpiry() ?? Infinity);
+    const next = Math.min(seen || lobbies ? now + CAPACITY.presence.lastSeenWriteMs : Infinity, this.townNext() ?? Infinity);
     if (next !== Infinity) await this.ctx.storage.setAlarm(Math.max(next, now + 1));
   }
 }

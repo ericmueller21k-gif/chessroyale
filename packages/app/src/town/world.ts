@@ -815,6 +815,10 @@ export interface Person {
   icon?: string;
   /** A real player's rating, as their card shows it. */
   rating?: number;
+  /** A real player in the town, from the server's list (here-net.ts `applyHere`): `home` once they've left. */
+  remote?: boolean;
+  /** Away (no input for TOWN_AFK.zzzAfterSec): a "zzz" floats over the pawn (render.ts). Yours too. */
+  zzz?: boolean;
 }
 
 /** Whether a person sits at a chess table now: stopped on one of its stools, meaning to sit. Its table, or null. */

@@ -55,6 +55,7 @@ import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
@@ -605,6 +606,9 @@ function setUp(): TablePiece[] {
 /** The street town's camera this frame: its zoom steps' numbers blended at the step it's at (feel.ts streetZoomSteps). */
 const STREET_CAMS = { tall: { ...TOWN_FEEL.camStreetTall }, wide: { ...TOWN_FEEL.camStreetWide } };
 
+/** The most "zzz"s drawn in a frame. */
+const ZZZ_MAX = 64;
+
 export class Renderer {
   readonly view: View = newView();
   W = 1;
@@ -682,8 +686,15 @@ export class Renderer {
   private mist = 0;
   private tint: string | null = null;
   /** This frame's name tags and speech bubble, drawn after the world's tint so they stay as easy to read at night. */
-  private readonly tags: { text: string; x: number; y: number; kind: TagKind; size: number; alpha: number }[] = [];
+  private readonly tags: { text: string; x: number; y: number; kind: TagKind; size: number; alpha: number; who: number }[] = [];
   private nTags = 0;
+  /** This frame's "zzz"s over away players' pawns (afk.ts), drawn with the tags: where, how big, how faded, whose (an index in the people). */
+  private readonly zX = new Float32Array(ZZZ_MAX);
+  private readonly zY = new Float32Array(ZZZ_MAX);
+  private readonly zS = new Float32Array(ZZZ_MAX);
+  private readonly zA = new Float32Array(ZZZ_MAX);
+  private readonly zP = new Int32Array(ZZZ_MAX);
+  private nZzz = 0;
   /** Where you stand, in squares from the camera's focus, this frame (the name tags' near rule, tags.ts), the setting as this frame reads it, and the table you sit at. */
   private youDx = 0;
   private youDz = 0;
@@ -988,6 +999,7 @@ export class Renderer {
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
     this.nTags = 0;
+    this.nZzz = 0;
     this.nClear = 0;
     this.bubble.on = false;
     this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
@@ -1004,6 +1016,7 @@ export class Renderer {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.kind, t.size, t.alpha);
     }
+    for (let i = 0; i < this.nZzz; i++) drawZzz(ctx, this.zX[i]!, this.zY[i]!, this.zS[i]!, now, this.zA[i]!);
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
@@ -1266,16 +1279,34 @@ export class Renderer {
    * (Tests, `__townTags`) The name tags drawn in the last frame: each one's name, kind, alpha, pill and ink (`TAG_STYLE`) and where its
    * pill is on the screen (CSS pixels in the world's box). Allocates its answer, so it's asked only by a test, never in the frame.
    */
-  tagList(): { text: string; kind: TagKind; alpha: number; pill: string; ink: string; x: number; y: number; w: number; h: number }[] {
+  tagList(): { text: string; kind: TagKind; alpha: number; pill: string; ink: string; x: number; y: number; w: number; h: number; who: number }[] {
     const out = [];
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
       const a = this.tagArt.find(t.text, Math.round(t.size), t.kind);
       const w = a?.w ?? 0;
       const h = a?.h ?? 0;
-      out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h });
+      out.push({ text: t.text, kind: t.kind, alpha: t.alpha, ...TAG_STYLE[t.kind], x: t.x - w / 2, y: t.y - h, w, h, who: t.who });
     }
     return out;
+  }
+
+  /** A "zzz" over person `i`'s head at (x, head y), its tag's size (`size`, 8 to 12), to draw after the tags. */
+  private zzz(i: number, x: number, hy: number, size: number, alpha: number): void {
+    if (this.nZzz >= ZZZ_MAX) return;
+    const n = this.nZzz++;
+    const s = size / 11;
+    // (Beside the head, to its right, so it's this pawn's and no neighbor's; it drifts off up and right, past its own tag.)
+    this.zX[n] = x + 9 * s;
+    this.zY[n] = hy + 10 * s;
+    this.zS[n] = s;
+    this.zA[n] = alpha;
+    this.zP[n] = i;
+  }
+
+  /** (Tests, `__townZzz`) Whose pawns had a "zzz" in the last frame (indices in the people). Allocates: a test asks, never the frame. */
+  zzzList(): number[] {
+    return Array.from(this.zP.subarray(0, this.nZzz));
   }
 
   /** Each figure's tag as last drawn: its alpha and that frame's time (made once a figure). */
@@ -1292,9 +1323,10 @@ export class Renderer {
   }
 
   /** A name tag to draw after the world's tint (kept in a list this frame: nothing allocated once it has grown). */
-  private tag(text: string, x: number, y: number, kind: TagKind, size: number, alpha: number): void {
+  private tag(text: string, x: number, y: number, kind: TagKind, size: number, alpha: number, who = -1): void {
     let t = this.tags[this.nTags];
-    if (!t) this.tags.push((t = { text, x, y, kind, size, alpha }));
+    if (!t) this.tags.push((t = { text, x, y, kind, size, alpha, who }));
+    t.who = who;
     t.text = text;
     t.x = x;
     t.y = y;
@@ -1597,7 +1629,8 @@ export class Renderer {
             this.drawSprite(it, art?.img ?? (isSprite(person.look) ? pawnImage("light", null) : pawnImage(person.look.side, person.look.tint)), f.youSquares * k, 0.5, (pad + PAWN_FOOT) / k, 1, pose.hop * f.youHop, pose.tilt * f.hobbleTilt, facing, 1, Math.min(art?.top ?? 1, (pad + PAWN_HEAD) / k), true, 1 / k, f.youSquares);
             this.soonBox(it, this.soonOf(person), wview, f.youSquares);
           }
-          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
+          if (this.fade > 0.02) this.tag(person.name, it.fx, it.hy - 2, "you", clamp((11 * this.p.k) / v.kf, 8, 12), this.fade, it.i);
+          if (person.zzz) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         } else {
           const lk = person.look;
           if (isSprite(lk)) {
@@ -1626,13 +1659,16 @@ export class Renderer {
           // `nameRadius` squares of you in both directions, fading over the last square (tags.ts; "Everyone" in Town settings: no near rule).
           // A figure whose card is open, one at a table with you and one walking to or from a game with you keep theirs wherever they are.
           const far = farOf(v, it.dz);
-          if (it.on && far < f.tagFar && this.fade > 0.02) {
+          // (A real player with no name: a guest's view, Eric on #542, "maybe nothing" over their heads.)
+          if (it.on && far < f.tagFar && this.fade > 0.02 && !(person.remote && !person.name)) {
             const always = person === town.hold || person === town.meet?.bot || person === town.leave?.bot || (!!table && table === this.youTable);
             const dist = Math.max(Math.abs(wrapF(it.dx - this.youDx)), Math.abs(wrapF(it.dz - this.youDz)));
             // (Eased toward it over about 150 ms, so a slow frame doesn't pop it: tags.ts easeTag.)
             const a = this.easedTag(person, tagAlpha(this.tagNames, dist, always, clamp((f.tagFar - far) / 0.12, 0, 1)), now);
-            if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade);
+            if (a > 0.004) this.tag(person.name, it.fx, it.hy - 2, isSprite(lk) ? "sidekick" : "bot", clamp((11 * this.p.k) / v.kf, 8, 12), a * this.fade, it.i);
           }
+          // (Away: the "zzz" over the head, near or far, whether or not the tag shows: everyone sees who's away.)
+          if (person.zzz && it.on && far < f.tagFar && this.fade > 0.02) this.zzz(it.i, it.fx, it.hy, clamp((11 * this.p.k) / v.kf, 8, 12), this.fade);
         }
         this.fade = 1;
         this.sitting = false;
