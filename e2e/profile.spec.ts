@@ -220,8 +220,8 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await tile.click();
   await expect(tile).toContainText("Worn");
   const riding = page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]');
-  await expect(riding).toHaveCount(2);
-  // The pawns ride it inside the same boxes: nothing moved or grew (Eric's "nothing shifts").
+  await expect(riding).toHaveCount(1);
+  // The pawn rides it inside the same box: nothing moved or grew (Eric's "nothing shifts").
   expect(await boxes()).toEqual(before);
   for (const r of await riding.all()) {
     const a = (await r.boundingBox())!;
