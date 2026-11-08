@@ -80,6 +80,7 @@ async function goInBabur(p: Page) {
 }
 
 test("the town's back button asks 'Leave Chess Town?' first: Stay keeps you on your square, Escape stays too, Leave goes home", async ({ page }) => {
+  test.skip(test.info().project.name === "desktop", "a computer has no back button since Nov 7 (its tools are in the right column): its side menu asks, below");
   const square = await openTown(page);
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(leaveDialog(page)).toBeVisible();
@@ -150,8 +151,15 @@ test("inside a room: the back button goes out to the square with no question; th
   await leaveDialog(page).getByRole("button", { name: "Stay" }).click();
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(room(page)).toHaveAttribute("data-ready", "1");
-  // The room's own back: out to the square, and no question.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // The room's own back (a computer's: its door's Go out, no bar since Nov 7): out to the square, and no question.
+  if (test.info().project.name === "phone") await page.getByRole("button", { name: "Back", exact: true }).click();
+  else
+    await expect(async () => {
+      const door = await page.evaluate(() => (window as unknown as { __shopAt?: (k: string) => { x: number; y: number } | null }).__shopAt?.("door") ?? null);
+      const cv = (await room(page).boundingBox())!;
+      if (door) await page.mouse.click(cv.x + door.x, cv.y + door.y);
+      await page.getByRole("dialog", { name: "Door" }).getByRole("button", { name: "Go out" }).click({ timeout: 3000 });
+    }).toPass({ timeout: 30_000 });
   await expect(room(page)).toHaveCount(0, { timeout: 20_000 });
   await expect(leaveDialog(page)).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();

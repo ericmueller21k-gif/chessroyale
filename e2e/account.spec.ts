@@ -9,7 +9,8 @@ test("a guest profile: icon and name stick, a solo match goes on it", async ({ p
   const config = await page.evaluate(() => fetch("/api/auth/config").then((r) => r.json()));
   expect(config.accounts).toBe(true);
   // A guest account is made on the first visit.
-  const chip = page.getByRole("button", { name: "Your profile" });
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  const chip = page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first();
   await expect(chip).toBeVisible();
   // (Home's line under your name: your 1 v 1 rank; a new account hasn't played one. Oct 28.)
   await expect(page.locator(".fd-hero-sub")).toHaveText("Unranked");

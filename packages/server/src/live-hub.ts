@@ -3,7 +3,7 @@ import { CAPACITY, FRIENDS, FRONT_DOOR, type ItemLook, type PawnColor } from "@c
 import { d1Sql, ensureSchema } from "./accounts.ts";
 import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
 import { countCall } from "./ops.ts";
-import { GlobalChat, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
+import { GlobalChat, TEST_GLOBAL_CHAT, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import { TOWN_CHAT_ROOM, TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
 import { pruneFriends, recentNews } from "./friends.ts";
 import { TownHere, type HereBeat, type HereLimits, type HereOther } from "./town-here.ts";
@@ -28,6 +28,11 @@ export class LiveHub extends DurableObject<Env> {
   private prunedAt = 0;
   /** The home page's global chat (global-chat.ts), kept in this object's storage too ("chat", and its drawn icons). */
   private chat = new GlobalChat();
+  /**
+   * A test's own global chat (global-chat-api.ts `globalRoomOf`, under the test switches only): no bots and a small server-wide cap
+   * (TEST_GLOBAL_CHAT), so an e2e can fill it; in memory only.
+   */
+  private chatTests = new Map<string, GlobalChat>();
   /**
    * The town square's typed chat (town-chat.ts), one room per key (town-chat-api.ts `chatRoomOf`): the town's own, and a test's own
    * under the test switches. In memory only, never in storage (a restart forgets it).
@@ -155,23 +160,38 @@ export class LiveHub extends DurableObject<Env> {
    * The global chat for someone who has it open (each Worker instance asks at most every 3 s while anyone on it does).
    * With bots on, this is also when a bot may speak: nothing runs while nobody has the chat open.
    */
-  async chatRead(): Promise<GlobalChatSnapshot> {
+  async chatRead(room?: string | null): Promise<GlobalChatSnapshot> {
     countCall("hub.chat");
     const now = Date.now();
+    if (room) return this.chatTest(room).snapshot(now);
     if (this.chat.watch(now)) await this.saveChat();
     return this.chat.snapshot(now);
   }
 
-  /** Someone signed in says a line (the Worker has checked their account); the chat as it is after it. */
-  async chatPost(sender: GlobalSender, say: string): Promise<{ post: GlobalPost; chat: GlobalChatSnapshot }> {
+  /**
+   * Someone signed in says a preset line (`say`, or the id alone) or types (`text`); the Worker has checked their account. The chat as it is after
+   * it (a line waiting in line isn't in it yet).
+   */
+  async chatPost(sender: GlobalSender, said: string | { say: string } | { text: string }, room?: string | null): Promise<{ post: GlobalPost; chat: GlobalChatSnapshot }> {
     countCall("hub.chatPost");
     const now = Date.now();
-    const post = this.chat.post(sender, say, now);
-    if (post.ok) {
+    const chat = room ? this.chatTest(room) : this.chat;
+    const post = typeof said === "string" ? chat.post(sender, said, now) : "text" in said ? chat.postText(sender, said.text, now) : chat.post(sender, said.say, now);
+    if (post.ok && !room) {
       if (post.line.iconKey && sender.icon) await this.ctx.storage.put(`chat-icon:${post.line.iconKey}`, sender.icon);
       await this.saveChat();
     }
-    return { post, chat: this.chat.snapshot(now) };
+    return { post, chat: chat.snapshot(now) };
+  }
+
+  /** A test's own global chat (made on first use; at most 50 kept, the oldest forgotten). */
+  private chatTest(room: string): GlobalChat {
+    let c = this.chatTests.get(room);
+    if (!c) {
+      if (this.chatTests.size >= 50) this.chatTests.delete(this.chatTests.keys().next().value!);
+      this.chatTests.set(room, (c = new GlobalChat(TEST_GLOBAL_CHAT)));
+    }
+    return c;
   }
 
   /** What the hub holds about an account, for its download: its lines in the global chat. */

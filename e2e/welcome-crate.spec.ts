@@ -164,7 +164,7 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
 
   // Your profile: your pawn rides it, and Wearing lists it with no purity and no shine ("Ride · HunChess gold & black · Not tradeable").
   await page.goto("/");
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator(`.fd-card .avatar.riding[data-ride="${won[0]!.def}"]`)).toHaveCount(1);
   const wearing = page.locator(".fd-item").filter({ hasText: "HunChess " });
   await expect(wearing).toContainText("Ride · HunChess gold & black · Not tradeable");

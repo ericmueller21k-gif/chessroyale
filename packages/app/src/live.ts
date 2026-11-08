@@ -53,7 +53,8 @@ export interface LiveRider {
   query(): string;
   take(body: unknown): void;
 }
-let rider: LiveRider | null = null;
+/** Every rider on now (the global chat and the town square's chat both ride on the town page): their queries go together. */
+const riders = new Set<LiveRider>();
 /** This app is in a match (App says): the request says so, and friends lists show "In a match". */
 let busy = false;
 export function setLiveBusy(on: boolean) {
@@ -69,12 +70,10 @@ let again = false;
 
 /** Rides on the live line's request until the returned function is called (and asks now). */
 export function rideLive(r: LiveRider): () => void {
-  rider = r;
+  riders.add(r);
   if (inFlight) again = true;
   else if (started) void poll();
-  return () => {
-    if (rider === r) rider = null;
-  };
+  return () => void riders.delete(r);
 }
 
 async function poll() {
@@ -82,14 +81,14 @@ async function poll() {
   inFlight = true;
   try {
     if (typeof document === "undefined" || document.visibilityState !== "hidden") {
-      const r = rider;
-      const q = new URLSearchParams(r ? r.query() : "");
+      const rs = [...riders];
+      const q = new URLSearchParams(rs.map((r) => r.query()).filter(Boolean).join("&"));
       if (busy) q.set("busy", "1");
       const res = await fetch(`/api/live${q.size ? `?${q}` : ""}`, { credentials: "same-origin" });
       if (res.ok) {
         const body = (await res.json()) as LiveCounts;
         current = body;
-        r?.take(body);
+        for (const r of rs) r.take(body);
         listeners.forEach((l) => l());
       }
     }

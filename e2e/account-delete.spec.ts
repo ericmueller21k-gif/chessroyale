@@ -31,7 +31,8 @@ const me = (page: import("@playwright/test").Page) => page.evaluate(() => fetch(
 test("Settings: download my data, then delete the account (asked first); it's gone everywhere, its results stay without it", async ({ page, browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // A guest with a name, a solo result, a crate item and a setting on this device.
   const id = (await me(page)).user.id;
   await page.evaluate(async () => {
@@ -69,7 +70,7 @@ test("Settings: download my data, then delete the account (asked first); it's go
   await page.getByRole("button", { name: /^Delete account/ }).click();
   await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   const fresh = (await me(page)).user;
   expect(fresh.id).not.toBe(id);
   expect(fresh.name).not.toBe("Delia");

@@ -262,6 +262,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "users", column: "age_ok_at", type: "INTEGER" },
   // Ranked 1 v 1's columns added after its table first shipped (to a test server).
   ...RANKED_COLUMNS,
+  // The chat's opt-in (Nov 7, 2026: typed chat, off by default): 1 once the player turned chat on (after its one-time notice); NULL off.
+  // Only a signed-in account's; a guest's is on its device. docs/decisions/2026-11-07-typed-chat-column.md.
+  { table: "users", column: "chat_on", type: "INTEGER" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
@@ -509,6 +512,11 @@ export async function updateProfile(sql: Sql, userId: string, patch: { name?: un
  * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md). An account signed in after its holder said they
  * were old enough keeps when they first did (and nothing else about it); later sign-ins leave that time as it is.
  */
+/** The chat's opt-in (Eric, Nov 7: off by default, "stored per account"): users.chat_on, 1 on, NULL off. */
+export async function setChatOn(sql: Sql, userId: string, on: boolean): Promise<void> {
+  await sql.run("UPDATE users SET chat_on = ? WHERE id = ?", on ? 1 : null, userId);
+}
+
 export async function markAgeOk(sql: Sql, userId: string, now: number): Promise<void> {
   await sql.run("UPDATE users SET age_ok_at = ? WHERE id = ? AND age_ok_at IS NULL", now, userId);
 }
@@ -773,6 +781,8 @@ export interface Profile {
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** Your chat ban in force and a moderator's notice you haven't seen (chat-mod.ts); missing when neither. */
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
+  /** Chat is on for this account (its opt-in, users.chat_on; off by default, and always for a guest: theirs is on the device). */
+  chatOn: boolean;
 }
 
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
@@ -794,6 +804,7 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
     teamWins: rs.filter((r) => r.team_won === 1).length,
   });
   const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
+  const chatOn = (await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null))?.chat_on === 1;
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub, pawn: pawnColorOf(user.pawn_color) },
     shop: await shopState(sql, user.id, admin),
@@ -810,6 +821,7 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
       playedAt: r.played_at,
     })),
     ...(chatMod ? { chatMod } : {}),
+    chatOn,
   };
 }
 

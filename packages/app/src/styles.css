@@ -9114,30 +9114,51 @@ button.fd-logo {
   display: contents;
 }
 /*
- * Home's card taps (Eric, Nov 6): your pawn opens your inventory, your icon and name open the icon picker. A generous area
- * (the padding), a pointer on a computer, and a press that shrinks a little.
+ * Home's card taps (Eric, Nov 6; split Nov 7): your pawn opens your inventory; your icon opens the icon picker; your name and
+ * rank line open your public profile. Each is a real button with its own focus ring, and the rest of the card does nothing.
+ * A pointer on a computer, and a press that shrinks a little. The pawn's is the same as before.
  */
-/* (Layout-neutral: no padding or margin. The generous tap area is a pseudo-element that sits outside the box.) */
-.fd-hero-tap,
 .fd-pawn.fd-tap {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 120ms ease;
 }
-.fd-hero-tap {
-  position: relative;
+.fd-hero-iconbtn,
+.fd-hero-namebtn {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
 }
-.fd-hero-tap::before {
-  content: "";
-  position: absolute;
-  inset: -10px;
-  border-radius: 14px;
+/* (The icon's button is the icon's box: no room added, so nothing moves.) */
+.fd-hero-iconbtn {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: inherit;
+  align-items: center;
+  justify-content: center;
 }
-.fd-hero-tap:active,
+.fd-hero-namebtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border-radius: 6px;
+}
+.fd-hero-iconbtn:active,
+.fd-hero-namebtn:active,
 .fd-pawn.fd-tap:active {
   transform: scale(0.97);
 }
-.fd-hero-tap:focus-visible,
+.fd-hero-iconbtn:focus-visible,
+.fd-hero-namebtn:focus-visible,
 .fd-pawn.fd-tap:focus-visible {
   outline: 2px solid var(--fd-gold, #f5c542);
   outline-offset: 2px;
@@ -9224,6 +9245,7 @@ button.fd-logo {
   text-align: left;
 }
 .fd-hero-name {
+  display: block;
   font-size: 20px;
   line-height: 22px;
   font-weight: 800;
@@ -9233,6 +9255,7 @@ button.fd-logo {
   white-space: nowrap;
 }
 .fd-hero-sub {
+  display: block;
   font-size: 14px;
   line-height: 16px;
   color: var(--fd-sub);
@@ -11787,16 +11810,16 @@ button.fd-seat {
   .fd-menu-crest {
     margin: -3px;
   }
+  /* The right column (RightPanel, Eric's mockup of Nov 7): the window's height, never scrolling as a whole (its chat's lines scroll). */
   .fd-right {
     position: sticky;
     /* (Under the maintenance banner, when one shows: --banner-h is 0 otherwise.) */
     top: var(--banner-h);
     height: var(--app-h);
-    overflow-y: auto;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 18px;
-    padding: 24px 22px 30px;
+    padding: 14px 10px 44px 12px;
     border-left: 1px solid var(--fd-line);
   }
   /* Your coins and your pawn: the top right of the page (Eric's arrow), level with the side menu's logo. */
@@ -14690,84 +14713,219 @@ img.qicon {
 }
 
 /*
- * -- The home page's global chat (GlobalChat.tsx): a computer's right column, under Playing now. It fills the rest of
- * the column's height; the feed scrolls inside it and the buttons stay at its foot. --
+ * -- The computer's right column (FrontMenu.tsx RightPanel) and its global chat (GlobalChat.tsx): Eric's approved mockup (Nov 7,
+ * notes/briefs/assets/chat-column-mock.html, whose CSS is the look). Flat like the left menu: no boxes, thin lines running almost the
+ * column's width. Every part has a fixed height down to the chat's lines, which fill the rest, so nothing moves from page to page:
+ * the slot (62 px), FRIENDS and the live line, GLOBAL CHAT; then the lines, and the band at the foot with 44 px under it. --
  */
-.gchat {
-  flex: 1 0 360px;
-  min-height: 360px;
+.rc-h {
+  margin: 0;
+  font: 800 12px/1.25 Archivo, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  color: var(--fd-muted);
+  text-align: center;
+}
+.rc-slot {
+  flex: none;
+  height: 62px;
+  margin-bottom: 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
-.gchat-title {
+.rc-tools,
+.rc-tools .town-tools {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 14px;
+  margin: 0;
 }
-.gchat-unmute {
-  margin-left: auto;
+.rc-tools .town-tool {
+  width: 30px;
+  height: 30px;
   border: 0;
   background: none;
-  padding: 2px 0;
-  color: var(--fd-muted);
-  font: 600 12px Archivo, system-ui, sans-serif;
+  color: var(--fd-text);
+}
+.rc-tools .town-tool:hover:not(:disabled) {
+  background: var(--fd-panel-2);
+}
+.rc-tools .town-tool .tc-icon,
+.rc-tools .town-tool .tm-btn-icon {
+  width: 22px;
+  height: 22px;
+}
+.rc-sep {
+  flex: none;
+  height: 1px;
+  margin: 10px -6px;
+  background: var(--fd-line);
+}
+.rc-slot + .rc-sep {
+  margin-top: 0;
+}
+.rc-friends {
+  position: relative;
+  align-self: center;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--fd-gold-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
   cursor: pointer;
 }
-.gchat-box {
+/* (A friend request's "1 new" beside FRIENDS, out of the line's flow: FRIENDS stays centered.) */
+.rc-friends .fr-badge {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  translate: 0 -50%;
+  white-space: nowrap;
+  text-decoration: none;
+  letter-spacing: 0;
+}
+.rc-online {
+  flex: none;
+  margin: 6px 0 0;
+  min-height: 1.3em;
+  color: var(--fd-sub);
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+}
+.rc-online b {
+  color: var(--fd-text);
+}
+.rc-online .fd-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  vertical-align: 0;
+}
+.gchat {
   flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+.gchat-head {
+  position: relative;
+  flex: none;
+}
+.gchat-gear {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  translate: 0 -50%;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.gchat-gear:hover,
+.gchat-gear[aria-expanded="true"] {
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+}
+/* The gear's menu: under the gear, over the lines. */
+.gchat-pop {
+  position: absolute;
+  z-index: 5;
+  right: -4px;
+  top: calc(100% + 8px);
+  width: 210px;
+  padding: 4px;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
   background: var(--fd-panel);
-  border-radius: 14px;
-  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.gchat-pop-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-text);
+  font: 700 14px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.gchat-pop-row:hover:not(:disabled) {
+  background: var(--fd-panel-2);
+}
+.gchat-pop-row:disabled {
+  color: var(--fd-muted);
+  cursor: default;
+}
+.gchat-body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .gchat-feed {
   flex: 1 1 0;
-  min-height: 120px;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 10px 8px;
+  scrollbar-width: thin;
+  padding: 0 2px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 7px;
+  font-size: 12.5px;
+  line-height: 1.3;
 }
-.gchat-empty {
-  margin: auto 0 0;
+.gchat-empty,
+.gchat-off {
+  margin: 0;
   color: var(--fd-muted);
-  font-size: 13px;
+  font-size: 12.5px;
 }
-.gline {
+.gchat-off {
+  margin: auto 0;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  align-items: flex-start;
+  text-align: center;
 }
-.gline:first-child {
-  margin-top: auto;
+.gchat-off p {
+  margin: 0;
 }
-.gicon {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  border-radius: 7px;
-  background: var(--fd-panel-2);
-  display: grid;
-  place-items: center;
-  font-size: 17px;
-  line-height: 1;
-  image-rendering: pixelated;
-}
-.gline-body {
-  flex: 1;
-  min-width: 0;
+.gchat-turn-on {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  font: 800 13px Archivo, system-ui, sans-serif;
+  cursor: pointer;
 }
 .gline-head {
   display: flex;
   align-items: baseline;
-  gap: 5px;
   min-width: 0;
-  font-size: 12px;
 }
 .gline-name {
   min-width: 0;
@@ -14775,7 +14933,7 @@ img.qicon {
   background: none;
   padding: 0;
   color: var(--fd-text);
-  font: 700 13px Archivo, system-ui, sans-serif;
+  font: 800 12.5px/1.3 Archivo, system-ui, sans-serif;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -14784,50 +14942,169 @@ img.qicon {
 .gline-name:hover {
   text-decoration: underline;
 }
-.gline.you .gline-name {
-  color: var(--fd-gold-text);
-}
+.gline-name.c0 { color: #15803d; }
+.gline-name.c1 { color: #b45309; }
+.gline-name.c2 { color: #a21caf; }
+.gline-name.c3 { color: #c0392b; }
+.gline-name.c4 { color: #2563eb; }
+.gline-name.c5 { color: #0e7490; }
+:root:not([data-theme="light"]) .gline-name.c0 { color: #4ade80; }
+:root:not([data-theme="light"]) .gline-name.c1 { color: #fbbf24; }
+:root:not([data-theme="light"]) .gline-name.c2 { color: #e879f9; }
+:root:not([data-theme="light"]) .gline-name.c3 { color: #f87171; }
+:root:not([data-theme="light"]) .gline-name.c4 { color: #60a5fa; }
+:root:not([data-theme="light"]) .gline-name.c5 { color: #22d3ee; }
 .gline-bot {
   flex: none;
-  padding: 1px 5px;
-  border-radius: 999px;
-  background: var(--fd-panel-2);
-  color: var(--fd-muted);
-  font-size: 10px;
+  margin-left: 3px;
+  color: var(--fd-dim);
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-}
-.gline-rating {
-  flex: none;
-  color: var(--fd-muted);
-  font-variant-numeric: tabular-nums;
 }
 .gline-time {
   flex: none;
-  margin-left: auto;
+  margin-left: 4px;
   color: var(--fd-dim);
-  font-size: 11px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .gline-text {
-  color: var(--fd-sub);
-  font-size: 14px;
-  line-height: 1.3;
+  color: var(--fd-text);
   overflow-wrap: anywhere;
 }
 .gline.emoji .gline-text {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.2;
 }
-.gchat-say,
-.gchat-menu,
-.gchat-guest {
-  border-top: 1px solid var(--fd-line);
-  padding: 8px 10px;
+/* Our pixel emoji (chat-emoji.tsx): the size of a line of text, crisp. */
+.chat-emo {
+  display: inline-block;
+  width: 1.45em;
+  height: 1.45em;
+  vertical-align: -0.38em;
+  image-rendering: pixelated;
 }
+.chat-emo-picker {
+  position: absolute;
+  z-index: 4;
+  right: 0;
+  bottom: 4px;
+  display: grid;
+  grid-template-columns: repeat(4, 40px);
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--fd-line);
+  border-radius: 12px;
+  background: var(--fd-panel);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.chat-emo-pick {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.chat-emo-pick:hover {
+  background: var(--fd-panel-2);
+}
+.chat-emo-pick .chat-emo {
+  width: 24px;
+  height: 24px;
+  vertical-align: 0;
+}
+/* The message band: the field (sized to its text, no box) and the emoji button at its right. */
+.gchat-band {
+  flex: none;
+  height: 30px;
+  margin: 0;
+  padding: 0 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gchat-field {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--fd-text);
+  font: 400 13px Archivo, system-ui, sans-serif;
+  text-align: left;
+}
+.gchat-field::placeholder {
+  color: var(--fd-dim);
+}
+.gchat-field:disabled {
+  color: var(--fd-dim);
+}
+.gchat-signin {
+  color: var(--fd-gold-text);
+  cursor: pointer;
+}
+.gchat-emo-btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.gchat-emo-btn:hover:not(:disabled),
+.gchat-emo-btn[aria-expanded="true"] {
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+}
+.gchat-emo-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* A refusal ("Chat is busy, try again.") or a name's menu: over the foot of the lines, never moving them. */
+.gchat-note,
+.gchat-menu {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--fd-line);
+  border-radius: 10px;
+  background: var(--fd-panel);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  font-size: 12.5px;
+}
+.gchat-note.error {
+  color: var(--fd-danger);
+}
+.gchat-menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--fd-sub);
+}
+.gchat-menu strong {
+  flex-basis: 100%;
+  color: var(--fd-text);
+}
+/* The quick chips (a device the age gate marked too young; or CHAT_TYPED off): the old tabs, flat in the band's place. */
 .gchat-say {
+  flex: none;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -14888,46 +15165,19 @@ img.qicon {
   border-color: transparent;
   color: var(--fd-muted);
 }
-.gchip.gold {
-  border-color: transparent;
-  background: var(--fd-gold);
-  color: var(--fd-gold-ink);
-  font-weight: 800;
-}
 .gchat-none {
   color: var(--fd-muted);
   font-size: 12px;
 }
-.gchat-status {
+/* The notice before chat first turns on (ChatOptIn.tsx). */
+.chat-optin h2 {
   margin: 0;
-  color: var(--fd-muted);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
+  font-size: 20px;
 }
-.gchat-status.error {
-  color: var(--fd-danger);
-}
-.gchat-menu,
-.gchat-guest {
+.chat-optin-buttons {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  color: var(--fd-sub);
-  font-size: 13px;
-}
-.gchat-menu strong {
-  flex-basis: 100%;
-  color: var(--fd-text);
-}
-.gchat.off {
-  flex: none;
-  min-height: 0;
-}
-.gchat.off .gchat-guest {
-  border: 0;
-  border-radius: 14px;
-  background: var(--fd-panel);
+  gap: 10px;
+  justify-content: flex-end;
 }
 
 /* ---------------- Hollow's dark and Lights out (BossPowers.tsx, LightsOut.tsx; the characters' sprites) ---------------- */
