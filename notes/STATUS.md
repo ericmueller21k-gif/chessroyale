@@ -433,3 +433,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   its own session session_01JuCWRvGDonrhvbb2yRQNxr, branch claude/autochess-redesign (from b641c2d). Delivers .pr-body.md
   on the branch + stills on stills/autochess. Director opens the PR on the first real push, watches CI, sends stills to Eric.
   Smudgy paint report is on main: docs/decisions/2026-11-08-smudgy-paint-report.md.
+- **Nov 8 ~19:30 UTC:** #558 auto chess redesign GREEN on 5fcca01 (draft). Stills sent to Eric (stills/autochess). Waiting on his OK
+  plus two questions: bench pieces bigger? Phone: grow the board/box into the empty lower half? Remove .pr-body.md before merge.
