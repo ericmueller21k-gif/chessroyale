@@ -109,6 +109,34 @@ async function goIn(p: Page, id: string, name: string) {
   await expect(room(p)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
 }
 
+/**
+ * Out of the room to the town square. A phone: its bar's back button. A computer has no bar since Nov 7 (the town's tools are in the
+ * right column's slot), so out by the door: walked toward until it's in view, a tap on it (you walk there), its card's "Go out".
+ */
+async function leaveRoom(p: Page) {
+  if (test.info().project.name === "phone") return p.getByRole("button", { name: "Back", exact: true }).click();
+  const card = p.getByRole("dialog", { name: "Door", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    // (Another card open, the crate's or the Shopkeeper's: closed first, as Escape does.)
+    if (await p.locator(".town-card").filter({ visible: true }).count()) {
+      await p.keyboard.press("Escape");
+      await expect(p.locator(".town-card").filter({ visible: true })).toHaveCount(0, { timeout: 2000 });
+    }
+    // (The door is behind you: walk down the screen, toward it, until it's in view; Up is up in every room, so Down goes back.)
+    if (!(await shopAt(p, "door"))) {
+      await p.keyboard.down("ArrowDown");
+      await p.waitForTimeout(700);
+      await p.keyboard.up("ArrowDown");
+    }
+    const at = await shopAt(p, "door");
+    expect(at, "the door on screen").not.toBeNull();
+    await p.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
+  await card.getByRole("button", { name: "Go out" }).click();
+}
+
 /** Taps the Shopkeeper (it's in view from the door) and waits for its card, once you've walked up to the counter. */
 async function talk(p: Page) {
   await expect.poll(() => shopAt(p, "keeper"), { message: "the Shopkeeper is drawn" }).not.toBeNull();
@@ -212,8 +240,8 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(crate).toBeVisible();
   await expect(crate).toContainText("3 Puddles tokens, or 1 Puddles token + 1 crate key");
   await expect(crate).toContainText("Puddles's Mower");
-  // Inside, back is "out to the town square", not home.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // Inside, back is "out to the town square", not home (a computer: its door, no bar since Nov 7; you can get out).
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   await expect(town(page)).toHaveAttribute("data-ready", "1");
@@ -238,7 +266,7 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   await expect(crate).toContainText("3 Alfil tokens, or 1 Alfil token + 1 crate key");
   await expect(crate).toContainText("Alfil's Howdah");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/alfil-crate-${test.info().project.name}.png` });
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -299,7 +327,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/showpiece-${test.info().project.name}.png` });
   }
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -366,7 +394,7 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/halfpipe-${test.info().project.name}.png` });
   }
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -446,7 +474,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await still("crate");
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   if (SHOTS && process.env.CAVE_VIEWS) {
@@ -459,7 +487,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
       await walkTo(sq);
       await still(`close-${sq.join("-")}`);
     }
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await leaveRoom(page);
     await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   }
   expect(errors).toEqual([]);
@@ -506,7 +534,7 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   await expect(crate.getByRole("button", { name: "Buy with 3 Wrangler tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -572,7 +600,7 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   await walkTo([6, 8]);
   await walkTo([3, 6]);
   await still("edge");
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -633,7 +661,7 @@ test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the
   await walkTo([6, 6]);
   await walkTo([3, 5]);
   await still("sculptures");
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -716,7 +744,7 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   await walkTo([7, 7]);
   await expect.poll(async () => (await crew(page))!.lift.waiting, { message: "it goes on", timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await crew(page))!.lift.at[0], { message: "it moves", timeout: 10_000 }).not.toBe(held.at[0]);
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -870,7 +898,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await tapTo([5, 8]);
   await expect.poll(async () => (await red()).waiting, { message: "he goes on", timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await red()).at, { message: "he moves", timeout: 10_000 }).not.toEqual(held.at);
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   expect(errors).toEqual([]);
 });
@@ -899,7 +927,7 @@ test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the ch
   await expect(crate).toContainText("3 Big Boy tokens, or 1 Big Boy token + 1 crate key");
   await expect(crate).toContainText("Big Boy's Buggy");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/bigboy-crate-${test.info().project.name}.png` });
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -1070,7 +1098,8 @@ for (const ride of [false, true])
     page.on("pageerror", (e) => errors.push(String(e)));
     if (ride) {
       await page.goto("/");
-      await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+      // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+      await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
       // (No crate holds a ride yet: given straight, as only admins have them.)
       const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
       await wearItem(page, "ride", chirp!);
@@ -1085,7 +1114,7 @@ for (const ride of [false, true])
       // (Up first: you start a step in from the door. Then back down, and across both ways.)
       for (const by of ["key", "pad"] as const) for (const way of ["up", "down", "left", "right"] as const) await screenWay(page, way, by, ride);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/room-keys-${id}-${ride ? "ride" : "foot"}-${test.info().project.name}.png` });
-      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await leaveRoom(page);
       await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
       await expect(town(page)).toHaveAttribute("data-ready", "1");
     }
@@ -1097,7 +1126,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);
@@ -1132,8 +1161,8 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   expect(new Set(moves.map((k) => k.split(":")[1])).size, `its move's frames: ${seen.join(" ")}`).toBeGreaterThan(1);
   // (Up the room toward the counter: its back, as walking up the screen in the town.)
   expect(moves.some((k) => k.endsWith(":1")), `its back going up: ${seen.join(" ")}`).toBe(true);
-  // Out by the back button: in the town again, still on it.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // Out by the back button (a computer: the door, no bar since Nov 7): in the town again, still on it.
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
@@ -1339,7 +1368,7 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await expect(crate.getByRole("button", { name: "Buy with 3 Boingo tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
