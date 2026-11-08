@@ -87,5 +87,8 @@ Eric owns it. You design, delegate to helpers, review, merge, check what's live,
 - The settings mockup. Whether to start typed-chat-2. Whether the "God King pack" chat pack leaves the shop too.
 
 ## Later / ideas
+- ROADMAP (Eric, Nov 8): custom quick chat. Each player writes up to 10 of their own quick-chat lines in their profile
+  (a character limit, the chat filter, appropriate only), quicker than typing mid-game. Until then: 10 default lines. Stored
+  user text that others see = moderation + xhigh rules. Open question: do chat packs (the Winter pack etc.) stay?
 Spread the boss homes (no two neighbors); other bosses face away until on the kit; the ledger (shelved); Dash's clock as a
 legendary item; other players' pawn color on queue/squads/boss-select cards; God King shop items (Eric will revisit).
