@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { bossCrateOf } from "@chessroyale/core";
-import { asAdmin, asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -109,6 +109,33 @@ async function goIn(p: Page, id: string, name: string) {
   await expect(room(p)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
 }
 
+/**
+ * Out of the room to the town square. A phone: its bar's back button. A computer has no bar since Nov 7 (the town's tools are in the
+ * right column's slot), so out by the door: the view brought to it if it's off screen, a tap on it (you walk there), its card's "Go out".
+ */
+async function leaveRoom(p: Page) {
+  if (test.info().project.name === "phone") return p.getByRole("button", { name: "Back", exact: true }).click();
+  const card = p.getByRole("dialog", { name: "Door", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    // (Another card open, the crate's or the Shopkeeper's: closed first, as Escape does.)
+    if (await p.locator(".town-card").filter({ visible: true }).count()) {
+      await p.keyboard.press("Escape");
+      await expect(p.locator(".town-card").filter({ visible: true })).toHaveCount(0, { timeout: 2000 });
+    }
+    // (The door is usually behind you: the view brought to it, as a drag there would, __shopLook.)
+    if (!(await shopAt(p, "door"))) {
+      await p.evaluate(() => (window as unknown as { __shopLook?: (k: "door") => boolean }).__shopLook?.("door"));
+      await p.waitForTimeout(300);
+    }
+    const at = await shopAt(p, "door");
+    expect(at, "the door on screen").not.toBeNull();
+    await p.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 10_000 });
+  }).toPass({ timeout: 90_000 });
+  await card.getByRole("button", { name: "Go out" }).click();
+}
+
 /** Taps the Shopkeeper (it's in view from the door) and waits for its card, once you've walked up to the counter. */
 async function talk(p: Page) {
   await expect.poll(() => shopAt(p, "keeper"), { message: "the Shopkeeper is drawn" }).not.toBeNull();
@@ -212,8 +239,8 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await expect(crate).toBeVisible();
   await expect(crate).toContainText("3 Puddles tokens, or 1 Puddles token + 1 crate key");
   await expect(crate).toContainText("Puddles's Mower");
-  // Inside, back is "out to the town square", not home.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // Inside, back is "out to the town square", not home (a computer: its door, no bar since Nov 7; you can get out).
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   await expect(town(page)).toHaveAttribute("data-ready", "1");
@@ -238,7 +265,7 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   await expect(crate).toContainText("3 Alfil tokens, or 1 Alfil token + 1 crate key");
   await expect(crate).toContainText("Alfil's Howdah");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/alfil-crate-${test.info().project.name}.png` });
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -299,7 +326,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/showpiece-${test.info().project.name}.png` });
   }
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -366,7 +393,7 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${SHOTS}/halfpipe-${test.info().project.name}.png` });
   }
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -446,7 +473,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   await still("crate");
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   if (SHOTS && process.env.CAVE_VIEWS) {
@@ -459,7 +486,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
       await walkTo(sq);
       await still(`close-${sq.join("-")}`);
     }
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    await leaveRoom(page);
     await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   }
   expect(errors).toEqual([]);
@@ -506,7 +533,7 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   await expect(crate.getByRole("button", { name: "Buy with 3 Wrangler tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -572,7 +599,7 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   await walkTo([6, 8]);
   await walkTo([3, 6]);
   await still("edge");
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -633,7 +660,7 @@ test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the
   await walkTo([6, 6]);
   await walkTo([3, 5]);
   await still("sculptures");
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -716,7 +743,7 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   await walkTo([7, 7]);
   await expect.poll(async () => (await crew(page))!.lift.waiting, { message: "it goes on", timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await crew(page))!.lift.at[0], { message: "it moves", timeout: 10_000 }).not.toBe(held.at[0]);
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -870,7 +897,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   await tapTo([5, 8]);
   await expect.poll(async () => (await red()).waiting, { message: "he goes on", timeout: 10_000 }).toBe(false);
   await expect.poll(async () => (await red()).at, { message: "he moves", timeout: 10_000 }).not.toEqual(held.at);
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   expect(errors).toEqual([]);
 });
@@ -899,7 +926,7 @@ test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the ch
   await expect(crate).toContainText("3 Big Boy tokens, or 1 Big Boy token + 1 crate key");
   await expect(crate).toContainText("Big Boy's Buggy");
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/bigboy-crate-${test.info().project.name}.png` });
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
@@ -1070,7 +1097,8 @@ for (const ride of [false, true])
     page.on("pageerror", (e) => errors.push(String(e)));
     if (ride) {
       await page.goto("/");
-      await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+      // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+      await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
       // (No crate holds a ride yet: given straight, as only admins have them.)
       const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
       await wearItem(page, "ride", chirp!);
@@ -1085,7 +1113,7 @@ for (const ride of [false, true])
       // (Up first: you start a step in from the door. Then back down, and across both ways.)
       for (const by of ["key", "pad"] as const) for (const way of ["up", "down", "left", "right"] as const) await screenWay(page, way, by, ride);
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/room-keys-${id}-${ride ? "ride" : "foot"}-${test.info().project.name}.png` });
-      await page.getByRole("button", { name: "Back", exact: true }).click();
+      await leaveRoom(page);
       await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
       await expect(town(page)).toHaveAttribute("data-ready", "1");
     }
@@ -1097,7 +1125,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);
@@ -1132,8 +1160,8 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   expect(new Set(moves.map((k) => k.split(":")[1])).size, `its move's frames: ${seen.join(" ")}`).toBeGreaterThan(1);
   // (Up the room toward the counter: its back, as walking up the screen in the town.)
   expect(moves.some((k) => k.endsWith(":1")), `its back going up: ${seen.join(" ")}`).toBe(true);
-  // Out by the back button: in the town again, still on it.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // Out by the back button (a computer: the door, no bar since Nov 7): in the town again, still on it.
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(town(page)).toHaveAttribute("data-ready", "1");
   expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
@@ -1339,8 +1367,157 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await expect(crate.getByRole("button", { name: "Buy with 3 Boingo tokens" })).toBeDisabled();
   await page.keyboard.press("Escape");
   await expect(crate).toBeHidden();
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+/**
+ * The shop's screens (Eric, Nov 7), on a phone and a computer: no "Shop" title on any tab (the tab row says where you are); the
+ * locker's tabs are All, Head, Face, Skin, Weapon and Ride (the God King tab is gone; its effects stay under All); the preview is
+ * one pawn in a box twice its old height (126 px with its frame before, 252 now), with W and B bottom right. B makes the pawn black
+ * and saves it on the account (signed in: it survives a reload; the town shows it, town-afk.spec.ts); W switches back. Number
+ * checks: the box's height, the pawn's piece class (white or black), aria-pressed, the picker inside the box.
+ */
+test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a box twice its old height, a W and B picker bottom right: B is black and saved (it survives a reload), W is white again (Eric, Nov 7)", async ({ page }) => {
+  await asSignedIn(page, "pawn");
+  await page.goto("/shop");
+  for (const tab of ["Shop", "Crates", "Locker"]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await expect(page.locator(".shop-head h1")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Shop", exact: true })).toHaveCount(0);
+  }
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-tabs [role=tab]")).toHaveText(["All", "Head", "Face", "Skin", "Weapon", "Ride"]);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  // One pawn, white by default, in a box 252 px tall.
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  expect(Math.round((await page.locator(".locker-preview").boundingBox())!.height)).toBe(252);
+  const W = page.getByRole("button", { name: "White", exact: true });
+  const B = page.getByRole("button", { name: "Black", exact: true });
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(B).toHaveAttribute("aria-pressed", "false");
+  // The picker sits inside the box's bottom-right corner.
+  const box = (await page.locator(".locker-preview").boundingBox())!;
+  const pick = (await page.locator(".locker-pawn-pick").boundingBox())!;
+  expect(pick.x + pick.width).toBeLessThanOrEqual(box.x + box.width);
+  expect(pick.y + pick.height).toBeLessThanOrEqual(box.y + box.height);
+  // Two small squares, one button each (30 px; a hit area of 40 px at most): each inside the box, not overlapping, its right and
+  // bottom insets 12 px at most; no "default" word in the box; no God King button or tab.
+  const btns = page.locator(".locker-pawn-letter");
+  await expect(btns).toHaveCount(2);
+  const sq = [(await btns.nth(0).boundingBox())!, (await btns.nth(1).boundingBox())!];
+  for (const q of sq) {
+    expect(q.width).toBeLessThanOrEqual(28);
+    expect(q.height).toBeLessThanOrEqual(28);
+    expect(q.x).toBeGreaterThanOrEqual(box.x);
+    expect(q.y).toBeGreaterThanOrEqual(box.y);
+    expect(q.x + q.width).toBeLessThanOrEqual(box.x + box.width);
+    expect(q.y + q.height).toBeLessThanOrEqual(box.y + box.height);
+  }
+  expect(sq[0]!.x + sq[0]!.width, "W and B don't overlap").toBeLessThanOrEqual(sq[1]!.x);
+  // The selected one is about 15% bigger than the other: W now (white selected), B after its tap below.
+  expect(sq[0]!.width, "W selected: bigger than B").toBeGreaterThanOrEqual(sq[1]!.width * 1.1);
+  // Each one's tap area is 32 px at least (an invisible ::before around the square).
+  for (const i of [0, 1]) expect(parseFloat(await btns.nth(i).evaluate((el) => getComputedStyle(el, "::before").width))).toBeGreaterThanOrEqual(32);
+  expect(box.x + box.width - (sq[1]!.x + sq[1]!.width), "right inset").toBeLessThanOrEqual(12);
+  expect(box.y + box.height - Math.max(sq[0]!.y + sq[0]!.height, sq[1]!.y + sq[1]!.height), "bottom inset").toBeLessThanOrEqual(12);
+  await expect(page.locator(".locker-preview")).not.toContainText(/default/i);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "God King", exact: true })).toHaveCount(0);
+  // The God King's effects are hidden from the locker and the shop (GOD_KING_SHOP, Nov 8): no "From the shop", no effects tab.
+  await expect(page.getByText("From the shop")).toHaveCount(0);
+  await expect(page.getByText("More God King effects")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
+  // B: black, saved on the account (the server says so), and it's still black after a reload.
+  await B.click();
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  const [bw, ww] = [(await B.boundingBox())!.width, (await W.boundingBox())!.width];
+  expect(bw, "B selected: bigger than W").toBeGreaterThanOrEqual(ww * 1.1);
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
+  // Its outline reads on the box: the light stroke against the window's blue (styles.css, .ff-window: #2a3cbd, #13207a, #0a1150),
+  // at least 3:1 against each (WCAG contrast ratio).
+  const stroke = await page.locator(".locker-preview svg.default-black path").getAttribute("stroke");
+  expect(stroke).toBe("#f5efe0");
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const ratio = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  for (const blue of ["#2a3cbd", "#13207a", "#0a1150"]) expect(ratio(stroke!, blue), `outline on ${blue}`).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("black");
+  await page.reload();
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  // W: white again, saved.
+  await W.click();
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
+  // The Shop tab: no God King effects tab, and no "Coming later: King kill moves" line.
+  await page.getByRole("tab", { name: "Shop", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
+  // The Chat packs tab: no God King pack (GOD_KING_SHOP off); the Winter pack is still there.
+  await page.getByRole("tab", { name: "Chat packs", exact: true }).click();
+  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
+  await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
+});
+
+/**
+ * The shop page's width (Eric, Nov 8): on a computer (the desktop project, 1440 by 900) all three tabs sit 120 to 160 px in from the
+ * main column on each side (about one filter chip, 140 px), and the tabs row, the blue box, the chips row and the first item card
+ * share its left and right edges within 2 px (the card's right edge is its grid's). On a phone the old 14 px gutter is unchanged.
+ * PADDED_SHOTS=<dir>: the three tabs' stills at 1440 by 900.
+ */
+test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 to 160 px in from the main column, edges aligned; on a phone the 14 px gutter stays", async ({ page }, testInfo) => {
+  const computer = testInfo.project.name === "desktop";
+  if (computer) await page.setViewportSize({ width: 1440, height: 900 });
+  await asSignedIn(page, "pawn");
+  await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.goto("/shop");
+  const cases = [
+    { tab: "Shop", shot: "shop", chips: ".shop-tabs", box: null, card: ".shop-item", grid: ".shop-grid" },
+    { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
+    { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
+  ] as const;
+  const rect = (sel: string) =>
+    page.locator(sel).first().evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      return { l: b.left, r: b.right };
+    });
+  for (const c of cases) {
+    await page.getByRole("tab", { name: c.tab, exact: true }).click();
+    await expect(page.locator(c.card).first()).toBeVisible();
+    const col = await rect(".screen.shop");
+    // The tabs row, the blue box, the chips row, and the first card (its left edge, and its grid's right edge).
+    const els: [string, { l: number; r: number }][] = [["tabs", await rect(".area-tabs")]];
+    if (c.box) els.push(["blue box", await rect(c.box)]);
+    if (c.chips) els.push(["chips", await rect(c.chips)]);
+    els.push(["first card", { l: (await rect(c.card)).l, r: (await rect(c.grid)).r }]);
+    const tabs = els[0]![1];
+    for (const [name, e] of els) {
+      const inL = e.l - col.l;
+      const inR = col.r - e.r;
+      if (computer) {
+        expect(inL, `${c.tab}: ${name} left inset`).toBeGreaterThanOrEqual(120);
+        expect(inL, `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(160);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeGreaterThanOrEqual(120);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(160);
+      } else {
+        // The old gutter: 14 px each side.
+        expect(Math.abs(inL - 14), `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(1);
+        expect(Math.abs(inR - 14), `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(e.l - tabs.l), `${c.tab}: ${name} left edge`).toBeLessThanOrEqual(2);
+      expect(Math.abs(e.r - tabs.r), `${c.tab}: ${name} right edge`).toBeLessThanOrEqual(2);
+    }
+    const shots = process.env.PADDED_SHOTS;
+    if (computer && shots) await page.screenshot({ path: `${shots}/${c.shot}-computer-padded.png` });
+  }
 });

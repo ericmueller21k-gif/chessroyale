@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import { GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -18,7 +18,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const { profile, config } = useAccount();
   useServerStatus();
   // (A profile's locked quick chat line opens it on the chat packs.)
-  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : "king");
+  // The tabs the shop shows: the God King's effects only with GOD_KING_SHOP (settings.ts).
+  const shopCategories = SHOP_CATEGORIES.filter((c) => GOD_KING_SHOP || c.slot !== "king");
+  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : GOD_KING_SHOP ? "king" : shopCategories[0]!.slot);
   // (A profile's "Open locker" opens it on the locker.)
   const [area, setArea] = useState<"shop" | "crates" | "locker">(() =>
     initial && initial !== "chat" ? initial : new URLSearchParams(location.search).has("crates") ? "crates" : "shop",
@@ -55,7 +57,6 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
     <div class="screen shop">
       <div class="shop-head">
         <BackButton onClick={onBack} />
-        <h1>Shop</h1>
         <span class="shop-coins" aria-label={`${shop?.coins ?? 0} coins`}>
           🪙 {shop?.coins ?? 0}
         </span>
@@ -83,7 +84,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
       ) : (
         <>
           <div class="shop-tabs" role="tablist">
-            {SHOP_CATEGORIES.map((c) => (
+            {shopCategories.map((c) => (
               <button type="button" role="tab" key={c.slot} aria-selected={c.slot === slot} class={c.slot === slot ? "on" : ""} onClick={() => setSlot(c.slot)}>
                 {c.name}
               </button>
@@ -96,7 +97,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           {error && <p class="shop-error">{error}</p>}
           {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
+            {SHOP_ITEMS.filter((i) => i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
@@ -141,7 +142,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               </button>
             </div>
           ) : (
-            <p class="muted small shop-soon">Coming later: King kill moves and more animations.</p>
+            GOD_KING_SHOP && <p class="muted small shop-soon">Coming later: King kill moves and more animations.</p>
           )}
         </>
       )}

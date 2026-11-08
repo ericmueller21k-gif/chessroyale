@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { ITEM_DEFS, SHOP_ITEMS, rankView, wornFromLocker } from "@chessroyale/core";
+import { ITEM_DEFS, rankView } from "@chessroyale/core";
 import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -85,12 +85,11 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
 test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Eric");
   const crate = page.locator(".locker-grid").first();
-  const fromShop = page.locator(".locker-grid").nth(1);
-  // A player: only what they own (nothing yet), the God King's starter effect.
+  // A player: only what they own (nothing yet). (The God King's effects are hidden from the locker: GOD_KING_SHOP, Nov 8.)
   await page.goto("/shop");
   await page.getByRole("tab", { name: "Locker" }).click();
   await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
-  await expect(page.locator(".locker-item")).toHaveCount(1);
+  await expect(page.locator(".locker-item")).toHaveCount(0);
   await expect(page.locator(".locker-admin")).toHaveCount(0);
   // An admin (ADMIN_EMAILS, docs/decisions/2026-10-31-admin-owns-all.md): one of every crate item and God King effect.
   const id = await asServerAdmin(page);
@@ -98,9 +97,8 @@ test("an admin's locker has one of every item, each tagged Admin, worn like any 
   await page.getByRole("tab", { name: "Locker" }).click();
   await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
   await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
-  const kings = SHOP_ITEMS.filter(wornFromLocker);
-  await expect(fromShop.locator(".locker-item")).toHaveCount(kings.length);
-  await expect(fromShop.locator(".locker-admin")).toHaveCount(kings.filter((k) => !k.starter).length);
+  // (The "From the shop" God King effects are hidden, GOD_KING_SHOP: the admin's are not shown, and their data stays.)
+  await expect(page.getByText("From the shop")).toHaveCount(0);
   // Worn like any item, and others see it.
   const crown = crate.getByRole("button", { name: /^Fire & Ice Crown, / });
   await crown.click();
@@ -194,7 +192,7 @@ test("in a match: a bot's name opens a bot's card, yours opens your profile", { 
   await board.locator(".tower-row:not(.you) .player-name").first().click();
   await expect(page.locator(".fd-overlay")).toContainText("Bots fill the empty seats in a match");
   await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
-  await board.getByRole("button", { name: "Your profile" }).click();
+  await board.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
   await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();
 });
@@ -209,7 +207,8 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "Open locker" }).click();
   const previews = page.locator(".locker-preview .locker-avatar");
-  await expect(previews).toHaveCount(2);
+  // (One pawn in the preview since Nov 7, in your default color; it was two, white and black.)
+  await expect(previews).toHaveCount(1);
   const boxes = () => page.locator(".locker-preview, .locker-preview .locker-avatar, .locker-tabs").evaluateAll((els) => els.map((e) => [...Object.values(e.getBoundingClientRect().toJSON())].map((v) => Math.round(Number(v) * 10) / 10)));
   const before = await boxes();
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
@@ -220,8 +219,8 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await tile.click();
   await expect(tile).toContainText("Worn");
   const riding = page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]');
-  await expect(riding).toHaveCount(2);
-  // The pawns ride it inside the same boxes: nothing moved or grew (Eric's "nothing shifts").
+  await expect(riding).toHaveCount(1);
+  // The pawn rides it inside the same box: nothing moved or grew (Eric's "nothing shifts").
   expect(await boxes()).toEqual(before);
   for (const r of await riding.all()) {
     const a = (await r.boundingBox())!;
@@ -242,7 +241,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /^Riding Chirp, Cobalt/ }).click();
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
-  await expect(page.locator(".locker-preview .avatar")).toHaveCount(2);
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
   expect(await boxes()).toEqual(before);
 });
 
@@ -397,7 +396,7 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
   const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
   await chirp.click();
   await expect(chirp.locator(".locker-worn")).toHaveText("Worn");
-  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(2);
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
   // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, in its red.
   await page.goto("/town?sky=day");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townRide?: () => { you: { ride: string | null; color: string | null; ready: boolean } } | null }).__townRide?.()?.you ?? null), { timeout: 20_000 }).toEqual(

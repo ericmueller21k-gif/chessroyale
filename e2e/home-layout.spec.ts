@@ -221,7 +221,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     // The right column (Eric's mockup, Nov 7): its top slot empty off the town, then FRIENDS; no pawn at the top right any more
     // (Profile is the side menu's).
     await expect(panel.getByRole("button", { name: /^FRIENDS/ })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "Your profile" })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "Your profile", exact: true })).toHaveCount(0);
     // Your card starts at the top (level with the logo), not low with space above it.
     const hero = (await page.locator(".fd-hero").boundingBox())!;
     expect(hero.y).toBeLessThan(40);
@@ -356,7 +356,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   }
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
@@ -379,7 +379,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(await sideways(page)).toBe(0);
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   expect(await sideways(page)).toBe(0);
 });
 
@@ -444,7 +444,9 @@ test("phone: the top bar's shop and gear open the shop and Settings in one tap (
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // One tap: the shop (its balance at the top); Back is home.
   await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
-  await expect(page.getByRole("heading", { name: "Shop" })).toBeVisible();
+  // (The shop's own "Shop" title is gone, Eric, Nov 7: its tab row says where you are.)
+  await expect(page.getByRole("heading", { name: "Shop" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Shop", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // One tap: Settings, as Profile → Settings opens it; Back is home.

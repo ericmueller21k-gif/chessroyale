@@ -12,10 +12,10 @@ import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
-import { townHereResponse } from "./town-here-api.ts";
+import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -347,16 +347,20 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
-  // PATCH /api/me {name?, icon?, chatOn?}. Not from a guest on a device that answered "too young": it keeps the default name and
-  // icon. (Someone signed in there, say in a tab opened before the answer, still may.) `chatOn` (the chat's opt-in, Nov 7) is kept
-  // for a signed-in account only: a guest's stays on its device.
+  // PATCH /api/me {name?, icon?, pawn?, chatOn?}. Not from a guest on a device that answered "too young": it keeps the default name and
+  // icon. (Someone signed in there, say in a tab opened before the answer, still may.) `pawn`: "white" or "black" (the default
+  // pawn color, pawn-color.ts); the town's next look of you is read again then, not after its minute. `chatOn` (the chat's opt-in,
+  // Nov 7) is kept for a signed-in account only: a guest's stays on its device.
   if (path === "/api/me" && request.method === "PATCH") {
     if (ageAnswer(request) === "under" && !isSignedIn(current)) return json({ message: "Guests play under the default name and icon." }, 403);
-    const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown; chatOn?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown; pawn?: unknown; chatOn?: unknown };
     // (A name with a slur or a hate term in it: text-filter.ts.)
     if (typeof body.name === "string" && isBlockedText(String(body.name).slice(0, 64))) return json({ message: NAME_NOT_ALLOWED }, 400);
+    if (body.pawn !== undefined && cleanPawnColor(body.pawn) === null) return json({ message: "Pick white or black." }, 400);
     if (typeof body.chatOn === "boolean" && isSignedIn(current)) await setChatOn(sql, current.id, body.chatOn);
-    return json(await profile(sql, await updateProfile(sql, current.id, body), admins));
+    const updated = await updateProfile(sql, current.id, body);
+    if (body.pawn !== undefined) forgetLook(current.id);
+    return json(await profile(sql, updated, admins));
   }
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the

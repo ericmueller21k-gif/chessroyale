@@ -15,6 +15,7 @@ import {
   bossThinkMs,
   landedEarlyMs,
   fullMoonMs,
+  popOffMs,
   folioTurnMs,
   landsAfterHisMove,
   PASS_WAIT,
@@ -1611,7 +1612,7 @@ export class LobbyCore {
     const burnt = !!b?.powers?.burnt?.some((x) => x.turn === b.crowdMoves && (x.piece || x.fizzled));
     // (Alfil's pieces came down early after your move: their landing plays first too; so does Moo's Full Moon, his
     // transformation at the start of his turn.)
-    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b);
+    const own = landedEarlyMs(b) + fullMoonMs(b) + folioTurnMs(b) + popOffMs(b);
     return queenSlain(view) || burnt || own ? this.io.now() + bossThinkMs(view, burnt, own) : undefined;
   }
 

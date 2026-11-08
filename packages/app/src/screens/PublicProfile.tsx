@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { rankView } from "@chessroyale/core";
+import { pawnColorOf, rankView, sideOfPawn } from "@chessroyale/core";
 import { BackButton, DressedPawn, TEST_LEVEL } from "../components/FrontDoor.tsx";
 import { BossArt } from "../components/BossCharacter.tsx";
 import { InviteButton, useProfileActions } from "../components/Friends.tsx";
@@ -211,7 +211,7 @@ function Picture({ p, loading }: { p: PublicProfile | null; loading: boolean }) 
               {icon}
             </span>
           ))}
-        {!loading && <DressedPawn size="avatar" ride look={p?.look} />}
+        {!loading && <DressedPawn size="avatar" ride look={p?.look} side={sideOfPawn(pawnColorOf(p?.pawn))} own={own} />}
       </span>
       {p?.online && !p.hidden && <span class="pp-online" role="img" aria-label="Online" />}
     </div>

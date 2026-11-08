@@ -19,7 +19,10 @@ import {
   chatPicks,
   chatPicksAfterGetting,
   cleanChatPickList,
+  cleanPawnColor,
   ownedChatPacks,
+  pawnColorOf,
+  type PawnColor,
   shopItem,
   starterItem,
   topPercent,
@@ -251,6 +254,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
   ...FRIENDS_COLUMNS,
+  // The default pawn color (Nov 7, 2026): "white" or "black"; NULL: white (core's pawn-color.ts). Saved by PATCH /api/me.
+  { table: "users", column: "pawn_color", type: "TEXT" },
   // The age gate (Oct 16, 2026): when the account's holder said they were old enough (AGE_GATE.minAge), the first time
   // they signed in after the question. NULL: signed in before the gate, or a guest. Never the birth date
   // (docs/decisions/2026-10-16-age-gate-and-real-money.md).
@@ -437,6 +442,8 @@ export interface User {
   email: string | null;
   google_sub: string | null;
   created_at: number;
+  /** The default pawn color (users.pawn_color; NULL: white). */
+  pawn_color?: string | null;
 }
 
 // ---------------- Users and sessions ----------------
@@ -460,7 +467,7 @@ export async function endSession(sql: Sql, token: string): Promise<void> {
 }
 
 export const getUser = (sql: Sql, id: string) =>
-  sql.first<User>("SELECT id, name, icon, email, google_sub, created_at FROM users WHERE id = ?", id);
+  sql.first<User>("SELECT id, name, icon, email, google_sub, created_at, pawn_color FROM users WHERE id = ?", id);
 
 /** The user a session token belongs to (null if unknown or expired). */
 /**
@@ -488,9 +495,12 @@ export async function touchSession(sql: Sql, token: string | null | undefined, n
   if (s && s.expires_at >= now) await touchUser(sql, s.user_id, now);
 }
 
-export async function updateProfile(sql: Sql, userId: string, patch: { name?: unknown; icon?: unknown }): Promise<User> {
+export async function updateProfile(sql: Sql, userId: string, patch: { name?: unknown; icon?: unknown; pawn?: unknown }): Promise<User> {
   const name = patch.name === undefined ? null : cleanName(patch.name);
   if (name) await sql.run("UPDATE users SET name = ? WHERE id = ?", name, userId);
+  // The default pawn color: only "white" or "black" (the route refuses anything else before this).
+  const pawn = cleanPawnColor(patch.pawn);
+  if (pawn) await sql.run("UPDATE users SET pawn_color = ? WHERE id = ?", pawn, userId);
   // A drawn icon (the icon builder), or one of the old emoji icons.
   if (isPixelIcon(patch.icon) || (typeof patch.icon === "string" && (ICONS as readonly string[]).includes(patch.icon))) {
     await sql.run("UPDATE users SET icon = ? WHERE id = ?", patch.icon, userId);
@@ -761,7 +771,7 @@ export interface ModeStats {
 }
 
 export interface Profile {
-  user: Pick<User, "id" | "name" | "icon"> & { signedIn: boolean; email: string | null; google: boolean };
+  user: Pick<User, "id" | "name" | "icon"> & { signedIn: boolean; email: string | null; google: boolean; pawn: PawnColor };
   shop: ShopState;
   locker: LockerState;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss: ModeStats };
@@ -796,7 +806,7 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
   const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
   const chatOn = (await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null))?.chat_on === 1;
   return {
-    user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub },
+    user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub, pawn: pawnColorOf(user.pawn_color) },
     shop: await shopState(sql, user.id, admin),
     locker: await lockerState(sql, user.id, admin),
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
@@ -854,6 +864,8 @@ export interface PublicProfile {
   icon: string;
   /** What they wear: crate items. */
   look: ItemLook;
+  /** Their default pawn color (white unless they chose black). */
+  pawn: PawnColor;
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;
@@ -951,8 +963,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
  * look has the admin copies they wear (the email is read only for that, never answered).
  */
 export async function publicProfile(sql: Sql, userId: string, now: number, admins: AdminCheck = NO_ADMINS): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null }>(
-    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null }>(
+    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -978,6 +990,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
     name: u.name,
     icon: u.icon,
     look: (await lockerState(sql, u.id, admins(u))).look,
+    pawn: pawnColorOf(u.pawn_color),
     joinedAt: u.created_at,
     lastSeen: u.hide_online ? null : u.last_seen,
     online: !u.hide_online && u.last_seen !== null && now - u.last_seen < FRONT_DOOR.onlineWindowMs,

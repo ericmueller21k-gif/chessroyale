@@ -35,18 +35,43 @@ export const DASH_LINES: Partial<Record<Beat, readonly string[]>> = {
 };
 
 /**
- * Dash v2's lines (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md), in his voice:
- * - `fit`: his clock fit (at most twice a battle, a few quick smacks): a quirk, he just loves that clock (Eric's two, and three more);
+ * Dash v2's and v3's clock lines (Eric, Nov 6 and Nov 7; docs/decisions/2026-11-06-dash-v2.md, 2026-11-07-dash-clock.md), in his voice:
+ * - `DASH_FIT_LINES`: the clock multi-hit (every 4 or 5 of his moves, 5 quick smacks): always a line, a quirk about the clock
+ *   (Eric's: "bet you had one of these"; how fast he is; he just loves that clock);
+ * - `DASH_POPOFF_LINES`: the pop-off's first beat (3 smacks): "I gotta pop off for a second, bro";
+ * - `DASH_LOVE_LINES`: the pop-off's second beat (10 fast smacks): he says again how much he loves that clock.
  * - his Scramble Rush: its warning a turn ahead (`warn`, with RAGE!, "Next turn: Scramble Rush"; Eric, Nov 6: "hope you were
  *   watching"), as the sweep ends (`done`), a piece put down one square off (`close`) or further (`far`), and the crowd too few
  *   back, as he moves again (`fail`). The God King's are his (godKing.ts: rushAsk, rushWell).
+ * Every line is at most DASH_LINE_MAX characters (the 2-row bubble; the longest of the old lines is 45; dash-clock.test.ts).
  */
+export const DASH_LINE_MAX = 48;
 export const DASH_FIT_LINES: readonly string[] = [
   "Nothing beats that click. I love this clock.",
   "Best sound in the world, fam.",
   "Click click! Sorry, it's a whole vibe.",
   "My guy, listen to that. Pure music.",
   "Can't help it, cuz. This clock is my therapy.",
+  "Bet you had one of these, cuz.",
+  "Bet you never owned a clock this cool.",
+  "Ask me how fast my clock is. Go on.",
+  "Bet you can't hit it like that, broski.",
+  "Smack, smack, smack. Pure clock energy.",
+  "One hand on the clock. Speed is a lifestyle.",
+  "Every move gets a smack. That's the rule.",
+  "Clock check! Still bussin, still fast.",
+  "Tick tock, tap tap. Respect the clock.",
+  "Bro, these buttons are so satisfying.",
+];
+export const DASH_POPOFF_LINES: readonly string[] = [
+  "Gotta pop off for a sec, bro.",
+  "Hold up, I gotta pop off for a sec.",
+  "Scuse me, fam. I gotta pop off real quick.",
+];
+export const DASH_LOVE_LINES: readonly string[] = [
+  "Nothing beats this clock. Nothing, bro.",
+  "I love this clock so much, cuz.",
+  "Real talk, this clock is my best friend.",
 ];
 export const DASH_RUSH_LINES = {
   warn: ["Hope you were watching.", "Eyes on the board, fam. Trust me.", "Take a good look, cuz. Real good.", "Memorize it, my guy. No cap."],

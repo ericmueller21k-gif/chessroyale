@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
-import { DASH_ANIM, scrambleLeft, type DashView } from "@chessroyale/chess";
+import { DASH_ANIM, POWER_FX, scrambleLeft, type DashView } from "@chessroyale/chess";
+import { CRITICAL } from "../speech.tsx";
 import { hash, pickLine } from "../characters/boss-beats.ts";
-import { DASH_FIT_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
+import { DASH_FIT_LINES, DASH_LOVE_LINES, DASH_POPOFF_LINES, DASH_RUSH_LINES } from "../characters/dash-lines.ts";
 import { renderFrame } from "../characters/sprite.ts";
 import { sidekickBlitz } from "../characters/sidekicks/blitz.ts";
 import { clockShown } from "../clock-text.ts";
@@ -25,6 +26,9 @@ import { InPlace, rageWarn, type BossUi, type Moment, type MomentProps, type Mom
  * - **Scramble Rush's warning** (`rushWarn`, a turn before it, as any ultimate's): RAGE!, "Next turn: Scramble Rush", his line.
  * - **His flag** (`flag`, as your turn after it begins): your time ran out, a random move was played for you: his finger gun and
  *   his jab, the dock says what happened.
+ * - **Clock multi-hit** (`clockFit`, every 4 or 5 of his moves: five quick smacks where he stands, always a line about his clock)
+ *   and **pop-off** (his thinking screen, `popOffMoments`: three smacks and "I gotta pop off", then ten fast smacks and a love
+ *   line, before his move lands; the crowd's clock starts after his move, as ever).
  * - **Tick**, his tortoise, in the boss bar's prop slot (fixed): asleep on his clock; he wakes with a bob at a slap and rattles
  *   through a scramble. Under him, the time Dash has stolen so far, or the scramble's moves left.
  */
@@ -121,14 +125,55 @@ function flagMoment({ moment }: MomentProps) {
   );
 }
 
-/** His clock fit: a few quick smacks where he stands (`fit3` to `fit5`), and a line about how much he loves that clock. */
+/** His clock multi-hit: quick smacks where he stands (dashClockFit.smacks, fit5 by default), and a line about his clock. */
 function fitMoment({ moment }: MomentProps) {
-  const n = Math.max(3, Math.min(5, moment.count ?? 3));
+  const n = Math.max(3, Math.min(5, moment.count ?? BOSS_POWERS.dashClockFit.smacks));
   return (
-    <div class="power-moment pm-fit pm-stay" data-count={n}>
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-count={n}>
       <InPlace runKey={moment.key} anims={[`fit${n}`]} since={moment.at} />
     </div>
   );
+}
+
+/** His pop-off's first beat: three smacks (fit3), "I gotta pop off for a sec". Its second, the fast ten (fit10), comes after. */
+function popOffMoment({ moment }: MomentProps) {
+  return (
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind="popOff" data-count={BOSS_POWERS.dashPopOff.smacks}>
+      <InPlace runKey={moment.key} anims={["fit3"]} since={moment.at} />
+    </div>
+  );
+}
+
+/** His pop-off's second beat: ten really fast smacks (fit10), then he says how much he loves that clock. */
+function popOffFastMoment({ moment }: MomentProps) {
+  return (
+    <div class="power-moment pm-fit pm-stay" data-key={moment.key} data-kind="popOffFast" data-count={BOSS_POWERS.dashPopOff.hits}>
+      <InPlace runKey={moment.key} anims={["fit10"]} since={moment.at} />
+    </div>
+  );
+}
+
+/** When this device first saw each pop-off (a screen drawn again carries on; it doesn't start over). */
+const popOffSeen = new Map<string, number>();
+
+/**
+ * His pop-off, as his thinking screen's moments (Boss.tsx), from when this device first saw it: the pop-off's two beats, one after
+ * the other. It plays while he thinks for the turn it comes (DashState.popOff.at = powers.turn); popOffMs holds his move for them.
+ */
+export function popOffMoments(boss: BossView, now = Date.now()): Moment[] {
+  const d = boss.id === "dash" ? boss.powers?.dash : null;
+  if (!d?.popOff || d.popOff.at !== boss.powers?.turn) return [];
+  const key = `${boss.id}:popOff:${d.popOff.at}`;
+  const seenKey = `${boss.startMove}:${key}`;
+  let at = popOffSeen.get(seenKey);
+  if (at === undefined) {
+    popOffSeen.set(seenKey, (at = now));
+    if (popOffSeen.size > 20) popOffSeen.delete(popOffSeen.keys().next().value!);
+  }
+  return [
+    { kind: "popOff", key, at, ms: POWER_FX.popOff },
+    { kind: "popOffFast", key: `${key}:fast`, at: at + POWER_FX.popOff, ms: POWER_FX.popOffFast },
+  ];
 }
 
 /** His extra move after a failed Scramble Rush: its own moment as it lands (Hollow's "TWICE!" in his colors; his line came as time was up). */
@@ -139,13 +184,17 @@ function rushExtraMoment({ boss, banner }: MomentProps) {
 /** One of his lines for a moment, the same on every screen (by the moment's key). */
 const lineOf = (lines: readonly string[], key: string): string => lines[hash(key) % lines.length]!;
 
-const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "rushWarn" | "rushExtra", MomentUi> = {
+const MOMENTS: Record<"slap" | "scramble" | "flag" | "clockFit" | "popOff" | "popOffFast" | "rushWarn" | "rushExtra", MomentUi> = {
   // (Your time ran out on your last move: first, his jab.)
   flag: { order: 1, kit: "cheer", view: flagMoment, dock: () => DASH_WORDS.flag, line: (kit, m) => (kit ? pickLine(kit, "flag", m.key) : null) },
   slap: { order: 2, kit: "power", lineAt: B.slap.slamAt, view: slapMoment, dock: () => DASH_WORDS.slap },
   scramble: { order: 3, kit: "ultimate", lineAt: B.scramble.castAt, view: (p) => scrambleMoment(p) },
   // (A quirk, not a power: no banner, nothing for you to do; the dock keeps the turn's line.)
   clockFit: { order: 4, kit: "power", view: fitMoment, line: (_kit, m) => lineOf(DASH_FIT_LINES, m.key) },
+  // (His pop-off's two beats, while he thinks: its line each, the second his love for the clock.)
+  popOff: { order: 1, kit: "power", view: popOffMoment, line: (_kit, m) => lineOf(DASH_POPOFF_LINES, m.key) },
+  // (Its love line cuts in on the pop-off line: a line said while one is up waits its turn, and this one must come before his move.)
+  popOffFast: { order: 2, kit: "power", view: popOffFastMoment, line: (_kit, m) => lineOf(DASH_LOVE_LINES, m.key), priority: () => CRITICAL },
   // (His Scramble Rush a turn ahead, as any ultimate's warning: RAGE!, "Next turn: Scramble Rush", his clock held up, his line.)
   rushWarn: { order: 1, kit: "ultimateWarn", view: (p) => rageWarn(p, "Scramble Rush", undefined, true), line: (_kit, m) => lineOf(DASH_RUSH_LINES.warn, m.key) },
   rushExtra: { order: 3, kit: "ultimateHit", own: (boss) => boss.powers?.dash?.rush?.extra === "played" && boss.powers.events.some((e) => e.kind === "rushExtra"), view: rushExtraMoment, line: () => null },

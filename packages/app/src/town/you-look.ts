@@ -32,13 +32,14 @@ export function offFace(look: ItemLook | null | undefined): ItemLook | null {
 }
 
 /**
- * Your dressed pawn at `px` pixels a pawn's box, over `pawn` (the plain pawn's picture, square): resolves to null if
- * there's nothing to wear or an image fails to load (the world then keeps the plain pawn).
+ * Your dressed pawn at `px` pixels a pawn's box, over `pawn` (the plain pawn's picture, square) in `side` (your default
+ * pawn color, or a player's; "w" for a bot): resolves to null if there's nothing to wear or an image fails to load (the
+ * world then keeps the plain pawn).
  */
-export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLCanvasElement, px: number): Promise<YouArt | null> {
+export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLCanvasElement, px: number, side: "w" | "b" = "w"): Promise<YouArt | null> {
   if (!lookKey(look)) return null;
   const host = document.createElement("div");
-  render(h(Avatar, { look: look!, side: "w" }), host);
+  render(h(Avatar, { look: look!, side }), host);
   try {
     const span = host.firstElementChild;
     if (!span) return null;

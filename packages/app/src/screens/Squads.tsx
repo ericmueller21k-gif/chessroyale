@@ -146,7 +146,7 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
           </div>
         )}
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={myLook} />
+          <DressedPawn size="card" look={myLook} own />
           <div>
             <div class="fd-you-title">You're in{squads ? ` · ${squadName(client.mySquad?.id)}` : ""}</div>
             <div class="fd-you-sub">Squads of 4 play a bracket: Relay, Pairs, then the final</div>

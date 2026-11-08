@@ -26,7 +26,7 @@
  * One requestAnimationFrame loop draws everything on one canvas (Canvas 2D); it stops when you go out or the tab is hidden. Every
  * frame of every piece is drawn into a canvas of its own as the room loads (behind the black fade), never in the loop.
  * Test hooks (test switches on): the canvas's `data-room` (its home), `data-you="c,r"`, `data-ready="1"`; `window.__shopAt("keeper"
- * | "door" | "square", [c, r]?)` where to tap; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw.
+ * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { onAccountChange } from "../../account.ts";
@@ -3767,7 +3767,18 @@ function startRoom(
     for (let i = 0; i < k; i++) draw(now);
     return (performance.now() - t0) / k;
   };
-  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves };
+  /** (Tests) The view brought to the door, as a drag there would (a computer has no back button since Nov 7: e2e leaves by the door). */
+  const hookLook = (kind: "door") => {
+    if (!testSwitchesAllowed() || kind !== "door") return false;
+    const d = room.doors[0]!;
+    follow = false;
+    camFocus(room, d.c, d.r, focus);
+    camX = focus.x;
+    camY = focus.y;
+    return true;
+  };
+  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook };
+  hooks.__shopLook = hookLook;
   hooks.__shopElves = hookElves;
   hooks.__shopAt = hookAt;
   hooks.__shopCrew = hookCrew;
@@ -3802,6 +3813,7 @@ function startRoom(
       cv.removeEventListener("wheel", onWheel);
       delete hooks.__shopAt;
       delete hooks.__shopCam;
+      delete hooks.__shopLook;
       delete hooks.__shopBench;
       delete hooks.__shopRide;
       delete hooks.__shopIntro;

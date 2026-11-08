@@ -9,6 +9,7 @@ import {
   chatSays,
   defaultChatPicks,
   ownedChatPacks,
+  packOffered,
   toggleChatPick,
   type ChatPack,
   type ChatPickKind,
@@ -233,7 +234,7 @@ function PickMenu({
   const cap = chatPickCap(kind);
   const full = picked.length >= cap;
   const q = fold(query);
-  const sections = CHAT_PACKS.filter((p) => (p.kind === "emoji") === (kind === "emoji"))
+  const sections = CHAT_PACKS.filter((p) => (p.kind === "emoji") === (kind === "emoji") && packOffered(p.id, packs))
     .map((pack) => ({ pack, own: packs.includes(pack.id), says: chatSays(pack.lines.map((l) => l.id)).filter((s) => matches(s, pack, q)) }))
     .filter((x) => x.says.length > 0)
     // Yours first (the free ones, then packs you got), then the ones in the shop.

@@ -94,7 +94,7 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
             </Icon>
           }
         />
-        <Item tip={tip} tour="profile" label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride />} />
+        <Item tip={tip} tour="profile" label="Profile" on={page === "profile"} onClick={nav.profile} icon={<DressedPawn size="ring" look={p?.locker?.look} ride own />} />
       </div>
       <div class="fd-menu fd-menu-end">
         <Item tip={tip} tour="settings" label="Settings" on={page === "settings"} onClick={nav.settings} icon={<GearIcon />} />

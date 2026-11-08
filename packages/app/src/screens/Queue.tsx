@@ -223,7 +223,7 @@ export function QueueScreen({
       <div class="fd-queue-panel">
         {grid}
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={myLook} />
+          <DressedPawn size="card" look={myLook} own />
           <div>
             <div class="fd-you-title">You're in · seat 1</div>
             <div class="fd-you-sub">Your pawn is gold-ringed in the grid</div>
@@ -269,7 +269,7 @@ export function QueueLine({ raid, waitSeconds, onCancel, title, seats }: { raid:
       <div class="fd-queue-panel">
         <Seats seats={[]} size={size} me={null} looks={new Map()} bots={0} />
         <div class="fd-queue-you">
-          <DressedPawn size="card" look={account().profile?.locker?.look} />
+          <DressedPawn size="card" look={account().profile?.locker?.look} own />
           <div>
             <div class="fd-you-title">You're in line</div>
             <div class="fd-you-sub">You'll get a seat as soon as one is free</div>
