@@ -898,7 +898,16 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (phase === "buy") {
       if (!buying()) return;
       if (isOffer(hold)) return buySlot(hold.at.offer);
-      if (isHeld(hold)) return placeHeldAt(hold.at.held);
+      // (Your bench, v5: a first tap picks the piece, lighting its tile and the square it goes to; a second tap, on the tile or that square, places it.)
+      if (isHeld(hold)) {
+        if (sameHold(selRef.current, hold)) return placeHeldAt(hold.at.held);
+        setSel(hold);
+        const cur = gref.current;
+        const h = cur.round.you.bench[hold.at.held];
+        const block = h && heldBlock(cur.round.you, hold.at.held, cfg, boardRoom());
+        if (h && block) say(heldWords(block, h.square, cfg, boardRoom()));
+        return;
+      }
       if (hold.kind === "k") return say("King: set by game");
     } else if (!adjusting()) return;
     if (phase === "adjust" && hold.kind === "k") return say(adjustWords("kingfixed", cfg));
@@ -925,6 +934,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     }
     const hold = selRef.current;
     if (!hold) return;
+    if (gref.current.phase === "buy" && isHeld(hold) && gref.current.round.you.bench[hold.at.held]?.square === square) return placeHeldAt(hold.at.held);
     if (gref.current.phase === "buy") setSel(null);
     else if (isSquare(hold)) adjustTo(hold.at.square, square);
   }
@@ -1156,6 +1166,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   else if (g.phase === "fight" && elapsed < bannerMs()) banner = { words: "BATTLE PHASE" };
 
   const held = sel ?? null;
+  // A bench piece of yours picked (v5): its tile and the square it goes to light up.
+  const aim = g.phase === "buy" && held && isHeld(held) ? (g.round.you.bench[held.at.held]?.square ?? null) : null;
   // What is being dragged while buying: an offer (to the bench) or a piece of yours (to the shop, to sell it).
   const dragOffer = g.phase === "buy" && drag && isOffer(drag) ? (g.round.shop.slots[drag.at.offer] ?? null) : null;
   const dragPiece = g.phase === "buy" && drag && drag.kind !== "k" && !isOffer(drag) ? drag : null;
@@ -1236,7 +1248,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           <MatchMenu exit={leave} />
         </header>
         {slot && createPortal(<p class="rc-sub ac-slot-line">Round {g.match.round} · {PHASE_NAME[g.phase]} phase</p>, slot)}
-          <div class="ac-bench them" aria-label="Their bench">
+          <div class={`ac-bench them ${theirs}`} aria-label="Their bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = theirBench[i];
               if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
@@ -1337,6 +1349,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 )}
                 {lit && <span class="ac-cell ac-pick" data-square={lit} style={sq(lit)} />}
                 {held && isSquare(held) && (g.phase === "buy" || !legal) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
+                {aim && <span class="ac-cell ac-aim" data-square={aim} style={sq(aim)} />}
                 {floats.filter((f) => "col" in f.at).map((f) => (
                   <FloatGold key={f.id} amount={f.amount} at={f.at} />
                 ))}
@@ -1423,7 +1436,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           )}
         </div>
 
-          <div class={`ac-bench you${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
+          <div class={`ac-bench you ${mine}${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = g.round.you.bench[i];
               if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
@@ -1450,7 +1463,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 <button
                   key={`${i}${h.kind}${h.square}`}
                   type="button"
-                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}`}
+                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}${aim && held && isHeld(held) && held.at.held === i ? " aimed" : ""}`}
                   data-held={i}
                   data-kind={h.kind}
                   data-square={h.square}

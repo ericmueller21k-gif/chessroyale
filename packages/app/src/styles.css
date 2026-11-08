@@ -22045,6 +22045,131 @@ button.sq-tiny {
   transform: translateY(1px);
 }
 
+/* A bench piece of yours picked (v5): its tile and the square it goes to light up in gold. */
+.ac-aim,
+.ac-slot.aimed {
+  background: rgba(242, 193, 78, 0.62);
+  box-shadow: inset 0 0 0 3px #f2b705;
+  z-index: 2;
+}
+
+/* ---- A phone (v5, Eric Nov 8; docs/decisions/2026-11-08-autochess-redesign.md): the board and the action box nearly the screen's
+   width; each bench a row of 4 tiles the size of the board's squares, lined up with its files: theirs over A to D, yours under E to
+   H, a few px from the border; the players kitty-corner: the opponent over E to H, you under A to D. ---- */
+@media (max-width: 1023px) {
+  .ac-root {
+    --rgap: 4px;
+    --lab: 14px;
+    --free: 12px;
+    /* Everything top to bottom but the board, the two rows and the cards. */
+    --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 3px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 10px - var(--k) / 4);
+    /* The board: as wide as the column less its frame, or what the height leaves (the frame is the board + 8, a card a quarter of the
+       frame less k, each row a tile, its gap and its label, or the player's block when that is taller), snapped to 8 px (it draws in
+       whole multiples of 8 device pixels); the frame's gold border takes up to 3 px more a side, so the frame is 8 px from each edge
+       at 390, 360 and 430. A tile is a square. */
+    --b: round(down, min(calc(var(--colw) - 8px), calc((var(--app-h) - var(--acc) - 2 * (var(--rgap) + var(--lab))) / 1.5), calc((var(--app-h) - var(--acc) - 2 * var(--pl-h)) / 1.25)), 8px);
+    --bd: calc(3px + min(3px, round(down, calc((var(--colw) - 8px - var(--b)) / 2), 1px)));
+    --fw: calc(var(--b) + 2px + 2 * var(--bd));
+    --acs: calc(var(--b) / 8);
+    --acrow: max(calc(var(--acs) + var(--rgap) + var(--lab)), var(--pl-h));
+  }
+  .ac-col {
+    grid-template-columns: minmax(0, 1fr) calc(var(--fw) / 2) calc(var(--fw) / 2) minmax(0, 1fr);
+    grid-template-rows: var(--head-h) var(--acrow) var(--fw) var(--acrow) auto;
+    grid-template-areas:
+      "head head head head"
+      ". bt opp opp"
+      ". board board ."
+      "me me by ."
+      ". dock dock .";
+  }
+  .ac-frame {
+    border-width: var(--bd);
+  }
+  .ac-players {
+    display: contents;
+  }
+  .ac-opp {
+    grid-area: opp;
+    align-self: end;
+    justify-self: center;
+    margin-bottom: var(--rgap);
+  }
+  .ac-me {
+    grid-area: me;
+    align-self: start;
+    justify-self: center;
+    margin-top: var(--rgap);
+  }
+  .ac-bench {
+    flex-direction: row;
+    gap: 0;
+    width: calc(var(--acs) * 4);
+  }
+  .ac-bench.them {
+    grid-area: bt;
+    align-self: end;
+    justify-self: end;
+    margin-bottom: var(--rgap);
+  }
+  .ac-bench.you {
+    grid-area: by;
+    align-self: start;
+    justify-self: start;
+    flex-direction: row;
+    margin-top: var(--rgap);
+  }
+  .ac-slot {
+    width: var(--acs);
+    height: var(--acs);
+    border-radius: 0;
+    background: var(--t1);
+  }
+  .ac-slot:nth-child(even) {
+    background: var(--t2);
+  }
+  .ac-slot.aimed {
+    background: rgba(242, 193, 78, 0.62);
+  }
+  /* The tiles: a side's own pair, a little off the board's squares (white light and tan, black two grays). */
+  .ac-bench.w {
+    --t1: #f6e5c6;
+    --t2: #d4bd96;
+  }
+  .ac-bench.b {
+    --t1: #d9d7d3;
+    --t2: #aeaba6;
+  }
+  .ac-slot .ac-pc {
+    width: var(--acs);
+  }
+  .ac-slot em {
+    position: absolute;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 11px;
+  }
+  .ac-bench.you .ac-slot em {
+    top: calc(100% + 2px);
+  }
+  .ac-bench.them .ac-slot em {
+    bottom: calc(100% + 2px);
+  }
+  .ac-slot.empty::before {
+    content: none;
+  }
+  .ac-slot.tapped {
+    box-shadow: inset 0 0 0 3px #dc2626;
+  }
+  .ac-bench.you .ac-float.on-bench {
+    left: calc(var(--acs) * var(--slot, 0));
+    top: 0;
+    bottom: auto;
+    width: var(--acs);
+    height: var(--acs);
+  }
+}
 /* ---- A computer (the front door's frame, 1024 px and wider): you left of the action box, the opponent right of the board's top ---- */
 @media (min-width: 1024px) {
   .fd-root.framed.fd-on-autochess .fd-center {
