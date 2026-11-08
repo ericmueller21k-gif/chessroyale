@@ -262,29 +262,64 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // The result screen: he rises if the crowd won, otherwise he stays down. Beside him, the Last Stand's card: one
   // line, and tapped open, your move, the best move, your chances and the position with both arrows.
   await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
-  // The stills (RESULT_SHOTS), taken as the result comes up: his line typed out, the God King and your pawn side by side,
-  // and the boss's own bubble centered over him inside the screen.
-  if (process.env.RESULT_SHOTS) {
-    await expect(page.locator(".gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
-    await expect.poll(() => page.locator(".gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
-    await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
+  // The conversation (Eric, Nov 8): the boss's line above him first; once it has typed out and held, the God King's above him.
+  // Sampled every frame for a few seconds: the two are never up together, the boss's comes first, and every figure, bubble and
+  // the pawn stays inside the screen's 16 px gutters. One row: the boss on the left of the God King.
+  type Sample = { t: number; boss: boolean; king: boolean; rects: Record<string, { x: number; r: number }> };
+  const samples: Sample[] = await page.evaluate(
+    () =>
+      new Promise<Sample[]>((resolve) => {
+        const out: Sample[] = [];
+        const t0 = performance.now();
+        const span = (sel: string) => {
+          const el = document.querySelector(sel);
+          if (!el) return null;
+          const b = el.getBoundingClientRect();
+          return { x: b.left, r: b.right };
+        };
+        const tick = () => {
+          const boss = !!document.querySelector(".results-duo .boss-char .bc-bubble");
+          const king = !!document.querySelector(".results-duo .gk-epilogue-bubble");
+          const rects: Record<string, { x: number; r: number }> = {};
+          const put = (k: string, sel: string) => {
+            const v = span(sel);
+            if (v) rects[k] = v;
+          };
+          put("boss", ".results-duo .boss-char");
+          put("king", ".results-duo .gk-epilogue .god-king");
+          put("pawn", ".results-duo .gk-epilogue-you .you-pawn");
+          if (boss) put("bossBubble", ".results-duo .boss-char .bc-bubble");
+          if (king) put("kingBubble", ".results-duo .gk-epilogue-bubble");
+          out.push({ t: performance.now() - t0, boss, king, rects });
+          if (performance.now() - t0 < 9000) requestAnimationFrame(tick);
+          else resolve(out);
+        };
+        tick();
+      }),
+  );
+  expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
+  expect(samples.some((x) => x.king), "the God King's line shows").toBe(true);
+  expect(samples.filter((x) => x.boss && x.king).length, "never both at once").toBe(0);
+  expect(samples.find((x) => x.boss)!.t < samples.find((x) => x.king)!.t, "the boss first").toBe(true);
+  const vwNow = page.viewportSize()!.width;
+  for (const x of samples) for (const [k, v] of Object.entries(x.rects)) {
+    expect(v.x, `${k} left gutter`).toBeGreaterThanOrEqual(16);
+    expect(v.r, `${k} right gutter`).toBeLessThanOrEqual(vwNow - 16);
   }
-  // Eric, Nov 7: your pawn stands beside him (his feet level with yours, on his right), and no trophy above the title.
-  await expect(page.locator(".results .trophy")).toHaveCount(0);
-  const god = await page.locator(".gk-epilogue .god-king").boundingBox();
-  const mine = await page.locator(".gk-epilogue-you .you-pawn").boundingBox();
-  expect(mine, "your pawn beside him").not.toBeNull();
-  expect(mine!.x, "to his right").toBeGreaterThan(god!.x + god!.width / 2);
-  expect(Math.abs(mine!.y + mine!.height - (god!.y + god!.height)), "feet level").toBeLessThan(24);
-  // The boss's own bubble: centered over him, inside the screen's 16 px gutters (the result's bubble check, boss-result.spec.ts).
-  await expect(page.locator(".results .bc-bubble")).toBeVisible({ timeout: 15_000 });
-  await expect.poll(() => page.locator(".results .bc-bubble").evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
-  const bb = (await page.locator(".results .bc-bubble").boundingBox())!;
-  const bo = (await page.locator(".results .boss-char.place-results").boundingBox())!;
-  const vw = page.viewportSize()!.width;
-  expect(Math.abs(bb.x + bb.width / 2 - (bo.x + bo.width / 2)), "boss bubble centered over him").toBeLessThan(8);
-  expect(bb.x, "left gutter").toBeGreaterThanOrEqual(16);
-  expect(bb.x + bb.width, "right gutter").toBeLessThanOrEqual(vw - 16);
+  const boss0 = samples.find((x) => x.rects.boss)!.rects.boss!;
+  const king0 = samples.find((x) => x.rects.king)!.rects.king!;
+  expect((boss0.x + boss0.r) / 2 < (king0.x + king0.r) / 2, "the boss on the left of the God King").toBe(true);
+  // The stills (RESULT_SHOTS): the boss's line up, then the God King's, each once fully opaque.
+  if (process.env.RESULT_SHOTS) {
+    const dir = process.env.RESULT_SHOTS;
+    const name = testInfo.project.name;
+    await expect(page.locator(".results-duo .boss-char .bc-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".results-duo .boss-char .bc-bubble").evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
+    if (name === "phone") await page.screenshot({ path: `${dir}/last-stand-phone-1-boss.png` });
+    await expect(page.locator(".results-duo .gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".results-duo .gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
+    await page.screenshot({ path: `${dir}/${name === "phone" ? "last-stand-phone-2-godking.png" : "last-stand-desktop.png"}` });
+  }
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

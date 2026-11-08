@@ -36,8 +36,8 @@ async function resultOf(page: Page, project: string, name: string) {
   expect(Math.abs(box.x + box.width / 2 - (boss.x + boss.width / 2)), "centered over him").toBeLessThan(8);
   expect(box.y + box.height, "above him").toBeLessThanOrEqual(boss.y);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` });
-  // The ranking note, when it's true for this match (boss alone is unranked), and nothing else of a record.
-  await expect(results.locator(".results-unranked")).toHaveText("Unranked: solo games don't count for ranking.");
+  // No solo "Unranked" note on a boss battle (Eric, Nov 8: it says nothing of ranking).
+  await expect(results).not.toContainText("Unranked: solo");
 }
 
 test("a boss battle's victory and defeat screens: the title in the pixel type, no trophy or skull, no record text, the boss's line", async ({ page }, testInfo) => {

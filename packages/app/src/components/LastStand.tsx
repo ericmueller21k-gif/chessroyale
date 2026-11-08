@@ -1,5 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { useContext, useEffect, useMemo, useState } from "preact/hooks";
+import { useContext, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { RESULT_TALK } from "@chessroyale/core";
+import { bossVoice } from "../speech.tsx";
 import { BoardTurn } from "../board-view.ts";
 import { LAST_STAND, lastStandAttackHits, lastStandHits, pieceAt, toSan, type NetBoss } from "@chessroyale/chess";
 import { useFrameNow } from "./Countdown.tsx";
@@ -260,7 +262,11 @@ export function GodKingEpilogue({ side, rises, children }: { side: "w" | "b"; ri
     return () => timers.forEach(clearTimeout);
   }, []);
   const words = KING_LINES.rise[0]!;
-  const shown = rises && t >= 2100 ? Math.min(words.length, Math.floor((t - 2100) / 28) + 1) : 0;
+  // The conversation (Eric, Nov 8): the boss's line first, above him; his own once it's gone (RESULT_TALK). Never both together.
+  const talk = useRef({ boss: false, at: null as number | null }).current;
+  if (bossVoice.line(now)) talk.boss = true;
+  if (talk.at === null && ((talk.boss && !bossVoice.line(now)) || (!talk.boss && t >= RESULT_TALK.kingAfterMs))) talk.at = now;
+  const shown = rises && talk.at !== null ? Math.min(words.length, Math.floor((now - talk.at) / 28) + 1) : 0;
   return (
     <div class={`gk-epilogue${rises ? " rises" : " down"}${up ? " up" : ""}`} aria-label={rises ? `The God King rises: ${words}` : "The God King stays down"}>
       {rises && t >= 600 && <span class="gk-epilogue-beam" aria-hidden="true" />}

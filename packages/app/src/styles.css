@@ -8546,7 +8546,7 @@ button.history-label {
   right: auto;
   bottom: auto;
   translate: -50% 0;
-  max-width: min(220px, 80vw);
+  max-width: min(220px, calc(100vw - 32px));
 }
 .gk-epilogue-bubble::after {
   left: calc(50% - 6px);
@@ -24412,4 +24412,30 @@ button.sq-tiny {
   left: calc(50% + 44px);
   bottom: 0;
   pointer-events: none;
+}
+
+/* ---- The Last Stand's result (Eric, Nov 8): one row, the boss on the left, the God King and your pawn on the right; each
+   bubble over its own speaker, inside the screen's 16 px gutters, never both at once (RESULT_TALK). ---- */
+.results-duo {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 auto;
+}
+.results-duo .boss-char.place-results {
+  margin: 100px 0 0;
+}
+.results-duo .gk-epilogue {
+  margin: 0 0 10px;
+}
+/* The boss's words start at his box's left edge (his tail over his middle): inside the gutter on a phone, the row is centered. */
+.results-duo .boss-char .bc-bubble {
+  left: -4px;
+  translate: 0 0;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.results-duo .boss-char .bc-bubble::after {
+  left: 40px;
+  margin-left: 0;
 }

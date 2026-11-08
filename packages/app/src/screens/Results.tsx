@@ -116,7 +116,19 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           </p>
         )}
         {/* A boss with a character takes its bow: knocked off its pogo, or bouncing in triumph. */}
-        {bossResult && match.boss && <BossCharacter match={match} place="results" />}
+        {/* After a Last Stand: the boss on the left, the God King with your pawn on the right, one row (Eric, Nov 8). */}
+        {bossResult && match.boss?.lastStand ? (
+          <div class="results-duo">
+            <BossCharacter match={match} place="results" />
+            <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"}>
+              <div class="gk-epilogue-you">
+                <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={match.boss.crowdSide} hopAt={0} />
+              </div>
+            </GodKingEpilogue>
+          </div>
+        ) : (
+          bossResult && match.boss && <BossCharacter match={match} place="results" />
+        )}
         {bossResult && match.boss && (
           <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
@@ -132,15 +144,6 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                 : `A draw with ${bossInText(match.boss.name)}.`}
           </p>
         )}
-        {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
-        {/* (Your pawn stands beside him, dressed as your profile has it: Eric, Nov 7.) */}
-        {bossResult && match.boss?.lastStand && (
-          <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"}>
-            <div class="gk-epilogue-you">
-              <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={match.boss.crowdSide} hopAt={0} />
-            </div>
-          </GodKingEpilogue>
-        )}
         {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
         {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
         {/* You resigned: a loss on your record (a boss battle says nothing of the record: its counts just move, Eric, Nov 7). */}
@@ -155,7 +158,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           </p>
         )}
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
-        {match.ranked === false && (
+        {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
+        {match.ranked === false && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
