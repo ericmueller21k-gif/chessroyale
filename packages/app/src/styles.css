@@ -22089,6 +22089,10 @@ button.sq-tiny {
   .ac-dock {
     border-width: var(--bd);
   }
+  /* (The Income breakdown keeps its place 3 px in from the box's outer edge, whatever the border.) */
+  .ac-income-box {
+    left: calc(3px - var(--bd));
+  }
   .ac-players {
     display: contents;
   }
@@ -22173,12 +22177,10 @@ button.sq-tiny {
     height: var(--acs);
   }
 }
-/* (Under 360 px wide, v5: the two rows a little shorter (a smaller pawn), the fight's and the result's words a size smaller, and 36 px
-   kept free at the foot for them to grow into, so they fit under a near-full-width board.) */
+/* (Under 360 px wide, v5: the fight's and the result's words a size smaller, and 36 px kept free at the foot for them to grow into, so
+   they fit under the board.) */
 @media (max-width: 359px) {
   .ac-root {
-    --pawn: 38px;
-    --hop: 6px;
     --free: 36px;
   }
   .ac-dock .ac-card {
