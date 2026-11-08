@@ -41,3 +41,9 @@ layout on #558 stays exactly as it is** (Eric: "the desktop config is good").
   the center column, and the left menu and right column never move.
 - Tests: the same tile checks on the computer (size = a square ±0.5 px, y lined up with its rank, 2–8 px off the border, labels
   outside the tiles); the computer's other checks keep passing.
+
+## FINAL (Eric, Nov 8 ~19:40) — overrides the "Added" section above
+- The computer uses the SAME layout as the phone (mockup notes/briefs/assets/autochess-v5-desktop.png): benches above A–D / below
+  E–H, players kitty-corner, the box under your row; the board shrinks to fit the height (~50 px squares at 1280 x 800), centered;
+  the menu, the right column and its AUTO CHESS slot never move; the gear top right, clear of the opponent.
+- Bench colors by OWNER, not side: ours a lighter gray (#e4e2dd / #c6c3bc), theirs slightly darker (#bdb9b1 / #98948b).

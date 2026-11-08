@@ -439,3 +439,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   over A–D; players kitty-corner; board + box near full width; a bench tap lights its tile + target square). Computer stays.
   Brief notes/briefs/brief-autochess-phone-v5.md, mockup sent. Fresh Opus helper session_01JuCWRuq2VtEduPx1AAXftt on the same branch.
   Stills to come on stills/autochess as phone-v5-*.png. Then send to Eric; merge after his OK + green.
+- **Nov 8 ~19:40:** Eric picked mockup B: the computer = the phone layout (benches above/below, kitty-corner); bench colors by owner
+  (ours light gray, theirs darker gray). Sent to the v5 helper. Then: stills (phone + computer) → Eric → merge #558.
