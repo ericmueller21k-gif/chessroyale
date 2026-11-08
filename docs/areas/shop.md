@@ -222,3 +222,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - When a number describes a drawing (a purity), measure the drawing against the number over many cases, then test it.
 - A packed pixel value compared with a typed array's is made unsigned (`>>> 0`) first; a flood fill has a bound it
   can't pass; test a tool many times in a row on its own result.
+
+**Chat packs off (Nov 8, `CHAT_PACKS_SHOP` in settings.ts = false).** The shop has no Chat packs tab and nothing is for sale
+(its Shop tab reads "Nothing is for sale right now."). The quick-chat picker offers only the free default lines. Owned packs
+still send; no data is deleted. Guards: `packages/core/test/chat.test.ts`, "packs the shop stops offering"; `e2e/shop.spec.ts`,
+"the shop has no … title"; `e2e/chat.spec.ts`, "quick chat picks in the profile".

@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import { CHAT_PACKS_SHOP, GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -18,9 +18,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const { profile, config } = useAccount();
   useServerStatus();
   // (A profile's locked quick chat line opens it on the chat packs.)
-  // The tabs the shop shows: the God King's effects only with GOD_KING_SHOP (settings.ts).
-  const shopCategories = SHOP_CATEGORIES.filter((c) => GOD_KING_SHOP || c.slot !== "king");
-  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" ? "chat" : GOD_KING_SHOP ? "king" : shopCategories[0]!.slot);
+  // The tabs the shop shows: the God King's effects only with GOD_KING_SHOP, the chat packs only with CHAT_PACKS_SHOP (settings.ts).
+  const shopCategories = SHOP_CATEGORIES.filter((c) => (c.slot !== "king" || GOD_KING_SHOP) && (c.slot !== "chat" || CHAT_PACKS_SHOP));
+  const [slot, setSlot] = useState<ShopSlot>(initial === "chat" && CHAT_PACKS_SHOP ? "chat" : GOD_KING_SHOP ? "king" : (shopCategories[0]?.slot ?? "king"));
   // (A profile's "Open locker" opens it on the locker.)
   const [area, setArea] = useState<"shop" | "crates" | "locker">(() =>
     initial && initial !== "chat" ? initial : new URLSearchParams(location.search).has("crates") ? "crates" : "shop",
@@ -30,7 +30,9 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const shop = profile?.shop;
-  const category = SHOP_CATEGORIES.find((c) => c.slot === slot)!;
+  // (With every tab hidden, nothing of a hidden tab shows: no blurb, no items.)
+  const shown = shopCategories.some((c) => c.slot === slot);
+  const category = SHOP_CATEGORIES.find((c) => c.slot === slot) ?? SHOP_CATEGORIES[0]!;
   const act = async (id: string, fn: (id: string) => Promise<void>) => {
     setBusy(id);
     setError(null);
@@ -83,6 +85,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
         <p class="muted">{config && (!config.accounts || profile) ? "The shop needs your account, which isn't available here." : "Loading the shop…"}</p>
       ) : (
         <>
+          {shopCategories.length === 0 && <p class="muted">Nothing is for sale right now. Your locker and crates stay as they are.</p>}
           <div class="shop-tabs" role="tablist">
             {shopCategories.map((c) => (
               <button type="button" role="tab" key={c.slot} aria-selected={c.slot === slot} class={c.slot === slot ? "on" : ""} onClick={() => setSlot(c.slot)}>
@@ -90,14 +93,16 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
               </button>
             ))}
           </div>
-          <p class="muted small">
-            {category.blurb}
-            {slot !== "chat" && " What you get goes to your Locker, where you wear it."}
-          </p>
+          {shown && (
+            <p class="muted small">
+              {category.blurb}
+              {slot !== "chat" && " What you get goes to your Locker, where you wear it."}
+            </p>
+          )}
           {error && <p class="shop-error">{error}</p>}
           {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {SHOP_ITEMS.filter((i) => i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
+            {SHOP_ITEMS.filter((i) => shown && i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).

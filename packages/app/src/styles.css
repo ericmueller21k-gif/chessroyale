@@ -24856,31 +24856,3 @@ button.sq-tiny {
   left: 40px;
   margin-left: 0;
 }
-
-/* Phones (Nov 8, Eric: the power-up row and the « » arrows take too much room): the power-up circles about a fifth smaller,
-   and the arrows' visible height stays 32 px. Each tap area is still 40 px tall or more (the ::before pseudo-elements). The
-   computer is unchanged. */
-@media (max-width: 899px) {
-  .pu-dot {
-    width: 21px;
-    height: 21px;
-    position: relative;
-  }
-  .pu-dot svg {
-    width: 11px;
-    height: 11px;
-  }
-  .pu-dot::before {
-    content: "";
-    position: absolute;
-    inset: -10px;
-  }
-  .history-nav > .nav-btn {
-    position: relative;
-  }
-  .history-nav > .nav-btn::before {
-    content: "";
-    position: absolute;
-    inset: -4px 0;
-  }
-}

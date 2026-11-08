@@ -2663,6 +2663,13 @@ export const SQUADS_LOBBY = {
 export const GOD_KING_SHOP = false;
 
 /**
+ * The shop's Chat packs tab (Eric, Nov 8: "the chat packs go away"). Off hides the tab and every pack in the shop, and the
+ * quick-chat picker offers only the free default lines. Nothing is deleted: owned packs still send (their lines work for
+ * whoever has them), and the server keeps its records and purchase code.
+ */
+export const CHAT_PACKS_SHOP = false;
+
+/**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
  * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to gray out its buttons.
  */
