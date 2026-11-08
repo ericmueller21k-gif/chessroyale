@@ -33,6 +33,8 @@
  * docs/areas/town-square.md.
  */
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
+import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { openProfile } from "../profile-nav.ts";
 import { account, onAccountChange, playerName } from "../account.ts";
@@ -329,6 +331,9 @@ export function TownScreen({
     void document.fonts?.ready.then(() => live && fitRows(el));
     return () => void (live = false);
   }, [fitKey]);
+  // The right column's top slot (a computer's frame): where the town's tools go.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setSlot(framed ? document.getElementById(RIGHT_SLOT_TOOLS) : null), [framed]);
   const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? home.boss : home.name) : undefined;
   /** A boss with an intro: "Fight" on its confirm. You and the boss walk to its door and in (once: a challenge already going is left alone). */
   const fight = (i: number) => {
@@ -338,22 +343,32 @@ export function TownScreen({
 
   return (
     <div class={framed ? "town-screen in-frame" : "town-screen"}>
-      <header class="town-bar">
-        {/* (Inside a shop, back takes you out to the town square.) */}
-        <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : () => askLeave(TOWN_BACK_TO, onBack)}>
-          ‹
-        </button>
-        {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
-        {inside ? (
-          <h1 class="town-shop-name" title={HOMES.find((h) => h.id === inside.room.def.home)?.name}>
-            {HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square"}
-          </h1>
-        ) : (
-          <h1>Town square</h1>
-        )}
-        {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
-        <TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />
-      </header>
+      {/* On a computer (in the frame) the bar is gone (Eric, Nov 7): the map, chat and settings buttons are in the right column's top slot,
+          under "TOWN" (FrontMenu.tsx RightPanel), in the town and in its rooms; a room's door card (Go out) and the side menu lead out. */}
+      {framed ? (
+        <>
+          {/* (The page's title stays for screen readers.) */}
+          <h1 class="town-sr-title">{inside ? (HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square") : "Town square"}</h1>
+          {slot && createPortal(<TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />, slot)}
+        </>
+      ) : (
+        <header class="town-bar">
+          {/* (Inside a shop, back takes you out to the town square.) */}
+          <button type="button" class="town-back" aria-label="Back" onClick={inside ? () => void goOut() : () => askLeave(TOWN_BACK_TO, onBack)}>
+            ‹
+          </button>
+          {/* (Inside a shop, the shop's name: "Babur's Circus"; Nov 2. On a computer's narrow header, on up to two smaller lines.) */}
+          {inside ? (
+            <h1 class="town-shop-name" title={HOMES.find((h) => h.id === inside.room.def.home)?.name}>
+              {HOMES.find((h) => h.id === inside.room.def.home)?.name ?? "Town square"}
+            </h1>
+          ) : (
+            <h1>Town square</h1>
+          )}
+          {/* The chat's icon (its three modes) and the gear (Town settings), at the right end of the same line (on a computer, in the frame: the chat icon beside the title, the gear at the right end). */}
+          <TownChatTools map={STREET_TOWN} mapDisabled={!!inside} />
+        </header>
+      )}
       <div class={inside ? "town-box town-inside" : "town-box"} ref={box}>
         <canvas class="town-canvas" ref={canvas} aria-label="The town square" />
         {/* A statue's quote, for screen readers, while you stand up close to it (it's drawn on its pedestal). */}

@@ -26,7 +26,7 @@ describe("global chat in the app", () => {
     expect(c.lines().map((l) => l.n)).toEqual([1, 2, 4]);
   });
 
-  it("mirrors the server's limit: 30 s after a line goes, or when the server says", async () => {
+  it("mirrors the server's limit: 5 s after a line goes, or when the server says", async () => {
     vi.useFakeTimers({ now: T0 });
     const c = new GlobalChatStore();
     expect(c.readyAt("me")).toBeLessThanOrEqual(T0);
@@ -40,9 +40,32 @@ describe("global chat in the app", () => {
     expect(d.error).toBe("One message every 30 s.");
     // A reload: your own last line in the chat says when you can post again.
     const e = new GlobalChatStore();
-    e.take({ n: 1, lines: [line(1, { from: "me", at: T0 - 10_000 })] });
-    expect(e.readyAt("me")).toBe(T0 + 20_000);
+    e.take({ n: 1, lines: [line(1, { from: "me", at: T0 - 2_000 })] });
+    expect(e.readyAt("me")).toBe(T0 - 2_000 + GLOBAL_CHAT.gapMs);
     expect(e.readyAt("someone else")).toBeLessThanOrEqual(T0);
+  });
+
+  it("typed lines (Nov 7): kept and shown as typed; a send says whether it went, keeps the server's reason, and notes a line waiting in a busy chat", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const c = new GlobalChatStore();
+    c.take({ n: 2, lines: [line(1, { say: undefined, text: "hello :crown:" }), line(2)] });
+    expect(c.lines().map((l) => l.text ?? l.say)).toEqual(["hello :crown:", "gg"]);
+    const sent: unknown[] = [];
+    const spy = (async (_u: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)));
+      return new Response(JSON.stringify({ ok: true, chat: { n: 2, lines: [] }, waitMs: 5_000, delayMs: 3_000 }), { status: 200 });
+    }) as unknown as typeof fetch;
+    expect(await c.type("hi all", spy)).toBe(true);
+    expect(sent).toEqual([{ text: "hi all", since: 2 }]);
+    expect(c.late).toBe(true);
+    expect(c.readyAt("me")).toBe(T0 + 5_000);
+    const d = new GlobalChatStore();
+    expect(await d.type("add me on discord", answer(400, { ok: false, message: "No links or contact details in chat.", chat: { n: 0, lines: [] } }))).toBe(false);
+    expect(d.error).toBe("No links or contact details in chat.");
+    expect(await d.type("hi", answer(503, { ok: false, busy: true, message: "Chat is busy, try again.", chat: { n: 0, lines: [] } }))).toBe(false);
+    expect(d.error).toBe("Chat is busy, try again.");
+    // (A busy refusal doesn't start the wait.)
+    expect(d.readyAt("me")).toBeLessThanOrEqual(T0);
   });
 
   it("mutes a player's lines on this device", () => {

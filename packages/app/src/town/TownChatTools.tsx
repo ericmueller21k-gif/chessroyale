@@ -8,6 +8,7 @@
  * drawing reads it). docs/areas/town-square.md, "The chat log" and "Name tags".
  */
 import { useEffect, useLayoutEffect, useState } from "preact/hooks";
+import { createPortal } from "preact/compat";
 import { GearIcon } from "../components/MatchMenu.tsx";
 import { CHAT_BACKGROUND_LABEL, CHAT_BACKGROUND_NOTE, CHAT_MODES, CHAT_MODE_CHOICE, CHAT_MODE_LABEL, chatBackground, chatMode, nextChatMode, onChatBackground, onChatMode, setChatBackground, setChatMode, type ChatMode } from "./chat.ts";
 import { NAMES_CHOICE, NAMES_LABEL, NAMES_MODES, namesMode, namesNote, onNamesMode, setNamesMode, type NamesMode } from "./tags.ts";
@@ -99,7 +100,8 @@ export function TownChatTools({ map = false, mapDisabled = false }: { map?: bool
       <button type="button" class="town-tool" aria-label="Town settings" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
         <GearIcon size={22} />
       </button>
-      {open && <Settings mode={mode} onClose={() => setOpen(false)} />}
+      {/* (Over everything: on a computer the tools sit in the right column's slot, so the sheet goes to the page's top.) */}
+      {open && createPortal(<Settings mode={mode} onClose={() => setOpen(false)} />, document.body)}
     </div>
   );
 }

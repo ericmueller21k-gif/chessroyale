@@ -114,7 +114,8 @@ test("chat moderation: mute from a name, a report from the profile, a moderator'
   await expect(notice).toContainText("Keep it friendly.");
   await notice.getByRole("button", { name: "Got it", exact: true }).click();
   await expect(notice).toHaveCount(0);
-  await bo.getByRole("button", { name: "Your profile", exact: true }).click();
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  await bo.getByRole("button", { name: "Your profile", exact: true }).or(bo.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await bo.getByRole("button", { name: "Back", exact: true }).click();
   await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(notice).toHaveCount(0);
@@ -135,7 +136,7 @@ test("chat moderation: mute from a name, a report from the profile, a moderator'
   await expect(ann.locator(".lobby-players")).not.toContainText(blocked);
   expect(await cy.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.name))).toBe("Player");
   await ann.getByRole("button", { name: "Leave", exact: true }).click();
-  await ann.getByRole("button", { name: "Your profile", exact: true }).click();
+  await ann.getByRole("button", { name: "Your profile", exact: true }).or(ann.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await ann.getByRole("button", { name: "Edit name & icon", exact: true }).click();
   await ann.getByLabel("Your name").fill(blocked);
   await ann.getByRole("button", { name: "Save name", exact: true }).click();

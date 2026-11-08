@@ -36,6 +36,8 @@ export interface Profile {
   admin?: boolean;
   /** Your chat ban in force, and a moderator's warning or chat ban you haven't seen yet (chat-mod.ts). */
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
+  /** Chat is on for this account (its opt-in, off by default; a guest's is on the device: chat-on.ts). */
+  chatOn?: boolean;
 }
 
 /** A moderator's warning or chat ban, shown to you once (components/ChatNotice.tsx). */
@@ -245,6 +247,14 @@ export async function updateProfile(patch: { name?: string; icon?: string }): Pr
 }
 
 /** Gets a shop item (free while testing). */
+/** The chat's opt-in, kept on a signed-in account (chat-on.ts): the profile as it is after it. */
+export async function updateChatOn(on: boolean): Promise<void> {
+  const p = state.profile;
+  // (Shown at once; the server's answer follows.)
+  if (p) set({ profile: { ...p, chatOn: on } });
+  set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ chatOn: on }) }) });
+}
+
 export async function buyShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/buy", { method: "POST", body: JSON.stringify({ item }) });

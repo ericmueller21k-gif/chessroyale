@@ -13,7 +13,8 @@ const responds = (page: Page) =>
 test("the icon builder's tools survive being spammed", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  await page.getByRole("button", { name: "Your profile", exact: true }).click();
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "Edit name & icon" }).click();
   await page.getByRole("button", { name: "Edit your icon" }).click();
   const canvas = page.getByLabel("Your icon, 48 by 48 pixels");

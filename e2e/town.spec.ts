@@ -72,12 +72,12 @@ test("the town square at /town: the world is drawn and fills its box under the b
   // The world fills the rest of the screen under the bar: the whole screen's width on a phone, the front door's center column's on a
   // computer (Oct 29: the town sits in the frame, between the menu and the live panel; its box is tested in town-desktop.spec.ts).
   const vp = page.viewportSize()!;
-  const bar = (await page.locator(".town-bar").boundingBox())!;
-  const cv = (await canvas(page).boundingBox())!;
-  const wide = test.info().project.name === "desktop" ? (await page.locator(".fd-center").boundingBox())!.width : vp.width;
-  // (A computer's bar is the right column's top row, Oct 30: its world starts at the window's top.)
   const computer = test.info().project.name === "desktop";
-  expect(Math.abs(cv.y - (computer ? 0 : bar.y + bar.height)), computer ? "the world starts at the window's top" : "the world starts right under the bar").toBeLessThanOrEqual(1.5);
+  // (A computer has no bar since Nov 7, its tools in the right column's top slot: its world starts at the window's top.)
+  const bar = computer ? null : (await page.locator(".town-bar").boundingBox())!;
+  const cv = (await canvas(page).boundingBox())!;
+  const wide = computer ? (await page.locator(".fd-center").boundingBox())!.width : vp.width;
+  expect(Math.abs(cv.y - (computer ? 0 : bar!.y + bar!.height)), computer ? "the world starts at the window's top" : "the world starts right under the bar").toBeLessThanOrEqual(1.5);
   expect(Math.abs(cv.width - wide), "as wide as the screen (a computer's: its center column)").toBeLessThanOrEqual(1);
   expect(Math.abs(cv.y + cv.height - vp.height), "down to the screen's foot").toBeLessThanOrEqual(1);
 
@@ -136,8 +136,10 @@ test("the town square at /town: the world is drawn and fills its box under the b
     }, { message: "the camera is back on you", timeout: 6000 })
     .toBeLessThan(2.5);
 
-  // Back asks first ("Leave Chess Town?", e2e/town-leave.spec.ts), and Leave goes home, with the address back to /.
-  await page.getByRole("button", { name: "Back", exact: true }).click();
+  // Back asks first ("Leave Chess Town?", e2e/town-leave.spec.ts), and Leave goes home, with the address back to /. (A computer's is the
+  // side menu's Play since Nov 7, no bar: it asks the same.)
+  if (computer) await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play", exact: true }).click();
+  else await page.getByRole("button", { name: "Back", exact: true }).click();
   await page.getByRole("alertdialog", { name: "Leave Chess Town?" }).getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
@@ -1247,7 +1249,8 @@ test("a real player's card (a test player; no real players walk in the town yet)
   // Another player's account (a guest, named), to have a real profile to open.
   const other = await (await browser.newContext()).newPage();
   await other.goto("/");
-  await expect(other.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  await expect(other.getByRole("button", { name: "Your profile", exact: true }).or(other.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   await other.evaluate(() => fetch("/api/me", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "Cyrus" }) }));
   const uid = ((await (await other.request.get("/api/me")).json()) as { user: { id: string; name: string } }).user.id;
   expect(((await (await other.request.get("/api/me")).json()) as { user: { name: string } }).user.name).toBe("Cyrus");
@@ -1367,7 +1370,8 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp, shoes] = await giveItems(page, [
     { def: "riding-chirp", color: "cobalt", blemish: 40 },
@@ -1524,7 +1528,8 @@ test.describe("rides lazy", () => {
   test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+    // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
+    await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
     const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
     await wearItem(page, "ride", chirp!);
     // (Its drawing's chunk held back until the boxes are read.)
