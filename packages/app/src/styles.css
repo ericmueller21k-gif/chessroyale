@@ -22061,8 +22061,10 @@ button.sq-tiny {
     --rgap: 4px;
     --lab: 14px;
     --free: 12px;
-    /* Everything top to bottom but the board, the two rows and the cards. */
-    --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 3px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 10px - var(--k) / 4);
+    /* Everything top to bottom but the board, the two rows and the cards (the frame's and the box's borders at their widest, 6 px). */
+    --k0: calc(2 * 3px + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+    --k: calc(2 * var(--bd) + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+    --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 6px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 16px - var(--k0) / 4);
     /* The board: as wide as the column less its frame, or what the height leaves (the frame is the board + 8, a card a quarter of the
        frame less k, each row a tile, its gap and its label, or the player's block when that is taller), snapped to 8 px (it draws in
        whole multiples of 8 device pixels); the frame's gold border takes up to 3 px more a side, so the frame is 8 px from each edge
@@ -22083,7 +22085,8 @@ button.sq-tiny {
       "me me by ."
       ". dock dock .";
   }
-  .ac-frame {
+  .ac-frame,
+  .ac-dock {
     border-width: var(--bd);
   }
   .ac-players {
@@ -22168,6 +22171,26 @@ button.sq-tiny {
     bottom: auto;
     width: var(--acs);
     height: var(--acs);
+  }
+}
+/* (Under 360 px wide, v5: the two rows a little shorter (a smaller pawn), the fight's and the result's words a size smaller, and 36 px
+   kept free at the foot for them to grow into, so they fit under a near-full-width board.) */
+@media (max-width: 359px) {
+  .ac-root {
+    --pawn: 38px;
+    --hop: 6px;
+    --free: 36px;
+  }
+  .ac-dock .ac-card {
+    padding: 4px 6px;
+  }
+  .ac-dock .ac-card-text,
+  .ac-dock .ac-card-gold {
+    font-size: 10.5px;
+    line-height: 1.25;
+  }
+  .ac-dock .ac-card-head {
+    font-size: 14px;
   }
 }
 /* ---- A computer (the front door's frame, 1024 px and wider): you left of the action box, the opponent right of the board's top ---- */

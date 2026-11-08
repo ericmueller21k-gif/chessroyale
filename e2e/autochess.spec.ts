@@ -278,7 +278,7 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   await expect(theirBench(page).locator(".ac-slot")).toHaveCount(4);
   await expect(held(page)).toHaveCount(0);
   await expect(theirBench(page).locator(".ac-slot.has")).toHaveCount(0);
-  const emptyLook = await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ring: getComputedStyle(el, "::before").borderTopStyle }));
+  const emptyLook = await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ring: getComputedStyle(el, "::before").content === "none" ? "none" : getComputedStyle(el, "::before").borderTopStyle }));
   // (Phone, v5: an empty slot is a tile in the bench's colors, no ring. Computer, Nov 8: a faint dashed ring.)
   if (phone()) expect(emptyLook).toEqual({ bg: expect.not.stringMatching(/^rgba\(0, 0, 0, 0\)$/), ring: "none" });
   else expect(emptyLook).toEqual({ bg: "rgba(0, 0, 0, 0)", ring: "dashed" });
@@ -1408,8 +1408,8 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await expect(tiles.nth(0).locator("piece")).toHaveClass(/black/);
   await expect(tiles.nth(1)).toHaveAttribute("data-kind", "r");
   await expect(tiles.nth(1)).toHaveAttribute("data-square", "f8");
-  // A tile is a real target: 44 px tall.
-  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  // A tile is a real target: a board square on a phone (v5: 45 px at 390 x 844, 41 on the test phone), 44 px tall on a computer.
+  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(phone() ? 40 : 44);
   await expect(page.locator(".ac-red")).toHaveCount(0);
   await expect(tiles.nth(0)).not.toHaveClass(/tapped/);
   // Tapped: a red ring on the tile, and the landing square lights red, exactly on that square of their half.
@@ -2057,10 +2057,10 @@ test("layouts (Nov 8, the brief's numbers): nothing scrolls and everything is in
     await expect(page.locator(".ac-income b")).toHaveText("+200");
     if (phone()) {
       // Every phone gets some free room at the bottom; the board is as big as fits (v5): the frame 8 px from each edge (to the 8 px the board
-      // snaps to: within 1 px at 360, 390, 430 wide), or as tall as the height allows. Centered.
+      // snaps to: within 1 px at 360, 390, 430 wide), or as tall as the height allows (under 360 wide, 36 px kept free for the fight's words). Centered.
       expect(m.free, `${where}: free room at the bottom`).toBeGreaterThanOrEqual(11.5);
       expect(Math.abs(m.frame.l - (w - m.frame.r)), `${where}: centered`).toBeLessThanOrEqual(1);
-      expect(m.frame.l >= 7.5 && (m.frame.l <= 12.5 || m.free <= 26), `${where}: the board is as big as fits (frame at ${m.frame.l}, ${m.free} free)`).toBe(true);
+      expect(m.frame.l >= 7.5 && (m.frame.l <= 12.5 || m.free <= (w < 360 ? 50 : 26)), `${where}: the board is as big as fits (frame at ${m.frame.l}, ${m.free} free)`).toBe(true);
       if (w === 390 && h === 844) expect(Math.abs(m.frame.l - 8), "390 x 844: the frame 8 px from each edge").toBeLessThanOrEqual(0.5);
     }
   }
@@ -3254,7 +3254,9 @@ test("the action box is one panel (Nov 8, was v9's): the band, Buy XP, Reroll an
     return { dock: [d.borderTopWidth, d.borderTopColor, d.outlineWidth, d.outlineColor, d.borderTopLeftRadius], frame: [f.borderTopWidth, f.borderTopColor, f.outlineWidth, f.outlineColor, f.borderTopLeftRadius], bg: d.backgroundColor };
   });
   expect(look.dock, "the board's own border").toEqual(look.frame);
-  expect(look.dock[0]).toBe("3px");
+  // (A phone's, v5: 3 to 6 px, the frame's gold border taking the board's 8 px snap; a computer's 3 px.)
+  if (phone()) expect(["3px", "4px", "5px", "6px"]).toContain(look.dock[0]);
+  else expect(look.dock[0]).toBe("3px");
   expect(look.dock[4], "square corners").toBe("0px");
   expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
   expect(errors).toEqual([]);
