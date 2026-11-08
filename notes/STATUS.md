@@ -453,3 +453,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Timber strip helper done (d62f806); CI watcher bhrxv55ml running; then open its PR and send stills.
 - Started Dash Job 1 (Opus, session_01JuCWRv8LJ3Ym1zdP6wUup1, claude/dash-rush-extra) and Job 2 (Haiku,
   session_01JuCWRtos2Ayr1kRp2oz3aB, claude/dash-popoff-fam), both from main b641c2d.
+
+### Nov 8 ~22:15
+- Merged #559 (Timber workshop strip bigger; live a7e16f2) and #558 (auto chess v5, phone + computer one layout; merge 031172b),
+  both with Eric's OK. Watching #558's deploy and main's full CI.
+- Dash helpers still running (rush: Opus, popoff/fam: Haiku); watchers bu5jy2twn (popoff) and bfnelmpt8 (rush).
+- Eric asked if GitHub runners are maxed: no; the cap is helper count (2 at once, 1 Opus). Offered more parallel Haiku helpers.
