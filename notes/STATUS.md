@@ -441,3 +441,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Stills to come on stills/autochess as phone-v5-*.png. Then send to Eric; merge after his OK + green.
 - **Nov 8 ~19:40:** Eric picked mockup B: the computer = the phone layout (benches above/below, kitty-corner); bench colors by owner
   (ours light gray, theirs darker gray). Sent to the v5 helper. Then: stills (phone + computer) → Eric → merge #558.
+- **Nov 8 ~19:35:** Eric: Timber's workshop strip pieces (boss bar) are tiny; make them near board-piece size, phone + computer. Haiku
+  helper session_01JuCWRsmfHm6SHwFJHUP7Mh, branch claude/timber-workshop-size (light lane), stills on stills/timber-workshop.
+  Two helpers running now (auto chess v5 Opus + this Haiku): the max.
