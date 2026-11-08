@@ -3,7 +3,7 @@ import { GLOBAL_CHAT, chatPackItem, chatSay, mulberry32 } from "@chessroyale/cor
 import { createGuest, ensureSchema } from "../src/accounts.ts";
 import { forgetSecrets, handleAccountApi } from "../src/api.ts";
 import { forgetChatCache } from "../src/global-chat-api.ts";
-import { GlobalChat, PAWN, iconKey, linesSince, type GlobalChatOptions, type GlobalSender } from "../src/global-chat.ts";
+import { CHAT_BUSY, GlobalChat, PAWN, TEST_GLOBAL_CHAT, TYPED_AGE, iconKey, linesSince, type GlobalChatOptions, type GlobalPost, type GlobalSender } from "../src/global-chat.ts";
 import { LiveHub } from "../src/live-hub.ts";
 import { memoryDb } from "./memory-db.ts";
 
@@ -15,16 +15,16 @@ const bo: GlobalSender = { id: "bo", name: "Bo", rating: null, icon: null, owned
 const PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==";
 
 describe("global chat: the room", () => {
-  it("one message per account every 30 s, enforced here; others still post", () => {
+  it("one message per account every 5 s, enforced here; others still post", () => {
     const c = new GlobalChat(opts({ bots: false }));
-    expect(c.post(ann, "l-hey", T0)).toMatchObject({ ok: true, line: { n: 1, name: "Ann", rating: 1520, icon: "♞", say: "l-hey" } });
-    expect(c.post(ann, "gg", T0 + 1_000)).toMatchObject({ ok: false, reason: "rate", retryMs: 29_000 });
-    expect(c.post(ann, "gg", T0 + 29_999)).toMatchObject({ ok: false, reason: "rate", retryMs: 1 });
+    expect(c.post(ann, "l-hey", T0)).toMatchObject({ ok: true, delayMs: 0, line: { n: 1, name: "Ann", rating: 1520, icon: "♞", say: "l-hey" } });
+    expect(c.post(ann, "gg", T0 + 1_000)).toMatchObject({ ok: false, reason: "rate", retryMs: 4_000, message: "One message every 5 s." });
+    expect(c.postText({ ...ann, typed: true }, "hello", T0 + 4_999)).toMatchObject({ ok: false, reason: "rate", retryMs: 1 });
     expect(c.post(bo, "e-dragon", T0 + 2_000)).toMatchObject({ ok: true, line: { n: 2, icon: PAWN } });
-    expect(c.post(ann, "gg", T0 + 30_000)).toMatchObject({ ok: true, line: { n: 3 } });
+    expect(c.post(ann, "gg", T0 + 5_000)).toMatchObject({ ok: true, line: { n: 3 } });
     // A refused line doesn't reset the clock, and the gap is counted from the last line that went.
-    expect(c.readyAt("ann", T0 + 31_000)).toBe(T0 + 60_000);
-    expect(c.readyAt("cy", T0 + 31_000)).toBe(T0 + 31_000);
+    expect(c.readyAt("ann", T0 + 6_000)).toBe(T0 + 10_000);
+    expect(c.readyAt("cy", T0 + 6_000)).toBe(T0 + 6_000);
   });
 
   it("the limit survives a restart: it's read from the lines kept too", () => {
@@ -32,7 +32,7 @@ describe("global chat: the room", () => {
     a.post(ann, "l-hey", T0);
     const b = new GlobalChat(opts({ bots: false }));
     b.restore(a.saved());
-    expect(b.post(ann, "gg", T0 + 10_000)).toMatchObject({ ok: false, reason: "rate", retryMs: 20_000 });
+    expect(b.post(ann, "gg", T0 + 2_000)).toMatchObject({ ok: false, reason: "rate", retryMs: 3_000 });
   });
 
   it("presets only: free text, unknown ids, plans and packs not owned never reach anyone", () => {
@@ -59,14 +59,15 @@ describe("global chat: the room", () => {
   it("keeps the last 50 lines and nothing older than a day; drawn icons go with their lines", () => {
     const c = new GlobalChat(opts({ bots: false }));
     c.post({ ...ann, icon: PNG }, "l-hey", T0);
-    for (let i = 0; i < 60; i++) c.post({ ...bo, id: `p${i}` }, "gg", T0 + 1000 + i);
-    const snap = c.snapshot(T0 + 2000);
+    // (One every 200 ms: the server-wide cap's pace, five a second, so none waits in line.)
+    for (let i = 0; i < 60; i++) c.post({ ...bo, id: `p${i}` }, "gg", T0 + 1000 + i * 200);
+    const snap = c.snapshot(T0 + 20_000);
     expect(snap.lines).toHaveLength(50);
     expect(snap.n).toBe(61);
     expect(snap.lines[0]!.n).toBe(12);
     expect(c.unusedIcons()).toEqual([iconKey(PNG)]);
     expect(c.icon(iconKey(PNG))).toBeUndefined();
-    expect(c.snapshot(T0 + GLOBAL_CHAT.maxAgeMs + 2000).lines).toHaveLength(0);
+    expect(c.snapshot(T0 + GLOBAL_CHAT.maxAgeMs + 20_000).lines).toHaveLength(0);
   });
 
   it("a newcomer gets everything kept; others get only what's new (all again if the count went back)", () => {
@@ -79,6 +80,70 @@ describe("global chat: the room", () => {
     expect(linesSince(snap, 2).lines).toEqual([]);
     expect(linesSince(snap, 9)).toMatchObject({ reset: true, n: 2 });
     expect(linesSince(snap, NaN)).toMatchObject({ reset: true });
+  });
+});
+
+describe("global chat: typed messages, the filter, the age gate and the server-wide cap (Nov 7)", () => {
+  const typer: GlobalSender = { ...ann, typed: true };
+  it("a player types; the message is tidied and kept as text; one every 5 s whatever they send", () => {
+    const c = new GlobalChat(opts({ bots: false }));
+    expect(c.postText(typer, "  gg   well   played :crown:  ", T0)).toMatchObject({ ok: true, line: { n: 1, text: "gg well played :crown:", name: "Ann" } });
+    expect(c.postText(typer, "again", T0 + 1_000)).toMatchObject({ ok: false, reason: "rate" });
+    expect(c.post(typer, "gg", T0 + 1_000)).toMatchObject({ ok: false, reason: "rate" });
+    expect(c.snapshot(T0).lines.map((l) => l.text)).toEqual(["gg well played :crown:"]);
+  });
+
+  it("the same filter as the town square's on every typed message: refused ones never reach anyone, nor start the wait", () => {
+    const c = new GlobalChat(opts({ bots: false }));
+    expect(c.postText(typer, "add me on discord", T0)).toMatchObject({ ok: false, reason: "text", message: "No links or contact details in chat." });
+    expect(c.postText(typer, "visit example.com now", T0)).toMatchObject({ ok: false, reason: "text", message: "No links or contact details in chat." });
+    expect(c.postText(typer, "what the f*cking hell", T0)).toMatchObject({ ok: false, reason: "text", message: "That message isn't allowed." });
+    expect(c.postText(typer, "   ", T0)).toMatchObject({ ok: false, reason: "text", message: "Type a message first." });
+    expect(c.postText(typer, "x".repeat(81), T0)).toMatchObject({ ok: false, reason: "text", message: "Messages are at most 80 characters." });
+    expect(c.postText(typer, 42, T0)).toMatchObject({ ok: false, reason: "text" });
+    expect(c.snapshot(T0).lines).toEqual([]);
+    expect(c.postText(typer, "x".repeat(80), T0)).toMatchObject({ ok: true });
+  });
+
+  it("a device the age gate marked too young can't type (the quick chips still go); with CHAT_TYPED off nobody types", () => {
+    const c = new GlobalChat(opts({ bots: false }));
+    expect(c.postText({ ...ann, typed: false }, "hi all", T0)).toMatchObject({ ok: false, reason: "typed", message: TYPED_AGE });
+    expect(c.postText({ ...ann }, "hi all", T0)).toMatchObject({ ok: false, reason: "typed" });
+    expect(c.post({ ...ann, typed: false }, "l-hey", T0)).toMatchObject({ ok: true });
+    const off = new GlobalChat(opts({ bots: false, typed: false }));
+    expect(off.postText(typer, "hi all", T0)).toMatchObject({ ok: false, reason: "unknown" });
+  });
+
+  it("server-wide: 5 messages a second show at once, the rest wait in line in order (up to 10 s), then \"Chat is busy, try again\"", () => {
+    const c = new GlobalChat(opts({ bots: true, keep: 100 }), mulberry32(1));
+    const sent: GlobalPost[] = [];
+    // 60 players at the same moment: 5 a second for 10 s is 55 (the first 5 at once, then 5 more each second up to 10 s late).
+    for (let i = 0; i < 60; i++) sent.push(c.postText({ ...typer, id: `p${i}` }, `hello ${i}`, T0));
+    const ok = sent.filter((p) => p.ok);
+    expect(ok).toHaveLength(55);
+    expect(sent.slice(55)).toEqual(Array(5).fill({ ok: false, reason: "busy", message: CHAT_BUSY }));
+    expect(CHAT_BUSY).toBe("Chat is busy, try again.");
+    const delays = ok.map((p) => (p.ok ? p.delayMs : -1));
+    expect(delays.slice(0, 5)).toEqual([0, 0, 0, 0, 0]);
+    expect(delays.slice(5, 10)).toEqual([1000, 1000, 1000, 1000, 1000]);
+    expect(Math.max(...delays)).toBe(10_000);
+    // A busy refusal doesn't start the player's wait: they may try again at once.
+    expect(c.readyAt("p59", T0)).toBe(T0);
+    // Only what's due shows, numbered in order; a reader never skips a line still waiting.
+    expect(c.snapshot(T0)).toMatchObject({ n: 5 });
+    expect(c.snapshot(T0 + 2_500).lines.map((l) => l.text)).toEqual(Array.from({ length: 15 }, (_, i) => `hello ${i}`));
+    expect(c.snapshot(T0 + 2_500).n).toBe(15);
+    // Bots never cut in while players wait.
+    for (let t = T0; t < T0 + 10_000; t += 500) expect(c.watch(t)).toBeNull();
+    // Over a minute at 5 a second, nobody waits.
+    const d = new GlobalChat(opts({ bots: false }));
+    for (let i = 0; i < 300; i++) expect(d.postText({ ...typer, id: `q${i}` }, "hi", T0 + i * 200)).toMatchObject({ ok: true, delayMs: 0 });
+  });
+
+  it("a test's own chat has a cap of one a second and a 2 s line", () => {
+    const c = new GlobalChat(TEST_GLOBAL_CHAT);
+    const r = ["a", "b", "c", "d"].map((id) => c.postText({ ...typer, id }, "hi", T0));
+    expect(r.map((p) => (p.ok ? p.delayMs : p.reason))).toEqual([0, 1000, 2000, "busy"]);
   });
 });
 
@@ -115,7 +180,7 @@ describe("global chat: bots", () => {
   it("say nothing while nobody has it open, and don't catch up afterwards", () => {
     const c = new GlobalChat(opts(), mulberry32(4));
     expect(watched(c, T0, 10 * 60_000).length).toBeGreaterThan(5);
-    const n = c.snapshot(T0).n;
+    const n = c.snapshot(T0 + 10 * 60_000).n;
     // Nobody for an hour: nothing is said (there's no timer: lines are only made when someone asks).
     const back = T0 + 70 * 60_000;
     expect(c.watch(back)).toBeNull();
@@ -205,70 +270,133 @@ describe("global chat: the API", () => {
     forgetSecrets();
   });
 
-  async function setup(signInSetUp: boolean) {
+  async function setup(signInSetUp: boolean, testSwitches = false) {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql);
     const { hub, ready } = hubWith();
     await ready();
-    const env = { DB: d1, LIVE: { idFromName: () => "global", get: () => hub }, ...(signInSetUp ? { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" } : {}) };
-    const call = async (path: string, token: string | null, body?: unknown) => {
+    const env = { DB: d1, LIVE: { idFromName: () => "global", get: () => hub }, ...(signInSetUp ? { GOOGLE_CLIENT_ID: "id", GOOGLE_CLIENT_SECRET: "secret" } : {}), ...(testSwitches ? { TEST_SWITCHES: "1" } : {}) };
+    const call = async (path: string, token: string | null, body?: unknown, o: { under?: boolean; method?: string } = {}) => {
+      const cookie = [token ? `hc_session=${token}` : "", o.under ? "hc_age=under" : ""].filter(Boolean).join("; ");
       const res = await handleAccountApi(
         new Request(`https://hunchess.test${path}`, {
-          method: body === undefined ? "GET" : "POST",
-          headers: { "content-type": "application/json", ...(token ? { cookie: `hc_session=${token}` } : {}) },
+          method: o.method ?? (body === undefined ? "GET" : "POST"),
+          headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
           body: body === undefined ? undefined : JSON.stringify(body),
         }),
         env as never,
       );
       return res!;
     };
-    return { sql, call };
+    /** A signed-in player (an email on the account), with chat on unless `off`. */
+    const signedIn = async (name: string, off = false) => {
+      const g = await createGuest(sql, Date.now(), name);
+      await sql.run("UPDATE users SET email = ? WHERE id = ?", `${name.toLowerCase()}@example.com`, g.user.id);
+      if (!off) expect((await call("/api/me", g.token, { chatOn: true }, { method: "PATCH" })).status).toBe(200);
+      return g;
+    };
+    return { sql, call, signedIn };
   }
 
-  it("signed-in players post; guests read; names, ratings and icons from the account, never an email", async () => {
-    const { sql, call } = await setup(true);
-    const now = Date.now();
-    const guest = await createGuest(sql, now, "Guesty");
-    const ann = await createGuest(sql, now, "Ann");
-    await sql.run("UPDATE users SET email = ?, rating = ?, icon = ? WHERE id = ?", "ann@example.com", 1520.4, PNG, ann.user.id);
-    // A guest can't post where sign-in is set up…
-    const g = await call("/api/chat", guest.token, { say: "l-hey" });
-    expect(g.status).toBe(401);
-    expect(((await g.json()) as { message: string }).message).toMatch(/Sign in to chat/);
-    // …a signed-in player can, and the guest reads it with the live line.
-    const a = await call("/api/chat", ann.token, { say: "l-raid", since: 0 });
-    expect(a.status).toBe(200);
-    expect(await a.json()).toMatchObject({ ok: true, line: { name: "Ann", rating: 1520, say: "l-raid", iconKey: iconKey(PNG) }, waitMs: GLOBAL_CHAT.gapMs });
-    const live = await call("/api/live?chat=0", guest.token);
-    const body = (await live.json()) as { chat: { n: number; lines: { from: string; name: string }[] }; online: number };
-    expect(body.chat.lines).toMatchObject([{ from: ann.user.id, name: "Ann" }]);
-    expect(JSON.stringify(body.chat)).not.toMatch(/example\.com|email|base64/);
-    // Nothing new after the last one; and the live line without ?chat has no chat at all.
-    expect(((await (await call(`/api/live?chat=${body.chat.n}`, guest.token)).json()) as { chat: { lines: unknown[] } }).chat.lines).toEqual([]);
-    expect("chat" in ((await (await call("/api/live", guest.token)).json()) as object)).toBe(false);
-    // The drawn icon, as a PNG the browser keeps.
-    const icon = await call(`/api/chat/icon/${iconKey(PNG)}`, null);
-    expect(icon.status).toBe(200);
-    expect(icon.headers.get("content-type")).toBe("image/png");
-    expect(icon.headers.get("cache-control")).toContain("immutable");
-    expect((await call("/api/chat/icon/not-a-key", null)).status).toBe(404);
+  it("signed-in players post; guests read (and can't post, even where signing in isn't set up); names, ratings and icons from the account, never an email", async () => {
+    for (const signInSetUp of [true, false]) {
+      forgetChatCache();
+      const { sql, call, signedIn } = await setup(signInSetUp);
+      const guest = await createGuest(sql, Date.now(), "Guesty");
+      const ann = await signedIn("Ann");
+      await sql.run("UPDATE users SET rating = ?, icon = ? WHERE id = ?", 1520.4, PNG, ann.user.id);
+      // A guest can't post…
+      for (const body of [{ say: "l-hey" }, { text: "hi" }]) {
+        const g = await call("/api/chat", guest.token, body);
+        expect(g.status).toBe(401);
+        expect(((await g.json()) as { message: string }).message).toMatch(/Sign in to chat/);
+      }
+      // …a signed-in player can, and the guest reads it with the live line.
+      const a = await call("/api/chat", ann.token, { text: "hello everyone", since: 0 });
+      expect(a.status).toBe(200);
+      expect(await a.json()).toMatchObject({ ok: true, line: { name: "Ann", rating: 1520, text: "hello everyone", iconKey: iconKey(PNG) }, waitMs: GLOBAL_CHAT.gapMs });
+      const live = await call("/api/live?chat=0", guest.token);
+      const body = (await live.json()) as { chat: { n: number; lines: { from: string; name: string }[] }; online: number };
+      expect(body.chat.lines).toMatchObject([{ from: ann.user.id, name: "Ann", text: "hello everyone" }]);
+      expect(JSON.stringify(body.chat)).not.toMatch(/example\.com|email|base64/);
+      // Nothing new after the last one; and the live line without ?chat has no chat at all.
+      expect(((await (await call(`/api/live?chat=${body.chat.n}`, guest.token)).json()) as { chat: { lines: unknown[] } }).chat.lines).toEqual([]);
+      expect("chat" in ((await (await call("/api/live", guest.token)).json()) as object)).toBe(false);
+      if (!signInSetUp) continue;
+      // The drawn icon, as a PNG the browser keeps.
+      const icon = await call(`/api/chat/icon/${iconKey(PNG)}`, null);
+      expect(icon.status).toBe(200);
+      expect(icon.headers.get("content-type")).toBe("image/png");
+      expect(icon.headers.get("cache-control")).toContain("immutable");
+      expect((await call("/api/chat/icon/not-a-key", null)).status).toBe(404);
+    }
   });
 
-  it("the server enforces the limit and the presets; a banned player can't post", async () => {
-    const { sql, call } = await setup(false);
-    const now = Date.now();
-    const bo = await createGuest(sql, now, "Bo");
-    expect((await call("/api/chat", bo.token, { say: "gg" })).status).toBe(200);
+  it("chat is off by default per account: nothing goes until it's on (PATCH /api/me {chatOn}, kept on the account; a guest's isn't kept)", async () => {
+    const { sql, call, signedIn } = await setup(true);
+    const bo = await signedIn("Bo", true);
+    const me = (await (await call("/api/me", bo.token)).json()) as { chatOn: boolean };
+    expect(me.chatOn).toBe(false);
+    const off = await call("/api/chat", bo.token, { text: "hi" });
+    expect(off.status).toBe(403);
+    expect(await off.json()).toMatchObject({ message: "Turn on chat first.", chatOff: true });
+    const on = (await (await call("/api/me", bo.token, { chatOn: true }, { method: "PATCH" })).json()) as { chatOn: boolean };
+    expect(on.chatOn).toBe(true);
+    expect(((await (await call("/api/me", bo.token)).json()) as { chatOn: boolean }).chatOn).toBe(true);
+    expect((await call("/api/chat", bo.token, { text: "hi" })).status).toBe(200);
+    await call("/api/me", bo.token, { chatOn: false }, { method: "PATCH" });
+    expect((await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", bo.user.id))!.chat_on).toBeNull();
+    const guest = await createGuest(sql, Date.now(), "Gus");
+    expect(((await (await call("/api/me", guest.token, { chatOn: true }, { method: "PATCH" })).json()) as { chatOn: boolean }).chatOn).toBe(false);
+  });
+
+  it("the server enforces the 5 s limit, the filter on typed text, the age gate and the presets; a banned player can't post", async () => {
+    const { sql, call, signedIn } = await setup(false);
+    const bo = await signedIn("Bo");
+    expect((await call("/api/chat", bo.token, { text: "gg all" })).status).toBe(200);
     const again = await call("/api/chat", bo.token, { say: "l-hey" });
     expect(again.status).toBe(429);
-    expect(((await again.json()) as { retryMs: number }).retryMs).toBeGreaterThan(25_000);
-    const cy = await createGuest(sql, now, "Cy");
-    expect((await call("/api/chat", cy.token, { say: "Buy cheap coins at example.com" })).status).toBe(400);
+    expect(((await again.json()) as { retryMs: number }).retryMs).toBeGreaterThan(3_000);
+    const cy = await signedIn("Cy");
+    // The filter: what it refuses never goes, with its short reason.
+    const link = await call("/api/chat", cy.token, { text: "Buy cheap coins at example.com" });
+    expect(link.status).toBe(400);
+    expect(await link.json()).toMatchObject({ message: "No links or contact details in chat." });
+    expect((await call("/api/chat", cy.token, { text: "x".repeat(5000) })).status).toBe(400);
     expect((await call("/api/chat", cy.token, { say: "gk-crown" })).status).toBe(400);
     expect((await call("/api/chat", cy.token, {})).status).toBe(400);
-    await sql.run("INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at) VALUES (?, 'banned', 'test', ?, ?)", cy.user.id, now, now);
-    const banned = await call("/api/chat", cy.token, { say: "gg" });
+    // A device the age gate marked too young (signed in there all the same): the quick chips only; typed lines never reach it.
+    const young = await call("/api/chat", cy.token, { text: "hi" }, { under: true });
+    expect(young.status).toBe(403);
+    expect(await young.json()).toMatchObject({ message: TYPED_AGE });
+    expect((await call("/api/chat", cy.token, { say: "l-hey" }, { under: true })).status).toBe(200);
+    forgetChatCache();
+    const seen = (await (await call("/api/live?chat=0", cy.token, undefined, { under: true })).json()) as { chat: { lines: { say?: string; text?: string }[] } };
+    expect(seen.chat.lines.map((l) => l.say ?? l.text)).toEqual(["l-hey"]);
+    forgetChatCache();
+    const all = (await (await call("/api/live?chat=0", cy.token)).json()) as { chat: { lines: { say?: string; text?: string }[] } };
+    expect(all.chat.lines.map((l) => l.say ?? l.text)).toEqual(["gg all", "l-hey"]);
+    await sql.run("INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at) VALUES (?, 'banned', 'test', ?, ?)", cy.user.id, Date.now(), Date.now());
+    vi.useFakeTimers({ now: Date.now() + 10_000, toFake: ["Date"] });
+    const banned = await call("/api/chat", cy.token, { text: "hi" });
+    vi.useRealTimers();
     expect(banned.status).toBe(403);
     expect(await banned.json()).toMatchObject({ banned: true });
+  });
+
+  it("past the server-wide line the sender hears \"Chat is busy, try again\" (a test's own chat, under the test switches)", async () => {
+    const { call, signedIn } = await setup(false, true);
+    const players = await Promise.all(["Ann", "Bo", "Cy", "Di"].map((n) => signedIn(n)));
+    const res = [];
+    for (const p of players) res.push(await call("/api/chat", p.token, { text: `hi from ${p.user.name}`, chatroom: "busy-test" }));
+    expect(res.map((r) => r.status)).toEqual([200, 200, 200, 503]);
+    expect(await res[3]!.json()).toMatchObject({ message: "Chat is busy, try again.", busy: true });
+    // (Real time passes between the calls: about a second's wait.)
+    expect(((await res[1]!.json()) as { delayMs: number }).delayMs).toBeGreaterThan(500);
+    // The test's chat is its own: the one chat has none of it.
+    const live = (await (await call("/api/live?chat=0", players[0]!.token)).json()) as { chat: { lines: unknown[] } };
+    expect(live.chat.lines).toEqual([]);
+    const mine = (await (await call("/api/live?chat=0&chatroom=busy-test", players[0]!.token)).json()) as { chat: { lines: { text?: string }[] } };
+    expect(mine.chat.lines.map((l) => l.text)).toEqual(["hi from Ann"]);
   });
 });

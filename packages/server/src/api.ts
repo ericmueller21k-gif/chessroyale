@@ -11,7 +11,7 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
-import { chatIconResponse, chatPostResponse, chatSlice } from "./global-chat-api.ts";
+import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
@@ -31,6 +31,7 @@ import {
   randomToken,
   recordResult,
   resetNameAndIcon,
+  setChatOn,
   setChatPicks,
   shopState,
   signInWithIdentity,
@@ -253,7 +254,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     }
     // ?chat=N (the home page's global chat is open): its lines after N ride along (global-chat-api.ts).
     const chatSince = url.searchParams.get("chat");
-    const chat = chatSince !== null && env.LIVE ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now).catch(() => null) : null;
+    const chat =
+      chatSince !== null && env.LIVE
+        ? await chatSlice(liveHub(env as Required<Pick<AccountEnv, "LIVE">>), Number(chatSince), now, {
+            room: globalRoomOf(url.searchParams.get("chatroom"), (env as AdminEnv).TEST_SWITCHES === "1"),
+            typed: ageAnswer(request) !== "under",
+          }).catch(() => null)
+        : null;
     // ?town=N (the town square is open): the town chat's lines after N, for anyone (a guest reads it too: Eric, on #542, "they
     // should be able to see the chat. They just can't type in it") but never on a device the age gate marked too young
     // (town-chat-api.ts); while its switch is off, only that it's paused. Sending stays signed-in only (townPostResponse).
@@ -340,13 +347,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
-  // PATCH /api/me {name?, icon?}. Not from a guest on a device that answered "too young": it keeps the default name and
-  // icon. (Someone signed in there, say in a tab opened before the answer, still may.)
+  // PATCH /api/me {name?, icon?, chatOn?}. Not from a guest on a device that answered "too young": it keeps the default name and
+  // icon. (Someone signed in there, say in a tab opened before the answer, still may.) `chatOn` (the chat's opt-in, Nov 7) is kept
+  // for a signed-in account only: a guest's stays on its device.
   if (path === "/api/me" && request.method === "PATCH") {
     if (ageAnswer(request) === "under" && !isSignedIn(current)) return json({ message: "Guests play under the default name and icon." }, 403);
-    const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown };
+    const body = (await request.json().catch(() => ({}))) as { name?: unknown; icon?: unknown; chatOn?: unknown };
     // (A name with a slur or a hate term in it: text-filter.ts.)
     if (typeof body.name === "string" && isBlockedText(String(body.name).slice(0, 64))) return json({ message: NAME_NOT_ALLOWED }, 400);
+    if (typeof body.chatOn === "boolean" && isSignedIn(current)) await setChatOn(sql, current.id, body.chatOn);
     return json(await profile(sql, await updateProfile(sql, current.id, body), admins));
   }
 
@@ -506,10 +515,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return json({ ok: true });
   }
 
-  // POST /api/chat {say}: a line in the home page's global chat (signed in where sign-in is set up; guests read).
+  // POST /api/chat {text | say}: a message in the global chat (signed in, chat on; guests read; a device the age gate marked too young
+  // sends the preset lines only): global-chat-api.ts.
   if (path === "/api/chat" && request.method === "POST") {
     if (!env.LIVE) return json({ message: "The chat isn't set up here." }, 503);
-    return chatPostResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), current, !signInRequired(env) || isSignedIn(current), now);
+    return chatPostResponse(request, sql, liveHub(env as Required<Pick<AccountEnv, "LIVE">>), { user: current, tooYoung: ageAnswer(request) === "under", testSwitches: (env as AdminEnv).TEST_SWITCHES === "1" }, now);
   }
 
   // POST /api/town/chat {text}: a message in the town square's chat (town-chat-api.ts: signed in, old enough, not banned,

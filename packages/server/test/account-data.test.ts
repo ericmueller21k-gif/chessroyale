@@ -153,7 +153,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
     "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned",
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
-  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online age_ok_at",
+  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online age_ok_at chat_on",
   wallets: "user_id coins crates crate_keys",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };

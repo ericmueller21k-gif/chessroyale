@@ -4,7 +4,7 @@ import { test } from "./helpers.ts";
 /**
  * The town square on a computer (Oct 29, Eric; docs/decisions/2026-10-29-town-on-computer.md, docs/areas/town-square.md): in the front
  * door's frame, in exactly the box home's middle column (`.fd-center`) takes, the side menu on the left and the live panel with the global
- * chat on the right as on home, and the chat icon at the left of the bar, right after the title (the gear stays at the right end). A
+ * chat on the right as on home; since Nov 7 no bar: the town's tools are in the right column's top slot, under "TOWN". A
  * computer is 1024 px wide or more with a mouse. Phones and tablets (a tablet on its side included: touch) are main's, box for box.
  */
 test.use({ actionTimeout: 15_000 });
@@ -21,7 +21,6 @@ const nearBox = (a: Box | null, b: Box, tol: number, what: string) => {
 };
 /** `a` lies inside `b` (a pixel's give). */
 const inside = (a: Box, b: Box) => a[0] >= b[0] - 1 && a[1] >= b[1] - 1 && a[0] + a[2] <= b[0] + b[2] + 1 && a[1] + a[3] <= b[1] + b[3] + 1;
-const apart = (a: Box, b: Box) => a[0] + a[2] <= b[0] || b[0] + b[2] <= a[0] || a[1] + a[3] <= b[1] || b[1] + b[3] <= a[1];
 const ready = (p: Page) => p.locator("canvas.town-canvas[data-ready='1']").waitFor();
 const onlyComputer = () => test.skip(test.info().project.name !== "desktop", "a computer's window: the desktop project");
 
@@ -34,7 +33,7 @@ async function parts(p: Page) {
 }
 
 for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
-  test(`${w} × ${h}: the town fills everything between the menu and the right column, top to bottom; the bar is the right column's top row (back, title, chat icon, gear, one size); nothing pokes out of the box`, async ({ page }) => {
+  test(`${w} × ${h}: the town fills everything between the menu and the right column, top to bottom; the town's tools in the right column's top slot under TOWN (no bar); nothing pokes out of the box`, async ({ page }) => {
     onlyComputer();
     // (The chat box lies over the map's top left corner and takes taps there; this test taps the map: e2e/town.spec.ts does the same.)
     await page.addInitScript(() => {
@@ -65,18 +64,18 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     await expect(page.getByRole("complementary", { name: "Live" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Global chat" })).toBeVisible();
 
-    // The bar is the right column's top row, where the profile button is on other pages (24 px down, 44 px high); the world fills the whole box.
-    const r = home.right;
-    expect(inside(t.bar, r), "the bar is inside the right column").toBe(true);
-    expect(Math.abs(t.bar[1] - 24) + Math.abs(t.bar[3] - 44), "the bar is the row the profile button has: 24 px down, 44 high").toBeLessThanOrEqual(1);
-    nearBox(t.canvas, t.screen, 1, "the world fills the whole box");
-    expect(await page.getByRole("button", { name: "Your profile" }).isVisible(), "no profile button on the town page").toBe(false);
-    // Back, title, chat icon, gear, left to right; the round buttons are one size, the profile button's (44 px); no icon covers the title.
-    expect(t.back[0] + t.back[2], "back, then the title").toBeLessThanOrEqual(t.title[0] + 1);
-    expect(t.title[0] + t.title[2], "the title, then the chat icon").toBeLessThanOrEqual(t.chatBtn[0] + 1);
+    // No bar on a computer (Eric's mockup, Nov 7): "TOWN" and the town's tools (the chat icon, the gear; an admin's map) centered in the
+    // right column's top slot, under it; the world fills the whole box.
+    await expect(page.locator(".town-bar")).toHaveCount(0);
+    const slot = (await box(page, ".rc-slot"))!;
+    expect(inside(slot, home.right), "the slot is in the right column").toBe(true);
+    for (const k of ["chatBtn", "gear"] as const) expect(inside(t[k], slot), `${k} is in the slot`).toBe(true);
+    const mid = (b: Box) => b[0] + b[2] / 2;
+    expect(Math.abs(mid((await box(page, ".rc-tools"))!) - mid(slot)), "the tools centered").toBeLessThanOrEqual(1);
+    expect(Math.abs(mid((await box(page, ".rc-slot .rc-h"))!) - mid(slot)), "TOWN centered").toBeLessThanOrEqual(1);
     expect(t.chatBtn[0] + t.chatBtn[2], "the chat icon, then the gear").toBeLessThanOrEqual(t.gear[0] + 1);
-    for (const k of ["back", "chatBtn", "gear"] as const) expect([t[k][2], t[k][3]], `${k} is 44 × 44, the profile button's size`).toEqual([44, 44]);
-    expect(apart(t.chatBtn, t.title) && apart(t.gear, t.title) && apart(t.back, t.title), "no icon covers the title").toBe(true);
+    nearBox(t.canvas, t.screen, 1, "the world fills the whole box");
+    expect(await page.getByRole("button", { name: "Your profile", exact: true }).isVisible(), "no profile button on the town page").toBe(false);
     // The buttons keep their corner of the box; the chat box keeps the world's top left corner.
     expect(Math.abs(t.screen[0] + t.screen[2] - 14 - (t.focus[0] + t.focus[2])), "the focus button 14 px from the box's right").toBeLessThanOrEqual(1);
     expect(Math.abs(t.screen[1] + t.screen[3] - 14 - (t.focus[1] + t.focus[3])), "and 14 px from its foot").toBeLessThanOrEqual(1);

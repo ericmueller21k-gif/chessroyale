@@ -20,7 +20,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   menu on the left (Chess Town marked as where you are) and the live panel with the global chat on the right, as on home, and the
   town filling the center column's box, edge to edge (`.fd-center`, which is home's middle box: the same left, top, width and
   height at every size from 1024 px up; the box is as high as the window, so at 1024 to 1279 px, where home's own box grows
-  taller than the window and scrolls, it's the window's height). Its bar is the box's top line, and the buttons, the chips,
+  taller than the window and scrolls, it's the window's height). No bar there since Nov 7 (Eric's mockup): the map, chat and gear
+  buttons are in the right column's top slot under "TOWN" (portaled from `Town.tsx`), in the town and its rooms. The buttons, the chips,
   the cards and the chat box are all inside the box. A computer is a window 1024 px wide or more **with a mouse** (`(hover: hover)
   and (pointer: fine)`, `COMPUTER` in `TownPage.tsx`, the same test the desktop board uses): phones, tablets (a tablet on its side
   included: touch) and a mouse window narrower than 1024 px have the whole screen and both icons at the right, as before.
@@ -1075,8 +1076,8 @@ noted wherever a slice changed one.
   CI jobs are retired.
 
 - `e2e/town-desktop.spec.ts` (Oct 29, the town on a computer): at 1280 × 800, 1440 × 900 and 1920 × 1080 the town's box is home's `.fd-center`
-  (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, the chat icon is in the bar's
-  left part after the title, the gear at its right end and neither over the title, the world fills the box under a 52 px bar, the buttons keep
+  (within a pixel), the menu and the right column are home's with the global chat showing, Chess Town is marked, no bar (Nov 7): the chat icon
+  and the gear centered in the right column's slot under TOWN, the world fills the box, the buttons keep
   their corner and the chat box its place, the chips and an open card are inside the box and the page doesn't scroll; the side menu's Play and
   Chess Town go home and back; the center column, the menu and the right column keep one box each while the town loads; a 900 × 700 mouse
   window has the whole screen and both icons at the right; and phones (390 × 844, 430 × 932) and tablets (768 × 1024, 1024 × 768 touch) have

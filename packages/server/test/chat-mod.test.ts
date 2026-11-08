@@ -92,17 +92,17 @@ describe("the global chat and the profile", () => {
     const chat = new GlobalChat({ ...GLOBAL_CHAT, bots: false });
     const hub: ChatHub = {
       chatRead: async () => chat.snapshot(Date.now()),
-      chatPost: async (sender, say) => ({ post: chat.post(sender, say, Date.now()), chat: chat.snapshot(Date.now()) }),
+      chatPost: async (sender, said) => ({ post: typeof said === "string" ? chat.post(sender, said, Date.now()) : "text" in said ? chat.postText(sender, said.text, Date.now()) : chat.post(sender, said.say, Date.now()), chat: chat.snapshot(Date.now()) }),
       chatIcon: async () => null,
     };
-    const post = (u: User) => chatPostResponse(new Request("https://x/api/chat", { method: "POST", body: JSON.stringify({ say: "gg" }) }), sql, hub, u, true, Date.now());
+    const post = (u: User) => chatPostResponse(new Request("https://x/api/chat", { method: "POST", body: JSON.stringify({ say: "gg" }) }), sql, hub, { user: u, tooYoung: false }, Date.now());
     await decideChat(sql, troll.id, { action: "ban", days: 1, reason: "spamming" }, "admin:e", Date.now());
     const res = await post(troll);
     expect(res.status).toBe(403);
     expect(await res.json()).toMatchObject({ message: "Your chat is off: a moderator's decision.", block: { until: expect.any(Number) } });
     expect(chat.snapshot(Date.now()).lines).toEqual([]);
     const old = await player(sql, "Oldname");
-    await sql.run("UPDATE users SET name = ? WHERE id = ?", `x${rot13("avttre")}`, old.id);
+    await sql.run("UPDATE users SET name = ?, chat_on = 1 WHERE id = ?", `x${rot13("avttre")}`, old.id);
     expect((await post(old)).status).toBe(200);
     expect(chat.snapshot(Date.now()).lines.map((l) => l.name)).toEqual(["Player"]);
   });
