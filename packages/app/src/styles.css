@@ -9065,30 +9065,51 @@ button.fd-logo {
   display: contents;
 }
 /*
- * Home's card taps (Eric, Nov 6): your pawn opens your inventory, your icon and name open the icon picker. A generous area
- * (the padding), a pointer on a computer, and a press that shrinks a little.
+ * Home's card taps (Eric, Nov 6; split Nov 7): your pawn opens your inventory; your icon opens the icon picker; your name and
+ * rank line open your public profile. Each is a real button with its own focus ring, and the rest of the card does nothing.
+ * A pointer on a computer, and a press that shrinks a little. The pawn's is the same as before.
  */
-/* (Layout-neutral: no padding or margin. The generous tap area is a pseudo-element that sits outside the box.) */
-.fd-hero-tap,
 .fd-pawn.fd-tap {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: transform 120ms ease;
 }
-.fd-hero-tap {
-  position: relative;
+.fd-hero-iconbtn,
+.fd-hero-namebtn {
+  appearance: none;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
 }
-.fd-hero-tap::before {
-  content: "";
-  position: absolute;
-  inset: -10px;
-  border-radius: 14px;
+/* (The icon's button is the icon's box: no room added, so nothing moves.) */
+.fd-hero-iconbtn {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: inherit;
+  align-items: center;
+  justify-content: center;
 }
-.fd-hero-tap:active,
+.fd-hero-namebtn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border-radius: 6px;
+}
+.fd-hero-iconbtn:active,
+.fd-hero-namebtn:active,
 .fd-pawn.fd-tap:active {
   transform: scale(0.97);
 }
-.fd-hero-tap:focus-visible,
+.fd-hero-iconbtn:focus-visible,
+.fd-hero-namebtn:focus-visible,
 .fd-pawn.fd-tap:focus-visible {
   outline: 2px solid var(--fd-gold, #f5c542);
   outline-offset: 2px;
@@ -9175,6 +9196,7 @@ button.fd-logo {
   text-align: left;
 }
 .fd-hero-name {
+  display: block;
   font-size: 20px;
   line-height: 22px;
   font-weight: 800;
@@ -9184,6 +9206,7 @@ button.fd-logo {
   white-space: nowrap;
 }
 .fd-hero-sub {
+  display: block;
   font-size: 14px;
   line-height: 16px;
   color: var(--fd-sub);

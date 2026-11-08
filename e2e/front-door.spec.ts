@@ -10,7 +10,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect(page.locator(".fd-logo").filter({ visible: true })).toHaveText("HunChess");
   // Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer (the right column's pawn went, Nov 7).
   if (test.info().project.name === "desktop") await expect(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).toBeVisible();
-  else await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  else await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   // The live line: you're online (the app told the server you're here).
   const line = page.getByRole("status").filter({ hasText: "online" });

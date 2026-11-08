@@ -194,7 +194,7 @@ test("in a match: a bot's name opens a bot's card, yours opens your profile", { 
   await board.locator(".tower-row:not(.you) .player-name").first().click();
   await expect(page.locator(".fd-overlay")).toContainText("Bots fill the empty seats in a match");
   await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
-  await board.getByRole("button", { name: "Your profile" }).click();
+  await board.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
   await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();
 });
