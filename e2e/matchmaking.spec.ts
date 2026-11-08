@@ -115,7 +115,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   expect(await phase(other)).toBe("lobby");
 });
 
-test("Boss raid: its screen has the three types too (and Boss alone); a Solo raid is you and 49 bots against a boss, and its results say Unranked", async ({ page }) => {
+test("Boss raid: its screen has the three types too (and Boss alone); a Solo raid is you and 49 bots against a boss, and its results say nothing of ranking", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=1");
@@ -156,7 +156,8 @@ test("Boss raid: its screen has the three types too (and Boss alone); a Solo rai
     await page.waitForTimeout(300);
   }
   expect(await phase(page)).toBe("results");
-  await expect(page.locator(".results-unranked")).toHaveText("Unranked: solo games don't count for ranking.");
+  // (Nov 8, Eric: no solo "Unranked" line on a boss battle's results; it says nothing of ranking.)
+  await expect(page.locator(".results-unranked")).toHaveCount(0);
 });
 
 test("opening the app from scratch during a live match puts you back in it; leaving on purpose doesn't", { tag: "@phone-only" }, async ({ browser }) => {
