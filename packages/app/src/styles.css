@@ -23573,31 +23573,30 @@ button.sq-tiny {
   background: repeating-linear-gradient(180deg, #7d4a27 0 3.2cqw, #9c6334 3.2cqw 3.6cqw);
   border-color: #f08a24;
 }
-/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces in a row, each with a bar
-   filling toward its cost and its count, his woodpecker foreman at the end. Positioned at the slot's top right (a phone's speech
-   bubble sits at the bar's foot, under it), the same size
-   whatever it shows, never taking a tap: nothing in the bar moves for it. */
+/* The workshop strip, in the boss bar's prop slot (right of his bars, under the status): his five pieces and his woodpecker foreman,
+   each a square of --ws (about a chess piece on the board: Eric, Nov 8, "nearly normal sized"). A piece's bar runs along its foot
+   and its count sits in its top right corner, so the squares keep their size. A phone lays them out three to a row, in two rows
+   (the room under the status is 61 to 72 px tall); a computer's bar is one row of six at the bar's height. Absolute, never taking
+   a tap: nothing in the bar moves for it. */
 .ws-strip {
+  --ws: 35px;
   position: absolute;
   right: 0;
   top: 0;
-  display: flex;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(3, var(--ws));
   gap: 2px;
   pointer-events: none;
 }
 .ws-slot {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 22px;
-  gap: 1px;
+  position: relative;
+  width: var(--ws);
+  height: var(--ws);
 }
 .ws-strip .ws-piece {
-  position: relative;
+  position: absolute;
+  inset: 0;
   display: block;
-  width: 18px;
-  height: 18px;
 }
 .ws-strip .ws-piece piece {
   position: absolute;
@@ -23607,29 +23606,17 @@ button.sq-tiny {
   will-change: auto;
 }
 .ws-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-/* A computer's bar is one short row (his figure stands by the board): the strip takes the free room's left part over both rows,
-   between his bars and "Move 2", centered on the bar's height. */
-@media (min-width: 900px) and (min-height: 600px) {
-  .boss-bar .boss-prop:has(> .ws-strip) {
-    grid-column: 2;
-    grid-row: 1 / 3;
-  }
-  .boss-bar .ws-strip {
-    top: 50%;
-    right: auto;
-    left: 4px;
-    transform: translateY(-50%);
-  }
+  position: absolute;
+  inset: 0;
+  z-index: 3; /* over the pieces (.hb-pieces piece is z 2) */
 }
 .ws-bar {
-  position: relative;
-  width: 18px;
-  height: 3px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  box-sizing: border-box;
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   background: rgba(0, 0, 0, 0.45);
@@ -23641,12 +23628,40 @@ button.sq-tiny {
   background: linear-gradient(90deg, #f7b267, #e8742c);
 }
 .ws-count {
-  font-size: 9px;
-  line-height: 1;
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: max(9px, calc(var(--ws) * 0.28));
+  line-height: 1.4;
   font-weight: 800;
   color: #ffe0b8;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* A phone narrower than 341 px (a 320 px one): the squares a little smaller, still about 80% of a board square. */
+@media (max-width: 340px) {
+  .ws-strip {
+    --ws: 28px;
+  }
+}
+/* A computer's boss bar is one short row (his figure stands by the board): the strip takes the free room's left part, one row of
+   six squares centered on the bar's height, between his bars and "Move 2". */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .ws-strip) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .ws-strip {
+    --ws: 42px;
+    grid-template-columns: repeat(6, var(--ws));
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
 }
 /* A finished piece glows until it drops. */
 .ws-slot.done .ws-piece {
@@ -23661,7 +23676,7 @@ button.sq-tiny {
 }
 @keyframes ws-bump {
   0% {
-    transform: translateY(-6px) scale(1.18);
+    transform: translateY(-3px) scale(1.1);
   }
   60% {
     transform: translateY(1px);
@@ -23672,9 +23687,8 @@ button.sq-tiny {
 }
 .ws-foreman {
   display: block;
-  width: 26px;
-  height: 26px;
-  margin-left: 1px;
+  width: var(--ws);
+  height: var(--ws);
 }
 .ws-foreman canvas {
   display: block;
