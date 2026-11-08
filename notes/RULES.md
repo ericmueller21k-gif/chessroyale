@@ -22,7 +22,8 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   - Cloud helpers tend to end their turn right after a push, even when told to wait (#551 pilot, 3 times). The director runs
     `wait-ci.sh` itself (a background script, no tokens) and sends the `ci-fail.sh` output back, or fixes a one-liner itself.
   - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
-  - Stills come on `stills/<PR#>` orphan branches, which you delete after the merge.
+  - Stills come on `stills/<PR#>` orphan branches. Deleting a remote branch is blocked by the permission classifier (Nov 8):
+    leave them, and list them for Eric to delete in GitHub (or to allow it).
 - **One Opus helper at a time.** Never more. A Haiku helper beside it only for a small UI/docs job Eric OK'd. CI and
   deploy watchers (scripts) don't count. (October, after ~10 at once used ~30% of a week; lost after the Nov 1 restart.)
 - Models: Haiku for UI, docs and simple jobs; never Sonnet. Opus high for rules, engine, bosses, sims, reviews, art,

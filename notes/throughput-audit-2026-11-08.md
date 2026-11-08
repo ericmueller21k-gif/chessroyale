@@ -51,7 +51,7 @@ The runs themselves are short: a typical helper run is 2–8 tests in **1–2 mi
 4. **Self-check before reporting.** A helper looks at every still it made, against the brief's numbers (bounds,
    order, counts), and fixes the problem itself before reporting. Number checks go in e2e so CI enforces them.
 5. **Stills from a helper on its own machine** go to an orphan branch `stills/<PR#>` (PNGs only, never on the work
-   branch). The director fetches them and sends them to Eric, then deletes the branch after the merge, so clones stay small.
+   branch). The director fetches them and sends them to Eric, then lists it for Eric to delete after the merge (remote branch deletion needs his permission).
 6. **Waits:** one blocking call (≤10 min), never short polls. The director keeps fewer helpers' reports in its context
    and starts a fresh session when the context gets big (HANDOFF.md).
 
