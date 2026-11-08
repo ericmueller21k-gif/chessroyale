@@ -24680,8 +24680,8 @@ button.sq-tiny {
   justify-content: center;
   align-items: flex-end;
   /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A phone's wide
-     boss overflows his box by about 12 px a side, so the gap is 32 px.) */
-  gap: 32px;
+     boss overflows his box by about 12 px a side, plus a few px of margin for sub-pixel scaling (15.8 measured at 32), so 36 px.) */
+  gap: 36px;
   margin: 0 auto;
 }
 .results-duo .boss-char.place-results {
