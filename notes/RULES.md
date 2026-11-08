@@ -19,6 +19,8 @@ notes to a private place or strip them). Never put a secret value here or anywhe
     model `claude-haiku-5-5` unless the job needs Opus). Each has its own machine, no shared lock, and runs in parallel.
   - **GitHub CI is the DEFAULT test lane (Eric, Nov 8):** local runs are only for the 1–3 tests being changed; push early; `ci-fail.sh <sha>` reads the failures.
   - The shared-machine local lane is `e2e-quick.sh` only.
+  - Cloud helpers tend to end their turn right after a push, even when told to wait (#551 pilot, 3 times). The director runs
+    `wait-ci.sh` itself (a background script, no tokens) and sends the `ci-fail.sh` output back, or fixes a one-liner itself.
   - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
   - Stills come on `stills/<PR#>` orphan branches, which you delete after the merge.
 - **One Opus helper at a time.** Never more. A Haiku helper beside it only for a small UI/docs job Eric OK'd. CI and
