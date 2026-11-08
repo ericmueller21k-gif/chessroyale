@@ -31,7 +31,7 @@ const me = (page: import("@playwright/test").Page) => page.evaluate(() => fetch(
 test("Settings: download my data, then delete the account (asked first); it's gone everywhere, its results stay without it", async ({ page, browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   // A guest with a name, a solo result, a crate item and a setting on this device.
   const id = (await me(page)).user.id;
   await page.evaluate(async () => {
@@ -69,7 +69,7 @@ test("Settings: download my data, then delete the account (asked first); it's go
   await page.getByRole("button", { name: /^Delete account/ }).click();
   await page.getByRole("button", { name: "Delete my account" }).click();
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("button", { name: "Your profile" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   const fresh = (await me(page)).user;
   expect(fresh.id).not.toBe(id);
   expect(fresh.name).not.toBe("Delia");

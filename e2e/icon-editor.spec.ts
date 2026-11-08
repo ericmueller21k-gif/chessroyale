@@ -13,7 +13,7 @@ const responds = (page: Page) =>
 test("the icon builder's tools survive being spammed", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/");
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await page.getByRole("button", { name: "Edit name & icon" }).click();
   await page.getByRole("button", { name: "Edit your icon" }).click();
   const canvas = page.getByLabel("Your icon, 48 by 48 pixels");

@@ -70,7 +70,7 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     expect(inside(t.bar, r), "the bar is inside the right column").toBe(true);
     expect(Math.abs(t.bar[1] - 24) + Math.abs(t.bar[3] - 44), "the bar is the row the profile button has: 24 px down, 44 high").toBeLessThanOrEqual(1);
     nearBox(t.canvas, t.screen, 1, "the world fills the whole box");
-    expect(await page.getByRole("button", { name: "Your profile" }).isVisible(), "no profile button on the town page").toBe(false);
+    expect(await page.getByRole("button", { name: "Your profile", exact: true }).isVisible(), "no profile button on the town page").toBe(false);
     // Back, title, chat icon, gear, left to right; the round buttons are one size, the profile button's (44 px); no icon covers the title.
     expect(t.back[0] + t.back[2], "back, then the title").toBeLessThanOrEqual(t.title[0] + 1);
     expect(t.title[0] + t.title[2], "the title, then the chat icon").toBeLessThanOrEqual(t.chatBtn[0] + 1);

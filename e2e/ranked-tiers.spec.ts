@@ -160,7 +160,7 @@ test("home's ranked row and the profile show your rank's emblem; the row's panel
     }
   }
   // The profile's 1 V 1 section: the emblem at 2× beside the pill and the record.
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator(".dv-profile .dv-rank")).toHaveText("Radiant 1 · 95 RP");
   await expectEmblem(page, ".dv-profile", "radiant-d1", 96);
 });
@@ -171,7 +171,7 @@ test("?rank= shows that rank on an admin's own screens, and does nothing for a p
   await p.getByRole("radio", { name: /1 v 1/ }).click();
   await expect(p.locator(".fd-rank1v1")).toHaveText("Your rank: Placement 0/5");
   await expectEmblem(p, ".fd-rank-words", null, 48);
-  await p.getByRole("button", { name: "Your profile" }).click();
+  await p.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(p.locator(".dv-profile")).toHaveCount(0);
 
   // An admin: Gold 3 on home, on the stage and on their profile; then Transcendent, the loop.
@@ -179,7 +179,7 @@ test("?rank= shows that rank on an admin's own screens, and does nothing for a p
   await a.getByRole("radio", { name: /1 v 1/ }).click();
   await expect(a.locator(".fd-rank1v1")).toHaveText("Your rank: Gold 3 · 45 RP");
   await expectEmblem(a, ".fd-rank-words", "gold-d3", 48);
-  await a.getByRole("button", { name: "Your profile" }).click();
+  await a.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(a.locator(".dv-profile .dv-rank")).toHaveText("Gold 3 · 45 RP");
   await expectEmblem(a, ".dv-profile", "gold-d3", 96);
   await a.goto("/1v1?nolanding&rank=transcendent&pool=rtadmin");

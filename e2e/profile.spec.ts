@@ -47,7 +47,7 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   // Home names your 1 v 1 rank under your name, the tier in its color; no rating rank's name (retired Oct 28).
   await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon 5 · 45 RP");
   await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 5");
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
   await expect(page.getByText("Online now")).toBeVisible();
   // The card: the 1 v 1 rank's pill, then the rating's number alone.
@@ -193,7 +193,7 @@ test("in a match: a bot's name opens a bot's card, yours opens your profile", { 
   await board.locator(".tower-row:not(.you) .player-name").first().click();
   await expect(page.locator(".fd-overlay")).toContainText("Bots fill the empty seats in a match");
   await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
-  await board.getByRole("button", { name: "Your profile" }).click();
+  await board.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator(".fd-overlay").getByRole("heading", { name: "Solo" })).toBeVisible();
   await expect(page.locator(".fd-overlay").getByRole("button", { name: "Edit name & icon" })).toBeVisible();
 });
@@ -205,7 +205,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   // (No crate holds a ride yet; only admins have them. Given straight, as admins will own them.)
   await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await page.reload();
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await page.getByRole("button", { name: "Open locker" }).click();
   const previews = page.locator(".locker-preview .locker-avatar");
   await expect(previews).toHaveCount(2);
@@ -233,7 +233,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
   // Your profile: your pawn rides it, and Wearing lists it with its slot. (The locker's Back goes home.)
   await page.getByRole("button", { name: "Back", exact: true }).first().click();
-  await page.getByRole("button", { name: "Your profile" }).click();
+  await page.getByRole("button", { name: "Your profile", exact: true }).click();
   await expect(page.locator('.fd-card .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
   await expect(page.locator(".fd-item").filter({ hasText: "Riding Chirp" })).toContainText("Ride · Cobalt · 60% pure");
   // Off again: the pawn alone, in the same boxes.
@@ -351,7 +351,7 @@ test.describe("rides lazy", () => {
     // Your profile's pawn, the same.
     open = await holdDrawing(page, "riding-chirp");
     await page.reload();
-    await page.getByRole("button", { name: "Your profile" }).click();
+    await page.getByRole("button", { name: "Your profile", exact: true }).click();
     // (The profile itself first: until its data comes the page shows "Loading…" in a different layout, so a slow
     // server measured that one and then the loaded page, 255 px apart (CI, Nov 1). The ride is held either way.)
     await expect(page.locator(".fd-card .fd-seen")).toBeVisible();
