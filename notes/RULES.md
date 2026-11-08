@@ -17,7 +17,7 @@ notes to a private place or strip them). Never put a secret value here or anywhe
 - **Nov 8 throughput rules (notes/throughput-audit-2026-11-08.md):**
   - Helpers run as **their own cloud sessions** (`create_session`, `source_url` chessroyale, `source_revision` the branch,
     model `claude-haiku-5-5` unless the job needs Opus). Each has its own machine, no shared lock, and runs in parallel.
-  - **CI is the second lane:** push early; `ci-fail.sh <sha>` reads the failures.
+  - **GitHub CI is the DEFAULT test lane (Eric, Nov 8):** local runs are only for the 1–3 tests being changed; push early; `ci-fail.sh <sha>` reads the failures.
   - The shared-machine local lane is `e2e-quick.sh` only.
   - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
   - Stills come on `stills/<PR#>` orphan branches, which you delete after the merge.

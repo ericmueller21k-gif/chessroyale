@@ -9,6 +9,8 @@
     needed. Never poll more often than every 30 s.
   - Locally, run only the tests you're writing or changing. Don't re-run whole area specs before pushing: CI does that.
   - Look at final stills only (about 10 images in the job). Big output goes to a file; read its tail or a grep.
+  - **GitHub CI is the default test lane (Eric, Nov 8).** Locally, run only the 1–3 tests you are changing right now, for quick tries;
+    everything broader (a spec file, an area, the full suite, repeats, the proof before you report) runs in CI on your push.
   - **Where to test (Nov 8, notes/throughput-audit-2026-11-08.md).** On your own machine (a helper session the director
     started with create_session) run local e2e directly, with no lock, on 2 workers. On the director's shared machine (a subagent),
     use only `notes/tools/e2e-quick.sh` (≤15 tests, `--repeat-each` ≤3, a 15-min cap on the lock wait).
