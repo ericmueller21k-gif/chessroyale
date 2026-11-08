@@ -36,7 +36,10 @@ Eric owns it. You design, delegate to helpers, review, merge, check what's live,
   the top-right avatar, Playing now, the friends list, the quick-chat tabs, the room Back bar. **Verify the deploy and main CI on f08e31e3 first.**
 
 ## In flight (branches pushed; no helper running; relaunch with fresh Haiku helpers, 2 at a time)
-- **#551 result screen** `claude/result-screen` @ ff09213b (layout + talk sequence committed; e2e + stills NOT yet run on it). Eric liked victory-phone. His newest asks (Nov 8):
+- **#551 result screen** `claude/result-screen` @ ff09213b (layout + talk sequence + no solo Unranked line committed; boss-result.spec green on both projects). FAILING:
+  formats.spec "God King's Last Stand" never sees `.results-duo .boss-char .bc-bubble`, on both projects (check that the row renders / the selector). Not done:
+  the boss facing (nothing flipped; only Smudgy is mirrored today; needs a larger 17-boss render), the stills last-stand-phone-1-boss/-2-godking,
+  and a retaken defeat-phone.. Eric liked victory-phone. His newest asks (Nov 8):
   - delete the "Unranked: solo games don't count" line on boss results (keep the online "fewer than N real players" line);
   - Last Stand layout: the boss on the LEFT; the God King + your pawn on the RIGHT, one row; "You beat X!" under it; then the Last
     Stand card;
