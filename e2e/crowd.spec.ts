@@ -469,6 +469,61 @@ test("the scoreboard never moves: its top edge, height and the middle box hold t
   expect(worstSpill, "middle box content overflow, px (≤ 0: it fits)").toBeLessThanOrEqual(0);
 });
 
+test("the match screen's rows never move (Nov 8, Eric: nothing on the match screen moves): the power-up row, the status slot and the table keep one place through picking, move in and the other team's vote, at 390×844, 360×740 and a computer", async ({ page }) => {
+  // One game, three sizes: each size plays a turn through picking ("Your pick for …": the status slot empty), move in
+  // ("Move in. Waiting for other players") and the other team's vote ("… is voting"), and the row tops, the status slot's
+  // top and height, and the table's top must be the same (within 1 px) in all three phases.
+  test.setTimeout(10 * 60_000);
+  await page.goto("/?debug&pace=quick&mode=crowd&augments=0");
+  await soloFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/play|watching/);
+  const snap = () =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      const box = (sel: string) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        return { top: r.top, h: r.height };
+      };
+      const banner = document.querySelector(".screen.game .play-slot .waiting-banner");
+      const text = banner?.textContent ?? "";
+      const kind = (m?.phase.kind ?? "none") as string;
+      const state = banner ? (/is voting/.test(text) ? "voting" : /Waiting for other players/.test(text) ? "move in" : "other") : kind === "play" ? "picking" : "other";
+      return { state, fen: (m?.phase.board?.fen ?? "") as string, nav: box(".screen.game .history-nav"), slot: box(".screen.game .play-slot"), panel: box(".screen.game .mini-tower, .screen.game .under-board") };
+    });
+  // Phone sizes (the locked phone layout) and a computer's; the same game carries on through each.
+  for (const vp of [
+    { width: 390, height: 844 },
+    { width: 360, height: 740 },
+    { width: 1280, height: 800 },
+  ]) {
+    await page.setViewportSize(vp);
+    const name = `${vp.width}×${vp.height}`;
+    const seen = new Map<string, Awaited<ReturnType<typeof snap>>>();
+    let submitted = "";
+    const stopAt = Date.now() + 3 * 60_000;
+    while (seen.size < 3 && Date.now() < stopAt) {
+      const s = await snap();
+      if (s.state === "picking" && s.fen !== submitted) {
+        // (The engine's best move, or any legal one: the turn has to end for the next phase to show.)
+        submitted = s.fen;
+        const best = await engineTop(page, "judged", 12_000).catch(() => null);
+        await submitMove(page, best?.top[0]?.move, best?.fen);
+      }
+      if (["picking", "move in", "voting"].includes(s.state) && s.nav && s.slot && s.panel && !seen.has(s.state)) seen.set(s.state, s);
+      await page.waitForTimeout(100);
+    }
+    expect([...seen.keys()].sort(), `the three phases seen at ${name}`).toEqual(["move in", "picking", "voting"]);
+    const all = [...seen.values()];
+    const spread = (f: (s: (typeof all)[number]) => number) => Math.max(...all.map(f)) - Math.min(...all.map(f));
+    expect(spread((s) => s.nav!.top), `power-up row top at ${name}, px`).toBeLessThanOrEqual(1);
+    expect(spread((s) => s.slot!.top), `status slot top at ${name}, px`).toBeLessThanOrEqual(1);
+    expect(spread((s) => s.slot!.h), `status slot height at ${name}, px`).toBeLessThanOrEqual(1);
+    expect(spread((s) => s.panel!.top), `table top at ${name}, px`).toBeLessThanOrEqual(1);
+  }
+});
+
 test("the scoreboard box is built once: the same element and header, the same box, through picking, the reveal, the next turn and a cut (phone)", async ({ page }) => {
   // (Eric, Nov 1: "the container should be static, and anything inside of it should be… fading in and out and moving,
   // but not flashing". Each phase of a turn is a screen of its own, and each built the box anew: three rows on its first
