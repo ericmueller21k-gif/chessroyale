@@ -1,4 +1,4 @@
-import type { ItemLook } from "@chessroyale/core";
+import { pawnColorOf, type ItemLook, type PawnColor } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { looksOf } from "./locker.ts";
 import { isBlockedText } from "./text-filter.ts";
@@ -17,7 +17,7 @@ import { HERE_LIMITS, type HereBeat, type HereLimits, type HereOther } from "./t
  */
 
 type HereHub = {
-  townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null): Promise<HereOther[]>;
+  townHere(id: string, name: string, room: string, beat: HereBeat | null, limits?: HereLimits, look?: ItemLook | null, pawn?: PawnColor): Promise<HereOther[]>;
   townWatch(room: string): Promise<HereOther[]>;
 };
 
@@ -28,17 +28,22 @@ const BODY_MAX = 1024;
 /** A player's name and look are read again after this long (a change of clothes shows within it). */
 const SEEN_MS = 60_000;
 const SEEN_MAX = 20_000;
-const seen = new Map<string, { name: string; look: ItemLook | null; until: number }>();
+const seen = new Map<string, { name: string; look: ItemLook | null; pawn: PawnColor; until: number }>();
 
-/** A player's name and what they wear (an admin's own copies included, as `looksOf` reads them), from this instance's cache or D1. */
-async function profileOf(sql: Sql, id: string, now: number, admin: (email: string | null) => boolean): Promise<{ name: string; look: ItemLook | null }> {
+/** Reads a player's name, look and pawn color again on their next beat (after a change of pawn color: PATCH /api/me). */
+export function forgetLook(id: string): void {
+  seen.delete(id);
+}
+
+/** A player's name, what they wear (an admin's own copies included, as `looksOf` reads them) and pawn color, from this instance's cache or D1. */
+async function profileOf(sql: Sql, id: string, now: number, admin: (email: string | null) => boolean): Promise<{ name: string; look: ItemLook | null; pawn: PawnColor }> {
   const hit = seen.get(id);
   if (hit && hit.until > now) return hit;
-  const row = await sql.first<{ name: string; email: string | null }>("SELECT name, email FROM users WHERE id = ?", id);
+  const row = await sql.first<{ name: string; email: string | null; pawn_color: string | null }>("SELECT name, email, pawn_color FROM users WHERE id = ?", id);
   const name = row?.name && !isBlockedText(row.name) ? row.name : "Player";
   const look = (await looksOf(sql, [id], admin(row?.email ?? null) ? new Set([id]) : new Set())).get(id) ?? null;
   if (seen.size >= SEEN_MAX) seen.delete(seen.keys().next().value!);
-  const p = { name, look, until: now + SEEN_MS };
+  const p = { name, look, pawn: pawnColorOf(row?.pawn_color), until: now + SEEN_MS };
   seen.set(id, p);
   return p;
 }
@@ -93,6 +98,6 @@ export async function townHereResponse(
   const beat = readBeat(body);
   if (!beat) return json({ message: "Not a beat." }, 400);
   const me = await profileOf(sql, id, now, a.admin);
-  const others = await hub.townHere(id, me.name, room, beat, a.testSwitches ? readLimits(body.limits) : undefined, me.look);
+  const others = await hub.townHere(id, me.name, room, beat, a.testSwitches ? readLimits(body.limits) : undefined, me.look, me.pawn);
   return json({ others });
 }

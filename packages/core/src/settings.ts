@@ -2647,6 +2647,12 @@ export const SQUADS_LOBBY = {
 };
 
 /**
+ * The God King's effects in the shop UI (the shop's effects tab, the locker's "From the shop" and their buttons; Eric, Nov 8): off
+ * hides them only. Nothing is deleted: the catalog (shop.ts), owned records and the database stay as they are.
+ */
+export const GOD_KING_SHOP = false;
+
+/**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
  * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to gray out its buttons.
  */

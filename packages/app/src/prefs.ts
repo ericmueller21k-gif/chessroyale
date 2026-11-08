@@ -1,4 +1,4 @@
-import { SQUADS_LOBBY } from "@chessroyale/core";
+import { DEFAULT_PAWN_COLOR, SQUADS_LOBBY, pawnColorOf, type PawnColor } from "@chessroyale/core";
 import { testSwitchesAllowed } from "./test-switches.ts";
 
 /** Small per-device preferences. */
@@ -292,3 +292,28 @@ export const showUnderBoard = (layout: UnderBoardLayout) => saveUnderBoardView({
 
 /** Folds the space under the board to its header bar, or opens it again, keeping the layout. */
 export const foldUnderBoard = (open: boolean) => saveUnderBoardView({ ...underBoardView(), open });
+
+const PAWN_KEY = "brc.pawnColor";
+let pawnMemory: PawnColor | null = null;
+
+/**
+ * The default pawn color on this device (Eric, Nov 7): a guest's (a signed-in player's is on the account: account.ts,
+ * `myPawnColor`). Without storage it lasts as long as the page. Nothing else is sent anywhere.
+ */
+export function devicePawnColor(): PawnColor {
+  if (pawnMemory) return pawnMemory;
+  try {
+    return pawnColorOf(localStorage.getItem(PAWN_KEY));
+  } catch {
+    return DEFAULT_PAWN_COLOR;
+  }
+}
+
+export function setDevicePawnColor(c: PawnColor) {
+  try {
+    localStorage.setItem(PAWN_KEY, c);
+    pawnMemory = null;
+  } catch {
+    pawnMemory = c;
+  }
+}

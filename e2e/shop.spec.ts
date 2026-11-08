@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { bossCrateOf } from "@chessroyale/core";
-import { asAdmin, asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -1371,4 +1371,153 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+/**
+ * The shop's screens (Eric, Nov 7), on a phone and a computer: no "Shop" title on any tab (the tab row says where you are); the
+ * locker's tabs are All, Head, Face, Skin, Weapon and Ride (the God King tab is gone; its effects stay under All); the preview is
+ * one pawn in a box twice its old height (126 px with its frame before, 252 now), with W and B bottom right. B makes the pawn black
+ * and saves it on the account (signed in: it survives a reload; the town shows it, town-afk.spec.ts); W switches back. Number
+ * checks: the box's height, the pawn's piece class (white or black), aria-pressed, the picker inside the box.
+ */
+test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a box twice its old height, a W and B picker bottom right: B is black and saved (it survives a reload), W is white again (Eric, Nov 7)", async ({ page }) => {
+  await asSignedIn(page, "pawn");
+  await page.goto("/shop");
+  for (const tab of ["Shop", "Crates", "Locker"]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await expect(page.locator(".shop-head h1")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Shop", exact: true })).toHaveCount(0);
+  }
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-tabs [role=tab]")).toHaveText(["All", "Head", "Face", "Skin", "Weapon", "Ride"]);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  // One pawn, white by default, in a box 252 px tall.
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  expect(Math.round((await page.locator(".locker-preview").boundingBox())!.height)).toBe(252);
+  const W = page.getByRole("button", { name: "White", exact: true });
+  const B = page.getByRole("button", { name: "Black", exact: true });
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(B).toHaveAttribute("aria-pressed", "false");
+  // The picker sits inside the box's bottom-right corner.
+  const box = (await page.locator(".locker-preview").boundingBox())!;
+  const pick = (await page.locator(".locker-pawn-pick").boundingBox())!;
+  expect(pick.x + pick.width).toBeLessThanOrEqual(box.x + box.width);
+  expect(pick.y + pick.height).toBeLessThanOrEqual(box.y + box.height);
+  // Two small squares, one button each (30 px; a hit area of 40 px at most): each inside the box, not overlapping, its right and
+  // bottom insets 12 px at most; no "default" word in the box; no God King button or tab.
+  const btns = page.locator(".locker-pawn-letter");
+  await expect(btns).toHaveCount(2);
+  const sq = [(await btns.nth(0).boundingBox())!, (await btns.nth(1).boundingBox())!];
+  for (const q of sq) {
+    expect(q.width).toBeLessThanOrEqual(28);
+    expect(q.height).toBeLessThanOrEqual(28);
+    expect(q.x).toBeGreaterThanOrEqual(box.x);
+    expect(q.y).toBeGreaterThanOrEqual(box.y);
+    expect(q.x + q.width).toBeLessThanOrEqual(box.x + box.width);
+    expect(q.y + q.height).toBeLessThanOrEqual(box.y + box.height);
+  }
+  expect(sq[0]!.x + sq[0]!.width, "W and B don't overlap").toBeLessThanOrEqual(sq[1]!.x);
+  // The selected one is about 15% bigger than the other: W now (white selected), B after its tap below.
+  expect(sq[0]!.width, "W selected: bigger than B").toBeGreaterThanOrEqual(sq[1]!.width * 1.1);
+  // Each one's tap area is 32 px at least (an invisible ::before around the square).
+  for (const i of [0, 1]) expect(parseFloat(await btns.nth(i).evaluate((el) => getComputedStyle(el, "::before").width))).toBeGreaterThanOrEqual(32);
+  expect(box.x + box.width - (sq[1]!.x + sq[1]!.width), "right inset").toBeLessThanOrEqual(12);
+  expect(box.y + box.height - Math.max(sq[0]!.y + sq[0]!.height, sq[1]!.y + sq[1]!.height), "bottom inset").toBeLessThanOrEqual(12);
+  await expect(page.locator(".locker-preview")).not.toContainText(/default/i);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "God King", exact: true })).toHaveCount(0);
+  // The God King's effects are hidden from the locker and the shop (GOD_KING_SHOP, Nov 8): no "From the shop", no effects tab.
+  await expect(page.getByText("From the shop")).toHaveCount(0);
+  await expect(page.getByText("More God King effects")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
+  // B: black, saved on the account (the server says so), and it's still black after a reload.
+  await B.click();
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  const [bw, ww] = [(await B.boundingBox())!.width, (await W.boundingBox())!.width];
+  expect(bw, "B selected: bigger than W").toBeGreaterThanOrEqual(ww * 1.1);
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
+  // Its outline reads on the box: the light stroke against the window's blue (styles.css, .ff-window: #2a3cbd, #13207a, #0a1150),
+  // at least 3:1 against each (WCAG contrast ratio).
+  const stroke = await page.locator(".locker-preview svg.default-black path").getAttribute("stroke");
+  expect(stroke).toBe("#f5efe0");
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const ratio = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  for (const blue of ["#2a3cbd", "#13207a", "#0a1150"]) expect(ratio(stroke!, blue), `outline on ${blue}`).toBeGreaterThanOrEqual(3);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("black");
+  await page.reload();
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  // W: white again, saved.
+  await W.click();
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
+  // The Shop tab: no God King effects tab, and no "Coming later: King kill moves" line.
+  await page.getByRole("tab", { name: "Shop", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
+  // The Chat packs tab: no God King pack (GOD_KING_SHOP off); the Winter pack is still there.
+  await page.getByRole("tab", { name: "Chat packs", exact: true }).click();
+  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
+  await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
+});
+
+/**
+ * The shop page's width (Eric, Nov 8): on a computer (the desktop project, 1440 by 900) all three tabs sit 120 to 160 px in from the
+ * main column on each side (about one filter chip, 140 px), and the tabs row, the blue box, the chips row and the first item card
+ * share its left and right edges within 2 px (the card's right edge is its grid's). On a phone the old 14 px gutter is unchanged.
+ * PADDED_SHOTS=<dir>: the three tabs' stills at 1440 by 900.
+ */
+test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 to 160 px in from the main column, edges aligned; on a phone the 14 px gutter stays", async ({ page }, testInfo) => {
+  const computer = testInfo.project.name === "desktop";
+  if (computer) await page.setViewportSize({ width: 1440, height: 900 });
+  await asSignedIn(page, "pawn");
+  await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.goto("/shop");
+  const cases = [
+    { tab: "Shop", shot: "shop", chips: ".shop-tabs", box: null, card: ".shop-item", grid: ".shop-grid" },
+    { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
+    { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
+  ] as const;
+  const rect = (sel: string) =>
+    page.locator(sel).first().evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      return { l: b.left, r: b.right };
+    });
+  for (const c of cases) {
+    await page.getByRole("tab", { name: c.tab, exact: true }).click();
+    await expect(page.locator(c.card).first()).toBeVisible();
+    const col = await rect(".screen.shop");
+    // The tabs row, the blue box, the chips row, and the first card (its left edge, and its grid's right edge).
+    const els: [string, { l: number; r: number }][] = [["tabs", await rect(".area-tabs")]];
+    if (c.box) els.push(["blue box", await rect(c.box)]);
+    if (c.chips) els.push(["chips", await rect(c.chips)]);
+    els.push(["first card", { l: (await rect(c.card)).l, r: (await rect(c.grid)).r }]);
+    const tabs = els[0]![1];
+    for (const [name, e] of els) {
+      const inL = e.l - col.l;
+      const inR = col.r - e.r;
+      if (computer) {
+        expect(inL, `${c.tab}: ${name} left inset`).toBeGreaterThanOrEqual(120);
+        expect(inL, `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(160);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeGreaterThanOrEqual(120);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(160);
+      } else {
+        // The old gutter: 14 px each side.
+        expect(Math.abs(inL - 14), `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(1);
+        expect(Math.abs(inR - 14), `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(e.l - tabs.l), `${c.tab}: ${name} left edge`).toBeLessThanOrEqual(2);
+      expect(Math.abs(e.r - tabs.r), `${c.tab}: ${name} right edge`).toBeLessThanOrEqual(2);
+    }
+    const shots = process.env.PADDED_SHOTS;
+    if (computer && shots) await page.screenshot({ path: `${shots}/${c.shot}-computer-padded.png` });
+  }
 });

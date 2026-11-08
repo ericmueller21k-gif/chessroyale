@@ -1,4 +1,4 @@
-import { QUICK_CHAT } from "./settings.ts";
+import { GOD_KING_SHOP, QUICK_CHAT } from "./settings.ts";
 
 /**
  * Quick chat: everything players can say to each other in a match. There is no typing anywhere: a message is the
@@ -231,6 +231,15 @@ export function ownedChatPacks(owned: readonly string[] | null | undefined): str
   const have = new Set(owned ?? []);
   return CHAT_PACKS.filter((p) => p.free || have.has(chatPackItem(p.id))).map((p) => p.id);
 }
+
+/** Chat packs the shop stops offering while GOD_KING_SHOP is off (Eric, Nov 8). Nothing is deleted: owners keep them. */
+const SHOP_HIDDEN_PACKS: readonly string[] = ["godking"];
+
+/** The shop offers this chat pack (its Chat packs tab). */
+export const shopOffersPack = (id: string): boolean => GOD_KING_SHOP || !SHOP_HIDDEN_PACKS.includes(id);
+
+/** The quick-chat picker shows a pack: the shop offers it, or you own it already (`ownedPacks` are pack ids). */
+export const packOffered = (id: string, ownedPacks: readonly string[]): boolean => shopOffersPack(id) || ownedPacks.includes(id);
 
 /** Whoever owns `owned` (shop item ids) may send this line. */
 export function canSay(id: unknown, owned: readonly string[] | null | undefined): boolean {

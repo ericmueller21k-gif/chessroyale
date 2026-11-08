@@ -1,4 +1,5 @@
-import { ASK_AGE_LINE, CHAT_MOD, oldEnough, type ChatPicks, type ShopState } from "@chessroyale/core";
+import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
+import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -22,7 +23,7 @@ export interface ModeStats {
 export type { RankedSummary };
 
 export interface Profile {
-  user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean };
+  user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean; pawn?: PawnColor };
   /** The shop: coins, items owned and what's equipped (missing from an older server). */
   shop?: ShopState;
   /** Crate items you own, what you wear, and your crates and keys (null: unlimited while testing). */
@@ -244,6 +245,32 @@ export async function refreshChatStanding(now = Date.now()): Promise<void> {
 export async function updateProfile(patch: { name?: string; icon?: string }): Promise<void> {
   if (!state.profile) return;
   set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify(patch) }) });
+}
+
+/** Your default pawn color (pawn-color.ts): the account's when signed in, this device's for a guest. */
+export function myPawnColor(): PawnColor {
+  const p = state.profile;
+  return p?.user.signedIn ? pawnColorOf(p.user.pawn) : devicePawnColor();
+}
+
+/**
+ * Picks your default pawn color (the locker's W or B): saved on your account when signed in, on this device otherwise. It shows
+ * at once; a save the server refuses puts the color back and throws.
+ */
+export async function setPawnColor(c: PawnColor): Promise<void> {
+  const p = state.profile;
+  if (!p?.user.signedIn) {
+    setDevicePawnColor(c);
+    set({ profile: p });
+    return;
+  }
+  set({ profile: { ...p, user: { ...p.user, pawn: c } } });
+  try {
+    set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ pawn: c }) }) });
+  } catch (e) {
+    set({ profile: p });
+    throw e;
+  }
 }
 
 /** Gets a shop item (free while testing). */
@@ -527,6 +554,8 @@ export interface PublicProfile {
   /** Their icon: a drawing (a PNG data URL), an older account's emoji, or the default pawn "♟" (missing from an older server). */
   icon?: string;
   look: ItemLook;
+  /** Their default pawn color (missing from an older server: white). */
+  pawn?: PawnColor;
   joinedAt: number;
   lastSeen: number | null;
   online: boolean;

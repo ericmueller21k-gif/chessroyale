@@ -737,7 +737,7 @@ export function HomeScreen({
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
       {/* (Your pawn opens your inventory (Eric, Nov 6); your icon opens the icon picker and your name, rank and public profile: Eric, Nov 7.) */}
-      <DressedPawn look={look} size="hero" shadow ride onTap={onInventory} tapLabel="Open your inventory" />
+      <DressedPawn look={look} size="hero" shadow ride own onTap={onInventory} tapLabel="Open your inventory" />
       {/* (Your icon to the left of your name and rating, as beside your name in chat; its height is the two lines'.) Only the
           icon and the name and rank line are taps; the rest of the card does nothing. */}
       <div class="fd-hero-id">

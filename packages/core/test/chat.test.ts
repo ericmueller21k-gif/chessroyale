@@ -23,12 +23,27 @@ import {
   defaultChatPicks,
   mulberry32,
   noChatSent,
+  GOD_KING_SHOP,
   ownedChatPacks,
+  packOffered,
   shopItem,
+  shopOffersPack,
   toggleChatPick,
   type ChatPicks,
   type ChatSent,
 } from "../src/index.ts";
+
+describe("quick chat: packs the shop stops offering", () => {
+  it("hides the God King pack from the shop while GOD_KING_SHOP is off, and keeps it for whoever owns it", () => {
+    expect(shopOffersPack("godking")).toBe(GOD_KING_SHOP);
+    expect(shopOffersPack("winter")).toBe(true);
+    expect(packOffered("godking", [])).toBe(GOD_KING_SHOP);
+    expect(packOffered("godking", ["godking"])).toBe(true);
+    expect(packOffered("winter", [])).toBe(true);
+    // Its lines still work for an owner.
+    expect(canSay("gk-crown", ["chat-godking"])).toBe(true);
+  });
+});
 
 describe("quick chat: the lines", () => {
   it("has the designed free phrases in four groups, and the free emoji", () => {

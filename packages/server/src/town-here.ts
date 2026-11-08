@@ -1,4 +1,4 @@
-import { TOWN_AFK, type ItemLook } from "@chessroyale/core";
+import { TOWN_AFK, pawnColorOf, type ItemLook, type PawnColor } from "@chessroyale/core";
 
 /**
  * Who's in the town square now, as pure logic (the live hub keeps one, in memory only: a restart forgets it, and each device's
@@ -49,6 +49,8 @@ export interface HereOther {
   zzz: boolean;
   /** What they wear (their equipped items, as every other screen draws them: Eric, on #542); absent: nothing on. */
   look?: ItemLook;
+  /** Their default pawn color (white unless they chose black; pawn-color.ts). */
+  pawn: PawnColor;
 }
 
 interface Entry {
@@ -63,6 +65,7 @@ interface Entry {
   beatAt: number;
   limits: HereLimits;
   look: ItemLook | null;
+  pawn: PawnColor;
 }
 
 /** The most rooms' worth of players held (a guard: a test makes a room per run). */
@@ -76,12 +79,12 @@ export class TownHere {
   }
 
   /** A device's beat: where its player is now. */
-  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null): void {
+  beat(id: string, name: string, room: string, b: HereBeat, now: number, limits: HereLimits = HERE_LIMITS, look: ItemLook | null = null, pawn?: PawnColor): void {
     const was = this.here.get(id);
     const hiddenSince = b.hidden ? (was?.hiddenSince ?? now) : null;
     if (!was && this.here.size >= HOLD_MAX) this.sweep(now);
     if (!was && this.here.size >= HOLD_MAX) return;
-    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look });
+    this.here.set(id, { id, name, room, c: b.c, r: b.r, shop: b.shop, idleSince: now - Math.max(0, b.idleMs), hiddenSince, beatAt: now, limits, look, pawn: pawnColorOf(pawn) });
   }
 
   /** A device left the town (back home, out to a game, the page closed). */
@@ -122,7 +125,7 @@ export class TownHere {
     const out: HereOther[] = [];
     for (const e of this.here.values()) {
       if (e.room !== room || e.id === except || e.shop) continue;
-      out.push({ id: e.id, name: names ? e.name : "", c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs, ...(e.look ? { look: e.look } : {}) });
+      out.push({ id: e.id, name: names ? e.name : "", c: e.c, r: e.r, zzz: now - e.idleSince >= e.limits.zzzMs, pawn: e.pawn, ...(e.look ? { look: e.look } : {}) });
       if (out.length >= max) break;
     }
     return out;

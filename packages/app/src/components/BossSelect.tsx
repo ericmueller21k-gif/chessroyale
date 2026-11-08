@@ -267,7 +267,7 @@ export function BossSelect({
               })}
               <span class="dv-st-plat" aria-hidden="true" />
               <span class="bs-me" aria-hidden="true">
-                <DressedPawn look={look} size="stage" />
+                <DressedPawn look={look} size="stage" own />
                 {party && <HeadBadges leader={party.me.leader} ready={party.me.ready} me />}
               </span>
               {menuFor && party && (

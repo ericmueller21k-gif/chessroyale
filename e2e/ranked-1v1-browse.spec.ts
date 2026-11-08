@@ -43,7 +43,8 @@ const goHome = (page: Page) => page.locator(".dv-search").getByRole("button", { 
 async function openShop(page: Page) {
   if (isComputer()) await page.locator(".fd-side").getByRole("button", { name: "Shop & crates" }).click();
   else await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
-  await expect(page.getByRole("heading", { name: "Shop", exact: true })).toBeVisible();
+  // (The shop has no "Shop" title since Nov 7: its tab row shows the shop is open.)
+  await expect(page.getByRole("tab", { name: "Shop", exact: true })).toHaveAttribute("aria-selected", "true");
 }
 
 /** Nothing of the page under the bar: the page's own top is at or below the bar's foot. */
@@ -117,7 +118,7 @@ test("an opponent found while you browse: a sound and a buzz, straight to the st
   // Straight from the shop to the stage: Bo's pawn, name and rank arrive on it; the bar has gone.
   await expect(a.locator(".dv-versus .dv-st-them .dv-st-name")).toHaveText("Bo Away", { timeout: 20_000 });
   await expect(a.locator(".dq-bar")).toHaveCount(0);
-  await expect(a.getByRole("heading", { name: "Shop", exact: true })).toHaveCount(0);
+  await expect(a.getByRole("tab", { name: "Shop", exact: true })).toHaveCount(0);
   const log = await a.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog);
   expect(log.filter((s) => s.startsWith("bannerStart"))).toHaveLength(1);
   expect(await a.evaluate(() => (window as unknown as { __buzz: unknown[] }).__buzz)).toEqual([[90, 60, 160]]);

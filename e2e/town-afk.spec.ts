@@ -13,7 +13,7 @@ import { asSignedIn, giveItems, test, wearItem } from "./helpers.ts";
 test.use({ actionTimeout: 15_000 });
 
 const canvas = (p: Page) => p.locator("canvas.town-canvas");
-type Here = { uid: string | null; you: boolean; name: string; at: [number, number]; here: boolean; zzz: boolean; drawn: boolean; look: Record<string, string> | null; dressed: boolean; tag: boolean };
+type Here = { uid: string | null; you: boolean; name: string; at: [number, number]; here: boolean; zzz: boolean; drawn: boolean; look: Record<string, string> | null; pawn: "white" | "black" | null; dressed: boolean; tag: boolean };
 const hereOf = (p: Page) => p.evaluate(() => (window as any).__townHere() as Here[]);
 const them = async (p: Page, uid: string) => (await hereOf(p)).find((h) => h.uid === uid) ?? null;
 const me = async (p: Page) => (await hereOf(p)).find((h) => h.you)!;
@@ -213,6 +213,37 @@ test("a guest watches (Eric, on #542): another player in their outfit, no name t
   expect(posts.length).toBeGreaterThan(0);
   for (const b of posts) expect(JSON.parse(b)).toMatchObject({ watch: true });
   expect((await hereOf(bo)).filter((h) => !h.you && h.here)).toEqual([]);
+  await bo.context().close();
+});
+
+test("your default pawn color goes with you (Eric, Nov 7): you're black in your town at once and Bo sees you black on your next beat; W switches it back for both", async ({ page, browser }, info) => {
+  test.setTimeout(150_000);
+  const r = room();
+  // You, signed in: B in the locker makes your pawn black, saved on your account.
+  const id = await asSignedIn(page, "pawn");
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await page.getByRole("button", { name: "Black", exact: true }).click();
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("black");
+  // Bo, signed in, in the same town (a room of this test's own).
+  const bo = await another(browser, info.project.name === "phone");
+  await openIn(bo, r, "600,900,900");
+  await page.goto(`/town?sky=day&townroom=${r}&townafk=off`);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForFunction(() => typeof (window as any).__townHere === "function");
+  // You're drawn black, and Bo sees you black (the server's next beat for you carries it).
+  await expect.poll(async () => (await me(page)).pawn, { message: "you're black in your town" }).toBe("black");
+  await expect.poll(async () => (await them(bo, id))?.pawn, { timeout: 20_000, message: "Bo sees you black" }).toBe("black");
+  // W in the locker: white, for you and for Bo.
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await page.getByRole("button", { name: "White", exact: true }).click();
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
+  await page.goto(`/town?sky=day&townroom=${r}&townafk=off`);
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await page.waitForFunction(() => typeof (window as any).__townHere === "function");
+  await expect.poll(async () => (await me(page)).pawn).toBe("white");
+  await expect.poll(async () => (await them(bo, id))?.pawn, { timeout: 20_000, message: "Bo sees you white again" }).toBe("white");
   await bo.context().close();
 });
 

@@ -183,8 +183,8 @@ function Privacy() {
         title="Your locker, coins and shop"
         what={
           <p>
-            The crate items you own (each with its color, purity and pattern), what you wear, your coins, earned crates and crate keys,
-            your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, tokens and
+            The crate items you own (each with its color, purity and pattern), what you wear, your default pawn color (white or black),
+            your coins, earned crates and crate keys, your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, tokens and
             items: what, how many, why (a game, a battle, a crate, a buy) and when.
           </p>
         }
@@ -305,8 +305,8 @@ function Privacy() {
 
       <h2>What other players see</h2>
       <p>
-        Your profile: your name, your icon (the drawing you made, shown blurred behind your pawn), the items you wear, when you
-        joined, "Online now" or when you were last seen (unless you hide it in Settings), your rating, rank and "Top %", your 1 v 1
+        Your profile: your name, your icon (the drawing you made, shown blurred behind your pawn), the items you wear, your default
+        pawn color, when you joined, "Online now" or when you were last seen (unless you hide it in Settings), your rating, rank and "Top %", your 1 v 1
         rank, record, best rank and win streak, your last five 1 v 1 games (who you played and the rank points each moved), your stats
         and last 10 matches (only their day while you hide when you're online), and "Banned" if you are.
         Your friends also see whether you're online or in a match, unless you hide it. Nobody
