@@ -775,7 +775,8 @@ export class SoloMatch implements GameView {
     const r = this.rush;
     if (!r || this.stopped) return;
     if (this.runner.rushDue()) {
-      this.runner.finishRush(this.you.alive ? { [HUMAN]: r.places } : {});
+      // (Solo: only your own put-back counts, no bots and no mean; Eric, Nov 8. Out of the battle: the bots' as online.)
+      this.runner.finishRush(this.you.alive ? { [HUMAN]: r.places } : {}, this.you.alive ? HUMAN : undefined);
       this.showRush();
       this.timer = setTimeout(() => this.rushStep(), Math.max(0, r.at + rushTimeline().total - Date.now()));
       return;

@@ -139,6 +139,16 @@ export const battleStartPly = (startMove: number) => Math.max(0, (startMove - 1)
 /** "12." for White's move, "12…" for Black's. */
 export const moveNumber = (ply: number) => `${Math.floor(ply / 2) + 1}${ply % 2 === 0 ? "." : "…"}`;
 
+/**
+ * A row's number from the position it was played in (its FEN's move number and side), so a passed turn reads right: Dash's
+ * extra move after a failed Scramble Rush (or Hollow's) is his "14…" after his "13…", never a "14." (Nov 8). A FEN without a
+ * move number: by its ply, as moveNumber.
+ */
+export function rowNumber(row: Pick<PlyRow, "ply" | "color" | "fenBefore">): string {
+  const n = Number(row.fenBefore.split(" ")[5]);
+  return Number.isInteger(n) && n > 0 ? `${n}${row.color === "w" ? "." : "…"}` : moveNumber(row.ply);
+}
+
 /** A move's time as the list shows it: "4s", "12s", "1:05". */
 export function timeShown(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));

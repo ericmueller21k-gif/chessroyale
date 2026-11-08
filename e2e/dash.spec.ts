@@ -323,6 +323,12 @@ for (const [right, held] of [
     await expect.poll(() => page.evaluate(() => (window as any).match.boss.powers.dash.rush.correct ?? null), { timeout: 30_000 }).toBe(right);
     expect(!(await page.evaluate(() => (window as any).match.boss.powers.dash.rush.extra))).toBe(held);
     await yourMove(page);
+    // (Eric, Nov 8: the move list. Failed: two of his moves in a row, numbered as played, "13…" then "14…"; held: one, then yours.)
+    const listed = await page.evaluate(() =>
+      [...document.querySelector(".mv-list")!.querySelectorAll(".mv-row:not(.mv-opening)")].slice(-2).map((r) => ({ boss: r.classList.contains("mv-boss"), no: r.querySelector(".mv-no")!.textContent! })),
+    );
+    expect(listed.map((r) => r.boss)).toEqual(held ? [false, true] : [true, true]);
+    if (!held) expect(Number.parseInt(listed[1]!.no)).toBe(Number.parseInt(listed[0]!.no) + 1);
     const rush = await page.evaluate(() => (window as any).match.boss.powers.dash.rush);
     const after = await page.evaluate(() => ({ fen: (window as any).match.phase.board.fen as string, plies: (window as any).match.boss.board.history.length as number }));
     if (held) expect(after.fen).toBe(start.fen);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fenAtPly } from "@chessroyale/chess";
-import { battleStartPly, moveNumber, moverOf, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type TurnInput } from "../src/move-list.ts";
+import { battleStartPly, moveNumber, moverOf, rowNumber, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type TurnInput } from "../src/move-list.ts";
 
 /** A game with a capture of each kind, castling, en passant and a promotion. */
 const GAME = ["e2e4", "d7d5", "e4d5", "d8d5", "b1c3", "d5a5", "g1f3", "c8g4", "f1e2", "b8c6", "e1g1", "e8c8"];
@@ -59,6 +59,10 @@ describe("the move list's rows from the match's history", () => {
 
   it("numbers and times as the rows show them", () => {
     expect([moveNumber(0), moveNumber(1), moveNumber(22)]).toEqual(["1.", "1…", "12."]);
+    // (From the position: a passed turn, Dash's extra move after his own, reads "13…", "14…", then the crowd's "15.".)
+    expect(rowNumber({ ply: 26, color: "b", fenBefore: "4k3/8/8/8/8/8/8/4K3 b - - 0 14" })).toBe("14…");
+    expect(rowNumber({ ply: 27, color: "w", fenBefore: "4k3/8/8/8/8/8/8/4K3 w - - 0 15" })).toBe("15.");
+    expect(rowNumber({ ply: 3, color: "b", fenBefore: "4k3/8/8/8/8/8/8/4K3 b - -" })).toBe("2…");
     expect([timeShown(400), timeShown(4_400), timeShown(65_000)]).toEqual(["0s", "4s", "1:05"]);
     expect(pieceOn("8/8/8/8/8/8/8/R3K2r w - - 0 1", "h1")).toEqual({ color: "b", type: "r" });
     expect(pieceOn("8/8/8/8/8/8/8/R3K2r w - - 0 1", "b1")).toBeNull();
