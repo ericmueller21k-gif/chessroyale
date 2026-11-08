@@ -16,6 +16,12 @@ Eric owns it. You design, delegate to helpers, review, merge, check what's live,
 - Helpers: each gets its own worktree, runs `npm ci` in it, and uses its own E2E_PORT (build, then E2E_PREBUILT=1),
   `flock /tmp/claude-0/e2e.lock`.
 
+## How helpers run now (Nov 8 audit: notes/throughput-audit-2026-11-08.md)
+- Each helper is its own cloud session on its own machine (`create_session`). No shared e2e lock. CI is the second
+  lane (push early; `notes/tools/ci-fail.sh <sha>`). Stills come on `stills/<PR#>` branches.
+- Pilot: #551 result screen, session_01JuCWRuSgqDxoUzeqE4thSP (started 03:30 UTC). Subagents on this machine:
+  #554 Locker and #553 Dash clock (started ~03:25; their results go to the old director session; check their branches).
+
 ## Usage lessons (Nov 8: about 30% of the week was gone by Saturday)
 - One Opus helper used about 4× what four Haiku helpers used together (672 turns, ~254M cache reads). The director's long
   context was the next biggest cost.

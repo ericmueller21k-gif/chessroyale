@@ -14,6 +14,13 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   rebuild the scratchpad scripts (`notes/tools/`), re-check open PRs and branches, re-arm CI watchers.
 
 ## Usage (Eric's money and week)
+- **Nov 8 throughput rules (notes/throughput-audit-2026-11-08.md):**
+  - Helpers run as **their own cloud sessions** (`create_session`, `source_url` chessroyale, `source_revision` the branch,
+    model `claude-haiku-5-5` unless the job needs Opus). Each has its own machine, no shared lock, and runs in parallel.
+  - **CI is the second lane:** push early; `ci-fail.sh <sha>` reads the failures.
+  - The shared-machine local lane is `e2e-quick.sh` only.
+  - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
+  - Stills come on `stills/<PR#>` orphan branches, which you delete after the merge.
 - **One Opus helper at a time.** Never more. A Haiku helper beside it only for a small UI/docs job Eric OK'd. CI and
   deploy watchers (scripts) don't count. (October, after ~10 at once used ~30% of a week; lost after the Nov 1 restart.)
 - Models: Haiku for UI, docs and simple jobs; never Sonnet. Opus high for rules, engine, bosses, sims, reviews, art,

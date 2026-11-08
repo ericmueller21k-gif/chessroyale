@@ -9,7 +9,14 @@
     needed. Never poll more often than every 30 s.
   - Locally, run only the tests you're writing or changing. Don't re-run whole area specs before pushing: CI does that.
   - Look at final stills only (about 10 images in the job). Big output goes to a file; read its tail or a grep.
-  - The machine is shared with other helpers today: run local e2e under the shared lock (`flock /tmp/claude-0/e2e.lock …`).
+  - **Where to test (Nov 8, notes/throughput-audit-2026-11-08.md).** On your own machine (a helper session the director
+    started with create_session) run local e2e directly, with no lock, on 2 workers. On the director's shared machine (a subagent),
+    use only `notes/tools/e2e-quick.sh` (≤15 tests, `--repeat-each` ≤3, a 15-min cap on the lock wait).
+    **Push early and often:** every push makes CI re-test your PR's areas in parallel for free. Read CI failures with
+    `notes/tools/ci-fail.sh <sha>` (no token needed). The full suite, broad runs and repeat sweeps run only in CI.
+  - **Self-check before you report.** Open every still you made and check it against the brief's numbers (inside the
+    screen, the order, counts). If anything is clipped, overlapping, missing or out of order, fix it first. A defect the
+    director finds costs a whole extra round.
 - Ports: 8797, 9229, 9331, 8788, 8811 may be taken; use others (and `--inspector-port`). Free a port you started with
   `fuser -k PORT/tcp`; never kill PIDs. Don't list processes, inspect /proc or the environment, print environment
   variables, read auth or config files, or call session or agent tools. Never force-push, rebase or push empty commits.
@@ -32,7 +39,8 @@ American English everywhere: player-visible text, docs, notes, PR bodies and rep
 realize, organize, meter, canceled, traveled. Don't rename existing code identifiers just for spelling.
 
 ## Keep it lean (Eric, Nov 6: "it shouldn't be this complicated … something has gotten bloated"; the audit of Nov 6 §4)
-- **Stills and GIFs stay out of the repo.** Save them untracked (for example `<worktree>/stills/`, never `git add`) and report their paths to the director, who sends them to Eric. Commit an image only when a test reads it as a fixture.
+- **Stills and GIFs stay out of the repo.** On your own machine, deliver them on an orphan branch `stills/<PR#>` (images only, never on
+  your work branch); the director deletes it after the merge. Save them untracked (for example `<worktree>/stills/`, never `git add`) and report their paths to the director, who sends them to Eric. Commit an image only when a test reads it as a fixture.
 - **The PR body:** at most 40 lines. What changed for players, the changed checks (old → new) and the test results. No restating the brief.
 - **The decision note:** at most 10 lines. Eric's words, the call, and why.
 - **Area pages (docs/areas):** add at most 5 lines per PR. Edit in place instead of appending history.
