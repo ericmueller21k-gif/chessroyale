@@ -148,7 +148,7 @@ test("typed chat (Nov 7) in the queue's lobby chat and the match: signed-in play
   await lobby(bo).getByRole("textbox", { name: "Send a message" }).fill("add me on discord");
   await lobby(bo).getByRole("textbox", { name: "Send a message" }).press("Enter");
   await expect(lobby(bo).locator(".qtype-note")).toHaveText("No links or contact details in chat.");
-  if (TYPED_STILLS) await bo.screenshot({ path: `${TYPED_STILLS}/${test.info().project.name}-lobby-typed.png` });
+  if (TYPED_STILLS) await bo.screenshot({ path: `${TYPED_STILLS}/${test.info().project.name}-lobby-typed.png`, fullPage: true });
   // The match: typing carries on in its chat (a phone's Chat tab: T opens the field over the feed's foot; a computer's panel beside the board).
   await expect.poll(() => phase(ann), { timeout: 90_000 }).toMatch(/play|watching/);
   if (phone) {
