@@ -444,3 +444,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **Nov 8 ~19:35:** Eric: Timber's workshop strip pieces (boss bar) are tiny; make them near board-piece size, phone + computer. Haiku
   helper session_01JuCWRsmfHm6SHwFJHUP7Mh, branch claude/timber-workshop-size (light lane), stills on stills/timber-workshop.
   Two helpers running now (auto chess v5 Opus + this Haiku): the max.
+- **Nov 8 ~19:50: Eric (Dash playtest):** Scramble Rush extra move never showed after a failed put-back; pop-off twice a game; fewer
+  "fam". Brief notes/briefs/brief-dash-nov8.md. QUEUED: Job 2 (Haiku) when the Timber helper finishes; Job 1 (Opus) when the auto chess
+  v5 helper finishes (one Opus at a time). Branches: claude/dash-popoff-fam, claude/dash-rush-extra.
