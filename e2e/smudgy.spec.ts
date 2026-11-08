@@ -433,18 +433,23 @@ test("Smudgy's Repaint: REPAINT!, a cream stroke on his pawn's square then a cha
   await bossAloneFromHome(page);
   await yourMove(page);
   await record(page);
-  // Quiet moves (never onto his pawns' files' first squares) until the Repaint has been played.
+  // Quiet moves (never onto his pawns' files' first squares) until the Repaint has been played. The warning's turn
+  // (warnAt, read as each of your turns begins) is the turn it comes (Eric, Nov 7: warned, then never).
+  let warnAt: number | undefined;
   for (let turn = 0; turn < 14; turn++) {
     await yourMove(page);
     const s = await state(page);
     if (s.boss.powers.repaints > 0) break;
+    warnAt ??= s.boss.powers.warnAt;
     await submitMove(page, quiet(s.fen, s.allowed), s.fen);
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   }
   await yourMove(page);
   const s = await state(page);
   expect(s.boss.powers.repaints).toBeGreaterThan(0);
-  const rp = s.boss.powers.repaint as { pawn: string; piece: string; type: string };
+  const rp = s.boss.powers.repaint as { pawn: string; piece: string; type: string; at: number };
+  expect(warnAt, "warned before it came").toBeDefined();
+  expect(rp.at, "his turn right after the warning").toBe(warnAt);
   const rec = await frames(page);
   expect(inOrder(rec.map((r) => r.repaint))).toEqual(["banner", "first", "second"]);
   expect(rec.some((r) => /REPAINT!/.test(r.banner) && r.banner.includes(`${rp.pawn} and ${rp.piece} change sides`))).toBe(true);

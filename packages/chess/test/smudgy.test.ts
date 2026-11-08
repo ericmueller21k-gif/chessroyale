@@ -469,7 +469,7 @@ describe("Repaint", () => {
     expect(repaintOptions("rnbqkbnr/ppppp1pp/5p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2", "b")).toEqual([]);
   });
 
-  it("the engine's pick: within the band, the nearest its target; none in the band, none (the test switch: the nearest)", async () => {
+  it("the engine's pick: within the band, the nearest its target; none in the band, the nearest outside it", async () => {
     // A stand-in engine: him to move before, 50%; each candidate's gain set by its crowd's expected score.
     const k = BOSS_POWERS.bouncePawnLogit;
     const sig = (x: number) => 1 / (1 + Math.exp(-x));
@@ -479,7 +479,9 @@ describe("Repaint", () => {
     };
     const at = { a: 0.5, b: 1.6, c: 2.2, d: 3.5 };
     expect((await repaintFrom([engineFor(at)], "x", ["a", "b", "c", "d"]))?.fen).toBe("c");
-    expect(await repaintFrom([engineFor({ a: 0.4, d: 3 })], "x", ["a", "d"])).toBeNull();
+    // (None in the band: the nearest outside it, so a warned Repaint always comes; Nov 7. Before: none.)
+    expect(await repaintFrom([engineFor({ a: 0.4, d: 3 })], "x", ["a", "d"])).toMatchObject({ fen: "d", outside: true });
+    expect(await repaintFrom([engineFor({ a: 0.4, d: 4 })], "x", ["a", "d"])).toMatchObject({ fen: "a", outside: true });
     expect(await repaintFrom([engineFor({ a: 0.4, d: 3 })], "x", ["a", "d"], true)).toMatchObject({ fen: "d", outside: true });
   });
 
@@ -535,6 +537,94 @@ describe("Repaint", () => {
     Object.assign(done.state.boss!.powers!, { repaints: 2, ults: 2, ultNext: true });
     expect(smudgyBattle.repaintDue(done)).toBe(false);
   });
+});
+
+describe("Repaint always comes once warned (Eric, Nov 7: warned for next turn, then never)", () => {
+  // The crowd White with seven pawns (its h-pawn gone); his e-pawn on e5: pairs to paint. The same with all eight: none.
+  const PAIRS = "r1bqkb1r/pppp1ppp/2n2n2/4p3/4P3/2N2N2/PPPP1PP1/R1BQKB1R b KQkq - 0 4";
+  const NONE = "rnbqkbnr/ppppppp1/8/8/7p/2N2N2/PPPPPPPP/R1BQKB1R b KQkq - 0 3";
+  const rules = bossRules({ id: "smudgy" })!;
+  /** The warning's hook as a crowd turn begins on `fen` (the crowd to move), the test switch on (so the meter counts as full). */
+  const warns = (fen: string, camo: Camouflage | null) => {
+    const next: BossPowerState = { ...initPowers(1, fen, "w"), turn: 5, camo };
+    const events: { kind: string }[] = [];
+    const t = { turn: 5, fen, crowd: "w", seed: 1, passive: "camouflage", ultimate: "repaint", test: "repaint", ultNext: false, lastMove: null, rageSpeed: 1, s: BOSS_POWERS, events };
+    rules.ultimate!(next, t as never);
+    return next.warnAt === 5 && events.some((e) => e.kind === "warn");
+  };
+
+  it("warns only when he could paint now: his forced moves done, a pair on the board, the crowd not in check", () => {
+    expect(warns(passTurn(PAIRS)!, hidden("g7"))).toBe(true);
+    expect(warns(passTurn(PAIRS)!, null)).toBe(true);
+    // (His forced moves still to come: not yet.)
+    expect(warns(passTurn(PAIRS)!, { side: "h", step: 1, missed: 0, due: null, square: null })).toBe(false);
+    // (The crowd with all eight pawns: no pair, so no promise of "next turn".)
+    expect(warns(passTurn(NONE)!, null)).toBe(false);
+    // (The crowd in check as its turn begins: none now.)
+    expect(warns("rnbqkbnr/pppp1ppp/8/4p3/5P1q/8/PPPPP1PP/RNBQKBNR w KQkq - 1 2", null)).toBe(false);
+  });
+
+  it("the pairs gone by his turn (the crowd's move): none now, the warning kept, and it comes at the next turn with a pair", async () => {
+    const b = stub(NONE, hidden("g7"), 6);
+    Object.assign(b.state.boss!.powers!, { warnAt: 5 });
+    expect(smudgyBattle.repaintDue(b)).toBe(false);
+    expect(b.state.boss!.powers!.warnAt).toBe(5);
+    // A later turn of his with pairs: due, and it fires (the stand-in engine scores every pair 0: outside the band).
+    b.boards.set(0, { ...b.boards.get(0)!, fen: PAIRS });
+    (b.state.boss as { crowdMoves: number }).crowdMoves = 8;
+    expect(smudgyBattle.repaintDue(b)).toBe(true);
+    const fired = await smudgyBattle.play(b, [fakeEngine()]);
+    expect(fired).toMatchObject({ at: 8, outside: true });
+    expect(b.state.boss!.powers!.repaints).toBe(1);
+  });
+
+  it("no engine answer: none this turn, the warning kept, due again after the crowd's next move", () => {
+    const b = stub(PAIRS, hidden("g7"), 6);
+    Object.assign(b.state.boss!.powers!, { warnAt: 5 });
+    expect(smudgyBattle.apply(b, null)).toBeNull();
+    expect(smudgyBattle.repaintDue(b)).toBe(false);
+    expect(b.state.boss!.powers!.warnAt).toBe(5);
+    (b.state.boss as { crowdMoves: number }).crowdMoves = 7;
+    expect(smudgyBattle.repaintDue(b)).toBe(true);
+  });
+
+  it("never in check (his move answers it) or once the game is over", () => {
+    const check = stub("rnbqkbnr/ppppp1pp/5p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2", null, 6);
+    Object.assign(check.state.boss!.powers!, { warnAt: 5 });
+    expect(smudgyBattle.repaintDue(check)).toBe(false);
+    const over = stub(PAIRS, hidden("g7"), 6);
+    Object.assign(over.state.boss!.powers!, { warnAt: 5 });
+    over.finalGameOver = () => true;
+    expect(smudgyBattle.repaintDue(over)).toBe(false);
+  });
+
+  it("whole battles, no test switch: every warning is followed by the Repaint at his first turn with a pair, the warned turn itself unless the crowd's move took every pair", async () => {
+    for (const seed of [1, 2, 3, 4]) {
+      for (const side of ["w", "b"] as const) {
+        const r = battle(seed, side, "", [fakeEngine()]);
+        const rng = mulberry32(seed + 99);
+        let warnAt: number | undefined;
+        let fired = 0;
+        for (let i = 0; i < 120 && !r.boss!.result && !r.finalGameOver(); i++) {
+          const p = r.boss!.powers!;
+          if (p.warnAt !== undefined) warnAt = p.warnAt;
+          if (r.bossToMove() && warnAt !== undefined && (p.repaints ?? 0) < BOSS_POWERS.repaintMax) {
+            const pairs = repaintOptions(fenOf(r), r.boss!.crowdSide === "w" ? "b" : "w", p.camo?.square ?? null).length;
+            if (pairs) {
+              expect(r.repaintDue(), `seed ${seed} ${side} turn ${r.boss!.crowdMoves}`).toBe(true);
+              expect(await r.playRepaint()).not.toBeNull();
+              expect(r.boss!.powers!.repaint!.at).toBe(r.boss!.crowdMoves);
+              fired++;
+              warnAt = undefined;
+              continue;
+            }
+          }
+          await step(r, (fen, allowed) => crowdPick(fen, allowed, rng));
+        }
+        expect(fired, `seed ${seed} ${side}`).toBeGreaterThan(0);
+      }
+    }
+  }, 120_000);
 });
 
 describe("Smudgy: a small fuzz of whole battles", () => {

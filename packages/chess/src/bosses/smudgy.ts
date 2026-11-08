@@ -39,8 +39,10 @@
  * repetition counts from it). The engine picks the pair (repaintFrom): what it gains him, judged with the crowd to move
  * (passScores), within repaintBand, the nearest repaintTarget. Never the crowd's queen, rooks or king, never his king or
  * the hidden rook, never a pawn one step from promoting for its new owner, nothing that leaves either side in check or
- * hands either a mate in one, never a position the engine refuses (repaintOptions). No pair in the band: no Repaint that
- * turn, again at the start of his next (the test switch and the admins' trigger take the nearest outside it).
+ * hands either a mate in one, never a position the engine refuses (repaintOptions). Warned only when a pair exists as
+ * the crowd's turn begins (paintableNow), and once warned it comes: no pair in the band, the nearest outside it
+ * (`outside`); no pair at all after the crowd's move (or no engine answer), at the start of his next turn, the warning
+ * kept, until one exists (Eric, Nov 7; docs/decisions/2026-11-08-smudgy-ult-fires.md).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type Camouflage, type PowerEvent, type RepaintResult } from "@chessroyale/core";
 import { BOSS_OPENING, newBoard } from "../boards.ts";
@@ -396,8 +398,7 @@ export function repaintOptions(fen: string, boss: Side, hidden: string | null = 
  * The engine's pick among the pairs (`candidates`: the positions after each, the crowd to move), from this device's
  * engines (the host's online, solo's, the sims'): each searched at repaintNodes against the position before (`fen`, him
  * to move): passScores' gain, in pawns. The one in repaintBand nearest repaintTarget (the first among equals); none in
- * the band: null, or with `any` (the test switch, the admins' trigger) the nearest outside it. Null too with no engine
- * or no answer.
+ * the band: the nearest outside it (`outside`). Null only with no engine or no answer.
  */
 export async function repaintFrom(
   engines: readonly EngineLike[],
@@ -417,7 +418,10 @@ export function repaintPick(
 ): { fen: string; gain: number; outside: boolean } | null {
   const [lo, hi] = s.repaintBand;
   const inBand = scores.filter((x) => x.gain >= lo && x.gain <= hi);
-  const pool = inBand.length ? inBand : any ? scores : [];
+  // (None in the band: the nearest outside it, so a warned Repaint always comes; Eric, Nov 7. `any` is kept for the
+  // callers: the test switch and the trigger took the nearest already.)
+  void any;
+  const pool = inBand.length ? inBand : scores;
   let pick: (typeof scores)[number] | null = null;
   for (const x of pool) if (!pick || Math.abs(x.gain - s.repaintTarget) < Math.abs(pick.gain - s.repaintTarget)) pick = x;
   return pick ? { fen: pick.fen, gain: Math.round(pick.gain * 100) / 100, outside: !inBand.length } : null;
@@ -473,6 +477,17 @@ function setBase(b: Battle, fen: string): void {
   b.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
 }
 
+/**
+ * He could paint now (`fen`: the crowd to move, as a crowd turn begins): his forced moves done (or given up), and a pair
+ * on this board were his turn to begin now (repaintOptions on it with him to move; none while the crowd is in check).
+ * The crowd's move can still take every pair away: then he paints at the start of a later turn, the warning kept.
+ */
+function paintableNow(fen: string, p: BossPowerState): boolean {
+  if (camoPending(p.camo)) return false;
+  const his = passTurn(fen);
+  return !!his && repaintOptions(his, sideToMove(his), p.camo?.square ?? null).length > 0;
+}
+
 /** His Camouflage as his turn begins (`fen`, him to move): the forced move due, or a turn missed (and given up after camoTries). */
 function camoTurn(c: Camouflage, fen: string, seed: number, boss: Side, at: number, s: CamoSettings = BOSS_POWERS): Camouflage {
   if (!camoPending(c)) return c;
@@ -492,9 +507,12 @@ export const SMUDGY: BossRules = {
   get ultimateMax() {
     return BOSS_POWERS.repaintMax;
   },
+  // The warning only when he could paint now (his forced moves done, a pair as his turn would begin: paintableNow), so
+  // "next turn" is a promise he keeps (Eric, Nov 7: warned around turn 6-7, then nothing while the crowd still had all
+  // eight pawns). The meter stays full until then.
   ultimate(next, t) {
     if ((next.repaints ?? 0) >= t.s.repaintMax || next.warnAt !== undefined || t.ultNext) return false;
-    if (meterFull(next, t) || testSwitch(t, next)) {
+    if ((meterFull(next, t) || testSwitch(t, next)) && paintableNow(t.fen, next)) {
       next.warnAt = t.turn;
       t.events.push({ kind: "warn", turn: t.turn });
     }
@@ -736,7 +754,7 @@ export const smudgyBattle = {
       setPowers(b, (p) => ({ ...p, repaintWait: boss.crowdMoves }));
       return null;
     }
-    const outside = smudgyBattle.any(b) && gain !== null && (gain < BOSS_POWERS.repaintBand[0] || gain > BOSS_POWERS.repaintBand[1]);
+    const outside = gain !== null && (gain < BOSS_POWERS.repaintBand[0] || gain > BOSS_POWERS.repaintBand[1]);
     const result: RepaintResult = { at: boss.crowdMoves, pawn: chosen.pawn, piece: chosen.piece, type: chosen.type, gain, ...(outside ? { outside: true as const } : {}) };
     const board = boardOf(b);
     setBase(b, chosen.fen);
