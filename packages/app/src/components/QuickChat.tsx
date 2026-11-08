@@ -155,6 +155,8 @@ function ChatFeed({ people, chat, scroll, teams, onName, hint, empty }: { people
 function TypeBar({ chat, focus = false, emoji = false, onSent }: { chat: MatchChat; focus?: boolean; emoji?: boolean; onSent?: () => void }) {
   const [draft, setDraft] = useState("");
   const [picker, setPicker] = useState(emoji);
+  // The quick chat button (Nov 8, Eric): the player's 10 quick lines, tapped to send (under the same limits as the chips).
+  const [quick, setQuick] = useState(false);
   const [wait, setWait] = useState<string | null>(null);
   const field = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => void (focus && field.current?.focus()), []);
@@ -176,6 +178,7 @@ function TypeBar({ chat, focus = false, emoji = false, onSent }: { chat: MatchCh
   };
   return (
     <div class="qtype" onClick={(e) => e.stopPropagation()}>
+      {quick && <ChatButtons chat={chat} layout="groups" fit={false} now={Date.now()} only="lines" onSent={() => setQuick(false)} />}
       {picker && (
         <EmojiPicker
           onPick={(code) => {
@@ -211,7 +214,26 @@ function TypeBar({ chat, focus = false, emoji = false, onSent }: { chat: MatchCh
           onInput={(e) => setDraft(e.currentTarget.value)}
           onKeyDown={(e) => e.key === "Escape" && setPicker(false)}
         />
-        <button type="button" class="qtype-emo" aria-label="Emoji" aria-expanded={picker} disabled={!!banned} onClick={() => setPicker(!picker)}>
+        <button
+          type="button"
+          class="qtype-quick"
+          aria-label="Quick chat: your lines"
+          aria-expanded={quick}
+          disabled={!!banned}
+          onClick={() => {
+            setPicker(false);
+            setQuick(!quick);
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 5.5h16v10H10l-4.5 3.5v-3.5H4z" />
+            <path d="M8 9.5h8M8 12.5h5" />
+          </svg>
+        </button>
+        <button type="button" class="qtype-emo" aria-label="Emoji" aria-expanded={picker} disabled={!!banned} onClick={() => {
+          setQuick(false);
+          setPicker(!picker);
+        }}>
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <circle cx="12" cy="12" r="9" />
             <path d="M8.2 14.2c1 1.4 2.3 2.1 3.8 2.1s2.8-.7 3.8-2.1" />

@@ -149,6 +149,19 @@ test("typed chat (Nov 7) in the queue's lobby chat and the match: signed-in play
   await lobby(bo).getByRole("textbox", { name: "Send a message" }).press("Enter");
   await expect(lobby(bo).locator(".qtype-note")).toHaveText("No links or contact details in chat.");
   if (TYPED_STILLS) await bo.screenshot({ path: `${TYPED_STILLS}/${test.info().project.name}-lobby-typed.png`, fullPage: true });
+  // The quick chat button (Nov 8): next to the emoji button; it opens the player's lines (10 by default) and a tap sends one.
+  const quickBtn = lobby(ann).getByRole("button", { name: "Quick chat: your lines" });
+  const emojiBtn = lobby(ann).getByRole("button", { name: "Emoji" });
+  const [qb, eb] = [(await quickBtn.boundingBox())!, (await emojiBtn.boundingBox())!];
+  expect(Math.abs(qb.y - eb.y)).toBeLessThan(2);
+  expect(qb.x + qb.width).toBeLessThanOrEqual(eb.x + 1);
+  await quickBtn.click();
+  const quickLines = lobby(ann).locator(".qtype .qchip:not(.emoji)");
+  await expect(quickLines).toHaveCount(10);
+  const said = (await quickLines.first().textContent())!.trim();
+  await quickLines.first().click();
+  await expect(lobby(bo).locator(".qline", { hasText: said }).filter({ hasText: "Ann Typed" })).toBeVisible();
+  await expect(lobby(ann).locator(".qtype .qchip:not(.emoji)")).toHaveCount(0);
   // The match: typing carries on in its chat (a phone's Chat tab: T opens the field over the feed's foot; a computer's panel beside the board).
   await expect.poll(() => phase(ann), { timeout: 90_000 }).toMatch(/play|watching/);
   if (phone) {
@@ -158,6 +171,9 @@ test("typed chat (Nov 7) in the queue's lobby chat and the match: signed-in play
     await expect(field).toBeFocused();
     await field.fill("gg team :knight:");
     if (TYPED_STILLS) {
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
+      await ann.screenshot({ path: `${TYPED_STILLS}/phone-quickchat-open.png` });
+      await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Quick chat: your lines" }).click();
       await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
       await ann.screenshot({ path: `${TYPED_STILLS}/phone-emoji-picker.png` });
       await ann.locator(".qchat-tab .qpop").getByRole("button", { name: "Emoji" }).click();
@@ -233,4 +249,49 @@ test("a private lobby: chat while you wait for the host", { tag: "@phone-only" }
   const start = page.getByRole("button", { name: /^Start with/ });
   await expect(start).toBeVisible();
   expect(overlaps(await box(chat), await box(start))).toBe(false);
+});
+
+// Nov 8 (Eric): on a phone the power-up circles are about a fifth smaller, the « » arrows are 32 px tall, and each tap
+// area is 40 px or more; a computer is unchanged. The gap from the power-up row to the chat is measured too, but it's
+// `fixme` until Eric OKs shrinking the crowd's middle box (the scoreboard holds its size: crowd.spec.ts, "never shifting").
+for (const size of [
+  { width: 390, height: 844 },
+  { width: 390, height: 664 },
+  { width: 360, height: 740 },
+]) {
+  test(`phone match layout at ${size.width}x${size.height}: power-up circles and arrows sized, tap areas 40 px`, { tag: "@phone-only" }, async ({ browser }) => {
+    test.skip(test.info().project.name !== "phone", "a phone's match");
+    test.setTimeout(3 * 60_000);
+    const p = await (await browser.newContext({ ...test.info().project.use, viewport: size })).newPage();
+    await named(p, "Size Sam");
+    await p.goto("/?debug");
+    await asSignedIn(p);
+    expect((await p.request.patch("/api/me", { data: { chatOn: true } })).status()).toBe(200);
+    await p.goto("/?debug");
+    await soloFromHome(p);
+    await expect(p.locator(".pu-dot").first()).toBeVisible({ timeout: 60_000 });
+    const dot = p.locator(".pu-dot").first();
+    const db = (await dot.boundingBox())!;
+    // (The layout size, not the box: a freshly lit circle pulses, and its box is scaled while it does.)
+    expect(await dot.evaluate((n) => (n as HTMLElement).offsetWidth)).toBe(21);
+    const nav = p.locator(".history-nav > .nav-btn").first();
+    const nb = (await nav.boundingBox())!;
+    expect(nb.height).toBeLessThanOrEqual(40);
+    // The tap area: a point 18 px above and below the visible circle or arrow is still that control.
+    const hits = async (el: Locator, box: { x: number; y: number; width: number; height: number }, dy: number) =>
+      el.evaluate((node, pt) => {
+        const at = document.elementFromPoint(pt.x, pt.y);
+        return !!at && (at === node || node.contains(at));
+      }, { x: box.x + box.width / 2, y: box.y + box.height / 2 + dy });
+    expect(await hits(dot, db, -18)).toBe(true);
+    expect(await hits(dot, db, 18)).toBe(true);
+    expect(await hits(nav, nb, -18)).toBe(true);
+    expect(await hits(nav, nb, 18)).toBe(true);
+    expect(await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+    await p.context().close();
+  });
+}
+
+test.fixme("phone match layout: the chat sits at most 12 px under the power-up row (waiting for Eric's OK on the crowd middle box)", { tag: "@phone-only" }, async () => {
+  // The measured gap today: 43 px at 390x844, 390x664 and 360x740 (main has the same). Its fix shrinks the crowd's middle box.
 });
