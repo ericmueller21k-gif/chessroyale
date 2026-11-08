@@ -167,7 +167,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   `equipItem`, and shows them worn in `publicProfile`, `looksOf` and `duelEntrant` (a worn copy of an item they've since
   really got shows the purest real one). Deleting ignores them and buying goes by what's really owned. A new item in `ITEM_DEFS` or a new worn shop slot is covered with no change; a new catalog
   needs its line in `admin-copies.ts`. Chat packs are left out
-  ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)).
+  ([2026-10-31-admin-owns-all.md](../decisions/2026-10-31-admin-owns-all.md)). Nov 7: the locker's preview is one pawn in your default color (W/B picker, bottom right, `Crates.tsx` `LockerPanel`), and the God King tab is gone (its effects stay under All).
 - **The icon builder** (the profile): a 48 × 48 pixel drawing with a paint bucket and undo (`UNDO_STEPS`), saved as a
   small PNG data URL (at most 16 KB, checked by the server).
 

@@ -57,6 +57,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the
   address (`?debug`, `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
+- **The default pawn color** (Nov 7; `users.pawn_color`, NULL: white): PATCH `/api/me` `{pawn}` (only "white" or "black"); shown on the profile and
+  in the town's presence (`town-here.ts`). A guest keeps it on the device (`brc.pawnColor`, `prefs.ts`). See `core/src/pawn-color.ts`.
 - **Names** pass the server's name filter (slurs and hate: [chat.md](chat.md), "Moderation"): a profile can't take
   such a name, and a lobby or Squads seat asked for with one is "Player N". A moderator can reset a name and icon from
   the player's page on fair play's review page. A lobby seat takes its account's name as the player joins.

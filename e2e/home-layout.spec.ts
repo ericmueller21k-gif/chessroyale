@@ -445,7 +445,9 @@ test("phone: the top bar's shop and gear open the shop and Settings in one tap (
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // One tap: the shop (its balance at the top); Back is home.
   await page.locator(".fd-top").getByRole("button", { name: "Shop & crates" }).click();
-  await expect(page.getByRole("heading", { name: "Shop" })).toBeVisible();
+  // (The shop's own "Shop" title is gone, Eric, Nov 7: its tab row says where you are.)
+  await expect(page.getByRole("heading", { name: "Shop" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Shop", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   // One tap: Settings, as Profile → Settings opens it; Back is home.

@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { bossCrateOf } from "@chessroyale/core";
-import { asAdmin, asServerAdmin, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -1343,4 +1343,52 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+/**
+ * The shop's screens (Eric, Nov 7), on a phone and a computer: no "Shop" title on any tab (the tab row says where you are); the
+ * locker's tabs are All, Head, Face, Skin, Weapon and Ride (the God King tab is gone; its effects stay under All); the preview is
+ * one pawn in a box twice its old height (126 px with its frame before, 252 now), with W and B bottom right. B makes the pawn black
+ * and saves it on the account (signed in: it survives a reload; the town shows it, town-afk.spec.ts); W switches back. Number
+ * checks: the box's height, the pawn's piece class (white or black), aria-pressed, the picker inside the box.
+ */
+test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a box twice its old height, a W and B picker bottom right: B is black and saved (it survives a reload), W is white again (Eric, Nov 7)", async ({ page }) => {
+  await asSignedIn(page, "pawn");
+  await page.goto("/shop");
+  for (const tab of ["Shop", "Crates", "Locker"]) {
+    await page.getByRole("tab", { name: tab, exact: true }).click();
+    await expect(page.locator(".shop-head h1")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Shop", exact: true })).toHaveCount(0);
+  }
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-tabs [role=tab]")).toHaveText(["All", "Head", "Face", "Skin", "Weapon", "Ride"]);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  // One pawn, white by default, in a box 252 px tall.
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  expect(Math.round((await page.locator(".locker-preview").boundingBox())!.height)).toBe(252);
+  const W = page.getByRole("button", { name: "White", exact: true });
+  const B = page.getByRole("button", { name: "Black", exact: true });
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(B).toHaveAttribute("aria-pressed", "false");
+  // The picker sits inside the box's bottom-right corner.
+  const box = (await page.locator(".locker-preview").boundingBox())!;
+  const pick = (await page.locator(".locker-pawn-pick").boundingBox())!;
+  expect(pick.x + pick.width).toBeLessThanOrEqual(box.x + box.width);
+  expect(pick.y + pick.height).toBeLessThanOrEqual(box.y + box.height);
+  // B: black, saved on the account (the server says so), and it's still black after a reload.
+  await B.click();
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".locker-preview piece.pawn.black")).toHaveCount(1);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("black");
+  await page.reload();
+  await page.goto("/shop");
+  await page.getByRole("tab", { name: "Locker", exact: true }).click();
+  await expect(page.locator(".locker-preview piece.pawn.black")).toHaveCount(1);
+  await expect(B).toHaveAttribute("aria-pressed", "true");
+  // W: white again, saved.
+  await W.click();
+  await expect(W).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
 });

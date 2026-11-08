@@ -1735,6 +1735,8 @@ function startTown(
         drawn: drawn.has(i),
         // (What they wear as the town has it, and whether the renderer has their dressed picture: drawn in it, not a plain pawn.)
         look: isSprite(p.look) ? null : p.look.wear ? Object.fromEntries(Object.entries(p.look.wear).map(([k, v]) => [k, v?.def])) : null,
+        // (Their default pawn color, as drawn: "white" or "black"; null for a sprite.)
+        pawn: isSprite(p.look) ? null : p.look.side === "dark" ? "black" : "white",
         dressed: r.botArt.has(p.id) || r.riders.has(p.id),
         tag: tagged.has(i),
       }));

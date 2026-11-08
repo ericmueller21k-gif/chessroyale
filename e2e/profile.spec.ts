@@ -208,7 +208,8 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await page.getByRole("button", { name: "Your profile" }).click();
   await page.getByRole("button", { name: "Open locker" }).click();
   const previews = page.locator(".locker-preview .locker-avatar");
-  await expect(previews).toHaveCount(2);
+  // (One pawn in the preview since Nov 7, in your default color; it was two, white and black.)
+  await expect(previews).toHaveCount(1);
   const boxes = () => page.locator(".locker-preview, .locker-preview .locker-avatar, .locker-tabs").evaluateAll((els) => els.map((e) => [...Object.values(e.getBoundingClientRect().toJSON())].map((v) => Math.round(Number(v) * 10) / 10)));
   const before = await boxes();
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
@@ -241,7 +242,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await page.getByRole("tab", { name: "Ride", exact: true }).click();
   await page.getByRole("button", { name: /^Riding Chirp, Cobalt/ }).click();
   await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(0);
-  await expect(page.locator(".locker-preview .avatar")).toHaveCount(2);
+  await expect(page.locator(".locker-preview .avatar")).toHaveCount(1);
   expect(await boxes()).toEqual(before);
 });
 
@@ -395,7 +396,7 @@ test("rides for an admin (Oct 31; admins own one of every item): the Ride tab ha
   const chirp = grid.getByRole("button", { name: /^Riding Chirp, / });
   await chirp.click();
   await expect(chirp.locator(".locker-worn")).toHaveText("Worn");
-  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(2);
+  await expect(page.locator('.locker-preview .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
   // In the town square, as the town reads anyone's look: your pawn on the admin copy's ride, in its red.
   await page.goto("/town?sky=day");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __townRide?: () => { you: { ride: string | null; color: string | null; ready: boolean } } | null }).__townRide?.()?.you ?? null), { timeout: 20_000 }).toEqual(

@@ -7787,13 +7787,13 @@ button.history-label {
   margin-top: 6px;
 }
 /* A shiny item: its shine rolls across the drawing itself (Items.tsx). */
-/* The locker. The preview is one pawn in a box twice its old height (Eric, Nov 7: 96 px pawn, 120 px box with its frame
-   before; 222 px of content plus padding and frame now, 252 px in all). The W and B picker sits in its bottom-right corner. */
+/* The locker. The preview is one pawn in a box twice its old height (Eric, Nov 7: 126 px with its frame before, measured;
+   252 px now, border-box). The W and B picker sits in its bottom-right corner. */
 .locker-preview {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 222px;
+  height: 252px;
   padding: 12px;
 }
 .locker-avatar {
