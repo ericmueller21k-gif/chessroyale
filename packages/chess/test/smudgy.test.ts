@@ -589,7 +589,7 @@ describe("Repaint always comes once warned (Eric, Nov 7: warned for next turn, t
   });
 
   it("never in check (his move answers it) or once the game is over", () => {
-    const check = stub("rnbqkbnr/ppppp1pp/5p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2", null, 6);
+    const check = stub("rnbqkbnr/ppppp1pp/5p2/7Q/4P3/8/PPPP1PPP/RNB1KBNR b KQkq - 1 2", hidden("g7"), 6);
     Object.assign(check.state.boss!.powers!, { warnAt: 5 });
     expect(smudgyBattle.repaintDue(check)).toBe(false);
     const over = stub(PAIRS, hidden("g7"), 6);
@@ -605,7 +605,7 @@ describe("Repaint always comes once warned (Eric, Nov 7: warned for next turn, t
         const rng = mulberry32(seed + 99);
         let warnAt: number | undefined;
         let fired = 0;
-        for (let i = 0; i < 120 && !r.boss!.result && !r.finalGameOver(); i++) {
+        for (let i = 0; i < 120 && !r.boss!.result; i++) {
           const p = r.boss!.powers!;
           if (p.warnAt !== undefined) warnAt = p.warnAt;
           if (r.bossToMove() && warnAt !== undefined && (p.repaints ?? 0) < BOSS_POWERS.repaintMax) {
