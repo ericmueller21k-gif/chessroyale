@@ -929,7 +929,7 @@ export interface DashState {
  * Dash's Scramble Rush (the chess package's bosses/dash.ts): as crowd turn `at` + 1 began, he swept 3 of the crowd's pieces and 3
  * of his own (never a king) from `from` to empty squares of the middle ranks (`to`; `piece`: color then type, "wn"). Only the
  * screens see them moved: the game's board never changes. `correct`: how many of the six the crowd put back (its people's mean,
- * its bots' too), once it's over; under BOSS_POWERS.dashScramble.needCorrect, his extra move (`extra`).
+ * its bots' too; solo, yours alone), once it's over; under BOSS_POWERS.dashScramble.needCorrect, his extra move (`extra`).
  */
 export interface DashRush {
   at: number;
