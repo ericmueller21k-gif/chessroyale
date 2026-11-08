@@ -433,14 +433,21 @@ test("Smudgy's Repaint: REPAINT!, a cream stroke on his pawn's square then a cha
   await bossAloneFromHome(page);
   await yourMove(page);
   await record(page);
-  // Quiet moves (never onto his pawns' files' first squares) until the Repaint has been played. The warning's turn
-  // (warnAt, read as each of your turns begins) is the turn it comes (Eric, Nov 7: warned, then never).
-  let warnAt: number | undefined;
+  // The warning's turn (its "warn" event, watched every frame) is the turn the Repaint comes (Eric, Nov 7: warned, then never).
+  await page.evaluate(() => {
+    const w = window as any;
+    const look = () => {
+      const e = (w.match?.boss?.powers?.events ?? []).find((x: { kind: string }) => x.kind === "warn");
+      if (e && w.__warnAt === undefined) w.__warnAt = e.turn;
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  // Quiet moves (never onto his pawns' files' first squares) until the Repaint has been played.
   for (let turn = 0; turn < 14; turn++) {
     await yourMove(page);
     const s = await state(page);
     if (s.boss.powers.repaints > 0) break;
-    warnAt ??= s.boss.powers.warnAt;
     await submitMove(page, quiet(s.fen, s.allowed), s.fen);
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   }
@@ -448,6 +455,7 @@ test("Smudgy's Repaint: REPAINT!, a cream stroke on his pawn's square then a cha
   const s = await state(page);
   expect(s.boss.powers.repaints).toBeGreaterThan(0);
   const rp = s.boss.powers.repaint as { pawn: string; piece: string; type: string; at: number };
+  const warnAt = await page.evaluate(() => (window as any).__warnAt as number | undefined);
   expect(warnAt, "warned before it came").toBeDefined();
   expect(rp.at, "his turn right after the warning").toBe(warnAt);
   const rec = await frames(page);
