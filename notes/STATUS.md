@@ -447,3 +447,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - **Nov 8 ~19:50: Eric (Dash playtest):** Scramble Rush extra move never showed after a failed put-back; pop-off twice a game; fewer
   "fam". Brief notes/briefs/brief-dash-nov8.md. QUEUED: Job 2 (Haiku) when the Timber helper finishes; Job 1 (Opus) when the auto chess
   v5 helper finishes (one Opus at a time). Branches: claude/dash-popoff-fam, claude/dash-rush-extra.
+
+### Nov 8 ~20:55
+- #558 auto chess v5 done (e8cf00a, CI green); stills (phone tap, 1280, 360, 1920) sent to Eric; waiting on his OK to merge.
+- Timber strip helper done (d62f806); CI watcher bhrxv55ml running; then open its PR and send stills.
+- Started Dash Job 1 (Opus, session_01JuCWRv8LJ3Ym1zdP6wUup1, claude/dash-rush-extra) and Job 2 (Haiku,
+  session_01JuCWRtos2Ayr1kRp2oz3aB, claude/dash-popoff-fam), both from main b641c2d.
