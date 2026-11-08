@@ -8568,6 +8568,9 @@ button.history-label {
 .gk-epilogue.up .god-king {
   width: 84px;
   height: 84px;
+}
+/* His rise's motion, as he starts to speak (never over the boss's line: LastStand.tsx). */
+.gk-epilogue.rising .god-king {
   animation: gk-rise 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 @keyframes gk-rise {
@@ -8607,7 +8610,7 @@ button.history-label {
   right: auto;
   bottom: auto;
   translate: -50% 0;
-  max-width: min(220px, 80vw);
+  max-width: min(220px, calc(100vw - 32px));
 }
 .gk-epilogue-bubble::after {
   left: calc(50% - 6px);
@@ -14048,9 +14051,24 @@ img.qicon {
   right: 0;
   bottom: calc(100% + 34px);
 }
+/* (Eric's result screen, Nov 7: his words centered above him, inside the screen with a 16 px gutter on each side, the tail
+   pointing down at him; the figure below makes room for them, so they never cover the title above.) */
 .place-results .bc-bubble {
-  left: calc(100% + 8px);
-  top: 0;
+  left: 50%;
+  top: auto;
+  bottom: calc(100% + 12px);
+  /* (`translate`, not `transform`: the entrance's animation sets transform and would drop the centering.) */
+  translate: -50% 0;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.place-results .bc-bubble::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
+}
+.boss-char.place-results {
+  margin-top: 100px;
 }
 /* The Hidden Boss (admins only, for now): his whole figure is far taller than the cast (129 px above his feet, 137 with
    his hair in the wind), so on a computer his words go above his head, whatever his scale; on the results he's drawn
@@ -22545,6 +22563,12 @@ button.sq-tiny {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
+/* The results: a figure drawn facing our left turns to the God King on its right, mirrored about its feet (only the image: the
+   bubble and its words are its own children and stay as they are). Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.place-results.art-left .boss-char-sprite {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+}
 /* The pump in the bar's free room, at its right end, standing on the room's bottom: 2x (68 x 72) on a phone, its foot 3 px below the
    room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any width
    (docs/decisions/2026-10-24-babur-bigger.md). */
@@ -24693,3 +24717,47 @@ button.sq-tiny {
   .wt-spot.wt-glide, .wt-hole.wt-glide, .wt-track, .wt-bar > span { transition: none; }
 }
 
+
+/* ---- A boss battle's result (Eric, Nov 7): its title in the God King's pixel type; your pawn stands beside him ---- */
+.results .boss-title {
+  font-family: "Press Start 2P", ui-monospace, monospace;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #1a1406;
+  text-shadow: 3px 3px 0 #e8b84a;
+  margin: 12px 0 14px;
+}
+.gk-epilogue-you {
+  position: absolute;
+  left: calc(50% + 44px);
+  bottom: 0;
+  pointer-events: none;
+}
+
+/* ---- The Last Stand's result (Eric, Nov 8): one row, the boss on the left, the God King and your pawn on the right; each
+   bubble over its own speaker, inside the screen's 16 px gutters, never both at once (RESULT_TALK). ---- */
+.results-duo {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A phone's wide
+     boss overflows his box by about 12 px a side, plus a few px of margin for sub-pixel scaling (15.8 measured at 32), so 36 px.) */
+  gap: 36px;
+  margin: 0 auto;
+}
+.results-duo .boss-char.place-results {
+  margin: 100px 0 0;
+}
+.results-duo .gk-epilogue {
+  margin: 0 0 10px;
+}
+/* The boss's words start at his box's left edge (his tail over his middle): inside the gutter on a phone, the row is centered. */
+.results-duo .boss-char .bc-bubble {
+  left: -4px;
+  translate: 0 0;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.results-duo .boss-char .bc-bubble::after {
+  left: 40px;
+  margin-left: 0;
+}

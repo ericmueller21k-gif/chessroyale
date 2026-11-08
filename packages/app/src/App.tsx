@@ -37,6 +37,7 @@ import { SettingsScreen } from "./screens/Settings.tsx";
 import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO } from "./town/LeaveTown.tsx";
+import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
 import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
@@ -695,8 +696,12 @@ export function App() {
    * the battle's screen shows. Leaving the battle (its result's "Back to town") puts you back where you stood (`townReturn`).
    */
   const townReturn = useRef<Stand | null>(null);
+  // The boss challenged from town (its home's id): it says goodbye back in the town. Kept apart from `townReturn`, which the
+  // town reads as a stand (a stray key there changed the town's canvas: the town-fixed and town-street specs, Nov 8).
+  const bossFromTown = useRef<string | null>(null);
   const challengeFromTown = async (id: string, stand: Stand | null) => {
     rememberBossPick(id);
+    bossFromTown.current = id;
     townReturn.current = stand ?? { c: -1, r: -1, facing: 1, view: 0 };
     setExitTo("town");
     prefetchBossAlone(id, account().profile?.rating ?? null);
@@ -1198,6 +1203,8 @@ export function App() {
     if (back) {
       townReturn.current = null;
       setExitTo("home");
+      setGoodbyeFrom(bossFromTown.current);
+      bossFromTown.current = null;
       setTownStand(back.c >= 0 ? back : null);
       setTownSeat(null);
       setShowTown(true);

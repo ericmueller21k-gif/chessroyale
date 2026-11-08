@@ -77,6 +77,8 @@ interface Waiting {
   key: string;
   priority: Priority;
   saidAt: number;
+  /** Stays this long after it has typed out (then fades), instead of its usual time (`holdMs`). */
+  hold?: number;
 }
 
 /**
@@ -99,15 +101,15 @@ export class Voice {
    * time runs from when this device says it, as a boss's animations run from when it first saw their moment, so a
    * busy frame never eats into it). Returns whether it was taken (shown now, or waiting its turn).
    */
-  say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now()): boolean {
+  say(text: string | null | undefined, key: string, priority: Priority = NORMAL, at = Date.now(), hold?: number): boolean {
     if (!text || this.said.has(key)) return false;
     this.said.add(key);
     if (this.said.size > 400) this.said.delete(this.said.values().next().value!);
     this.advance(at);
     const cur = this.now;
-    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at }, at);
+    if (!cur || at >= cur.until || (cutsIn(priority, cur) && at >= cur.firm)) this.start({ text, key, priority, saidAt: at, hold }, at);
     else {
-      this.queue.push({ text, key, priority, saidAt: at });
+      this.queue.push({ text, key, priority, saidAt: at, hold });
       // Highest priority first; in the order said within one.
       this.queue.sort((a, b) => b.priority - a.priority || a.saidAt - b.saidAt);
     }
@@ -147,7 +149,8 @@ export class Voice {
   }
 
   private start(w: Waiting, at: number) {
-    this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + holdMs(w.text), firm: at + typeMs(w.text) + SPEECH.minReadMs };
+    // (A hold: the line stays `hold` ms after it has typed out, then fades; the result screen's conversation, RESULT_TALK.)
+    this.now = { text: w.text, key: w.key, priority: w.priority, at, until: at + (w.hold === undefined ? holdMs(w.text) : typeMs(w.text) + w.hold + SPEECH.fadeMs), firm: at + typeMs(w.text) + SPEECH.minReadMs };
     // (Its sound once, as it starts: a line is started once.)
     const sound = this.heard ? lineSounds.get(w.text) : undefined;
     if (sound) play(sound);

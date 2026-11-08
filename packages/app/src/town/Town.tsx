@@ -1620,6 +1620,8 @@ function startTown(
           boxes: r.boxDraws(),
           // The boss whose speech bubble is up (null: none): drawn over the world, so a pixel check of the world quiets it (`__townHush`).
           speech: town.speech.boss?.home.id ?? null,
+          // (The line in that bubble, "" for none: a boss's goodbye on the way back from its battle, Eric, Nov 7.)
+          speechLine: town.speech.boss ? town.speech.line : "",
         }
       : null;
   // ... and `__townGather()` sends the three bots nearest you to stand beside you (to see a ring form).

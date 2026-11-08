@@ -1936,6 +1936,16 @@ export const voteResultMs = (s: { voteResultSeconds: number }): number => s.vote
  * like two rows or more than a certain number of words, and then even… sit out a little bit longer." A short line now
  * rests about 3 s once typed, a two-row one (50 characters) about 5.5 s, none over 6.5 s.
  */
+/**
+ * The result screen's conversation after a Last Stand (Eric, Nov 8): the boss says its line above him, and once it has typed out
+ * it stays `bossHoldMs` more and fades; then the God King answers above him. Never both together.
+ */
+export const RESULT_TALK = {
+  bossHoldMs: 1200,
+  /** If the boss says nothing, the God King speaks after this long (ms from the result). */
+  kingAfterMs: 3000,
+} as const;
+
 export const SPEECH = {
   typeMs: 28,
   readMs: 2700,
