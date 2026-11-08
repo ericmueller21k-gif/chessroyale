@@ -111,7 +111,7 @@ async function goIn(p: Page, id: string, name: string) {
 
 /**
  * Out of the room to the town square. A phone: its bar's back button. A computer has no bar since Nov 7 (the town's tools are in the
- * right column's slot), so out by the door: walked toward until it's in view, a tap on it (you walk there), its card's "Go out".
+ * right column's slot), so out by the door: the view brought to it if it's off screen, a tap on it (you walk there), its card's "Go out".
  */
 async function leaveRoom(p: Page) {
   if (test.info().project.name === "phone") return p.getByRole("button", { name: "Back", exact: true }).click();
@@ -123,11 +123,10 @@ async function leaveRoom(p: Page) {
       await p.keyboard.press("Escape");
       await expect(p.locator(".town-card").filter({ visible: true })).toHaveCount(0, { timeout: 2000 });
     }
-    // (The door is behind you: walk down the screen, toward it, until it's in view; Up is up in every room, so Down goes back.)
+    // (The door is usually behind you: the view brought to it, as a drag there would, __shopLook.)
     if (!(await shopAt(p, "door"))) {
-      await p.keyboard.down("ArrowDown");
-      await p.waitForTimeout(700);
-      await p.keyboard.up("ArrowDown");
+      await p.evaluate(() => (window as unknown as { __shopLook?: (k: "door") => boolean }).__shopLook?.("door"));
+      await p.waitForTimeout(300);
     }
     const at = await shopAt(p, "door");
     expect(at, "the door on screen").not.toBeNull();
