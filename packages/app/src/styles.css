@@ -1868,6 +1868,15 @@ p {
   font-size: 16px;
   animation: fade 160ms ease-out;
 }
+/* A 50 v 50's status slot (Nov 8, Eric: nothing on the match screen moves): one height in every phase, reserved (empty)
+   while picking, so the box under it never shifts. The banner is the desktop's 56 px; the phone's is set below. */
+.screen.game.crowd-50 .play-slot {
+  height: 56px;
+}
+.screen.game.crowd-50 .play-slot > .waiting-banner {
+  height: 100%;
+  min-width: 0;
+}
 .waiting-count {
   margin-left: auto;
   font-weight: 800;
@@ -3075,10 +3084,18 @@ button.history-label {
     min-height: 0;
     align-content: start;
   }
-  /* (The power-up row or the waiting line sits in the middle of the box while it's the picking's: the box's height is the
-     vote box's, so the space is shared out, not left at the foot.) */
+  /* Nov 8 (Eric: nothing on the match screen moves): the power-up row sits at the top of the box, right under the board, on
+     every phase, and the status slot under it is 42 px on every phase (empty while picking, the waiting line's box in the
+     others). Two lines of text fit it, so a long line never grows the box. */
   .screen.game.crowd-50 > .play-footer {
-    align-content: center;
+    align-content: start;
+  }
+  .screen.game.crowd-50 .play-slot {
+    height: 42px;
+  }
+  .screen.game.crowd-50 .play-slot > .waiting-banner {
+    padding: 0 14px;
+    line-height: 1.2;
   }
   .screen.game.crowd-50 .poll {
     display: flex;

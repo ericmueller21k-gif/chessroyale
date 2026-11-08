@@ -200,7 +200,8 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
 - **The phone's layout (Nov 1; docs/decisions/2026-11-01-crowd-phone-scoreboard.md, then 2026-11-01-crowd-phone-tabs.md):**
   the middle box under the board is one fixed height (`--mid-h`, styles.css, the locked phone screen), exactly the vote
   box's: its bars (14 px each, six at most; `--slots` steps down on short screens) and the one result line, which sits at
-  its foot. The ⚡ row, the status line and the bars take turns in it. The scoreboard starts 4 px under it and fills the
+  its foot. The ⚡ row sits at its top and the status slot under it is 42 px in every phase (empty while picking; Nov 8,
+  `crowd.spec` "the match screen's rows never move"), the bars take turns in the rest. The scoreboard starts 4 px under it and fills the
   rest of the screen, and never moves. Its header reads Black · White · All · Chat (yours picked when the match starts;
   tapping the picked one or the rows opens the full list for that pick). Chat replaces the scoreboard in the same box;
   "‹ Back" returns to the pick. The reveal has no "your team watched" line any more. The box is one element for the
