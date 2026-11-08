@@ -194,16 +194,16 @@ test("Report a bug asks first (Cancel goes back to the list; Report opens the fe
   await expect(page.locator(".results h1")).toHaveText("You resigned", { timeout: 10_000 });
 });
 
-test("Auto chess: the same gear at the top right, with Sound, Animations, Leave (asked first: \"Leave this game?\") and Report a bug; the back button stays", async ({ page }) => {
+test("Auto chess: the same gear at the top right, with Sound, Animations, Leave (asked first: \"Leave this game?\") and Report a bug; no back button (Nov 8: the gear's Leave is the way out)", async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await page.goto(AUTO);
   const gear = page.getByRole("button", { name: "Match options" });
   await expect(gear).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole("button", { name: "Back to home" })).toBeVisible();
-  // (a) On the top line, right of the title.
-  const [g, t] = await Promise.all([gear.boundingBox(), page.locator(".ac-title").boundingBox()]);
-  expect(g!.x, "right of the title").toBeGreaterThanOrEqual(t!.x + t!.width - 1);
+  await expect(page.getByRole("button", { name: "Back to home" })).toHaveCount(0);
+  // (a) On the top line, at the right: right of the title (a phone's; a computer's title is the right column's slot).
+  const [g, t, col] = await Promise.all([gear.boundingBox(), page.locator(".ac-head").boundingBox(), page.locator(".ac-col").boundingBox()]);
   expect(g!.y, "on the top line").toBeLessThan(t!.y + t!.height);
+  expect(col!.x + col!.width - (g!.x + g!.width), "at the right").toBeLessThanOrEqual(8);
   // (b) Its rows: Sound, Animations, Leave, Report a bug (no motion trail: no picks fly here).
   await gear.click();
   const list = page.getByRole("dialog", { name: "Match options" });
@@ -237,41 +237,33 @@ test("Auto chess: the same gear at the top right, with Sound, Animations, Leave 
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a phone in the title row, centered on its first line, clear of the title, the opponent's name, pawn and bars (8 px at 390 and 360, 4 px at 320); on a computer over the shop panel's right edge; the board's size unchanged", async ({ page }) => {
+test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a phone at the title row's right end, clear of the title and the players; on a computer at the top right, over the opponent's block (v5, Nov 8)", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   // A phone: 390 x 844, 360 x 640 and 320 x 568. A computer: 1280 x 800 and 1440 x 900.
   const sizes = phone() ? ([[390, 844], [360, 640], [320, 568]] as const) : ([[1280, 800], [1440, 900]] as const);
-  // The board before this change (measured Oct 25 on the same layout): 360 at 390 x 844, 287 at 360 x 640, 219 at 320 x 568,
-  // 514 at 1280 x 800, 554 at 1440 x 900.
-  const boardWas: Record<string, number> = { "390x844": 360, "360x640": 287, "320x568": 219, "1280x800": 514, "1440x900": 554 };
   for (const [w, h] of sizes) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto(AUTO);
     await expect(page.getByRole("button", { name: "Match options" })).toBeVisible({ timeout: 60_000 });
     const m = await page.evaluate(() => {
       const box = (sel: string) => {
-        const el = document.querySelector(sel);
-        if (!el) return null;
-        const b = el.getBoundingClientRect();
+        const b = document.querySelector(sel)!.getBoundingClientRect();
         return { x: b.x, y: b.y, right: b.right, bottom: b.bottom, w: b.width, h: b.height };
       };
       // The Euclidean gap between two boxes (0 where they overlap).
       const gap = (a: any, b: any) => Math.hypot(Math.max(b.x - a.right, a.x - b.right, 0), Math.max(b.y - a.bottom, a.y - b.bottom, 0));
-      const gear = box(".ac-root .mm-more") as any;
+      const gear = box(".ac-root .mm-more");
       const cs = getComputedStyle(document.querySelector(".ac-root .mm-more")!);
-      const title = box(".ac-title") as any;
-      const first = box(".ac-title strong") as any;
       return {
         gear,
         border: cs.borderTopWidth,
         shadow: cs.boxShadow,
         bg: cs.backgroundColor,
-        board: box(".ac-board") as any,
-        dock: box(".ac-dock") as any,
-        // The gear's centre against the first line's centre (the title's first line, "Auto chess").
-        centreOff: Math.abs(gear.y + gear.h / 2 - (first.y + first.h / 2)),
-        title,
-        gaps: { title: gap(gear, title), name: gap(gear, box(".ac-who")), pawn: gap(gear, box(".ac-stage")), bars: gap(gear, box(".ac-bars")) },
+        head: box(".ac-head"),
+        board: box(".ac-frame"),
+        opp: box(".ac-opp"),
+        col: box(".ac-col"),
+        gaps: { title: gap(gear, box(".ac-title")), you: gap(gear, box(".ac-me")), opponent: gap(gear, box(".ac-opp")), board: gap(gear, box(".ac-frame")) },
       };
     });
     const at = `${w}x${h}`;
@@ -280,21 +272,19 @@ test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a ph
     expect(m.border, `${at}: no border`).toBe("0px");
     expect(m.shadow, `${at}: no box-shadow`).toBe("none");
     expect(m.bg, `${at}: no fill`).toBe("rgba(0, 0, 0, 0)");
-    // (b) The board's size is the one it was.
-    expect(Math.abs(m.board.w - boardWas[at]!), `${at}: board width`).toBeLessThanOrEqual(1);
-    expect(Math.abs(m.board.h - boardWas[at]!), `${at}: board height`).toBeLessThanOrEqual(1);
+    // (b) In the top row, at its right end, inside the screen.
+    expect(m.gear.y, `${at}: in the top row`).toBeGreaterThanOrEqual(m.head.y - 0.5);
+    expect(m.gear.bottom, `${at}: in the top row`).toBeLessThanOrEqual(m.head.bottom + 0.5);
+    expect(m.col.right - m.gear.right, `${at}: at the right end`).toBeLessThanOrEqual(8);
+    expect(m.gear.right, `${at}: inside the screen`).toBeLessThanOrEqual(w);
     if (phone()) {
-      // (c) A phone: in the title row, centered on the title's first line, clear of the title, the name, pawn and bars.
-      expect(m.centreOff, `${at}: centred on the first line`).toBeLessThanOrEqual(1.5);
-      // (The gear's centre within the title's height: the title row.)
-      expect(m.gear.y + 18 > m.title.y && m.gear.y + 18 < m.title.y + m.title.h, `${at}: in the title row`).toBe(true);
-      const need = w >= 360 ? 8 : 4;
-      for (const [what, d] of Object.entries(m.gaps)) expect(d, `${at}: ${what} clear of the gear by ${need} px`).toBeGreaterThanOrEqual(need);
+      // (c) A phone: clear of the title and the two players by 4 px or more.
+      for (const what of ["title", "you", "opponent"] as const) expect(m.gaps[what], `${at}: ${what} clear of the gear`).toBeGreaterThanOrEqual(4);
     } else {
-      // (d) A computer: over the shop panel's right edge, and clear of the opponent's block.
-      expect(Math.abs(m.gear.right - m.dock.right), `${at}: the gear lines up with the shop panel's right edge`).toBeLessThanOrEqual(2);
-      expect(m.gear.x, `${at}: the gear is right of the board`).toBeGreaterThan(m.board.right);
-      for (const [what, d] of Object.entries(m.gaps)) expect(d, `${at}: ${what} clear of the gear by 8 px`).toBeGreaterThanOrEqual(8);
+      // (d) A computer (v5, Nov 8): over the opponent's block (over the board's right half), clear of it and of the board.
+      expect(m.gear.right, `${at}: at the opponent's side`).toBeGreaterThan(m.opp.x + m.opp.w / 2);
+      expect(m.gear.bottom, `${at}: over the opponent's block`).toBeLessThanOrEqual(m.opp.y);
+      for (const what of ["opponent", "board"] as const) expect(m.gaps[what], `${at}: ${what} clear of the gear`).toBeGreaterThanOrEqual(4);
     }
   }
 });

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUTOCHESS } from "@chessroyale/core";
 import { beginRound, goldBreakdown, newMatch, refundFor, settleRound } from "../src/autochess/economy.ts";
 import { piecesOn } from "../src/autochess/position.ts";
-import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveCount, moveWords } from "../src/autochess/words.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, incomeLines, headline, matchWords, moveCount, moveWords } from "../src/autochess/words.ts";
 
 describe("auto chess: what the result says", () => {
   it("the fight's rules, in the box while it plays, from the settings (short enough for a 320 px phone)", () => {
@@ -68,6 +68,25 @@ describe("auto chess: what the result says", () => {
     // A fight's cash-ins (2 gold a pawn: one pawn here) get their own part.
     const cashed = goldBreakdown(2, { gold: 2, hp: 20, wins: 0, losses: 0, refund: { survivors: 2, cashIns: 2 } } as never);
     expect(goldWords(cashed)).toBe("Next round: 2 saved + 12 income + 2 survivors + 2 from cash-ins = 18 gold");
+  });
+
+  it("the Income breakdown (Nov 8): base, interest, the streak, the round bonus and a refund add up to the income shown, the savings left out", () => {
+    const g = goldBreakdown(3, { gold: 12, hp: 20, wins: 2, losses: 0, refund: { survivors: 3 } } as never);
+    const inc = incomeLines(g, 2, 0);
+    expect(inc.lines).toEqual([
+      { label: "Base", gold: 10 },
+      { label: "Interest (15 gold)", gold: 1 },
+      { label: "Win streak (2)", gold: 1 },
+      { label: "Round bonus", gold: 4 },
+      { label: "Last fight's refund", gold: 3 },
+    ]);
+    expect(inc.total).toBe(g.total - g.saved);
+    expect(inc.lines.reduce((s, l) => s + l.gold, 0)).toBe(inc.total);
+    // Round 1: the base alone, no refund line; a loss streak says so.
+    const first = incomeLines(goldBreakdown(1, { gold: 0, hp: 24, wins: 0, losses: 0, refund: { survivors: 0 } } as never), 0, 0);
+    expect(first.total).toBe(10);
+    expect(first.lines.map((l) => l.label)).toEqual(["Base", "Interest (0 gold)", "Win streak (0)", "Round bonus"]);
+    expect(incomeLines(goldBreakdown(4, { gold: 0, hp: 20, wins: 0, losses: 3, refund: { survivors: 0 } } as never), 0, 3).lines[2]!.label).toBe("Loss streak (3)");
   });
 
   it("a clock counts down in whole seconds, rounded up", () => {

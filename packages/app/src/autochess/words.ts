@@ -107,6 +107,24 @@ export function goldWords(g: GoldBreakdown): string {
   return `Next round: ${parts.join(" + ")} = ${g.total} gold`;
 }
 
+/**
+ * This round's income, line by line (the Income breakdown in the action box, Nov 8): the base income, the round bonus (what the
+ * income has grown since round 1), interest on what was banked, the win or loss streak, and the last fight's refund when there is
+ * one. `total` is everything but the gold saved: the "Income +N" the box shows. `wins` and `losses` are the streaks the round began with.
+ */
+export function incomeLines(g: GoldBreakdown, wins: number, losses: number, cfg: AutoChessSettings = AUTOCHESS): { lines: { label: string; gold: number }[]; total: number } {
+  const base = Math.min(g.income, cfg.income.first);
+  const banked = g.saved + g.survivors + g.cashIns;
+  const lines = [
+    { label: "Base", gold: base },
+    { label: `Interest (${banked} gold)`, gold: g.interest },
+    { label: wins > 0 || losses === 0 ? `Win streak (${wins})` : `Loss streak (${losses})`, gold: g.streak },
+    { label: "Round bonus", gold: g.income - base },
+  ];
+  if (g.survivors + g.cashIns > 0) lines.push({ label: "Last fight's refund", gold: g.survivors + g.cashIns });
+  return { lines, total: g.total - g.saved };
+}
+
 export const matchWords = (won: boolean) => (won ? { head: "You win the match!", sub: "Your opponent is out of HP." } : { head: "You lose the match.", sub: "You are out of HP." });
 
 /** A clock: minutes and seconds, rounded up (a countdown never shows 0:00 before it ends). */
