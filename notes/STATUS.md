@@ -425,3 +425,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   #551 result screen: fixes pushed (36aa2fe5), waiting on CI; then merge (Eric liked the look; check mergeable after #554).
   New own-machine helpers: typed-chat-2 (Haiku, session_01JuCWRtXqrUekcRQmtFuM7P) and Smudgy ult + paint report (Opus,
   session_01JuCWRuSWR2Qgn5n5mXdjLx, claude/smudgy-ult). Timing on the new setup: Locker 27 min, Dash 28 min, padding 34 min (old: 4–9 h).
+- **Nov 8 overnight (Eric pre-approved):** LIVE + main green: #551 result screen (d7cfdf77), #555 Smudgy ult always fires
+  (40bb907e), #557 match rows fixed (ce8a52bc), #556 typed chat in match/lobby/phone + Quick chat button + Chat packs tab off
+  (b641c2d7). Stills branches to delete by Eric in GitHub: stills/551, stills/typed-chat-2, stills/match-fixed (the git proxy refuses deletes).
+  Next queue: auto chess redesign (Opus), town intro, intermittents (squads-three-boards:152 still seen on #556), custom quick chat (roadmap).

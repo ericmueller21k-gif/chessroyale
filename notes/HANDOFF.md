@@ -34,7 +34,7 @@ Eric owns it. You design, delegate to helpers, review, merge, check what's live,
   - **`--repeat-each` ≤3** unless Eric OKs more;
   - **start a new director session** when the context gets big; this file makes that cheap.
 
-## Live now (main)
+## Live now (main) — see STATUS.md's Nov 8 overnight entry for the latest (#551, #553, #554, #555, #556, #557 all live)
 - #552 home card taps (d7325418): icon → icon editor, name → your public profile, the big pawn still opens the inventory
   (Eric confirmed Nov 8).
 - #550 typed chat + right column, computer (merged f08e31e3, Nov 8 ~03:45 UTC): 8 pixel emoji, opt-in
