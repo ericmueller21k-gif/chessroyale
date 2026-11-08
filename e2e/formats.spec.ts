@@ -191,9 +191,10 @@ test("boss raid alone flows like a chess site: your move is played, the boss rep
   expect(await page.evaluate(() => (window as any).match.phase.startsAt <= Date.now())).toBe(true);
 });
 
-test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he takes the blow, falls, leaves his charges as power-ups, and you pick again without that move", async ({ page }) => {
+test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he takes the blow, falls, leaves his charges as power-ups, and you pick again without that move", async ({ page }, testInfo) => {
   test.setTimeout(8 * 60_000);
-  test.skip(test.info().project.name !== "phone", "one run is enough");
+  // (Desktop runs only for the result stills, RESULT_SHOTS: the same code path, one run in CI is enough.)
+  test.skip(test.info().project.name !== "phone" && !process.env.RESULT_SHOTS, "one run is enough");
   // (?boss=1600 skips the boss menu.)
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3&boss=1600&laststand=1");
   await bossAloneFromHome(page);
@@ -268,6 +269,11 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   expect(mine, "your pawn beside him").not.toBeNull();
   expect(mine!.x, "to his right").toBeGreaterThan(god!.x + god!.width / 2);
   expect(Math.abs(mine!.y + mine!.height - (god!.y + god!.height)), "feet level").toBeLessThan(24);
+  // The stills (RESULT_SHOTS): the God King and your pawn side by side, once his line is typed out.
+  if (process.env.RESULT_SHOTS) {
+    await expect(page.locator(".gk-epilogue-bubble .gk-bubble-rest")).toHaveText("", { timeout: 15_000 });
+    await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
+  }
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

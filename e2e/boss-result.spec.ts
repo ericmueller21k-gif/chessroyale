@@ -9,7 +9,6 @@ import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
 const SHOTS = process.env.RESULT_SHOTS;
 
 async function resultOf(page: Page, project: string, name: string) {
-  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` });
   const results = page.locator(".results");
   await expect(results.locator("h1")).toHaveClass(/boss-title/);
   // No trophy and no skull above the title: nothing before the title in the top part.
@@ -18,8 +17,23 @@ async function resultOf(page: Page, project: string, name: string) {
   await expect(results).not.toContainText("🏆");
   // No record line, win or loss counted, in any words.
   await expect(results).not.toContainText(/on your record|counts as a (win|loss)|a win on|a loss on/i);
-  // The boss's line in its bubble, said as the result shows.
-  await expect(results.locator(".bc-bubble")).not.toBeEmpty({ timeout: 15_000 });
+  // The boss's line in its bubble, typed out in full (its rest, not yet typed, is empty), inside the screen with a 16 px gutter
+  // on each side, centered over him.
+  const bubble = results.locator(".bc-bubble");
+  await expect(bubble).not.toBeEmpty({ timeout: 15_000 });
+  await expect(bubble.locator(".speech-rest")).toHaveText("", { timeout: 15_000 });
+  const line = (await bubble.locator(".speech-line").innerText()).trim();
+  expect(line.length, "a line").toBeGreaterThan(10);
+  // (The full line: what's typed (the shown part) is all of it now.)
+  expect(await bubble.locator(".speech-line").textContent()).toContain(line);
+  const vw = page.viewportSize()!.width;
+  const box = (await bubble.boundingBox())!;
+  expect(box.x, "left gutter").toBeGreaterThanOrEqual(16);
+  expect(box.x + box.width, "right gutter").toBeLessThanOrEqual(vw - 16);
+  const boss = (await page.locator(".boss-char.place-results").boundingBox())!;
+  expect(Math.abs(box.x + box.width / 2 - (boss.x + boss.width / 2)), "centered over him").toBeLessThan(8);
+  expect(box.y + box.height, "above him").toBeLessThanOrEqual(boss.y);
+  if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` });
   // The ranking note, when it's true for this match (boss alone is unranked), and nothing else of a record.
   await expect(results.locator(".results-unranked")).toHaveText("Unranked: solo games don't count for ranking.");
 }

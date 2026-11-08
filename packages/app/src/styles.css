@@ -13964,9 +13964,24 @@ img.qicon {
   right: 0;
   bottom: calc(100% + 34px);
 }
+/* (Eric's result screen, Nov 7: his words centered above him, inside the screen with a 16 px gutter on each side, the tail
+   pointing down at him; the figure below makes room for them, so they never cover the title above.) */
 .place-results .bc-bubble {
-  left: calc(100% + 8px);
-  top: 0;
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: calc(100% + 12px);
+  margin: 0 auto;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 32px));
+}
+.place-results .bc-bubble::after {
+  left: 50%;
+  right: auto;
+  margin-left: -6px;
+}
+.boss-char.place-results {
+  margin-top: 100px;
 }
 /* The Hidden Boss (admins only, for now): his whole figure is far taller than the cast (129 px above his feet, 137 with
    his hair in the wind), so on a computer his words go above his head, whatever his scale; on the results he's drawn
