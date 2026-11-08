@@ -459,3 +459,13 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   both with Eric's OK. Watching #558's deploy and main's full CI.
 - Dash helpers still running (rush: Opus, popoff/fam: Haiku); watchers bu5jy2twn (popoff) and bfnelmpt8 (rush).
 - Eric asked if GitHub runners are maxed: no; the cap is helper count (2 at once, 1 Opus). Offered more parallel Haiku helpers.
+
+### Nov 8 ~23:05
+- #558 live (031172b), main full CI green. #559 live (a7e16f2).
+- Dash: #560 (pop-off twice, fewer fam; Haiku) and #561 (Rush solo-only verdict, extra move never skipped; Opus) open, both
+  green before cleanup; review of #561 (session_01JuCWRtnccVCFVcwDGT7nRy, branch review/561): no blockers; its 3 small findings
+  fixed by the director in 7a3e632. .pr-body.md removed on both (26f111f, b3094ea); CI watcher bg995zpju. Still sent to Eric
+  (solo fail: 2… e5, 3… h6). Waiting on Eric's OK to merge both; only .pr-body.md conflicted between them (now gone).
+- Local e2e on this machine: Playwright pins chromium 1194; use a temp config with launchOptions.executablePath
+  /opt/pw-browsers/chromium (don't commit it). npm ci was needed in /home/user/chessroyale.
+- Next queue: town intro; intermittent tests (squads-three-boards:152, squads-watch:167, dash:241, town-leave:143); custom quick chat.
