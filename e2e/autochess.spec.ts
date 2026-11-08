@@ -279,9 +279,8 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   await expect(held(page)).toHaveCount(0);
   await expect(theirBench(page).locator(".ac-slot.has")).toHaveCount(0);
   const emptyLook = await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => ({ bg: getComputedStyle(el).backgroundColor, ring: getComputedStyle(el, "::before").content === "none" ? "none" : getComputedStyle(el, "::before").borderTopStyle }));
-  // (Phone, v5: an empty slot is a tile in the bench's colors, no ring. Computer, Nov 8: a faint dashed ring.)
-  if (phone()) expect(emptyLook).toEqual({ bg: expect.not.stringMatching(/^rgba\(0, 0, 0, 0\)$/), ring: "none" });
-  else expect(emptyLook).toEqual({ bg: "rgba(0, 0, 0, 0)", ring: "dashed" });
+  // (v5, phone and computer: an empty slot is a tile in the bench's colors, no ring.)
+  expect(emptyLook).toEqual({ bg: expect.not.stringMatching(/^rgba\(0, 0, 0, 0\)$/), ring: "none" });
   expect(errors).toEqual([]);
 });
 
@@ -770,7 +769,7 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
   expect(errors).toEqual([]);
 });
 
-test("the screen (Nov 8): a phone's (v5) benches a row of board squares on their files, yours under E-H and theirs over A-D, in the side's own alternating colors, the players kitty-corner; a computer's benches up and down the board's sides, the same gap from it, and you left of the action box and the opponent right of the board's top; name and level, thin HP and XP bars", async ({ page }) => {
+test("the screen (Nov 8, v5, phone and computer): the benches rows of board squares on their files, yours under E-H and theirs over A-D, alternating, yours lighter, the players kitty-corner; name and level, thin HP and XP bars", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -782,71 +781,48 @@ test("the screen (Nov 8): a phone's (v5) benches a row of board squares on their
   const opp = await box(".ac-opp");
   const me = await box(".ac-me");
   const col = await box(".ac-col");
-  if (phone()) {
-    // v5 (Eric, Nov 8): each bench a row of 4 board squares lined up with its files, 2 to 8 px from the board's border: yours under E to H, theirs
-    // over A to D. The tiles: the side's own pair, alternating, unlike the board's squares (white light and tan, black grays).
-    const look = await page.evaluate(() => {
-      const r = (e: Element) => e.getBoundingClientRect();
-      const board = r(document.querySelector(".hb-board")!);
-      const tiles = (sel: string) => [...document.querySelectorAll(`${sel} .ac-slot`)].map((e) => ({ x: r(e).left, w: r(e).width, t: r(e).top, b: r(e).bottom, bg: getComputedStyle(e).backgroundColor }));
-      const probe = document.createElement("div");
-      document.body.append(probe);
-      const sqColor = (v: string) => ((probe.style.background = `var(${v})`), getComputedStyle(probe).backgroundColor);
-      const out = { board: { l: board.left, t: board.top, w: board.width }, you: tiles(".ac-bench.you"), them: tiles(".ac-bench.them"), light: sqColor("--sq-light"), dark: sqColor("--sq-dark") };
-      probe.remove();
-      return out;
+  // v5 (Eric, Nov 8), phone and computer: each bench a row of 4 board squares lined up with its files, 2 to 8 px from the board's border: yours
+  // under E to H, theirs over A to D. The tiles by owner: an alternating pair, unlike the board's squares; yours lighter than theirs.
+  const look = await page.evaluate(() => {
+    const r = (e: Element) => e.getBoundingClientRect();
+    const board = r(document.querySelector(".hb-board")!);
+    const tiles = (sel: string) => [...document.querySelectorAll(`${sel} .ac-slot`)].map((e) => ({ x: r(e).left, w: r(e).width, t: r(e).top, b: r(e).bottom, bg: getComputedStyle(e).backgroundColor }));
+    const probe = document.createElement("div");
+    document.body.append(probe);
+    const sqColor = (v: string) => ((probe.style.background = `var(${v})`), getComputedStyle(probe).backgroundColor);
+    const out = { board: { l: board.left, t: board.top, w: board.width }, you: tiles(".ac-bench.you"), them: tiles(".ac-bench.them"), light: sqColor("--sq-light"), dark: sqColor("--sq-dark") };
+    probe.remove();
+    return out;
+  });
+  const sq = look.board.w / 8;
+  for (const [who, list, first] of [["yours", look.you, 4], ["theirs", look.them, 0]] as const) {
+    list.forEach((t, i) => {
+      expect(Math.abs(t.x - (look.board.l + (first + i) * sq)), `${who}: tile ${i} on its file`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(t.w - sq), `${who}: a square wide`).toBeLessThanOrEqual(0.5);
     });
-    const sq = look.board.w / 8;
-    for (const [who, list, first] of [["yours", look.you, 4], ["theirs", look.them, 0]] as const) {
-      list.forEach((t, i) => {
-        expect(Math.abs(t.x - (look.board.l + (first + i) * sq)), `${who}: tile ${i} on its file`).toBeLessThanOrEqual(0.5);
-        expect(Math.abs(t.w - sq), `${who}: a square wide`).toBeLessThanOrEqual(0.5);
-      });
-      const bgs = list.map((t) => t.bg);
-      expect(bgs[0], `${who}: alternating`).not.toBe(bgs[1]);
-      expect(bgs[0]).toBe(bgs[2]);
-      expect(bgs[1]).toBe(bgs[3]);
-      for (const bg of bgs.slice(0, 2)) expect([look.light, look.dark], `${who}: not the board's squares`).not.toContain(bg);
-    }
-    expect(look.you[0]!.bg, "white's tiles and black's differ").not.toBe(look.them[0]!.bg);
-    const below = look.you[0]!.t - (frame.y + frame.height);
-    const above = frame.y - look.them[0]!.b;
-    for (const gap of [below, above]) {
-      expect(gap, "a few px from the board's border").toBeGreaterThanOrEqual(2);
-      expect(gap).toBeLessThanOrEqual(8);
-    }
-    // The players kitty-corner: you under the board's left half, beside your bench; the opponent over its right half, beside theirs.
-    const mid = frame.x + frame.width / 2;
-    expect(me.x + me.width, "you: under the left half").toBeLessThanOrEqual(mid + 0.5);
-    expect(me.y, "you: under the board").toBeGreaterThanOrEqual(frame.y + frame.height);
-    expect(opp.x, "the opponent: over the right half").toBeGreaterThanOrEqual(mid - 0.5);
-    expect(opp.y + opp.height, "the opponent: over the board").toBeLessThanOrEqual(frame.y);
-    expect(opp.y, "the opponent under the title row").toBeGreaterThanOrEqual(col.y);
-    expect(dock.y, "the action box under your row").toBeGreaterThanOrEqual(Math.max(yours.y + yours.height, me.y + me.height));
-    expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y);
-  } else {
-    // The benches on the board's sides, the same gap from it: yours left, its first slot in your corner (the board's foot); theirs right.
-    const gapL = frame.x - (yours.x + yours.width);
-    const gapR = theirs.x - (frame.x + frame.width);
-    expect(Math.abs(gapL - gapR), `the benches' gaps: ${gapL} and ${gapR}`).toBeLessThanOrEqual(1);
-    expect(gapL).toBeGreaterThanOrEqual(2);
-    expect(gapL).toBeLessThanOrEqual(10);
-    const slots = page.locator(".ac-bench.you .ac-slot");
-    const firstMine = (await slots.first().boundingBox())!;
-    expect(Math.abs(firstMine.y + firstMine.height - (frame.y + frame.height)), "your first slot in your corner").toBeLessThanOrEqual(1);
-    expect(yours.y, "your bench runs up the board's side").toBeGreaterThanOrEqual(frame.y - 0.5);
-    const firstTheirs = (await page.locator(".ac-bench.them .ac-slot").first().boundingBox())!;
-    expect(firstTheirs.y, "a computer's: under the opponent's block").toBeGreaterThanOrEqual(opp.y + opp.height - 0.5);
-    expect(theirs.y + theirs.height, "their bench runs down the board's side").toBeLessThanOrEqual(frame.y + frame.height + 0.5);
-    const tiles = async (sel: string) => page.locator(`${sel} .ac-slot`).evaluateAll((els) => els.map((e) => ({ w: Math.round(e.getBoundingClientRect().width * 10) / 10, h: Math.round(e.getBoundingClientRect().height * 10) / 10 })));
-    expect(await tiles(".ac-bench.them")).toEqual(await tiles(".ac-bench.you"));
-    // You left of the action box, level with it; the opponent right of the board's top.
-    expect(me.x + me.width, "you are left of the action box").toBeLessThanOrEqual(dock.x + 0.5);
-    expect(me.y + me.height / 2, "level with the action box").toBeGreaterThan(dock.y);
-    expect(me.y + me.height / 2).toBeLessThan(dock.y + dock.height);
-    expect(opp.x, "the opponent is right of the board").toBeGreaterThanOrEqual(frame.x + frame.width - 0.5);
-    expect(Math.abs(opp.y - frame.y), "at the board's top").toBeLessThanOrEqual(2);
+    const bgs = list.map((t) => t.bg);
+    expect(bgs[0], `${who}: alternating`).not.toBe(bgs[1]);
+    expect(bgs[0]).toBe(bgs[2]);
+    expect(bgs[1]).toBe(bgs[3]);
+    for (const bg of bgs.slice(0, 2)) expect([look.light, look.dark], `${who}: not the board's squares`).not.toContain(bg);
   }
+  const light = (c: string) => c.match(/\d+/g)!.slice(0, 3).reduce((a, v) => a + Number(v), 0);
+for (const i of [0, 1]) expect(light(look.you[i]!.bg), "yours lighter than theirs").toBeGreaterThan(light(look.them[i]!.bg));
+  const below = look.you[0]!.t - (frame.y + frame.height);
+  const above = frame.y - look.them[0]!.b;
+  for (const gap of [below, above]) {
+    expect(gap, "a few px from the board's border").toBeGreaterThanOrEqual(2);
+    expect(gap).toBeLessThanOrEqual(8);
+  }
+  // The players kitty-corner: you under the board's left half, beside your bench; the opponent over its right half, beside theirs.
+  const mid = frame.x + frame.width / 2;
+  expect(me.x + me.width, "you: under the left half").toBeLessThanOrEqual(mid + 0.5);
+  expect(me.y, "you: under the board").toBeGreaterThanOrEqual(frame.y + frame.height);
+  expect(opp.x, "the opponent: over the right half").toBeGreaterThanOrEqual(mid - 0.5);
+  expect(opp.y + opp.height, "the opponent: over the board").toBeLessThanOrEqual(frame.y);
+  expect(opp.y, "the opponent under the title row").toBeGreaterThanOrEqual(col.y);
+  expect(dock.y, "the action box under your row").toBeGreaterThanOrEqual(Math.max(yours.y + yours.height, me.y + me.height));
+  expect(theirs.y + theirs.height).toBeLessThanOrEqual(frame.y);
   // The name and the level by each pawn; the numbers in thin bars (phone: beside the pawn; computer: under it).
   await expect(page.locator(".ac-who .ac-name")).toHaveText("Bot");
   await expect(botLevel(page)).toHaveText("Lv 4");
@@ -861,8 +837,7 @@ test("the screen (Nov 8): a phone's (v5) benches a row of board squares on their
     for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(8);
     const pawn = (await page.locator(`${sel} .ac-pawn`).boundingBox())!;
     const first = (await page.locator(`${sel} .ac-bar`).first().boundingBox())!;
-    if (phone()) expect(first.x, `${sel}: the bars are right of the pawn`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 2);
-    else expect(first.y, `${sel}: the bars are under the pawn`).toBeGreaterThanOrEqual(pawn.y + pawn.height - 2);
+    expect(first.x, `${sel}: the bars are right of the pawn`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 2);
     expect(pawn.height, `${sel}: a big pawn`).toBeGreaterThanOrEqual(40);
   }
   // HP is green at full (the move clock's own colors: hue 135) and the bar's length is the share left.
@@ -1408,8 +1383,8 @@ test("tap one of their bench pieces: a red ring on it and its landing square lig
   await expect(tiles.nth(0).locator("piece")).toHaveClass(/black/);
   await expect(tiles.nth(1)).toHaveAttribute("data-kind", "r");
   await expect(tiles.nth(1)).toHaveAttribute("data-square", "f8");
-  // A tile is a real target: a board square on a phone (v5: 45 px at 390 x 844, 41 on the test phone), 44 px tall on a computer.
-  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(phone() ? 40 : 44);
+  // A tile is a board square (v5: 45 px at 390 x 844, 41 on the test phone, 52 at 1280 x 800).
+  expect((await tiles.nth(0).boundingBox())!.height).toBeGreaterThanOrEqual(40);
   await expect(page.locator(".ac-red")).toHaveCount(0);
   await expect(tiles.nth(0)).not.toHaveClass(/tapped/);
   // Tapped: a red ring on the tile, and the landing square lights red, exactly on that square of their half.
@@ -2007,10 +1982,9 @@ test("layouts (Nov 8, the brief's numbers): nothing scrolls and everything is in
     expect(Math.abs(m.frame.w - m.frame.h), `${where}: a square frame`).toBeLessThan(1);
     expect(Math.abs(m.dock.w - m.frame.w), `${where}: the action box is the board's width`).toBeLessThanOrEqual(0.5);
     expect(Math.abs(m.dock.l - m.frame.l), `${where}: and lined up with it`).toBeLessThanOrEqual(0.5);
-    // (A phone's, v5: a bit below your row under the board.)
-    const over = phone() ? m.rowB : m.frame.b;
-    expect(m.dock.t - over, `${where}: a bit below the board`).toBeGreaterThanOrEqual(phone() ? 4 : 6);
-    expect(m.dock.t - over).toBeLessThanOrEqual(phone() ? 24 : 16);
+    // (v5: a bit below your row under the board.)
+    expect(m.dock.t - m.rowB, `${where}: a bit below your row`).toBeGreaterThanOrEqual(4);
+    expect(m.dock.t - m.rowB).toBeLessThanOrEqual(24);
     expect(m.dock.b, `${where}: the box on screen`).toBeLessThanOrEqual(h);
     // Four cards, each 44 px tall at least; square wherever it is 44 wide.
     expect(m.cards, `${where}: four cards`).toHaveLength(4);
@@ -2023,24 +1997,17 @@ test("layouts (Nov 8, the brief's numbers): nothing scrolls and everything is in
     for (const b of m.buttons) expect(b.w, `${where}: a button's width`).toBeGreaterThanOrEqual(44);
     expect(m.overflow.buttons.every((x) => x <= 0.5), `${where}: the buttons' words`).toBe(true);
     expect(m.overflow.names.every((x) => x <= 0), `${where}: card labels`).toBe(true);
-    // The benches: 8 slots. A phone's (v5): each a board square (±0.5 px), a bench piece the board's piece size. A computer's: each a 44 px
-    // target as wide as the bench's column, a bench piece 28 px or more.
+    // The benches (v5, phone and computer): 8 slots, each a board square (±0.5 px), a bench piece the board's piece size.
     expect(m.tiles, `${where}: four slots a bench`).toHaveLength(8);
     const square = m.board.w / 8;
     for (const t of m.tiles) {
-      if (phone()) {
-        expect(Math.abs(t.w - square), `${where}: a tile is a square wide`).toBeLessThanOrEqual(0.5);
-        expect(Math.abs(t.h - square), `${where}: and tall`).toBeLessThanOrEqual(0.5);
-      } else {
-        expect(Math.abs(t.h - 44), `${where}: a slot's height`).toBeLessThanOrEqual(0.5);
-        expect(Math.abs(t.w - m.bench.w), `${where}: a slot is the bench's width`).toBeLessThanOrEqual(0.5);
-      }
+      expect(Math.abs(t.w - square), `${where}: a tile is a square wide`).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(t.h - square), `${where}: and tall`).toBeLessThanOrEqual(0.5);
     }
     expect(m.benchPieces.length, `${where}: their two held pieces`).toBe(2);
-    for (const pc of m.benchPieces) {
-      if (phone()) expect(Math.abs(pc - square), `${where}: a bench piece is a board piece's size`).toBeLessThanOrEqual(0.5);
-      else expect(pc, `${where}: a bench piece's size`).toBeGreaterThanOrEqual(28);
-    }
+    for (const pc of m.benchPieces) expect(Math.abs(pc - square), `${where}: a bench piece is a board piece's size`).toBeLessThanOrEqual(0.5);
+    // (A computer at 1280 x 800: squares about 50 px, Eric.)
+    if (w === 1280 && h === 800) expect(square, "1280 x 800: about 50 px squares").toBeGreaterThanOrEqual(46);
     // The hexagon: centered on the box; its step name and time centered in it, the name over the time; the income left of it and the odds right of it.
     expect(Math.abs(m.hex.c.x - (m.dock.l + m.dock.w / 2)), `${where}: the hexagon is centered on the box`).toBeLessThanOrEqual(1);
     expect(Math.abs(m.hex.c.y - m.row.c.y), `${where}: in the band's middle`).toBeLessThanOrEqual(1);
@@ -3254,9 +3221,8 @@ test("the action box is one panel (Nov 8, was v9's): the band, Buy XP, Reroll an
     return { dock: [d.borderTopWidth, d.borderTopColor, d.outlineWidth, d.outlineColor, d.borderTopLeftRadius], frame: [f.borderTopWidth, f.borderTopColor, f.outlineWidth, f.outlineColor, f.borderTopLeftRadius], bg: d.backgroundColor };
   });
   expect(look.dock, "the board's own border").toEqual(look.frame);
-  // (A phone's, v5: 3 to 6 px, the frame's gold border taking the board's 8 px snap; a computer's 3 px.)
-  if (phone()) expect(["3px", "4px", "5px", "6px"]).toContain(look.dock[0]);
-  else expect(look.dock[0]).toBe("3px");
+  // (v5: 3 to 6 px, the frame's gold border taking the board's 8 px snap.)
+  expect(["3px", "4px", "5px", "6px"]).toContain(look.dock[0]);
   expect(look.dock[4], "square corners").toBe("0px");
   expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
   expect(errors).toEqual([]);

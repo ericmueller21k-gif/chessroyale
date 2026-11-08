@@ -237,7 +237,7 @@ test("Auto chess: the same gear at the top right, with Sound, Animations, Leave 
   expect(new URL(page.url()).pathname).toBe("/");
 });
 
-test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a phone at the title row's right end, clear of the title and the players; on a computer at the top right, over the opponent's block, right of the board (Nov 8)", async ({ page }) => {
+test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a phone at the title row's right end, clear of the title and the players; on a computer at the top right, over the opponent's block (v5, Nov 8)", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   // A phone: 390 x 844, 360 x 640 and 320 x 568. A computer: 1280 x 800 and 1440 x 900.
   const sizes = phone() ? ([[390, 844], [360, 640], [320, 568]] as const) : ([[1280, 800], [1440, 900]] as const);
@@ -281,8 +281,8 @@ test("Auto chess's gear: a plain gear (no box, border or shadow; 36 px); on a ph
       // (c) A phone: clear of the title and the two players by 4 px or more.
       for (const what of ["title", "you", "opponent"] as const) expect(m.gaps[what], `${at}: ${what} clear of the gear`).toBeGreaterThanOrEqual(4);
     } else {
-      // (d) A computer: over the opponent's block (right of the board's top), clear of it and of the board.
-      expect(m.gear.x, `${at}: right of the board`).toBeGreaterThan(m.board.right);
+      // (d) A computer (v5, Nov 8): over the opponent's block (over the board's right half), clear of it and of the board.
+      expect(m.gear.right, `${at}: at the opponent's side`).toBeGreaterThan(m.opp.x + m.opp.w / 2);
       expect(m.gear.bottom, `${at}: over the opponent's block`).toBeLessThanOrEqual(m.opp.y);
       for (const what of ["opponent", "board"] as const) expect(m.gaps[what], `${at}: ${what} clear of the gear`).toBeGreaterThanOrEqual(4);
     }

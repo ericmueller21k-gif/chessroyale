@@ -1248,7 +1248,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           <MatchMenu exit={leave} />
         </header>
         {slot && createPortal(<p class="rc-sub ac-slot-line">Round {g.match.round} · {PHASE_NAME[g.phase]} phase</p>, slot)}
-          <div class={`ac-bench them ${theirs}`} aria-label="Their bench">
+          <div class="ac-bench them" aria-label="Their bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = theirBench[i];
               if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;
@@ -1436,7 +1436,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
           )}
         </div>
 
-          <div class={`ac-bench you ${mine}${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
+          <div class={`ac-bench you${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = g.round.you.bench[i];
               if (!h) return <div key={`empty${i}`} class="ac-slot empty" aria-hidden="true" />;

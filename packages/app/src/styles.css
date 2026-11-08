@@ -22053,130 +22053,132 @@ button.sq-tiny {
   z-index: 2;
 }
 
-/* ---- A phone (v5, Eric Nov 8; docs/decisions/2026-11-08-autochess-redesign.md): the board and the action box nearly the screen's
-   width; each bench a row of 4 tiles the size of the board's squares, lined up with its files: theirs over A to D, yours under E to
-   H, a few px from the border; the players kitty-corner: the opponent over E to H, you under A to D. ---- */
-@media (max-width: 1023px) {
-  .ac-root {
-    --rgap: 4px;
-    --lab: 14px;
-    --free: 12px;
-    /* Everything top to bottom but the board, the two rows and the cards (the frame's and the box's borders at their widest, 6 px). */
-    --k0: calc(2 * 3px + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
-    --k: calc(2 * var(--bd) + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
-    --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 6px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 16px - var(--k0) / 4);
-    /* The board: as wide as the column less its frame, or what the height leaves (the frame is the board + 8, a card a quarter of the
-       frame less k, each row a tile, its gap and its label, or the player's block when that is taller), snapped to 8 px (it draws in
-       whole multiples of 8 device pixels); the frame's gold border takes up to 3 px more a side, so the frame is 8 px from each edge
-       at 390, 360 and 430. A tile is a square. */
-    --b: round(down, min(calc(var(--colw) - 8px), calc((var(--app-h) - var(--acc) - 2 * (var(--rgap) + var(--lab))) / 1.5), calc((var(--app-h) - var(--acc) - 2 * var(--pl-h)) / 1.25)), 8px);
-    --bd: calc(3px + min(3px, round(down, calc((var(--colw) - 8px - var(--b)) / 2), 1px)));
-    --fw: calc(var(--b) + 2px + 2 * var(--bd));
-    --acs: calc(var(--b) / 8);
-    --acrow: max(calc(var(--acs) + var(--rgap) + var(--lab)), var(--pl-h));
-  }
-  .ac-col {
-    grid-template-columns: minmax(0, 1fr) calc(var(--fw) / 2) calc(var(--fw) / 2) minmax(0, 1fr);
-    grid-template-rows: var(--head-h) var(--acrow) var(--fw) var(--acrow) auto;
-    grid-template-areas:
-      "head head head head"
-      ". bt opp opp"
-      ". board board ."
-      "me me by ."
-      ". dock dock .";
-  }
-  .ac-frame,
-  .ac-dock {
-    border-width: var(--bd);
-  }
-  /* (The Income breakdown keeps its place 3 px in from the box's outer edge, whatever the border.) */
-  .ac-income-box {
-    left: calc(3px - var(--bd));
-  }
-  .ac-players {
-    display: contents;
-  }
-  .ac-opp {
-    grid-area: opp;
-    align-self: end;
-    justify-self: center;
-    margin-bottom: var(--rgap);
-  }
-  .ac-me {
-    grid-area: me;
-    align-self: start;
-    justify-self: center;
-    margin-top: var(--rgap);
-  }
-  .ac-bench {
-    flex-direction: row;
-    gap: 0;
-    width: calc(var(--acs) * 4);
-  }
-  .ac-bench.them {
-    grid-area: bt;
-    align-self: end;
-    justify-self: end;
-    margin-bottom: var(--rgap);
-  }
-  .ac-bench.you {
-    grid-area: by;
-    align-self: start;
-    justify-self: start;
-    flex-direction: row;
-    margin-top: var(--rgap);
-  }
-  .ac-slot {
-    width: var(--acs);
-    height: var(--acs);
-    border-radius: 0;
-    background: var(--t1);
-  }
-  .ac-slot:nth-child(even) {
-    background: var(--t2);
-  }
-  .ac-slot.aimed {
-    background: rgba(242, 193, 78, 0.62);
-  }
-  /* The tiles: a side's own pair, a little off the board's squares (white light and tan, black two grays). */
-  .ac-bench.w {
-    --t1: #f6e5c6;
-    --t2: #d4bd96;
-  }
-  .ac-bench.b {
-    --t1: #d9d7d3;
-    --t2: #aeaba6;
-  }
-  .ac-slot .ac-pc {
-    width: var(--acs);
-  }
-  .ac-slot em {
-    position: absolute;
-    left: 0;
-    right: 0;
-    text-align: center;
-    font-size: 11px;
-  }
-  .ac-bench.you .ac-slot em {
-    top: calc(100% + 2px);
-  }
-  .ac-bench.them .ac-slot em {
-    bottom: calc(100% + 2px);
-  }
-  .ac-slot.empty::before {
-    content: none;
-  }
-  .ac-slot.tapped {
-    box-shadow: inset 0 0 0 3px #dc2626;
-  }
-  .ac-bench.you .ac-float.on-bench {
-    left: calc(var(--acs) * var(--slot, 0));
-    top: 0;
-    bottom: auto;
-    width: var(--acs);
-    height: var(--acs);
-  }
+/* ---- v5, every size (Eric Nov 8; docs/decisions/2026-11-08-autochess-redesign.md): the board and the action box as big as fit (a
+   phone's nearly its width); each bench a row of 4 tiles the size of the board's squares, lined up with its files: theirs over A to
+   D, yours under E to H, a few px from the border; the players kitty-corner: the opponent over E to H, you under A to D. A computer
+   only sets its frame and a few sizes (below). ---- */
+.ac-root {
+  --rgap: 4px;
+  --lab: 14px;
+  --free: 12px;
+  /* Everything top to bottom but the board, the two rows and the cards (the frame's and the box's borders at their widest, 6 px). */
+  --k0: calc(2 * 3px + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+  --k: calc(2 * var(--bd) + 2 * var(--box-p) + var(--btnw) + 4 * var(--cgap));
+  --acc: calc(env(safe-area-inset-top) + env(safe-area-inset-bottom) + var(--pad-t) + var(--head-h) + var(--dock-gap) + 2 * 6px + var(--band-h) + 1px + 2 * var(--box-p) + var(--free) + var(--lock-h, 0px) + 16px - var(--k0) / 4);
+  /* The board: as wide as the column less its frame, or what the height leaves (the frame is the board + 8, a card a quarter of the
+     frame less k, each row a tile, its gap and its label, or the player's block when that is taller), snapped to 8 px (it draws in
+     whole multiples of 8 device pixels); the frame's gold border takes up to 3 px more a side, so the frame is 8 px from each edge
+     at 390, 360 and 430. A tile is a square. */
+  --b: round(down, min(calc(var(--colw) - 8px), calc((var(--app-h) - var(--acc) - 2 * (var(--rgap) + var(--lab))) / 1.5), calc((var(--app-h) - var(--acc) - 2 * var(--pl-h)) / 1.25)), 8px);
+  --bd: calc(3px + min(3px, round(down, calc((var(--colw) - 8px - var(--b)) / 2), 1px)));
+  --fw: calc(var(--b) + 2px + 2 * var(--bd));
+  --acs: calc(var(--b) / 8);
+  --acrow: max(calc(var(--acs) + var(--rgap) + var(--lab)), var(--pl-h));
 }
+.ac-col {
+  /* (Up to 24 px each side of the board, so the players and the gear stay by it on a wide screen.) */
+  width: min(var(--colw), calc(var(--fw) + 48px));
+  grid-template-columns: minmax(0, 1fr) calc(var(--fw) / 2) calc(var(--fw) / 2) minmax(0, 1fr);
+  grid-template-rows: var(--head-h) var(--acrow) var(--fw) var(--acrow) auto;
+  grid-template-areas:
+    "head head head head"
+    ". bt opp opp"
+    ". board board ."
+    "me me by ."
+    ". dock dock .";
+}
+.ac-frame,
+.ac-dock {
+  border-width: var(--bd);
+}
+/* (The Income breakdown keeps its place 3 px in from the box's outer edge, whatever the border.) */
+.ac-income-box {
+  left: calc(3px - var(--bd));
+}
+.ac-players {
+  display: contents;
+}
+.ac-opp {
+  grid-area: opp;
+  align-self: end;
+  justify-self: center;
+  margin-bottom: var(--rgap);
+}
+.ac-me {
+  grid-area: me;
+  align-self: start;
+  justify-self: center;
+  margin-top: var(--rgap);
+}
+.ac-bench {
+  flex-direction: row;
+  gap: 0;
+  width: calc(var(--acs) * 4);
+}
+.ac-bench.them {
+  grid-area: bt;
+  align-self: end;
+  justify-self: end;
+  margin-bottom: var(--rgap);
+}
+.ac-bench.you {
+  grid-area: by;
+  align-self: start;
+  justify-self: start;
+  flex-direction: row;
+  margin-top: var(--rgap);
+}
+.ac-slot {
+  width: var(--acs);
+  height: var(--acs);
+  border-radius: 0;
+  background: var(--t1);
+}
+.ac-slot:nth-child(even) {
+  background: var(--t2);
+}
+.ac-slot.aimed {
+  background: rgba(242, 193, 78, 0.62);
+}
+/* The tiles: by owner (Eric, Nov 8): yours a light gray pair, theirs a slightly darker one, both unlike the board's squares. */
+.ac-bench.you {
+  --t1: #e4e2dd;
+  --t2: #c6c3bc;
+}
+.ac-bench.them {
+  --t1: #bdb9b1;
+  --t2: #98948b;
+}
+.ac-slot .ac-pc {
+  width: var(--acs);
+}
+.ac-slot em {
+  position: absolute;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+}
+.ac-bench.you .ac-slot em {
+  top: calc(100% + 2px);
+}
+.ac-bench.them .ac-slot em {
+  bottom: calc(100% + 2px);
+}
+.ac-slot.empty::before {
+  content: none;
+}
+.ac-slot.tapped {
+  box-shadow: inset 0 0 0 3px #dc2626;
+}
+.ac-bench.you .ac-float.on-bench {
+  left: calc(var(--acs) * var(--slot, 0));
+  top: 0;
+  bottom: auto;
+  width: var(--acs);
+  height: var(--acs);
+}
+
 /* (Under 360 px wide, v5: the fight's and the result's words a size smaller, and 36 px kept free at the foot for them to grow into, so
    they fit under the board.) */
 @media (max-width: 359px) {
@@ -22200,101 +22202,30 @@ button.sq-tiny {
     font-size: 14px;
   }
 }
-/* ---- A computer (the front door's frame, 1024 px and wider): you left of the action box, the opponent right of the board's top ---- */
+/* ---- A computer (the front door's frame, 1024 px and wider): the same screen (v5) in the center column, with a computer's sizes ---- */
 @media (min-width: 1024px) {
   .fd-root.framed.fd-on-autochess .fd-center {
     max-width: none;
   }
   .ac-root {
     --pad-t: 12px;
-    --head-h: 44px;
-    --pl-h: 0px;
-    --above: 0px;
-    --pawn: 64px;
-    --hop: 10px;
-    --bw: 40px;
-    --bgap: 8px;
-    --bp: 30px;
+    --head-h: 40px;
     --band-h: 48px;
     --box-p: 7px;
-    --btnw: 96px;
+    /* (Buy XP and Reroll's column follows the height, as the board does, so a card stays 44 px wide or more on a short screen.) */
+    --btnw: clamp(58px, calc(var(--app-h) * 0.1), 96px);
     --cgap: 6px;
-    --dock-gap: 14px;
-    --free: 12px;
-    --side: 92px;
     --colw: calc(100vw - var(--fd-menu) - var(--fd-rail) - 32px);
-    --fw: calc(round(down, min(calc(var(--colw) - 2 * (var(--side) + var(--bw) + var(--bgap))), calc((var(--a) + var(--k) / 4) * 0.8)) - 8px, 8px) + 8px);
   }
-  .ac-col {
-    width: auto;
-    grid-template-columns: var(--side) calc(var(--bw) + var(--bgap)) var(--fw) calc(var(--bw) + var(--bgap)) var(--side);
-    grid-template-rows: var(--head-h) auto minmax(0, 1fr) auto;
-    grid-template-areas:
-      "head head head head head"
-      ". . board opp opp"
-      ". by board bt ."
-      "me me dock . .";
-  }
-  /* (The title block is the right column's slot here: "AUTO CHESS", the round and the step.) */
+  /* (The title block is the right column's slot here: "AUTO CHESS", the round and the step. The gear: top right, over the opponent.) */
   .ac-title {
     visibility: hidden;
   }
   .ac-head {
     padding: 0;
   }
-  .ac-players {
-    display: contents;
-  }
-  .ac-side {
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    text-align: center;
-  }
-  .ac-info {
-    align-items: center;
-  }
-  .ac-name {
-    font-size: 15px;
-    max-width: 136px;
-  }
-  .ac-lv {
-    font-size: 12.5px;
-  }
-  .ac-info .ac-bars {
-    width: 120px;
-  }
-  .ac-me {
-    grid-area: me;
-    align-self: center;
-    justify-self: center;
-    margin-top: var(--dock-gap);
-  }
-  .ac-opp {
-    grid-area: opp;
-    align-self: start;
-    justify-self: center;
-    margin-bottom: 14px;
-  }
-  .ac-bench.them {
-    align-self: start;
-  }
-  .ac-bench.you {
-    grid-row: 2 / 4;
-  }
-  .ac-frame {
-    grid-row: 2 / 4;
-  }
-  .ac-slot em {
-    font-size: 10px;
-  }
   .ac-income {
     font-size: 13px;
-  }
-}
-@media (min-width: 1440px) {
-  .ac-root {
-    --side: 112px;
   }
 }
 .rc-sub {
