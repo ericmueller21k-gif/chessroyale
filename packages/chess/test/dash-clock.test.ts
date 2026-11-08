@@ -83,8 +83,8 @@ describe("Dash's pop-off (Eric, Nov 7: once a battle; Eric, Nov 8: twice, before
     expect(pairs.size).toBeGreaterThan(10);
   });
 
-  it("the test switch (?power=popoff): on his second and eighth turns", () => {
-    expect(simulate(5, "popoff", 9).popAt).toEqual([2, 8]);
+  it("the test switch (?power=popoff): on his second and fourth turns", () => {
+    expect(simulate(5, "popoff", 9).popAt).toEqual([2, 4]);
   });
 
   it("two beats of 4 to 6 seconds in all (3 smacks and the pop-off line, then 10 fast smacks and the love line)", () => {

@@ -224,10 +224,11 @@ export const popOffHolding = (boss: { id?: string; powers?: { turn?: number; das
 
 /**
  * His two pop-off turns: two of his turns from dashPopOff.from to dashPopOff.to, at least dashPopOff.gap apart, from the battle's
- * seed (the same on every device; in order). The test switch (?power=popoff): his second and eighth turns.
+ * seed (the same on every device; in order). The test switch (?power=popoff): his second and fourth turns (close together, so
+ * the e2e plays few moves: before his Scramble Rush can come, turn 7, and before Stockfish mates the test's shuffled knights).
  */
 export function popOffTurns(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff, test = ""): [number, number] {
-  if (test === "popoff") return [2, 8];
+  if (test === "popoff") return [2, 4];
   const first = s.from + Math.floor(powerRoll(seed, "popoff", 1) * (s.to - s.from + 1 - s.gap));
   const second = first + s.gap + Math.floor(powerRoll(seed, "popoff", 2) * (s.to - first - s.gap + 1));
   return [first, second];

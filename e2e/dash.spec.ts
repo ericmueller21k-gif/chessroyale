@@ -438,9 +438,10 @@ test.describe("Dash's clock", () => {
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await yourMove(page);
     await watchClock(page);
-    // (The test switch: the pop-offs are his second and eighth turns' (Eric, Nov 8: two a battle). His pop-off comes as your move
-    // before his turn does, so eight of your moves reach the eighth.)
-    for (let i = 0; i < 8; i++) await playOne(page);
+    // (The test switch: the pop-offs are his second and fourth turns' (Eric, Nov 8: two a battle). His pop-off comes as your move
+    // before his turn does, so four of your moves reach the fourth: before his Scramble Rush can come (from his turn 7, its
+    // countdown smacks fit3 too) and before Stockfish mates the shuffled knights.)
+    for (let i = 0; i < 4; i++) await playOne(page);
     await yourMove(page);
     const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
     const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff").sort((x, y) => x.at - y.at);
