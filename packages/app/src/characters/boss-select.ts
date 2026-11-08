@@ -86,7 +86,7 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   // Folio (the director's, Oct 26): its select and intro line, the only one (its tile comes with the wiring lane).
   folio: ["Every game's a draft. Write one?"],
   timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
-  dash: ["Yo yo yo! Dash in the building, fam!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
+  dash: ["Yo yo yo! Dash in the building, cuz!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -216,6 +216,6 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   tiger: "That was fun! Come back anytime, no roaring needed.",
   folio: "That was a good read. Come back for another draft.",
   timber: "That was fun! Come back anytime, the sawdust is fresh.",
-  dash: "That was fun, fam. Come back anytime. No cap.",
+  dash: "That was fun, bro. Come back anytime. No cap.",
   recluse: "Good game. Come back and bring a better opening.",
 };

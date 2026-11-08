@@ -1698,11 +1698,12 @@ export const BOSS_POWERS = {
   dashClockFit: { every: [4, 5] as readonly [number, number], smacks: 5, smackMs: 150 },
   /**
    * Dash's pop-off (Eric, Nov 7: "I gotta pop off for a second, bro", then he smacks it 10 times really fast, then says again how
-   * much he loves that clock): once a battle, on one of his turns from `from` to `to` (drawn from the battle's seed), before his
-   * move lands. `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks
-   * at `hitMs` a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   * much he loves that clock; Eric, Nov 8: twice a battle, docs/decisions/2026-11-08-dash-popoff-twice.md): twice a battle, on two
+   * of his turns from `from` to `to` (drawn from the battle's seed), at least `gap` of his turns apart, before his move lands. Each
+   * is `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks at `hitMs`
+   * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
    */
-  dashPopOff: { from: 8, to: 20, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
+  dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   /**
    * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
    * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A

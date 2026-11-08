@@ -32,7 +32,7 @@
  * Dash v2 (Eric, Nov 6; docs/decisions/2026-11-06-dash-v2.md): Time Scramble at most twice a battle (maxUltimates.dash); and once a
  * battle his **Scramble Rush** (below): a memory test over a frozen position, whose only outcome is his extra move or not.
  * Dash v3 (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md): his clock multi-hit every 4 or 5 of his moves (`clockFit`: 5
- * quick smacks and always a line, clockHitTurns), and once a battle his pop-off (popOff: state, not an event; popOffMs holds his
+ * quick smacks and always a line, clockHitTurns), and twice a battle his pop-off (popOff: state, not an event; popOffMs holds his
  * thinking for its two beats, 3 smacks and a pop-off line, then 10 fast smacks and a love line).
  */
 import { BOSS_POWERS, type BossPowerSettings, type BossPowerState, type BossState, type DashRush, type DashState } from "@chessroyale/core";
@@ -143,9 +143,9 @@ export const DASH: BossRules = {
   ultimateRunning: (p, turn, s) => scrambleOn(p, turn, s),
   // As the crowd's turn after his turn's end begins: your flag's jab, then his slap.
   everyTurn(next, t) {
-    // His pop-off, once a battle, on one of his turns (from the seed; the test switch: his second turn). It is state, not an
-    // event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
-    if (next.dash && !next.dash.popOff && (t.test === "popoff" ? t.turn === 2 : t.turn === popOffTurn(t.seed, t.s.dashPopOff))) next.dash = { ...next.dash, popOff: { at: t.turn } };
+    // His pop-off, twice a battle, on two of his turns (from the seed; the test switch: his second and eighth turns). It is state,
+    // not an event: it plays while he thinks, before his move lands (popOffMs), so it's set before the rest reads his state.
+    if (next.dash && popOffTurns(t.seed, t.s.dashPopOff, t.test).includes(t.turn)) next.dash = { ...next.dash, popOff: { at: t.turn } };
     const d = next.dash;
     if (!d) return;
     if (d.flag && d.flag.at + 1 === t.turn) t.events.push({ kind: "flag", turn: t.turn, move: d.flag.move });
@@ -222,9 +222,15 @@ export const popOffPending = (boss: { id?: string; powers?: { turn?: number; das
 export const popOffHolding = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
   boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at >= (boss.powers.turn ?? 0) - 1;
 
-/** His pop-off's turn: one of his turns from dashPopOff.from to dashPopOff.to, from the battle's seed. */
-export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff): number {
-  return s.from + Math.floor(powerRoll(seed, "popoff") * (s.to - s.from + 1));
+/**
+ * His two pop-off turns: two of his turns from dashPopOff.from to dashPopOff.to, at least dashPopOff.gap apart, from the battle's
+ * seed (the same on every device; in order). The test switch (?power=popoff): his second and eighth turns.
+ */
+export function popOffTurns(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff, test = ""): [number, number] {
+  if (test === "popoff") return [2, 8];
+  const first = s.from + Math.floor(powerRoll(seed, "popoff", 1) * (s.to - s.from + 1 - s.gap));
+  const second = first + s.gap + Math.floor(powerRoll(seed, "popoff", 2) * (s.to - first - s.gap + 1));
+  return [first, second];
 }
 
 /**

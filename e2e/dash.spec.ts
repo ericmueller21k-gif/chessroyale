@@ -353,7 +353,7 @@ for (const [right, held] of [
 
 /**
  * Dash's clock (Eric, Nov 7; docs/decisions/2026-11-07-dash-clock.md), Boss alone on a phone and a computer. His multi-hit
- * (`&power=clockfit`: five quick smacks and a line, on his second turn) and his pop-off (`&power=popoff`: on his second turn, three
+ * (`&power=clockfit`: five quick smacks and a line, on his second turn) and his pop-off (`&power=popoff`: on his second and eighth turns, three
  * smacks and "I gotta pop off", then ten fast smacks and a love line, while he thinks, before his move lands). Read from the page:
  * each moment's key, kind and count as it first shows, and the lines said on screen (the same text as the lines' files).
  */
@@ -428,7 +428,7 @@ test.describe("Dash's clock", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the pop-off, once: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks; your clock starts after it", async ({ page }) => {
+  test("the pop-off, twice: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks, twice; your clock starts after the first", async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -438,18 +438,17 @@ test.describe("Dash's clock", () => {
     await page.getByRole("main").getByRole("button", { name: /^Boss alone/ }).click();
     await yourMove(page);
     await watchClock(page);
-    // (The test switch: the pop-off is his second turn's, and only one comes in a battle.)
-    await playOne(page);
-    await playOne(page);
-    await playOne(page);
+    // (The test switch: the pop-offs are his second and eighth turns' (Eric, Nov 8: two a battle), so play through his eighth.)
+    for (let i = 0; i < 7; i++) await playOne(page);
     await yourMove(page);
     const seen = await page.evaluate(() => (window as any).__clock as ClockSeen);
-    const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff");
-    const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast");
-    expect(pops).toHaveLength(1);
-    expect(fast).toHaveLength(1);
-    expect(pops[0]!.count).toBe("3");
-    expect(fast[0]!.count).toBe("10");
+    const pops = Object.values(seen.moments).filter((m) => m.kind === "popOff").sort((x, y) => x.at - y.at);
+    const fast = Object.values(seen.moments).filter((m) => m.kind === "popOffFast").sort((x, y) => x.at - y.at);
+    expect(pops).toHaveLength(2);
+    expect(fast).toHaveLength(2);
+    for (const m of [...pops, ...fast]) expect(m.count).toBe(m.kind === "popOff" ? "3" : "10");
+    // (The second pop-off comes after the first one's beats are over.)
+    expect(pops[1]!.at).toBeGreaterThan(fast[0]!.at + BOSS_POWERS.dashPopOff.loveMs);
     expect(seen.lines.some((l) => DASH_POPOFF_LINES.includes(l))).toBe(true);
     expect(seen.lines.some((l) => DASH_LOVE_LINES.includes(l))).toBe(true);
     // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
@@ -477,8 +476,8 @@ test.describe("Dash's clock", () => {
     expect(landed!).toBeGreaterThanOrEqual(beatEnd - 300);
     // (The move list doesn't grow while the beats play: his move isn't in it until it lands.)
     for (const x of seen.samples) if (x.t >= beatStart && x.t < landed! - 50) expect(x.rows, `rows at ${x.t - beatStart} ms`).toBe(before);
-    expect(seen.cues["fit10:click"]).toBe(BOSS_POWERS.dashPopOff.hits);
-    expect(seen.cues["fit3:click"]).toBe(BOSS_POWERS.dashPopOff.smacks);
+    expect(seen.cues["fit10:click"]).toBe(2 * BOSS_POWERS.dashPopOff.hits);
+    expect(seen.cues["fit3:click"]).toBe(2 * BOSS_POWERS.dashPopOff.smacks);
     expect(errors).toEqual([]);
   });
 });
