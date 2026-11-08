@@ -1590,7 +1590,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 })}
               </div>
               {/* Sell (a piece of yours selected on the board): over the cards, where a dragged piece is dropped to sell. */}
-              {!dragPiece && g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
+              {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
                 <button type="button" class="ac-sell" onClick={() => sell(held)}>
                   Sell {sellValue(held.kind, cfg, starsAt(g.round.you, held.at.square))}
                 </button>

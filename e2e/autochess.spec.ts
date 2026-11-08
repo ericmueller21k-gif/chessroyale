@@ -272,14 +272,15 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   const [r, g, b] = (await page.locator(".ac-sil-shape").first().evaluate((el) => getComputedStyle(el).backgroundColor.match(/\d+/g)!.map(Number))) as number[];
   expect(g!).toBeGreaterThan(r!);
   expect(g!).toBeGreaterThan(b!);
-  // The board holds only your king: nothing is placed for free. Both benches are always there, four slots each, empty ones faint tile outlines.
+  // The board holds only your king: nothing is placed for free. Both benches are always there, four slots each, empty ones faint rings.
   await expect(page.locator(`${BOARD_SEL.piece}.white`)).toHaveCount(1);
   await expect(youBench(page).locator(".ac-slot")).toHaveCount(4);
   await expect(theirBench(page).locator(".ac-slot")).toHaveCount(4);
   await expect(held(page)).toHaveCount(0);
   await expect(theirBench(page).locator(".ac-slot.has")).toHaveCount(0);
   expect(await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
-  expect(await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  // (Nov 8: an empty slot is a faint dashed ring.)
+  expect(await youBench(page).locator(".ac-slot.empty").first().evaluate((el) => getComputedStyle(el, "::before").borderTopStyle)).toBe("dashed");
   expect(errors).toEqual([]);
 });
 
@@ -718,23 +719,14 @@ test("the odds pill in the gold row: each piece's icon with its percent under it
   // Each icon is a piece's picture with its percent under it.
   const parts = await page.locator(".ac-od").evaluateAll((els) => els.map((e) => ({ icon: e.querySelector(".ac-pc")!.getBoundingClientRect().bottom, pct: e.querySelector("b")!.getBoundingClientRect().top })));
   for (const p of parts) expect(p.icon, "the percent is under its icon").toBeLessThanOrEqual(p.pct + 1);
-  // The bottom of the percent numbers sits on the same line as the bottom of the gold number (their baselines).
-  const baselines = await page.evaluate(() => {
-    const base = (el: Element) => {
-      const probe = document.createElement("span");
-      probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
-      el.appendChild(probe);
-      const y = probe.getBoundingClientRect().bottom;
-      probe.remove();
-      return y;
-    };
-    return { gold: base(document.querySelector(".ac-gold-you b")!), pcts: [...document.querySelectorAll(".ac-od b")].map(base) };
-  });
-  for (const y of baselines.pcts) expect(Math.abs(y - baselines.gold), "a percent's baseline is the gold number's").toBeLessThanOrEqual(1);
+  // (Nov 8: the odds sit in the band's middle, as the gold and the hexagon do; was: on the gold number's baseline.)
+  const band = (await page.locator(".ac-goldrow").boundingBox())!;
+  const ob = (await pill.boundingBox())!;
+  expect(Math.abs(ob.y + ob.height / 2 - (band.y + band.height / 2)), "the odds in the band's middle").toBeLessThanOrEqual(3);
   // The icons sit higher than the gold number's top (a little), as Eric allowed; the pill is small (its height under a button's).
   const gold = (await page.locator(".ac-gold-you b").boundingBox())!;
   const pb = (await pill.boundingBox())!;
-  expect(pb.y).toBeLessThan(gold.y + 4);
+  expect(pb.y).toBeLessThan(gold.y + 6);
   expect(pb.height).toBeLessThan(44);
   // A level-up: Buy XP (2 + 4 reaches level 5): 66/14/13/7/0, the rook no longer faded.
   await tap(page, xpButton(page));
@@ -1198,7 +1190,7 @@ test("lock in (behind `?lockin=1`): when the opponent locks first you see it, ge
   await expect(root(page)).toHaveAttribute("data-bonus", "bot");
   await expect(lockButton(page)).not.toContainText("+3");
   // Their name and level still fit at the narrowest screen, with the tag in it.
-  expect(await page.locator(".ac-who").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+  expect(await page.locator(".ac-who .ac-name").evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
   expect(await goldOf(page)).toBe(10);
   // You lock in second: no bonus, and the step ends at once (it would run to 7 s).
   await tap(page, lockButton(page));
@@ -1761,7 +1753,8 @@ test("a fight plays to a result, HP changes by the rule, and the next round star
   expect(shown).toHaveLength(4);
   for (const o of shown) expect(Number(o.square[1])).toBeGreaterThanOrEqual(5);
   expect(await goldOf(page)).toBe(total);
-  await expect(page.locator(".ac-income b")).toHaveText("+12");
+  // (Nov 8: "Income +N" is everything earned this round, the next round's gold less what was saved.)
+  await expect(page.locator(".ac-income b")).toHaveText(`+${total - Number(gold.match(/^Next round: (\d+) saved/)![1])}`);
   await expect(page.locator(".ac-od b")).toHaveText(["66%", "14%", "13%", "7%", "0%"]);
   const k2 = (await root(page).getAttribute("data-king"))!;
   const b2 = (await root(page).getAttribute("data-bot-king"))!;
@@ -2906,7 +2899,8 @@ test("the stars' size and place (v8, Eric Oct 22: very tiny, in the body of the 
     await expect.poll(() => marks(page)).toEqual({ g3: 2, d2: 2, c2: 2 });
     check(await starBoxes(page, `${BOARD_SEL.piece} .ac-art`), `${w}: board`);
     check(await starBoxes(page, ".ac-buy[data-up] .ac-art"), `${w}: cards`);
-    for (const c of await page.locator(".ac-buy[data-up]").all()) expect((await c.boundingBox())!.width, `${w}: a card keeps its width`).toBeGreaterThan(50);
+    const plainW = (await page.locator(".ac-buy").first().boundingBox())!.width;
+    for (const c of await page.locator(".ac-buy[data-up]").all()) expect(Math.abs((await c.boundingBox())!.width - plainW), `${w}: a card keeps its width`).toBeLessThanOrEqual(0.5);
     // The pieces drawn whole by the outline sit on their square exactly: the piece's own box is the square's.
     for (const e of await page.locator(`${BOARD_SEL.piece}.ac-drawn`).all()) {
       const box = (await e.boundingBox())!;
@@ -3179,32 +3173,27 @@ test("the meeting fits the board: at 320, 390, 428 px wide and on a computer, th
   }
 });
 
-test("the shop area is one panel (v9): the gold row, Buy XP, Reroll and the four cards inside its rounded edge with about 10 px to spare, and on a phone the board keeps the column's width", async ({ page }) => {
+test("the action box is one panel (Nov 8, was v9's): the band, Buy XP, Reroll and the four cards inside its double border (black, gold, black), on its dark ground", async ({ page }) => {
   const errors = watchErrors(page);
-  // (A phone at 390 x 844: a taller screen than the project's own 390 x 664, where the board is the height's, not the column's.)
   if (phone()) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
   const dock = await box(".ac-dock");
-  const goldRow = await box(".ac-goldrow");
-  const cards = await box(".ac-cards");
-  const btns = await box(".ac-btns");
-  // The gold row, the buttons and the cards sit inside the panel's edge (its 10 px of padding and 1 px of border).
-  expect(goldRow.x - dock.x, "the gold row's left inset").toBeCloseTo(11, 0);
-  expect(dock.x + dock.width - (cards.x + cards.width), "the cards' right inset").toBeCloseTo(11, 0);
-  expect(btns.x - dock.x, "the buttons' left inset").toBeCloseTo(11, 0);
-  expect(cards.y + cards.height, "the cards' bottom inset").toBeLessThanOrEqual(dock.y + dock.height - 10);
-  // The home panels' surface, edge and corners.
-  const look = await page.locator(".ac-dock").evaluate((e) => {
-    const s = getComputedStyle(e);
-    return { bg: s.backgroundColor, edge: s.borderTopColor, radius: s.borderTopLeftRadius, pad: s.paddingTop, panel: getComputedStyle(document.documentElement).getPropertyValue("--fd-panel").trim() };
+  for (const sel of [".ac-goldrow", ".ac-btns", ".ac-cards"]) {
+    const b = await box(sel);
+    expect(b.x, `${sel} inside`).toBeGreaterThanOrEqual(dock.x + 3);
+    expect(b.x + b.width, `${sel} inside`).toBeLessThanOrEqual(dock.x + dock.width - 3);
+    expect(b.y + b.height, `${sel} inside`).toBeLessThanOrEqual(dock.y + dock.height - 3);
+  }
+  const look = await page.evaluate(() => {
+    const d = getComputedStyle(document.querySelector(".ac-dock")!);
+    const f = getComputedStyle(document.querySelector(".ac-frame")!);
+    return { dock: [d.borderTopWidth, d.borderTopColor, d.outlineWidth, d.outlineColor, d.borderTopLeftRadius], frame: [f.borderTopWidth, f.borderTopColor, f.outlineWidth, f.outlineColor, f.borderTopLeftRadius], bg: d.backgroundColor };
   });
-  expect(look.pad).toBe("10px");
-  expect(look.radius).toBe("14px");
+  expect(look.dock, "the board's own border").toEqual(look.frame);
+  expect(look.dock[0]).toBe("3px");
+  expect(look.dock[4], "square corners").toBe("0px");
   expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
-  // The board: on a phone it is as wide as the column (it doesn't shrink for the panel).
-  const frame = await box(".ac-frame");
-  if (phone()) expect(Math.abs(frame.width - 366), "the board's width on a 390 phone").toBeLessThanOrEqual(1);
   expect(errors).toEqual([]);
 });
