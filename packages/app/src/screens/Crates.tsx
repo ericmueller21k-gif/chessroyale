@@ -6,6 +6,7 @@ import {
   CRATES_FREE,
   FISCHER,
   ITEM_COLORS,
+  GOD_KING_SHOP,
   PAWN_COLORS,
   PURITY_BANDS,
   sideOfPawn,
@@ -893,8 +894,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
     .sort((a, b) => tierIndex(top(b).def) - tierIndex(top(a).def) || colorIndex(top(b).color) - colorIndex(top(a).color) || top(a).blemish - top(b).blemish);
   // What you got in the shop: God King effects (under All; the God King tab is gone, Eric, Nov 7).
-  const fromShop = SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id));
-  const shopTab = tab === "all";
+  const fromShop = GOD_KING_SHOP ? SHOP_ITEMS.filter((i) => wornFromLocker(i) && shop?.owned.includes(i.id)) : [];
+  const shopTab = tab === "all" && GOD_KING_SHOP;
   const wornIn = (s: ItemStack) => {
     const slot = itemDef(top(s).def)!.slot;
     return s.items.some((i) => i.id === locker.equipped[slot]);
@@ -903,24 +904,21 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
     <div class="locker">
       <div class="ff-window locker-preview">
         <span class="locker-avatar">
-          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride />
+          <Avatar look={locker.look} side={sideOfPawn(pawn)} ride outlined />
         </span>
-        <div class="locker-pawn-pick">
-          <div class="locker-pawn-square" role="group" aria-label="Your default pawn color">
-            {PAWN_COLORS.map((c) => (
-              <button
-                type="button"
-                key={c}
-                class={`locker-pawn-letter ${c}${pawn === c ? " on" : ""}`}
-                aria-pressed={pawn === c}
-                aria-label={c === "white" ? "White" : "Black"}
-                onClick={() => pickPawnColor(c)}
-              >
-                {c === "white" ? "W" : "B"}
-              </button>
-            ))}
-          </div>
-          <span class="locker-pawn-default">default</span>
+        <div class="locker-pawn-pick" role="group" aria-label="Your default pawn color">
+          {PAWN_COLORS.map((c) => (
+            <button
+              type="button"
+              key={c}
+              class={`locker-pawn-letter ${c}${pawn === c ? " on" : ""}`}
+              aria-pressed={pawn === c}
+              aria-label={c === "white" ? "White" : "Black"}
+              onClick={() => pickPawnColor(c)}
+            >
+              {c === "white" ? "W" : "B"}
+            </button>
+          ))}
         </div>
       </div>
       <div class="shop-tabs locker-tabs" role="tablist">

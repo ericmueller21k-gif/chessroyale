@@ -13,5 +13,11 @@ export const pawnColorOf = (v: unknown): PawnColor => (PAWN_COLORS as readonly u
 /** A value to save: only "white" or "black" (null: not a pawn color, nothing is saved). */
 export const cleanPawnColor = (v: unknown): PawnColor | null => ((PAWN_COLORS as readonly unknown[]).includes(v) ? (v as PawnColor) : null);
 
+/**
+ * The black default pawn's outline (Eric, Nov 8: a black silhouette vanished on the locker's blue and the town's night sky): a
+ * warm off-white, the weight of the white pawn's black outline. Only the default color's black pawn; a match's black pieces keep theirs.
+ */
+export const PAWN_OUTLINE_ON_BLACK = "#f5efe0";
+
 /** A pawn color as the figure's side (components/Items.tsx: "w" or "b"). */
 export const sideOfPawn = (c: PawnColor): "w" | "b" => (c === "black" ? "b" : "w");

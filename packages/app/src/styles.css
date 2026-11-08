@@ -7802,39 +7802,43 @@ button.history-label {
 }
 .locker-pawn-pick {
   position: absolute;
-  right: 10px;
+  right: 8px;
   bottom: 8px;
-  display: grid;
-  justify-items: center;
-  gap: 2px;
-}
-.locker-pawn-square {
   display: flex;
-  width: 64px;
-  height: 64px;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  border-radius: 12px;
+  align-items: flex-end;
+  gap: 8px;
 }
+/* Each of W and B is its own small rounded square (24 px; the selected one about 15% bigger, 27.5 px). Its tap area is 32 px at
+   least, invisible (::before). A white W is outlined dark and a black B outlined light, so both read on the blue. */
 .locker-pawn-letter {
-  flex: 1;
+  position: relative;
   display: grid;
   place-items: center;
+  width: 24px;
+  height: 24px;
   margin: 0;
   padding: 0;
-  border: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 7px;
   background: none;
   font: inherit;
-  font-size: 15px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
   opacity: 0.8;
   cursor: pointer;
 }
+.locker-pawn-letter::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
 .locker-pawn-letter.on {
-  font-size: 24px;
+  width: 27.5px;
+  height: 27.5px;
+  font-size: 13.5px;
   opacity: 1;
 }
-/* A white W on the blue, outlined dark; a black B outlined light, so both read. */
 .locker-pawn-letter.white {
   color: #fff;
   text-shadow: -1px 0 #0b1230, 1px 0 #0b1230, 0 -1px #0b1230, 0 1px #0b1230;
@@ -7845,11 +7849,7 @@ button.history-label {
 }
 .locker-pawn-letter:focus-visible {
   outline: 2px solid #fff;
-  outline-offset: -5px;
-}
-.locker-pawn-default {
-  font-size: 11px;
-  color: #aeb4c6;
+  outline-offset: 2px;
 }
 .locker-grid {
   display: grid;

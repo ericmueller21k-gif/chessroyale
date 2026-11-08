@@ -1376,19 +1376,61 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   const pick = (await page.locator(".locker-pawn-pick").boundingBox())!;
   expect(pick.x + pick.width).toBeLessThanOrEqual(box.x + box.width);
   expect(pick.y + pick.height).toBeLessThanOrEqual(box.y + box.height);
+  // Two small squares, one button each (30 px; a hit area of 40 px at most): each inside the box, not overlapping, its right and
+  // bottom insets 12 px at most; no "default" word in the box; no God King button or tab.
+  const btns = page.locator(".locker-pawn-letter");
+  await expect(btns).toHaveCount(2);
+  const sq = [(await btns.nth(0).boundingBox())!, (await btns.nth(1).boundingBox())!];
+  for (const q of sq) {
+    expect(q.width).toBeLessThanOrEqual(34);
+    expect(q.height).toBeLessThanOrEqual(34);
+    expect(q.x).toBeGreaterThanOrEqual(box.x);
+    expect(q.y).toBeGreaterThanOrEqual(box.y);
+    expect(q.x + q.width).toBeLessThanOrEqual(box.x + box.width);
+    expect(q.y + q.height).toBeLessThanOrEqual(box.y + box.height);
+  }
+  expect(sq[0]!.x + sq[0]!.width, "W and B don't overlap").toBeLessThanOrEqual(sq[1]!.x);
+  // The selected one is about 15% bigger than the other: W now (white selected), B after its tap below.
+  expect(sq[0]!.width, "W selected: bigger than B").toBeGreaterThanOrEqual(sq[1]!.width * 1.1);
+  // Each one's tap area is 32 px at least (an invisible ::before around the square).
+  for (const i of [0, 1]) expect(parseFloat(await btns.nth(i).evaluate((el) => getComputedStyle(el, "::before").width))).toBeGreaterThanOrEqual(32);
+  expect(box.x + box.width - (sq[1]!.x + sq[1]!.width), "right inset").toBeLessThanOrEqual(12);
+  expect(box.y + box.height - Math.max(sq[0]!.y + sq[0]!.height, sq[1]!.y + sq[1]!.height), "bottom inset").toBeLessThanOrEqual(12);
+  await expect(page.locator(".locker-preview")).not.toContainText(/default/i);
+  await expect(page.getByRole("tab", { name: "God King", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "God King", exact: true })).toHaveCount(0);
+  // The God King's effects are hidden from the locker and the shop (GOD_KING_SHOP, Nov 8): no "From the shop", no effects tab.
+  await expect(page.getByText("From the shop")).toHaveCount(0);
+  await expect(page.getByText("More God King effects")).toHaveCount(0);
   // B: black, saved on the account (the server says so), and it's still black after a reload.
   await B.click();
   await expect(B).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".locker-preview piece.pawn.black")).toHaveCount(1);
+  const [bw, ww] = [(await B.boundingBox())!.width, (await W.boundingBox())!.width];
+  expect(bw, "B selected: bigger than W").toBeGreaterThanOrEqual(ww * 1.1);
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
+  // Its outline reads on the box: the light stroke against the window's blue (styles.css, .ff-window: #2a3cbd, #13207a, #0a1150),
+  // at least 3:1 against each (WCAG contrast ratio).
+  const stroke = await page.locator(".locker-preview svg.default-black path").getAttribute("stroke");
+  expect(stroke).toBe("#f5efe0");
+  const lum = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+  };
+  const ratio = (a: string, b: string) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05);
+  for (const blue of ["#2a3cbd", "#13207a", "#0a1150"]) expect(ratio(stroke!, blue), `outline on ${blue}`).toBeGreaterThanOrEqual(3);
   await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("black");
   await page.reload();
   await page.goto("/shop");
   await page.getByRole("tab", { name: "Locker", exact: true }).click();
-  await expect(page.locator(".locker-preview piece.pawn.black")).toHaveCount(1);
+  await expect(page.locator(".locker-preview svg.default-black")).toHaveCount(1);
   await expect(B).toHaveAttribute("aria-pressed", "true");
   // W: white again, saved.
   await W.click();
   await expect(W).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".locker-preview piece.pawn.white")).toHaveCount(1);
   await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { user: { pawn: string } }).user.pawn).toBe("white");
+  // The Shop tab: no God King effects tab, and no "Coming later: King kill moves" line.
+  await page.getByRole("tab", { name: "Shop", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
+  await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
 });

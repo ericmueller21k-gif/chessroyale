@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { ITEM_DEFS, SHOP_ITEMS, rankView, wornFromLocker } from "@chessroyale/core";
+import { ITEM_DEFS, rankView } from "@chessroyale/core";
 import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
@@ -84,12 +84,11 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
 test("an admin's locker has one of every item, each tagged Admin, worn like any item and never deleted; a player's only theirs", { tag: "@phone-only" }, async ({ page }) => {
   await named(page, "Eric");
   const crate = page.locator(".locker-grid").first();
-  const fromShop = page.locator(".locker-grid").nth(1);
-  // A player: only what they own (nothing yet), the God King's starter effect.
+  // A player: only what they own (nothing yet). (The God King's effects are hidden from the locker: GOD_KING_SHOP, Nov 8.)
   await page.goto("/shop");
   await page.getByRole("tab", { name: "Locker" }).click();
   await expect(page.getByText("No crate items here yet. Open a crate!")).toBeVisible();
-  await expect(page.locator(".locker-item")).toHaveCount(1);
+  await expect(page.locator(".locker-item")).toHaveCount(0);
   await expect(page.locator(".locker-admin")).toHaveCount(0);
   // An admin (ADMIN_EMAILS, docs/decisions/2026-10-31-admin-owns-all.md): one of every crate item and God King effect.
   const id = await asServerAdmin(page);
@@ -97,9 +96,8 @@ test("an admin's locker has one of every item, each tagged Admin, worn like any 
   await page.getByRole("tab", { name: "Locker" }).click();
   await expect(crate.locator(".locker-item")).toHaveCount(ITEM_DEFS.length);
   await expect(crate.locator(".locker-admin")).toHaveCount(ITEM_DEFS.length);
-  const kings = SHOP_ITEMS.filter(wornFromLocker);
-  await expect(fromShop.locator(".locker-item")).toHaveCount(kings.length);
-  await expect(fromShop.locator(".locker-admin")).toHaveCount(kings.filter((k) => !k.starter).length);
+  // (The "From the shop" God King effects are hidden, GOD_KING_SHOP: the admin's are not shown, and their data stays.)
+  await expect(page.getByText("From the shop")).toHaveCount(0);
   // Worn like any item, and others see it.
   const crown = crate.getByRole("button", { name: /^Fire & Ice Crown, / });
   await crown.click();
