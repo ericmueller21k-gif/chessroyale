@@ -16,6 +16,8 @@
     use only `notes/tools/e2e-quick.sh` (≤15 tests, `--repeat-each` ≤3, a 15-min cap on the lock wait).
     **Push early and often:** every push makes CI re-test your PR's areas in parallel for free. Read CI failures with
     `notes/tools/ci-fail.sh <sha>` (no token needed). The full suite, broad runs and repeat sweeps run only in CI.
+  - **Stop only on green CI.** After your last push, keep waiting (`timeout 590 sh wait-ci.sh <sha>`, repeated) until CI
+    finishes. If it's red, read `ci-fail.sh`, fix and push again. Ending your turn while CI runs leaves the director a red PR and costs a round.
   - **Self-check before you report.** Open every still you made and check it against the brief's numbers (inside the
     screen, the order, counts). If anything is clipped, overlapping, missing or out of order, fix it first. A defect the
     director finds costs a whole extra round.
