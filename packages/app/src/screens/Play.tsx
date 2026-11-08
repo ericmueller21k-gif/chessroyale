@@ -412,6 +412,8 @@ export function PlayScreen({
       ) : (
         <div class="play-footer">
         {lockedPhone && powerRow}
+        {/* (A 50 v 50's status slot: one fixed height in every phase, empty while picking, so nothing below moves: styles.css.) */}
+        <div class={fifty ? "play-slot" : undefined}>
         {waiting ? (
           <div class="waiting-banner" role="status">
             <span class="waiting-dots" aria-hidden="true">
@@ -439,6 +441,7 @@ export function PlayScreen({
             {hint && hint.length === 0 && <p class="muted small hints-wait">Asking the engine…</p>}
           </>
         )}
+        </div>
       </div>
       )}
       {match.boss ? besideBoard(match, layout, <UnderBoard match={match} />) : <UnderBoard match={match} />}
