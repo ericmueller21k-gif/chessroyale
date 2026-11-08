@@ -207,7 +207,7 @@ function Privacy() {
         what={
           <>
             <p>
-              Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Lines in a
+              Chat is preset lines and emoji, except in the town square, the global chat and match chat, where signed-in players type. Lines in a
               match go to its players and stay with the match until its lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes
               after the end. Lines in the global chat carry your name, rating and icon. Whether you turned chat on is kept with your
               account (a guest's on the device).
@@ -508,7 +508,7 @@ function Terms() {
       <h2>Conduct and chat</h2>
       <ul>
         <li>
-          Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Don't use chat
+          Chat is preset lines and emoji, except in the town square, the global chat and match chat, where signed-in players type. Don't use chat
           to harass anyone or to spam.
         </li>
         <li>

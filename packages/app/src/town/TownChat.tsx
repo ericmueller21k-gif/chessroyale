@@ -41,6 +41,7 @@
  * to: up to 5 minutes); `__townChatter(false)` stops the bosses' and kids' chatter (true starts it again); `window.__townTapped` lists the taps
  * on player lines.
  */
+import { ChatText } from "../chat-emoji.tsx";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { account, onAccountChange } from "../account.ts";
 import { mutes } from "../chat-mod.ts";
@@ -404,7 +405,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
             <div class={`tc-line tc-${l.kind}`} key={l.id} data-id={l.id}>
               <span class="tc-time">[{l.time}]</span> {l.name && <b class="tc-name" data-c={shade ? c : undefined} style={shade ? `--nd:${shade.day};--nn:${shade.night}` : undefined}>{l.name}</b>}
               {l.name && ": "}
-              {l.text}
+              {/* (A player's line: our pixel emoji drawn for their `:name:` codes, as in every chat; Nov 7.) */}
+              {l.kind === "player" ? <ChatText text={l.text} /> : l.text}
             </div>
           );
         })}

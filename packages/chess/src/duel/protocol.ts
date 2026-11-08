@@ -74,8 +74,8 @@ export type DuelClientMessage =
   /** Offer a draw, or accept the other side's offer. */
   | { t: "draw" }
   | { t: "drawNo" }
-  | { t: "chat"; say: string }
-  | { t: "chatPrefs"; off?: boolean; muted?: string[] }
+  | { t: "chat"; say: string; text?: string }
+  | { t: "chatPrefs"; off?: boolean; muted?: string[]; typed?: boolean }
   | { t: "sync" };
 
 export type DuelServerMessage = (
@@ -91,7 +91,7 @@ export type DuelServerMessage = (
   | { t: "chat"; line: NetChatLine }
   | { t: "chatLog"; lines: NetChatLine[]; packs: string[] }
   /** `block`: your chat ban (reason "mod", chat moderation). */
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; message?: string }
   /** `reload`: the app is out of date (DUEL_PROTOCOL): it reloads. */
   | { t: "error"; message: string; reload?: boolean }
   | { t: "closed"; reason: string }

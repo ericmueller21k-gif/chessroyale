@@ -328,7 +328,7 @@ export class NetDuel implements DuelSession {
         this.chat.onLog(msg.lines, msg.packs);
         break;
       case "chatNo":
-        this.chat.onRefused(msg.say, msg.reason, msg.retryAt, msg.block);
+        this.chat.onRefused(msg.say, msg.reason, msg.retryAt, msg.block, msg.message);
         break;
       case "error":
         // An app on an older protocol: reload once for the new one (twice in a minute: say so instead).

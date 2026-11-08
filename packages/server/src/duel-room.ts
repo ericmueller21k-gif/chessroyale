@@ -1,3 +1,4 @@
+import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
 import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
@@ -58,6 +59,8 @@ interface DuelChat {
   muted: Partial<Record<Color, true>>;
   /** Chat moderation: a side with a chat ban in force (it can't send), as the game's object last read it. */
   blocked?: Partial<Record<Color, ChatBlock>>;
+  /** Typed chat (Nov 7, typed-chat.ts): who may type, who reads typed lines, who's too young, when each last typed. */
+  typed?: TypedSeats;
 }
 
 export interface DuelRecord {
@@ -300,9 +303,9 @@ export class DuelCore {
         this.io.send(c, { t: "game", game: this.view() });
         return;
       case "chat":
-        return this.chatSay(c, msg.say);
+        return this.chatSay(c, msg.say, msg.text);
       case "chatPrefs":
-        return this.chatPrefs(c, msg.off, msg.muted);
+        return this.chatPrefs(c, msg.off, msg.muted, msg.typed);
       case "pick": {
         // (Before the vote opens, during the versus moment: nothing.)
         if (!g || now < g.voteAt) return;
@@ -377,7 +380,7 @@ export class DuelCore {
     const ch = this.r.chat;
     if (ch.off[c]) return false;
     if (line.from === c) return true;
-    return !ch.muted[c];
+    return !ch.muted[c] && hearsTyped(ch.typed ?? {}, c, line);
   }
 
   private sendChatLog(c: Color) {
@@ -408,14 +411,20 @@ export class DuelCore {
    * repeats), and never from a player with a chat ban in force. There are no teams in a 1 v 1, so every line goes to
    * both (as the lobby's chat before a match).
    */
-  private chatSay(c: Color, say: unknown) {
+  private chatSay(c: Color, say: unknown, text?: unknown) {
     const now = this.io.now();
     const ch = this.r.chat;
-    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock) =>
-      this.io.send(c, { t: "chatNo", say: String(say).slice(0, 40), reason, retryAt, ...(block ? { block } : {}) });
+    const refuse = (reason: ChatRefusal, retryAt = now, block?: ChatBlock, message?: string) =>
+      this.io.send(c, { t: "chatNo", say: String(say ?? "").slice(0, 40), reason, retryAt, ...(block ? { block } : {}), ...(message ? { message } : {}) });
     if (ch.off[c]) return refuse("off");
     const block = ch.blocked?.[c];
     if (block && (block.until === null || block.until > now)) return refuse("mod", block.until ?? now, block);
+    // Typed (CHAT_TYPED, typed-chat.ts): may they type, the filter, the length, one every 5 s.
+    if (typeof text === "string") {
+      const t = typedSay((ch.typed ??= {}), c, c, text, now);
+      if (!t.ok) return refuse(t.reason, t.retryAt, undefined, t.message);
+      return this.post({ n: ++ch.n, from: c, say: "", text: t.text, to: "all", team: null, at: now });
+    }
     const line = chatSay(say);
     if (!line) return refuse("unknown");
     if (!canSay(line.id, ch.owned[c])) return refuse("locked");
@@ -423,14 +432,24 @@ export class DuelCore {
     const check = chatCheck(sent, line.id, now);
     if (!check.ok) return refuse(check.limit, check.retryAt);
     ch.sent[c] = chatSent(sent, line.id, now);
-    const full: NetChatLine = { n: ++ch.n, from: c, say: line.id, to: "all", team: null, at: now };
+    this.post({ n: ++ch.n, from: c, say: line.id, to: "all", team: null, at: now });
+  }
+
+  private post(full: NetChatLine) {
+    const ch = this.r.chat;
     ch.lines = [...ch.lines, full].slice(-QUICK_CHAT.logSize);
     for (const to of ["w", "b"] as const) if (this.hears(to, full)) this.io.send(to, { t: "chat", line: full });
   }
 
+  /** Typed chat for a side as it connects (or turns chat on): may it type, is its device too young (typed-chat.ts). */
+  chatTyping(c: Color, o: { may: boolean; young: boolean }) {
+    typedSeat((this.r.chat.typed ??= {}), c, o);
+  }
+
   /** This device's chat choices: chat off, and whether it muted the other player (by their side: "w" or "b"). */
-  private chatPrefs(c: Color, off: unknown, muted: unknown) {
+  private chatPrefs(c: Color, off: unknown, muted: unknown, typed?: unknown) {
     const ch = this.r.chat;
+    if (typeof typed === "boolean" && typedReads((ch.typed ??= {}), c, typed) && !ch.off[c] && off !== true) this.sendChatLog(c);
     const wasOff = !!ch.off[c];
     const wasMuted = !!ch.muted[c];
     if (off === true) ch.off[c] = true;

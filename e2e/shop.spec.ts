@@ -1463,10 +1463,11 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
   await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
-  // The Chat packs tab: no God King pack (GOD_KING_SHOP off); the Winter pack is still there.
-  await page.getByRole("tab", { name: "Chat packs", exact: true }).click();
-  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
-  await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
+  // The Chat packs tab is off (CHAT_PACKS_SHOP, Nov 8): no tab and no pack for sale (the Winter pack too). Before: the tab
+  // showed the Winter pack and no God King pack.
+  await expect(page.getByRole("tab", { name: "Chat packs", exact: true })).toHaveCount(0);
+  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(0);
+  await expect(page.getByText("Nothing is for sale right now.")).toBeVisible();
 });
 
 /**
@@ -1482,7 +1483,7 @@ test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 
   await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await page.goto("/shop");
   const cases = [
-    { tab: "Shop", shot: "shop", chips: ".shop-tabs", box: null, card: ".shop-item", grid: ".shop-grid" },
+    // (The Shop case is paused with CHAT_PACKS_SHOP off, Nov 8: no tab and nothing for sale to lay out. It comes back with a tab.)
     { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
     { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
   ] as const;

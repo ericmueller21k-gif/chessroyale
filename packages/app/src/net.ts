@@ -804,7 +804,7 @@ export class NetMatch implements GameView {
       case "chatLog":
         return this.chat.onLog(m.lines, m.packs);
       case "chatNo":
-        return this.chat.onRefused(m.say, m.reason, m.retryAt, m.block);
+        return this.chat.onRefused(m.say, m.reason, m.retryAt, m.block, m.message);
       case "results":
         this.freeBrain();
         this.scout?.reset();

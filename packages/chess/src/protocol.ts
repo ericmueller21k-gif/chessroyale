@@ -535,7 +535,13 @@ export interface NetVote {
 export interface NetChatLine {
   n: number;
   from: string;
+  /** A preset line's id ("" for a typed one). */
   say: string;
+  /**
+   * What a player typed (Nov 7, CHAT_TYPED: tidied and passed by the server's filter). Sent only to players who turned chat on and
+   * whose device the age gate didn't mark too young (docs/decisions/2026-11-07-typed-chat-everywhere.md).
+   */
+  text?: string;
   to: "team" | "all";
   team: "w" | "b" | null;
   at: number;
@@ -547,7 +553,7 @@ export interface NetChatLine {
  * Why the server dropped a chat line (the app mirrors the limits, so this is rare). "mod": the sender has a
  * moderator's chat ban (see ChatBlock).
  */
-export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod";
+export type ChatRefusal = "unknown" | "locked" | "team" | "gap" | "burst" | "repeat" | "closed" | "off" | "mod" | "typed" | "text";
 
 /** A moderator's chat ban: the player can't send (they still read) until `until` (server time; null: no end). */
 export interface ChatBlock {
@@ -609,12 +615,12 @@ export type ClientMessage =
    */
   | { t: "resign" }
   /** Quick chat: say a line (a phrase or emoji id) to your team or, for Hello and Sporting lines and emoji, to everyone. */
-  | { t: "chat"; say: string; to?: "team" | "all" }
+  | { t: "chat"; say: string; to?: "team" | "all"; /** Typed (CHAT_TYPED): what the player typed, `say` "". */ text?: string }
   /**
    * Quick chat, this device's choices: chat off (nothing is sent to it, and it can't send), and the players muted
    * for this match (their lines aren't sent to it).
    */
-  | { t: "chatPrefs"; off?: boolean; muted?: string[] }
+  | { t: "chatPrefs"; off?: boolean; muted?: string[]; /** Chat is on for typed lines here (its opt-in; the server checks the account and the age gate). */ typed?: boolean }
   /** Many judges: this device's engine speed (nodes per second), from its speed check on joining. */
   | { t: "speed"; nps: number }
   /** Many judges: this device's answer to one scoring job. */
@@ -975,7 +981,7 @@ export type ServerMessage = { now: number } & (
    * Quick chat: your line was dropped; `retryAt` (server time) is when it (or anything, for the gap and burst limits)
    * could go. `block`: your chat ban (reason "mod").
    */
-  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock }
+  | { t: "chatNo"; say: string; reason: ChatRefusal; retryAt: number; block?: ChatBlock; /** Why, in words (a typed message: the filter's, the age gate's). */ message?: string }
   | {
       t: "results";
       placements: Record<string, number>;

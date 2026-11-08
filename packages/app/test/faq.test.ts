@@ -713,9 +713,9 @@ describe("the FAQ: 1 v 1", () => {
 describe("the FAQ's chat entry (the town square's typed chat, Oct 28; the global chat's, Nov 7)", () => {
   it("says what typed chat allows, from the settings, that it's off until turned on, and that a reported town message is kept", () => {
     const s = section("fair-play");
-    expect(s).toContain("Chat is typed in the global chat (a computer's right column) and the town square; matches and lobbies use preset lines and emoji.");
-    expect(s).toContain("The global chat is off until you turn it on");
-    expect(s).toContain("up to 80 characters, one message every 5 seconds in the global chat (15 in the town square)");
+    expect(s).toContain("Chat is typed in the global chat (a computer's right column), the town square, and match and lobby chat once you turn chat on");
+    expect(s).toContain("Chat is off until you turn it on");
+    expect(s).toContain("up to 80 characters, one message every 5 seconds in the global chat and in matches (15 in the town square)");
     expect(s).toContain("a device that answered the age question \"too young\" keeps the preset lines");
     expect(s).toContain("if someone reports a town square message, the report keeps its words and when it was said, for a moderator to read");
     expect(s).toContain("tap a message in the town square to report it");

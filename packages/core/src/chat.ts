@@ -1,4 +1,4 @@
-import { GOD_KING_SHOP, QUICK_CHAT } from "./settings.ts";
+import { CHAT_PACKS_SHOP, GOD_KING_SHOP, QUICK_CHAT } from "./settings.ts";
 
 /**
  * Quick chat: everything players can say to each other in a match. There is no typing anywhere: a message is the
@@ -235,11 +235,15 @@ export function ownedChatPacks(owned: readonly string[] | null | undefined): str
 /** Chat packs the shop stops offering while GOD_KING_SHOP is off (Eric, Nov 8). Nothing is deleted: owners keep them. */
 const SHOP_HIDDEN_PACKS: readonly string[] = ["godking"];
 
-/** The shop offers this chat pack (its Chat packs tab). */
-export const shopOffersPack = (id: string): boolean => GOD_KING_SHOP || !SHOP_HIDDEN_PACKS.includes(id);
+/** The shop offers this chat pack (its Chat packs tab, which CHAT_PACKS_SHOP shows). */
+export const shopOffersPack = (id: string): boolean => CHAT_PACKS_SHOP && (GOD_KING_SHOP || !SHOP_HIDDEN_PACKS.includes(id));
 
-/** The quick-chat picker shows a pack: the shop offers it, or you own it already (`ownedPacks` are pack ids). */
-export const packOffered = (id: string, ownedPacks: readonly string[]): boolean => shopOffersPack(id) || ownedPacks.includes(id);
+/**
+ * The quick-chat picker shows a pack. With the Chat packs tab on: the shop offers it, or you own it already (`ownedPacks` are
+ * pack ids). With it off (Nov 8): only the free default lines; owned packs still send, they're just not offered for picking.
+ */
+export const packOffered = (id: string, ownedPacks: readonly string[]): boolean =>
+  CHAT_PACKS_SHOP ? shopOffersPack(id) || ownedPacks.includes(id) : !!CHAT_PACKS.find((p) => p.id === id)?.free;
 
 /** Whoever owns `owned` (shop item ids) may send this line. */
 export function canSay(id: unknown, owned: readonly string[] | null | undefined): boolean {
