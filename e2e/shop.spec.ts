@@ -1463,4 +1463,8 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
   await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
+  // The Chat packs tab: no God King pack (GOD_KING_SHOP off); the Winter pack is still there.
+  await page.getByRole("tab", { name: "Chat packs", exact: true }).click();
+  await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
+  await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
 });

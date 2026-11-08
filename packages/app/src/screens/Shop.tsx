@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import { GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, wornFromLocker, type ShopSlot } from "@chessroyale/core";
+import { GOD_KING_SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
@@ -97,7 +97,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           {error && <p class="shop-error">{error}</p>}
           {slot === "chat" && gotPack && <GotPackNote got={gotPack} />}
           <div class="shop-grid">
-            {SHOP_ITEMS.filter((i) => i.slot === slot).map((item) => {
+            {SHOP_ITEMS.filter((i) => i.slot === slot && (i.slot !== "chat" || shopOffersPack(i.look.pack ?? ""))).map((item) => {
               const owned = shop.owned.includes(item.id);
               const equipped = item.slot !== "chat" && shop.equipped[item.slot] === item.id;
               // Chat packs: their lines are the preview, and owning one is all it takes (nothing to equip).
