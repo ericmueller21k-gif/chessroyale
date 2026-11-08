@@ -212,7 +212,8 @@ test("quick chat picks in the profile: search, a check, n/10, free lines only (t
   await desk.waitForTimeout(800);
   expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => !["hi-all", "push-pawns"].includes(l.say) && !/^bot/.test(l.from)).length)).toBe(0);
   expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "w-hohoho").length)).toBe(0);
-  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "hi-all").length)).toBe(1);
+  // (Bots greet too: only the phone's own "Hi all!" counts.)
+  expect(await desk.evaluate(() => (window as any).match.chat.list.filter((l: any) => l.say === "hi-all" && !/^bot/.test(l.from)).length)).toBe(1);
 
   // An emoji to the team floats over its sender's row on the computer's leaderboard (when they're on the same team).
   await phone.getByRole("button", { name: "Emoji", exact: true }).click();
