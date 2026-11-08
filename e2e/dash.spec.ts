@@ -374,11 +374,13 @@ async function watchClock(page: Page) {
     const w = window as any;
     const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[], plays: [] as number[], lineAt: {} as Record<string, number>, samples: [] as { t: number; rows: number; ring: boolean; last: string; phase: string }[], cues: {} as Record<string, number> };
     w.__clock = seen;
-    // (Every smack: the figure's frame cue set as its frame changes; a click is one smack.)
+    // (Every smack: the figure's frame cue set as its frame changes; a click is one smack. Only the figure on screen counts: the
+    // boss screen mounts a second figure beside the board (BossSide, display none on a phone) that runs the same frames, so
+    // counting every element would count each smack twice.)
     new MutationObserver((muts) => {
       for (const m of muts) {
         const el = m.target as HTMLElement;
-        if (el.dataset.cue === "click") {
+        if (el.dataset.cue === "click" && el.getBoundingClientRect().width > 0) {
           const k = `${el.dataset.anim}:click`;
           seen.cues[k] = (seen.cues[k] ?? 0) + 1;
         }
