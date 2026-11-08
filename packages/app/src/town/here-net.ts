@@ -1,4 +1,4 @@
-import { TOWN_AFK, cleanLook, type ItemLook } from "@chessroyale/core";
+import { TOWN_AFK, cleanLook, type ItemLook, type PawnColor } from "@chessroyale/core";
 import { lookKey } from "./you-look.ts";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { account } from "../account.ts";
@@ -26,6 +26,8 @@ export interface HereOther {
   zzz: boolean;
   /** What they wear (absent: nothing on). */
   look?: ItemLook;
+  /** Their default pawn color (absent: white). */
+  pawn?: PawnColor;
 }
 
 const isOther = (o: unknown): o is HereOther => {
@@ -35,9 +37,9 @@ const isOther = (o: unknown): o is HereOther => {
 
 /**
  * The server's list, into the town: a newcomer stands on their square (or the nearest free one) and fades in; someone already here
- * walks to their new square; someone no longer listed leaves (`home`: not drawn, not tapped, off every square). Each one's "zzz"
- * and look as said (an empty name: a guest's view, no name tag). Answers those who left, and those whose look is new (to dress:
- * Town.tsx `dressPerson`, the bots' way). (Your own pawn is never in the list: the server leaves you out.)
+ * walks to their new square; someone no longer listed leaves (`home`: not drawn, not tapped, off every square). Each one's "zzz",
+ * look and pawn color as said (an empty name: a guest's view, no name tag). Answers those who left, and those whose look or color is
+ * new (to dress: Town.tsx `dressPerson`, the bots' way). (Your own pawn is never in the list: the server leaves you out.)
  */
 export function applyHere(t: Town, others: readonly HereOther[], now: number): { gone: Person[]; dressed: Person[] } {
   const dressed: Person[] = [];
@@ -46,6 +48,7 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
     if (o.c < 0 || o.r < 0 || o.c >= N || o.r >= N || !walkable(o.c, o.r)) continue;
     const id = `player:${o.id}`;
     listed.add(id);
+    const side = o.pawn === "black" ? "dark" : "light";
     const sq: Sq = { c: o.c, r: o.r };
     let p = t.people.find((x) => x.id === id && x.remote);
     if (!p || p.home) {
@@ -55,7 +58,7 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
         if (s) ((w.c = s.c), (w.r = s.r));
       }
       if (!p) {
-        p = { id, name: o.name, look: { side: "light", tint: null, wear: null }, you: false, walker: w, sit: false, bot: null, waved: -Infinity, home: false, came: now, leaves: Infinity, going: false, trip: null, due: false, uid: o.id, remote: true };
+        p = { id, name: o.name, look: { side, tint: null, wear: null }, you: false, walker: w, sit: false, bot: null, waved: -Infinity, home: false, came: now, leaves: Infinity, going: false, trip: null, due: false, uid: o.id, remote: true };
         t.people.push(p);
       } else {
         p.walker = w;
@@ -70,9 +73,9 @@ export function applyHere(t: Town, others: readonly HereOther[], now: number): {
     p.name = o.name;
     p.zzz = o.zzz;
     const wear = o.look ? cleanLook(o.look) : null;
-    const was = "sprite" in p.look ? null : p.look.wear;
-    if (lookKey(wear) !== lookKey(was)) {
-      p.look = { side: "light", tint: null, wear: lookKey(wear) ? wear : null };
+    const was = "sprite" in p.look ? null : p.look;
+    if (!was || was.side !== side || lookKey(wear) !== lookKey(was.wear)) {
+      p.look = { side, tint: null, wear: lookKey(wear) ? wear : null };
       dressed.push(p);
     }
   }

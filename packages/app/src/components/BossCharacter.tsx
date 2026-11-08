@@ -355,6 +355,9 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         g?.putImageData(frameImage(kit.ch, frame, look), 0, 0);
         placeEngine(eng.current, frame);
         box.current?.setAttribute("data-anim", s.anim);
+        // (Each frame's number and cue, so a test counts a clock smack by its own click, not by timing.)
+        box.current?.setAttribute("data-frame", String(s.frame));
+        box.current?.setAttribute("data-cue", frame.cue ?? "");
         box.current?.setAttribute("data-look", look);
         const sound = frame.cue ? kit.sounds[frame.cue] : undefined;
         if (sound && !played.has(s.tag)) {

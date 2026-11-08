@@ -1690,11 +1690,19 @@ export const BOSS_POWERS = {
    */
   dashThinkMs: 350,
   /**
-   * Dash's clock (Eric, Nov 6: "He smacks the clock too much… Just have him smack it every time he moves"): one smack a move of
-   * his, none in his rest loops, and a **clock fit** at most `max` times a battle: `smacks` (3 to 5) quick smacks in a row and a
-   * line about his clock, on crowd turns drawn from the battle's seed between `from` and `to`.
+   * Dash's clock multi-hit (Eric, Nov 7: "every four or five turns, he bangs on it… he hits it like five times… and always says a
+   * line"; docs/decisions/2026-11-07-dash-clock.md): every `every` (4 to 5) of his own moves, drawn from the battle's seed,
+   * `smacks` (5) quick smacks of the clock at `smackMs` a smack, and always a line about his clock. Was (Nov 6, Eric: "He smacks
+   * the clock too much"): one smack a move, and a clock fit at most twice a battle, 3 to 5 smacks, on turns 3 to 30 from the seed.
    */
-  dashClockFit: { max: 2, from: 3, to: 30, smacks: [3, 5] as readonly [number, number] },
+  dashClockFit: { every: [4, 5] as readonly [number, number], smacks: 5, smackMs: 150 },
+  /**
+   * Dash's pop-off (Eric, Nov 7: "I gotta pop off for a second, bro", then he smacks it 10 times really fast, then says again how
+   * much he loves that clock): once a battle, on one of his turns from `from` to `to` (drawn from the battle's seed), before his
+   * move lands. `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks
+   * at `hitMs` a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   */
+  dashPopOff: { from: 8, to: 20, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   /**
    * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
    * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A
@@ -2647,6 +2655,12 @@ export const SQUADS_LOBBY = {
   /** A party in line asks the matchmaker again this often while it's busy. */
   partyRetryMs: 3_000,
 };
+
+/**
+ * The God King's effects in the shop UI (the shop's effects tab, the locker's "From the shop" and their buttons; Eric, Nov 8): off
+ * hides them only. Nothing is deleted: the catalog (shop.ts), owned records and the database stay as they are.
+ */
+export const GOD_KING_SHOP = false;
 
 /**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat

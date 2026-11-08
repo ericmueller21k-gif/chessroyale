@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import type { RiderDraft } from "./rides/kit.ts";
@@ -1192,10 +1192,11 @@ export function ItemArt({ def, finish, side = "w", class: cls }: { def: string; 
 // ---------------- Rides (Oct 31) ----------------
 
 /** The plain pawn on its 100 × 100 square (the board's cburnett pawn, as the chimney draws it), in SVG: what rides a ride. */
-function PawnShape({ side }: { side: "w" | "b" }) {
+function PawnShape({ side, outlined = false }: { side: "w" | "b"; outlined?: boolean }) {
+  // (`outlined`: the default color's black pawn, its outline light; a match's black piece keeps its own.)
   return (
     <g transform="scale(2.2222)">
-      <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke="#000" stroke-width="1.5" stroke-linecap="round" />
+      <path d={PAWN_PATH} fill={side === "w" ? "#fff" : "#000"} stroke={outlined && side === "b" ? PAWN_OUTLINE_ON_BLACK : "#000"} stroke-width="1.5" stroke-linecap="round" />
     </g>
   );
 }
@@ -1336,7 +1337,7 @@ function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells;
  * the votes, the cut screen, the queue and profiles. `ride` (the locker and the profiles, Oct 31): on their ride, if they
  * have one on, in its idle; everywhere else a ride isn't drawn (a match's screens, the crowd, home's pawn).
  */
-export function Avatar({ look, side = "w", ride = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean }) {
+export function Avatar({ look, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
   // Worn items in drawing order (face, head, then a weapon; a face item tagged "above" goes over a hat: goggles, shades;
@@ -1376,7 +1377,7 @@ export function Avatar({ look, side = "w", ride = false }: { look?: ItemLook; si
         rider={
           <>
             {items(true)}
-            {skin ? <ItemLayer def={skin.def} finish={skin} side={side} /> : <PawnShape side={side} />}
+            {skin ? <ItemLayer def={skin.def} finish={skin} side={side} /> : <PawnShape side={side} outlined={outlined} />}
             {items(false)}
           </>
         }
@@ -1398,6 +1399,13 @@ export function Avatar({ look, side = "w", ride = false }: { look?: ItemLook; si
       {skin ? (
         <svg class="avatar-skin" viewBox="0 0 100 100">
           <ItemLayer def={skin.def} finish={skin} side={side} />
+        </svg>
+      ) : outlined && side === "b" ? (
+        // The default color's black pawn: the piece's own drawing in black, its outline light (PAWN_OUTLINE_ON_BLACK).
+        <svg class="avatar-skin default-black" viewBox="0 0 100 100">
+          <g transform="scale(2.2222)">
+            <path d={PAWN_PATH} fill="#000000" stroke={PAWN_OUTLINE_ON_BLACK} stroke-width="1.5" stroke-linecap="round" stroke-linejoin="miter" />
+          </g>
         </svg>
       ) : (
         <piece class={`${side === "w" ? "white" : "black"} pawn`} />

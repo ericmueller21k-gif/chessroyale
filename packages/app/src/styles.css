@@ -6389,15 +6389,22 @@ button.history-label {
 .screen.shop {
   gap: 12px;
 }
+/*
+ * Computer (Eric, Nov 8): the shop and crates page, all three tabs, sits in one column inset from the main column's sides by
+ * --shop-side. 140 px is about one filter chip ("All" and "Ride" are ~138 px at 1440 px), so the blue locker box isn't the full
+ * width. Narrower windows give up less: 10% of the window, at most 140 px. Phones keep the 14 px gutter.
+ */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .screen.shop {
+    --shop-side: min(140px, 10vw);
+    padding-inline: var(--shop-side);
+  }
+}
 .shop-head {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 10px;
-}
-.shop-head h1 {
-  margin: 0;
-  text-align: center;
 }
 .shop-coins {
   font-weight: 800;
@@ -7791,16 +7798,70 @@ button.history-label {
   margin-top: 6px;
 }
 /* A shiny item: its shine rolls across the drawing itself (Items.tsx). */
-/* The locker. */
+/* The locker. The preview is one pawn in a box twice its old height (Eric, Nov 7: 126 px with its frame before, measured;
+   252 px now, border-box). The W and B picker sits in its bottom-right corner. */
 .locker-preview {
   display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 18px;
+  height: 252px;
   padding: 12px;
 }
 .locker-avatar {
-  width: 96px;
-  height: 96px;
+  width: 192px;
+  height: 192px;
+}
+.locker-pawn-pick {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+/* Each of W and B is its own small rounded square (24 px; the selected one about 15% bigger, 27.5 px). Its tap area is 32 px at
+   least, invisible (::before). A white W is outlined dark and a black B outlined light, so both read on the blue. */
+.locker-pawn-letter {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 7px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  opacity: 0.8;
+  cursor: pointer;
+}
+/* (The containing block is the padding box, inside the 1.5 px border: 5.5 px out puts the 24 px square's tap area at 32 px.) */
+.locker-pawn-letter::before {
+  content: "";
+  position: absolute;
+  inset: -5.5px;
+}
+.locker-pawn-letter.on {
+  width: 27.5px;
+  height: 27.5px;
+  font-size: 13.5px;
+  opacity: 1;
+}
+.locker-pawn-letter.white {
+  color: #fff;
+  text-shadow: -1px 0 #0b1230, 1px 0 #0b1230, 0 -1px #0b1230, 0 1px #0b1230;
+}
+.locker-pawn-letter.black {
+  color: #000;
+  text-shadow: -1px 0 #fff, 1px 0 #fff, 0 -1px #fff, 0 1px #fff;
+}
+.locker-pawn-letter:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 .locker-grid {
   display: grid;

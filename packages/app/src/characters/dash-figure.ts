@@ -8,10 +8,12 @@
  * docs/decisions/2026-11-06-dash-v2.md), built from the same frames and rig:
  * - one smack a move: his move and his check keep their one slap of the clock; his capture's slap goes, as his Clock Slap's slam
  *   is that move's smack; his rest loops (idle, thinking, rattled) never touch the clock;
- * - his clock fits (`fit3` to `fit5`: three to five quick smacks), at most twice a battle and in the Scramble Rush's countdown;
+ * - his clock smacks: the multi-hit (`fit5`, every 4 or 5 of his moves), the pop-off's two beats (`fit3`, then `fit10`), and the
+ *   Scramble Rush's countdown (`fit3`, `fit4`);
  * - his Scramble Rush's running copy (DASH_RUN: his zip-in's pose, drawn leaning by the screen);
  * - his attack on a king (DASH_ATTACK: a dash in with his trail, ten claw swipes, a dash off).
  */
+import { BOSS_POWERS } from "@chessroyale/core";
 import { BOSS_BLITZ, PALETTE, layers, star, type Pose } from "./boss-blitz.ts";
 import { moved } from "./attack-frame.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
@@ -46,20 +48,35 @@ const rattled: Anim = {
 /** His capture without its slap: his Clock Slap's slam (as your turn begins) is that move's smack. */
 const capture: Anim = { loop: false, frames: A.capture!.frames.map((f, i) => (i === 5 ? as(A.capture!, i, 4) : f)) };
 
-/** A clock fit: `n` quick slaps of the clock (his move's slap: the paw up, then down with its click), then a grin. */
-function fit(n: number): Anim {
+/**
+ * A clock multi-hit: `n` quick smacks of the clock, `ms` a smack (his move's slap: the paw up, then down with its click, the up a
+ * little under 40%), then a grin. The multi-hit is fit5 (dashClockFit: 5 at smackMs), his pop-off's first beat fit3 (smackMs),
+ * its fast second beat fit10 (dashPopOff: 10 at hitMs); the Scramble Rush's countdown smacks are fit3 and fit4 as well.
+ */
+function fit(n: number, ms: number): Anim {
   const [up, down, high] = [A.move!.frames[3]!, A.move!.frames[4]!, A.move!.frames[5]!];
+  const rise = Math.round(ms * 0.4);
   return {
     loop: false,
-    frames: [...Array.from({ length: n }, () => [{ ...up, ms: 60 }, { ...down, ms: 90 }]).flat(), { ...high, ms: 120 }, F(240, { mouth: "grin", brow: 1, eyes2: "sly" })],
+    frames: [...Array.from({ length: n }, () => [{ ...up, ms: rise }, { ...down, ms: ms - rise }]).flat(), { ...high, ms: 120 }, F(240, { mouth: "grin", brow: 1, eyes2: "sly" })],
   };
 }
 
-/** His figure: the approved one in a frame with room on its right (105 x 104), his rest loops quiet, and his clock fits. */
+/** His figure: the approved one in a frame with room on its right (105 x 104), his rest loops quiet, and his clock smacks. */
 export const DASH_FIGURE: Character = {
   ...BOSS_BLITZ,
   w: BOSS_BLITZ.w + DASH_ROOM,
-  anims: { ...A, idle, thinking, rattled, capture, fit3: fit(3), fit4: fit(4), fit5: fit(5) },
+  anims: {
+    ...A,
+    idle,
+    thinking,
+    rattled,
+    capture,
+    fit3: fit(3, BOSS_POWERS.dashClockFit.smackMs),
+    fit4: fit(4, BOSS_POWERS.dashClockFit.smackMs),
+    fit5: fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs),
+    fit10: fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs),
+  },
 };
 
 /** The Scramble Rush's running copy: his zip-in's pose (on his toes, ears back, tail out), facing our left; the screen leans it. */

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import { QUICK_CHAT, crateDef, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
 import {
+  createSession,
+  getUser,
   isPixelIcon,
   buyItem,
   setChatPicks,
@@ -224,6 +226,19 @@ describe("account API", () => {
     // Results go on the profile.
     await call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "crowd", placement: 2, players: 100 }), cookie: ok.cookie });
     expect((await call(env, "/api/me", { cookie: ok.cookie })).body.stats.crowd.matches).toBe(1);
+  });
+
+  it("PATCH /api/me {pawn} (Eric, Nov 7): white or black is saved and shows on /api/me; anything else is a 400 and nothing changes", async () => {
+    const env = { DB: memoryD1() };
+    const me = await call(env, "/api/me?name=Painter");
+    expect(me.body.user.pawn).toBe("white");
+    const black = await call(env, "/api/me", { method: "PATCH", body: JSON.stringify({ pawn: "black" }), cookie: me.cookie });
+    expect(black.res.status).toBe(200);
+    expect(black.body.user.pawn).toBe("black");
+    expect((await call(env, "/api/me", { cookie: me.cookie })).body.user.pawn).toBe("black");
+    const bad = await call(env, "/api/me", { method: "PATCH", body: JSON.stringify({ pawn: "green" }), cookie: me.cookie });
+    expect(bad.res.status).toBe(400);
+    expect((await call(env, "/api/me", { cookie: me.cookie })).body.user.pawn).toBe("black");
   });
 
   it("POST /api/results: a solo result never becomes your rating, whatever rating (or online, ranked) it claims", async () => {
@@ -576,5 +591,25 @@ describe("account API", () => {
     expect((await updateProfile(sql, user.id, { icon: png(64, 64) })).icon).toBe(png(48, 48));
     // The old emoji still work for older accounts.
     expect((await updateProfile(sql, user.id, { icon: "🐉" })).icon).toBe("🐉");
+  });
+
+  it("the default pawn color (Eric, Nov 7): white until chosen, saved on the account and read back; only white or black is kept", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Painter");
+    // White until they pick (no change for anyone who hasn't).
+    expect((await profile(sql, user)).user.pawn).toBe("white");
+    expect((await publicProfile(sql, user.id, 1000))!.pawn).toBe("white");
+    // Saved on the account, and read back by a later load of it (a new request's user), on the profile and the public one.
+    await updateProfile(sql, user.id, { pawn: "black" });
+    const later = (await userFromToken(sql, (await createSession(sql, user.id, 1000)), 1000))!;
+    expect((await profile(sql, later)).user.pawn).toBe("black");
+    expect((await publicProfile(sql, user.id, 1000))!.pawn).toBe("black");
+    // Anything else is no change: not "green", not a number, not nothing at all.
+    for (const junk of ["green", "Black", 1, null, ""]) await updateProfile(sql, user.id, { pawn: junk });
+    expect((await getUser(sql, user.id))!.pawn_color).toBe("black");
+    // Back to white.
+    await updateProfile(sql, user.id, { pawn: "white" });
+    expect((await getUser(sql, user.id))!.pawn_color).toBe("white");
   });
 });

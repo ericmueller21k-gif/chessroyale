@@ -158,7 +158,8 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   await expect(tile.locator(".locker-worn")).toHaveText("Worn");
   // (Its own label says "not tradeable": a button named for trading, selling or listing would be a word of its own.)
   await expect(page.getByRole("button", { name: /\b(trade|sell|list)\b/i })).toHaveCount(0);
-  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(2);
+  // (One pawn in the preview since Nov 7: your default color, W or B.)
+  await expect(page.locator(".locker-preview .avatar.riding")).toHaveCount(1);
   await shot(page, "not-tradeable");
 
   // Your profile: your pawn rides it, and Wearing lists it with no purity and no shine ("Ride · HunChess gold & black · Not tradeable").

@@ -43,18 +43,21 @@ describe("Dash's wiring", () => {
       expect(DASH_FIGURE.anims[a]!.frames.some((f) => f.layers.some((l) => l.part === "btnR:true")), a).toBe(false);
       expect(DASH_FIGURE.anims[a]!.frames.reduce((s, f) => s + f.ms, 0), a).toBe(BOSS_BLITZ.anims[a]!.frames.reduce((s, f) => s + f.ms, 0));
     }
-    // His clock fits: 3, 4 and 5 quick smacks, each short enough for its moment.
+    // His clock smacks: 3, 4 and 5 quick smacks (the Rush's countdown, the multi-hit's five), each short enough for its moment; the
+    // pop-off's fast ten (fit10) within its beat.
     for (const n of [3, 4, 5]) {
       expect(smacks(`fit${n}`)).toBe(n);
       expect(DASH_FIGURE.anims[`fit${n}`]!.frames.reduce((s, f) => s + f.ms, 0)).toBeLessThanOrEqual(DASH_FX.clockFit);
     }
+    expect(smacks("fit10")).toBe(10);
+    expect(DASH_FIGURE.anims.fit10!.frames.reduce((s, f) => s + f.ms, 0)).toBeLessThanOrEqual(DASH_FX.popOff);
   });
 
   it("his figure is the art's as drawn, in a frame with room on its right (his feet where they were); his name says Dash everywhere a player sees", () => {
     expect(kit.ch).toBe(DASH_FIGURE);
     // (Every animation as drawn but his quiet rest loops and his capture (Dash v2, below), and his clock fits added.)
     for (const [name, a] of Object.entries(BOSS_BLITZ.anims)) if (!["idle", "thinking", "rattled", "capture"].includes(name)) expect(DASH_FIGURE.anims[name], name).toBe(a);
-    expect(Object.keys(DASH_FIGURE.anims).sort()).toEqual([...Object.keys(BOSS_BLITZ.anims), "fit3", "fit4", "fit5"].sort());
+    expect(Object.keys(DASH_FIGURE.anims).sort()).toEqual([...Object.keys(BOSS_BLITZ.anims), "fit3", "fit4", "fit5", "fit10"].sort());
     expect(DASH_FIGURE.w).toBe(BOSS_BLITZ.w + DASH_ROOM);
     expect(DASH_FIGURE.foot).toEqual(BOSS_BLITZ.foot);
     expect([DASH_FIGURE.name, sidekickBlitz.name, TOKEN_ART.dash!.name]).toEqual(["Dash", "Tick", "Dash token"]);
