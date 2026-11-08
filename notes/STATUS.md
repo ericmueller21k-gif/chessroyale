@@ -435,3 +435,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Smudgy paint report is on main: docs/decisions/2026-11-08-smudgy-paint-report.md.
 - **Nov 8 ~19:30 UTC:** #558 auto chess redesign GREEN on 5fcca01 (draft). Stills sent to Eric (stills/autochess). Waiting on his OK
   plus two questions: bench pieces bigger? Phone: grow the board/box into the empty lower half? Remove .pr-body.md before merge.
+- **Nov 8 ~19:05 UTC:** Eric: phone layout v5 for #558 (benches = 4 board-color squares lined up with the files: ours under E–H, theirs
+  over A–D; players kitty-corner; board + box near full width; a bench tap lights its tile + target square). Computer stays.
+  Brief notes/briefs/brief-autochess-phone-v5.md, mockup sent. Fresh Opus helper session_01JuCWRuq2VtEduPx1AAXftt on the same branch.
+  Stills to come on stills/autochess as phone-v5-*.png. Then send to Eric; merge after his OK + green.
