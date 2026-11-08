@@ -266,7 +266,7 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // Sampled every frame for a few seconds: the two are never up together, the boss's comes first, and every figure, bubble and
   // the pawn stays inside the screen's 16 px gutters. One row: the boss on the left of the God King.
   type Sample = { t: number; boss: boolean; king: boolean; rects: Record<string, { x: number; r: number }> };
-  const samples: Sample[] = await page.evaluate(
+  const sampling: Promise<Sample[]> = page.evaluate(
     () =>
       new Promise<Sample[]>((resolve) => {
         const out: Sample[] = [];
@@ -297,10 +297,32 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
         tick();
       }),
   );
-  expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
-  expect(samples.some((x) => x.king), "the God King's line shows").toBe(true);
-  expect(samples.filter((x) => x.boss && x.king).length, "never both at once").toBe(0);
-  expect(samples.find((x) => x.boss)!.t < samples.find((x) => x.king)!.t, "the boss first").toBe(true);
+  // The stills run while the sampler watches (it started above): the boss's line up, then the God King's, each once fully opaque.
+  // (A crowd win only: he rises and speaks then. A boss win or a draw has no God King line.)
+  if (process.env.RESULT_SHOTS && end.result === "crowd") {
+    const dir = process.env.RESULT_SHOTS;
+    const name = testInfo.project.name;
+    await expect(page.locator(".results-duo .boss-char .bc-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".results-duo .boss-char .bc-bubble").evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
+    // (Typed out in full: its rest, not yet typed, is empty, as boss-result.spec.ts checks.)
+    await expect(page.locator(".results-duo .boss-char .speech-rest")).toHaveText("", { timeout: 15_000 });
+    if (name === "phone") await page.screenshot({ path: `${dir}/last-stand-phone-1-boss.png` });
+    await expect(page.locator(".results-duo .gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".results-duo .gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
+    await page.screenshot({ path: `${dir}/${name === "phone" ? "last-stand-phone-2-godking.png" : "last-stand-desktop.png"}` });
+  }
+  const samples = await sampling;
+  // The conversation (by design, boss-beats.ts and LastStand.tsx): a crowd win has the boss's line, then the God King's (he rises).
+  // A boss win has the boss's line only (he stays down without a word); a draw has no line of the God King's.
+  if (end.result === "crowd") {
+    expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
+    expect(samples.some((x) => x.king), "the God King's line shows").toBe(true);
+    expect(samples.filter((x) => x.boss && x.king).length, "never both at once").toBe(0);
+    expect(samples.find((x) => x.boss)!.t < samples.find((x) => x.king)!.t, "the boss first").toBe(true);
+  } else {
+    expect(samples.some((x) => x.king), "the God King stays silent unless the crowd won").toBe(false);
+    if (end.result === "boss") expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
+  }
   const vwNow = page.viewportSize()!.width;
   for (const x of samples) for (const [k, v] of Object.entries(x.rects)) {
     expect(v.x, `${k} left gutter`).toBeGreaterThanOrEqual(16);
@@ -309,17 +331,6 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   const boss0 = samples.find((x) => x.rects.boss)!.rects.boss!;
   const king0 = samples.find((x) => x.rects.king)!.rects.king!;
   expect((boss0.x + boss0.r) / 2 < (king0.x + king0.r) / 2, "the boss on the left of the God King").toBe(true);
-  // The stills (RESULT_SHOTS): the boss's line up, then the God King's, each once fully opaque.
-  if (process.env.RESULT_SHOTS) {
-    const dir = process.env.RESULT_SHOTS;
-    const name = testInfo.project.name;
-    await expect(page.locator(".results-duo .boss-char .bc-bubble")).toBeVisible({ timeout: 15_000 });
-    await expect.poll(() => page.locator(".results-duo .boss-char .bc-bubble").evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
-    if (name === "phone") await page.screenshot({ path: `${dir}/last-stand-phone-1-boss.png` });
-    await expect(page.locator(".results-duo .gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
-    await expect.poll(() => page.locator(".results-duo .gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
-    await page.screenshot({ path: `${dir}/${name === "phone" ? "last-stand-phone-2-godking.png" : "last-stand-desktop.png"}` });
-  }
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();

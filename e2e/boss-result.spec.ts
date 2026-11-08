@@ -25,7 +25,8 @@ async function resultOf(page: Page, project: string, name: string) {
   // Fully opaque (its entrance has faded in): the still and the checks read it as it reads.
   await expect.poll(() => bubble.evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
   const line = (await bubble.locator(".speech-line").innerText()).trim();
-  expect(line.length, "a line").toBeGreaterThan(10);
+  // (Not a length floor: a short line such as "Ouch!" is a real line; the empty-rest check above is what says it's complete.)
+  expect(line.length, "a line").toBeGreaterThan(0);
   // (The full line: what's typed (the shown part) is all of it now.)
   expect(await bubble.locator(".speech-line").textContent()).toContain(line);
   const vw = page.viewportSize()!.width;
