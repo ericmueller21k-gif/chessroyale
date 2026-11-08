@@ -22499,6 +22499,12 @@ button.sq-tiny {
   transform: scaleX(-1);
   transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
 }
+/* The results: a figure drawn facing our left turns to the God King on its right, mirrored about its feet (only the image: the
+   bubble and its words are its own children and stay as they are). Pixel-crisp: whole-pixel scale, nearest filtering. */
+.boss-char.place-results.art-left .boss-char-sprite {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--bc-fx) * var(--bc-scale) * 1px) 100%;
+}
 /* The pump in the bar's free room, at its right end, standing on the room's bottom: 2x (68 x 72) on a phone, its foot 3 px below the
    room's bottom, inside the bar's padding, so a stage-4 balloon's top and a pop's over-swell clear the status at any width
    (docs/decisions/2026-10-24-babur-bigger.md). */
