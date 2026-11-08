@@ -6389,6 +6389,17 @@ button.history-label {
 .screen.shop {
   gap: 12px;
 }
+/*
+ * Computer (Eric, Nov 8): the shop and crates page, all three tabs, sits in one column inset from the main column's sides by
+ * --shop-side. 140 px is about one filter chip ("All" and "Ride" are ~138 px at 1440 px), so the blue locker box isn't the full
+ * width. Narrower windows give up less: 10% of the window, at most 140 px. Phones keep the 14 px gutter.
+ */
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .screen.shop {
+    --shop-side: min(140px, 10vw);
+    padding-inline: var(--shop-side);
+  }
+}
 .shop-head {
   display: grid;
   grid-template-columns: auto 1fr auto;

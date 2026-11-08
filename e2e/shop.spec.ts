@@ -1468,3 +1468,56 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(1);
   await expect(page.locator(".shop-grid")).not.toContainText("God King pack");
 });
+
+/**
+ * The shop page's width (Eric, Nov 8): on a computer (the desktop project, 1440 by 900) all three tabs sit 120 to 160 px in from the
+ * main column on each side (about one filter chip, 140 px), and the tabs row, the blue box, the chips row and the first item card
+ * share its left and right edges within 2 px (the card's right edge is its grid's). On a phone the old 14 px gutter is unchanged.
+ * PADDED_SHOTS=<dir>: the three tabs' stills at 1440 by 900.
+ */
+test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 to 160 px in from the main column, edges aligned; on a phone the 14 px gutter stays", async ({ page }, testInfo) => {
+  const computer = testInfo.project.name === "desktop";
+  if (computer) await page.setViewportSize({ width: 1440, height: 900 });
+  await asSignedIn(page, "pawn");
+  await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
+  await page.goto("/shop");
+  const cases = [
+    { tab: "Shop", shot: "shop", chips: ".shop-tabs", box: null, card: ".shop-item", grid: ".shop-grid" },
+    { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
+    { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
+  ] as const;
+  const rect = (sel: string) =>
+    page.locator(sel).first().evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      return { l: b.left, r: b.right };
+    });
+  for (const c of cases) {
+    await page.getByRole("tab", { name: c.tab, exact: true }).click();
+    await expect(page.locator(c.card).first()).toBeVisible();
+    const col = await rect(".screen.shop");
+    // The tabs row, the blue box, the chips row, and the first card (its left edge, and its grid's right edge).
+    const els: [string, { l: number; r: number }][] = [["tabs", await rect(".area-tabs")]];
+    if (c.box) els.push(["blue box", await rect(c.box)]);
+    if (c.chips) els.push(["chips", await rect(c.chips)]);
+    els.push(["first card", { l: (await rect(c.card)).l, r: (await rect(c.grid)).r }]);
+    const tabs = els[0]![1];
+    for (const [name, e] of els) {
+      const inL = e.l - col.l;
+      const inR = col.r - e.r;
+      if (computer) {
+        expect(inL, `${c.tab}: ${name} left inset`).toBeGreaterThanOrEqual(120);
+        expect(inL, `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(160);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeGreaterThanOrEqual(120);
+        expect(inR, `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(160);
+      } else {
+        // The old gutter: 14 px each side.
+        expect(Math.abs(inL - 14), `${c.tab}: ${name} left inset`).toBeLessThanOrEqual(1);
+        expect(Math.abs(inR - 14), `${c.tab}: ${name} right inset`).toBeLessThanOrEqual(1);
+      }
+      expect(Math.abs(e.l - tabs.l), `${c.tab}: ${name} left edge`).toBeLessThanOrEqual(2);
+      expect(Math.abs(e.r - tabs.r), `${c.tab}: ${name} right edge`).toBeLessThanOrEqual(2);
+    }
+    const shots = process.env.PADDED_SHOTS;
+    if (computer && shots) await page.screenshot({ path: `${shots}/${c.shot}-computer-padded.png` });
+  }
+});
