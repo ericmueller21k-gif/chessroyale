@@ -448,7 +448,10 @@ test("Smudgy's Repaint: REPAINT!, a cream stroke on his pawn's square then a cha
     await yourMove(page);
     const s = await state(page);
     if (s.boss.powers.repaints > 0) break;
-    await submitMove(page, quiet(s.fen, s.allowed), s.fen);
+    // (Never a check: in check his move answers it and the Repaint waits a turn, by design.)
+    const noCheck = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.san.includes("+") && !m.san.includes("#")).map((m) => m.from + m.to);
+    const allowed = (s.allowed ?? noCheck).filter((m) => noCheck.includes(m));
+    await submitMove(page, quiet(s.fen, allowed.length ? allowed : s.allowed), s.fen);
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   }
   await yourMove(page);
