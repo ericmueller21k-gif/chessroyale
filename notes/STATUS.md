@@ -419,3 +419,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 8 00:45: **#552 home card taps LIVE** (d7325418). #553 Dash clock: sent back (love line never shows; move list shows his move early).
   #551 result screen: sent back (bubble off the right edge on phone; Last Stand stills). #550: fixing desktop specs (room Back bar,
   "Your profile" avatar) + merging main (#552). IDEAS: Dash's clock as a legendary item.
+- **Nov 8 ~04:00: director handoff.** #550 merged (f08e31e3). #551/#553/#554 WIP pushed, no helpers running. Usage ~30% of the week:
+  new limits (max 2 helpers, Opus only for hard work, one blocking wait, repeat-each ≤3). New sessions start from notes/HANDOFF.md.
