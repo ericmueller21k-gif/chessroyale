@@ -6,6 +6,8 @@ alternate normally; a quiet extra move would show two Dash moves in a row). sett
 six back, judged on "the crowd's people's mean, its bots' too (each bot puts each back with botHit 0.6)", he moves again at once.
 - Find why: suspects (a) the verdict line is per player but the extra move uses the crowd mean with bots, so a solo player's fail is
   outvoted by bots; (b) the extra move fires but the move list doesn't show it; (c) it's skipped in some state (check, turn order).
+- **Eric (Nov 8): "there should be no average when I'm playing in solo mode … a different rule set for that."** Solo: only YOUR
+  put-back counts (no bots, no mean). Online crowd: the mean stays.
 - Eric's intent: if YOU fail (solo), he moves twice, and the move list shows both moves. Online with a crowd: the line and the extra
   move must agree (same verdict). Fix so the line and the move never disagree.
 - e2e: a solo fail → two Dash moves in a row in the move list; a pass → one. Boss lane (boss kit + one review pass).
