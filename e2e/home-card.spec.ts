@@ -32,7 +32,7 @@ test("a tap on your pawn opens your inventory; a tap on your icon opens the icon
 
 test("a tap on your name or rank opens your public profile; the rest of the card does nothing", async ({ page }) => {
   await page.goto("/");
-  const id = await page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.id as string));
+  await expect(page.getByRole("button", { name: "View your profile" })).toBeVisible();
   const hero = (await page.locator(".fd-hero").boundingBox())!;
 
   // Empty card space (the panel's bottom corner, under the tag and the pawn): nothing opens, nothing moves.
@@ -43,6 +43,8 @@ test("a tap on your name or rank opens your public profile; the rest of the card
 
   // The name: your public profile, the address /profile/ID (the page others see).
   await page.getByRole("button", { name: "View your profile" }).click();
+  // (Your id, as the account the page loaded: a guest's is made on the first visit, so it's read once the page is up.)
+  const id = await page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.id as string));
   await expect(page).toHaveURL(new RegExp(`/profile/${id}$`));
   await expect(page.getByRole("heading", { name: "Player Profile", level: 1 })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toHaveCount(0);
