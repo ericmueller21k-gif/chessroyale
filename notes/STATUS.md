@@ -429,3 +429,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (40bb907e), #557 match rows fixed (ce8a52bc), #556 typed chat in match/lobby/phone + Quick chat button + Chat packs tab off
   (b641c2d7). Stills branches to delete by Eric in GitHub: stills/551, stills/typed-chat-2, stills/match-fixed (the git proxy refuses deletes).
   Next queue: auto chess redesign (Opus), town intro, intermittents (squads-three-boards:152 still seen on #556), custom quick chat (roadmap).
+- **Nov 8 ~17:35 UTC (11:35 Eric's time): Eric said go on the auto chess redesign** ("Opus even on Medium is probably sufficient"). Opus helper,
+  its own session session_01JuCWRvGDonrhvbb2yRQNxr, branch claude/autochess-redesign (from b641c2d). Delivers .pr-body.md
+  on the branch + stills on stills/autochess. Director opens the PR on the first real push, watches CI, sends stills to Eric.
+  Smudgy paint report is on main: docs/decisions/2026-11-08-smudgy-paint-report.md.
