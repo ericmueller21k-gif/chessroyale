@@ -22185,6 +22185,11 @@ button.sq-tiny {
   }
   .ac-dock .ac-card {
     padding: 4px 6px;
+    grid-template-columns: 66px minmax(0, 1fr);
+    column-gap: 6px;
+  }
+  .ac-dock .ac-card-fight {
+    grid-template-columns: minmax(0, 1fr);
   }
   .ac-dock .ac-card-text,
   .ac-dock .ac-card-gold {
