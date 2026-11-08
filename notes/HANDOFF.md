@@ -34,6 +34,16 @@ Eric owns it. You design, delegate to helpers, review, merge, check what's live,
   - **`--repeat-each` ≤3** unless Eric OKs more;
   - **start a new director session** when the context gets big; this file makes that cheap.
 
+## Scheduled task to recreate (moved from the old director session, Nov 8)
+The twice-weekly "Bloat sweep of the HunChess pipeline" (Mon 05:47 UTC and Thu 17:47 UTC) was bound to the OLD director
+session, so it's now DISABLED there (trig_01QYRT1Nz1yWJmwpQbeReECs, trig_01KQ78iK67ZGbG2ehHoZWC7u) to stop a second director
+from waking. The new director recreates it bound to its own session (create_trigger, same crons, human_request: Eric, Nov 6).
+The prompt: run a read-only auditor per notes/briefs/brief-pipeline-audit.md; write notes/pipeline-audit-<date>.md with a
+"Trend" table against the previous one (LOC per package, test counts and unit/e2e time, the slowest 10 specs, CI wall time,
+intermittents on main, repo and docs/ image size, the largest bundle chunks, PR body/decision-note length; flag >10% growth with
+no feature reason); fix the director-sized quick wins, queue the rest in STATUS, and send Eric a short summary. Use a cloud
+helper session (own machine), not the old /home/user/cr-notes paths.
+
 ## Live now (main) — see STATUS.md's Nov 8 overnight entry for the latest (#551, #553, #554, #555, #556, #557 all live)
 - #552 home card taps (d7325418): icon → icon editor, name → your public profile, the big pawn still opens the inventory
   (Eric confirmed Nov 8).
