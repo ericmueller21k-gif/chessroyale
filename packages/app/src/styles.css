@@ -21349,12 +21349,12 @@ button.sq-tiny {
   --hop: 8px;
   --pawn: 44px;
   --pad-t: 6px;
-  --head-h: 40px;
+  --head-h: 44px;
   --pl-h: calc(var(--hop) + var(--pawn) + 4px);
   --above: 5px;
   /* A bench: its column, the gap to the board, a slot (a 44 px target) and the piece in it. */
-  --bw: 30px;
-  --bgap: 4px;
+  --bw: 28px;
+  --bgap: 3px;
   --tile: 44px;
   --sgap: 2px;
   --bp: 24px;
@@ -21387,7 +21387,8 @@ button.sq-tiny {
   position: relative;
   width: var(--colw);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--bw) var(--fw) var(--bw) minmax(0, 1fr);
+  /* (A bench's track holds the bench and its gap to the board.) */
+  grid-template-columns: minmax(0, 1fr) calc(var(--bw) + var(--bgap)) var(--fw) calc(var(--bw) + var(--bgap)) minmax(0, 1fr);
   grid-template-rows: var(--head-h) var(--pl-h) var(--fw) auto;
   column-gap: 0;
   grid-template-areas:
@@ -21423,6 +21424,11 @@ button.sq-tiny {
   white-space: nowrap;
 }
 /* The gear (Eric, Oct 25): the match screens' plain gear, no box, 36 px. */
+/* (At the top of the row, level with the title's first line: clear of the players under it.) */
+.ac-head > .mm {
+  align-self: flex-start;
+  margin-top: 2px;
+}
 .ac-head .mm-more {
   width: 36px;
   min-height: 36px;
@@ -21557,13 +21563,13 @@ button.sq-tiny {
 .ac-bench.you {
   grid-area: by;
   align-self: end;
-  margin-right: var(--bgap);
+  justify-self: start;
   flex-direction: column-reverse;
 }
 .ac-bench.them {
   grid-area: bt;
   align-self: start;
-  margin-left: var(--bgap);
+  justify-self: end;
 }
 .ac-slot {
   position: relative;
@@ -21664,6 +21670,7 @@ button.sq-tiny {
 .ac-dock {
   grid-area: dock;
   position: relative;
+  container-type: inline-size;
   margin-top: var(--dock-gap);
   width: var(--fw);
   border: 3px solid var(--ac-gold);
@@ -21689,11 +21696,11 @@ button.sq-tiny {
   white-space: nowrap;
 }
 .ac-gold-you .ac-coin {
-  width: calc(var(--band-h) * 0.3);
-  height: calc(var(--band-h) * 0.3);
+  width: calc(var(--band-h) * 0.28);
+  height: calc(var(--band-h) * 0.28);
 }
 .ac-gold-you b {
-  font: 400 calc(var(--band-h) * 0.4) / 1 "Archivo Black", Archivo, sans-serif;
+  font: 400 calc(var(--band-h) * 0.37) / 1 "Archivo Black", Archivo, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 .ac-income {
@@ -21704,15 +21711,22 @@ button.sq-tiny {
   background: none;
   color: #fff;
   font-family: inherit;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   white-space: nowrap;
   cursor: pointer;
 }
-/* (A narrow phone: "+10" alone, so the hexagon keeps its room.) */
-@media (max-width: 374px) {
+/* (A narrow box: "+10" alone, so the hexagon keeps its room.) */
+@container (max-width: 300px) {
   .ac-income-word {
     display: none;
+  }
+  .ac-goldrow {
+    gap: 4px;
+    padding: 0 4px;
+  }
+  .ac-income {
+    padding-left: 4px;
   }
 }
 .ac-income b {
@@ -21729,7 +21743,7 @@ button.sq-tiny {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: calc(var(--hex-h) * 1.75);
+  width: calc(var(--hex-h) * 1.62);
   height: var(--hex-h);
   transform: translate(-50%, -50%);
   clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%);
@@ -21773,7 +21787,7 @@ button.sq-tiny {
   gap: 0;
 }
 .ac-od {
-  width: calc((var(--fw) / 2 - var(--band-h) * 0.875 - 16px) / 5);
+  width: calc((var(--fw) / 2 - var(--band-h) * 0.81 - 14px) / 5);
   max-width: 30px;
   display: flex;
   flex-direction: column;
@@ -21844,6 +21858,7 @@ button.sq-tiny {
   filter: grayscale(0.7);
 }
 .ac-btns {
+  grid-area: 1 / 1;
   display: grid;
   grid-template-rows: 1fr 1fr;
   gap: var(--cgap);
@@ -21869,7 +21884,7 @@ button.sq-tiny {
   align-content: center;
   justify-items: start;
   column-gap: 2px;
-  font-size: clamp(9px, calc(var(--ch) * 0.2), 14px);
+  font-size: clamp(9px, calc(var(--btnw) * 0.17), 14px);
   font-weight: 800;
   line-height: 1.05;
   text-align: left;
@@ -21880,7 +21895,7 @@ button.sq-tiny {
 .ac-btn-icon {
   grid-area: 1 / 2 / 3 / 3;
   align-self: center;
-  width: clamp(10px, calc(var(--ch) * 0.24), 22px);
+  width: clamp(9px, calc(var(--btnw) * 0.17), 18px);
   height: auto;
   fill: none;
   stroke: #a0700f;
@@ -21912,6 +21927,7 @@ button.sq-tiny {
   filter: none;
 }
 .ac-cards {
+  grid-area: 1 / 2;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--cgap);
@@ -22056,7 +22072,7 @@ button.sq-tiny {
   }
   .ac-col {
     width: auto;
-    grid-template-columns: var(--side) var(--bw) var(--fw) var(--bw) var(--side);
+    grid-template-columns: var(--side) calc(var(--bw) + var(--bgap)) var(--fw) calc(var(--bw) + var(--bgap)) var(--side);
     grid-template-rows: var(--head-h) auto minmax(0, 1fr) auto;
     grid-template-areas:
       "head head head head head"
