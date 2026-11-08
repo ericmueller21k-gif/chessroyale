@@ -383,7 +383,7 @@ export const rushHeld = (correct: readonly number[], swept: number, s: RushSetti
 /**
  * His extra move after a failed Rush (Eric, Nov 8: "if YOU fail, he moves twice"): Hollow's quiet move within the cap
  * (extraMoveFrom) when there's one; else the quiet candidate closest to no gain at all (the least either way; never a forced mate
- * in its line, unless every one has one). Null only when the crowd's turn can't pass or he has no quiet move.
+ * in its line, unless every one has one: then one against him before his own). Null only when the crowd's turn can't pass or he has no quiet move.
  */
 export async function dashExtraMoveFrom(engine: EngineLike, fen: string): Promise<string | null> {
   const capped = await extraMoveFrom(engine, fen);
@@ -394,7 +394,10 @@ export async function dashExtraMoveFrom(engine: EngineLike, fen: string): Promis
   const crowdBest = (await engine.topMoves(fen, 1))[0];
   const before = crowdBest ? 1 - crowdBest.expected : 0.5;
   const scored = (await engine.scoreMoves(passed, candidates)).filter((m) => candidates.includes(m.move));
-  const pool = scored.some((m) => m.mate === undefined) ? scored.filter((m) => m.mate === undefined) : scored;
+  // Prefer no forced mate; then one against him (the crowd's); his own only when nothing else is left (review of #561).
+  const quiet = scored.filter((m) => m.mate === undefined);
+  const theirs = scored.filter((m) => m.mate !== undefined && m.mate < 0);
+  const pool = quiet.length ? quiet : theirs.length ? theirs : scored;
   return [...pool].sort((a, b) => Math.abs(a.expected - before) - Math.abs(b.expected - before) || (a.move < b.move ? -1 : 1))[0]?.move ?? candidates[0]!;
 }
 
@@ -554,7 +557,7 @@ export const dashBattle = {
     const held = rushHeld(counts, r.moves.length);
     const passed = held ? null : passTurn(fen);
     const extra = held ? undefined : passed && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
-    const rush: DashRush = { ...r, correct: Math.round(mean * 10) / 10, ...(extra ? { extra } : {}) };
+    const rush: DashRush = { ...r, correct: Math.floor(mean * 10 + 1e-9) / 10, ...(extra ? { extra } : {}) };
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...d, rush } } } };
     return { correct, mean, held };
   },

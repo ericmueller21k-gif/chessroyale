@@ -136,7 +136,8 @@ export function rushDock(boss: BossView, view: RushView, now: number): { line: s
   // `extra`, the same field his extra move goes by, so the line and the move never disagree; Nov 8.)
   const crowd = rush.correct !== right;
   const count = crowd ? `Crowd: ${rush.correct} of ${n}` : `${right} of ${n}`;
-  const yours = crowd ? ` (On average; you: ${right}.)` : "";
+  // "you" only for a viewer who put pieces back (not a spectator, nor one who was out; review of #561).
+  const yours = crowd && Object.keys(view.places).length ? ` (On average; you: ${right}.)` : "";
   if (rush.extra === "skipped") return { line: `${count}: too few`, sub: `No quiet move for him: your move.${yours}` };
   return rush.extra ? { line: `${count}: too few`, sub: `He moves again.${yours}` } : { line: `${count}: well done!`, sub: `The board as it was. Your move.${yours}` };
 }
