@@ -208,6 +208,20 @@ export function clockHitTurns(seed: number, upTo: number, s: BossPowerSettings["
 export const clockHitOn = (seed: number, turn: number, s: BossPowerSettings["dashClockFit"] = BOSS_POWERS.dashClockFit, test = ""): boolean =>
   (test === "clockfit" && turn === 2) || clockHitTurns(seed, turn, s).includes(turn);
 
+/**
+ * His pop-off is playing as his thinking screen's beats, for the move he's about to play: the turn it came on is his turn to think
+ * (powers.turn). Until his move lands, the move list keeps his move out (MovePanel's shownRows).
+ */
+export const popOffPending = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
+  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at === boss.powers.turn;
+
+/**
+ * His move's row stays out of the move list while his pop-off's beats play: the pop-off came on this turn or the one before (the
+ * runner's turn moves on as his move is played, before its beats end).
+ */
+export const popOffHolding = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): boolean =>
+  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at >= (boss.powers.turn ?? 0) - 1;
+
 /** His pop-off's turn: one of his turns from dashPopOff.from to dashPopOff.to, from the battle's seed. */
 export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BOSS_POWERS.dashPopOff): number {
   return s.from + Math.floor(powerRoll(seed, "popoff") * (s.to - s.from + 1));
@@ -219,7 +233,7 @@ export function popOffTurn(seed: number, s: BossPowerSettings["dashPopOff"] = BO
  * the server alike), so his move lands after it and no crowd clock runs meanwhile.
  */
 export const popOffMs = (boss: { id?: string; powers?: { turn?: number; dash?: { popOff?: { at: number } | null } | null } | null } | null | undefined): number =>
-  boss?.id === "dash" && !!boss.powers?.dash?.popOff && boss.powers.dash.popOff.at === boss.powers.turn ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
+  popOffPending(boss) ? DASH_FX.popOff + DASH_FX.popOffFast : 0;
 
 // ---------------- Scramble Rush ----------------
 

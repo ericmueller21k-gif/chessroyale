@@ -357,14 +357,35 @@ for (const [right, held] of [
  * smacks and "I gotta pop off", then ten fast smacks and a love line, while he thinks, before his move lands). Read from the page:
  * each moment's key, kind and count as it first shows, and the lines said on screen (the same text as the lines' files).
  */
-type ClockSeen = { moments: Record<string, { kind: string; count: string; at: number }>; lines: string[]; plays: number[] };
+type ClockSeen = {
+  moments: Record<string, { kind: string; count: string; at: number }>;
+  lines: string[];
+  plays: number[];
+  /** When each line first showed on the page (ms, the page's clock). */
+  lineAt: Record<string, number>;
+  /** Each frame's sample: the move list's rows and whether the square ring (his move landed) is drawn. */
+  samples: { t: number; rows: number; ring: boolean; last: string; phase: string }[];
+  /** The figure's clicks: `anim:click` counted as each frame's cue is set (a smack is one click frame). */
+  cues: Record<string, number>;
+};
 const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
 async function watchClock(page: Page) {
   await page.evaluate((lines: string[]) => {
     const w = window as any;
-    const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[], plays: [] as number[] };
+    const seen = { moments: {} as Record<string, { kind: string; count: string; at: number }>, lines: [] as string[], plays: [] as number[], lineAt: {} as Record<string, number>, samples: [] as { t: number; rows: number; ring: boolean; last: string; phase: string }[], cues: {} as Record<string, number> };
     w.__clock = seen;
+    // (Every smack: the figure's frame cue set as its frame changes; a click is one smack.)
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        const el = m.target as HTMLElement;
+        if (el.dataset.cue === "click") {
+          const k = `${el.dataset.anim}:click`;
+          seen.cues[k] = (seen.cues[k] ?? 0) + 1;
+        }
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["data-cue"] });
     setInterval(() => {
+      seen.samples.push({ t: Date.now(), rows: document.querySelectorAll(".mv-row").length, ring: !!document.querySelector(".square-ring"), last: (document.querySelectorAll(".mv-row").item(document.querySelectorAll(".mv-row").length - 1) as HTMLElement | null)?.className ?? "", phase: (w.match?.phase?.kind ?? "") + ":" + (w.match?.phase?.thinking ? "T" : "") });
       // (Each turn's clock as it starts: the play phase's startsAt, once per turn.)
       const ph = w.match?.phase;
       if (ph?.kind === "play" && ph.startsAt && !seen.plays.includes(ph.startsAt)) seen.plays.push(ph.startsAt);
@@ -373,7 +394,10 @@ async function watchClock(page: Page) {
         if (!seen.moments[key]) seen.moments[key] = { kind: el.dataset.kind ?? "clockFit", count: el.dataset.count ?? "", at: Date.now() };
       }
       const text = document.body.textContent ?? "";
-      for (const l of lines) if (text.includes(l) && !seen.lines.includes(l)) seen.lines.push(l);
+      for (const l of lines) if (text.includes(l) && !seen.lines.includes(l)) {
+        seen.lines.push(l);
+        seen.lineAt[l] = Date.now();
+      }
     }, 30);
   }, ALL_CLOCK_LINES);
 }
@@ -427,13 +451,32 @@ test.describe("Dash's clock", () => {
     expect(seen.lines.some((l) => DASH_POPOFF_LINES.includes(l))).toBe(true);
     expect(seen.lines.some((l) => DASH_LOVE_LINES.includes(l))).toBe(true);
     // (Its two beats play one after the other, 4.6 s; your clock starts only after them, so nobody's time goes while he thinks.)
-    const total = BOSS_POWERS.dashPopOff.popMs + BOSS_POWERS.dashPopOff.loveMs;
-    expect(fast[0]!.at - pops[0]!.at).toBeGreaterThanOrEqual(BOSS_POWERS.dashPopOff.popMs - 300);
+    const { popMs, loveMs } = BOSS_POWERS.dashPopOff;
+    const total = popMs + loveMs;
+    const beatStart = pops[0]!.at;
+    const beatEnd = fast[0]!.at + loveMs;
+    expect(fast[0]!.at - beatStart).toBeGreaterThanOrEqual(popMs - 300);
     // (The first clock to start after it: your turn's, once its beats are over and his move has shown.)
-    const after = seen.plays.find((t) => t > pops[0]!.at);
+    const after = seen.plays.find((t) => t > beatStart);
     expect(after).toBeDefined();
-    expect(after! - pops[0]!.at).toBeGreaterThanOrEqual(total - 300);
-    expect(after! - pops[0]!.at).toBeLessThanOrEqual(total + 3000);
+    expect(after! - beatStart).toBeGreaterThanOrEqual(total - 300);
+    expect(after! - beatStart).toBeLessThanOrEqual(total + 3000);
+    // (The bubble, in order: the pop-off line, then a love line, and his move lands only after both.)
+    const popLine = DASH_POPOFF_LINES.find((l) => seen.lineAt[l] !== undefined);
+    const loveLine = DASH_LOVE_LINES.find((l) => seen.lineAt[l] !== undefined);
+    expect(popLine).toBeDefined();
+    expect(loveLine).toBeDefined();
+    expect(seen.lineAt[popLine!]!).toBeLessThan(seen.lineAt[loveLine!]!);
+    // (His move lands when its row comes into the list: after the beats, and after the love line.)
+    const before = seen.samples.filter((x) => x.t <= beatStart).at(-1)!.rows;
+    const landed = seen.samples.find((x) => x.t > beatStart && x.rows > before)?.t;
+    expect(landed).toBeDefined();
+    expect(seen.lineAt[loveLine!]!).toBeLessThan(landed!);
+    expect(landed!).toBeGreaterThanOrEqual(beatEnd - 300);
+    // (The move list doesn't grow while the beats play: his move isn't in it until it lands.)
+    for (const x of seen.samples) if (x.t >= beatStart && x.t < landed! - 50) expect(x.rows, `rows at ${x.t - beatStart} ms`).toBe(before);
+    expect(seen.cues["fit10:click"]).toBe(BOSS_POWERS.dashPopOff.hits);
+    expect(seen.cues["fit3:click"]).toBe(BOSS_POWERS.dashPopOff.smacks);
     expect(errors).toEqual([]);
   });
 });

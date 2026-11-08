@@ -2,6 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal, memo } from "preact/compat";
 import { bossAlone, cutLabel, roundLive, scoreDp, towerView, type BossView, type GameView } from "../game.ts";
+import { popOffHolding } from "@chessroyale/chess";
 import { crossedOut } from "./Folio.tsx";
 import { battleStartPly, moveNumber, moverOf, newPlyCache, noteTurns, pieceOn, plyRows, timeShown, turnBook, turnMs, type Mover, type PieceType, type PlyCache, type PlyRow } from "../move-list.ts";
 import { camoHidden, seenFen } from "../camo.ts";
@@ -66,6 +67,8 @@ function shownRows(match: GameView, boss: BossView): { rows: Shown[]; opening: n
     const mover = moverOf(row, boss.crowdSide, start, boss.kingMoves ?? []);
     rows.push({ row, mover, piece, captured, ms: turnMs(book, row.ply), picks: mover === "crowd" || mover === "king" ? (book.picks.get(row.ply) ?? null) : null });
   }
+  // (Dash's pop-off, while he thinks for the move he's about to play: that move isn't on the board yet, so not in the list.)
+  if (match.phase.kind === "boss" && match.phase.thinking && popOffHolding(boss) && rows.at(-1)?.mover === "boss") rows.pop();
   return { rows, opening: start };
 }
 
