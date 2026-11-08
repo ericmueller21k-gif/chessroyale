@@ -8507,6 +8507,9 @@ button.history-label {
 .gk-epilogue.up .god-king {
   width: 84px;
   height: 84px;
+}
+/* His rise's motion, as he starts to speak (never over the boss's line: LastStand.tsx). */
+.gk-epilogue.rising .god-king {
   animation: gk-rise 600ms cubic-bezier(0.2, 1.4, 0.4, 1) both;
 }
 @keyframes gk-rise {
@@ -24676,7 +24679,9 @@ button.sq-tiny {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  gap: 8px;
+  /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A phone's wide
+     boss overflows his box by about 12 px a side, so the gap is 32 px.) */
+  gap: 32px;
   margin: 0 auto;
 }
 .results-duo .boss-char.place-results {

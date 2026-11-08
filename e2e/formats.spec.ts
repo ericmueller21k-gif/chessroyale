@@ -265,7 +265,10 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // The conversation (Eric, Nov 8): the boss's line above him first; once it has typed out and held, the God King's above him.
   // Sampled every frame for a few seconds: the two are never up together, the boss's comes first, and every figure, bubble and
   // the pawn stays inside the screen's 16 px gutters. One row: the boss on the left of the God King.
-  type Sample = { t: number; boss: boolean; king: boolean; rects: Record<string, { x: number; r: number }> };
+  // The gap (16 px, Eric's rule: nothing touches) is measured on what's painted: each canvas's opaque columns, mapped to the screen
+  // (the boss's feet sit at his box's center; his mirror, when he has one, turns about them). `kingStill`: the God King has no
+  // transform or animation while the boss's bubble is up.
+  type Sample = { t: number; boss: boolean; king: boolean; kingStill: boolean; gap: number | null; rects: Record<string, { x: number; r: number }> };
   const sampling: Promise<Sample[]> = page.evaluate(
     () =>
       new Promise<Sample[]>((resolve) => {
@@ -276,6 +279,31 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
           if (!el) return null;
           const b = el.getBoundingClientRect();
           return { x: b.left, r: b.right };
+        };
+        const opaque = (cv: HTMLCanvasElement) => {
+          const w = cv.width, h = cv.height;
+          const d = cv.getContext("2d")!.getImageData(0, 0, w, h).data;
+          let minx = w, maxx = -1;
+          for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) { if (x < minx) minx = x; if (x > maxx) maxx = x; }
+          return maxx < 0 ? null : { minx, maxx };
+        };
+        const bossSpan = (cv: HTMLCanvasElement) => {
+          const box = cv.closest<HTMLElement>(".boss-char")!;
+          const cs = getComputedStyle(box);
+          const k = parseFloat(cs.getPropertyValue("--bc-scale")) || 1;
+          const fx = (parseFloat(cs.getPropertyValue("--bc-fx")) || 0) * k;
+          const c = box.getBoundingClientRect();
+          const cx = c.left + c.width / 2;
+          const o = opaque(cv);
+          if (!o) return null;
+          const a = o.minx * k, b = (o.maxx + 1) * k;
+          return box.classList.contains("art-left") ? { l: cx + fx - b, r: cx + fx - a } : { l: cx - fx + a, r: cx - fx + b };
+        };
+        const kingSpan = (cv: HTMLCanvasElement) => {
+          const rc = cv.getBoundingClientRect();
+          const k = rc.width / cv.width;
+          const o = opaque(cv);
+          return o ? { l: rc.left + o.minx * k, r: rc.left + (o.maxx + 1) * k } : null;
         };
         const tick = () => {
           const boss = !!document.querySelector(".results-duo .boss-char .bc-bubble");
@@ -290,7 +318,14 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
           put("pawn", ".results-duo .gk-epilogue-you .you-pawn");
           if (boss) put("bossBubble", ".results-duo .boss-char .bc-bubble");
           if (king) put("kingBubble", ".results-duo .gk-epilogue-bubble");
-          out.push({ t: performance.now() - t0, boss, king, rects });
+          const kEl = document.querySelector<HTMLElement>(".results-duo .gk-epilogue .god-king");
+          const kcs = kEl ? getComputedStyle(kEl) : null;
+          const kingStill = !kcs || (kcs.transform === "none" && kcs.animationName === "none");
+          const bossCv = document.querySelector<HTMLCanvasElement>(".results-duo .boss-char .boss-char-sprite");
+          const kingCv = document.querySelector<HTMLCanvasElement>(".results-duo .gk-epilogue .gk-canvas");
+          const bs = bossCv ? bossSpan(bossCv) : null;
+          const ks = kingCv ? kingSpan(kingCv) : null;
+          out.push({ t: performance.now() - t0, boss, king, kingStill, gap: bs && ks ? ks.l - bs.r : null, rects });
           if (performance.now() - t0 < 9000) requestAnimationFrame(tick);
           else resolve(out);
         };
@@ -323,6 +358,9 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
     expect(samples.some((x) => x.king), "the God King stays silent unless the crowd won").toBe(false);
     if (end.result === "boss") expect(samples.some((x) => x.boss), "the boss's line shows").toBe(true);
   }
+  // While the boss speaks, the God King is drawn still (no rise mid-line); the boss and the God King never touch: 16 px apart.
+  for (const x of samples) if (x.boss) expect(x.kingStill, "the God King still while the boss speaks").toBe(true);
+  for (const x of samples) if (x.gap !== null) expect(x.gap, "16 px between the boss and the God King").toBeGreaterThanOrEqual(16);
   const vwNow = page.viewportSize()!.width;
   for (const x of samples) for (const [k, v] of Object.entries(x.rects)) {
     expect(v.x, `${k} left gutter`).toBeGreaterThanOrEqual(16);

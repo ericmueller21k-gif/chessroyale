@@ -255,7 +255,6 @@ export function GodKingEpilogue({ side, rises, children }: { side: "w" | "b"; ri
   const now = useFrameNow();
   const [start] = useState(Date.now());
   const t = now - start;
-  const up = rises && t >= 1500;
   useEffect(() => {
     if (!rises) return;
     const timers = [setTimeout(() => play("gkSummon"), 600), setTimeout(() => play("gkAppear"), 1450)];
@@ -267,10 +266,12 @@ export function GodKingEpilogue({ side, rises, children }: { side: "w" | "b"; ri
   if (bossVoice.line(now)) talk.boss = true;
   if (talk.at === null && ((talk.boss && !bossVoice.line(now)) || (!talk.boss && t >= RESULT_TALK.kingAfterMs))) talk.at = now;
   const shown = rises && talk.at !== null ? Math.min(words.length, Math.floor((now - talk.at) / 28) + 1) : 0;
+  // On a crowd win he stands from the first frame (the rise is already done: `since` long past), so the boss's line is never over
+  // a half-risen figure. His rise's motion (`rising`) plays only as he starts to speak, after the boss's line is gone.
   return (
-    <div class={`gk-epilogue${rises ? " rises" : " down"}${up ? " up" : ""}`} aria-label={rises ? `The God King rises: ${words}` : "The God King stays down"}>
+    <div class={`gk-epilogue${rises ? " rises up" : " down"}${rises && talk.at !== null ? " rising" : ""}`} aria-label={rises ? `The God King rises: ${words}` : "The God King stays down"}>
       {rises && t >= 600 && <span class="gk-epilogue-beam" aria-hidden="true" />}
-      {up ? <GodKingSprite side={side} anim="rise" since={start + 1500} then="raised" /> : <GodKingFallen side={side} />}
+      {rises ? <GodKingSprite side={side} anim="rise" since={start - 2000} then="raised" /> : <GodKingFallen side={side} />}
       {children}
       {shown > 0 && (
         <span class="gk-bubble gk-epilogue-bubble" role="status">

@@ -806,6 +806,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His sounds are his own,
   // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 6,
     barName: 13,
@@ -877,6 +878,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // art branch's boss-blitz, as drawn (characters/boss-blitz.ts). His sounds are his own: sneakers and a chess clock
   // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
   "Dash": {
+    artFacesLeft: true,
     barScale: 0.97,
     barShift: 6,
     ch: DASH,
