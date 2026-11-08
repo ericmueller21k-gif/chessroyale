@@ -87,7 +87,7 @@ export function DressedPawn({
   }, [size]);
   const box = (
     <span class="fd-pawn-box">
-      <Avatar look={look} side={pawnSide} ride={ride} outlined={pawnSide === "b"} />
+      <Avatar look={look} side={pawnSide} ride={ride} />
     </span>
   );
   const cls = `fd-pawn fd-pawn-${size}${shadow ? " shadow" : ""}${onTap ? " fd-tap" : ""}`;

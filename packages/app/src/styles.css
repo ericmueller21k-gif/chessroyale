@@ -7828,10 +7828,11 @@ button.history-label {
   opacity: 0.8;
   cursor: pointer;
 }
+/* (The containing block is the padding box, inside the 1.5 px border: 5.5 px out puts the 24 px square's tap area at 32 px.) */
 .locker-pawn-letter::before {
   content: "";
   position: absolute;
-  inset: -4px;
+  inset: -5.5px;
 }
 .locker-pawn-letter.on {
   width: 27.5px;

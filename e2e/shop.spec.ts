@@ -1410,8 +1410,8 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await expect(btns).toHaveCount(2);
   const sq = [(await btns.nth(0).boundingBox())!, (await btns.nth(1).boundingBox())!];
   for (const q of sq) {
-    expect(q.width).toBeLessThanOrEqual(34);
-    expect(q.height).toBeLessThanOrEqual(34);
+    expect(q.width).toBeLessThanOrEqual(28);
+    expect(q.height).toBeLessThanOrEqual(28);
     expect(q.x).toBeGreaterThanOrEqual(box.x);
     expect(q.y).toBeGreaterThanOrEqual(box.y);
     expect(q.x + q.width).toBeLessThanOrEqual(box.x + box.width);
@@ -1430,6 +1430,7 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   // The God King's effects are hidden from the locker and the shop (GOD_KING_SHOP, Nov 8): no "From the shop", no effects tab.
   await expect(page.getByText("From the shop")).toHaveCount(0);
   await expect(page.getByText("More God King effects")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
   // B: black, saved on the account (the server says so), and it's still black after a reload.
   await B.click();
   await expect(B).toHaveAttribute("aria-pressed", "true");
@@ -1461,4 +1462,5 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   await page.getByRole("tab", { name: "Shop", exact: true }).click();
   await expect(page.getByRole("tab", { name: "God King effects", exact: true })).toHaveCount(0);
   await expect(page.getByText("Coming later: King kill moves")).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText(/Holy Light|God King effect|From the shop/);
 });
