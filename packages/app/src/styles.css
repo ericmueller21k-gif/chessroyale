@@ -13967,11 +13967,11 @@ img.qicon {
 /* (Eric's result screen, Nov 7: his words centered above him, inside the screen with a 16 px gutter on each side, the tail
    pointing down at him; the figure below makes room for them, so they never cover the title above.) */
 .place-results .bc-bubble {
-  left: 0;
-  right: 0;
+  left: 50%;
   top: auto;
   bottom: calc(100% + 12px);
-  margin: 0 auto;
+  /* (`translate`, not `transform`: the entrance's animation sets transform and would drop the centering.) */
+  translate: -50% 0;
   width: max-content;
   max-width: min(220px, calc(100vw - 32px));
 }

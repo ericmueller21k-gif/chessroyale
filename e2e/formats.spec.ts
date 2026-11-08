@@ -271,7 +271,9 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   expect(Math.abs(mine!.y + mine!.height - (god!.y + god!.height)), "feet level").toBeLessThan(24);
   // The stills (RESULT_SHOTS): the God King and your pawn side by side, once his line is typed out.
   if (process.env.RESULT_SHOTS) {
-    await expect(page.locator(".gk-epilogue-bubble .gk-bubble-rest")).toHaveText("", { timeout: 15_000 });
+    // (His line up, then typed out: its rest, not yet typed, is empty; the bubble may fade after, so it's read while it shows.)
+    await expect(page.locator(".gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
     await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
   }
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
