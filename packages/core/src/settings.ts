@@ -1460,8 +1460,8 @@ export const BOSS_POWERS = {
    * Smudgy's Repaint (his ultimate, his whole turn; Eric, Oct 19): one of his pawns painted the crowd's color and one of
    * the crowd's knights or bishops his. The engine picks the pair: what it gains him (his evaluation with the crowd to
    * move after it, against his evaluation before it with him to move, in pawns: passScores, each position searched at
-   * repaintNodes) within repaintBand, the nearest repaintTarget; none in the band: no Repaint that turn, again at the
-   * start of his next. At most repaintMax a battle (then his meter is off).
+   * repaintNodes) within repaintBand, the nearest repaintTarget; none in the band: the nearest outside it (Nov 7: a
+   * warned Repaint always comes). Warned only when a pair exists. At most repaintMax a battle (then his meter is off).
    */
   repaintBand: [1.5, 2.5] as readonly [number, number],
   repaintTarget: 2,
