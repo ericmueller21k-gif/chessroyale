@@ -207,13 +207,16 @@ function Privacy() {
         what={
           <>
             <p>
-              Chat is preset lines and emoji, except in the town square, where signed-in players type. Lines in a match go to its
-              players and stay with the match until its lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes after the end.
-              Lines in the home page's global chat carry your name, rating and icon.
+              Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Lines in a
+              match go to its players and stay with the match until its lobby closes, up to {LOBBY_LIFE.lobbyResultsKeepMinutes} minutes
+              after the end. Lines in the global chat carry your name, rating and icon. Whether you turned chat on is kept with your
+              account (a guest's on the device).
             </p>
             <p>
-              What you type in the town square goes to the signed-in players there, with your name. A filter checks it first and
-              refuses slurs, swearing, links and contact details. It isn't stored: the server holds each message in memory for{" "}
+              What you type in the global chat goes to everyone reading it, with your name, and is kept with its last{" "}
+              {GLOBAL_CHAT.keep} lines (none older than {hours(GLOBAL_CHAT.maxAgeMs)} hours). What you type in the town square goes to the
+              signed-in players there, with your name. A filter checks every message first and refuses slurs, swearing, links and
+              contact details. It isn't stored: the server holds each message in memory for{" "}
               {TOWN_CHAT.lineMs / 60_000} minutes, and then it's gone. If someone reports a message, the report keeps its words and when it
               was said, for a moderator to read.
             </p>
@@ -505,12 +508,13 @@ function Terms() {
       <h2>Conduct and chat</h2>
       <ul>
         <li>
-          Chat is preset lines and emoji, except in the town square, where signed-in players type. Don't use chat to harass anyone
-          or to spam.
+          Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type. Don't use chat
+          to harass anyone or to spam.
         </li>
         <li>
           In the town square: no slurs, hate, swearing, links or contact details. The filter refuses them, a moderator can take a
-          message down, and you can report one by tapping it.
+          message down, and you can report one by tapping it. The same goes for the global chat, where you report a player by
+          tapping their name.
         </li>
         <li>Don't attack, overload or scrape the game, and don't play with bots or scripts.</li>
         <li>Names and icons that offend, and names with slurs or hate in them, aren't allowed.</li>

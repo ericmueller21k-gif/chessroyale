@@ -176,7 +176,8 @@ async function arrowStep(page: Page, key: string) {
   return way(from, await you(page));
 }
 type R = { x: number; y: number; width: number; height: number };
-const rect = (p: Page, sel: string) => p.locator(sel).first().boundingBox() as Promise<R | null>;
+// (Null at once for something not on the page: a computer has no town bar since Nov 7.)
+const rect = async (p: Page, sel: string) => ((await p.locator(sel).count()) ? (p.locator(sel).first().boundingBox() as Promise<R | null>) : null);
 const meets = (a: R, b: R) => a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 /** The dot's middle on the page (the element's own box is its middle: 0 × 0). */
 async function dot(page: Page, sel = ".tm-small .tm-you") {
@@ -322,11 +323,18 @@ test(`locking a new view: a drag let go near east snaps there; a tap locks it in
   expect(await you(page), "you didn't walk into it").toEqual([9, 16]);
   await card.getByRole("button", { name: "Go in" }).click();
   await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
-  // (Back once the room has finished coming in: a press during the zoom in isn't taken.)
+  // (Back once the room has finished coming in: a press during the zoom in isn't taken. A computer has no Back since Nov 7, its tools in
+  // the right column: out by the room's door, its card's Go out.)
   await expect(async () => {
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    if (test.info().project.name === "phone") await page.getByRole("button", { name: "Back", exact: true }).click();
+    else {
+      const door = await page.evaluate(() => (window as unknown as { __shopAt?: (k: string) => { x: number; y: number } | null }).__shopAt?.("door") ?? null);
+      const cv = (await room(page).boundingBox())!;
+      if (door) await page.mouse.click(cv.x + door.x, cv.y + door.y);
+      await page.getByRole("dialog", { name: "Door" }).getByRole("button", { name: "Go out" }).click({ timeout: 3000 });
+    }
     await expect(room(page)).toHaveCount(0, { timeout: 2000 });
-  }).toPass({ timeout: 20_000 });
+  }).toPass({ timeout: 30_000 });
   await expect.poll(async () => (await cam(page)).base, { timeout: 5000 }).toBe(0);
   // Off the strip: north (not east).
   expect(await arrowStep(page, "ArrowDown"), "down goes south").toEqual([0, -1]);

@@ -1,10 +1,10 @@
 import type { ComponentChildren } from "preact";
-import { bossThreat } from "@chessroyale/core";
 import { account } from "../account.ts";
-import { useLive, type PlayingNow } from "../live.ts";
-import { AccountBar, DressedPawn, GearIcon, LiveLine, Logo } from "./FrontDoor.tsx";
+import { friendsBadge, useFriends } from "../friends.ts";
+import { useLive } from "../live.ts";
+import { DressedPawn, GearIcon, Logo } from "./FrontDoor.tsx";
 import { GlobalChat } from "./GlobalChat.tsx";
-import { FriendsPanel, InviteToast } from "./Friends.tsx";
+import { FriendsBadge, InviteToast } from "./Friends.tsx";
 import { AwayNote } from "./AwayNote.tsx";
 import { Pic } from "../home-art/Pic.tsx";
 import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
@@ -103,50 +103,58 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
   );
 }
 
-/** A running match on the list: its mode (and boss), players left, and how long it's been going. */
-function matchLine(m: PlayingNow, now: number): { title: string; sub: string } {
-  // (A raid's boss is random now: its strength's skulls, not a name.)
-  const title = m.mode === "boss" ? `Boss raid${m.bossElo ? ` · ${"💀".repeat(bossThreat(m.bossElo))}` : ""}` : m.mode === "crowd" ? "Crowd · 50 v 50" : "Classic";
-  const left = m.alive !== null && m.total !== null ? `${m.alive} of ${m.total} left` : "starting";
-  const min = m.startedAt ? Math.max(0, Math.round((now - m.startedAt) / 60_000)) : null;
-  return { title, sub: [left, min === null ? null : min < 1 ? "just started" : `${min} min in`].filter(Boolean).join(" · ") };
-}
+/** The right column's top slot: the town's (TOWN and its tools, which Town.tsx draws into it), else empty (RightPanel). */
+export const RIGHT_SLOT_TOOLS = "rc-slot-tools";
 
 /**
- * The computer's right column: your coins and pawn at the top right, your friends who are online (above the players
- * online, Eric's order), the live line, and the matches being played now.
+ * The computer's right column (Eric's approved mockup, Nov 7: notes/briefs/assets/chat-column-*.png), the same place and size on
+ * every front-door page (home and every mode, the queue, the town and its rooms, the pages): flat, no boxes, thin lines between.
+ * From the top: a slot of fixed height (in the town "TOWN" with its tools under it; elsewhere empty, so nothing below ever moves),
+ * "FRIENDS ›" (opens your friends) and the live line under it, then the global chat (components/GlobalChat.tsx) filling the rest.
+ * docs/decisions/2026-11-07-typed-chat-column.md.
  */
-export function RightPanel({ onProfile, onFriends, chat, onSignIn }: { onProfile: () => void; onFriends: () => void; chat?: boolean; onSignIn?: () => void }) {
+export function RightPanel({ onFriends, onSignIn, town = false }: { onFriends: () => void; onSignIn?: () => void; town?: boolean }) {
+  // (A computer's: under 1024 px the column isn't shown, so nothing in it is drawn, fetched or polled.)
+  const computer = useMedia("(min-width: 1024px)");
+  return computer ? <RightColumn onFriends={onFriends} onSignIn={onSignIn} town={town} /> : <aside class="fd-right" aria-label="Live" />;
+}
+
+function RightColumn({ onFriends, onSignIn, town }: { onFriends: () => void; onSignIn?: () => void; town: boolean }) {
   const live = useLive();
-  const now = Date.now();
+  // (Your friends' news for the badge: requests and invites, refreshed while the column shows.)
+  useFriends(true);
+  const label = live ? `${live.online} online, ${live.matches} matches running, ${live.queue} in queue` : undefined;
   return (
     <aside class="fd-right" aria-label="Live">
-      <AccountBar onProfile={onProfile} tourId="profile" />
-      <FriendsPanel onOpen={onFriends} />
-      <LiveLine live={live} stacked />
-      <section class="fd-section">
-        <h2 class="fd-label">PLAYING NOW</h2>
-        {live && !live.playing.length && <p class="fd-note">No matches running right now. PLAY starts one.</p>}
-        {live?.playing.map((m, i) => {
-          const l = matchLine(m, now);
-          return (
-            <div key={`${m.startedAt}-${i}`} class="fd-playing">
-              <span class={`fd-playing-mode ${m.mode}`} aria-hidden="true">
-                {m.mode === "boss" ? "👑" : "♟"}
-              </span>
-              <span class="fd-item-text">
-                <strong>{l.title}</strong>
-                <span>{l.sub}</span>
-              </span>
-            </div>
-          );
-        })}
-      </section>
-      {/* The home page's global chat (the social lane's: components/GlobalChat.tsx). */}
-      {chat && <GlobalChat onSignIn={onSignIn} />}
+      <div class="rc-slot">
+        {town && (
+          <>
+            <h2 class="rc-h">TOWN</h2>
+            <div class="rc-tools" id={RIGHT_SLOT_TOOLS} />
+          </>
+        )}
+      </div>
+      <div class="rc-sep" />
+      <button type="button" class="rc-h rc-friends" onClick={onFriends}>
+        FRIENDS ›<FriendsBadge n={friendsBadge()} />
+      </button>
+      <p class="rc-online" role="status" aria-label={label}>
+        <span class={`fd-dot${live ? "" : " off"}`} />
+        {live ? (
+          <>
+            <b>{live.online.toLocaleString("en-US")} online</b> · {plural(live.matches, "match", "matches")} · {live.queue.toLocaleString("en-US")} in queue
+          </>
+        ) : (
+          " "
+        )}
+      </p>
+      <div class="rc-sep" />
+      <GlobalChat onSignIn={onSignIn} />
     </aside>
   );
 }
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
 /**
  * A match's screen on a computer with a mouse (Nov 1): the side menu beside it, the match in the rest (game-frame.css). A
@@ -175,7 +183,8 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
     <div class={`fd-root${nav ? " framed" : ""}${page ? ` fd-on-${page}` : ""}`}>
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
-      {nav && <RightPanel onProfile={nav.profile} onFriends={nav.friendsList} chat={page === "home" || page === "town"} onSignIn={nav.signIn} />}
+      {/* (The global chat on every page with the column: it was home's and the town's only, so the queue, 1 v 1's search among them, had none. Nov 7.) */}
+      {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} town={page === "town"} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
       {/* Back from the town for being away (town/afk.ts): "You've been dropped from the town" on home. */}

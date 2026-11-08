@@ -524,7 +524,7 @@ export const HOME_BOT_LINES: readonly string[] = [
  * A bot's next line in the global chat: a bot that hasn't spoken in the last few lines, saying something not said in
  * the last few. `names` are the bots' names (the match bots' list); `recent` the chat's latest lines, oldest first.
  */
-export function homeBotLine(rng: () => number, names: readonly string[], recent: readonly { name: string; say: string; bot?: boolean }[]): { name: string; say: string } {
+export function homeBotLine(rng: () => number, names: readonly string[], recent: readonly { name: string; say?: string; bot?: boolean }[]): { name: string; say: string } {
   const pick = <T>(xs: readonly T[]) => xs[Math.floor(rng() * xs.length) % xs.length]!;
   const last = recent.slice(-6);
   const nameOptions = names.filter((n) => !last.some((l) => l.bot && l.name === n));

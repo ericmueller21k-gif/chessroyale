@@ -693,7 +693,7 @@ describe("town chat: the API after the review", () => {
   }
 
   it("a huge message never reaches the shared hub; the global chat's line id is cut too (finding 7)", async () => {
-    const { call, signedIn, posted } = await setup();
+    const { sql, call, signedIn, posted } = await setup();
     const a = await signedIn("Ann");
     const big = JSON.stringify({ text: "x".repeat(50_000) });
     const r = await call("/api/town/chat", a.token, big, { "content-length": String(big.length) });
@@ -703,8 +703,14 @@ describe("town chat: the API after the review", () => {
     const ok = await call("/api/town/chat", a.token, JSON.stringify({ text: `${"y".repeat(900)}` }));
     expect(ok.status).toBe(400);
     expect((posted[0] as string).length).toBeLessThanOrEqual(1024);
+    // (The global chat: chat on first, its opt-in; a line's id goes cut to 64, typed text to 1,024, and a huge body not at all.)
+    await sql.run("UPDATE users SET chat_on = 1 WHERE id = ?", a.user.id);
     await call("/api/chat", a.token, JSON.stringify({ say: "z".repeat(5000) }));
-    expect((posted[1] as string).length).toBeLessThanOrEqual(64);
+    expect((posted[1] as { say: string }).say.length).toBeLessThanOrEqual(64);
+    expect((await call("/api/chat", a.token, big)).status).toBe(413);
+    expect(posted).toHaveLength(2);
+    await call("/api/chat", a.token, JSON.stringify({ text: "w".repeat(5000) }));
+    expect((posted[2] as { text: string }).text.length).toBeLessThanOrEqual(1024);
   });
 
   it("a guest or a too-young device can't report a line (a nit); the reviewer's API leaves the line out and can't clear a chat report (finding 6)", async () => {

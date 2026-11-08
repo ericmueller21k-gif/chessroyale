@@ -125,7 +125,8 @@
   /* The ordinary arrow, also while you drag the view (Eric, Oct 26: "just the normal default mouse"). */
   cursor: default;
 }
-/* Off screen, for screen readers only: a statue's quote while you're up close to it. */
+/* Off screen, for screen readers only: a statue's quote while you're up close to it; and, on a computer (no bar since Nov 7), the page's title. */
+.town-sr-title,
 .town-sr {
   position: absolute;
   width: 1px;

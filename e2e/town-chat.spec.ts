@@ -230,9 +230,9 @@ test("the chat box (always on, the default): one see-through box flush in the ma
     expect(b0.h).toBeLessThanOrEqual(130);
   }
   expect(meets(b0, await rectOf(page, ".town-controls")), "the box never covers the buttons").toBe(false);
-  const bar = await rectOf(page, ".town-bar");
-  // (A computer's bar is the right column's top row, Oct 30: there the box is just on the map.)
-  expect(b0.y, "under the bar: on the map").toBeGreaterThanOrEqual(phone ? bar.y + bar.h : map.y);
+  // (A computer has no bar since Nov 7, its tools in the right column's slot: there the box is just on the map.)
+  const bar = phone ? await rectOf(page, ".town-bar") : null;
+  expect(b0.y, "under the bar: on the map").toBeGreaterThanOrEqual(bar ? bar.y + bar.h : map.y);
 
   // Always on: it shows with nothing said (the stream empty), and keeps its place and size. The typing line is there only while you're
   // typing (v4): not now, and no blur behind the box.
@@ -676,16 +676,23 @@ test("new messages: sending from it works while the lines show (the tap opens ty
 
 test("the header's chat icon cycles always on, new messages only, off (both bubbles green, then just the top one, then both gray) and the gear's sheet sets the mode; off shows no box and no field, and the lines that came meanwhile show when it's on again; the mode is remembered; the icons never cover the title", async ({ page }) => {
   await open(page);
-  // At the right end of the title's line, never over the title.
-  const title = await rectOf(page, ".town-bar h1");
-  const bar = await rectOf(page, ".town-bar");
   const ic = await rectOf(page, "button.tc-mode");
   const gear = await rectOf(page, 'button[aria-label="Town settings"]');
-  expect(meets(ic, title) || meets(gear, title), "the icons don't cover the title").toBe(false);
-  expect(ic.x, "right of the title").toBeGreaterThan(title.x + title.w);
   expect(gear.x, "the gear is the last").toBeGreaterThan(ic.x);
-  expect(gear.x + gear.w, "at the right end").toBeGreaterThan(bar.x + bar.w - 24);
-  for (const r of [ic, gear]) expect(Math.abs(r.y + r.h / 2 - (title.y + title.h / 2)), "on the title's line").toBeLessThan(6);
+  if (test.info().project.name === "phone") {
+    // At the right end of the title's line, never over the title.
+    const title = await rectOf(page, ".town-bar h1");
+    const bar = await rectOf(page, ".town-bar");
+    expect(meets(ic, title) || meets(gear, title), "the icons don't cover the title").toBe(false);
+    expect(ic.x, "right of the title").toBeGreaterThan(title.x + title.w);
+    expect(gear.x + gear.w, "at the right end").toBeGreaterThan(bar.x + bar.w - 24);
+    for (const r of [ic, gear]) expect(Math.abs(r.y + r.h / 2 - (title.y + title.h / 2)), "on the title's line").toBeLessThan(6);
+  } else {
+    // A computer (Nov 7, no bar): under "TOWN" in the right column's top slot, on one line, never over it.
+    const town = await rectOf(page, ".rc-slot .rc-h");
+    for (const r of [ic, gear]) expect(r.y, "under TOWN").toBeGreaterThanOrEqual(town.y + town.h);
+    expect(Math.abs(ic.y + ic.h / 2 - (gear.y + gear.h / 2)), "on one line").toBeLessThan(1);
+  }
 
   // Its two bubbles' colors, by mode (the green is the game's "good").
   const probe = page.locator("body");
@@ -1482,7 +1489,8 @@ test("the privacy page and the terms say what the town square's chat is: typed, 
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.goto("/privacy");
   const privacy = page.locator("main, .legal, body").first();
-  await expect(privacy).toContainText("Chat is preset lines and emoji, except in the town square, where signed-in players type.");
+  // (Since Nov 7 the global chat is typed too: the sentence names both.)
+  await expect(privacy).toContainText("Chat is preset lines and emoji, except in the town square and the global chat, where signed-in players type.");
   // (Eric OK'd 5 minutes, Oct 28: it was 60 seconds. The same two sentences, nothing else changed: here and under "Kept:" below.)
   await expect(privacy).toContainText("It isn't stored: the server holds each message in memory for 5 minutes, and then it's gone.");
   await expect(privacy).toContainText("A town square message: 5 minutes in memory, never stored (a reported one: its words with the report).");

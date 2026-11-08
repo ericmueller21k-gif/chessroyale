@@ -7,7 +7,9 @@ import { openReport } from "../components/Problems.tsx";
 import { SignIn } from "../components/SignIn.tsx";
 import { AccountData } from "../components/AccountData.tsx";
 import { BackButton } from "../components/FrontDoor.tsx";
-import { signOut, tooYoung } from "../account.ts";
+import { account, signOut, tooYoung } from "../account.ts";
+import { chatOn as chatOnNow, onChatOn, setChatOn as setTypedOn } from "../chat-on.ts";
+import { useTurnChatOn } from "../components/ChatOptIn.tsx";
 import { BOARD_COLORS, boardColors, boardMarksOn, chatOff, crowdAnimations, crowdTrail, onPrefsChange, practiceOn, premovesOn, setBoardColors, setBoardMarksOn, setChatOff, setCrowdAnimations, setCrowdTrail, setPracticeOn, setPremovesOn, setSquadsJumpNext, squadsJumpNext, type BoardColors } from "../prefs.ts";
 import { JUMP_NEXT_INFO, JUMP_NEXT_LABEL } from "../squads-view.ts";
 import { clearAllPremoves } from "../board/yours.ts";
@@ -213,6 +215,10 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const [anim, setAnim] = useState(crowdAnimations);
   const [trail, setTrail] = useState(crowdTrail);
   const [chatOn, setChatOn] = useState(() => !chatOff());
+  // Chat's opt-in (chat-on.ts): the account's, read again when it changes.
+  const [typedOn, setTyped] = useState(chatOnNow);
+  useEffect(() => onChatOn(() => setTyped(chatOnNow())), []);
+  const turnOn = useTurnChatOn();
   // (Squads: Quick board jump, read afresh as prefs change.)
   const jumpNext = squadsJumpNext();
   const [busy, setBusy] = useState(false);
@@ -310,6 +316,15 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
         <Toggle title={JUMP_NEXT_LABEL} checked={jumpNext} onChange={setSquadsJumpNext}>
           {JUMP_NEXT_INFO}
         </Toggle>
+      </section>
+
+      <section class="fd-section">
+        <h2 class="fd-label">CHAT</h2>
+        <Toggle title="Chat" checked={typedOn} onChange={(on) => (on ? turnOn.ask() : void setTypedOn(false))}>
+          Players' typed messages: the global chat on a computer. Off by default; we filter hate speech and slurs, and you can report
+          anyone by tapping their name. {account().profile?.user.signedIn ? "Kept with your account." : "Kept on this device."}
+        </Toggle>
+        {turnOn.notice}
       </section>
 
       <section class="fd-section">

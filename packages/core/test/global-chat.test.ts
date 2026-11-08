@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CHAT_PACKS,
+  CHAT_TYPED,
   GLOBAL_CHAT,
   GLOBAL_CHAT_BOTS,
   HOME_BOT_LINES,
@@ -85,7 +86,13 @@ describe("the global chat's bots", () => {
   it("are on for the beta, behind one setting, at about 30-90 s", () => {
     expect(typeof GLOBAL_CHAT_BOTS).toBe("boolean");
     expect(GLOBAL_CHAT.botGapMs).toEqual([30_000, 90_000]);
-    expect(GLOBAL_CHAT.gapMs).toBe(30_000);
     expect(GLOBAL_CHAT.keep).toBe(50);
+  });
+
+  it("typed chat's numbers (Eric, Nov 7): one message per player every 5 s; server-wide 5 a second, a line of up to 10 s; 80 characters; one switch", () => {
+    expect(CHAT_TYPED).toBe(true);
+    expect(GLOBAL_CHAT.gapMs).toBe(5_000);
+    expect([GLOBAL_CHAT.capCount, GLOBAL_CHAT.capWindowMs, GLOBAL_CHAT.queueMs]).toEqual([5, 1_000, 10_000]);
+    expect(GLOBAL_CHAT.maxChars).toBe(80);
   });
 });
