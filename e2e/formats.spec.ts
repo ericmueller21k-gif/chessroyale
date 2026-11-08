@@ -262,6 +262,13 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   // The result screen: he rises if the crowd won, otherwise he stays down. Beside him, the Last Stand's card: one
   // line, and tapped open, your move, the best move, your chances and the position with both arrows.
   await expect(page.locator(end.result === "crowd" ? ".gk-epilogue.rises" : ".gk-epilogue.down")).toBeVisible();
+  // The stills (RESULT_SHOTS), taken as the result comes up: his line typed out, the God King and your pawn side by side,
+  // and the boss's own bubble centered over him inside the screen.
+  if (process.env.RESULT_SHOTS) {
+    await expect(page.locator(".gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
+    await expect.poll(() => page.locator(".gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
+    await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
+  }
   // Eric, Nov 7: your pawn stands beside him (his feet level with yours, on his right), and no trophy above the title.
   await expect(page.locator(".results .trophy")).toHaveCount(0);
   const god = await page.locator(".gk-epilogue .god-king").boundingBox();
@@ -269,13 +276,15 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   expect(mine, "your pawn beside him").not.toBeNull();
   expect(mine!.x, "to his right").toBeGreaterThan(god!.x + god!.width / 2);
   expect(Math.abs(mine!.y + mine!.height - (god!.y + god!.height)), "feet level").toBeLessThan(24);
-  // The stills (RESULT_SHOTS): the God King and your pawn side by side, once his line is typed out.
-  if (process.env.RESULT_SHOTS) {
-    // (His line up, then typed out: its rest, not yet typed, is empty; the bubble may fade after, so it's read while it shows.)
-    await expect(page.locator(".gk-epilogue-bubble")).toBeVisible({ timeout: 15_000 });
-    await expect.poll(() => page.locator(".gk-epilogue-bubble").evaluate((e) => e.querySelector(".gk-bubble-rest")?.textContent ?? ""), { timeout: 15_000 }).toBe("");
-    await page.screenshot({ path: `${process.env.RESULT_SHOTS}/last-stand-${testInfo.project.name}.png` });
-  }
+  // The boss's own bubble: centered over him, inside the screen's 16 px gutters (the result's bubble check, boss-result.spec.ts).
+  await expect(page.locator(".results .bc-bubble")).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => page.locator(".results .bc-bubble").evaluate((e) => getComputedStyle(e).opacity), { timeout: 15_000 }).toBe("1");
+  const bb = (await page.locator(".results .bc-bubble").boundingBox())!;
+  const bo = (await page.locator(".results .boss-char.place-results").boundingBox())!;
+  const vw = page.viewportSize()!.width;
+  expect(Math.abs(bb.x + bb.width / 2 - (bo.x + bo.width / 2)), "boss bubble centered over him").toBeLessThan(8);
+  expect(bb.x, "left gutter").toBeGreaterThanOrEqual(16);
+  expect(bb.x + bb.width, "right gutter").toBeLessThanOrEqual(vw - 16);
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();
