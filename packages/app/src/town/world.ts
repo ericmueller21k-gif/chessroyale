@@ -6,7 +6,8 @@
  * square-to-square walk, the same hobble, the same pauses. Every number that shapes the feel is in feel.ts.
  */
 import { adminFirst, type ItemLook } from "@chessroyale/core";
-import { SELECT_LINES } from "../characters/boss-select.ts";
+import { GOODBYE_LINES, SELECT_LINES } from "../characters/boss-select.ts";
+import { takeGoodbyeFrom } from "./goodbye.ts";
 import { N, WRAP, colI, rowI, wrapF, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { ADMIN_TOWN, STREET_TOWN } from "./admin-town.ts";
 import { STREET_BUILDINGS, STREET_COLISEUM, STREET_FOUNTAIN, STREET_GROUND, STREET_HOMES, STREET_PARK, STREET_PROPS, STREET_START, STREET_TABLES, STREET_WRAP, type SqBox } from "./street.ts";
@@ -980,6 +981,12 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     homeQueue: order.filter((i) => !out.has(i)).map((i) => bots[i]!),
     crowd: [],
   };
+  // (Its goodbye, in its bubble: the same bubble its own lines use, for the time they stay up.)
+  const fromBoss = takeGoodbyeFrom();
+  const bye = fromBoss ? bosses.find((b) => b.home.id === fromBoss) : undefined;
+  if (bye && GOODBYE_LINES[bye.home.id]) {
+    t.speech = { boss: bye, line: GOODBYE_LINES[bye.home.id]!, until: now + f.speechMs, next: now + f.speechMs + f.speechGapMs[0] };
+  }
   return t;
 }
 

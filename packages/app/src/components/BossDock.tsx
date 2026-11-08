@@ -263,7 +263,7 @@ function hopAt(match: GameView): number {
  * draw it): a slow, slight bob like his breathing, and one small hop as your move goes in. CSS transforms only; it's drawn once
  * (memo) and again only for a hop, never per frame. It doesn't react to the King's save, a boss's power or the result.
  */
-const YourPawn = memo(function YourPawn({ look, side, hopAt, seat }: { look: ItemLook | undefined; side: "w" | "b"; hopAt: number; seat?: number }) {
+export const YourPawn = memo(function YourPawn({ look, side, hopAt, seat }: { look: ItemLook | undefined; side: "w" | "b"; hopAt: number; seat?: number }) {
   // (The bob keeps the clock's phase, so a screen's new dock carries on where the last one was.)
   const [phase] = useState(() => Date.now() % BOB_MS);
   const age = Date.now() - hopAt;

@@ -57,6 +57,7 @@ type Intro = { step: string; layout: string; attack: boolean; you: [number, numb
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townYou?: () => Stand | null;
+  __townCam?: () => { focus: [number, number] } | null;
   __shopIntro?: () => Intro | null;
 };
 const town = (p: Page) => p.locator("canvas.town-canvas");
@@ -85,9 +86,38 @@ async function alfilAt(p: Page, id = "alfil") {
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
 
+/**
+ * The camera at rest: the same focus square on three reads 100 ms apart (its follow spring or its glide has landed). The camera runs in
+ * frame time (dt capped at 0.1 s), so under load this takes longer in wall time than on a quiet machine.
+ */
+async function cameraAtRest(p: Page) {
+  let last = "";
+  let same = 0;
+  await expect
+    .poll(
+      async () => {
+        const f = await p.evaluate(() => (window as unknown as Hooks).__townCam?.()?.focus ?? null);
+        const k = f ? f.map((v) => Math.round(v * 100)).join(",") : "";
+        same = k && k === last ? same + 1 : 0;
+        last = k;
+        return same >= 3;
+      },
+      { message: "the camera has come to rest", intervals: [100], timeout: 20_000 },
+    )
+    .toBe(true);
+}
+/** The camera glides onto a boss (as his chip would): from where it rests, he may be off the screen, or hidden behind a figure or a house. */
+const glideTo = (p: Page, id: string) => p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+
 /** Opens Alfil's card (his Pyramid is across the map: the camera glides there, as its chip would) and his challenge's confirm (or another boss's). */
 async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
-  if (!(await alfilAt(page, id))) await page.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
+  // The camera comes to rest first: a town opens with it still on its way to your pawn, and a boss in view while it moves can be off the
+  // screen (or hidden) once it lands (Timber, Nov 7: at rest on you, his picture was covered and the taps found nothing for 20 s).
+  await cameraAtRest(page);
+  if (!(await alfilAt(page, id))) {
+    await glideTo(page, id);
+    await cameraAtRest(page);
+  }
   await expect.poll(() => alfilAt(page, id), { message: `${name} comes into view` }).not.toBeNull();
   // His card (he may stroll a step between the look and the tap: tap again; another's card that opened is closed first).
   const card = page.getByRole("dialog", { name, exact: true });
@@ -95,6 +125,8 @@ async function toConfirm(page: Page, id = "alfil", name = "Alfil") {
     if (await card.isVisible()) return;
     if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
     const at = await alfilAt(page, id);
+    // (Not drawn, or covered from here: the camera glides onto him, and the tap is tried again once it has.)
+    if (!at) await glideTo(page, id);
     expect(at, "drawn").not.toBeNull();
     await page.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
@@ -229,6 +261,8 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await shot("07-result");
   await back.click();
   await backAt(page, stood);
+  // Alfil's goodbye (Eric, Nov 7), in his bubble as you walk back in: the town's own speech, read from its state (the bubble is canvas).
+  await expect.poll(() => page.evaluate(() => (window as any).__townCam().speechLine as string), { timeout: 3_000, intervals: [100] }).toBe("Good game! The Pyramid door stays open for you.");
   // The server's lines: still the one start line (the quit left it open: no second), and this battle's outcome (?mate=1 plays
   // your moves for you, none of them yours: no count; the counts are packages/server/test/town-chat.test.ts's).
   await expect

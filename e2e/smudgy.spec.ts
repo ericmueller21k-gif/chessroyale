@@ -433,18 +433,34 @@ test("Smudgy's Repaint: REPAINT!, a cream stroke on his pawn's square then a cha
   await bossAloneFromHome(page);
   await yourMove(page);
   await record(page);
+  // The warning's turn (its "warn" event, watched every frame) is the turn the Repaint comes (Eric, Nov 7: warned, then never).
+  await page.evaluate(() => {
+    const w = window as any;
+    const look = () => {
+      const e = (w.match?.boss?.powers?.events ?? []).find((x: { kind: string }) => x.kind === "warn");
+      if (e && w.__warnAt === undefined) w.__warnAt = e.turn;
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
   // Quiet moves (never onto his pawns' files' first squares) until the Repaint has been played.
   for (let turn = 0; turn < 14; turn++) {
     await yourMove(page);
     const s = await state(page);
     if (s.boss.powers.repaints > 0) break;
-    await submitMove(page, quiet(s.fen, s.allowed), s.fen);
+    // (Never a check: in check his move answers it and the Repaint waits a turn, by design.)
+    const noCheck = new Chess(s.fen).moves({ verbose: true }).filter((m) => !m.san.includes("+") && !m.san.includes("#")).map((m) => m.from + m.to);
+    const allowed = (s.allowed ?? noCheck).filter((m) => noCheck.includes(m));
+    await submitMove(page, quiet(s.fen, allowed.length ? allowed : s.allowed), s.fen);
     await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
   }
   await yourMove(page);
   const s = await state(page);
   expect(s.boss.powers.repaints).toBeGreaterThan(0);
-  const rp = s.boss.powers.repaint as { pawn: string; piece: string; type: string };
+  const rp = s.boss.powers.repaint as { pawn: string; piece: string; type: string; at: number };
+  const warnAt = await page.evaluate(() => (window as any).__warnAt as number | undefined);
+  expect(warnAt, "warned before it came").toBeDefined();
+  expect(rp.at, "his turn right after the warning").toBe(warnAt);
   const rec = await frames(page);
   expect(inOrder(rec.map((r) => r.repaint))).toEqual(["banner", "first", "second"]);
   expect(rec.some((r) => /REPAINT!/.test(r.banner) && r.banner.includes(`${rp.pawn} and ${rp.piece} change sides`))).toBe(true);

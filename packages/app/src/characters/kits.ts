@@ -142,6 +142,11 @@ export interface BossKit extends BeatLines {
    * EngineOverlay, placed on his head frame by frame; BossCharacter's `setEngineAt`). An overlay, never its frames.
    */
   engine?: boolean;
+  /**
+   * Its drawing faces our left as drawn (not on the sprite kit). On the result screen, where the God King stands to its right, its
+   * image is mirrored about its feet (styles.css, `.art-left`); its bubble and words never are. Judged by eye, Nov 8.
+   */
+  artFacesLeft?: boolean;
 }
 
 /**
@@ -297,6 +302,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
     kingAttack: { ch: BIGBOY_ATTACK, anim: "kingAttack", perSquare: 36, stand: 1, facesLeft: true, hit: bonkItem },
   },
   "Sawyer": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 7,
     barName: 5,
@@ -388,6 +394,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Alfil, the woolly mammoth (Eric, Oct 17): docs/decisions/2026-10-17-alfil-wired.md.
   "Alfil": {
+    artFacesLeft: true,
     barScale: 13 / 12,
     barShift: 18,
     barName: 14,
@@ -437,6 +444,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Eric's own, in one table (recluse-lines.ts).
   // Chub & Chirp, a rabbit riding a grasshopper (Eric, Oct 18): docs/decisions/2026-10-18-hopper-wired.md.
   "Chub & Chirp": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 5,
     ch: HOPPER,
@@ -542,6 +550,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Moo & Moon, a cow and his friend the Moon (Eric, Oct 20): docs/decisions/2026-10-20-moo-wired.md.
   "Moo": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 2,
     ch: MOO,
@@ -614,6 +623,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Puddles, the hippo gardener (Eric, Oct 20-21): docs/decisions/2026-10-23-gardener-wired.md.
   "Gardener": {
+    artFacesLeft: true,
     barScale: 14 / 12,
     barShift: 5,
     ch: GARDENER,
@@ -673,6 +683,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Babur, the circus tiger (Eric, Oct 23-24): docs/decisions/2026-10-24-tiger-wired.md.
   "Tiger": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: -1,
     ch: TIGER_FIGURE,
@@ -737,6 +748,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   },
   // Folio, the paper crane (the director's, Oct 26; "it" everywhere): docs/decisions/2026-10-27-folio-wired.md.
   "Folio": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 13,
     barName: 14,
@@ -794,6 +806,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // Timber, the beaver builder (Eric's idea, Oct 20; approved Nov 1): docs/decisions/2026-11-01-timber.md. His sounds are his own,
   // all wood (Eric, Nov 2: "a gnawing wood sound… Wood knocking, cutting, saw, thumping"): characters/timber-sounds.ts.
   "Timber": {
+    artFacesLeft: true,
     barScale: 1,
     barShift: 6,
     barName: 13,
@@ -865,6 +878,7 @@ export const BOSS_KITS: Record<string, BossKit> = {
   // art branch's boss-blitz, as drawn (characters/boss-blitz.ts). His sounds are his own: sneakers and a chess clock
   // (characters/dash-sounds.ts); Tick's ding, chomp and step too.
   "Dash": {
+    artFacesLeft: true,
     barScale: 0.97,
     barShift: 6,
     ch: DASH,

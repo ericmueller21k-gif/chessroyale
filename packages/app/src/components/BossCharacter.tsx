@@ -29,6 +29,7 @@ import { lightsId, syncLights } from "../characters/lights.ts";
 import { seenFen } from "../camo.ts";
 import { KING_REACH, SIDE_FEEL, SIDE_REACH, sideSizes } from "../characters/side-size.ts";
 import { GOD_KING } from "../characters/god-king.ts";
+import { RESULT_TALK } from "@chessroyale/core";
 
 /**
  * A raid boss as a character (if it has one: see characters/kits.ts), standing across the board from the God King: on a
@@ -377,7 +378,10 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   useLayoutEffect(() => {
     // (A line of its own for the moment, from the battle, over its kit's: the Hidden Boss's "Best by test.")
     const said = beat ? (kit?.lineOf?.(beat.anim, boss) ?? beat.line) : null;
-    if (said && !quiet && !figure.run) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW);
+    // (After a Last Stand the result's line is the conversation's first: it stays `RESULT_TALK.bossHoldMs` past its typing, then
+    // fades, and the God King answers, LastStand.tsx.)
+    const hold = place === "results" && boss.lastStand ? RESULT_TALK.bossHoldMs : undefined;
+    if (said && !quiet && !figure.run) bossVoice.say(said, `${boss.id}:${boss.startMove}:${beat!.key}`, BEAT_PRIORITY[beat!.anim] ?? LOW, undefined, hold);
   }, [beat?.key]);
   // Beaten: its fall lines (the Hidden Boss's mumbling), one after another once its defeat's animation is over, each
   // as the last one goes; carried on by whichever screen draws it next (the result screen), from the same moment.
@@ -401,7 +405,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
   // (A phone's bar: his size and his drawing's shift in the box (kits.ts barScale, barShift; styles.css). Full size and no shift otherwise.)
   const barSize = place === "bar" ? { "--bc-scale": kit.barScale ?? 1, "--bc-shift": kit.barShift ?? 0 } : {};
   return (
-    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
+    <div ref={box} class={`boss-char place-${place} ch-${ch.id}${kit.tall ? " tall" : ""}${kit.wide ? " wide" : ""}${place === "results" && kit.artFacesLeft ? " art-left" : ""}`} data-anim={beat.anim} data-faces={kit.sprite ? drawnFacing(kit.sprite, ch) : undefined} aria-hidden="true" style={{ "--bc-w": ch.w, "--bc-h": ch.h, "--bc-fx": ch.foot[0], "--bc-fy": ch.foot[1], ...barSize }}>
       <canvas ref={cv} class="boss-char-sprite" width={ch.w} height={ch.h} />
       {kit.engine && <EngineOverlay ch={ch} elRef={eng} />}
       {/* Its words: a pixel text box beside it that types itself out and fades at the end (like the God King's). In the

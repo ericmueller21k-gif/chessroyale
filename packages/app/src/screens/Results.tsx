@@ -10,6 +10,8 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
 import { BossCharacter, BossTag, hasCharacter } from "../components/BossCharacter.tsx";
+import { YourPawn } from "../components/BossDock.tsx";
+import { pawnLook } from "../looks.ts";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
@@ -65,10 +67,14 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             <MatchMenu exit={exitFor(match)} />
           </div>
         )}
-        <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
-          {resigned ? <FlagIcon size={56} /> : bossResult ? (bossResult === "crowd" ? "🏆" : bossResult === "boss" ? "💀" : "🤝") : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
-        </div>
-        <h1>
+        {/* (A boss battle has no trophy and no skull above its title: Eric, Nov 7.) */}
+        {!bossResult && (
+          <div class={`trophy${resigned ? " resigned" : ""}`} aria-hidden="true">
+            {resigned ? <FlagIcon size={56} /> : placement === 1 ? "🏆" : placement <= 4 ? "🥈" : "♟️"}
+          </div>
+        )}
+        {/* (A boss battle's title: the God King's pixel type, Eric, Nov 7.) */}
+        <h1 class={bossResult ? "boss-title" : undefined}>
           {afk ? (
             "Removed for being away"
           ) : resigned ? (
@@ -110,7 +116,19 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           </p>
         )}
         {/* A boss with a character takes its bow: knocked off its pogo, or bouncing in triumph. */}
-        {bossResult && match.boss && <BossCharacter match={match} place="results" />}
+        {/* After a Last Stand: the boss on the left, the God King with your pawn on the right, one row (Eric, Nov 8). */}
+        {bossResult && match.boss?.lastStand ? (
+          <div class="results-duo">
+            <BossCharacter match={match} place="results" />
+            <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"}>
+              <div class="gk-epilogue-you">
+                <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={match.boss.crowdSide} hopAt={0} />
+              </div>
+            </GodKingEpilogue>
+          </div>
+        ) : (
+          bossResult && match.boss && <BossCharacter match={match} place="results" />
+        )}
         {bossResult && match.boss && (
           <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
@@ -120,18 +138,16 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
                 ? `You beat ${bossInText(match.boss.name)} on all ${simul.of} boards!`
                 : `${bossInText(match.boss.name, true)} won. You won ${simul.won} of ${simul.of} boards: all ${simul.of} must be won.`
               : bossResult === "crowd"
-              ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!${survived ? " A win on your record." : ""}`
+              ? `${alone ? "You" : "The crowd"} beat ${bossInText(match.boss.name)}!`
               : bossResult === "boss"
                 ? `${bossInText(match.boss.name, true)} won${onTime ? " on time" : byCarrots ? " with their fifth carrot" : byBlackout ? ": the last of your ten bulbs went out" : ""}.`
                 : `A draw with ${bossInText(match.boss.name)}.`}
           </p>
         )}
-        {/* After his Last Stand: he rises again if the crowd won; otherwise he stays down. */}
-        {bossResult && match.boss?.lastStand && <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"} />}
         {/* What he saved you from: the blunder, the boss's reply, the best move, your chances (tap to open). */}
         {bossResult && match.boss?.lastStand?.fen && <LastStandCard stand={match.boss.lastStand} side={match.boss.crowdSide} />}
-        {/* You resigned: a loss on your record. */}
-        {resigned && <p class="team-result bad">It counts as a loss.</p>}
+        {/* You resigned: a loss on your record (a boss battle says nothing of the record: its counts just move, Eric, Nov 7). */}
+        {resigned && !bossResult && <p class="team-result bad">It counts as a loss.</p>}
         {team && !bossResult && !left && (
           <p class={`team-result ${gameWinner === team ? "good" : gameWinner ? "bad" : ""}`}>
             {gameWinner === team
@@ -142,7 +158,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
           </p>
         )}
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
-        {match.ranked === false && (
+        {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
+        {match.ranked === false && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`
