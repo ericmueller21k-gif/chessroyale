@@ -499,3 +499,13 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   bench row" literally; brief Haiku with measurable targets and have it look at its own stills.
 - Nov 9 ~01:30: #563 (meet chat cards) LIVE 4a5f1f7. Eric asked for the XP / levels / daily reward / quests design (no code yet):
   draft v0 notes/briefs/design-xp-quests.md, 11 open questions sent to Eric. Waiting on his answers (and Hearthstone screenshots).
+- Nov 9 ~01:45: main's first 15-shard run: shards' tests 16 min (was ~26), but 28 min total: runner waits (4 min to start a
+  shard, 8 min for `result`) while two PR runs overlapped (free plan ~20 jobs). Told Eric GitHub Pro (~40 jobs) now helps; his call.
+- Flaky batch done (068da5c, Opus): PR #564 (squads strip + watcher app bugs, town-leave helper, bots=strong no random). Touches
+  the town-leave guard test's HELPER only (no assertion): told Eric. CI watcher bxk3pjooz.
+- Squads snap-live: Haiku session_01JuCWRsDjQqTaq5tNFQ9kqZ on claude/squads-snap-live (watcher bwxrejkxi); then a short Opus
+  diff review (Eric's tandem plan).
+- Auto chess player size: round 2 (6713c60) much better; round 3 polish (Haiku session_01JuCWRrc3otBcJEntm1NTSA, done signal
+  .round3.md, watcher b6a74kljp).
+- XP design v1 (crates plentiful, keys scarce; 2 crates + 1 key a level; a boss crate you pick every 10 levels; daily reward
+  without a key). Waiting on Eric's answers.
