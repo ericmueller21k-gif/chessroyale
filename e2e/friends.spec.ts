@@ -132,3 +132,51 @@ test("two players: a request accepted, online in each other's list, the invites 
   await expect(bo.page.locator("#fr-friends")).toHaveText("FRIENDS · 0");
 });
 
+
+test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friends in a centered box; tap one for Invite to play or View profile; the dim closes it", { tag: "@phone-only" }, async ({ browser }) => {
+  test.setTimeout(2 * 60_000);
+  const ann = await player(browser, "Ann Overlay");
+  const bo = await player(browser, "Bo Overlay");
+  // (Friends through the API: the request and its answer, as the first test does from a profile and the list.)
+  const post = (page: Page, action: string, body: object) =>
+    page.evaluate(([a, b]) => fetch(`/api/friends/${a}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.status), [action, body] as const);
+  expect(await post(ann.page, "request", { id: bo.id })).toBe(200);
+  expect(await post(bo.page, "answer", { id: ann.id, accept: true })).toBe(200);
+  await ann.page.reload();
+
+  // The top bar's Friends: a centered box titled Friends (not the old sheet), Bo in it, online.
+  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+  const box = ann.page.getByRole("dialog", { name: "Friends" });
+  await expect(box).toBeVisible();
+  await expect(ann.page.getByRole("dialog", { name: "Play with friends" })).toHaveCount(0);
+  const row = box.getByRole("button", { name: /^Bo Overlay, / });
+  await expect(row).toHaveAccessibleName("Bo Overlay, Online", NEWS);
+  await expect(box.getByRole("button", { name: "Requests sent and blocked ›" })).toBeEnabled();
+  // (Its opening scale done, then measured.)
+  await box.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+  // Centered: the box's middle within a few pixels of the window's.
+  const b = (await box.boundingBox())!;
+  const vw = ann.page.viewportSize()!.width;
+  expect(Math.abs(b.x + b.width / 2 - vw / 2)).toBeLessThan(3);
+
+  // Tap Bo: his menu, Invite to play (on: he's online) and View profile; opening it moves nothing in the box.
+  const before = await row.boundingBox();
+  await row.click();
+  const menu = box.getByRole("menu", { name: "Bo Overlay: what to do" });
+  await expect(menu.getByRole("button", { name: "Invite to play" })).toBeEnabled();
+  await expect(menu.getByRole("button", { name: "View profile" })).toBeVisible();
+  expect(await row.boundingBox()).toEqual(before);
+  await menu.getByRole("button", { name: "Close the menu" }).click();
+  await expect(menu).toHaveCount(0);
+
+  // A tap on the dim closes the box.
+  await ann.page.mouse.click(4, ann.page.viewportSize()!.height - 4);
+  await expect(box).toHaveCount(0);
+
+  // View profile: his profile, and the box is gone.
+  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+  await box.getByRole("button", { name: /^Bo Overlay, / }).click();
+  await box.getByRole("menu").getByRole("button", { name: "View profile" }).click();
+  await expect(box).toHaveCount(0);
+  await expect(ann.page.getByRole("button", { name: "Challenge" })).toBeVisible();
+});
