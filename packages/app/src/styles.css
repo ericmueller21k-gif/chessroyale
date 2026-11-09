@@ -24810,6 +24810,17 @@ button.sq-tiny {
   flex-direction: column;
   align-items: center;
 }
+/* Eric, Nov 9 (round 2): your pawn is bigger, 1.6x (about 77 px tall at 390; it was about 48). It grows up and to the right from
+   its box's left edge (the margin keeps that edge where it was, so the gap to the boss, measured from the box, doesn't move), and its
+   feet stay on the base line. The layout box stays 58 x 62, so the XP under it, the row and the boss don't move or jump. The column
+   is 176 px (160 under 360), and the bigger pawn stays inside it, so the 16 px gutters hold at 320, 360 and 390 px. */
+.rd-you .you-pawn {
+  --pk: 1.6;
+  --pw: calc(68px * var(--pk));
+}
+.rd-you .you-pawn-bob {
+  margin-left: -34px;
+}
 /* Each lash: your pawn jolts back (away from him) and flashes, as the king does at his mate (KingAttack.tsx). */
 .rd-pawn.rd-hit {
   animation: rd-knock 170ms ease-out 10 both;
