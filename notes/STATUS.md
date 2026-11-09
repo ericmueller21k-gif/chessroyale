@@ -643,3 +643,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   not the private lobby; Squads Party already does that. Sent corrections to both Opus helpers (home-modes: 50v50 Party greyed
   "Soon"; friends-overlay: add "Private lobby ›" opening the old sheet). Ranked: decisions 1, 2, 4 decided (#578); seasons open.
   xhigh queue (one at a time): crowd party (server matchmaker), Squads Bots, ranked L1 (leave rules), private lobby overhaul later.
+- Nov 9 ~17:35: #577 profile backdrop LIVE; #578 ranked decisions merged; #579 friends overlay merged (green). #580 top bar (CI),
+  #581 home modes (CI, full suite; merged main in). Haiku and both high Opus helpers done. Started Opus xhigh ALONE:
+  `session_01JuCWRvvM1dZdrwE8sriDGN` ranked L1 (claude/ranked-l1, brief-ranked-l1.md; full lane: full-e2e label, review, delta).
+  After: crowd party (xhigh), Squads Bots (xhigh). Seasons still open with Eric.
