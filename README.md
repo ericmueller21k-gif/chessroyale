@@ -8,3 +8,6 @@ From `e2e/xp.spec.ts` with `XP_SHOTS` (Boss alone against Ginger):
 - `xp-none-{phone,computer}.png`: "No XP: test game." in the same box, at the same size (the bar standing at 250 of 1,000).
 
 (The computer's files are named `-desktop`: the Playwright project's name.)
+
+Refreshed Nov 9 (review fixes): the box's top row now reads "+XP · your name · Level N", the name centered between the gain and the
+level ("Player": the e2e's guest), so it's plainly your XP, not the boss's (Eric: "it looks like the boss is the one leveling up").
