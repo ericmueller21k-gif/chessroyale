@@ -557,7 +557,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   }
 });
 
-test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the Quests entry reopens it; at 320 px it fits and the entry covers nothing", async ({ page }) => {
+test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the Quests entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row and the card fits", async ({ page }) => {
   await named(page, "Christopher Wallace");
   await page.goto("/?quests=mock");
   const quests = page.getByRole("dialog", { name: "Daily Quests" });
@@ -573,18 +573,51 @@ test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailie
   for (const r of await rerolls.all()) await expect(r).toBeDisabled();
   await quests.getByRole("button", { name: "Got it" }).click();
   await expect(quests).toHaveCount(0);
+  // The entry: in the top bar on a phone (1 px from the shop's row), on your card's top right on a computer (1024 px and up).
+  const computer = await page.evaluate(() => innerWidth >= 1024);
+  await expect(page.locator(computer ? ".fd-hero .fd-quests-btn" : ".fd-top .fd-top-quests")).toHaveCount(1);
+  await expect(page.locator(computer ? ".fd-top .fd-top-quests" : ".fd-hero .fd-quests-btn")).toHaveCount(0);
   const entry = page.getByRole("button", { name: "Quests", exact: true });
   await entry.click();
   await expect(quests).toBeVisible();
   await quests.getByRole("button", { name: "Close" }).click();
   await expect(quests).toHaveCount(0);
 
-  // A 320 px phone: the card inside the window, no row's words cut, nothing sideways; the entry over none of your card's tag.
+  // A 320 px phone (the Quests entry in the top bar, Nov 9 round 2): the top bar's items in one row, none over another, none
+  // cut; the entry is the same square as the shop's; the card fits in the window, no row's words cut, nothing sideways.
+  if (computer) return;
   await page.setViewportSize({ width: 320, height: 568 });
-  const tag = await page.locator(".fd-hero-id").boundingBox();
-  const btn = await entry.boundingBox();
-  expect(tag && btn).toBeTruthy();
-  expect(btn!.x >= tag!.x + tag!.width || btn!.y >= tag!.y + tag!.height || btn!.y + btn!.height <= tag!.y).toBe(true);
+  const bar = await page.evaluate(() => {
+    const top = document.querySelector(".fd-top")!;
+    const shop = document.querySelector(".fd-top-shop")!.getBoundingClientRect();
+    const questsBtn = document.querySelector(".fd-top-quests")!.getBoundingClientRect();
+    // (Every button and the logo in the bar, the pawn's button included: its wrapper can be squeezed narrower than what it holds.)
+    const items = [...top.querySelectorAll(":scope > .fd-logo, .fd-top-end button")].map((e) => ({ name: (e as HTMLElement).className || e.tagName, r: e.getBoundingClientRect() }));
+    const overlaps: string[] = [];
+    for (let i = 0; i < items.length; i++)
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i].r, b = items[j].r;
+        if (a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5) overlaps.push(`${items[i].name} / ${items[j].name}`);
+      }
+    const cut = [...top.querySelectorAll(":scope > .fd-logo, .fd-top-end *")].filter((e) => e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== "visible").map((e) => e.className);
+    const edge = Math.max(...items.map((i) => i.r.right)) - innerWidth;
+    return {
+      overlaps,
+      cut,
+      edge,
+      rows: [...new Set(items.filter((i) => i.name.includes("fd-icon-btn") || i.name.includes("fd-ring")).map((i) => Math.round(i.r.top)))],
+      outside: items.filter((i) => i.r.left < top.getBoundingClientRect().left - 0.5 || i.r.right > top.getBoundingClientRect().right + 0.5).map((i) => i.name),
+      entry: { w: questsBtn.width, h: questsBtn.height, sameAsShop: Math.abs(questsBtn.width - shop.width) < 1 && Math.abs(questsBtn.height - shop.height) < 1 && Math.abs(questsBtn.top - shop.top) < 1 },
+      sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  expect(bar.overlaps).toEqual([]);
+  expect(bar.outside).toEqual([]);
+  expect(bar.cut).toEqual([]);
+  expect(bar.edge).toBeLessThanOrEqual(0);
+  expect(bar.rows).toHaveLength(1);
+  expect(bar.entry.sameAsShop).toBe(true);
+  expect(bar.sideways).toBe(0);
   await entry.click();
   await expect(quests).toBeVisible();
   const fit = await page.evaluate(() => {

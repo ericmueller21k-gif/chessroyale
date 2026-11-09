@@ -9082,6 +9082,26 @@ button.fd-logo {
     height: 40px;
   }
 }
+/*
+ * Below 344 px (a 320 px phone) the row holds your pawn, Quests, the shop, Friends and the gear beside "HunChess": the round
+ * items are 36 px with 4 px gaps, and the logo 14 px. (Measured Nov 9 with Quests added: at 40 px the pawn overlapped Quests by
+ * 25 px.)
+ */
+@media (max-width: 343px) {
+  .fd-top,
+  .fd-top .fd-top-end,
+  .fd-top .fd-top-right {
+    gap: 4px;
+  }
+  .fd-top .fd-logo {
+    font-size: 14px;
+  }
+  .fd-top .fd-ring,
+  .fd-top .fd-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
 .fd-home-main {
   flex: 1 1 auto;
   display: flex;
@@ -24959,9 +24979,8 @@ button.sq-tiny {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: var(--fd-scrim);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  /* (A plain dark overlay, light and dark: no blur, which costs a phone while home's pictures move.) */
+  background: rgba(0, 0, 0, 0.55);
   /* (A flex box and the card's auto margins: centered, and when the window is shorter than the card, it scrolls from its top.) */
   display: flex;
   padding: 46px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
@@ -24997,7 +25016,7 @@ button.sq-tiny {
     animation: none;
   }
 }
-/* The crest: the board's pawn in a black disc ringed in gold, over the card's top edge. */
+/* The crest: the HunChess app icon (public/icons/icon.svg) in a black disc ringed in gold, over the card's top edge. */
 .qo-crest {
   position: absolute;
   top: -34px;
@@ -25011,6 +25030,12 @@ button.sq-tiny {
   box-shadow: 0 0 0 2px var(--qo-ink);
   display: grid;
   place-items: center;
+  overflow: hidden;
+}
+.qo-crest-img {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .hb-pieces.qo-pieces {
   width: 40px;
@@ -25392,13 +25417,6 @@ button.sq-tiny {
   }
   .fd-quests-btn span {
     display: none;
-  }
-}
-/* (A phone or tablet: the bottom right corner, clear of your tag, which sits at the card's top on a tall card. A computer: the top right.) */
-@media (max-width: 1023.98px) {
-  .fd-quests-btn {
-    top: auto;
-    bottom: 10px;
   }
 }
 /* (The key is drawn across the middle of its square: a little bigger, so it reads beside the crate.) */

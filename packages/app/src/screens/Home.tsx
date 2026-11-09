@@ -740,6 +740,8 @@ export function HomeScreen({
   const [questsOpen, setQuestsOpen] = useState(false);
   const questsShown = useRef(false);
   const [rerollLeft, setRerollLeft] = useState(true);
+  // (A computer (1024 px and up, the top bar hidden there) keeps the entry on your card's top right; a phone's entry is in the top bar.)
+  const computer = useMedia("(min-width: 1024px)");
   const closeQuests = useCallback(() => setQuestsOpen(false), []);
   useEffect(() => {
     if (!qmock || questsShown.current) return;
@@ -747,7 +749,7 @@ export function HomeScreen({
     if (qmock !== "entry") setQuestsOpen(true);
   }, [qmock]);
   const hero = (
-    <section class={`fd-hero${qmock && !queueing ? " fd-has-quests" : ""}`} aria-label="You">
+    <section class={`fd-hero${qmock && !queueing && computer ? " fd-has-quests" : ""}`} aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
@@ -775,8 +777,8 @@ export function HomeScreen({
       </div>
       </div>
       {/* (The Quests entry, Nov 9 mockup: always there once quests exist (nothing hidden), in the card's top right corner, over
-          nothing, so nothing on home moves.) */}
-      {qmock && !queueing && (
+          nothing, so nothing on home moves. A computer only: a phone's is in the top bar.) */}
+      {qmock && !queueing && computer && (
         <button type="button" class="fd-quests-btn" aria-label="Quests" title="Quests" onClick={() => setQuestsOpen(true)}>
           <QuestsIcon />
           <span>Quests</span>
@@ -1100,6 +1102,12 @@ export function HomeScreen({
         <Logo />
         <div class="fd-top-end">
           <AccountBar onProfile={onProfile} tourId="profile" />
+          {qmock && !computer && (
+            // (The Quests entry, Nov 9 mockup: one more square button in a phone's top bar, the quests icon, as the shop's.)
+            <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title="Quests" onClick={() => setQuestsOpen(true)}>
+              <QuestsIcon />
+            </button>
+          )}
           <button type="button" class="fd-icon-btn fd-top-shop" data-tour="shop" aria-label="Shop & crates" onClick={onShop}>
             <ShopIcon />
           </button>

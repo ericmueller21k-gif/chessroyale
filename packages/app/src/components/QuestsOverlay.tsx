@@ -4,7 +4,7 @@ import { KeyArt, WinterCrateArt } from "./Items.tsx";
 
 /**
  * The daily quests overlay (design: notes/briefs/design-xp-quests.md, section 5; Eric's reference of Nov 9): a framed card over
- * home, the game's pawn in a crest, "Daily Quests", when the dailies renew, then one row per quest (its picture, name, goal,
+ * home, the HunChess app icon in a crest, "Daily Quests", when the dailies renew, then one row per quest (its picture, name, goal,
  * progress bar and count, its reward drawn with the shop's art) and "Got it". Two daily rows and the weekly one under its own
  * label and countdown. Each daily has a small reroll button (one free a day: greyed once used, or on a finished quest). The ×,
  * "Got it", Escape or a tap outside close it.
@@ -185,9 +185,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft,
     <div class="qo-back" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class="qo-card" role="dialog" aria-modal="true" aria-labelledby="qo-title">
         <span class="qo-crest" aria-hidden="true">
-          <span class="hb-pieces qo-pieces">
-            <piece class="white pawn" />
-          </span>
+          <img class="qo-crest-img" src="/icons/icon.svg" alt="" />
         </span>
         <button type="button" class="qo-x" aria-label="Close" onClick={onClose}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
