@@ -292,7 +292,9 @@ for (const [right, held] of [
       await page.mouse.click(at(m.from).x, at(m.from).y);
       const after = await page.evaluate((f) => ({ to: (window as any).match.phase.rush.places[f], moved: (window as any).match.phase.rush.moved[f] }), m.from);
       expect(after).toEqual({ to: w2, moved: BOSS_POWERS.dashScramble.movesPerPiece });
-      expect(((await page.evaluate(() => (window as any).__rush)) as RushSeen).shook).toContain(w2);
+      // (The watcher samples once a frame; the refusal, its word and this read can all land within one frame under load: wait for
+      // its next frame, as the shake lasts 360 ms.)
+      await expect.poll(async () => ((await page.evaluate(() => (window as any).__rush)) as RushSeen).shook, { timeout: 2_000 }).toContain(w2);
     }
     for (const [i, m] of start.moves.slice(0, right).entries()) {
       const a = at(m.to);
