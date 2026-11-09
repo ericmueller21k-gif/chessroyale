@@ -1,6 +1,6 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedSummary, XpGrant } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -32,6 +32,11 @@ export interface Profile {
   rating: number | null;
   /** Ranked 1 v 1: the rank ("Gold 2 · 45 RP", "Placement 2/5") and the record (missing from an older server). */
   ranked1v1?: RankedSummary;
+  /**
+   * Ranked's leave rules (L1, Nov 9; the server's own reckoning): a lockout, the delayed queue, what a dodge would cost now, and
+   * home's note after a dodge. Null while PAUSE_LEAVE_PENALTIES is on; missing from an older server.
+   */
+  leaves?: RankedLeaves | null;
   recent: { mode: string; online: boolean; placement: number; players: number; teamWon: boolean | null; playedAt: number }[];
   /** An admin (ADMIN_EMAILS, as for the fair-play review): sees the boss battle's test trigger, may use the test switches. */
   admin?: boolean;

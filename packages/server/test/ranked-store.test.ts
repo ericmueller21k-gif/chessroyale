@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { RANKED_1V1, duelCoins, itemDef, placeLadder, rankView } from "@chessroyale/core";
+import { LEAVES, RANKED_1V1, duelCoins, itemDef, placeLadder, rankView } from "@chessroyale/core";
 import { DELETED_ID, createGuest, ensureSchema, profile, publicProfile, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { accountDownload, deleteAccount } from "../src/account-data.ts";
 import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
-import { coinCount, duelEntrant, duelGamesOf, purgeDuelGames, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
+import { coinCount, duelEntrant, duelGamesOf, marksOf, purgeConduct, purgeDuelGames, rankedLeaves, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
 import { memoryDb, stockCrates } from "./memory-db.ts";
 
@@ -508,5 +508,222 @@ describe("keeping, the profile and the account", () => {
     await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0);
     expect((await rankedRecordOf(sql, owner.id)).record).toMatchObject({ games: 1, wins: 1 });
     expect(await sql.first("SELECT user_id FROM ranked_1v1 WHERE user_id = ?", guest.id)).toBeNull();
+  });
+});
+
+describe("leaving early (ranked's leave rules, L1, Nov 9)", () => {
+  /** A player on the ladder (placements done) at this ladder. */
+  const onLadder = (sql: Sql, uid: string, ladder: number, games = 20) =>
+    sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 1500, 80, ?, 10, 10, 0, ?, ?)", uid, games, ladder, T0 - 60 * MIN);
+  const ladderOf = async (sql: Sql, uid: string) => (await sql.first<{ ladder: number | null }>("SELECT ladder FROM ranked_1v1 WHERE user_id = ?", uid))?.ladder ?? null;
+  /** What the same loss costs White with nobody leaving (both at 400, as the tests below set them): the leave's fee goes on top. */
+  async function plainLoss(): Promise<number> {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    return (await recordDuel(sql, game(a.id, b.id, "0-1"), notHeld))!.w.change!.points!;
+  }
+  /** A game called off before it started, `who` having dodged it. */
+  const dodged = (w: string, b: string, who: "w" | "b", patch: Partial<FinishedDuel> = {}) =>
+    game(w, b, "aborted", { reason: "abort", moves: [], times: [], startedAt: T0, endedAt: T0, conduct: { [who]: "dodge" }, ...patch });
+
+  it("a dodge: −5 RP and a mark, no hidden-rating change, and nothing for the other player", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    const before = (await rankedRecordOf(sql, a.id)).record;
+    const out = await recordDuel(sql, dodged(a.id, b.id, "w"), notHeld);
+    expect(out).toEqual({ w: { change: null, coins: 0, conduct: { kind: "dodge", rp: 5 } }, b: { change: null, coins: 0 } });
+    expect(await ladderOf(sql, a.id)).toBe(395);
+    expect(await ladderOf(sql, b.id)).toBe(400);
+    const after = (await rankedRecordOf(sql, a.id)).record;
+    expect({ ...after, ladder: 400 }).toEqual(before);
+    expect(await marksOf(sql, a.id)).toEqual([{ kind: "dodge", at: T0, games: 20, rp: 5 }]);
+    expect(await marksOf(sql, b.id)).toEqual([]);
+    // No game row for a game that never happened.
+    expect(await duelGamesOf(sql, a.id)).toEqual([]);
+  });
+
+  it("charged once: a retry, and two recordings of the same game at once (two tabs, a retry racing the first try)", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    const g = dodged(a.id, b.id, "w");
+    const [one, two] = await Promise.all([recordDuel(sql, g, notHeld), recordDuel(sql, g, notHeld)]);
+    expect(one!.w.conduct).toEqual({ kind: "dodge", rp: 5 });
+    expect(two!.w.conduct).toEqual({ kind: "dodge", rp: 5 });
+    const again = await recordDuel(sql, g, notHeld);
+    expect(again!.w.conduct).toEqual({ kind: "dodge", rp: 5 });
+    expect(await ladderOf(sql, a.id)).toBe(395);
+    expect(await marksOf(sql, a.id)).toHaveLength(1);
+  });
+
+  it("dodge levels: −10 from the second, with a lockout that grows; the level drops every 12 hours", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: T0 }), notHeld);
+    expect((await rankedLeaves(sql, a.id, T0 + 1000)).lockedUntil).toBeNull();
+    const second = await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: T0 + MIN }), notHeld);
+    expect(second!.w.conduct).toEqual({ kind: "dodge", rp: 10 });
+    expect(await ladderOf(sql, a.id)).toBe(385);
+    expect(await rankedLeaves(sql, a.id, T0 + 2 * MIN)).toMatchObject({ level: 2, lock: "dodge", lockedUntil: T0 + MIN + 5 * MIN, nextDodge: { rp: 10, lockoutMin: 30 } });
+    await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: T0 + 7 * MIN }), notHeld);
+    expect((await rankedLeaves(sql, a.id, T0 + 8 * MIN)).lockedUntil).toBe(T0 + 7 * MIN + 30 * MIN);
+    // A day later: level 3 − 2 = 1, so the next dodge is level 2 (−10, 5 minutes).
+    const day = T0 + 7 * MIN + 24 * 3_600_000;
+    expect(await rankedLeaves(sql, a.id, day)).toMatchObject({ level: 1, lockedUntil: null, nextDodge: { rp: 10, lockoutMin: 5 } });
+  });
+
+  it("in placements there are no rank points to take: the mark only (and what a dodge would cost says 0)", async () => {
+    const { sql, a, b } = await setup();
+    const out = await recordDuel(sql, dodged(a.id, b.id, "w"), notHeld);
+    expect(out!.w.conduct).toEqual({ kind: "dodge", rp: 0 });
+    expect(await sql.first("SELECT user_id FROM ranked_1v1 WHERE user_id = ?", a.id)).toBeNull();
+    expect(await marksOf(sql, a.id)).toEqual([{ kind: "dodge", at: T0, games: 0, rp: 0 }]);
+    expect((await rankedLeaves(sql, a.id, T0)).nextDodge.rp).toBe(0);
+  });
+
+  it("a player fair play holds keeps their rank: the mark, no fee", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    const out = await recordDuel(sql, dodged(a.id, b.id, "w"), async (uid) => uid === a.id);
+    expect(out!.w.conduct).toEqual({ kind: "dodge", rp: 0 });
+    expect(await ladderOf(sql, a.id)).toBe(400);
+  });
+
+  it("the kill switch (penalties off): nothing recorded or charged, for a dodge or a leave", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    expect(await recordDuel(sql, dodged(a.id, b.id, "w"), notHeld, T0, { penalties: false })).toBeNull();
+    const out = await recordDuel(sql, game(a.id, b.id, "0-1", { conduct: { w: "leave" } }), notHeld, T0 + 6 * MIN, { penalties: false });
+    expect(out!.w.conduct).toBeUndefined();
+    expect(out!.w.change!.points).toBe(await plainLoss());
+    expect(await marksOf(sql, a.id)).toEqual([]);
+  });
+
+  it("a leave: the full loss, then 10 RP more and a mark, once (the game's row has the points)", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    const g = game(a.id, b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"], conduct: { w: "leave" } });
+    const out = await recordDuel(sql, g, notHeld);
+    // The loss as it would be anyway, then 10 more for leaving.
+    const loss = await plainLoss();
+    expect(out!.w).toMatchObject({ change: { points: loss - 10 }, conduct: { kind: "leave", rp: 10 } });
+    expect(out!.b.conduct).toBeUndefined();
+    expect(await ladderOf(sql, a.id)).toBe(400 + loss - 10);
+    expect(await sql.first("SELECT white_points, black_points FROM ranked_1v1_games WHERE id = ?", g.id)).toEqual({ white_points: loss - 10, black_points: out!.b.change!.points });
+    expect(await marksOf(sql, a.id)).toEqual([{ kind: "leave", at: g.endedAt, games: 21, rp: 10 }]);
+    const again = await recordDuel(sql, g, notHeld);
+    expect(again!.w.conduct).toEqual({ kind: "leave", rp: 10 });
+    expect(await ladderOf(sql, a.id)).toBe(400 + loss - 10);
+    expect(await marksOf(sql, a.id)).toHaveLength(1);
+  });
+
+  it("the last 20: 3 leaves bring the delayed queue, clean games clear it; home's note after a dodge until a game is played", async () => {
+    const { sql, a, b } = await setup();
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    let t = T0;
+    for (let i = 0; i < 3; i++) {
+      t += 10 * MIN;
+      await recordDuel(sql, game(a.id, b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"], startedAt: t - MIN, endedAt: t, conduct: { w: "leave" } }), notHeld);
+    }
+    expect(await rankedLeaves(sql, a.id, t)).toMatchObject({ marks: 3, delaySec: LEAVES.delayed[0]!.waitSec, lockedUntil: null, dodged: null });
+    for (let i = 0; i < 18; i++) {
+      t += 10 * MIN;
+      await recordDuel(sql, game(a.id, b.id, "1/2-1/2", { startedAt: t - 6 * MIN, endedAt: t }), notHeld);
+    }
+    expect(await rankedLeaves(sql, a.id, t)).toMatchObject({ marks: 2, delaySec: 0 });
+    // A dodge: home's note, for LEAVES.noteMinutes or until the next game.
+    t += MIN;
+    await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: t }), notHeld);
+    expect((await rankedLeaves(sql, a.id, t + MIN)).dodged).toEqual({ at: t, rp: 5 });
+    expect((await rankedLeaves(sql, a.id, t + LEAVES.noteMinutes * MIN)).dodged).toBeNull();
+    await recordDuel(sql, game(a.id, b.id, "1-0", { startedAt: t + MIN, endedAt: t + 2 * MIN }), notHeld);
+    expect((await rankedLeaves(sql, a.id, t + 3 * MIN)).dodged).toBeNull();
+  });
+
+  it("marks go after LEAVES.keepDays; the download has them, deleting erases them, a guest's go to the account", async () => {
+    const { sql, a, b } = await setup();
+    await recordDuel(sql, dodged(a.id, b.id, "w", { id: "old", endedAt: T0 }), notHeld);
+    await recordDuel(sql, dodged(a.id, b.id, "w", { id: "new", endedAt: T0 + 5 * 86_400_000 }), notHeld);
+    await purgeConduct(sql, T0 + LEAVES.keepDays * 86_400_000);
+    expect(await marksOf(sql, a.id)).toHaveLength(2);
+    await purgeConduct(sql, T0 + LEAVES.keepDays * 86_400_000 + 1);
+    expect((await marksOf(sql, a.id)).map((m) => m.at)).toEqual([T0 + 5 * 86_400_000]);
+    const data = (await accountDownload(sql, a, T0)) as { ranked1v1: { leaves: Record<string, unknown>[] } };
+    expect(data.ranked1v1.leaves).toEqual([{ game: "new", at: new Date(T0 + 5 * 86_400_000).toISOString(), mode: "1v1", kind: "dodge", rp: 0 }]);
+    // A guest signing in: its marks become the account's.
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await signInWithIdentity(sql, a, "email", "owner@example.com", {}, T0);
+    expect(await marksOf(sql, owner.id)).toHaveLength(1);
+    expect(await marksOf(sql, a.id)).toEqual([]);
+    await deleteAccount(sql, owner, T0);
+    expect(await sql.all("SELECT * FROM ranked_conduct")).toEqual([]);
+  });
+
+  it("a leave in the game that completes placements: the loss and the mark, no fee (the FAQ: in placements it only goes on the record)", async () => {
+    const { sql, a, b } = await setup();
+    const fourth = () => sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 1500, 200, 4, 2, 2, 0, NULL, ?)", a.id, T0 - 60 * MIN);
+    await fourth();
+    await onLadder(sql, b.id, 400);
+    const g = game(a.id, b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"], conduct: { w: "leave" } });
+    const out = await recordDuel(sql, g, notHeld);
+    expect(out!.w.change!.placed).toBe(true);
+    expect(out!.w.conduct).toEqual({ kind: "leave", rp: 0 });
+    expect(await marksOf(sql, a.id)).toEqual([{ kind: "leave", at: g.endedAt, games: 5, rp: 0 }]);
+    // The ladder it placed at, untouched: the same as the same loss with nobody leaving.
+    const plain = await setup();
+    await plain.sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 1500, 200, 4, 2, 2, 0, NULL, ?)", plain.a.id, T0 - 60 * MIN);
+    await onLadder(plain.sql, plain.b.id, 400);
+    await recordDuel(plain.sql, game(plain.a.id, plain.b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"] }), notHeld);
+    expect(await ladderOf(sql, a.id)).toBe(await ladderOf(plain.sql, plain.a.id));
+    expect(await ladderOf(sql, a.id)).not.toBeNull();
+  });
+
+  it("a dodge's fee landing between a game's read and its write isn't overwritten: the game is read again, the fee kept", async () => {
+    const { sql, a, b } = await setup();
+    const c = (await createGuest(sql, T0, "Cy")).user;
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    // Ann dodges a game against Cy (another tab) just as her game against Bob is being written.
+    let raced = false;
+    const racing: Sql = {
+      ...sql,
+      async batch(statements) {
+        if (!raced && statements.some((s) => s.sql.includes("INSERT OR IGNORE INTO ranked_1v1_games") && s.params[0] === "won")) {
+          raced = true;
+          await recordDuel(sql, dodged(a.id, c.id, "w", { id: "dodged" }), notHeld);
+        }
+        return sql.batch(statements);
+      },
+    };
+    const out = await recordDuel(racing, game(a.id, b.id, "1-0", { id: "won" }), notHeld);
+    expect(raced).toBe(true);
+    expect(await marksOf(sql, a.id)).toEqual([expect.objectContaining({ kind: "dodge", rp: 5 })]);
+    // The win's points on top of the ladder after the fee: 395, not 400.
+    expect(await ladderOf(sql, a.id)).toBe(395 + out!.w.change!.points!);
+  });
+
+  it("a guest's marks moved to an account with more games: still as many games back (in the window), never newer than now", async () => {
+    const { sql, a, b } = await setup();
+    // The guest: a leave in its first game, then a dodge.
+    await recordDuel(sql, game(a.id, b.id, "0-1", { id: "left", reason: "resign", moves: ["e2e4", "e7e5"], conduct: { w: "leave" } }), notHeld);
+    await recordDuel(sql, dodged(a.id, b.id, "w", { id: "dodge", endedAt: T0 + 10 * MIN }), notHeld);
+    expect(await marksOf(sql, a.id)).toEqual([expect.objectContaining({ kind: "dodge", games: 1 }), expect.objectContaining({ kind: "leave", games: 1 })]);
+    // The account: 30 ranked games of its own (it keeps its rank).
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await onLadder(sql, owner.id, 400, 30);
+    await signInWithIdentity(sql, a, "email", "owner@example.com", {}, T0);
+    expect((await marksOf(sql, owner.id)).map((m) => m.games)).toEqual([30, 30]);
+    expect((await rankedLeaves(sql, owner.id, T0 + 11 * MIN)).marks).toBe(2);
+  });
+
+  it("the profile carries the standing (null with the kill switch on)", async () => {
+    const { sql, a, b } = await setup();
+    await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: Date.now() - 1000 }), notHeld);
+    expect((await profile(sql, a)).leaves).toMatchObject({ marks: 1, level: 1, dodged: { rp: 0 } });
+    expect((await profile(sql, a, undefined, { leaves: false })).leaves).toBeNull();
   });
 });

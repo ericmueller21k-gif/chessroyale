@@ -185,7 +185,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
   `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."), `PAUSE_REWARDS` (Nov 9: XP, the daily reward,
   level rewards and quests (no progress, no pay; the overlay says so); games play on, the XP box says "Rewards are paused for a moment.", levels reached are paid at the next game after it:
-  [2026-11-09-xp-phase2-pause.md](../decisions/2026-11-09-xp-phase2-pause.md)),
+  [2026-11-09-xp-phase2-pause.md](../decisions/2026-11-09-xp-phase2-pause.md)), `PAUSE_LEAVE_PENALTIES` (Nov 9: ranked's leave
+  rules, if they misfire: no dodge or leave is charged or marked, and no lockout or delayed queue applies; games play on;
+  [ranked.md](ranked.md), "Leaving early"),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,

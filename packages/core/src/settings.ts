@@ -2613,6 +2613,54 @@ export const RANKED_1V1 = {
 };
 
 /**
+ * Leaving ranked games early (phase L1, 1 v 1; Eric, Nov 9: "Quitting during time control. Yeah, that's fine. Quitting
+ * mid-game. Yeah, full loss."; docs/ideas/ranked-ladder.md section 4, docs/areas/ranked.md "Leaving"). The server
+ * decides all of it from the game's own record (core's ranked-leaves.ts does the math); PAUSE_LEAVE_PENALTIES turns it off.
+ *   - A **dodge**: leaving after the match is found, before both first moves (Abort, the vote, closing the app, no first
+ *     move, never connecting). The game is called off as before (no result, no hidden-rating change), and the dodger loses
+ *     `dodgeRp[0]` rank points, `dodgeRp[1]` from dodge level 2 on, with a lockout from ranked by their dodge level.
+ *   - A **leave**: after the game starts, abandoning it (your clock ran out while you were gone and your opponent was there)
+ *     or resigning before your `quickResignMoves`th move. A full loss, then `leaveRp` more rank points.
+ *   - Both put a **mark** on your record: `window` is how many of your latest ranked games and dodges are counted.
+ */
+export const LEAVES = {
+  /** Rank points a dodge costs: the first (dodge level 1), then from level 2 on. None in placements (no rank points yet). */
+  dodgeRp: [5, 10] as readonly number[],
+  /** Rank points a leave costs on top of the loss. */
+  leaveRp: 10,
+  /** The lockout from ranked after a dodge, in minutes, by the dodge level it brought (1, 2, 3, 4, 5 and up). */
+  dodgeLockoutMin: [0, 5, 30, 120, 720] as readonly number[],
+  /** The dodge level drops by one every this many hours without a dodge. */
+  dodgeDecayHours: 12,
+  /** Marks are counted among your latest this many ranked games and dodges. */
+  window: 20,
+  /**
+   * The delayed queue: with at least `at` marks in the window, each ranked search waits `waitSec` before it can be paired
+   * (the most `at` reached applies). From `noteAt` marks home's note also says "Finish ranked games to clear your leaves."
+   */
+  delayed: [
+    { at: 3, waitSec: 120 },
+    { at: 5, waitSec: 300 },
+  ] as readonly { at: number; waitSec: number }[],
+  noteAt: 5,
+  /** With this many marks in the window, ranked is locked for `lockHours` from the latest mark. */
+  lockAt: 8,
+  lockHours: 24,
+  /** Resigning before your this-many-th move is a leave (a dodge in disguise). */
+  quickResignMoves: 3,
+  /**
+   * A player counts as gone (for who left: duel rules' conductOf) only once their last socket has been closed this long: a
+   * phone backgrounding, a Wi-Fi to cellular handoff, a reload or a deploy's dropped sockets come back well within it. Within it,
+   * an Abort pressed is the presser's own, and a flag is a plain loss.
+   */
+  goneGraceMs: 12_000,
+  /** Home's note after a dodge ("You left before the game started: −5 RP") shows this long, unless a game comes after it. */
+  noteMinutes: 30,
+  /** A mark is kept this long, then the 15-minute cron deletes it. */
+  keepDays: 90,
+};
+
+/**
  * Squads' server (phase 2; docs/areas/squads.md, "The server"): the lobby around the rules (`SQUADS`, below), its
  * parties, bot work and rewards. The lobby's life (results kept, idle, abandoned) is LOBBY_LIFE's; the queue's fill
  * time is MATCH_FILL_SECONDS, as for Crowd.

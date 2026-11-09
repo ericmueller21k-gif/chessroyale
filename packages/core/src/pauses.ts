@@ -14,9 +14,11 @@ import { BOSS_ROSTER, bossDef, bossInText } from "./boss.ts";
  *     bosses' chatter goes on);
  *   - "rewards": XP and its rewards (PAUSE_REWARDS, Nov 9): games play and their results are kept, but no XP, daily reward or level
  *     reward is granted while it's on (the result's XP box says so). Levels reached are paid at the next counted game after it.
+ *   - "leave-penalties": ranked's leave rules (PAUSE_LEAVE_PENALTIES, Nov 9; LEAVES): no dodge or leave is charged or marked, and no
+ *     lockout or delayed queue applies while it's on (if they misfire). Games play as usual.
  *   - "boss:<id>": one boss (PAUSE_BOSS_<ID>): never met, at random or picked.
  */
-export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "town-chat", "rewards"] as const;
+export const PAUSABLE = ["classic", "crowd", "raid", "squads", "ranked1v1", "solo", "shop", "friends", "town-chat", "rewards", "leave-penalties"] as const;
 export type Pausable = (typeof PAUSABLE)[number] | `boss:${string}`;
 
 /** Every switch there is: the parts above, then one per boss in the roster. */
@@ -37,10 +39,11 @@ const NAMES: Record<(typeof PAUSABLE)[number], string> = {
   friends: "Friends are",
   "town-chat": "Town chat is",
   rewards: "Rewards are",
+  "leave-penalties": "Leave penalties are",
 };
 
 /** Parts whose line isn't "… resting for a bit": the town chat's field says this in its place (the director's line). */
-const LINES: Partial<Record<(typeof PAUSABLE)[number], string>> = { "town-chat": "Chat is paused.", rewards: "Rewards are paused for a moment." };
+const LINES: Partial<Record<(typeof PAUSABLE)[number], string>> = { "town-chat": "Chat is paused.", rewards: "Rewards are paused for a moment.", "leave-penalties": "Leave penalties are paused." };
 
 /** The short friendly line for a part that's resting: on its way in (the app), and in the server's refusal. */
 export function pausedLine(what: Pausable): string {

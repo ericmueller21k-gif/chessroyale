@@ -105,11 +105,17 @@ export class DuelGame extends DurableObject<Env> {
         const sql = d1Sql(this.env.DB);
         await ensureSchema(sql, this.env.DB);
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
-        outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
+        // (Ranked's leave rules, a dodge or a leave charged once: off while PAUSE_LEAVE_PENALTIES is on.)
+        outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)), finished.endedAt, {
+          penalties: !isPaused(this.env, "leave-penalties"),
+        });
+        const played = finished.result !== "aborted";
+        // (Ops' counts, /admin/ops: dodges and leaves charged.)
+        if (outcomes) for (const o of [outcomes.w, outcomes.b]) if (o.conduct) countCall(`ranked.${o.conduct.kind}`);
         // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
-        if (outcomes) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
+        if (outcomes && played) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
-        if (outcomes) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
+        if (outcomes && played) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
       if (!this.record) return;
       const core = this.core();
@@ -155,15 +161,25 @@ export class DuelGame extends DurableObject<Env> {
   }
 
   /**
-   * A player who pressed Cancel just as they were paired (the queue's cancel answered this game): the game is called
-   * off for them (an abort, before any first move: nothing recorded), and the other player hears it at once.
+   * A player who pressed the queue's Cancel after they were paired (the queue's cancel answered this game): their own Abort or
+   * Resign (ranked's leave rules decide what it costs: DuelCore.cancelled), except for one who never connected to it, pressed
+   * the moment it was found: called off, nobody's dodge. The other player hears it at once.
    */
   async abandon(uid: string): Promise<void> {
     if (!this.record || (await this.closeIfDue())) return;
     const c = this.record.players.w.uid === uid ? "w" : this.record.players.b.uid === uid ? "b" : null;
     if (!c) return;
     const core = this.core();
-    await this.change(core, () => core.message(c, { t: "resign" }));
+    await this.change(core, () => core.cancelled(c));
+  }
+
+  /** The queue handed this player the game's code (ranked's leave rules, L1: from then a no-show is their dodge). */
+  async delivered(uid: string): Promise<void> {
+    if (!this.record || (await this.closeIfDue())) return;
+    const c = this.record.players.w.uid === uid ? "w" : this.record.players.b.uid === uid ? "b" : null;
+    if (!c || this.record.delivered?.[c]) return;
+    const core = this.core();
+    await this.change(core, () => core.delivered(c));
   }
 
   async exists(): Promise<boolean> {

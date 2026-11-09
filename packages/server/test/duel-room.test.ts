@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { QUICK_CHAT, RANKED_1V1, rankView } from "@chessroyale/core";
+import { LEAVES, QUICK_CHAT, RANKED_1V1, rankView } from "@chessroyale/core";
 import type { Color, DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, newDuelRecord, type DuelIO, type DuelOutgoing, type DuelRecord } from "../src/duel-room.ts";
 
@@ -40,9 +40,11 @@ function room(opts: { testSeconds?: number } = {}) {
     conn[c] = false;
     core().disconnect(c);
   };
+  // (A socket gone without its close reaching the room: a deploy.)
+  const drop = (c: Color) => void (conn[c] = false);
   const send = (c: Color, msg: Parameters<DuelCore["message"]>[1]) => core().message(c, msg);
   const last = <T extends DuelOutgoing["t"]>(c: Color, t: T) => inbox[c].filter((m) => m.t === t).at(-1) as Extract<DuelOutgoing, { t: T }> | undefined;
-  return { record, core, at, come, go, send, inbox, last, now: () => now, set: (t: number) => void (now = t) };
+  return { record, core, at, come, go, drop, send, inbox, last, now: () => now, set: (t: number) => void (now = t) };
 }
 
 /** Both connected at T0: the versus moment, then the vote at T0 + VERSUS. */
@@ -90,40 +92,210 @@ describe("1 v 1's room: the timeline", () => {
     expect(r.last("b", "game")?.game).toMatchObject({ phase: "play", firstMoveBy: T0 + 3000 + VERSUS + VOTE + OVERLAY + FIRST });
   });
 
-  it("nobody, or only one, turned up: called off at the join time, nothing to record, closing later", () => {
+  it("nobody, or only one, turned up: called off at the join time (the one who didn't come dodged: L1), closing later", () => {
     const one = room();
+    // (The queue told Black the game's code: DuelCore.delivered. One it never told isn't charged: below.)
+    one.core().delivered("b");
     one.come("w");
     one.at(T0 + RANKED_1V1.joinSeconds * 1000);
     expect(one.last("w", "game")?.game.end).toMatchObject({ result: "aborted", reason: "no_show", by: "b" });
-    expect(one.core().takeFinished()).toBeNull();
+    expect(one.core().takeFinished()).toMatchObject({ result: "aborted", reason: "no_show", moves: [], conduct: { b: "dodge" } });
     expect(one.record.closeAt).toBe(T0 + RANKED_1V1.joinSeconds * 1000 + RANKED_1V1.resultsKeepMinutes * 60_000);
     const none = room();
     none.at(T0 + RANKED_1V1.joinSeconds * 1000);
     expect(none.core().end).toMatchObject({ reason: "no_show", by: null });
+    // (Nobody came: nobody's dodge, nothing to record.)
+    expect(none.core().takeFinished()).toBeNull();
   });
 
-  it("a first move that doesn't come aborts the game: no result to record", () => {
+  it("a first move that doesn't come aborts the game: no result, a dodge for the side to move (L1)", () => {
     const r = playing();
     const start = r.record.game!.startsAt!;
     expect(r.core().nextAlarm).toBe(start + FIRST);
     r.at(start + FIRST);
     expect(r.last("w", "game")?.game.end).toMatchObject({ result: "aborted", reason: "no_first_move", by: "w" });
-    expect(r.core().takeFinished()).toBeNull();
+    expect(r.core().takeFinished()).toMatchObject({ result: "aborted", conduct: { w: "dodge" } });
   });
 
   it("Abort (resign before both first moves): in the versus moment, the vote, or after White's first move", () => {
     const early = started();
     early.send("b", { t: "resign" });
     expect(early.core().end).toMatchObject({ result: "aborted", reason: "abort", by: "b" });
+    expect(early.core().takeFinished()?.conduct).toEqual({ b: "dodge" });
     const waiting = room();
     waiting.come("w");
     waiting.send("w", { t: "resign" });
     expect(waiting.core().end).toMatchObject({ result: "aborted", reason: "abort", by: "w" });
+    expect(waiting.core().takeFinished()?.conduct).toEqual({ w: "dodge" });
     const r = playing();
     r.send("w", { t: "move", uci: "e2e4", ply: 0 });
     r.send("w", { t: "resign" });
     expect(r.core().end).toMatchObject({ result: "aborted", reason: "abort" });
+    // (Ranked's leave rules, L1: Abort is a dodge now, recorded as one; it was "nothing to record" before.)
+    expect(r.core().takeFinished()).toMatchObject({ result: "aborted", conduct: { w: "dodge" } });
+  });
+});
+
+describe("1 v 1's room: who left early (ranked's leave rules, L1)", () => {
+  it("Abort after the other player closed the app during the vote (gone past the grace): their dodge, not yours", () => {
+    const r = started();
+    r.set(T0 + VERSUS + 100);
+    r.go("b");
+    r.set(r.now() + LEAVES.goneGraceMs);
+    r.send("w", { t: "resign" });
+    expect(r.core().takeFinished()?.conduct).toEqual({ b: "dodge" });
+    // The result's words follow it (the view's `left`): Bo's dodge.
+    expect(r.last("w", "game")?.game).toMatchObject({ end: { reason: "abort", by: "w" }, left: { b: "dodge" } });
+  });
+  it("Abort while the other's phone was away only a moment (within the grace: a backgrounded app, a handoff): the presser's dodge", () => {
+    const r = started();
+    r.set(T0 + VERSUS + 100);
+    r.go("b");
+    r.set(r.now() + LEAVES.goneGraceMs - 1);
+    r.send("w", { t: "resign" });
+    expect(r.core().takeFinished()?.conduct).toEqual({ w: "dodge" });
+    expect(r.last("w", "game")?.game.left).toEqual({ w: "dodge" });
+    // Back a moment later: Bo sees Wendy's dodge (the app's words: "Wendy left before the first moves. No rank change.").
+    r.come("b");
+    expect(r.last("b", "welcome")?.game).toMatchObject({ end: { reason: "abort", by: "w" }, left: { w: "dodge" } });
+  });
+  it("a first move that didn't come: the side to move's dodge, unless the other side had been gone past the grace", () => {
+    const brief = playing();
+    const start = brief.record.game!.startsAt!;
+    brief.set(start + FIRST - LEAVES.goneGraceMs + 1);
+    brief.go("b");
+    brief.at(start + FIRST);
+    expect(brief.record.conduct).toEqual({ w: "dodge" });
+    const long = playing();
+    long.set(start + FIRST - LEAVES.goneGraceMs);
+    long.go("b");
+    long.at(start + FIRST);
+    expect(long.record.conduct).toEqual({ b: "dodge" });
+  });
+  it("a no-show the queue never told about the game (a phone asleep as it paired): nobody's dodge, nothing to record", () => {
+    const r = room();
+    r.come("w");
+    r.at(T0 + RANKED_1V1.joinSeconds * 1000);
+    expect(r.core().end).toMatchObject({ reason: "no_show", by: "b" });
+    expect(r.record.conduct).toEqual({});
     expect(r.core().takeFinished()).toBeNull();
+    // A side that had connected and gone again before the other came: it knew of it.
+    const back = room();
+    back.come("b");
+    back.go("b");
+    back.come("w");
+    // (Gone at T0: at the join time, still within the grace, so the room waits it out.)
+    back.at(T0 + RANKED_1V1.joinSeconds * 1000);
+    expect(back.core().end).toBeNull();
+    back.at(T0 + LEAVES.goneGraceMs);
+    expect(back.core().end).toMatchObject({ reason: "no_show", by: "b" });
+    expect(back.record.conduct).toEqual({ b: "dodge" });
+  });
+  it("a moment away just before the join time (the delta review of #582, D1): the room waits out the grace; back in time, the game starts", () => {
+    const r = room();
+    r.come("b");
+    r.set(T0 + 8000);
+    r.go("b");
+    r.set(T0 + 9000);
+    r.come("w");
+    r.at(T0 + RANKED_1V1.joinSeconds * 1000);
+    expect(r.core().end).toBeNull();
+    expect(r.core().nextAlarm).toBe(T0 + 8000 + LEAVES.goneGraceMs);
+    r.set(T0 + 15_000);
+    r.come("b");
+    expect(r.record.game).not.toBeNull();
+    expect(r.core().end).toBeNull();
+    expect(r.record.conduct ?? {}).toEqual({});
+  });
+  it("the queue's Cancel the moment it was paired (never connected to it): called off, and nobody's dodge (nothing to record)", () => {
+    const r = room();
+    r.come("w");
+    r.core().delivered("b");
+    r.core().cancelled("b");
+    expect(r.core().end).toMatchObject({ result: "aborted", reason: "abort", by: "b" });
+    expect(r.record.conduct).toEqual({});
+    expect(r.core().takeFinished()).toBeNull();
+  });
+  it("the queue's Cancel from a player who saw the game is their own Abort or Resign: waiting, the versus moment and vote, after moves", () => {
+    // Waiting: Black connected (and left again) before White came: Black's dodge.
+    const waiting = room();
+    waiting.come("b");
+    waiting.go("b");
+    waiting.core().cancelled("b");
+    expect(waiting.record.conduct).toEqual({ b: "dodge" });
+    expect(waiting.core().takeFinished()).toMatchObject({ result: "aborted", reason: "abort", conduct: { b: "dodge" } });
+    // The versus moment, and the vote.
+    for (const t of [T0 + 100, T0 + VERSUS + 100]) {
+      const r = started();
+      r.set(t);
+      r.core().cancelled("w");
+      expect(r.core().takeFinished()).toMatchObject({ result: "aborted", reason: "abort", conduct: { w: "dodge" } });
+    }
+    // After the first moves: a resignation before the 3rd move, a leave.
+    const moved = playing();
+    moved.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    moved.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    moved.core().cancelled("w");
+    expect(moved.core().takeFinished()).toMatchObject({ result: "0-1", reason: "resign", conduct: { w: "leave" } });
+    // A Cancel once it's over changes nothing.
+    moved.core().cancelled("b");
+    expect(moved.core().end).toMatchObject({ result: "0-1", by: "w" });
+  });
+  it("resigning before your 3rd move: a leave, recorded with the loss; from it, a plain loss", () => {
+    const r = playing();
+    r.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    r.send("w", { t: "resign" });
+    expect(r.core().takeFinished()).toMatchObject({ result: "0-1", reason: "resign", conduct: { w: "leave" } });
+    const late = playing();
+    for (const [i, m] of ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"].entries()) late.send(i % 2 ? "b" : "w", { t: "move", uci: m, ply: i });
+    late.send("w", { t: "resign" });
+    expect(late.core().takeFinished()).toMatchObject({ result: "0-1", reason: "resign", conduct: {} });
+  });
+  it("a flag gone only a moment (within the grace: a deploy's dropped sockets, the opponent back first): a plain loss", () => {
+    const r = playing(null, null, { testSeconds: 30 });
+    r.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    // (White's clock has about 30 s; both dropped 5 s before it falls, Black back at once.)
+    r.set(r.now() + 25_000);
+    r.go("w");
+    r.go("b");
+    r.come("b");
+    r.at(r.now() + 6_000);
+    expect(r.core().takeFinished()).toMatchObject({ result: "0-1", reason: "timeout", conduct: {} });
+    // A deploy whose closes the room never heard: counted from when it noticed (a moment before the flag): a plain loss too.
+    const d = playing(null, null, { testSeconds: 30 });
+    d.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    d.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    d.set(d.now() + 25_000);
+    d.drop("w");
+    d.at(d.now() + 1_000);
+    expect(d.record.goneAt?.w).toBe(d.now());
+    d.at(d.now() + 5_000);
+    expect(d.core().takeFinished()).toMatchObject({ result: "0-1", reason: "timeout", conduct: {} });
+  });
+  it("a flag while gone, the opponent there: a leave (abandoning); a flag while there: a plain loss", () => {
+    const r = playing(null, null, { testSeconds: 30 });
+    r.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    r.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    r.go("w");
+    r.at(r.now() + 31_000);
+    expect(r.core().takeFinished()).toMatchObject({ result: "0-1", reason: "timeout", conduct: { w: "leave" } });
+    const here = playing(null, null, { testSeconds: 30 });
+    here.send("w", { t: "move", uci: "e2e4", ply: 0 });
+    here.send("b", { t: "move", uci: "e7e5", ply: 1 });
+    here.at(here.now() + 31_000);
+    expect(here.core().takeFinished()).toMatchObject({ result: "0-1", reason: "timeout", conduct: {} });
+  });
+  it("decided once, as it ends: coming back afterwards changes nothing", () => {
+    const r = started();
+    r.set(T0 + VERSUS + 100);
+    r.go("b");
+    r.set(r.now() + LEAVES.goneGraceMs);
+    r.send("w", { t: "resign" });
+    r.come("b");
+    r.at(r.now() + 1000);
+    expect(r.record.conduct).toEqual({ b: "dodge" });
   });
 });
 

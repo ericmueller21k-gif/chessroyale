@@ -91,7 +91,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   [docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md](../decisions/2026-10-15-delete-my-account-and-download-my-data.md)):
   - **The download:** GET `/api/me/data` answers a JSON file of everything kept about the account (every store's rows,
     the global chat's lines from the live hub). It leaves out who has blocked them and fair play's detection records
-    (on request, by email).
+    (on request, by email). Ranked's marks for leaving early (`ranked_conduct`, Nov 9) are in its `ranked1v1` part as
+    `leaves`; deleting erases them, and a guest's move to the account on sign-in ([ranked.md](ranked.md), "Leaving early").
   - **Deleting:** POST `/api/me/delete` `{confirm: "delete"}`, from the site's own origin, as JSON, after the app's
     confirmation. It removes everything personal in every store, in one batch (one transaction), and signs the
     account out on every device. The live hub forgets it (online, global chat lines). The app clears its local

@@ -17,6 +17,7 @@ import {
   tick,
   type Color,
   type DuelClientMessage,
+  type DuelConduct,
   type DuelEnd,
   type DuelGamePhase,
   type DuelOutcome,
@@ -25,7 +26,7 @@ import {
   type DuelView,
 } from "@chessroyale/chess/duel";
 import { MatchChat } from "./chat.ts";
-import { account } from "./account.ts";
+import { account, refreshProfile } from "./account.ts";
 import { maiaAllowed } from "./boss-brain.ts";
 import { ownEngine, pauseEngines } from "./engine.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
@@ -81,6 +82,8 @@ export interface DuelSnapshot {
   canOffer: Record<Color, boolean>;
   connected: Record<Color, boolean>;
   end: DuelEnd | null;
+  /** Who left early (ranked's leave rules, L1), as the server decided as it ended (missing: nobody said, a bot's game). */
+  left?: DuelConduct;
   /** What the game did for you (your rank, your coins), once the server has recorded it. */
   outcome: DuelOutcome | null;
   /** The game can't be shown (refused, ended before you got there), and why. */
@@ -223,6 +226,9 @@ export class NetDuel implements DuelSession {
 
   dispose() {
     this.closed = true;
+    // (Left an aborted game before its outcome came, e.g. Abort then Home at once: a dodge may still be on its way to being recorded,
+    // so your profile, home's note and line, is read again a moment later.)
+    if (this.view?.end?.result === "aborted" && !this.outcome) setTimeout(() => void refreshProfile().catch(() => undefined), 2000);
     if (this.retryTimer) clearTimeout(this.retryTimer);
     document.removeEventListener("visibilitychange", this.onVisible);
     this.chat.dispose();
@@ -320,6 +326,8 @@ export class NetDuel implements DuelSession {
         break;
       case "outcome":
         this.outcome = msg.outcome;
+        // (A dodge or a leave changed your standing with ranked's leave rules: home's note and line read it from your profile.)
+        if (msg.outcome.conduct) void refreshProfile().catch(() => undefined);
         break;
       case "chat":
         this.chat.onLine(msg.line);
@@ -373,6 +381,7 @@ export class NetDuel implements DuelSession {
       canOffer: v?.canOffer ?? { w: false, b: false },
       connected: v?.connected ?? { w: false, b: false },
       end: v?.end ?? null,
+      ...(v?.left ? { left: v.left } : {}),
       outcome: this.outcome,
       gone: this.gone,
     };
@@ -732,7 +741,8 @@ export interface TownBotGame {
 // ---------------- The queue ----------------
 
 export type DuelQueueState =
-  | { kind: "searching"; since: number }
+  /** `delayUntil`: ranked's delayed queue (L1): the server pairs this search from then on (missing: now). */
+  | { kind: "searching"; since: number; delayUntil?: number }
   /** Refused: resting (the kill switch), signing in needed, banned, or an error; `message` says so. */
   | { kind: "refused"; message: string; banned?: boolean; signIn?: boolean }
   | { kind: "found"; code: string }
@@ -859,6 +869,7 @@ export class DuelQueue {
         message?: string;
         banned?: boolean;
         expired?: boolean;
+        delayMs?: number;
       };
       if (this.stopped) {
         // Cancelled while this ask was out, before any ticket was known (the first ask): the server made one, so it's
@@ -876,6 +887,12 @@ export class DuelQueue {
         continue;
       }
       if (body.ticket) this.ticket = body.ticket;
+      // The delayed queue's wait (ranked's leave rules, L1): the stage counts it down (told again only when it moves a second or more).
+      if (body.searching && this.state.kind === "searching") {
+        const until = body.delayMs ? Date.now() + body.delayMs : undefined;
+        const was = this.state.delayUntil;
+        if ((until === undefined) !== (was === undefined) || (until !== undefined && Math.abs(until - was!) >= 1000)) this.set({ ...this.state, delayUntil: until });
+      }
       this.save();
       if (res.status === 429 || body.busy) {
         await new Promise((r) => setTimeout(r, body.retryMs ?? 3000));

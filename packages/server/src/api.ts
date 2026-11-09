@@ -228,6 +228,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // Who's an admin (ADMIN_EMAILS): an admin owns one of every item, never stored (core/admin-copies.ts), so the profile,
   // shop and locker answers carry their admin copies, and others see the ones they wear.
   const admins: AdminCheck = (u) => isAdmin(env as AdminEnv, u);
+  // (Ranked's leave rules on the profile, L1: none while PAUSE_LEAVE_PENALTIES is on.)
+  const leaves = { leaves: !isPaused(env, "leave-penalties") };
 
   // GET /api/live: the live line (online, matches running, in queue, the playing-now list, typical waits). Polled by
   // the front door every few seconds and by matches every 30 s, so it also marks you as online.
@@ -339,7 +341,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       return new Response(null, { status: 302, headers });
     }
     headers.set("content-type", "application/json");
-    return new Response(JSON.stringify(await profile(sql, user, admins)), { status: 200, headers });
+    return new Response(JSON.stringify(await profile(sql, user, admins, leaves)), { status: 200, headers });
   };
 
   // GET /api/me: your profile (a guest account is made the first time). It also gives the device its marker.
@@ -347,11 +349,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const headers = new Headers({ "content-type": "application/json", "cache-control": "no-store" });
     if (!readCookie(request, DEVICE_COOKIE)) headers.append("set-cookie", cookie(DEVICE_COOKIE, randomToken(16), 400 * 86_400));
     // (Admins, ADMIN_EMAILS as for the fair-play review, also see the boss battle's test trigger.)
-    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins)), ...(admin ? { admin: true } : {}) }), { headers });
+    if (current) return new Response(JSON.stringify({ ...(await profile(sql, current, admins, leaves)), ...(admin ? { admin: true } : {}) }), { headers });
     // (A device that answered "too young" plays under the default name.)
     const g = await createGuest(sql, now, ageAnswer(request) === "under" ? "Player" : (url.searchParams.get("name") ?? "Player"));
     headers.append("set-cookie", sessionCookie(g.token));
-    return new Response(JSON.stringify(await profile(sql, g.user, admins)), { headers });
+    return new Response(JSON.stringify(await profile(sql, g.user, admins, leaves)), { headers });
   }
   if (!current) return json({ message: "No account on this device yet." }, 401);
 
@@ -368,7 +370,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     if (typeof body.chatOn === "boolean" && isSignedIn(current)) await setChatOn(sql, current.id, body.chatOn);
     const updated = await updateProfile(sql, current.id, body);
     if (body.pawn !== undefined) forgetLook(current.id);
-    return json(await profile(sql, updated, admins));
+    return json(await profile(sql, updated, admins, leaves));
   }
 
   // POST /api/auth/age {oldEnough}: the age question's answer, asked before any sign-in (the app works it out from the
@@ -666,7 +668,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       await endSession(sql, token);
     }
     const g = await createGuest(sql, now, "Player");
-    return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
+    return json(await profile(sql, g.user, admins, leaves), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
   // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----

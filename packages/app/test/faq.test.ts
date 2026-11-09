@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
-import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, type FaqSources } from "../src/faq/content.ts";
+import { BOSS_BRAIN, BOSS_DIFFICULTY, BOSS_POWERS, BOSS_ROSTER, BOSS_TIERS, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, LEAVES, LEAVING, RANKED_1V1, RECLUSE_PHASE2, crowdFinalBoss, crowdFinalists, fixedLevel, isPlayable, lastStandBar, maiaRatingFor, maiaTopRating } from "@chessroyale/core";
+import { BOSS_BLOCKS, FAQ_DEFAULTS, eloExpected, faqAnchors, faqPage, faqPlainText, faqSections, ranked1v1, rankedLeaving, type FaqSources } from "../src/faq/content.ts";
 import { inlineText, linksOf, parse, plainText } from "../src/faq/markdown.ts";
 
 /** The FAQ's text, built from these sources. */
@@ -765,5 +765,32 @@ describe("the FAQ's rating entry (Eric, Oct 28)", () => {
   it("Your rating says when your ranking changes, from the settings: 30 real players (15 in a raid), or the share's own counts (the sentence home's ⓘ carried until Oct 28)", () => {
     expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
     expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a raid).");
+  });
+});
+
+describe("ranked's leave rules in the FAQ (L1): every number from LEAVES", () => {
+  it("as set: −5, then −10 with the lockouts; a leave's 10 more; the last 20, the waits and the 24-hour lock; 90 days", () => {
+    const t = rankedLeaving(LEAVES);
+    expect(t).toContain("A dodge to level 1 costs 5 RP; from level 2 it costs 10 RP and locks you out of 1 v 1 for 5 minutes, then 30 minutes, 2 hours and 12 hours at most.");
+    expect(t).toContain("each 12 hours without a dodge lowers it by one again");
+    expect(t).toContain("unless it's before your 3rd move");
+    expect(t).toContain("a loss, then 10 RP more.");
+    expect(t).toContain("counted over your last 20 ranked games and dodges. With 3 or more, every 1 v 1 search waits 2 minutes longer before you can be matched (5 minutes with 5 or more). With 8 or more, 1 v 1 is locked for 24 hours.");
+    expect(t).toContain("kept 90 days");
+    // (The review's fixes: Cancel, the grace before you count as gone, a no-show only once told, the window's games.)
+    expect(t).toContain("Pressing Cancel the moment a match is found, before the game opens on your screen, isn't a dodge; once it has opened, Cancel is the same as Abort.");
+    expect(t).toContain("you count as gone only after 12 seconds without a connection");
+    expect(t).toContain("while you've been gone 12 seconds or more and your opponent is still there");
+    expect(t).toContain("not turning up once your device was told a match was found");
+    expect(t).toContain("Every ranked game you finish that counts for your rank pushes an old one out of the count.");
+    expect(ranked1v1(RANKED_1V1)).toContain(t);
+  });
+  it("follows the settings when they change", () => {
+    const t = rankedLeaving({ ...LEAVES, dodgeRp: [4, 9], leaveRp: 15, dodgeLockoutMin: [0, 10, 60], lockAt: 9, lockHours: 48, quickResignMoves: 4 });
+    expect(t).toContain("A dodge to level 1 costs 4 RP; from level 2 it costs 9 RP and locks you out of 1 v 1 for 10 minutes, then 1 hour at most.");
+    expect(t).toContain("a loss, then 15 RP more.");
+    expect(t).toContain("With 9 or more, 1 v 1 is locked for 48 hours.");
+    expect(t).toContain("before your 4th move");
+    expect(rankedLeaving({ ...LEAVES, goneGraceMs: 20_000 })).toContain("only after 20 seconds without a connection");
   });
 });
