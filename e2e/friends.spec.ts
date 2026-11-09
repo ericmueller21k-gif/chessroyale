@@ -133,7 +133,7 @@ test("two players: a request accepted, online in each other's list, the invites 
 });
 
 
-test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friends in a centered box; tap one for Invite to play or View profile; the dim closes it", { tag: "@phone-only" }, async ({ browser }) => {
+test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friends in a centered box; tap one for Invite to play or View profile; Private lobby opens the code sheet; the dim closes it", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const ann = await player(browser, "Ann Overlay");
   const bo = await player(browser, "Bo Overlay");
@@ -146,7 +146,7 @@ test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friend
 
   // The top bar's Friends: a centered box titled Friends (not the old sheet), Bo in it, online.
   await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  const box = ann.page.getByRole("dialog", { name: "Friends" });
+  const box = ann.page.getByRole("dialog", { name: "Friends", exact: true });
   await expect(box).toBeVisible();
   await expect(ann.page.getByRole("dialog", { name: "Play with friends" })).toHaveCount(0);
   const row = box.getByRole("button", { name: /^Bo Overlay, / });
@@ -168,6 +168,14 @@ test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friend
   expect(await row.boundingBox()).toEqual(before);
   await menu.getByRole("button", { name: "Close the menu" }).click();
   await expect(menu).toHaveCount(0);
+
+  // Private lobby ›: Play with friends' sheet (make a lobby or join by code), as the top bar opened before; its ✕ back home.
+  await box.getByRole("button", { name: /^Private lobby ›/ }).click();
+  const sheet = ann.page.getByRole("dialog", { name: "Play with friends" });
+  await expect(sheet.getByRole("button", { name: "Get friend code" })).toBeVisible();
+  await expect(box).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
 
   // A tap on the dim closes the box.
   await ann.page.mouse.click(4, ann.page.viewportSize()!.height - 4);

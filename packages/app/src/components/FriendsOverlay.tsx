@@ -11,8 +11,8 @@ import { PlayerName } from "./PlayerName.tsx";
  * in a centered box over home, in the Quests overlay's shell (the same dim, card, crest and ✕; tap the dim or Escape to close).
  * Inside, scrolling in the box only: invites to you (Join, ✕), friend requests (Accept, Decline), then your friends, online
  * first (the server's order), the offline ones greyed with when they were last online. Tap a friend: a small menu at the
- * box's foot with Invite to play (greyed with its reason when it can't go) and View profile. The footer's links: the full
- * list (requests sent, blocked) and, until home's Party option has it, the lobby code sheet. Classes start with `fo-`.
+ * box's foot with Invite to play (greyed with its reason when it can't go) and View profile. Above the list, Private lobby ›
+ * (Play with friends' sheet: make a lobby or join one by its code); the footer's link, the full list (requests sent, blocked). Classes start with `fo-`.
  */
 export function FriendsOverlay({
   onClose,
@@ -23,7 +23,7 @@ export function FriendsOverlay({
   onClose: () => void;
   /** The full friends list (/friends): requests sent, who's blocked. */
   onAllFriends: () => void;
-  /** Play with friends' sheet: a lobby code to share, or join one. */
+  /** Play with friends' sheet: the private lobby, made or joined by its code. */
   onLobbyCode: () => void;
   onSignIn: () => void;
 }) {
@@ -64,6 +64,14 @@ export function FriendsOverlay({
             Friends
           </h2>
         </header>
+        {/* (The private lobby: a code or link for up to 100, e.g. a streamer's; Play with friends' sheet, as the top bar opened before.
+            Always here, signed out too: Eric, Nov 9.) */}
+        <button type="button" class="fo-private" onClick={onLobbyCode}>
+          <span class="fr-row-text">
+            <strong class="fo-name">Private lobby ›</strong>
+            <span class="fr-status">Make one or join with a code</span>
+          </span>
+        </button>
         <div class="fo-list">
           {status === "signIn" && (
             <div class="fo-empty">
@@ -128,9 +136,6 @@ export function FriendsOverlay({
         <div class="fo-foot">
           <button type="button" class="fd-link fo-foot-link" disabled={!on} onClick={onAllFriends}>
             Requests sent and blocked ›
-          </button>
-          <button type="button" class="fd-link fo-foot-link" onClick={onLobbyCode}>
-            Lobby code ›
           </button>
         </div>
         {friend && <FriendMenu f={friend} onNote={(t, e) => say(t, !!e)} onClose={() => setPicked(null)} onProfile={onClose} />}

@@ -25649,13 +25649,28 @@ button.sq-tiny {
   line-height: 1;
   color: var(--fd-muted);
 }
+.fo-private {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--fd-gold);
+  background: var(--qo-row);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 .fo-note {
   margin: 0 4px;
 }
 .fo-foot {
   flex: none;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   padding: 2px 6px 0;
   font-size: 14px;

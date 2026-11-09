@@ -138,7 +138,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
-  - **Play with friends** (a phone's friends overlay's **Lobby code ›** since Nov 9, a computer's side menu): **Get friend code** makes a
+  - **Play with friends** (a phone's friends overlay's **Private lobby ›** since Nov 9, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
@@ -221,8 +221,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     friend requests (Accept, Decline), then your friends in the server's order (online, in a match, the rest), the offline
     ones greyed with "Last online 2h ago" (`FriendEntry.lastSeen`, the account's `users.last_seen`, null while they hide it;
     "Offline" without one). Tap a friend: a menu over the box's foot with **Invite to play** (`InviteButton`: your lobby or
-    party, or one made in home's mode; greyed with its reason when they're offline) and **View profile**. Its footer:
-    "Requests sent and blocked ›" (`/friends`) and "Lobby code ›" (Play with friends' sheet, until home's Party option has it).
+    party, or one made in home's mode; greyed with its reason when they're offline) and **View profile**. Above the list,
+    **Private lobby ›** ("Make one or join with a code": Play with friends' sheet, signed out too; Eric, Nov 9); its footer,
+    "Requests sent and blocked ›" (`/friends`).
     Signed out: "Sign in to add friends …" and Sign in; no friends: "Add friends from their profile: tap their name anywhere";
     paused: `pausedLine("friends")`.
   - **Where:** a phone's way in is **Friends** in home's top bar (the overlay above; its "Requests sent and blocked ›"), or Friends on your own
