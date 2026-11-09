@@ -533,3 +533,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~03:20: Eric OK'd #564 (guard helper) and "Yes" to a second Opus for XP. #564: .pr-body removed + main merged (3073237);
   CI watcher b5db4f6ux; merge on green. XP phase 1: Opus xhigh session_01JuCWRtw76FM64wxGBykpww on claude/xp-phase1 (done signal
   .pr-body.md; watcher). Eric had to sign in to Claude Code again (used his Claude account with the top plan): nothing needed.
+- Nov 9 ~03:45: #564 merged (edd3d01; watcher bu1a39o7l). #568 boss-result fix merged (0acd0cc; cause: ?mate=1 can't mate at
+  once vs Wrangler or Sawyer, test now names Hollow); watcher on main's full run. XP phase 1 running (watcher biax7eoce).
