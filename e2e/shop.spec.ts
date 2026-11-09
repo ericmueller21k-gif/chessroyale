@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { bossCrateOf } from "@chessroyale/core";
+import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
 import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
@@ -1467,7 +1467,94 @@ test("the shop has no \"Shop\" title on any tab; the locker has one pawn in a bo
   // showed the Winter pack and no God King pack.
   await expect(page.getByRole("tab", { name: "Chat packs", exact: true })).toHaveCount(0);
   await expect(page.locator(".shop-item", { hasText: "Winter pack" })).toHaveCount(0);
-  await expect(page.getByText("Nothing is for sale right now.")).toBeVisible();
+  await expect(page.getByText("Everything in the shop is 50% off during beta.")).toBeVisible();
+});
+
+/**
+ * The Shop tab's page (Eric's mockup, Nov 9; docs/decisions/2026-11-09-shop-page.md), look only: the line under the tabs, the special
+ * offer (its tab, the bundle's words, the Mythic Crate's icon), the five cards in order, each (and the bundle) with the discount's ribbon
+ * and its full price struck through beside the discounted one (from SHOP), the gold clock on the limited ones only, whose tap opens its
+ * pop-up, and a price's tap "Buying opens soon"; neither moves anything. Phone: 2 cards a row; computer: 4.
+ * SHOP_PAGE_SHOTS=<dir>: the PR's stills (phone 390 light and dark, top and scrolled; 320; the computer).
+ */
+test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards with the discount's ribbon and struck prices, the limited clock's pop-up, \"Buying opens soon\"; 2 a row on a phone, 4 on a computer", async ({ page, browser }, testInfo) => {
+  const computer = testInfo.project.name === "desktop";
+  await asSignedIn(page, "shopper");
+  await page.goto("/shop");
+  const pct = Math.round(SHOP.discount * 100);
+  await expect(page.getByText(`Everything in the shop is ${pct}% off during beta.`)).toBeVisible();
+  const offer = page.locator(".shop-offer");
+  for (const words of ["SPECIAL OFFER", "Crate + Key Bundle", "3 Keys + 3 Random Crates", "Includes a chance at a", "Mythic Crate."]) await expect(offer).toContainText(words);
+  await expect(offer.locator(".bundle-art svg")).toHaveCount(1);
+  await expect(offer.locator(".shop-mythic-icon .mythic-crate-art")).toHaveCount(1);
+  const cards = page.locator(".shop-card");
+  await expect(cards.locator("strong")).toHaveText(["Boss Crate", "HunChess Crate", "Gift Crate", "Beta Crate", "Crate Key"]);
+  await expect(page.locator('.shop-card[data-offer="boss"] .boss-crate-art')).toHaveCount(1);
+  // The ribbon and the struck price on every card and the bundle, from the setting.
+  for (const id of ["bundle", "boss", "hunchess", "gift", "beta", "key"] as const) {
+    const box = page.locator(`[data-offer="${id}"]`);
+    await expect(box.locator(".shop-ribbon")).toHaveText(discountLabel()!);
+    await expect(box.locator(".shop-price s")).toHaveText(String(SHOP.prices[id]));
+    await expect(box.locator(".shop-price b")).toHaveText(String(shopPrice(SHOP.prices[id])));
+  }
+  expect(discountLabel()).toBe(`${pct}% OFF`);
+  // The clock on the limited items only.
+  await expect(page.locator(".shop-card:has(.shop-clock)")).toHaveCount(SHOP.limited.length);
+  for (const id of ["boss", "hunchess", "key"]) await expect(page.locator(`.shop-card[data-offer="${id}"] .shop-clock`)).toHaveCount(0);
+  // 2 a row on a phone, 4 on a computer.
+  const tops = await cards.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+  const perRow = tops.filter((t) => t === tops[0]).length;
+  expect(perRow, "cards a row").toBe(computer ? 4 : 2);
+  // The pop-ups: the clock's words, then a price's; nothing moves while either shows.
+  const boxes = () => page.locator(".shop-offer, .shop-card, .area-tabs, .shop-line").evaluateAll((els) =>
+      els.map((e) => {
+        // (In the page, not the window: a tap may scroll its button into view.)
+        const b = e.getBoundingClientRect();
+        return [b.left + scrollX, b.top + scrollY, b.width, b.height].map(Math.round).join(",");
+      }),
+    );
+  const before = await boxes();
+  await page.locator('.shop-card[data-offer="gift"] .shop-clock').click();
+  const pop = page.getByRole("dialog");
+  await expect(pop).toHaveText(/Limited: a rotating shop item\. It leaves the shop when its time is up\./);
+  expect(await boxes()).toEqual(before);
+  await pop.getByRole("button", { name: "OK" }).click();
+  await expect(pop).toHaveCount(0);
+  await page.locator('.shop-card[data-offer="key"] .shop-price').click();
+  await expect(pop).toHaveText(/Buying opens soon\./);
+  expect(await boxes()).toEqual(before);
+  await page.keyboard.press("Escape");
+  await expect(pop).toHaveCount(0);
+  await page.locator('.shop-offer .shop-price').click();
+  await expect(pop).toHaveText(/Buying opens soon\./);
+  await page.mouse.click(5, 5);
+  await expect(pop).toHaveCount(0);
+  // The stills, at deviceScaleFactor 2, in a context of their own (the same account), from the computer's run.
+  const shots = process.env.SHOP_PAGE_SHOTS;
+  if (shots && computer) {
+    const state = await page.context().storageState();
+    const sizes = [
+      ["phone-390", 390, 844, ["light", "dark"]],
+      ["phone-320", 320, 640, ["light"]],
+      ["computer-1440", 1440, 900, ["light", "dark"]],
+    ] as const;
+    for (const [name, width, height, schemes] of sizes) {
+      for (const colorScheme of schemes) {
+        const ctx = await browser.newContext({ storageState: state, deviceScaleFactor: 2, viewport: { width, height }, colorScheme, baseURL: testInfo.project.use.baseURL });
+        const p = await ctx.newPage();
+        await p.goto("/shop");
+        await expect(p.locator(".shop-card")).toHaveCount(5);
+        await p.waitForTimeout(400);
+        await p.screenshot({ path: `${shots}/${name}-${colorScheme}-top.png` });
+        if (!name.startsWith("computer")) {
+          await p.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+          await p.waitForTimeout(300);
+          await p.screenshot({ path: `${shots}/${name}-${colorScheme}-scrolled.png` });
+        }
+        await ctx.close();
+      }
+    }
+  }
 });
 
 /**
@@ -1483,7 +1570,8 @@ test("the shop page's width (Eric, Nov 8): on a computer all three tabs sit 120 
   await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await page.goto("/shop");
   const cases = [
-    // (The Shop case is paused with CHAT_PACKS_SHOP off, Nov 8: no tab and nothing for sale to lay out. It comes back with a tab.)
+    // The Shop tab's page (Nov 9): the special offer's banner and its cards (paused Nov 8 while nothing was for sale).
+    { tab: "Shop", shot: "shop", chips: null, box: ".shop-offer", card: ".shop-card", grid: ".shop-cards" },
     { tab: "Crates", shot: "crates", chips: null, box: null, card: ".crates .crate-row", grid: ".crates" },
     { tab: "Locker", shot: "locker-W", chips: ".locker-tabs", box: ".locker-preview", card: ".locker-item", grid: ".locker-grid" },
   ] as const;
