@@ -138,7 +138,7 @@ test("ranked's leave rules (L1): a lockout greys 1 v 1's PLAY with its countdown
   const standing = { marks: 2, level: 2, lock: "dodge", delaySec: 0, nextDodge: { rp: 10, lockoutMin: 30 }, dodged: null };
   const play = page.getByRole("button", { name: "PLAY", exact: true });
   const line = page.locator(".fd-go > .fd-hint");
-  for (const width of desktop() ? [1280] : [320, 390]) {
+  for (const width of desktop() ? [1280] : [390, 320]) {
     if (!desktop()) await page.setViewportSize({ width, height: 740 });
     leaves = () => ({ ...standing, lockedUntil: Date.now() + 4 * 60_000 + 30_000 });
     await page.goto("/?mode=1v1&nolanding");
@@ -150,6 +150,18 @@ test("ranked's leave rules (L1): a lockout greys 1 v 1's PLAY with its countdown
     expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
     expect((await words.boundingBox())!.height, `${width}: one line`).toBeLessThan(20);
     expect(await sideways(page), `${width}`).toBe(0);
+  }
+  // The widest line (the 24-hour lock, in hours) and the delayed queue's: one line too (at 320 px on a phone).
+  for (const [make, text] of [
+    [() => ({ ...standing, marks: 8, lock: "leaves", lockedUntil: Date.now() + 23 * 3_600_000 + 59 * 60_000 + 50_000 }), /^Too many leaves: 1 v 1 opens in 23:59:\d\d$/],
+    [() => ({ ...standing, marks: 7, lock: null, lockedUntil: null, delaySec: 300 }), /^7 leaves in your last 20: \+5 min queue$/],
+  ] as const) {
+    leaves = make;
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(text);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, "one line").toBeLessThan(20);
   }
   // Another mode's PLAY isn't locked.
   await page.getByRole("radio", { name: /^50 v 50/ }).click();
