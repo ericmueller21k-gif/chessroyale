@@ -9225,8 +9225,8 @@ button.fd-logo {
 }
 /*
  * The profile square's face (Eric, Nov 9: "a zoom in of your guy's head, but there should still be padding around all the sides,
- * just like for the rest of the icons"): a rounded window inset `--pad` from the square's edges (the square's own background
- * around it), your pawn inside it at `--face` with its head in view. The window clips with `clip-path`, never `overflow: hidden`
+ * just like for the rest of the icons"): a window inset `--pad` from the square's edges, on the square's own gray (no layer of
+ * its own), your pawn inside it at `--face` with its head in view. The window clips with `clip-path`, never `overflow: hidden`
  * (the Quests spec's "cut" guard).
  */
 .fd-top .fd-top-face {
@@ -9243,7 +9243,6 @@ button.fd-logo {
   width: auto;
   height: auto;
   border-radius: 8px;
-  background: var(--fd-panel);
   clip-path: inset(0 round 8px);
 }
 .fd-top .fd-top-face .fd-pawn-ring .fd-pawn-box {
