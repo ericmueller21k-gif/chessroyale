@@ -144,7 +144,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
-  - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
+  - **Play with friends** (a phone's friends overlay's **Private lobby ›** since Nov 9, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
@@ -221,7 +221,18 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **Where:** a phone's way in is **Friends** in home's top bar (its sheet's "Your friends ›"), or Friends on your own
+  - **The friends overlay (phone, Nov 9; [docs/decisions/2026-11-09-friends-overlay.md](../decisions/2026-11-09-friends-overlay.md)):**
+    the top bar's **Friends** opens a centered box in the Quests overlay's shell (`components/FriendsOverlay.tsx`; the same dim,
+    card, crest and ✕; the dim or Escape closes it), a fixed height with the list scrolling inside: invites to you (Join, ✕),
+    friend requests (Accept, Decline), then your friends in the server's order (online, in a match, the rest), the offline
+    ones greyed with "Last online 2h ago" (`FriendEntry.lastSeen`, the account's `users.last_seen`, null while they hide it;
+    "Offline" without one). Tap a friend: a menu over the box's foot with **Invite to play** (`InviteButton`: your lobby or
+    party, or one made in home's mode; greyed with its reason when they're offline) and **View profile**. Above the list,
+    **Private lobby ›** ("Make one or join with a code": Play with friends' sheet, signed out too; Eric, Nov 9); its footer,
+    "Requests sent and blocked ›" (`/friends`).
+    Signed out: "Sign in to add friends …" and Sign in; no friends: "Add friends from their profile: tap their name anywhere";
+    paused: `pausedLine("friends")`.
+  - **Where:** a phone's way in is **Friends** in home's top bar (the overlay above; its "Requests sent and blocked ›"), or Friends on your own
     profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's right column has "FRIENDS ›" (Nov 7: the list and its Invite buttons went with Eric's mockup; requests' count
     beside it). Both open the friends list (`/friends`): invites to you (Join,

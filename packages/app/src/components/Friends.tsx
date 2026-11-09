@@ -23,6 +23,7 @@ import {
 import { FdButton } from "./FrontDoor.tsx";
 import { useMedia } from "./QuickChat.tsx";
 import { PlayerName } from "./PlayerName.tsx";
+import { ago } from "../public-profile.ts";
 
 /**
  * Friends' pieces (docs/decisions/2026-10-15-friends-and-invites.md): a friend's row, the phone home's line and the computer's live
@@ -30,13 +31,20 @@ import { PlayerName } from "./PlayerName.tsx";
  * settings, and the friend buttons on a profile. Classes start with `fr-`.
  */
 
-/** "Online", "In a match", "Offline", or "Online status hidden" for a friend who hides it. */
-export function friendStatus(f: FriendEntry): string {
+/**
+ * "Online", "In a match", "Last online 2h ago" (or "Offline" when the server didn't say when), or "Online status hidden" for a
+ * friend who hides it. The "ago" words are the public profile's (public-profile.ts).
+ */
+export function friendStatus(f: FriendEntry, now = Date.now()): string {
   if (f.hidden) return "Online status hidden";
-  return f.busy ? "In a match" : f.online ? "Online" : "Offline";
+  if (f.busy) return "In a match";
+  if (f.online) return "Online";
+  if (!f.lastSeen) return "Offline";
+  const when = ago(f.lastSeen, now);
+  return `Last online ${when === "Yesterday" ? "yesterday" : when}`;
 }
 
-function Dot({ f }: { f: FriendEntry }) {
+export function Dot({ f }: { f: FriendEntry }) {
   return <span class={`fr-dot${f.hidden ? " hidden" : f.busy ? " busy" : f.online ? "" : " off"}`} aria-hidden="true" />;
 }
 

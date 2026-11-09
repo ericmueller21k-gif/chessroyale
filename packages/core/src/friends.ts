@@ -40,6 +40,8 @@ export interface FriendEntry {
   busy: boolean;
   /** They hide when they're online (Settings → Friends): no dot either way. */
   hidden: boolean;
+  /** When they were last seen (ms; `users.last_seen`), for "Last online 2h ago"; null while they hide it (older servers: absent). */
+  lastSeen?: number | null;
 }
 
 export interface FriendRequestEntry {

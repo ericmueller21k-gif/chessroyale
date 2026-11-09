@@ -277,7 +277,7 @@ export async function friendsState(sql: Sql, meId: string, now: number, presence
   );
   const live = await presenceRows(rows, now, presenceOf);
   const friends = rows
-    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online }))
+    .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online, lastSeen: r.hide_online ? null : r.last_seen }))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
   const requests = await sql.all<{ id: string; name: string; at: number }>(
     `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
