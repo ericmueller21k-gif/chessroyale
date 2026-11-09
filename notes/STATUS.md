@@ -524,3 +524,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   gear (#565's bigger words). Fix forward PR #567 (claude/autochess-gear-clear, deed0a6): bigger words only at >= 360 wide and
   >= 700 tall. Passes locally both projects. CI watcher boam8v6gj; merge on green.
 - Still waiting on Eric: OK for #564 (town-leave guard test helper), the XP design answers.
+- Nov 9 ~03:10: #567 merged (729e639). Main full run on 729e639: 19.3 min total, runner waits 3 s (Pro works). RED on two:
+  squads-watch:167 (fixed by #564, waiting on Eric's OK) and boss-result.spec.ts:44 phone, both tries ("Defeated" never shown;
+  passes locally). Opus helper session_01JuCWRtPbmgkwnC1WZ6Ma44 on claude/fix-boss-result-red (done signal .pr-body.md).
