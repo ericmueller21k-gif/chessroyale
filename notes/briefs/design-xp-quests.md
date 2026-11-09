@@ -88,6 +88,17 @@ Eric listed the daily XP bonus and the daily crate and key separately. **I'd mak
   - **Nothing in this project sells anything.** It only makes keys their own currency, so selling them later is a small step.
 
 ### 5. The daily overlay (Hearthstone style)
+**Eric's reference (Nov 9): assets/quests-overlay-eric-ref.png** (a ChatGPT mockup: "I actually like about 90% where it's gone with
+this … if we tweak this to match the game, it is probably actually a fairly good starting place"). Its layout is the target:
+a framed card over a blurred home, a pawn crest, "Daily Quests", "New quests in 12h", one row per quest (icon, name, goal, progress
+bar and count, reward with crate/key art), a button at the foot. Our tweaks (director, to confirm with Eric):
+- Our own art and type (the game's pixel style, boss portraits as quest icons, our crate and key art), simpler frame (CSS).
+- 2 daily rows + 1 weekly row (marked "Weekly", its own reset countdown), as designed.
+- No auto chess quests until auto chess is played on the server (today the device's word: not verifiable).
+- Rewards follow the economy (keys scarce): dailies give XP (and sometimes a crate), the weekly gives the key.
+- Rewards are granted the moment a quest completes (server), so the foot button is "Got it" (or Close); each daily has a small
+  reroll icon (one free reroll a day).
+
 - **When it shows:** the first time you open the app each day (signed in), over home.
   - the day's daily reward (done or not);
   - your daily quests and the weekly one, with progress bars;
