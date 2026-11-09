@@ -81,9 +81,12 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   expect(fill[0]!.done, "not done as it starts to fill").toBe(false);
   expect(fill[0]!.share, "starts at the old XP: 990 of Level 1's 1,000").toBeCloseTo(0.99, 2);
   expect(fill.at(-1)!.share, "ends at the new: 160 of Level 2's 1,000").toBeCloseTo(0.16, 2);
+  // (Review m7: while waiting, the bar stands at the XP it showed first, even once the profile has the new XP; so from the box's
+  // first frame, waiting included, it never steps back.)
+  for (const s of all.filter((x) => x.wait)) expect(s.share, "waiting: the old XP, standing still").toBeCloseTo(0.99, 2);
   let wraps = 0;
-  for (let i = 1; i < fill.length; i++) {
-    const [a, b] = [fill[i - 1]!, fill[i]!];
+  for (let i = 1; i < all.length; i++) {
+    const [a, b] = [all[i - 1]!, all[i]!];
     if (b.share < a.share) {
       // (The one way it goes back: a level-up, from the end to empty.)
       wraps++;
@@ -149,13 +152,14 @@ test('"No XP: you resigned before move 10.": resigning at once, no test switch o
   await expect(page.getByTestId("xp-box").locator(".xp-why")).toHaveText("No XP: you resigned before move 10.", { timeout: 20_000 });
 });
 
-test("each other \"No XP\" line, in the same box and size (the server's answer faked): ended early, left, a guest, banned", async ({ page }) => {
+test("each other \"No XP\" line, in the same box and size (the server's answer faked): ended early, left, a guest, banned, the daily solo limit", async ({ page }) => {
   test.setTimeout(4 * 60_000);
   for (const [none, line] of [
     ["short", "No XP: the game ended before move 10."],
     ["left", "No XP: you left the match."],
     ["guest", "Sign in to earn XP."],
     ["banned", "No XP: this account is banned."],
+    ["limit", "No XP: daily solo limit reached."],
   ] as const) {
     await page.unrouteAll();
     await page.route(/\/api\/results$/, async (route) => {
@@ -182,7 +186,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
     const res = await route.fetch();
     await route.fulfill({
       response: res,
-      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 100, levelAfter: 101, parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
+      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 100, levelAfter: 101, parts: [{ label: "30 min (Daily solo limit)", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
     });
   });
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
@@ -190,7 +194,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   const box = page.getByTestId("xp-box");
   await expect(box).toHaveClass(/xp-done/, { timeout: 120_000 });
   await expect(box.locator(".xp-gain")).toHaveText("+300 XP");
-  await expect(box.locator(".xp-parts")).toHaveText("30 min +300 · Win (paid once today) +0");
+  await expect(box.locator(".xp-parts")).toHaveText("30 min (Daily solo limit) +300 · Win (paid once today) +0");
   await expect(box.locator(".xp-level")).toHaveText("Level 101");
   for (const sel of [".xp-top", ".xp-parts"]) expect(await box.locator(sel).evaluate((e) => e.scrollWidth <= e.clientWidth), `${sel} fits at 320 px`).toBe(true);
   const b = (await box.boundingBox())!;
