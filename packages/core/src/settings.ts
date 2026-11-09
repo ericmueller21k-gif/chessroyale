@@ -375,6 +375,8 @@ export interface Settings {
    * or "random" (each bot's rating uniform over BOT_LOBBY.ratings' range). Unset: BOT_LOBBY's own curve, as before (online lobbies).
    */
   botLevel?: number | "random";
+  /** The people a 50 v 50 party (a private Crowd lobby) seats: CROWD_PARTY_MAX when unset (lobbyPeopleCap). Tests that seat more set it. */
+  partyPeople?: number;
   botRandomMoveChance: number;
   /** Crowd 50 v 50's bots (CROWD_BOTS): spread over the good lines with each turn's shared lean. Unset: botPick as before. */
   crowdBots?: CrowdBotSpread;
@@ -703,8 +705,8 @@ export function botLevelMean(id: BotLevelId, yourRating: number | null): number 
  * The humans a lobby seats: a 50 v 50 party (a private Crowd lobby, home's Party; Eric, Nov 9: "you can invite up to 8 people") takes
  * CROWD_PARTY_MAX, bots filling the rest; every other lobby its whole size.
  */
-export function lobbyPeopleCap(s: Pick<Settings, "mode" | "raid" | "lobbySize">, priv: boolean): number {
-  return priv && s.mode === "crowd" && !s.raid ? Math.min(s.lobbySize, CROWD_PARTY_MAX) : s.lobbySize;
+export function lobbyPeopleCap(s: Pick<Settings, "mode" | "raid" | "lobbySize" | "partyPeople">, priv: boolean): number {
+  return priv && s.mode === "crowd" && !s.raid ? Math.min(s.lobbySize, s.partyPeople ?? CROWD_PARTY_MAX) : s.lobbySize;
 }
 /** A 50 v 50 party's people: you and up to 8 friends (Eric, Nov 9). */
 export const CROWD_PARTY_MAX = 9;

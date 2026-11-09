@@ -14,7 +14,8 @@ function lobby(seed: number) {
     { now: () => now, send: (id, msg) => inbox.set(id, [...(inbox.get(id) ?? []), { ...msg, now } as ServerMessage]) },
     library,
     mulberry32(seed),
-    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), powerUpsAtStart: 1 },
+    // (Ten people in a private lobby: more than a 50 v 50 party's 9 since Nov 9, so its cap is raised here.)
+    { ...DEFAULT_SETTINGS, ...modeSettings("crowd", { augments: false }), powerUpsAtStart: 1, partyPeople: 100 },
   );
   const last = <T extends ServerMessage["t"]>(id: string, t: T) =>
     [...(inbox.get(id) ?? [])].reverse().find((m) => m.t === t) as Extract<ServerMessage, { t: T }> | undefined;
