@@ -460,7 +460,8 @@ describe("the FAQ's numbers come from the settings", () => {
   it("XP and levels (Nov 9), from the settings: a level's XP, a game's, the move minimum, each \"No XP\" reason, the caps", () => {
     const t = section("xp");
     expect(t).toContain("Each level takes 1,000 XP, the same for every level, with no top level. You start at Level 1.");
-    expect(t).toContain("10 XP for each whole minute you played, up to 30 minutes, plus 50 XP for a win. So a game earns at most 350 XP.");
+    expect(t).toContain("more for a longer game, plus 50 XP for a win. A game earns at most 350 XP.");
+    expect(t).toContain("(1,200 XP a day before win bonuses)");
     expect(t).toContain("A game counts from your 10th move.");
     expect(t).toContain('"No XP: the game ended before move 10."');
     expect(t).toContain('"No XP: you resigned before move 10."');
@@ -470,7 +471,11 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("08:00 UTC (midnight Pacific)");
     const moved = section("xp", { ...FAQ_DEFAULTS, xp: { ...FAQ_DEFAULTS.xp, perLevel: 1500, perMinute: 12, maxMinutes: 25, win: 40, minMoves: 8, soloWinsPerDay: 3 } });
     expect(moved).toContain("Each level takes 1,500 XP");
-    expect(moved).toContain("12 XP for each whole minute you played, up to 25 minutes, plus 40 XP for a win. So a game earns at most 340 XP.");
+    expect(moved).toContain("more for a longer game, plus 40 XP for a win. A game earns at most 340 XP.");
+    // (No minutes and no per-minute numbers, Eric, Nov 9: "we dont want players to know they could just stall".)
+    for (const x of [t, moved]) {
+      expect(x).not.toMatch(/\bminutes?\b|\bmin\b|per minute|a minute/i);
+    }
     expect(moved).toContain("from your 8th move");
     expect(moved).toContain("3 wins a day");
   });

@@ -5,13 +5,12 @@ import { elimination, lossRows, myTeam, scoreDp, type GameView } from "../game.t
 import { useState } from "preact/hooks";
 import { Breakdown } from "../components/Breakdown.tsx";
 import { ordinal } from "./StageBreak.tsx";
-import { GodKingEpilogue, LastStandCard } from "../components/LastStand.tsx";
+import { LastStandCard } from "../components/LastStand.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
 import { ChatSection, useMedia } from "../components/QuickChat.tsx";
 import { bossInText, crowdFinalists, rankedMinHumans } from "@chessroyale/core";
-import { BossCharacter, BossTag, hasCharacter } from "../components/BossCharacter.tsx";
-import { YourPawn } from "../components/BossDock.tsx";
-import { pawnLook } from "../looks.ts";
+import { BossTag, hasCharacter } from "../components/BossCharacter.tsx";
+import { ResultDuo } from "../components/ResultDuo.tsx";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
@@ -118,20 +117,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
             )}
           </p>
         )}
-        {/* A boss with a character takes its bow: knocked off its pogo, or bouncing in triumph. */}
-        {/* After a Last Stand: the boss on the left, the God King with your pawn on the right, one row (Eric, Nov 8). */}
-        {bossResult && match.boss?.lastStand ? (
-          <div class="results-duo">
-            <BossCharacter match={match} place="results" />
-            <GodKingEpilogue side={match.boss.crowdSide} rises={bossResult === "crowd"}>
-              <div class="gk-epilogue-you">
-                <YourPawn look={pawnLook({ id: "", isYou: true, isBot: false }).look} side={match.boss.crowdSide} hopAt={0} />
-              </div>
-            </GodKingEpilogue>
-          </div>
-        ) : (
-          bossResult && match.boss && <BossCharacter match={match} place="results" />
-        )}
+        {/* The boss on the left (his bow, or his attack on you if he won), your pawn on the right with your XP under it; no God
+            King (Eric, Nov 9: ResultDuo). */}
+        {bossResult && match.boss && <ResultDuo match={match} result={bossResult} xp={xp} />}
         {bossResult && match.boss && (
           <p class={`team-result ${bossResult === "crowd" && survived ? "good" : bossResult === "boss" ? "bad" : ""}`}>
             {hasCharacter(match) ? null : <><BossTag boss={match.boss} /> </>}
@@ -169,8 +157,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
               : "Unranked: solo games don't count for ranking."}
           </p>
         )}
-        {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen. */}
-        <XpResult xp={xp} />
+        {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen (a boss battle's: under your pawn). */}
+        {!(bossResult && match.boss) && <XpResult xp={xp} />}
         {/* Online: quick chat, for the GGs. */}
         <ChatSection match={match} />
         {me && (

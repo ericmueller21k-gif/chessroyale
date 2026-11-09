@@ -45,13 +45,25 @@ async function sampleXp(page: Page) {
 type Sample = { t: number; share: number; gain: string; level: string; pop: string | null; box: number[]; title: number[] | null; actions: number[] | null; wait: boolean; done: boolean };
 const samples = (page: Page) => page.evaluate(() => (window as unknown as { __xp: Sample[] }).__xp);
 
-/** The box's top row: the gain, your name and the level never overlap; `centered`: the name's middle is the box's (within 3 px). */
+/**
+ * The box's top: the gain, your name and the level never overlap; `centered`: the name's middle is the box's (within 3 px). The
+ * compact box (a boss battle's result, under your pawn, Nov 9) has your name on a line of its own above the gain and the level.
+ */
 async function topRowFits(box: Locator, centered: boolean) {
   const [g, n, l, b] = await Promise.all([".xp-gain", ".xp-name", ".xp-level", ""].map((s) => (s ? box.locator(s) : box).boundingBox()));
-  expect(g!.x + g!.width, "the gain ends before the name").toBeLessThanOrEqual(n!.x + 0.5);
-  expect(n!.x + n!.width, "the name ends before the level").toBeLessThanOrEqual(l!.x + 0.5);
+  if (/xp-compact/.test((await box.getAttribute("class")) ?? "")) {
+    expect(n!.y + n!.height, "the name above the gain").toBeLessThanOrEqual(g!.y + 0.5);
+    expect(n!.y + n!.height, "the name above the level").toBeLessThanOrEqual(l!.y + 0.5);
+    expect(g!.x + g!.width, "the gain ends before the level").toBeLessThanOrEqual(l!.x + 0.5);
+  } else {
+    expect(g!.x + g!.width, "the gain ends before the name").toBeLessThanOrEqual(n!.x + 0.5);
+    expect(n!.x + n!.width, "the name ends before the level").toBeLessThanOrEqual(l!.x + 0.5);
+  }
   if (centered) expect(Math.abs(n!.x + n!.width / 2 - (b!.x + b!.width / 2)), "the name centered").toBeLessThan(3);
 }
+
+/** The box's fixed height: 78 px, or 96 for the compact box (a boss battle's result, under your pawn, Nov 9; its last row two lines). */
+const boxHeight = async (box: Locator) => (/xp-compact/.test((await box.getAttribute("class")) ?? "") ? 96 : 78);
 
 /** Your account's XP, once it's loaded and the ?xp= switch has set it. */
 async function xpIs(page: Page, xp: number) {
@@ -81,7 +93,11 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   await expect(box).toHaveClass(/xp-done/, { timeout: 20_000 });
   await expect(box.locator(".xp-gain")).toHaveText("+170 XP");
   await expect(box.locator(".xp-level")).toHaveText("Level 2");
-  await expect(box.locator(".xp-parts")).toHaveText("12 min +120 · Win +50");
+  // (Never the minutes, Eric, Nov 9: "we dont want players to know they could just stall to get more XP"; the total counts them.)
+  await expect(box.locator(".xp-parts")).toHaveText("Win +50");
+  await expect(box.locator(".xp-parts")).not.toContainText("min");
+  // (A boss battle's result: the compact box under your pawn, Nov 9.)
+  await expect(box).toHaveClass(/xp-compact/);
   // Whose XP (Eric, Nov 9): your name in the top row, centered in the box, between the gain and the level.
   const name = ((await (await page.request.get("/api/me")).json()) as { user: { name: string } }).user.name;
   await expect(box.getByTestId("xp-name")).toHaveText(name);
@@ -120,7 +136,7 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   // from the box's first frame to its last.
   const shape = (x: Sample) => [x.box[0], x.box[1]! - x.title![1]!, x.box[2], x.box[3], x.actions![1]! - x.title![1]!, x.title![2], x.title![3], x.actions![3]];
   for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
-  expect(all[0]!.box[3], "the box's fixed height").toBe(78);
+  expect(all[0]!.box[3], "the box's fixed height").toBe(await boxHeight(box));
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
   // Home: the real level and its ring (Level 2, 16% of the way round).
   await page.getByRole("button", { name: "Home", exact: true }).click();
@@ -142,7 +158,7 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(box.locator(".xp-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await expect(box.locator(".xp-gain")).toHaveText("+0 XP");
   await expect(box.locator(".xp-level")).toHaveText("Level 1");
-  expect((await box.boundingBox())!.height).toBe(78);
+  expect((await box.boundingBox())!.height).toBe(await boxHeight(box));
   // (The bar stands at your XP: 250 of 1,000.)
   const share = await box.locator(".xp-fill").evaluate((e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
   expect(share).toBeCloseTo(0.25, 2);
@@ -185,9 +201,10 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     await expect(box.locator(".xp-why")).toHaveText(line, { timeout: 20_000 });
     await expect(box.locator(".xp-level")).toHaveText("Level 5");
     const b = (await box.boundingBox())!;
-    expect(b.height, none).toBe(78);
+    expect(b.height, none).toBe(await boxHeight(box));
     // (Whole on its line: not cut.)
-    expect(await box.locator(".xp-parts").evaluate((e) => e.scrollWidth <= e.clientWidth), `${none}: the line fits`).toBe(true);
+    // (Whole: no wider than its row, and no taller: the compact box's row holds two lines.)
+    expect(await box.locator(".xp-parts").evaluate((e) => e.scrollWidth <= e.clientWidth && e.scrollHeight <= e.clientHeight), `${none}: the line fits`).toBe(true);
   }
 });
 
@@ -213,7 +230,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   expect(await box.getByTestId("xp-name").evaluate((e) => e.scrollWidth > e.clientWidth), "the long name is ellipsized").toBe(true);
   await topRowFits(box, false);
   await expect(box.locator(".xp-gain")).toHaveText("+300 XP");
-  await expect(box.locator(".xp-parts")).toHaveText("30 min +300 · Win (paid once today) +0");
+  await expect(box.locator(".xp-parts")).toHaveText("Win (paid once today) +0");
   await expect(box.locator(".xp-level")).toHaveText("Level 101");
   for (const sel of [".xp-top", ".xp-parts"]) expect(await box.locator(sel).evaluate((e) => e.scrollWidth <= e.clientWidth), `${sel} fits at 320 px`).toBe(true);
   const b = (await box.boundingBox())!;

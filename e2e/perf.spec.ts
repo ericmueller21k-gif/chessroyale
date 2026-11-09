@@ -380,3 +380,23 @@ test("the XP box on a slow phone: the result screen's frames while the bar fills
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
+
+test("the boss's attack on your pawn on a slow phone: a loss's result screen while he attacks and your XP fills (Nov 9)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(3 * 60_000);
+  await page.addInitScript(instrument);
+  // (Ginger mates you at once: his attack where he stands, your pawn jolting at each lash, ResultDuo.tsx.)
+  await page.goto("/?debug&nolanding&pace=quick&mate=1&boss=gingerbread");
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("boss");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.locator(".results-duo").waitFor({ timeout: 60_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect(page.locator(".results-duo")).toHaveAttribute("data-attack", "done", { timeout: 30_000 });
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`the boss's attack on your pawn (slowed phone): ${f(s)}`);
+  expect(s.n, "frames while he attacked").toBeGreaterThan(20);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});
