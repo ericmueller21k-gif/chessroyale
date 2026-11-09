@@ -27,7 +27,7 @@ import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
-import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult } from "./account.ts";
+import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
 import { setLiveBusy, startLive } from "./live.ts";
@@ -65,6 +65,7 @@ import { noteWhere } from "./problems.ts";
 import { testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
+import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
 
 /**
@@ -395,7 +396,12 @@ export function App() {
     } catch {
       // No storage.
     }
-    void loadAccount(name);
+    // (The test switch ?xp=<n>: your XP set to n once your account has loaded, to reach a level-up; test servers and admins only.)
+    // (Read once the account has loaded: only then does the server's config say whether the test switches apply.)
+    void loadAccount(name).then(() => {
+      const xp = Number(testParams().get("xp"));
+      if (testParams().has("xp") && Number.isInteger(xp)) void setTestXp(xp).catch(() => undefined);
+    });
   }, []);
   // A solo match's result goes on your profile (online results are saved by the server).
   useEffect(() => {
@@ -408,30 +414,47 @@ export function App() {
     const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
     const bossResult = match.phase.bossResult;
     // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
-    const resigned = match.phase.left?.how === "resigned" || match.phase.left?.how === "afk";
-    void recordSoloResult({
-      mode: raid ? "boss" : match.settings.mode,
-      placement: match.phase.placement,
-      players: match.totalPlayers,
-      team: me?.team ?? null,
-      teamWon: resigned
-        ? me?.team || runner.boss
-          ? false
-          : null
-        : bossResult
-        ? feats?.survived && bossResult !== "draw"
-          ? bossResult === "crowd"
-          : null
-        : match.phase.gameWinner === undefined || !me?.team
-          ? null
-          : match.phase.gameWinner === me.team,
-      avgScore: me?.avg ?? null,
-      rating: me?.rating ?? null,
-      brilliant: match.moves.filter((m) => m.brilliant).length,
-      bestMove: bestMoveOf(match.moves),
-      ...feats,
-      ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
-      evalBar: evalBarOn(),
+    const how = match.phase.left?.how;
+    const resigned = how === "resigned" || how === "afk";
+    const mode = raid ? "boss" : match.settings.mode;
+    const solo = match;
+    const placement = match.phase.placement;
+    const teamWon = resigned
+      ? me?.team || runner.boss
+        ? false
+        : null
+      : bossResult
+      ? feats?.survived && bossResult !== "draw"
+        ? bossResult === "crowd"
+        : null
+      : match.phase.gameWinner === undefined || !me?.team
+        ? null
+        : match.phase.gameWinner === me.team;
+    // XP (Nov 9): the server's clock times the game (its id from the start); your moves, the win, a resign and a test switch are this
+    // device's word, which can only lower it. The answer's XP goes to the result screen's box (xp.ts).
+    void soloGameId(solo).then(async (game) => {
+      const xp = await recordSoloResult({
+        mode,
+        placement,
+        players: solo.totalPlayers,
+        team: me?.team ?? null,
+        teamWon,
+        avgScore: me?.avg ?? null,
+        rating: me?.rating ?? null,
+        brilliant: solo.moves.filter((m) => m.brilliant).length,
+        bestMove: bestMoveOf(solo.moves),
+        ...feats,
+        ...(resigned && feats?.strikes !== null && feats?.strikes !== undefined ? { survived: false } : {}),
+        evalBar: evalBarOn(),
+        game,
+        moves: solo.moves.filter((m) => m.move !== null).length,
+        won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
+        resigned: how === "resigned",
+        // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
+        left: how === "afk",
+        test: soloTestGame(practiceOn()),
+      });
+      settleSoloXp(solo, xp);
     });
   });
   const [, rerender] = useReducer((n: number, _: unknown) => n + 1, 0);
@@ -978,6 +1001,8 @@ export function App() {
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
+    // XP (Nov 9): the server times every solo game by its own clock, from now to its result (xp.ts).
+    noteSoloGame(m);
     use(m);
     if (fill) m.fill();
     else m.start();

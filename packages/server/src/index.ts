@@ -224,7 +224,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const pool = await testPool(request, env, url, waitUntil);
       const name = queueName(raid ? "raid" : "crowd", type, pool, region);
       // (With a test's pool, ?afk=0: its 50 v 50 misses as before Nov 4, CrowdMisses off, for a test that idles on purpose.)
-      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null } : {}) };
+      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null, tested: true } : {}) };
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
       const ticket = url.searchParams.get("ticket");
       let since: number | undefined;
@@ -254,7 +254,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
-      const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1");
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }

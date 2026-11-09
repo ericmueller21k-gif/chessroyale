@@ -382,6 +382,8 @@ function OwnProfileScreen({
         </div>
         <div class="fd-pills">
           {/* (The rank shown is 1 v 1's since Oct 28, once they've played one; the crowd rating's number beside it, no rank name.) */}
+          {/* (Their level, Nov 9: from their XP; missing from an older server.) */}
+          {typeof p.level === "number" && <span class="fd-pill fp-level">Level {p.level}</span>}
           {p.banned ? <span class="fd-pill fp-banned">Banned</span> : <HeaderRank p={p} own={own} />}
           {!p.banned && <RatingPill rating={p.rating} />}
           {p.topPercent !== null && <span class="fd-pill">Top {p.topPercent}%</span>}

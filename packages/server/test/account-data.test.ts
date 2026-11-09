@@ -150,11 +150,12 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce white_points black_points",
   reports: "id reporter target reason at match line line_at",
   results:
-    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned",
+    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none",
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
+  solo_games: "user_id id started_at test_minutes",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online pawn_color age_ok_at chat_on",
-  wallets: "user_id coins crates crate_keys",
+  wallets: "user_id coins crates crate_keys xp",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
 
@@ -206,7 +207,7 @@ describe("download my data", () => {
       ["boss", null],
     ]);
     expect(d.results[0]).not.toHaveProperty("held");
-    expect(d.shop.wallet).toEqual({ coins: 50, crates: 2, crate_keys: 1 });
+    expect(d.shop.wallet).toEqual({ coins: 50, crates: 2, crate_keys: 1, xp: 0 });
     expect(d.bossTokens.tokens).toEqual([{ boss: "gingerbread", n: 1 }, { boss: "tiger", n: 2 }]);
     expect(d.bossTokens.drops).toEqual([{ boss: "gingerbread", at: new Date(T0 + 4).toISOString(), battle: "ABCDE" }]);
     expect(d.bossTokens.soloBattle).toEqual({ started_at: new Date(T0 + 4).toISOString() });

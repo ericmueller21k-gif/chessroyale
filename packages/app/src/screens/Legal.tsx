@@ -184,7 +184,7 @@ function Privacy() {
         what={
           <p>
             The crate items you own (each with its color, purity and pattern), what you wear, your default pawn color (white or black),
-            your coins, earned crates and crate keys, your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, tokens and
+            your coins, earned crates and crate keys, your shop items, and the quick-chat lines you picked. And a record of each change to your coins, crates, keys, XP, tokens and
             items: what, how many, why (a game, a battle, a crate, a buy) and when.
           </p>
         }
@@ -201,6 +201,17 @@ function Privacy() {
         }
         why="so a token is yours on every device, the game can tell how many you've had in the last day, and a solo battle's length is timed by our server, not your device."
         kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends; a boss crate until you open it."
+      />
+      <Item
+        title="XP and levels"
+        what={
+          <p>
+            Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
+            the XP it gave you and what for, or why it gave none. When a game you play on your device began (our server times it).
+          </p>
+        }
+        why="so your level is yours on every device, a game's XP is counted once, and the result screen can show what a game gave you."
+        kept="your XP until the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in."
       />
       <Item
         title="Chat"

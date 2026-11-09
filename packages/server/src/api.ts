@@ -11,11 +11,12 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
+import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -194,7 +195,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/town/here" &&
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
-    path !== "/api/boss/token"
+    path !== "/api/boss/token" &&
+    !path.startsWith("/api/xp")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -562,14 +564,63 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (path === "/api/boss/token" && request.method === "GET") return json({ token: await battleToken(sql, current.id, url.searchParams.get("battle"), now) });
 
-  // POST /api/results: a solo match's result, from the browser.
+  // XP (Nov 9; xp.ts). POST /api/xp/solo/start as any solo game begins ({game}: its id; the server notes the time); its result's POST
+  // /api/results carries it back, and answers the game's XP. GET /api/xp?game=CODE: your XP from an online game, once its room has
+  // written it ({xp}: null until then). POST /api/xp/test {xp} (test switches only): sets your XP, for tests and stills.
+  if (path === "/api/xp/solo/start" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { xpgame?: unknown } | null;
+    // (?xpgame=MINUTES counts the game that long only where TEST_SWITCHES is "1" (local, e2e, staging). Anywhere else, an admin's
+    // included, it's a test switch like the others: the game is a test game, no XP (SOLO_TESTED). Review m1, Nov 9.)
+    const asked = typeof b?.xpgame === "number" && Number.isFinite(b.xpgame) && testSwitchesOn(env as AdminEnv, current);
+    const minutes = !asked ? null : (env as AdminEnv).TEST_SWITCHES === "1" ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b!.xpgame as number))) : SOLO_TESTED;
+    return json({ game: await startSoloGame(sql, current.id, now, minutes) });
+  }
+  if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
+  if (path === "/api/xp/test" && request.method === "POST") {
+    if (!testSwitchesOn(env as AdminEnv, current)) return json({ message: "Not allowed" }, 403);
+    const b = (await request.json().catch(() => ({}))) as { xp?: unknown } | null;
+    const xp = await setTestXp(sql, current.id, b?.xp, now);
+    return xp === null ? json({ message: "Bad XP" }, 400) : json({ xp });
+  }
+
+  // POST /api/results: a solo match's result, from the browser. Its XP (Nov 9) is the server's: the time between the game's start
+  // and now by the server's clock (`game`: its id from /api/xp/solo/start); the moves, the win, a resign, leaving (`left`: removed
+  // for idling) and a test switch are the device's word, so they can only lower it. A result the server never timed (no `game`, or
+  // one already ended) earns no XP at all; a win needs XP.soloWinMinMinutes of the server's time and is capped (XP.soloWinsPerDay
+  // a day), and the time too (XP.soloMinutesPerDay a day). Review M1 and M2, Nov 9. Answers {ok, xp}.
   if (path === "/api/results" && request.method === "POST") {
-    const b = (await request.json().catch(() => null)) as Partial<MatchResult> | null;
+    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown }) | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
-    await recordResult(sql, current.id, { ...b, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic" } as MatchResult, now);
+    const timed = await endSoloGame(sql, current.id, b.game, now);
+    // (An app from before XP sends no moves: NULL, as for every result from before.)
+    const moves = typeof b.moves === "number" && Number.isFinite(b.moves) ? Math.max(0, Math.min(10_000, Math.round(b.moves))) : null;
+    const tested = timed?.testMinutes === SOLO_TESTED;
+    const forced = tested ? null : (timed?.testMinutes ?? null);
+    const ms = forced !== null ? forced * 60_000 : (timed?.ms ?? 0);
+    const xp = !timed
+      ? null
+      : await grantXp(sql, current.id, {
+          key: `solo:${timed.id}`,
+          facts: {
+            ms,
+            moves: forced !== null ? Math.max(moves ?? 0, XP.minMoves) : (moves ?? 0),
+            won: b.won === true && ms >= XP.soloWinMinMinutes * 60_000,
+            resigned: b.resigned === true,
+            abandoned: b.left === true,
+            test: tested || (forced === null && b.test === true),
+          },
+          cap: "solo",
+          signedInOnly: signInRequired(env),
+          now,
+        }).catch((e: unknown) => {
+          console.log(`xp for a solo game: ${String(e)}`);
+          return null;
+        });
+    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, ...result } = b;
+    await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed?.ms ?? null, moves, xp } as MatchResult, now);
     // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
     await grantWelcomeCrate(sql, current.id, now).catch(() => false);
-    return json({ ok: true });
+    return json({ ok: true, xp });
   }
 
   // POST /api/auth/logout: a fresh guest account on this device.

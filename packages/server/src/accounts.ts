@@ -31,6 +31,8 @@ import {
   type EquipSlot,
   type ShopState,
   type StoredChatPicks,
+  levelOf,
+  type XpGrant,
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
@@ -42,6 +44,7 @@ import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-sch
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
+import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -203,6 +206,8 @@ const SCHEMA = [
   ...CHAT_MOD_SCHEMA,
   // Ranked 1 v 1: each player's rank, and each ranked game kept for a while (ranked.ts).
   ...RANKED_SCHEMA,
+  // XP (Nov 9): the solo game the server is timing for each account (xp.ts).
+  ...XP_SCHEMA,
 ];
 
 /**
@@ -250,6 +255,17 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Crate keys (Nov 2, 2026: a boss crate takes one; an admin's test grant gives them): boss-tokens.ts.
   { table: "wallets", column: "crate_keys", type: "INTEGER NOT NULL DEFAULT 0" },
+  // XP (Nov 9, 2026; xp.ts): each account's XP, its level worked out from it (core's levelOf). Moved only through the ledger (asset
+  // kind "xp"). Every row from before starts at 0.
+  { table: "wallets", column: "xp", type: "INTEGER NOT NULL DEFAULT 0" },
+  // A game's XP (Nov 9, 2026; xp.ts): the player's time in it and their own moves (online: as the match room counted them; solo: the
+  // server's clock between the game's start and its result, and the device's count of moves), and what the result screen showed: their XP before, the parts (JSON [{label, xp}]) or why none
+  // ("short", "resigned", "left", "guest", "test", "banned"). NULL on every result from before (and a solo result from an app before XP).
+  { table: "results", column: "play_ms", type: "INTEGER" },
+  { table: "results", column: "moves", type: "INTEGER" },
+  { table: "results", column: "xp_before", type: "INTEGER" },
+  { table: "results", column: "xp_parts", type: "TEXT" },
+  { table: "results", column: "xp_none", type: "TEXT" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
@@ -687,6 +703,10 @@ export interface MatchResult {
   evalBar?: boolean | null;
   /** Recorded because the player abandoned the match (gone too long, idle or removed: the match room says; never the app's word). */
   abandoned?: boolean;
+  /** XP (Nov 9; xp.ts): the player's time in the game and own moves, as the server counted them, and the game's XP as granted. */
+  playMs?: number | null;
+  moves?: number | null;
+  xp?: XpGrant | null;
 }
 
 /** A count from a result (0-500), or null. */
@@ -706,8 +726,9 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   const lobby = r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null;
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
+       play_ms, moves, xp_before, xp_parts, xp_none)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
      ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
     userId,
     mode,
@@ -735,6 +756,10 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
     flag(r.evalBar),
     // (Only an online match's room says a player abandoned it.)
     r.online && r.abandoned === true ? 1 : null,
+    // (XP's facts are the server's: the caller's, never the app's.)
+    typeof r.playMs === "number" && Number.isFinite(r.playMs) ? Math.max(0, Math.round(r.playMs)) : null,
+    typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
+    ...xpColumns(r.xp),
     // (An account deleted mid-match gets nothing new.)
     userId,
     ...(once ? [userId, lobby, once.since] : []),
@@ -783,6 +808,8 @@ export interface Profile {
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
   /** Chat is on for this account (its opt-in, users.chat_on; off by default, and always for a guest: theirs is on the device). */
   chatOn: boolean;
+  /** Your XP (Nov 9): your level and its ring come from it (core's levelOf, levelProgress). */
+  xp: number;
 }
 
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
@@ -812,6 +839,7 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
     ranked1v1: await rankedSummary(sql, user.id, admins),
+    xp: await xpOf(sql, user.id),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -871,6 +899,8 @@ export interface PublicProfile {
   online: boolean;
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null, whatever the truth. */
   hidden?: boolean;
+  /** Their level (Nov 9: from their XP; core's levelOf). Public, as the public profile shows it. */
+  level: number;
   rating: number | null;
   /** "Top 18%" among rated players (null until enough players have a rating). */
   topPercent: number | null;
@@ -999,6 +1029,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
     topPercent: banned ? null : top,
     banned,
     ranked1v1: banned ? null : await rankedSummary(sql, u.id, admins),
+    level: levelOf(await xpOf(sql, u.id)),
     crowd: crowdStats(rows.filter((r) => r.mode === "crowd")),
     boss: raidStats(raids),
     ratingHistory: rows

@@ -45,8 +45,9 @@ describe("the line under the name", () => {
     expect(joinedText(Date.UTC(2026, 9, 2, 12))).toBe("Oct 2026");
   });
   it("the level line is Level N where the test switches count, else empty (the page then shows no line, and keeps no room for one)", () => {
-    expect(levelLine(true, 38)).toBe("Level 38");
-    expect(levelLine(false, 38)).toBe("");
+    expect(levelLine(38)).toBe("Level 38");
+    expect(levelLine(1)).toBe("Level 1");
+    expect(levelLine(undefined)).toBe("");
   });
   it("an icon of their own goes behind their pawn; the default pawn, or none, gets the theme's yellow", () => {
     expect(hasOwnIcon("data:image/png;base64,AAAA")).toBe(true);

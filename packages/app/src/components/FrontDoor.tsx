@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { FRONT_DOOR, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { FRONT_DOOR, levelOf, levelProgress, sideOfPawn, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import type { HomeRankLine } from "../ranked.ts";
 import { Avatar } from "./Items.tsx";
 import { account, myPawnColor, onAccountChange } from "../account.ts";
@@ -230,12 +230,6 @@ export function RatingPill({ rating }: { rating: number | null }) {
   return <span class="fd-pill">{rating === null ? "No rating yet" : `Rating ${Math.round(rating)}`}</span>;
 }
 
-/**
- * PLACEHOLDER for an admin's home, until the real levels exist (Eric, Oct 28: the level "lvl - 38", "show it at 3/4 like I'm
- * 3/4 to level 39"). Shown only where testSwitchesAllowed(); a player sees no level. The real level system replaces it. (The
- * test rank "Opal III" it came with is now any rank by `?rank=`: ranked.ts, rankFromSwitch.)
- */
-export const TEST_LEVEL = { level: 38, progress: 0.75 } as const;
 
 /**
  * The rank line under your name on home (Eric, Oct 28: "we're going with the new ranking system"): your ranked 1 v 1 rank,
@@ -265,11 +259,13 @@ const RING_LEN = 4 * (RING - 2 - 2 * RING_R) + 2 * Math.PI * RING_R;
 const RING_PATH = `M${RING / 2} 1H${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1} ${1 + RING_R}V${RING - 1 - RING_R}A${RING_R} ${RING_R} 0 0 1 ${RING - 1 - RING_R} ${RING - 1}H${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 1 ${RING - 1 - RING_R}V${1 + RING_R}A${RING_R} ${RING_R} 0 0 1 ${1 + RING_R} 1H${RING / 2}`;
 
 /**
- * An admin's test level on home (TEST_LEVEL, a placeholder): a thin green ring round your icon, filled clockwise from the top
- * to `progress` over a faint track, and "LVL 38" above it. Both sit outside the icon's box (styles.css, `fd-level`).
+ * Your level on home (Nov 9: real, from your XP; it was an admin's placeholder, Oct 28): a thin green ring round your icon, filled
+ * clockwise from the top to your share of the level over a faint track, and "LVL 7" above it. Both sit outside the icon's box
+ * (styles.css, `fd-level`), so home is the same size and shape with or without them.
  */
-export function LevelRing() {
-  const { level, progress } = TEST_LEVEL;
+export function LevelRing({ xp }: { xp: number }) {
+  const level = levelOf(xp);
+  const progress = levelProgress(xp);
   return (
     <>
       <span class="fd-level">{`LVL ${level}`}</span>

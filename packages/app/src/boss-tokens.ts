@@ -9,7 +9,7 @@ import { account, finishSoloBossBattle, onAccountChange, onlineBattleToken, refr
  */
 
 /** Your account has loaded (a START tapped the moment the app opens waits for it), or it didn't within `ms`. */
-function accountReady(ms = 15_000): Promise<boolean> {
+export function accountReady(ms = 15_000): Promise<boolean> {
   if (account().profile) return Promise.resolve(true);
   return new Promise((done) => {
     const off = onAccountChange(() => {

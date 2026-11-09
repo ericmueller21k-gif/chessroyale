@@ -145,6 +145,8 @@ test("Pairs (a test lobby): your partner's pick shows live, both squads' tokens 
   await page.getByRole("button", { name: "Next round" }).click();
   await expect.poll(async () => Object.values(await next.seen()).some(Boolean), { timeout: 20_000 }).toBe(true);
   await fits(page);
+  // XP (Nov 9): knocked out, the card's XP box; a test lobby records nothing, so it says so.
+  if ((await next.seen()).out) await expect(page.locator(".sq-out").getByTestId("xp-box").locator(".xp-why")).toHaveText("No XP: test game.");
 });
 
 test("the final (a test lobby): the whole squad votes, teammates' picks named on the board, copy one, lock in, the most picked plays", { tag: "@phone-only" }, async ({ page }) => {

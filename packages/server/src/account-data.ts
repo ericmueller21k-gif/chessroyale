@@ -55,9 +55,9 @@ const DAY = 86_400_000;
 
 /** A result's columns in the download (not `held`, which would say fair play is looking at the account). */
 const RESULT_COLUMNS =
-  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned";
+  "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none";
 /** A kept result's columns (every column but its id and account: a test pins the table's columns, so a new one is seen). */
-const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned";
+const KEPT_RESULT = "mode, online, placement, players, team, team_won, avg_score, rating, played_at, brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, lobby, ranked, held, eval_bar, abandoned, play_ms, moves, xp_before, xp_parts, xp_none";
 
 export const ACCOUNT_STORES: AccountStore[] = [
   {
@@ -78,7 +78,8 @@ export const ACCOUNT_STORES: AccountStore[] = [
       stmt(
         `INSERT INTO results (user_id, ${KEPT_RESULT})
          SELECT ?, mode, online, placement, players, team, team_won, avg_score, NULL, played_at - played_at % ${DAY}, brilliant, NULL,
-           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned
+           cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, boss_id, NULL, ranked, held, NULL, abandoned,
+           play_ms, moves, NULL, xp_parts, xp_none
          FROM results WHERE user_id = ? ORDER BY random()`,
         DELETED_ID,
         u.id,
@@ -90,7 +91,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     name: "shop",
     tables: ["wallets", "inventory", "equipped", "chat_picks"],
     export: async (sql, u) => ({
-      wallet: await sql.first("SELECT coins, crates, crate_keys FROM wallets WHERE user_id = ?", u.id),
+      wallet: await sql.first("SELECT coins, crates, crate_keys, xp FROM wallets WHERE user_id = ?", u.id),
       items: await all(sql, "SELECT item_id, acquired_at FROM inventory WHERE user_id = ?", u.id),
       equipped: await all(sql, "SELECT slot, item_id FROM equipped WHERE user_id = ?", u.id),
       chatPicks: await sql.first("SELECT lines, emoji FROM chat_picks WHERE user_id = ?", u.id),
@@ -122,6 +123,14 @@ export const ACCOUNT_STORES: AccountStore[] = [
     }),
     // (The tokens and boss crates go with the ledger's store, below.)
     erase: (u) => ["boss_token_drops", "solo_battles"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id)),
+  },
+  {
+    // XP (xp.ts, Nov 9): the solo game the server is timing (when it began, and a test's minutes). The XP itself is the wallet's
+    // (above, with its ledger rows below), and each game's is on its result (its time, moves and XP).
+    name: "xp",
+    tables: ["solo_games"],
+    export: async (sql, u) => ({ soloGame: await sql.first("SELECT started_at, test_minutes FROM solo_games WHERE user_id = ?", u.id) }),
+    erase: (u) => [stmt("DELETE FROM solo_games WHERE user_id = ?", u.id)],
   },
   {
     // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished

@@ -10,7 +10,7 @@ import type { Env } from "./index.ts";
 import { countCall } from "./ops.ts";
 import { liveHub } from "./live-hub.ts";
 import { SERVER_RECHECK_NODES, serverRecheck, serverScoreAt, warmEngine } from "./engine.ts";
-import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, battleCounts } from "@chessroyale/core";
+import { CAPACITY, CHAT_MOD, DEFAULT_SETTINGS, XP, battleCounts } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
@@ -19,6 +19,7 @@ import { isAdmin } from "./admin.ts";
 import { pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
+import { grantXp, type XpGame } from "./xp.ts";
 
 const library = openings as unknown as Opening[];
 
@@ -178,14 +179,22 @@ export class Lobby extends DurableObject<Env> {
       }
       // …then a player in review (or banned) has their results held off ranking until they're cleared.
       const held = !(await eligibleForRanked(sql, userId).catch(() => true));
-      await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held }, Date.now()).catch(() => undefined);
+      // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for
+      // the result screen to ask for (server/xp.ts). Never in the way of the result.
+      const span = core.xpSpan(r.playerId) ?? { moves: 0, ms: 0 };
+      const opponents = core.xpOpponents(r.playerId);
+      const xp = await grantXp(sql, userId, lobbyXpGame(rec, r, userId, span, mode, opponents, signInRequired(env), Date.now())).catch((e: unknown) => {
+        console.log(`xp for ${rec.code}: ${String(e)}`);
+        return null;
+      });
+      await recordResult(sql, userId, { ...r, mode, online: true, lobby: rec.code, held, playMs: span.ms, moves: span.moves, xp }, Date.now()).catch(() => undefined);
       // The Welcome Crate (Nov 6): a finished game may earn it, once ever (welcome.ts; an abandoned one isn't counted).
       await grantWelcomeCrate(sql, userId, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${rec.code}: ${String(e)}`));
       // Boss tokens: a boss battle counts once it reached 10 of their own moves or 5 minutes (this room's count and clock), win
       // or lose; then maybe a token (boss-tokens.ts). Once: keyed by this match (its code and start) and the account, so a room that
       // stops after writing it and before storing that it did (resultsSaved, a left player's `saved`) drops nothing more next time.
-      const span = core.bossBattleSpan(r.playerId);
-      if (span && battleCounts(span)) {
+      const battle = core.bossBattleSpan(r.playerId);
+      if (battle && battleCounts(battle)) {
         const op = opKeys.onlineDrop(rec.code, rec.startedAt ?? rec.createdAt);
         await countBossBattle(sql, userId, Date.now(), { battle: rec.code, op, off: pausedBosses(this.env), signedInOnly: signInRequired(env) }).catch((e: unknown) =>
           console.log(`boss token for ${rec.code}: ${String(e)}`),
@@ -573,4 +582,42 @@ export class Lobby extends DurableObject<Env> {
     await this.persist(core);
     await this.tellParty(core);
   }
+}
+
+/**
+ * One player's XP game for a match room's match (server/xp.ts): their moves and time as the room counted them (`span`: xpSpan); a
+ * win is 1st in Classic, their team's (or the crowd's against the boss) otherwise; nothing for leaving (abandoned), practice or a
+ * lobby a test switch made (except ?xpgame=MINUTES: that long, with enough moves). A friends' lobby (not matchmade) pays the win
+ * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). Keyed by the match
+ * (its code and start).
+ */
+export function lobbyXpGame(
+  rec: LobbyRecord,
+  r: { playerId: string; placement: number; teamWon: boolean | null; abandoned?: true },
+  userId: string,
+  span: { moves: number; ms: number },
+  mode: string,
+  opponents: readonly string[],
+  signedInOnly: boolean,
+  now: number,
+): XpGame {
+  const o = rec.overrides ?? {};
+  const left = rec.left?.find((l) => l.id === r.playerId);
+  const practice = !!(rec.humans.find((h) => h.id === r.playerId)?.practice || left?.practice);
+  const forced = typeof o.xpGame === "number" ? o.xpGame : null;
+  const vs = rec.auto ? null : { vs: [...new Set(opponents.flatMap((id) => (rec.accounts?.[id] && rec.accounts[id] !== userId ? [rec.accounts[id]!] : [])))] };
+  return {
+    key: `lobby:${rec.code}:${rec.startedAt ?? rec.createdAt}`,
+    facts: {
+      ms: forced !== null ? forced * 60_000 : span.ms,
+      moves: forced !== null ? Math.max(span.moves, XP.minMoves) : span.moves,
+      won: mode === "classic" ? r.placement === 1 : r.teamWon === true,
+      resigned: left?.how === "resigned",
+      abandoned: !!r.abandoned,
+      test: forced === null && (!!o.tested || practice),
+    },
+    cap: vs,
+    signedInOnly,
+    now,
+  };
 }

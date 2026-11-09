@@ -2,11 +2,12 @@ import { DurableObject } from "cloudflare:workers";
 import { CHAT_MOD } from "@chessroyale/core";
 import { DUEL_PROTOCOL, DUEL_UPDATE, type Color, type DuelClientMessage, type DuelOutcome, type DuelPlayerView } from "@chessroyale/chess/duel";
 import { DuelCore, RECORD_RETRY_MS, newDuelRecord, type DuelRecord } from "./duel-room.ts";
-import { accountOf, ageAnswer, isSignedIn } from "./api.ts";
+import { accountOf, ageAnswer, isSignedIn, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, shopState } from "./accounts.ts";
 import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
-import { recordDuel } from "./ranked.ts";
+import { recordDuel, type FinishedDuel } from "./ranked.ts";
+import { grantXp } from "./xp.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
@@ -104,6 +105,8 @@ export class DuelGame extends DurableObject<Env> {
         await ensureSchema(sql, this.env.DB);
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
         outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
+        // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
+        if (outcomes) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)));
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
         if (outcomes) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
@@ -268,4 +271,27 @@ export class DuelGame extends DurableObject<Env> {
 /** A seat's player as the queue hands it over: their account and a name. */
 function validPlayer(p: DuelPlayerView | undefined): p is DuelPlayerView {
   return !!p && typeof p.uid === "string" && !!p.uid && typeof p.name === "string";
+}
+
+/**
+ * Each side's XP for a finished ranked game (server/xp.ts): your own moves (White the odd plies, Black the even), the game's length
+ * by this room's clock, a win; a resign before the minimum says so; a test's clock earns none. Never in the way of the outcome.
+ */
+async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: Record<Color, DuelOutcome>, signedInOnly: boolean): Promise<Record<Color, DuelOutcome>> {
+  const out = { ...outcomes };
+  for (const c of ["w", "b"] as const) {
+    const won = f.result === (c === "w" ? "1-0" : "0-1");
+    const lost = f.result === (c === "w" ? "0-1" : "1-0");
+    const xp = await grantXp(sql, f.players[c], {
+      key: `duel:${f.id}`,
+      facts: { ms: f.endedAt - f.startedAt, moves: c === "w" ? Math.ceil(f.moves.length / 2) : Math.floor(f.moves.length / 2), won, resigned: f.reason === "resign" && lost, test: !!f.testSeconds },
+      signedInOnly,
+      now: Date.now(),
+    }).catch((e: unknown) => {
+      console.log(`xp for duel ${f.id}: ${String(e)}`);
+      return null;
+    });
+    if (xp) out[c] = { ...out[c], xp };
+  }
+  return out;
 }

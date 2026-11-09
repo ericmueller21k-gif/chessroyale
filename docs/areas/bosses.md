@@ -5,6 +5,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 [god-king.md](god-king.md).
 
 ## How it works today
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): a boss battle's result screen (Boss alone and raids; Boss alone timed by the server's clock) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("12 min +120 · Win +50"), or why there was none. Its rules
+  and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid

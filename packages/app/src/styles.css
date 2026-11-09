@@ -24787,3 +24787,153 @@ button.sq-tiny {
   left: 40px;
   margin-left: 0;
 }
+
+/*
+ * The XP box on every result screen (Nov 9; components/XpResult.tsx). One fixed size whatever it shows (filling, done, waiting, "No
+ * XP"), so nothing around it moves; it contains its own layout and paint, and the fill moves only by its transform. The bar's green
+ * is home's level ring's.
+ */
+.xp-box {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 420px;
+  height: 78px;
+  margin: 10px auto;
+  padding: 9px 12px 8px;
+  display: grid;
+  grid-template-rows: 20px 10px 18px;
+  row-gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  contain: strict;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+/* The gain, your name, your level: the name centered between them (equal side tracks), the one that shrinks (ellipsized) first. */
+.xp-top {
+  display: grid;
+  grid-template-columns: 1fr minmax(0, max-content) 1fr;
+  align-items: baseline;
+  column-gap: 8px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.xp-gain {
+  justify-self: start;
+}
+.xp-level {
+  justify-self: end;
+}
+.xp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.xp-gain {
+  font-weight: 800;
+  font-size: 17px;
+  color: var(--good);
+}
+.xp-none .xp-gain,
+.xp-wait .xp-gain {
+  color: var(--muted);
+}
+.xp-level {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.xp-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  overflow: visible;
+}
+.xp-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: 5px;
+  background: var(--good);
+  transform-origin: left center;
+  will-change: transform;
+}
+.xp-none .xp-fill,
+.xp-wait .xp-fill {
+  background: color-mix(in srgb, var(--good) 55%, var(--muted));
+}
+/* "Level 8!" over the bar's end as a level is reached: an opacity and transform pop, no layout. */
+.xp-pop {
+  position: absolute;
+  right: 0;
+  bottom: 14px;
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.xp-pop.on {
+  animation: xp-pop 900ms ease-out both;
+}
+.xp-level {
+  transition: opacity 120ms;
+}
+.xp-popping .xp-level {
+  opacity: 0;
+}
+@keyframes xp-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.7);
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(1);
+  }
+}
+.xp-parts {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.xp-parts b {
+  color: var(--text);
+}
+.xp-part {
+  visibility: hidden;
+}
+.xp-part.shown {
+  visibility: visible;
+}
+.xp-why {
+  color: var(--text);
+}
+.xp-wait .xp-why {
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .xp-pop.on {
+    animation: none;
+  }
+  .xp-popping .xp-level {
+    opacity: 1;
+  }
+}
