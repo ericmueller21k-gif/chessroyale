@@ -24960,7 +24960,7 @@ button.sq-tiny {
 
 /*
  * The daily quests overlay (a mockup, Nov 9: components/QuestsOverlay.tsx; Eric's reference, notes/briefs/design-xp-quests.md,
- * section 5): a gold-framed card over home (dimmed and a little blurred behind), the pawn in a black-and-gold crest (the Welcome
+ * section 5): a gold-framed card over home (dimmed behind; no blur, Eric Nov 9), the pawn in a black-and-gold crest (the Welcome
  * Crate's colors), the title on a black banner, a row per quest, "Got it". Plain CSS over the front door's colors, light and dark;
  * the pictures are the game's own (a boss's portrait, the board's pieces, the shop's crate and key).
  */
