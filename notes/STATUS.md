@@ -604,3 +604,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~10:00: #571 boss result v2 merged (aed4384; watcher bo1pd6rp5 on deploy + main CI). #573 ranked design docs merged
   (21f99e4; mockup PNG moved to notes/briefs/assets since docs/ can't hold images). XP phase 2 running (watcher b33e7b9eg).
   Waiting on Eric's ranked decisions.
+- Nov 9 ~10:20: XP phase 2 done (5ca3f62): PR #574 (draft, full-e2e), stills sent. Independent review Opus
+  session_01JuCWRvSpYr8V325ycWCrGx (branch review/574, watcher bn8081s6p); full CI watcher b06jzr4n6. Eric's 100 keys: Shop →
+  Crates → "Admin: test grants" → +100 crate keys (after merge).
