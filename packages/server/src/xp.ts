@@ -235,8 +235,16 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   if (solo && g.time && !gained) return xpGrant(after?.xp ?? who.xp, [], "limit");
   // (The levels owed at the XP it reached: paid once each, their legs naming this game, so its result answers them; then this
   // game's rewards as the ledger has them, so a replay answers the same.)
-  await payLevels(sql, me, after?.xp ?? 0, game.key, game.now);
-  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, await gameRewards(sql, me, game.key));
+  // (A failure here leaves the levels owed (paid at the next game, never twice) and must not cost the box this game's XP, already in:
+  // review of #574, m4.)
+  let rewards: Awaited<ReturnType<typeof gameRewards>> | undefined;
+  try {
+    await payLevels(sql, me, after?.xp ?? 0, game.key, game.now);
+    rewards = await gameRewards(sql, me, game.key);
+  } catch {
+    rewards = undefined;
+  }
+  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards);
 }
 
 /** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none, xp_rewards). */

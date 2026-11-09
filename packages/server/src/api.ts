@@ -585,7 +585,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
   if (path === "/api/xp/test" && request.method === "POST") {
-    if (!testSwitchesOn(env as AdminEnv, current)) return json({ message: "Not allowed" }, 403);
+    // (Only where TEST_SWITCHES is "1" (local, e2e, staging), never an admin's on production: a jump there would be owed real level
+    // rewards, crates, keys and boss picks. Review of #574, M1, Nov 9.)
+    if ((env as AdminEnv).TEST_SWITCHES !== "1") return json({ message: "Not allowed" }, 403);
     const b = (await request.json().catch(() => ({}))) as { xp?: unknown } | null;
     const xp = await setTestXp(sql, current.id, b?.xp, now);
     return xp === null ? json({ message: "Bad XP" }, 400) : json({ xp });

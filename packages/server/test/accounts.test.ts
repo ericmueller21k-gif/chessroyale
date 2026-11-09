@@ -314,6 +314,9 @@ describe("account API", () => {
       at(T + 20 * 60_000);
       expect((await result(prod, admin.cookie, { game: b, moves: 30, won: true })).body.xp).toMatchObject({ none: "test", parts: [] });
       expect((await call(prod, "/api/me", { cookie: admin.cookie })).body.xp).toBe(0);
+      // (Review of #574, M1: an admin's XP jump is refused off a test server, so no level rewards can be owed from it.)
+      expect((await call(prod, "/api/xp/test", { method: "POST", body: JSON.stringify({ xp: 100000 }), cookie: admin.cookie })).res.status).toBe(403);
+      expect((await call(test, "/api/xp/test", { method: "POST", body: JSON.stringify({ xp: 1000 }), cookie: t.cookie })).res.status).toBe(200);
     });
   });
 

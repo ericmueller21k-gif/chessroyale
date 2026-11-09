@@ -8,3 +8,7 @@ The brief: a kill switch that pauses XP grants, the daily reward and level-up re
   meant for emergencies.
 - **The day's reward and level rewards aren't lost**: the daily reward goes to the day's first counted game *after* the pause (its op
   is per day), and levels are paid whenever owed (2026-11-09-xp-phase2-levels.md). Only a pause across the day's end loses that day's.
+- **Not paused (review of #574, m1):** Squads' placement coins and crates (`squads-do.ts` `writeReward`) keep paying while it's on;
+  the switch covers XP, the daily reward and level rewards, as the brief scoped it.
+- **Admins' XP jump (review of #574, M1):** `POST /api/xp/test` (the `?xp=` switch) answers only where TEST_SWITCHES is "1"; an
+  admin on production gets 403, so no level rewards can be owed from a jump. Admins test levels with real games there.

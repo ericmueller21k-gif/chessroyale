@@ -1120,7 +1120,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 
 **Level-up rewards:** every level you reach gives you **${n(X.levelCrates, "crate")} and ${n(X.levelKeys, "crate key")}**, and every ${nth(X.bossCrateEvery)} level (${X.bossCrateEvery}, ${2 * X.bossCrateEvery}, ${3 * X.bossCrateEvery}, …) also **a boss crate you choose**: pick whose in the Crates tab ("Choose your boss crate"). It opens like any boss crate you hold, with nothing more to pay. Each level pays once, at the end of the game that reached it (a level reached some other way is paid at your next game that counts). The crates are from the newest series.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +50 · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up or the daily reward then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns nothing; levels you reach are paid at your next game.
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +50 · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up or the daily reward then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward or level rewards; levels you reach are paid at your next game.
 =======
 After each game the result screen's XP box fills from your old XP to the new, with your win bonus when there is one ("Win +${X.win}"), or says why there was none.
 >>>>>>> origin/main
