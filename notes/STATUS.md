@@ -621,3 +621,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~11:35: #574 LIVE (f7d93d8), main green. Starting XP phase 3 (quests): brief notes/briefs/brief-xp-phase3.md.
 - Nov 9 ~12:25: XP phase 3 (quests) done (e11d12c): PR #575 (draft, full-e2e); stills sent. Independent review Opus
   session_01JuCWRt4d1RBtnzyj5sUDyn (review/575, watcher bikddxl5y); full CI watcher bsrsr77o7.
+- Nov 9 ~12:50: #575 review: no blockers; M1 flaky quests test (1 in 3), m1 replay after reroll/new day moves new quests, m2 solo past
+  cap still progresses, m3 overlay can open over the queue, m4 .pr-body, m5 reads note. Fix round: fresh Opus on claude/xp-phase3
+  (done signal .review-fixes.md); then delta re-review + full CI.
