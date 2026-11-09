@@ -556,3 +556,44 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
     expect(new URL(page.url()).pathname).toBe("/town");
   }
 });
+
+test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the Quests entry reopens it; at 320 px it fits and the entry covers nothing", async ({ page }) => {
+  await named(page, "Christopher Wallace");
+  await page.goto("/?quests=mock");
+  const quests = page.getByRole("dialog", { name: "Daily Quests" });
+  await expect(quests).toBeVisible();
+  await expect(quests.locator(".qo-name")).toHaveText(["Boss Hunter", "Squad Up", "Regular"]);
+  await expect(quests.locator(".qo-row.weekly .qo-name")).toHaveText("Regular");
+  await expect(quests.getByText("New quests in 12h")).toBeVisible();
+  await expect(quests.getByText("Resets in 4d")).toBeVisible();
+  // One free reroll a day: both dailies offer it; once used, both grey (still there).
+  const rerolls = quests.locator(".qo-reroll");
+  await expect(rerolls).toHaveCount(2);
+  await rerolls.first().click();
+  for (const r of await rerolls.all()) await expect(r).toBeDisabled();
+  await quests.getByRole("button", { name: "Got it" }).click();
+  await expect(quests).toHaveCount(0);
+  const entry = page.getByRole("button", { name: "Quests", exact: true });
+  await entry.click();
+  await expect(quests).toBeVisible();
+  await quests.getByRole("button", { name: "Close" }).click();
+  await expect(quests).toHaveCount(0);
+
+  // A 320 px phone: the card inside the window, no row's words cut, nothing sideways; the entry over none of your card's tag.
+  await page.setViewportSize({ width: 320, height: 568 });
+  const tag = await page.locator(".fd-hero-id").boundingBox();
+  const btn = await entry.boundingBox();
+  expect(tag && btn).toBeTruthy();
+  expect(btn!.x >= tag!.x + tag!.width || btn!.y >= tag!.y + tag!.height || btn!.y + btn!.height <= tag!.y).toBe(true);
+  await entry.click();
+  await expect(quests).toBeVisible();
+  const fit = await page.evaluate(() => {
+    const card = document.querySelector(".qo-card")!.getBoundingClientRect();
+    const cut = [...document.querySelectorAll(".qo-name, .qo-count, .qo-xp")].filter((e) => e.scrollWidth > e.clientWidth + 1).map((e) => e.textContent);
+    return { left: card.left, right: card.right, width: innerWidth, cut, sideways: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  expect(fit.left).toBeGreaterThanOrEqual(0);
+  expect(fit.right).toBeLessThanOrEqual(fit.width);
+  expect(fit.cut).toEqual([]);
+  expect(fit.sideways).toBe(0);
+});

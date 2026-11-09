@@ -24948,10 +24948,12 @@ button.sq-tiny {
   --qo-card: color-mix(in srgb, var(--fd-gold) 6%, var(--fd-panel));
   --qo-row: var(--fd-panel-2);
   --qo-ink: #16130d;
+  --qo-track: #101218;
 }
 :root[data-theme="light"] {
   --qo-card: color-mix(in srgb, var(--fd-gold) 12%, #fff);
   --qo-row: #fff;
+  --qo-track: var(--fd-seat);
 }
 .qo-back {
   position: fixed;
@@ -25202,7 +25204,7 @@ button.sq-tiny {
   flex: 1 1 auto;
   height: 10px;
   border-radius: 999px;
-  background: var(--fd-seat);
+  background: var(--qo-track);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
   overflow: hidden;
 }
