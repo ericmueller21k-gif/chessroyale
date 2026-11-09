@@ -20,3 +20,4 @@ export * from "./friends.ts";
 export * from "./pauses.ts";
 export * from "./age-gate.ts";
 export * from "./pawn-color.ts";
+export * from "./xp.ts";
