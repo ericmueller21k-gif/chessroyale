@@ -1490,9 +1490,10 @@ export function App() {
   if (!match && showAutoChess) {
     return (
       <>
-        <GameFrame nav={autoNav}>
+        {/* The front door's frame (Nov 8): the same side menu and right column as home, so neither moves on the way in. */}
+        <FrontFrame page="autochess" nav={autoNav}>
           <AutoChessScreen onBack={autoBack} />
-        </GameFrame>
+        </FrontFrame>
         {sideConfirm}
       </>
     );

@@ -5,8 +5,9 @@ import { account } from "../account.ts";
 import { useAccount } from "./Profile.tsx";
 import { Board } from "../components/Board.tsx";
 import type { PieceDecor } from "../board/types.ts";
-import { COUNT_FROM_SECONDS, TimerBar } from "../components/Countdown.tsx";
-import { BackButton } from "../components/FrontDoor.tsx";
+import { createPortal } from "preact/compat";
+import { COUNT_FROM_SECONDS } from "../components/Countdown.tsx";
+import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
 import { MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { useBoardAnimations } from "../hooks.ts";
 import { Avatar } from "../components/Items.tsx";
@@ -84,7 +85,7 @@ import { buyFromSlot, holdFromSlot, newShop, oddsFor, replaceTaken, rerollFor, r
 import { moveStars, playFight, thinFight, withPiece } from "../autochess/fight.ts";
 import { armiesFen, armyPieces, fenFrom, fightStart, piecesOn, starUpsByColor } from "../autochess/position.ts";
 import { KIND_NAME, KINDS, other, type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "../autochess/types.ts";
-import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, matchWords, moveCount, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
+import { clockWords, damageWords, endWords, fightRulesWords, goldWords, headline, incomeLines, matchWords, moveCount, moveWords, type EndDetail, type EndKind } from "../autochess/words.ts";
 
 /**
  * Auto chess, the demo (/autochess; docs/decisions/2026-10-19-autochess-demo.md, docs/areas/autochess.md): you against a
@@ -284,7 +285,8 @@ function settingsFor(quick: boolean, gold: number, adjust: boolean, lockIn: bool
   return out;
 }
 
-const colorName = (c: Color) => (c === "w" ? "White" : "Black");
+/** Each step's name: the hexagon timer's word (upper case there) and the computer's right column ("Round 2 · Planning phase"). */
+const PHASE_NAME: Record<Phase, string> = { meet: "Meeting", buy: "Planning", adjust: "Move", fight: "Battle", result: "Result", over: "Result" };
 /** The sounds this screen plays, made ahead (off the page's thread) once the audio is awake. */
 const SOUNDS_USED = ["acPlace", "acHold", "acReroll", "sell", "acXp", "acLevel", "acLock", "acReveal", "acCash", "acStar2", "acStar3"] as const;
 /** What the opponent is called: the same word as a bot in a 1 v 1. */
@@ -437,6 +439,11 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const floatId = useRef(0);
   const floatTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const [msg, setMsg] = useState("");
+  // The Income breakdown, opened by its button in the action box (closed again by a tap on it or a new step).
+  const [incomeOpen, setIncomeOpen] = useState(false);
+  // A computer's right column: its top slot says the round and the step (FrontMenu.tsx RightPanel, "AUTO CHESS").
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => setSlot(document.getElementById(RIGHT_SLOT_TOOLS)), []);
   const msgTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const say = (text: string) => {
     setMsg(text);
@@ -891,7 +898,16 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     if (phase === "buy") {
       if (!buying()) return;
       if (isOffer(hold)) return buySlot(hold.at.offer);
-      if (isHeld(hold)) return placeHeldAt(hold.at.held);
+      // (Your bench, v5: a first tap picks the piece, lighting its tile and the square it goes to; a second tap, on the tile or that square, places it.)
+      if (isHeld(hold)) {
+        if (sameHold(selRef.current, hold)) return placeHeldAt(hold.at.held);
+        setSel(hold);
+        const cur = gref.current;
+        const h = cur.round.you.bench[hold.at.held];
+        const block = h && heldBlock(cur.round.you, hold.at.held, cfg, boardRoom());
+        if (h && block) say(heldWords(block, h.square, cfg, boardRoom()));
+        return;
+      }
       if (hold.kind === "k") return say("King: set by game");
     } else if (!adjusting()) return;
     if (phase === "adjust" && hold.kind === "k") return say(adjustWords("kingfixed", cfg));
@@ -918,6 +934,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     }
     const hold = selRef.current;
     if (!hold) return;
+    if (gref.current.phase === "buy" && isHeld(hold) && gref.current.round.you.bench[hold.at.held]?.square === square) return placeHeldAt(hold.at.held);
     if (gref.current.phase === "buy") setSel(null);
     else if (isSquare(hold)) adjustTo(hold.at.square, square);
   }
@@ -1115,6 +1132,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   }, [interactiveLayer]);
   useLayoutEffect(() => {
     cancelGesture();
+    setIncomeOpen(false);
   }, [g.phase, g.match.round]);
   const goldNow = g.match.you.gold;
 
@@ -1126,7 +1144,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   let clockWordsFull = "";
   if (g.phase === "buy") {
     clock = clockWords(remaining);
-    label = youLocked ? "Locked in" : locked ? "Locked" : "Buy";
+    label = youLocked ? "Locked in" : locked ? "Locked" : "Planning";
     clockWordsFull = `${label}, ${clock} left`;
   } else if (g.phase === "adjust") {
     clock = clockWords(remaining);
@@ -1134,12 +1152,10 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
     clockWordsFull = `Move step, ${clock} left`;
   } else if (g.phase === "fight") {
     // (The fight's counter is short here: "12/60"; the full words, with "twice as fast", are the clock's spoken label.)
-    clock = "Fight";
-    label = moveCount(g.fight?.plies ?? 0, cfg);
+    clock = moveCount(g.fight?.plies ?? 0, cfg);
+    label = "Battle";
     clockWordsFull = moveWords(g.fight?.plies ?? 0, cfg, !!g.fight && thinFight(g.fight.fen, cfg));
   }
-  const timerBars = g.phase === "buy" || (g.phase === "adjust" && adj !== null && !adjOver);
-  const stepMs = g.phase === "buy" ? cfg.buySeconds * 1000 : g.round.adjustMs;
 
   // The banner on the board's middle: "ACTION PHASE" as buying begins, the big 3-2-1 for its last seconds, "MOVE PHASE", "BATTLE PHASE".
   let banner: { words: string } | { n: number } | null = null;
@@ -1150,6 +1166,8 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   else if (g.phase === "fight" && elapsed < bannerMs()) banner = { words: "BATTLE PHASE" };
 
   const held = sel ?? null;
+  // A bench piece of yours picked (v5): its tile and the square it goes to light up.
+  const aim = g.phase === "buy" && held && isHeld(held) ? (g.round.you.bench[held.at.held]?.square ?? null) : null;
   // What is being dragged while buying: an offer (to the bench) or a piece of yours (to the shop, to sell it).
   const dragOffer = g.phase === "buy" && drag && isOffer(drag) ? (g.round.shop.slots[drag.at.offer] ?? null) : null;
   const dragPiece = g.phase === "buy" && drag && drag.kind !== "k" && !isOffer(drag) ? drag : null;
@@ -1199,13 +1217,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const meetOut = g.phase === "buy" && cfg.introSeconds > 0 && g.match.round === 1 && elapsed < MEET_OUT_MS;
   const meeting = g.phase === "meet" || meetOut;
   const introLeft = Math.max(1, Math.ceil((cfg.introSeconds * 1000 - elapsed) / 1000));
-  const wins = g.match.you.wins;
+  // This round's income, line by line (the Income button's breakdown).
+  const income = incomeLines(g.round.gold.you, g.match.you.wins, g.match.you.losses, cfg);
   // The next reroll's price (v7.1: 5, then 1 more each time, up to 10; back to 5 each round).
   const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
 
   return (
     <div
-      class="fd-root ac-root"
+      class="ac-root"
       onPointerDownCapture={wake}
       data-phase={g.phase}
       data-round={g.match.round}
@@ -1219,17 +1238,16 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
       data-bot-king={botKing}
     >
       <div class="ac-col">
-        <section class="ac-top">
-          <header class="ac-titlebar">
-            <BackButton onClick={onBack} label="Back to home" />
-            <div class="ac-title">
-              <strong>Auto chess</strong>
-              <span>
-                Round {g.match.round} · you play {colorName(mine)}
-              </span>
-            </div>
-            <MatchMenu exit={leave} />
-          </header>
+        {/* The top line (a phone's): "Auto chess" and the round at the left, the gear at the right (it has Leave). On a computer the
+            right column's slot says the mode and the round instead (portal below), and only the gear shows here. */}
+        <header class="ac-head">
+          <div class="ac-title">
+            <strong>Auto chess</strong>
+            <span>Round {g.match.round}</span>
+          </div>
+          <MatchMenu exit={leave} />
+        </header>
+        {slot && createPortal(<p class="rc-sub ac-slot-line">Round {g.match.round} · {PHASE_NAME[g.phase]} phase</p>, slot)}
           <div class="ac-bench them" aria-label="Their bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = theirBench[i];
@@ -1255,30 +1273,45 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               );
             })}
           </div>
-          <span class="ac-who" aria-label="Your opponent">
-            <strong class="ac-name">{BOT_NAME}</strong>
-            <span class="ac-lv" data-level={botLevelNow.level} aria-label={`${BOT_NAME}'s level ${botLevelNow.level}`}>
-              Lv <b>{botLevelNow.level}</b>
-            </span>
-            {botIsLocked && (
-              <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
-                Locked in
-              </span>
-            )}
-          </span>
-          <div class="ac-side ac-opp" aria-label="Your opponent's pawn">
+          <div class="ac-players">
+          <div class="ac-side ac-opp" aria-label="Your opponent">
             <div class="ac-stage">
               <HopPawn look={theirLook} side={theirs} cfg={cfg} />
             </div>
-            <div class="ac-bars">
-              <Bar kind="hp" cls="ac-hp-bot" frac={botHp / cfg.hp} text={String(botHp)} label="Opponent's HP" />
-              <Bar kind="xp" cls="ac-xp-bot" frac={botNeed === null ? 1 : botLevelNow.xp / botNeed} text={botNeed === null ? "max" : `${botLevelNow.xp}/${botNeed}`} label="Opponent's XP" />
+            <div class="ac-info ac-who">
+              <strong class="ac-name">{BOT_NAME}</strong>
+              <span class="ac-lv" data-level={botLevelNow.level} aria-label={`${BOT_NAME}'s level ${botLevelNow.level}`}>
+                Lv <b>{botLevelNow.level}</b>
+              </span>
+              {botIsLocked && (
+                <span class="ac-tag ac-bot-locked" aria-label="Opponent locked in">
+                  Locked in
+                </span>
+              )}
+              <div class="ac-bars">
+                <Bar kind="hp" cls="ac-hp-bot" frac={botHp / cfg.hp} text={String(botHp)} label="Opponent's HP" />
+                <Bar kind="xp" cls="ac-xp-bot" frac={botNeed === null ? 1 : botLevelNow.xp / botNeed} text={botNeed === null ? "max" : `${botLevelNow.xp}/${botNeed}`} label="Opponent's XP" />
+              </div>
             </div>
           </div>
-        </section>
+          <div class="ac-side ac-me" aria-label="You">
+            <div class="ac-stage">
+              <HopPawn look={myLook} side={mine} cfg={cfg} />
+            </div>
+            <div class="ac-info" title={myName}>
+              <strong class="ac-name">{myName}</strong>
+              <span class="ac-lv">
+                Lv <LevelBadge level={g.match.you.level} xp={g.match.you.xp} cfg={cfg} />
+              </span>
+              <div class="ac-bars">
+                <Bar kind="hp" cls="ac-hp-you" frac={myHp / cfg.hp} text={String(myHp)} label="Your HP" />
+                <Bar kind="xp" cls="ac-xp-you" frac={myNeed === null ? 1 : g.match.you.xp / myNeed} text={myNeed === null ? "max" : `${g.match.you.xp}/${myNeed}`} label="Your XP" />
+              </div>
+            </div>
+          </div>
+          </div>
 
         <div class="ac-frame">
-          {timerBars && <TimerBar key={`${g.match.round}-${g.phase}`} startsAt={g.wallStart} deadline={g.wallStart + stepMs} total={stepMs} quiet />}
           <div class="ac-board">
             <Board fen={fen} orientation={orientation} lastMove={lastMove} animate={animOn && (g.phase === "adjust" || g.phase === "fight")} silent={g.phase !== "fight"} decor={starDecor}>
               <div
@@ -1316,6 +1349,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 )}
                 {lit && <span class="ac-cell ac-pick" data-square={lit} style={sq(lit)} />}
                 {held && isSquare(held) && (g.phase === "buy" || !legal) && <span class="ac-cell ac-picked" style={sq(held.at.square)} />}
+                {aim && <span class="ac-cell ac-aim" data-square={aim} style={sq(aim)} />}
                 {floats.filter((f) => "col" in f.at).map((f) => (
                   <FloatGold key={f.id} amount={f.amount} at={f.at} />
                 ))}
@@ -1394,26 +1428,14 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               )}
             </Board>
           </div>
+          {/* A short message, for a moment, over the board's foot (the box under it never grows for one). */}
+          {msg && (
+            <span class="ac-msg" role="status" aria-live="polite">
+              {msg}
+            </span>
+          )}
         </div>
 
-        <section class="ac-bottom">
-          <div class="ac-side ac-me" aria-label="You">
-            <div class="ac-stage">
-              <HopPawn look={myLook} side={mine} cfg={cfg} badge={<LevelBadge level={g.match.you.level} xp={g.match.you.xp} cfg={cfg} />} />
-            </div>
-            <div class="ac-bars" title={myName}>
-              <Bar kind="hp" cls="ac-hp-you" frac={myHp / cfg.hp} text={String(myHp)} label="Your HP" />
-              <Bar kind="xp" cls="ac-xp-you" frac={myNeed === null ? 1 : g.match.you.xp / myNeed} text={myNeed === null ? "max" : `${g.match.you.xp}/${myNeed}`} label="Your XP" />
-            </div>
-          </div>
-          {/* (The Sell button sits in the gap between your pawn and your bench, level with the bench; a short message is under it, beside your pawn: the clock moved to the gold row.) */}
-          <div class="ac-spot">
-            {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
-              <button type="button" class="ac-sell" onClick={() => sell(held)}>
-                Sell {sellValue(held.kind, cfg, starsAt(g.round.you, held.at.square))}
-              </button>
-            )}
-          </div>
           <div class={`ac-bench you${dragOffer ? " lit" : ""}`} data-ac-drop="bench" aria-label="Bench">
             {Array.from({ length: cfg.benchSlots }, (_, i) => {
               const h = g.round.you.bench[i];
@@ -1441,7 +1463,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                 <button
                   key={`${i}${h.kind}${h.square}`}
                   type="button"
-                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}`}
+                  class={`ac-slot has ${tone}${block || locked ? " off" : ""}${lifted ? " lifted" : ""}${popping ? " merged" : ""}${aim && held && isHeld(held) && held.at.held === i ? " aimed" : ""}`}
                   data-held={i}
                   data-kind={h.kind}
                   data-square={h.square}
@@ -1464,48 +1486,49 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
               <FloatGold key={f.id} amount={f.amount} at={f.at} />
             ))}
           </div>
-          {msg && (
-            <span class="say" role="status" aria-live="polite">
-              {msg}
-            </span>
-          )}
-        </section>
 
         <section class="ac-dock" aria-label="Shop">
           {/* (The result's box takes the gold row's room too: its line says the next round's gold.) */}
           {g.phase !== "result" && g.phase !== "over" && (
           <div class="ac-goldrow">
-            <div class="ac-purse">
-              <span class="ac-gold-you" aria-label="Your gold">
-                <i class="ac-coin" />
-                <b>{goldNow}</b>
-              </span>
-              <span class="ac-income" aria-label="This round's income">
-                <span class="ac-income-word">Income</span> <b>+{incomeFor(g.match.round, cfg)}</b>
+            <span class="ac-gold-you" aria-label="Your gold">
+              <i class="ac-coin" />
+              <b>{goldNow}</b>
+            </span>
+            <button type="button" class={`ac-income${incomeOpen ? " on" : ""}`} aria-expanded={incomeOpen} aria-label={`This round's income: +${income.total}. Show where it comes from`} onClick={() => setIncomeOpen((o) => !o)}>
+              <span class="ac-income-word">Income</span> <b>+{income.total}</b>
+            </button>
+            {/* The hexagon timer (Nov 8): the step's name over the time, centered on the box; no bars. */}
+            <div class={`ac-clock${locked ? " low" : ""}${g.phase === "fight" ? " quiet" : ""}`} role="timer" aria-label={clockWordsFull}>
+              <span class="ac-clock-in">
+                <span class="ac-step">{label}</span>
+                <b>{clock}</b>
               </span>
             </div>
-            {clock && (
-              <div class={`ac-clock${locked ? " low" : ""}${g.phase === "fight" ? " quiet" : ""}`} role="timer" aria-label={clockWordsFull}>
-                <span class="ac-clock-in">
-                  <b>{clock}</b>
-                  <span class="ac-step">{label}</span>
-                </span>
-              </div>
-            )}
             <div class="ac-odds" role="img" aria-label={`Chance of each piece in the shop at level ${g.match.you.level}: ${oddsWordsLine}`} data-level={g.match.you.level}>
               {KINDS.map((k) => (
                 <span key={k} class={`ac-od${odds[k] === 0 ? " none" : ""}`} data-kind={k} data-odds={odds[k]}>
-                  <PieceIcon color={mine} kind={k} />
+                  <PieceIcon color="w" kind={k} />
                   <b>{odds[k]}%</b>
                 </span>
               ))}
             </div>
-            {wins >= 2 && (
-              <span class="ac-streak" title="Win streak" aria-label={`Win streak: ${wins}`}>
-                W{wins}
-              </span>
-            )}
           </div>
+          )}
+          {incomeOpen && g.phase !== "result" && g.phase !== "over" && (
+            <div class="ac-income-box" role="group" aria-label="Income this round">
+              <p class="ac-income-head">Income this round</p>
+              {income.lines.map((l) => (
+                <p key={l.label} class="ac-income-line">
+                  <span>{l.label}</span>
+                  <b>+{l.gold}</b>
+                </p>
+              ))}
+              <p class="ac-income-line ac-income-total">
+                <span>Total</span>
+                <b>+{income.total}</b>
+              </p>
+            </div>
           )}
 
           {g.phase === "buy" || g.phase === "adjust" || g.phase === "meet" ? (
@@ -1517,6 +1540,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     <i class="ac-coin" />
                     <b>{cfg.levels.buyXpCost}</b>
                   </span>
+                  <svg class="ac-btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9l6-5 6 5M6 15l6-5 6 5M6 21l6-5 6 5" />
+                  </svg>
                 </button>
                 <button
                   type="button"
@@ -1530,6 +1556,9 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                     <i class="ac-coin" />
                     <b>{rerollNow}</b>
                   </span>
+                  <svg class="ac-btn-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M19 12a7 7 0 1 1-2.1-5M19 3.5v4h-4" />
+                  </svg>
                 </button>
               </div>
               <div class="ac-cards">
@@ -1573,6 +1602,12 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
                   );
                 })}
               </div>
+              {/* Sell (a piece of yours selected on the board): over the cards, where a dragged piece is dropped to sell. */}
+              {g.phase === "buy" && !locked && held && isSquare(held) && held.kind !== "k" && g.round.you.board[held.at.square] === held.kind && (
+                <button type="button" class="ac-sell" onClick={() => sell(held)}>
+                  Sell {sellValue(held.kind, cfg, starsAt(g.round.you, held.at.square))}
+                </button>
+              )}
               {dragPiece && <div class="ac-sell-drop">Drop to sell for {sellValue(dragPiece.kind as Kind, cfg, isSquare(dragPiece) ? starsAt(g.round.you, dragPiece.at.square) : isHeld(dragPiece) ? heldStars(g.round.you.bench[dragPiece.at.held] ?? { kind: "p", square: "" }) : 1)}</div>}
             </div>
           ) : (

@@ -55,7 +55,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     mode shares), or a path no area has. A CI-only change (`e2e.yml`, `e2e/ci-*`) runs the smoke set (Nov 6), (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
-  - **On every push to main: the whole suite**, both projects, on 10 shards (about 28 minutes, Nov 6: the slowest
+  - **On every push to main: the whole suite**, both projects, on 15 shards since Nov 9 (Eric: "Sure try it"; on 10, about 28 minutes, Nov 6: the slowest
     shard's tests about 26, setup about 1 in Playwright's image): the full run after each merge, which the director checks before the next merge.
     **One main run at a time** (Nov 1; `check` too): a push while main's run is going waits (the run going is never
     cancelled), and a newer push replaces the one waiting. A merge whose own run was skipped is tested by the next run,
