@@ -376,6 +376,12 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     an invite does when the other player is already in a match. It's stored data and a client-server change, so it
     takes the full test lane.
 
+## Live ops: alerts, an on-call agent, a live-site bot (Eric, Nov 9, 2026: build before launch, not urgent)
+
+The design is `docs/ideas/live-ops.md`. Push alerts to Discord when real players hit errors, and a scheduled agent that confirms
+the problem and fixes it through the normal lanes, telling Eric. A bot plays the live site every 2 hours. Releases go out
+gradually. False alarms are avoided by design (rates against normal, two checks in a row, retry, confirm first). Build order there.
+
 ## Riders in regular crates (Eric, Nov 9, 2026: next after the shop page)
 
 A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
