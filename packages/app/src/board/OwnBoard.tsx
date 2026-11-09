@@ -21,9 +21,10 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOARD } from "@chessroyale/core";
+import { haptic } from "../haptics.ts";
 import { applyMove, inCheck, isChess960Fen, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
-import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
+import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pickedUp, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
 import type { BoardProps } from "./types.ts";
 import { boardMarksOn, premovesOn } from "../prefs.ts";
 import { addPremove, dropYours, onYours, setMarks, setQueue, yours } from "./yours.ts";
@@ -145,8 +146,10 @@ export function OwnBoard(props: BoardProps) {
                 const uci = pr.from + pr.to + p;
                 if (pr.premove) addPremove(pr.premove.key, { from: pr.from, to: pr.to, promo: p }, pr.premove.many);
                 else if (pr.dark) onDarkRef.current?.(uci);
-                else if (stoppedRef.current?.(uci)) onRefusedRef.current?.(uci);
+                else if (stoppedRef.current?.(uci)) return void onRefusedRef.current?.(uci);
                 else onMoveRef.current?.(uci);
+                // (A move made: its tick, once the move's gone.)
+                haptic("move");
               }}
               aria-label={{ q: "Queen", r: "Rook", b: "Bishop", n: "Knight" }[p]}
             >
@@ -269,6 +272,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const dragged = useRef(false);
   /** The press being made is a mouse's (a computer: premoves queue up). */
   const pressMouse = useRef(false);
+  /** When the press went down (Date.now()): let go within HAPTICS.holdMs, it was a tap. */
+  const pressAt = useRef(0);
   /** A right-drag (an arrow, or a square's color where it started), and the square and color under it now. */
   const right = useRef<{ from: string; at: string | null; pointer: number; box: Box; mods: PointerEvent } | null>(null);
   const pieceEls = useRef(new Map<number, HTMLElement>());
@@ -298,7 +303,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       const piece = pieceAt(s.fen, from);
       // (A pawn you can see reaching the last rank: you pick its piece. From the dark: a queen.)
       if (piece?.type === "p" && !s.darkList.includes(from) && (to[1] === "8" || to[1] === "1")) return setPromotion({ from, to, dark: true });
-      return acts.darkTry(from + to);
+      acts.darkTry(from + to);
+      return haptic("move");
     }
     const legal = gestureMoves(s.fen, moves, from, to);
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
@@ -321,6 +327,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     local.current = { pieces: after, last: [from, to] };
     redraw();
     acts.move(legal[0]!);
+    haptic("move");
   };
 
   /** A move made ahead (a premove): its piece shows at once on its new square, both squares in the premove color. */
@@ -332,6 +339,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const many = pressMouse.current;
     if (s.shown.get(from)?.[1] === "p" && to[1] === (side === "w" ? "8" : "1")) return setPromotion({ from, to, premove: { key: s.ykey, side, many } });
     addPremove(s.ykey, { from, to }, many);
+    haptic("move");
   };
 
   /** A move from the board's gestures: made now, or ahead. */
@@ -457,7 +465,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       if (s.darkSel) {
         if (sq === s.darkSel) return void setDarkSel(null);
         setDarkSel(null);
-        if (!mine) return void acts.darkTry(s.darkSel + sq);
+        if (!mine) return void (acts.darkTry(s.darkSel + sq), haptic("move"));
       } else {
         const held = selected.current;
         if (held && sq !== held && mine) selected.current = null;
@@ -476,6 +484,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       made(r.move[0], r.move[1], false);
     } else if (r.press) {
       press.current = r.press;
+      pressAt.current = Date.now();
       pressBox.current = box;
       pressPointer.current = e.pointerId;
       pressId.current = tr.pieces.find((q) => q.square === sq)?.id ?? null;
@@ -534,6 +543,8 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     if (p.started) endDrag(p);
     if (r.move) made(r.move[0], r.move[1], true);
     else if (p.started && to && to !== p.from) refusedTry(p.from, to);
+    // A tap that picked up a piece (not one held, nor a drag, nor a tap on the one already picked up): its tick.
+    else if (pickedUp(p, r.selected, to, Date.now() - pressAt.current)) haptic("select");
     redraw();
   };
 

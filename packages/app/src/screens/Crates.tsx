@@ -62,6 +62,7 @@ import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
 import { testParams } from "../test-switches.ts";
+import { haptic } from "../haptics.ts";
 import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
@@ -1165,7 +1166,7 @@ function HoldButton({
     // (Held, with or without anything to do: the click that follows isn't a tap.)
     held.current = true;
     if (!onHold) return;
-    navigator.vibrate?.(15);
+    haptic("crateHold");
     onHold();
   };
   return (

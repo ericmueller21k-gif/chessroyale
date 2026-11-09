@@ -177,6 +177,29 @@ export function setBoardMarksOn(on: boolean) {
   listeners.forEach((l) => l());
 }
 
+const VIBRATION_KEY = "brc.vibration";
+
+/**
+ * Settings → Sound, "Vibration" (Eric, Nov 9; on unless switched off): every haptic (haptics.ts), the board's taps and
+ * moves and the boss moments. Per device; greyed where the device can't vibrate.
+ */
+export function vibrationOn(): boolean {
+  try {
+    return localStorage.getItem(VIBRATION_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setVibrationOn(on: boolean) {
+  try {
+    localStorage.setItem(VIBRATION_KEY, on ? "1" : "0");
+  } catch {
+    // Not important.
+  }
+  listeners.forEach((l) => l());
+}
+
 const PRACTICE_KEY = "brc.practice";
 
 /*

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "preact/hooks";
+import { hapticOnce } from "../haptics.ts";
 import { KING_ATTACK, SNACK, bossIntroTimeline, bossRules, fenAtPly, inCheck, pieceAt, withPiece } from "@chessroyale/chess";
 import { BLIZZARD, BURN, BossBarExtra, CANDLE, FUNHOUSE, FireBurn, HOLLOW_CASTER, THAW, angleView, dockLine, noMoveLine, PowerBoard, PowerMoment, RageMeter, funhouseView, mateMomentsOf, momentAt, momentsOf, thawOver, useMomentSpeech } from "../components/BossPowers.tsx";
 import { BossMoment } from "../components/BossEffect.tsx";
@@ -314,6 +315,10 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
   // (the Slam's, a bounce's, the funhouse's, his second thinking) never brings it back.
   const queenDue = intro || loading || victim ? null : dueQueenBanner(boss, thinkingNow ? "thinking" : thinking ? null : "move", `${boss.id}:${boss.startMove}`);
   const queenBanner = queenDue && bannerOn(queenDue.key, now, bossBannerMs()) ? queenDue : null;
+  // (QUEEN SLAIN!'s buzz, once for its banner, as it comes: haptics.ts.)
+  useLayoutEffect(() => {
+    if (queenBanner?.kind === "slain") hapticOnce(`slain:${queenBanner.key}`, "queenSlain");
+  }, [queenBanner?.key]);
   const left = until ? Math.max(0, Math.ceil((until - now) / 1000)) : null;
   // A boss raid alone plays like any chess site: the boss's move lands and it's your turn (no ring, no countdown).
   const alone = match.standings().length === 1;
