@@ -11,6 +11,7 @@
 - **Top matches bottom.** Both sides use the same block, pawn and sizes, and the check asserts it.
 - **Calls made:**
   - The 1.7x cap and "the space under the action box is at most the free margin + 8 px" cannot both hold at 390 x 844. Half the spare at 390 would be 2.1x the old row, and at 2.1x the figure (about 135 px) and the block's name would not fit the 187 px column beside the board. I kept the cap, so 390 x 844 keeps about 64 px under the box. Raising the cap to about 2.1x (one number, `0.7` in `--grow`) closes the rest of the gap; the call is the director's.
+  - The meeting's middle pawns (`.ac-meet`) grow with the row too: at least twice the old 44 px corner, or 1.66x the usable height, still capped at 36% of the board. Without this they would be smaller than the corner pawns.
   - At 320 x 568 the pawn's figure grows from about 35 to 44 px (it is the row's usable height there) while the rows stay put.
   - Bench tiles and the board are unchanged; the bench tiles still sit at the foot of the top row and the top of ours.
 - **Checks, old → new** (`e2e/autochess.spec.ts`):
