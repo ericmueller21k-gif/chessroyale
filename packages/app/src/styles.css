@@ -8747,6 +8747,7 @@ button.history-label {
   --fd-gold-text: #f2c14e;
   --fd-gold-ink: #1a1406;
   --fd-gold-soft: #3a2f12;
+  --fd-blue: #7fb2f0;
   --fd-green: #4ade80;
   --fd-seat: #262a33;
   --fd-line: #2d313b;
@@ -8765,6 +8766,7 @@ button.history-label {
   --fd-off: #3a3f48;
   --fd-gold-text: #9a6a06;
   --fd-gold-soft: #fbefcc;
+  --fd-blue: #2d64a8;
   --fd-green: #16a34a;
   --fd-seat: #e4e1da;
   --fd-line: #dcd8d0;
@@ -9194,6 +9196,46 @@ button.fd-logo {
 }
 .fd-quests-btn:disabled:active {
   transform: none;
+}
+/*
+ * The phone's top bar in colour (Eric, Nov 9: "the 5 we have should all have some color"): the icons a size bigger (29 px in
+ * the same 44 px squares, 40 px below 360 px where the squares shrink), the Quests clipboard and the shop's bag gold, Friends
+ * blue, Settings a plain dark outline. Flat fills, the same outline weight. The profile is the shop's square too: no gold
+ * ring, your pawn's face only (cropped, still: no ride, no animation). A computer's top right keeps its ring.
+ */
+.fd-top .fd-icon-btn svg {
+  width: 29px;
+  height: 29px;
+}
+.fd-top .fd-top-shop svg {
+  fill: var(--fd-gold);
+  stroke: var(--fd-gold-text);
+}
+.fd-top .fd-top-quests .fd-qbar-body,
+.fd-top .fd-top-quests .fd-qbar-clip {
+  fill: var(--fd-gold);
+  stroke: var(--fd-gold-text);
+}
+.fd-top .fd-top-quests .fd-qbar-check {
+  stroke: var(--fd-gold-ink);
+}
+.fd-top .fd-top-friends svg {
+  fill: var(--fd-blue);
+  stroke: var(--fd-blue);
+}
+.fd-top .fd-top-face {
+  clip-path: inset(0 round 12px);
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+}
+.fd-top .fd-top-face .fd-pawn-ring {
+  position: absolute;
+  left: 50%;
+  top: -18px;
+  width: 122px;
+  height: 122px;
+  transform: translateX(-50%);
 }
 .fd-home-main {
   flex: 1 1 auto;
