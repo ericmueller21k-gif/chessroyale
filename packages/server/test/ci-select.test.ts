@@ -148,18 +148,18 @@ describe("shards", () => {
   const timings = readTimings(undefined, "");
   const weight = weigher(timings);
 
-  it("as few as the specs need, at least 1, at most 10 (Eric, Nov 6: the repo is public, so more runners cost nothing), never more than the files", () => {
+  it("as few as the specs need, at least 1, at most 15 (Eric, Nov 6: the repo is public, so more runners cost nothing; 15 since Nov 9), never more than the files", () => {
     expect(shardCount(smoke, () => 100)).toBe(1);
     expect(shardCount(smoke, () => 200)).toBe(2);
     expect(shardCount(["e2e/formats.spec.ts"], () => 5000)).toBe(1);
     expect(shardCount(all, weight)).toBe(MAX_SHARDS);
-    expect(MAX_SHARDS).toBe(10);
+    expect(MAX_SHARDS).toBe(15);
   });
 
-  it("every spec: 10 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
+  it("every spec: 15 shards, each with its own files (every spec file exactly once); otherwise the pull request's files", () => {
     const full = plan({ full: "this is a push run, which tests everything", specs: [], why: [] }, timings, all);
-    expect(full.outputs).toMatchObject({ specs: "", total: "10", shards: "[1,2,3,4,5,6,7,8,9,10]" });
-    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 10 shards: this is a push run, which tests everything.`);
+    expect(full.outputs).toMatchObject({ specs: "", total: "15", shards: "[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]" });
+    expect(full.outputs.note).toBe(`Every spec file (${all.length}) on 15 shards: this is a push run, which tests everything.`);
     const filters: string[] = JSON.parse(full.outputs.assignment).flatMap((s: string) => s.split(" "));
     expect(filters.sort()).toEqual(all.map((f) => `${f.replaceAll(".", "\\.")}$`).sort());
     const one = plan(pick("packages/app/src/components/Sawyer.tsx"), timings, all);
