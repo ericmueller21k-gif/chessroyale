@@ -111,6 +111,26 @@ describe("the server refuses new matches for a part that's resting", () => {
     expect(party.body).toEqual({ code: expect.stringMatching(/^[A-Z2-9]{5}$/) });
   });
 
+  it("ranked's leave rules (L1): a locked-out player's 1 v 1 search is refused with when; PAUSE_LEAVE_PENALTIES lifts it", async () => {
+    expect(pauseVariable("leave-penalties")).toBe("PAUSE_LEAVE_PENALTIES");
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const guest = await createGuest(sql, Date.now(), "Player");
+    const now = Date.now();
+    // Two dodges a minute apart: dodge level 2, locked 5 minutes from the second.
+    for (const [i, at] of [now - 2 * 60_000, now - 60_000].entries())
+      await sql.run("INSERT INTO ranked_conduct (user_id, match_id, at, mode, kind, games, rp, nonce) VALUES (?, ?, ?, '1v1', 'dodge', 0, 0, 'n')", guest.user.id, `G${i}`, at);
+    const play = async (env: object) => {
+      const res = await worker.fetch(new Request("https://hunchess.test/api/1v1/play", { method: "POST", headers: { cookie: `hc_session=${guest.token}`, "cf-connecting-ip": `10.1.0.${++ip}` } }), { DB: d1, ...env } as never, ctx);
+      return { status: res.status, body: (await res.json()) as { message?: string; lockedUntil?: number; lock?: string } };
+    };
+    const locked = await play({});
+    expect(locked.status).toBe(403);
+    expect(locked.body).toMatchObject({ lock: "dodge", lockedUntil: now - 60_000 + 5 * 60_000 });
+    // Off: no lockout (the queue isn't there in this test, so it gets as far as asking it).
+    expect((await play({ PAUSE_LEAVE_PENALTIES: "1" })).status).not.toBe(403);
+  });
+
   it("the shop: nothing new from it while it rests; equipping what you have still works", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql);

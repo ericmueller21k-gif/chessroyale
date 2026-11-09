@@ -127,6 +127,21 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(d.admit(T0, 0, PAIR_BY_RATING)).toHaveLength(1);
   });
 
+  it("ranked's delayed queue (L1): a ticket with `notBefore` waits for it, keeping its place; then it pairs as usual", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const a = q.enqueue(null, T0, { ...info("a", 1500), notBefore: T0 + 120_000 });
+    const b = q.enqueue(null, T0, info("b", 1500));
+    expect(q.admit(T0, 0, PAIR_BY_RATING)).toEqual([]);
+    // A third player, not delayed, pairs with b meanwhile.
+    q.enqueue(null, T0 + 1000, info("c", 1500));
+    expect(q.admit(T0 + 1000, 0, PAIR_BY_RATING)[0]!.tickets.map((t) => t.info?.uid)).toEqual(["b", "c"]);
+    const d = q.enqueue(null, T0 + 60_000, info("d", 1500));
+    for (const t of [a, d]) q.enqueue(t.id, T0 + 110_000);
+    expect(q.admit(T0 + 119_999, 0, PAIR_BY_RATING)).toEqual([]);
+    expect(q.admit(T0 + 120_000, 0, PAIR_BY_RATING)[0]!.tickets.map((t) => t.info?.uid)).toEqual(["a", "d"]);
+    expect(b).toBeTruthy();
+  });
+
   it("its own queue name", () => {
     expect(queueName("ranked1v1", "default")).toBe("ranked1v1-default");
     expect(queueName("ranked1v1", "default", "e2e-1")).toBe("ranked1v1-default-e2e-1");
@@ -186,6 +201,19 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     const g = D.made.get(codes[0]!)!;
     expect([g.w.uid, g.b.uid].sort()).toEqual(["ann", "bob"]);
     expect(g.testSeconds).toBe(9);
+  });
+
+  it("the delayed queue (L1): still looking, with how long until the ticket can be paired, even beside a player close in rating", async () => {
+    const D = duels();
+    const mm = matchmaker(D.ns);
+    const now = Date.now();
+    const first = await mm.duelNext(null, { ...info("ann", 1500), notBefore: now + 120_000 });
+    expect(first).toMatchObject({ searching: true });
+    expect("delayMs" in first && first.delayMs! > 110_000 && first.delayMs! <= 120_000).toBe(true);
+    const bob = await mm.duelNext(null, info("bob", 1500));
+    expect(bob).toMatchObject({ searching: true });
+    expect("delayMs" in bob).toBe(false);
+    expect(D.made.size).toBe(0);
   });
 
   it("a ticket asked about after it went (a phone asleep past its time, or one made up) is expired: never a new, empty ticket", async () => {
