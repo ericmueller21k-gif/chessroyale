@@ -24763,13 +24763,16 @@ button.sq-tiny {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A phone's wide
-     boss overflows his box by about 12 px a side, plus a few px of margin for sub-pixel scaling (15.8 measured at 32), so 36 px.) */
+  /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A mirrored boss (artFacesLeft)
+     paints past his box's right edge: Folio's wing 7 px and Alfil's ankus 11 px from the God King at 36 px (Nov 9, every boss measured).
+     The boss is moved 16 px left (a translate, so the row's width and the God King and his pawn stay where they were: their speech
+     bubble keeps its gutter); every boss then has 23 px at worst.) */
   gap: 36px;
   margin: 0 auto;
 }
 .results-duo .boss-char.place-results {
   margin: 100px 0 0;
+  translate: -16px 0;
 }
 .results-duo .gk-epilogue {
   margin: 0 0 10px;
