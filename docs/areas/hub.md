@@ -4,6 +4,15 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **The daily quests overlay (a mockup, Nov 9; behind `?quests=mock`, `done` or `entry`; [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md)):**
+  `components/QuestsOverlay.tsx` (props: the quests, the two countdowns, today's reroll, callbacks), fed fake data by `quests-mock.ts`;
+  nothing stored or sent yet. A gold-framed card over home (a plain dark dim, no blur): the app icon in a crest, "Daily Quests", "New quests in 12h",
+  two daily rows and the weekly under its own label ("Resets in 4d"), each with its picture (a boss's portrait, the board's pieces),
+  goal, bar and count, and its reward in the shop's art (the Winter crate, the key); a reroll on each daily (one a day: greyed once
+  used or on a done quest); "Got it", ×, Escape or a tap outside close it. The **Quests entry** is a phone's top bar button (beside your
+  pawn, before the shop; 36 px below 344 px so it fits at 320 px) and a computer's top right corner on your card, over nothing (icon only on
+  a short card). Guard: `e2e/home-layout.spec.ts`, "quests mockup …", phone and computer.
+
 - **The first-time walkthrough** (`components/Walkthrough.tsx`, slides in `tutorial.ts`): 13 slides; each lights every visible
   `data-tour` element (a computer's side menu and home button both). Only the last slide has OK and "Don't show me this again";
   `?tour=1` reopens it. Decision: [2026-11-07-walkthrough-v2.md](../decisions/2026-11-07-walkthrough-v2.md).

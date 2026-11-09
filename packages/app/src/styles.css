@@ -9082,6 +9082,28 @@ button.fd-logo {
     height: 40px;
   }
 }
+/*
+ * Below 344 px (a 320 px phone) the row holds your pawn, Quests, the shop, Friends and the gear beside "HunChess": the round
+ * items are 36 px with 4 px gaps, and the logo 14 px. (Measured Nov 9 with Quests added: at 40 px the pawn overlapped Quests by
+ * 25 px.)
+ */
+@media (max-width: 343px) {
+  /* (Only while the Quests button is in the bar: without it the bar keeps its 40 px buttons, home-layout.spec.ts's tap-target
+     check. Phase 3 must find room at 320 px without going under 40 px.) */
+  .fd-top:has(.fd-top-quests),
+  .fd-top:has(.fd-top-quests) .fd-top-end,
+  .fd-top:has(.fd-top-quests) .fd-top-right {
+    gap: 4px;
+  }
+  .fd-top:has(.fd-top-quests) .fd-logo {
+    font-size: 14px;
+  }
+  .fd-top:has(.fd-top-quests) .fd-ring,
+  .fd-top:has(.fd-top-quests) .fd-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
 .fd-home-main {
   flex: 1 1 auto;
   display: flex;
@@ -24936,4 +24958,470 @@ button.sq-tiny {
   .xp-popping .xp-level {
     opacity: 1;
   }
+}
+
+/*
+ * The daily quests overlay (a mockup, Nov 9: components/QuestsOverlay.tsx; Eric's reference, notes/briefs/design-xp-quests.md,
+ * section 5): a gold-framed card over home (dimmed behind; no blur, Eric Nov 9), the pawn in a black-and-gold crest (the Welcome
+ * Crate's colors), the title on a black banner, a row per quest, "Got it". Plain CSS over the front door's colors, light and dark;
+ * the pictures are the game's own (a boss's portrait, the board's pieces, the shop's crate and key).
+ */
+:root {
+  --qo-card: color-mix(in srgb, var(--fd-gold) 6%, var(--fd-panel));
+  --qo-row: var(--fd-panel-2);
+  --qo-ink: #16130d;
+  --qo-track: #101218;
+}
+:root[data-theme="light"] {
+  --qo-card: color-mix(in srgb, var(--fd-gold) 12%, #fff);
+  --qo-row: #fff;
+  --qo-track: var(--fd-seat);
+}
+.qo-back {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  /* (A plain dark overlay, light and dark: no blur, which costs a phone while home's pictures move.) */
+  background: rgba(0, 0, 0, 0.55);
+  /* (A flex box and the card's auto margins: centered, and when the window is shorter than the card, it scrolls from its top.) */
+  display: flex;
+  padding: 46px max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: Archivo, system-ui, sans-serif;
+  color: var(--fd-text);
+}
+.qo-card {
+  position: relative;
+  width: min(100%, 440px);
+  margin: auto;
+  background: var(--qo-card);
+  border: 3px solid var(--fd-gold);
+  border-radius: 24px;
+  box-shadow:
+    0 0 0 2px var(--qo-ink),
+    0 18px 44px rgba(0, 0, 0, 0.35);
+  padding: 40px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  container: qo-card / inline-size;
+  animation: qo-in 180ms ease-out;
+}
+@keyframes qo-in {
+  from {
+    transform: scale(0.96);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qo-card {
+    animation: none;
+  }
+}
+/* The crest: the HunChess app icon (public/icons/icon.svg) in a black disc ringed in gold, over the card's top edge. */
+.qo-crest {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  translate: -50% 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 35%, #3a3020, var(--qo-ink) 70%);
+  border: 3px solid var(--fd-gold);
+  box-shadow: 0 0 0 2px var(--qo-ink);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.qo-crest-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.hb-pieces.qo-pieces {
+  width: 40px;
+  height: 40px;
+}
+.hb-pieces.qo-pieces piece {
+  width: 100%;
+  height: 100%;
+}
+.qo-x {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid var(--fd-gold);
+  background: var(--qo-ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: 0 0 0 2px var(--qo-ink);
+}
+.qo-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.qo-title {
+  margin: 0;
+  background: var(--qo-ink);
+  color: #fff;
+  border: 2px solid var(--fd-gold);
+  border-radius: 12px;
+  padding: 5px 22px 9px;
+  font: 400 24px/1.1 "Archivo Black", Archivo, system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+.qo-when,
+.qo-label-when {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.qo-when {
+  position: relative;
+  margin-top: -6px;
+  background: var(--fd-gold);
+  color: var(--fd-gold-ink);
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+.qo-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.qo-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 2px 4px -2px;
+  font: 800 12px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fd-gold-text);
+}
+.qo-label-when {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fd-sub);
+  font-size: 12px;
+}
+.qo-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 10px;
+  min-height: 96px;
+  padding: 10px;
+  background: var(--qo-row);
+  border: 1.5px solid var(--fd-line);
+  border-radius: 16px;
+}
+.qo-row.weekly {
+  background: var(--fd-gold-soft);
+  border-color: var(--fd-gold);
+}
+.qo-row.done {
+  border-color: var(--fd-green);
+}
+/* The quest's picture: a dark tile with a thin gold line, as the reference's. */
+.qo-pic {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: #2a2318;
+  box-shadow: inset 0 0 0 2px rgba(242, 193, 78, 0.55);
+  display: grid;
+  place-items: center;
+}
+.qo-pic .qo-boss {
+  width: 48px;
+  height: 46px;
+  object-fit: contain;
+}
+.hb-pieces.qo-board {
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  overflow: hidden;
+  /* (The board's own squares.) */
+  background: repeating-conic-gradient(#f0d9b5 0 25%, #b58863 0 50%) 0 0 / 22px 22px;
+}
+.hb-pieces.qo-board piece {
+  inset: 3px;
+  width: auto;
+  height: auto;
+}
+.hb-pieces.qo-squad {
+  width: 50px;
+  height: 44px;
+}
+.hb-pieces.qo-squad piece {
+  width: 30px;
+  height: 30px;
+}
+.hb-pieces.qo-squad piece:nth-child(1) {
+  left: -1px;
+  top: 14px;
+  z-index: 3;
+}
+.hb-pieces.qo-squad piece:nth-child(2) {
+  left: 10px;
+  top: 2px;
+}
+.hb-pieces.qo-squad piece:nth-child(3) {
+  left: 21px;
+  top: 14px;
+  z-index: 3;
+}
+.qo-check {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--fd-green);
+  color: #fff;
+  border: 2px solid var(--qo-row);
+  display: grid;
+  place-items: center;
+}
+.qo-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.qo-name {
+  font: 800 16px/1.25 Archivo, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qo-goal {
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--fd-sub);
+}
+.qo-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.qo-bar {
+  flex: 1 1 auto;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--qo-track);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.qo-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(#f8d77e, #e2a92c);
+}
+.qo-row.done .qo-fill {
+  background: var(--fd-green);
+}
+.qo-count {
+  flex: none;
+  min-width: 36px;
+  text-align: right;
+  font: 800 14px Archivo, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.qo-row.done .qo-count {
+  color: var(--fd-green);
+}
+/* Reroll (a daily's): a small round button on the row's top left corner, always there; greyed when it can't be used. */
+.qo-reroll {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 2;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--fd-gold);
+  background: var(--qo-ink);
+  color: var(--fd-gold);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+/* (Its tap area is 44 px, more than it shows.) */
+.qo-reroll::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+.qo-reroll:disabled {
+  cursor: default;
+  border-color: var(--fd-dim);
+  color: var(--fd-dim);
+  background: var(--fd-seat);
+}
+.qo-reward {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-left: 1.5px solid var(--fd-line);
+  padding-left: 8px;
+}
+.qo-row.weekly .qo-reward {
+  border-color: color-mix(in srgb, var(--fd-gold) 45%, transparent);
+}
+.qo-reward-tag {
+  font: 800 10px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fd-gold-ink);
+  background: var(--fd-gold);
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+.qo-xp {
+  font: 900 15px Archivo, system-ui, sans-serif;
+  color: var(--fd-gold-text);
+  white-space: nowrap;
+}
+.qo-things {
+  display: flex;
+  gap: 6px;
+}
+.qo-thing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: 700 10px Archivo, system-ui, sans-serif;
+  color: var(--fd-sub);
+}
+.qo-thing .item-art {
+  width: 36px;
+  height: 36px;
+  margin: -2px 0 -3px;
+}
+.qo-ok {
+  margin-top: 4px;
+  min-height: 52px;
+  font-size: 17px;
+  border: 2px solid var(--qo-ink);
+}
+/* A narrow phone (320 px): smaller pictures and rewards, so the quest's words keep their room. */
+@container qo-card (max-width: 320px) {
+  .qo-row {
+    grid-template-columns: 44px minmax(0, 1fr) 72px;
+    gap: 8px;
+    padding: 8px;
+  }
+  .qo-pic {
+    width: 44px;
+    height: 44px;
+  }
+  .qo-pic .qo-boss {
+    width: 40px;
+    height: 40px;
+  }
+  .hb-pieces.qo-board {
+    width: 38px;
+    height: 38px;
+    background-size: 19px 19px;
+  }
+  .hb-pieces.qo-squad {
+    transform: scale(0.85);
+  }
+  .qo-name {
+    font-size: 15px;
+  }
+  .qo-goal {
+    font-size: 12px;
+  }
+  .qo-xp {
+    font-size: 13px;
+  }
+  .qo-thing .item-art {
+    width: 30px;
+    height: 30px;
+  }
+  .qo-title {
+    font-size: 21px;
+    padding: 5px 16px 8px;
+  }
+}
+/* Home's Quests entry: in your card's top right corner, over nothing, so home never moves for it. */
+.fd-hero {
+  position: relative;
+}
+.fd-quests-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 9px;
+  border-radius: 999px;
+  border: 1.5px solid var(--fd-gold);
+  background: var(--fd-gold-soft);
+  color: var(--fd-gold-text);
+  font: 800 13px Archivo, system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fd-quests-btn::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.fd-quests-btn:active {
+  transform: scale(0.97);
+}
+/*
+ * A short card (a small phone: your pawn beside your tag, the card's own rule above): the entry is its icon alone, 36 px, and the
+ * card keeps its corner free for it, so a long name ellipsizes before it rather than running under it.
+ */
+@container fd-hero (max-height: 189px) {
+  .fd-has-quests .fd-hero-in,
+  .fd-home:not(.queueing) .fd-has-quests .fd-hero-in {
+    padding-right: 52px;
+  }
+  .fd-quests-btn {
+    width: 36px;
+    padding: 0;
+    justify-content: center;
+  }
+  .fd-quests-btn span {
+    display: none;
+  }
+}
+/* (The key is drawn across the middle of its square: a little bigger, so it reads beside the crate.) */
+.qo-thing .key-art svg {
+  transform: scale(1.3);
 }
