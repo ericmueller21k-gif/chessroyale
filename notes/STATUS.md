@@ -574,3 +574,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   ?quests=mock) so phase 3 builds on it.
 - Eric on boss result v2: read as "Yes" (blows land on the pawn) and "the pawn is fine for now". Director fixed the review minor
   (Win +50 timing). PR #571 (f319d33), CI watcher bhxccw9l5; merge on green.
+- Nov 9 ~07:25: Eric: the attack landing on the pawn is good; "the pawn is fine" meant the quest crest (he still wants to SEE the
+  app-icon crest). Boss result pawn "way too small", show it dressed up: Haiku session_01JuCWRsaru8sh3761MT3s2m on
+  claude/boss-result-v2 (~1.6x pawn, dressed stills; done signal .round2.md, watcher blhf1m8ex). Hold #571's merge for it.
