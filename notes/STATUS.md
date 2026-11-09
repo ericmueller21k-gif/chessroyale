@@ -583,3 +583,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~08:00: Eric: quests mockups look good. #572 CI red: home-layout.spec.ts:413 (top bar buttons >= 40 px under 360) vs the
   36 px squeeze; director gated the squeeze to `.fd-top:has(.fd-top-quests)` (343e819), passes locally. PHASE 3 NOTE: at 320 px the
   Quests button must fit without going under 40 px (e.g. the logo shrinks to its icon) — Eric's tap-target floor.
+- Nov 9 ~08:55: #572 quests mock merged (74b8def), main green. Eric asked (overnight): (a) a Duo (2 v 2) idea — answered in chat
+  (recommend Hand and Brain duo, our twist); (b) the ranked ladder for every mode (separate vs main+flex, MMR naming, dodge vs leave
+  penalties and queue delays, bots at the leaver's strength, library math, tiers, post-game screens). Research+design Opus high
+  session_01JuCWRvjqERZdHUakRak83c on claude/ranked-ladder-design (docs/ideas/ranked-ladder.md; done signal .done.md, watcher
+  bgcy9l93r). Web research allowed for this job (Eric). Boss result pawn Haiku still running (watcher blhf1m8ex).
