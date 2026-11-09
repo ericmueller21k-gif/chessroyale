@@ -26,7 +26,8 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   const partsRef = useRef<HTMLDivElement>(null);
   // (While it's coming: your XP as your profile had it when the box appeared, standing still, read once: a profile refreshed while
   // waiting never moves the bar. For a game with none: the server's.)
-  const waited = useRef<number | null>(xp === undefined ? (account().profile?.xp ?? 0) : null);
+  // (Read for a box with no grant too (`null`): it shows your real level, never "Level 1"; delta review D1.)
+  const waited = useRef<number | null>(xp ? null : (account().profile?.xp ?? 0));
   const still = xp ? xp.before : (waited.current ?? 0);
   // (Where the fill starts, decided once per grant (review m7, Nov 9): never below what the box already showed while waiting, so the
   // bar never steps back; and a grant whose fill already finished in an earlier box (Squads' card, then its results) isn't

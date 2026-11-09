@@ -155,10 +155,11 @@ async function winCap(sql: Sql, account: string, game: XpGame, day: number): Pro
       return {
         source: `vs:${ids.join(",")}`,
         when: cond(
-          `NOT EXISTS (SELECT 1 FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id LIKE 'vs:%' AND created_at >= ? AND (${ids.map(() => "(',' || substr(source_id, 4) || ',') LIKE ?").join(" OR ")}))`,
+          // (The ids as one JSON parameter, so the statement's parameters don't grow with the opponents: D1 allows 100; delta review D2.)
+          `NOT EXISTS (SELECT 1 FROM ledger, json_each(?) j WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id LIKE 'vs:%' AND created_at >= ? AND (',' || substr(source_id, 4) || ',') LIKE '%,' || j.value || ',%')`,
+          JSON.stringify(ids),
           account,
           day,
-          ...ids.map((id) => `%,${id},%`),
         ),
       };
     }
