@@ -1,6 +1,6 @@
 import { devices, expect, type Page } from "@playwright/test";
 import { ITEM_DEFS, rankView } from "@chessroyale/core";
-import { asServerAdmin, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
+import { asServerAdmin, giveCrates, giveItems, named, soloFromHome, switchesOff, test, openBossRaid, wearItem } from "./helpers.ts";
 
 const phase = (p: Page) => p.evaluate(() => (window as any).match?.phase.kind ?? "none");
 
@@ -20,7 +20,8 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
       body: JSON.stringify({ mode: "crowd", placement: 3, players: 100, team: "w", rating: 1612, brilliant: 1, bestMove: "Nxe5", cuts: 11, cutsSurvived: 11 }),
     }),
   );
-  // Something to wear: a crate item, worn in its slot.
+  // Something to wear: a crate item, worn in its slot. (Crates need a key since Nov 9: one crate and one key to open.)
+  await giveCrates(page, "winter-1", 1);
   await page.evaluate(async () => {
     const post = (path: string, body: object) =>
       fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });

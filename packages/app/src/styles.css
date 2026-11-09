@@ -7475,8 +7475,92 @@ button.history-label {
   width: 28px;
   height: 28px;
 }
-.boss-crate-row.none {
+.boss-crate-row.none,
+.series-crate-row.none,
+.boss-pick-row.none {
   opacity: 0.55;
+}
+/* A series crate you can't open yet (Nov 9: none held, or no key): the Welcome Crate's padlock on its corner. */
+.crate-lock {
+  z-index: 1;
+}
+.crates-how {
+  margin: 0;
+}
+/* Choosing a level's boss crate (Nov 9): every live boss's crate as a tile, its token on the corner. */
+.boss-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.boss-pick {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.boss-pick:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.boss-pick-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.boss-pick-said {
+  min-height: 1.45em;
+  margin: 0;
+}
+/* The result screen's rewards toast (components/RewardBox.tsx; Nov 9): the friends' invite toast's place and look, the crate and the
+   key with their counts, then the lines. It takes no taps (whatever is under it stays tappable) and goes on its own. */
+.reward-toast {
+  position: fixed;
+  z-index: 65;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 24px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  color: var(--fd-text);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--fd-line);
+  pointer-events: none;
+}
+.reward-art {
+  flex: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 800;
+}
+.reward-thing {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.reward-thing-art {
+  width: 40px;
+  height: 40px;
+}
+.reward-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+.reward-title {
+  font-size: 16px;
 }
 .crate-row-held {
   font-size: 12px;

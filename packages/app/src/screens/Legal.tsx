@@ -207,11 +207,12 @@ function Privacy() {
         what={
           <p>
             Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
-            the XP it gave you and what for, or why it gave none. When a game you play on your device began (our server times it).
+            the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward and your levels'). The
+            crates you hold by series, and the boss crates you have to pick. When a game you play on your device began (our server times it).
           </p>
         }
-        why="so your level is yours on every device, a game's XP is counted once, and the result screen can show what a game gave you."
-        kept="your XP until the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in."
+        why="so your level is yours on every device, a game's XP and rewards are counted once, and the result screen can show what a game gave you."
+        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in."
       />
       <Item
         title="Chat"

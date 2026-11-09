@@ -32,6 +32,7 @@ import {
   type ShopState,
   type StoredChatPicks,
   levelOf,
+  XP,
   type XpGrant,
 } from "@chessroyale/core";
 import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
@@ -251,13 +252,18 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // been searched again.
   { table: "fairplay_matches", column: "deep_queued", type: "INTEGER" },
   { table: "fairplay_matches", column: "deep_done", type: "INTEGER" },
-  // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free (CRATES_FREE).
+  // Crates earned (Squads' placement rewards, Oct 10, 2026), counted for when crates stop being free. Since Nov 9 (XP phase 2) crates
+  // are held by series (ledger.ts, series_crates): a count here is turned into crates of the newest series as the locker is read
+  // (rewards.ts, seriesFromWallet), and nothing adds to it any more but a guest's merge.
   { table: "wallets", column: "crates", type: "INTEGER NOT NULL DEFAULT 0" },
   // Crate keys (Nov 2, 2026: a boss crate takes one; an admin's test grant gives them): boss-tokens.ts.
   { table: "wallets", column: "crate_keys", type: "INTEGER NOT NULL DEFAULT 0" },
   // XP (Nov 9, 2026; xp.ts): each account's XP, its level worked out from it (core's levelOf). Moved only through the ledger (asset
   // kind "xp"). Every row from before starts at 0.
   { table: "wallets", column: "xp", type: "INTEGER NOT NULL DEFAULT 0" },
+  // Boss crates to pick (Nov 9, 2026, XP phase 2: every 10th level's; rewards.ts): moved only through the ledger (asset kind
+  // "boss_pick"). Every row from before has none.
+  { table: "wallets", column: "boss_picks", type: "INTEGER NOT NULL DEFAULT 0" },
   // A game's XP (Nov 9, 2026; xp.ts): the player's time in it and their own moves (online: as the match room counted them; solo: the
   // server's clock between the game's start and its result, and the device's count of moves), and what the result screen showed: their XP before, the parts (JSON [{label, xp}]) or why none
   // ("short", "resigned", "left", "guest", "test", "banned"). NULL on every result from before (and a solo result from an app before XP).
@@ -266,6 +272,9 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "results", column: "xp_before", type: "INTEGER" },
   { table: "results", column: "xp_parts", type: "TEXT" },
   { table: "results", column: "xp_none", type: "TEXT" },
+  // What the game paid beside its XP (Nov 9, 2026, XP phase 2): JSON {crate, daily, crates, keys, bossPicks, levels} (core's
+  // XpRewards), for the result screen's rewards box. NULL: nothing (and every result from before).
+  { table: "results", column: "xp_rewards", type: "TEXT" },
   // Each account's latest rating, for the percentile (filled in from the results already stored).
   { table: "users", column: "rating", type: "INTEGER", then: [`UPDATE users SET rating = ${LATEST_RATING("users.id")}`] },
   // Friends (Oct 15, 2026): who may invite you, hiding when you're online (friends.ts).
@@ -727,8 +736,8 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   await sql.run(
     `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
        brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-       play_ms, moves, xp_before, xp_parts, xp_none)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+       play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
      ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
     userId,
     mode,
@@ -1164,7 +1173,8 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
 }
 
 /**
- * A placement reward (Squads): coins into the wallet, and crates counted there (spendable once crates stop being free). One ledger
+ * A placement reward (Squads): coins into the wallet, and crates of the newest series (XP.rewardCrate, since Nov 9: each opens with a
+ * crate key). One ledger
  * op, keyed by `op` (Squads': opKeys.squadsReward, so its lobby can write it again after a failure or a restart and it pays once;
  * none: a fresh key). Answers what became of it; null: nothing to give, or no such account (deleted mid-match). A failed write throws.
  */
@@ -1178,7 +1188,7 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
     id: op === undefined ? `reward:${crypto.randomUUID()}` : keyFor(op, me),
     reason: "reward",
     now,
-    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.crates(userId, k)] : [])],
+    legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.seriesCrates(userId, XP.rewardCrate, k)] : [])],
   });
 }
 

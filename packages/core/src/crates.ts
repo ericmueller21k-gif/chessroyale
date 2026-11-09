@@ -406,11 +406,10 @@ export const bossCrateDef = (id: string) => BOSS_CRATES.find((c) => c.id === id)
 export const bossCrateOf = (boss: string) => BOSS_CRATES.find((c) => c.boss === boss);
 
 /**
- * While testing: unlimited crates (the Crates tab's, opened free), and the test switches (?fischer=1, ?shiny=1) work for those
- * allowed them (an admin, or TEST_SWITCHES: docs/areas/ops.md, "Test switches"). Crate keys are counted and stored since Nov 2
- * (a boss crate takes one), and a boss crate is never free.
+ * Opening a crate (Nov 9, XP phase 2; Eric: "get rid of all that. Make it actually ready to go"): a series crate (CRATES) takes one of
+ * that crate you hold and one crate key, for everyone, admins too; a boss crate is one you hold (bought, picked or won). The test
+ * switches ?fischer=1 and ?shiny=1 force a series crate's roll only where the server's TEST_SWITCHES is "1" (local, e2e, staging).
  */
-export const CRATES_FREE = true;
 
 /**
  * One item a player owns: which item, its color (and a second color for two-color items), its blemish (0-100,

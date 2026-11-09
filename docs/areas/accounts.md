@@ -58,8 +58,15 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
   `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
   XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
+- **The daily reward and level rewards** (Nov 9, phase 2; `server/rewards.ts`, decisions `2026-11-09-xp-phase2-*.md`): the XP day's first
+  counted game with `XP.dailyMinMoves` (15) of your own moves (solo: also 3 minutes of the server's time) pays +200 XP ("Daily reward
+  +200" in the box) and a Winter Crate, once a day (`daily:<day>:<ledger id>`). Each level reached pays 2 Winter Crates and a crate key,
+  every 10th also a boss crate to pick (`wallets.boss_picks`), once per level (`level:<n>:<ledger id>`), every level owed at the next
+  counted game (at most 20 a game). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
+  (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants
+  nothing ("Rewards are paused for a moment."). Merge adds the crates and picks; deleting closes them; the download has them.
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
-  coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
+  coins into `wallets.coins`, crates (Winter Crates since Nov 9, in `series_crates`; before, counted in `wallets.crates`), both carried over
   when a guest signs in (`grantReward`).
 - **Admins** are the emails in `ADMIN_EMAILS` (a Worker variable or secret, never in the repo): the fair-play review
   page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the

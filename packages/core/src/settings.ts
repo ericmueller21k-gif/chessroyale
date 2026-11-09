@@ -2574,8 +2574,8 @@ export const SQUADS_LOBBY = {
   /** The drawn bracket on screen before round 1's matches begin (after the votes). */
   bracketIntroSeconds: 8,
   /**
-   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are counted
-   * there for when crates stop being free (CRATES_FREE). Each person on the squad still playing their seat when its
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are crates of the
+   * newest series (XP.rewardCrate since Nov 9), each opened with a crate key. Each person on the squad still playing their seat when its
    * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
    */
   rewards: {
@@ -3110,7 +3110,8 @@ export const BOSS_CRATE_PRICE = {
  * clock alone (`minutes` from its start to its finish as the server saw them: the device's word for its moves isn't trusted).
  * Where sign-in is set up, only signed-in accounts earn them (a guest's would move on signing in: many guests into one account).
  * `shortNames`: a boss whose token says a shorter name than the boss's own ("Boingo token", as its picture is named).
- * `grantMax`: the most an admin's test grant gives at once (keys, or one boss's tokens).
+ * `grantMax`: the most an admin's test grant gives at once of one boss's tokens; `keysGrantMax` of crate keys (Eric, Nov 9: an admin
+ * grants themselves up to 100 keys at once, now that crates take one: docs/decisions/2026-11-09-xp-phase2-keys.md).
  */
 export const BOSS_TOKENS = {
   moves: 10,
@@ -3120,6 +3121,7 @@ export const BOSS_TOKENS = {
   cap: 3,
   shortNames: { clown: "Boingo" } as Readonly<Record<string, string>>,
   grantMax: 10,
+  keysGrantMax: 100,
 } as const;
 
 /**
@@ -3140,6 +3142,16 @@ export const BOSS_TOKENS = {
  *     each part appearing in turn; a level-up fills to the end, pops "Level N!" for `levelUpMs`, and carries on from empty. Online,
  *     the screen asks the server for its game's XP at `asksMs` after the results (the room may still be writing them).
  *   - `testMax`: the most XP the test switch `?xp=` sets (test servers and admins only).
+ *
+ * Phase 2 (Eric, Nov 9: "go with phase two"; the design's sections 2 and 4; docs/decisions/2026-11-09-xp-phase2-*.md):
+ *   - **The daily reward:** your first counted game of the XP day with at least `dailyMinMoves` of your own moves (a solo game also
+ *     `dailySoloMinMinutes` of the server's own time) pays `dailyBonus` XP ("Daily reward +200") and `dailyCrates` crates of
+ *     `rewardCrate` (the newest series), once an XP day.
+ *   - **Level-up rewards:** each level reached pays `levelCrates` crates of `rewardCrate` and `levelKeys` crate keys; every
+ *     `bossCrateEvery`th level also a boss crate the player picks among the live bosses (it waits in the Crates tab until picked).
+ *     Paid once per level, at the next counted game (so levels reached while rewards were paused, or before phase 2, are paid then);
+ *     at most `levelsPerGame` levels a game (the rest at the next).
+ *   - The result screen shows what a game paid beside its XP in a toast at the top once the XP bar has filled, for `rewardToastMs`.
  */
 export const XP = {
   perLevel: 1000,
@@ -3155,6 +3167,16 @@ export const XP = {
   levelUpMs: 700,
   asksMs: [700, 1500, 3000, 6000, 10_000],
   testMax: 100_000,
+  dailyBonus: 200,
+  dailyMinMoves: 15,
+  dailySoloMinMinutes: 3,
+  dailyCrates: 1,
+  levelCrates: 2,
+  levelKeys: 1,
+  bossCrateEvery: 10,
+  levelsPerGame: 20,
+  rewardCrate: "winter-1",
+  rewardToastMs: 6000,
 } as const;
 
 /**

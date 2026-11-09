@@ -45,3 +45,14 @@ export function memoryDb() {
   } as unknown as D1Database;
   return { db, sql, d1 };
 }
+
+/**
+ * Crates to open (Nov 9, XP phase 2: a series crate takes one you hold and a crate key): `n` of `crate` and `n` keys, through the
+ * ledger as any grant (an op "test-stock"), so the balances and the ledger still agree.
+ */
+export async function stockCrates(sql: Sql, userId: string, crate: string, n: number, now = 1): Promise<void> {
+  const { applyOp, leg, ledgerAccount } = await import("../src/ledger.ts");
+  const me = await ledgerAccount(sql, userId);
+  if (!me || n <= 0) return;
+  await applyOp(sql, me, { id: `test-stock:${me.account}:${crypto.randomUUID()}`, reason: "test", now, legs: [leg.seriesCrates(userId, crate, n), leg.keys(userId, n)] });
+}

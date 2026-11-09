@@ -6,7 +6,7 @@ import { equipLocker, lockerState, openCrate } from "../src/locker.ts";
 import { appeal, setCase } from "../src/fairplay.ts";
 import { coinCount, duelEntrant, duelGamesOf, purgeDuelGames, rankedRecordOf, recordDuel, type FinishedDuel } from "../src/ranked.ts";
 import { TOP_PLACE_MS, forgetTopPlaces, rankOf, rankedSummary, topPlace } from "../src/ranked-schema.ts";
-import { memoryDb } from "./memory-db.ts";
+import { memoryDb, stockCrates } from "./memory-db.ts";
 
 /**
  * Ranked 1 v 1's records in D1 (ranked.ts): a game recorded once (ranks, coins, the kept game), safely beside
@@ -362,6 +362,7 @@ describe("the public profile's numbers (Oct 28, 2026): peak, streak, each game's
     await settledAt(sql, b.id, 1500);
     await settledAt(sql, c.id, 1500);
     // Bob wears a crate item (its look as his locker has it); Cy nothing.
+    await stockCrates(sql, b.id, "winter-1", 1);
     const opened = await openCrate(sql, b.id, "winter-1", {}, T0);
     if (!opened.ok) throw new Error(opened.message);
     const slot = itemDef(opened.item.def)!.slot;

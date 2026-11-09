@@ -7,7 +7,7 @@ import { accountDownload } from "../src/account-data.ts";
 import { deleteLockerItems, equipLocker, lockerState, looksOf, openCrate } from "../src/locker.ts";
 import { rankedSummary } from "../src/ranked-schema.ts";
 import { duelEntrant } from "../src/ranked.ts";
-import { memoryDb } from "./memory-db.ts";
+import { memoryDb, stockCrates } from "./memory-db.ts";
 
 /**
  * Admins own one of every item (Eric, Oct 31, 2026; docs/decisions/2026-10-31-admin-owns-all.md): admin copies, added
@@ -279,6 +279,9 @@ describe("fair play and the economy: nobody else gets one, and one never becomes
 
   it("crates: a stored item's id is never an admin copy's; opening one as an admin stores only the real roll", async () => {
     const { sql, eric } = await setup();
+    // (An admin opens as anyone does since Nov 9: a crate held and a key each. None: refused.)
+    expect((await openCrate(sql, eric.id, "beta-001", {}, T0, true)).ok).toBe(false);
+    await stockCrates(sql, eric.id, "beta-001", 5);
     for (let i = 0; i < 5; i++) {
       const r = await openCrate(sql, eric.id, "beta-001", {}, T0 + i, true);
       if (!r.ok) throw new Error(r.message);

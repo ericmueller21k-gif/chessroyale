@@ -11,6 +11,7 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
+import { pickBossCrate } from "./rewards.ts";
 import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
@@ -452,13 +453,15 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // The locker. GET /api/locker; POST /api/locker/open {crate, request, fischer?, shiny?} (`request`: the app's id for the open, so a
-  // retry opens it once; the test switches: admins, or
-  // TEST_SWITCHES, and only while crates are free; a boss crate is one you hold, opened once, never with a test switch: openBossCrate); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete
-  // {items} (deletes your crate items for good).
+  // retry opens it once; a series crate takes one you hold and a crate key, for everyone (Nov 9); the test switches ?fischer and ?shiny
+  // only where TEST_SWITCHES is "1", never an admin's elsewhere (Eric, Nov 9: no admin special ability); a boss crate is one you hold,
+  // opened once, never with a test switch: openBossCrate); POST /api/locker/pick {crate, request} (a level's boss crate picked:
+  // rewards.ts); POST /api/locker/equip {slot, item} (item null empties the slot); POST /api/locker/delete {items} (deletes your crate
+  // items for good).
   if (path === "/api/locker" && request.method === "GET") return json(await lockerState(sql, current.id, admin));
   if (path === "/api/locker/open" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { crate?: unknown; fischer?: unknown; shiny?: unknown; request?: unknown };
-    const force = testSwitchesOn(env as AdminEnv, current) ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
+    const force = (env as AdminEnv).TEST_SWITCHES === "1" ? { fischer: b.fischer === true, shiny: b.shiny === true } : {};
     // (The Welcome Crate, Nov 6: yours once you've earned it, opened once, the server's roll only: welcome.ts.)
     if (isWelcomeCrate(b.crate)) {
       const w = await openWelcomeCrate(sql, current.id, now);
@@ -467,6 +470,11 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const once = requestId(b.request);
     const r = typeof b.crate === "string" && bossCrateDef(b.crate) ? await openBossCrate(sql, current.id, b.crate, now, admin, once) : await openCrate(sql, current.id, b.crate, force, now, admin, once);
     return r.ok ? json(r) : json({ message: r.message }, 400);
+  }
+  if (path === "/api/locker/pick" && request.method === "POST") {
+    const b = (await request.json().catch(() => ({}))) as { crate?: unknown; request?: unknown };
+    const r = await pickBossCrate(sql, current.id, b?.crate, requestId(b?.request), now);
+    return r.ok ? json({ crate: r.crate, locker: await lockerState(sql, current.id, admin) }) : json({ message: r.message }, 400);
   }
   // POST /api/locker/welcome/seen: the "You earned a Welcome Crate!" notice closed, for good (it shows once). Answers the locker.
   if (path === "/api/locker/welcome/seen" && request.method === "POST") {
@@ -478,8 +486,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     const r = await equipLocker(sql, current.id, b.slot, b.item ?? null, admin);
     return r.ok ? json(r.locker) : json({ message: r.message }, 400);
   }
-  // POST /api/locker/grant {keys?, boss?, tokens?, request}: an admin's test grant to their own account (crate keys, a boss's tokens;
-  // once per request id); for anyone else it isn't there. Answers the locker.
+  // POST /api/locker/grant {keys?, boss?, tokens?, request}: an admin's test grant to their own account (crate keys, up to
+  // BOSS_TOKENS.keysGrantMax (100) at once; a boss's tokens; once per request id); for anyone else it isn't there. Answers the locker.
   if (path === "/api/locker/grant" && request.method === "POST") {
     if (!admin) return json({ message: "Not found" }, 404);
     const b = (await request.json().catch(() => ({}))) as { keys?: unknown; boss?: unknown; tokens?: unknown; request?: unknown };
@@ -577,7 +585,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
   if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
   if (path === "/api/xp/test" && request.method === "POST") {
-    if (!testSwitchesOn(env as AdminEnv, current)) return json({ message: "Not allowed" }, 403);
+    // (Only where TEST_SWITCHES is "1" (local, e2e, staging), never an admin's on production: a jump there would be owed real level
+    // rewards, crates, keys and boss picks. Review of #574, M1, Nov 9.)
+    if ((env as AdminEnv).TEST_SWITCHES !== "1") return json({ message: "Not allowed" }, 403);
     const b = (await request.json().catch(() => ({}))) as { xp?: unknown } | null;
     const xp = await setTestXp(sql, current.id, b?.xp, now);
     return xp === null ? json({ message: "Bad XP" }, 400) : json({ xp });
@@ -612,6 +622,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           cap: "solo",
           signedInOnly: signInRequired(env),
           now,
+          paused: isPaused(env, "rewards", now),
         }).catch((e: unknown) => {
           console.log(`xp for a solo game: ${String(e)}`);
           return null;

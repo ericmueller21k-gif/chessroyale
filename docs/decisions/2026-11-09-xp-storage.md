@@ -15,6 +15,6 @@ working.
   message in three rooms, an online result screen asks `GET /api/xp?game=CODE` a few times (XP.asksMs), as boss tokens' screen
   already does; it also works after a reload. Ranked 1 v 1 carries it on its existing `outcome` message (`DuelOutcome.xp`,
   optional). Solo: the `POST /api/results` answer (`xp`). Old apps ignore all three.
-- **Test switches** (test servers and admins only): `?xp=<n>` (`POST /api/xp/test`, a ledger op "test") and `?xpgame=MINUTES`
+- **Test switches** (`?xp=` test servers only since Nov 9, review of #574 M1; others test servers and admins): `?xp=<n>` (`POST /api/xp/test`, a ledger op "test") and `?xpgame=MINUTES`
   (solo: on the start; a lobby: `overrides.xpGame`) counts a game that long with enough moves, test switches or not. Any other
   lobby test switch marks it `tested` (no XP).

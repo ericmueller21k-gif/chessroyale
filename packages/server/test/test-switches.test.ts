@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_ROSTER, BOSS_TIERS, CRATES_FREE, CROWD_SETTINGS, CROWD_START, QUICK_PACE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
-import { createGuest, createSession, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
+import { BOSS_ROSTER, BOSS_TIERS, CROWD_SETTINGS, CROWD_START, QUICK_PACE, WEAK_BOT_SKILL, isPlayable } from "@chessroyale/core";
+import { createGuest, createSession, ensureSchema, grantReward, signInWithIdentity } from "../src/accounts.ts";
+import { grantTestItems } from "../src/boss-tokens.ts";
 import { testSwitchesOn } from "../src/admin.ts";
 import { handleAccountApi } from "../src/api.ts";
 import { LOBBY_TEST_SWITCHES, asksTestSwitches, lobbyOptions } from "../src/lobby-options.ts";
@@ -124,22 +125,32 @@ describe("the account API", () => {
     expect((await call({ DB: memoryDb().d1, TEST_SWITCHES: "1" }, "/api/auth/config")).testSwitches).toBe(true);
   });
 
-  it.runIf(CRATES_FREE)("a crate's forced roll (Fischer Random, Shiny) only for an admin or where TEST_SWITCHES is on", async () => {
+  it("a crate's forced roll (Fischer Random, Shiny) only where TEST_SWITCHES is on, never an admin's elsewhere (Eric, Nov 9)", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql);
     const guest = await createGuest(sql, Date.now(), "Player");
+    // (Every open takes a crate and a key since Nov 9: plenty of both.)
+    const stock = async (userId: string) => {
+      await grantReward(sql, userId, 0, 20);
+      await grantTestItems(sql, userId, { keys: 20 });
+    };
     const open = async (env: object, cookie: string) =>
       (await call(env, "/api/locker/open", { method: "POST", body: JSON.stringify({ crate: "winter-1", fischer: true, shiny: true }), cookie })).roll as { fischer: boolean };
+    await stock(guest.user.id);
     // A player: ignored (natural odds: not 8 Fischer Randoms in a row).
     const player = `hc_session=${guest.token}`;
     const rolls = [];
     for (let i = 0; i < 8; i++) rolls.push(await open({ DB: d1, ADMIN_EMAILS: "eric@example.com" }, player));
     expect(rolls.filter((r) => r.fischer).length).toBeLessThan(8);
-    // TEST_SWITCHES on, or an admin: forced.
+    // TEST_SWITCHES on: forced.
     expect((await open({ DB: d1, TEST_SWITCHES: "1" }, player)).fischer).toBe(true);
+    // An admin where TEST_SWITCHES is off (production): ignored, as anyone's.
     const g2 = await createGuest(sql, Date.now(), "Eric");
     const eric = await signInWithIdentity(sql, g2.user, "email", "eric@example.com", {}, Date.now());
+    await stock(eric.id);
     const admin = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
-    for (let i = 0; i < 3; i++) expect((await open({ DB: d1, ADMIN_EMAILS: "eric@example.com" }, admin)).fischer).toBe(true);
+    const adminRolls = [];
+    for (let i = 0; i < 8; i++) adminRolls.push(await open({ DB: d1, ADMIN_EMAILS: "eric@example.com" }, admin));
+    expect(adminRolls.filter((r) => r.fischer).length).toBeLessThan(8);
   });
 });

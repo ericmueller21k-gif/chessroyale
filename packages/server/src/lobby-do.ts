@@ -16,7 +16,7 @@ import { chatBlock } from "./chat-mod.ts";
 import { BANNED_MESSAGE, banCheck, eligibleForRanked, recordFairPlay } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { isAdmin } from "./admin.ts";
-import { pausedBosses } from "./kill-switches.ts";
+import { isPaused, pausedBosses } from "./kill-switches.ts";
 import { countBossBattle } from "./boss-tokens.ts";
 import { opKeys } from "./ledger.ts";
 import { grantXp, type XpGame } from "./xp.ts";
@@ -183,7 +183,7 @@ export class Lobby extends DurableObject<Env> {
       // the result screen to ask for (server/xp.ts). Never in the way of the result.
       const span = core.xpSpan(r.playerId) ?? { moves: 0, ms: 0 };
       const opponents = core.xpOpponents(r.playerId);
-      const xp = await grantXp(sql, userId, lobbyXpGame(rec, r, userId, span, mode, opponents, signInRequired(env), Date.now())).catch((e: unknown) => {
+      const xp = await grantXp(sql, userId, { ...lobbyXpGame(rec, r, userId, span, mode, opponents, signInRequired(env), Date.now()), paused: isPaused(this.env, "rewards") }).catch((e: unknown) => {
         console.log(`xp for ${rec.code}: ${String(e)}`);
         return null;
       });

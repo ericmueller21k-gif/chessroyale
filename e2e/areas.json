@@ -162,8 +162,8 @@
   ],
   "areas": {
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
-      "paths": ["packages/server/src/xp.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx"],
-      "specs": ["e2e/xp.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
+      "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx"],
+      "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
     },
     "CI's e2e plan, shards and summary (the smoke set proves a shard still plans, runs and reports; ci-select's unit tests run in check; main runs everything)": {
       "paths": [".github/workflows/e2e.yml", "e2e/ci-*.mjs", "e2e/ci-summary.ts"],
@@ -727,7 +727,7 @@
         "packages/server/src/welcome.ts",
         "packages/app/src/claw/**"
       ],
-      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts", "e2e/claw.spec.ts"]
+      "specs": ["e2e/crate-banner.spec.ts", "e2e/home-layout.spec.ts", "e2e/icon-editor.spec.ts", "e2e/profile.spec.ts", "e2e/votes.spec.ts", "e2e/shop.spec.ts", "e2e/welcome-crate.spec.ts", "e2e/claw.spec.ts", "e2e/xp-rewards.spec.ts"]
     },
     "chat": {
       "paths": [

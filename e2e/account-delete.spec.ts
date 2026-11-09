@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect } from "@playwright/test";
-import { D1_DIR, test } from "./helpers.ts";
+import { D1_DIR, giveCrates, test } from "./helpers.ts";
 
 /**
  * Settings → Download my data and Delete account (docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md):
@@ -35,6 +35,8 @@ test("Settings: download my data, then delete the account (asked first); it's go
   await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // A guest with a name, a solo result, a crate item and a setting on this device.
   const id = (await me(page)).user.id;
+  // (Crates need a key since Nov 9: one crate and one key to open.)
+  await giveCrates(page, "beta-001", 1);
   await page.evaluate(async () => {
     const post = (path: string, body: unknown, method = "POST") => fetch(path, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     await post("/api/me", { name: "Delia" }, "PATCH");

@@ -23,6 +23,7 @@ import {
 } from "../src/accounts.ts";
 import { handleAccountApi, isSignedIn, signInRequired } from "../src/api.ts";
 import { deleteLockerItems, equipLocker, lockerState, looksOf, openCrate } from "../src/locker.ts";
+import { stockCrates } from "./memory-db.ts";
 
 // node:sqlite through require (Vite doesn't know it as a built-in yet).
 const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
@@ -313,6 +314,9 @@ describe("account API", () => {
       at(T + 20 * 60_000);
       expect((await result(prod, admin.cookie, { game: b, moves: 30, won: true })).body.xp).toMatchObject({ none: "test", parts: [] });
       expect((await call(prod, "/api/me", { cookie: admin.cookie })).body.xp).toBe(0);
+      // (Review of #574, M1: an admin's XP jump is refused off a test server, so no level rewards can be owed from it.)
+      expect((await call(prod, "/api/xp/test", { method: "POST", body: JSON.stringify({ xp: 100000 }), cookie: admin.cookie })).res.status).toBe(403);
+      expect((await call(test, "/api/xp/test", { method: "POST", body: JSON.stringify({ xp: 1000 }), cookie: t.cookie })).res.status).toBe(200);
     });
   });
 
@@ -543,6 +547,7 @@ describe("account API", () => {
     const { user } = await createGuest(sql, 1000, "Guest");
     for (const id of ["beta-001", "winter-1"]) {
       const crate = crateDef(id)!;
+      await stockCrates(sql, user.id, id, 12);
       for (let i = 0; i < 12; i++) {
         const r = await openCrate(sql, user.id, id, { fischer: i % 3 === 0 }, 1100 + i);
         if (!r.ok) throw new Error(r.message);
@@ -552,12 +557,15 @@ describe("account API", () => {
     }
   });
 
-  it("the locker: crates open on the server (free while testing), items equip by slot, and a guest's items follow them", async () => {
+  it("the locker: crates open on the server (one you hold and a key, Nov 9), items equip by slot, and a guest's items follow them", async () => {
     const sql = memorySql();
     await ensureSchema(sql);
     const { user: guest } = await createGuest(sql, 1000, "Guest");
     expect((await lockerState(sql, guest.id)).items).toEqual([]);
     expect((await openCrate(sql, guest.id, "nope", {}, 1100)).ok).toBe(false);
+    // (None held, no key: refused, nothing changes.)
+    expect(await openCrate(sql, guest.id, "winter-1", {}, 1100)).toEqual({ ok: false, message: "You need a Winter Crate and a crate key to open it." });
+    await stockCrates(sql, guest.id, "winter-1", 1);
     // The test switch lands on Fischer Random: a Legendary or Mythic item, shiny when asked.
     const r = await openCrate(sql, guest.id, "winter-1", { fischer: true, shiny: true }, 1100);
     if (!r.ok) throw new Error(r.message);
@@ -614,6 +622,7 @@ describe("account API", () => {
     await ensureSchema(sql);
     await ensureSchema(sql, {}); // a second connection runs the column migration again
     const { user } = await createGuest(sql, 1000, "Guest");
+    await stockCrates(sql, user.id, "winter-1", 400);
     let present;
     for (let i = 0; i < 400 && !present; i++) {
       const r = await openCrate(sql, user.id, "winter-1", {}, 1100 + i);
@@ -641,6 +650,7 @@ describe("account API", () => {
     const st = await lockerState(sql, user.id);
     expect(Object.fromEntries(st.items.map((i) => [i.id, i.blemish]))).toEqual({ "old-rough": 49, "old-shiny": 9.5 });
     // New rolls use the whole range, 100% down to 0%.
+    await stockCrates(sql, user.id, "winter-1", 1);
     const r = await openCrate(sql, user.id, "winter-1", {}, 1100);
     if (!r.ok) throw new Error(r.message);
     expect(r.item.blemish).toBeGreaterThanOrEqual(0);
