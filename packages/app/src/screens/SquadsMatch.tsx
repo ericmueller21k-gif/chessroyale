@@ -533,6 +533,12 @@ function MatchView({
   const d = onMine && !client.me?.botPlays ? dutyOf(m, me) : null;
   const mySide = sideIn(m, me);
   const myLocked = !!me && m.locked.includes(me);
+  // Your turn begins (a new half asks your move on this board): it goes live, even if you were looking back (Eric,
+  // Nov 9: "The moment it becomes your turn on a board, it should snap you to that board"). Keyed by the half.
+  const turnHalf = d && !myLocked && m.current ? `${m.key}/${m.current.seq}` : null;
+  useLayoutEffect(() => {
+    if (turnHalf) history.live();
+  }, [turnHalf]);
   const mineChoice = me ? (m.visible[me] ?? null) : null;
   const partner = d?.partner ?? null;
   const partnerChoice = partner ? (m.visible[partner] ?? null) : null;

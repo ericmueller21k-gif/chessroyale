@@ -494,7 +494,7 @@ door's look; every class is `sq-`.
     (your move shows nowhere else until the half ends), unless you've opened another board meanwhile. Next turn's board
     finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
     above the board says "Watching Board 3 · your next board"; a tap on your own tiny board brings you back ("Back to
-    my board" is gone, Nov 5), and the jump comes once a half. Off: you stay on your board until the game moves you. Pairs and the final have no next board.
+    my board" is gone, Nov 5), and the jump comes once a half. **Your turn snaps the big board live** (Eric, Nov 9; docs/decisions/2026-11-09-squads-snap-live.md): when a new half asks your move on the board in view, that board's history goes back to live, even if you had stepped back with « while waiting (`MatchView`, `turnHalf`; check: `e2e/squads-three-boards.spec.ts`, "your turn snaps you live"). Off: you stay on your board until the game moves you. Pairs and the final have no next board.
     The half ending at once with your move (you were the last to move) doesn't call the jump off (Eric, Oct 18: it
     waited for the other half instead; `squads-watch.spec.ts` covers it).
   - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
