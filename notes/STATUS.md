@@ -469,3 +469,10 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Local e2e on this machine: Playwright pins chromium 1194; use a temp config with launchOptions.executablePath
   /opt/pw-browsers/chromium (don't commit it). npm ci was needed in /home/user/chessroyale.
 - Next queue: town intro; intermittent tests (squads-three-boards:152, squads-watch:167, dash:241, town-leave:143); custom quick chat.
+
+### Nov 9 ~00:05
+- Eric OK'd merging #560 and #561 once green.
+- The Actions re-run API is refused (403 "Resource not accessible by integration": the GitHub App has no Actions write). Ways to
+  get a fresh run without it: merge main into the branch (a real change), or add the `full-e2e` label (starts a new full run).
+- #560: flake-fix helper session_01JuCWRtScazpRhLc3z4JwQb (Opus; done signal .fix-note.md on claude/dash-popoff-fam).
+  #561: red only on town-leave:144 (known intermittent); after #560 merges, merge main into it for a fresh run, then merge.
