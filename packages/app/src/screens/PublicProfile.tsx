@@ -579,7 +579,6 @@ export function PublicProfileScreen({ target, onBack, match }: { target: Profile
           {seen?.dot && <span class="fd-dot small" aria-hidden="true" />}
           <span class={loading ? "sk" : undefined}>{seen?.text ?? "Online now · Joined Oct 2026"}</span>
         </div>
-        {/* (Levels aren't built yet: only an admin's placeholder shows. For everyone else there is no line, so nothing is ever added later.) */}
         {/* (Its line is there while the page loads too, so nothing moves when the level comes.) */}
         <div class="pp-level">{level || "\u00a0"}</div>
         <div class="pp-actions">

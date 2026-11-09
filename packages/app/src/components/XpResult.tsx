@@ -18,6 +18,7 @@ const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-r
 
 /** `xp`: the grant (null: none came; undefined: still coming). `none`: what to say when none came (default: "No XP for this game."). */
 export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | null | undefined; none?: string }) {
+  const box = useRef<HTMLDivElement>(null);
   const fill = useRef<HTMLDivElement>(null);
   const gain = useRef<HTMLSpanElement>(null);
   const level = useRef<HTMLSpanElement>(null);
@@ -26,7 +27,9 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   // (While it's coming, and for a game with none: your XP as your profile has it, standing still.)
   const still = xp ? xp.before : (account().profile?.xp ?? 0);
   const filling = !!xp && !xp.none && xp.after > xp.before;
-  const [done, setDone] = useState(!filling);
+  // (Done: its last state is shown. Never while it's still coming; at once for a game with none or nothing gained.)
+  const [filled, setFilled] = useState<XpGrant | null>(null);
+  const done = xp !== undefined && (!filling || filled === xp);
 
   // The fill, frame by frame, from its first frame (a layout effect: the box's first paint is the old XP).
   useLayoutEffect(() => {
@@ -50,13 +53,16 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
           el.classList.remove("on");
           void el.offsetWidth;
           el.classList.add("on");
+          // (The label steps aside while the pop stands in its place: never two "Level"s on top of each other.)
+          box.current?.classList.add("xp-popping");
+          el.onanimationend = () => box.current?.classList.remove("xp-popping");
         }
       }
       parts.forEach((el, i) => el.classList.toggle("shown", i === 0 || at.xp - xp.before >= starts[i]!));
     };
     if (reduced()) {
       draw(ms);
-      setDone(true);
+      setFilled(xp);
       return;
     }
     draw(0);
@@ -66,22 +72,17 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
       const t = now - t0;
       draw(t);
       if (t < ms) raf = requestAnimationFrame(frame);
-      else setDone(true);
+      else setFilled(xp);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
-  }, [xp]);
-
-  // (A game with none, or nothing gained: its last state at once.)
-  useEffect(() => {
-    if (!filling) setDone(true);
   }, [xp]);
 
   const nothing = xp === null || !!xp?.none;
   const line = xp === undefined ? "Counting your XP…" : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
   const start = filling ? xp!.before : still;
   return (
-    <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite">
+    <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
       <div class="xp-top">
         <span class="xp-gain" ref={gain}>
           {xp === undefined ? "XP" : `+${fmt(filling ? 0 : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}

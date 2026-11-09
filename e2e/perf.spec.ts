@@ -356,3 +356,27 @@ test("the Hidden Boss's phase 2 on a slow phone: the phase change and four board
     expect(s.slow, `${what}: share of dropped frames`).toBeLessThan(0.15);
   }
 });
+
+test("the XP box on a slow phone: the result screen's frames while the bar fills, a level-up included (Nov 9)", { tag: "@perf" }, async ({ page }) => {
+  test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+  test.setTimeout(3 * 60_000);
+  await page.addInitScript(instrument);
+  // (990 XP, then a won game counted as 12 minutes: 170 XP, through a level-up. e2e/xp.spec.ts has the fill's own checks.)
+  await page.goto("/?debug&nolanding&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12");
+  await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
+  await expect.poll(async () => ((await (await page.request.get("/api/me")).json()) as { xp?: number }).xp, { timeout: 20_000 }).toBe(990);
+  await bossAloneFromHome(page);
+  await expect.poll(() => phase(page), { timeout: 60_000 }).toBe("play");
+  // (Slowed from the mate on: the result screen comes, the box waits for its XP, then fills.)
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+  await page.evaluate(() => (window as any).match.submit("h5f7"));
+  await page.locator(".xp-box").waitFor({ timeout: 60_000 });
+  await page.evaluate(() => ((window as any).__perf.frames = []));
+  await expect(page.locator(".xp-box")).toHaveClass(/xp-done/, { timeout: 30_000 });
+  const s = frameStats(((await page.evaluate(() => (window as any).__perf.frames.splice(0))) as [number][]).map((x) => x[0]));
+  console.log(`the XP box filling (slowed phone): ${f(s)}`);
+  expect(s.n, "frames while it filled").toBeGreaterThan(20);
+  expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
+  expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
+});

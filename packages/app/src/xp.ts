@@ -1,6 +1,7 @@
 import { XP, type XpGrant } from "@chessroyale/core";
 import { onlineGameXp, refreshProfile, startSoloGame } from "./account.ts";
 import { testParams } from "./test-switches.ts";
+import { accountReady } from "./boss-tokens.ts";
 
 /**
  * A game's XP on its result screen (Nov 9; the server decides it: server/xp.ts). A solo game is noted on the server as it begins
@@ -14,7 +15,14 @@ const soloGames = new WeakMap<object, Promise<string | null>>();
 /** A solo game begins: the server times it. `?xpgame=MINUTES` (a test switch): it counts as a game that long. */
 export function noteSoloGame(match: object): void {
   const minutes = Number(testParams().get("xpgame"));
-  soloGames.set(match, startSoloGame(Number.isFinite(minutes) && testParams().has("xpgame") ? { xpgame: minutes } : {}).catch(() => null));
+  // (A START tapped the moment the app opens waits for your account, as boss tokens' does.)
+  const body = Number.isFinite(minutes) && testParams().has("xpgame") ? { xpgame: minutes } : {};
+  soloGames.set(
+    match,
+    accountReady()
+      .then((ok) => (ok ? startSoloGame(body) : null))
+      .catch(() => null),
+  );
 }
 /** The id the server gave this solo game as it began (null: none). */
 export const soloGameId = (match: object): Promise<string | null> => soloGames.get(match) ?? Promise.resolve(null);

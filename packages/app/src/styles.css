@@ -24863,6 +24863,12 @@ button.sq-tiny {
 .xp-pop.on {
   animation: xp-pop 900ms ease-out both;
 }
+.xp-level {
+  transition: opacity 120ms;
+}
+.xp-popping .xp-level {
+  opacity: 0;
+}
 @keyframes xp-pop {
   0% {
     opacity: 0;
@@ -24907,5 +24913,8 @@ button.sq-tiny {
 @media (prefers-reduced-motion: reduce) {
   .xp-pop.on {
     animation: none;
+  }
+  .xp-popping .xp-level {
+    opacity: 1;
   }
 }

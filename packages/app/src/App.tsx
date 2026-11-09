@@ -397,8 +397,11 @@ export function App() {
       // No storage.
     }
     // (The test switch ?xp=<n>: your XP set to n once your account has loaded, to reach a level-up; test servers and admins only.)
-    const xp = Number(testParams().get("xp"));
-    void loadAccount(name).then(() => (testParams().has("xp") && Number.isInteger(xp) ? setTestXp(xp).catch(() => undefined) : undefined));
+    // (Read once the account has loaded: only then does the server's config say whether the test switches apply.)
+    void loadAccount(name).then(() => {
+      const xp = Number(testParams().get("xp"));
+      if (testParams().has("xp") && Number.isInteger(xp)) void setTestXp(xp).catch(() => undefined);
+    });
   }, []);
   // A solo match's result goes on your profile (online results are saved by the server).
   useEffect(() => {

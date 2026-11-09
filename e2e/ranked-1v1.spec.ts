@@ -147,6 +147,8 @@ test("two players: one tap to queue, the vote on the game's own board, checkmate
   await expect(white.locator(".dv-result-title")).toHaveText("You lost");
   // The ranks moved: one placement game each (the server's record).
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  // XP (Nov 9): the result card's XP box, from the outcome: 2 moves each is too few for anyone.
+  for (const p of [white, black]) await expect(p.getByTestId("xp-box").locator(".xp-why")).toHaveText("No XP: the game ended before move 10.");
   expect(await record(black)).toMatchObject({ games: 1, wins: 1, losses: 0, rank: { label: "Placement 1/5" } });
   expect(await record(white)).toMatchObject({ games: 1, wins: 0, losses: 1 });
 });
