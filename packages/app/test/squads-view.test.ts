@@ -41,6 +41,7 @@ import {
   chipsLeft,
   studyBoard,
   notWatchers,
+  myRelayMoves,
   type LocalMatch,
 } from "../src/squads-view.ts";
 import { SQUADS } from "@chessroyale/core";
@@ -194,6 +195,16 @@ describe("Squads screens: jump to my next board, and who's watching (Oct 14)", (
     // Pairs: the pair on the board plays it. The final: everyone in the match plays it.
     expect(notWatchers(match({}, 2), 0, null)).toEqual(["a0", "a1", "b0", "b1"]);
     expect(notWatchers(match({}, 1), 0, null)).toHaveLength(8);
+    // Relay on 3 boards: each squad's waiting seat plays no board this turn, so it shows watching the board it plays
+    // next (Nov 9: it was left out); the two players moving there this turn never show.
+    const three = { ...match(), boards: match().boards.slice(0, 3) };
+    for (const side of [0, 1] as const)
+      for (const id of three.sides[side].seats) {
+        const [a] = myRelayMoves(three, id, 1);
+        if (a!.turn === three.turn) expect(notWatchers(three, a!.board, null)).toContain(id);
+        else for (let bd = 0; bd < 3; bd++) expect(notWatchers(three, bd, null)).not.toContain(id);
+      }
+    expect([0, 1, 2].map((bd) => notWatchers(three, bd, null).length)).toEqual([2, 2, 2]);
   });
 
   it("the client keeps each board's viewers as the server says (a change, nobody, a full picture), and says what it shows only when that changes", () => {

@@ -248,10 +248,17 @@ export const JUMP_NEXT_INFO = "On: once you've moved in Relay, you go straight t
 /**
  * Who's watching a board full size (Oct 14) shows the people the server says show it, less these: you, and the
  * board's own players (they're playing it). `m.turn` is the turn whose boards are on screen (during the show after a
- * turn, the one just played, as the YOU marks).
+ * turn, the one just played, as the YOU marks). Relay: a player whose move this turn is on that board; a squad's
+ * waiting seat (3 boards, 4 players) plays none this turn, so it shows when it watches the board it plays next (Nov 9:
+ * `myBoards` says that board, and the pawn was hidden).
  */
 export function notWatchers(m: Pick<NetSquadsMatch, "format" | "sides" | "turn" | "boards">, board: number, me: string | null): string[] {
-  const players = m.sides.flatMap((s) => s.seats).filter((id) => myBoards(m, id)?.you === board);
+  const playsNow = (id: string) => {
+    if (m.format !== "relay" || m.boards.length < 2) return myBoards(m, id)?.you;
+    const [a] = myRelayMoves(m, id, 1);
+    return a && a.turn === m.turn ? a.board : null;
+  };
+  const players = m.sides.flatMap((s) => s.seats).filter((id) => playsNow(id) === board);
   return me && !players.includes(me) ? [me, ...players] : players;
 }
 
