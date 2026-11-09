@@ -492,3 +492,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~01:00: Eric's squads bug (missed his turn while looking back at old moves): brief notes/briefs/brief-squads-snap-live.md.
   QUEUED: Haiku fix + Opus diff review, when a helper slot frees (2 running: flaky batch Opus, auto chess player size Haiku).
 - #563 (meet chat cards fix, director's own) CI watcher bw4z86g7p; merge when green (Eric wants it live).
+- Nov 9 ~01:00: #562 (15 shards) merged cbee1ba; watcher b3jrnt4os times main's first 15-shard run (drop to 12 if runners wait).
+- Auto chess player size round 1 (Haiku, 43b1f05) REJECTED on director review: phone pawn 44 → 45 px only, 150 px left empty under
+  the action box, computer top block cramped and unlike the bottom. Round 2 (fresh Haiku session_01JuCWRrbfjnj717fC811q8d): rows grow
+  into the empty space, drawn pawn ≥ 85% of the row, top = bottom; done signal .round2.md. Lesson: Haiku took "about as tall as the
+  bench row" literally; brief Haiku with measurable targets and have it look at its own stills.
