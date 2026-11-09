@@ -17,7 +17,7 @@ import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
-import { ranked1v1Rank, yourRankShown } from "../ranked.ts";
+import { abortNote, ranked1v1Rank, resignNote, yourLeaves, yourRankShown } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { clockShown } from "../clock-text.ts";
 
@@ -70,6 +70,7 @@ function youOnStage(): StageSide {
 function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void, onAway: () => void) {
   const s = queue.state;
   const waited = s.kind === "searching" ? Math.max(0, now - s.since) : 0;
+  const delayLeft = s.kind === "searching" && s.delayUntil ? Math.max(0, s.delayUntil - now) : 0;
   return (
     <DuelStage
       label="Finding opponent"
@@ -86,7 +87,8 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
       }
       waiting={
         <>
-          <span class="dv-st-finding">Finding opponent…</span>
+          {/* The delayed queue (ranked's leave rules, L1): its countdown in the line's place, then the search as ever. */}
+          <span class="dv-st-finding">{delayLeft > 0 ? `Delayed queue · ${clockShown(delayLeft)}` : "Finding opponent…"}</span>
           <span class="dv-wait">{clockShown(waited)}</span>
         </>
       }
@@ -188,6 +190,8 @@ function rankAfter(snap: DuelSnapshot): RankView | null {
 function rankLine(snap: DuelSnapshot): string | null {
   if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
+  // (A dodge, ranked's leave rules L1: what it cost you, once the server has recorded it.)
+  if (snap.end?.result === "aborted" && snap.outcome?.conduct?.kind === "dodge") return `Left before it started${snap.outcome.conduct.rp ? `: −${snap.outcome.conduct.rp} RP` : ""}`;
   if (!snap.end || snap.end.result === "aborted") return null;
   const o = snap.outcome;
   if (!o) return "Updating your rank…";
@@ -305,11 +309,16 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   const first = snap.firstMoveBy !== null && !over ? Math.max(0, Math.ceil((snap.firstMoveBy - now) / 1000)) : null;
   // Abort before both first moves (nothing recorded); after, resign (a loss). Nothing once it's over.
   const abortable = !over && snap.moves.length < 2;
+  // In a ranked game the confirm says what leaving costs (ranked's leave rules, L1: the words only, the same box); a bot's or the
+  // town's game costs nothing.
+  const leaves = !snap.town && !snap.bot ? yourLeaves() : null;
+  const placed = (account().profile?.ranked1v1?.rank.ladder ?? null) !== null;
+  const mine = you === "w" ? Math.ceil(snap.moves.length / 2) : Math.floor(snap.moves.length / 2);
   const exit: MatchExit | null = over
     ? null
     : abortable
-      ? { kind: "leave", note: "The game is called off: no result, and no rank change.", go: () => session.resign() }
-      : { kind: "resign", note: "It counts as a loss.", go: () => session.resign() };
+      ? { kind: "leave", note: abortNote(leaves), go: () => session.resign() }
+      : { kind: "resign", note: resignNote(leaves, mine, placed), go: () => session.resign() };
   const theirName = snap.players[them].name;
   const people: ChatPeople = {
     nameOf: (id) => (id === "w" || id === "b" ? snap.players[id].name : "?"),

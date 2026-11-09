@@ -30,7 +30,7 @@ import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
 import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
-import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
+import { homeRankLine, leavesLine, ranked1v1Rank, rankedLockedUntil, yourLeaves } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { SwordsIcon } from "../town/CardIcons.tsx";
 import { Pic, Scene } from "../home-art/Pic.tsx";
@@ -410,6 +410,22 @@ const types: { id: MatchmakingType; label: string }[] = [
   { id: "solo", label: "Solo" },
 ];
 
+/**
+ * Home's line above PLAY for 1 v 1 under ranked's leave rules (L1): a lockout's countdown, or the delayed queue's extra wait
+ * (empty otherwise). Its own small part, so only it is drawn each second while a lockout counts down.
+ */
+function LeavesLine() {
+  const l = yourLeaves();
+  const counting = !!rankedLockedUntil(l, Date.now());
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    if (!counting) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [counting]);
+  return <span class="fd-leaves">{leavesLine(l, Math.max(now, Date.now())) ?? ""}</span>;
+}
+
 /** A short note at the top of the home screen ("That match has ended"), with "See your result" when there is one. */
 export interface HomeNotice {
   text: string;
@@ -668,8 +684,17 @@ export function HomeScreen({
   // What PLAY would start, if it's resting: Squads, 1 v 1 (PAUSE_RANKED1V1), Solo (you and bots), or 50 v 50 online.
   const resting = !mode ? null : mode === "squads" ? rest("squads") : mode === "1v1" ? rest("ranked1v1") : type === "solo" ? rest("solo") : mode === "crowd" ? rest("crowd") : null;
   const soloResting = rest("solo");
+  // Ranked's leave rules (L1): a lockout greys 1 v 1's PLAY until it's over (the line above PLAY counts it down; the server
+  // refuses the search anyway). Drawn again once, as it ends.
+  const lockUntil = mode === "1v1" && !onlineLocked ? rankedLockedUntil(yourLeaves(), Date.now()) : null;
+  const [, lockEnded] = useState(0);
+  useEffect(() => {
+    if (!lockUntil) return;
+    const t = setTimeout(() => lockEnded((n) => n + 1), Math.max(0, lockUntil - Date.now()) + 50);
+    return () => clearTimeout(t);
+  }, [lockUntil]);
   const play = () => {
-    if (!mode || resting) return;
+    if (!mode || resting || lockUntil) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
     if (type === "solo") return onSolo(mode, { fill: true });
@@ -702,8 +727,8 @@ export function HomeScreen({
       `Solo queue: bots fill any empty seat after ${fill} s`
     )
   ) : mode === "1v1" ? (
-    // (What 1 v 1 is: in the panel, with your rank.)
-    onlineLocked ? signIn("1 v 1") : ""
+    // (What 1 v 1 is: in the panel, with your rank. A lockout or the delayed queue: here, L1.)
+    onlineLocked ? signIn("1 v 1") : <LeavesLine />
   ) : mode === "classic" && type !== "solo" ? (
     "Classic is being reworked"
   ) : onlineLocked ? (
@@ -1061,7 +1086,7 @@ export function HomeScreen({
         <span>{loading ? "Loading the engine…" : hint}</span>
       </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
-      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || !!lockUntil || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       {error && <p class="fd-error">{error}</p>}
