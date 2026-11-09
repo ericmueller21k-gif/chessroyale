@@ -647,3 +647,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   #581 home modes (CI, full suite; merged main in). Haiku and both high Opus helpers done. Started Opus xhigh ALONE:
   `session_01JuCWRvvM1dZdrwE8sriDGN` ranked L1 (claude/ranked-l1, brief-ranked-l1.md; full lane: full-e2e label, review, delta).
   After: crowd party (xhigh), Squads Bots (xhigh). Seasons still open with Eric.
+- Nov 9 ~18:07: #581 home modes and #580 top bar merged (both green; main's full run watched). Live soon. Running: ranked L1
+  (session_01JuCWRvvM1dZdrwE8sriDGN, xhigh alone). Queue: crowd party, Squads Bots. Seasons open with Eric.
