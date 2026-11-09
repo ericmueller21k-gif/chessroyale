@@ -1808,12 +1808,18 @@ function startTown(
     town.speech.boss = null;
     town.speech.next = on ? Infinity : 0;
   };
+  // ... `__townStill()`: no bot sets off from now on (the bots' source and their turns paused, as `__townSeat` and `__townCall` do);
+  // the walks under way end (`__townBots()`' moving), so a test can measure what the world's walkers would otherwise nudge.
+  const hookStill = () => {
+    if (!testSwitchesAllowed()) return;
+    town.nextBotAt = Infinity;
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townHere?: typeof hookHere };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1833,6 +1839,7 @@ function startTown(
   hooks.__townWalk = hookWalk;
   hooks.__townHeading = hookHeading;
   hooks.__townHush = hookHush;
+  hooks.__townStill = hookStill;
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
   hooks.__townHere = hookHere;
@@ -2002,6 +2009,7 @@ function startTown(
       delete hooks.__townWalk;
       delete hooks.__townHeading;
       delete hooks.__townHush;
+      delete hooks.__townStill;
       delete hooks.__townRide;
       delete hooks.__townYou;
       delete hooks.__townHere;

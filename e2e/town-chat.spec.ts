@@ -1239,6 +1239,11 @@ test("the edge chips keep off the chat box (always on and new messages, shown or
       if (d) expect(Math.hypot(c.x - d.x, c.y - d.y), `${c.name} stays put ${when}`).toBeLessThan(15);
     }
   };
+  // (The town held still first: no bot sets off, and the walks under way end. A bot walking by an edge chip pushes it along the
+  // edge by its name tag, by as many steps as the tag is wide: main run 1171, Crumb's tag took Wrangler's chip 24-30 px down
+  // the left edge as the log faded. What's measured here is the log, not the walkers.)
+  await page.evaluate(() => (window as any).__townStill());
+  await expect.poll(() => page.evaluate(() => ((window as any).__townBots() as { moving: boolean; fading: string | null }[]).filter((b) => b.moving || b.fading).length), { timeout: 30_000 }).toBe(0);
   await goMode(page, "new");
   await page.waitForTimeout(300);
   const before = await byTheBox();
