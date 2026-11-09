@@ -597,3 +597,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~09:30: Eric: go XP phase 2 + crates need keys for everyone (no admin free opening, no admin ?fischer); 100 keys for his
   account (admin grant); an inventory of every admin ability for a later cleanup. Brief notes/briefs/brief-xp-phase2.md. Payments
   question answered in chat (Stripe/MoR, Apple/Google, legal) — before launch, not now.
+- Nov 9 ~09:40: ranked design done (docs/ideas/ranked-ladder.md; PR #573 docs-only, CI watcher ba0n0lem4; merge on green). Sent
+  Eric the mockup + doc. His decisions: (1) separate rank per mode (rec yes, 1v1 main), (2) MMR hidden + tier/RP shown, (4) the RP
+  fees (dodge -5/-10, leave loss -10, delayed queue 3 in 20), (7) season reset one tier or none, season length (rec 3 months).
+  Build order: L1 leave rules first (1v1 dodges are free today). XP phase 2 running (Opus, watcher b33e7b9eg).
