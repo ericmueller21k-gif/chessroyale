@@ -276,12 +276,16 @@ describe("Squads screens: words and numbers", () => {
     expect(standingsOrder(lobby)).toEqual([3, 1, 2, 0]);
   });
 
-  it("the tiny boards: live matches and the latest round's finished ones", () => {
+  it("the tiny boards: live matches and the latest begun round's finished ones, kept through the next round's break", () => {
     const a = match({ key: "r0m0", state: "over" });
     const b = match({ key: "r0m1", index: 1 });
     const c = match({ key: "r1m0", round: 1, state: "break" }, 2);
     expect(shownMatches([a, b]).map((m) => m.key)).toEqual(["r0m0", "r0m1"]);
-    expect(shownMatches([a, b, c]).map((m) => m.key)).toEqual(["r0m1", "r1m0"]);
+    // (A next round's match in its break: the round just played stays until it begins, its finished ones too.)
+    expect(shownMatches([a, b, c]).map((m) => m.key)).toEqual(["r0m0", "r0m1"]);
+    const d = match({ key: "r1m0", round: 1, state: "half" }, 2);
+    expect(shownMatches([a, b, d]).map((m) => m.key)).toEqual(["r0m1", "r1m0"]);
+    expect(shownMatches([c, match({ key: "r1m1", round: 1, index: 1, state: "break" }, 2)]).map((m) => m.key)).toEqual(["r1m0", "r1m1"]);
   });
 
   it("a half's moves, board by board", () => {

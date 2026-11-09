@@ -439,11 +439,15 @@ export function standingsOrder(lobby: NetSquadsLobby): number[] {
 }
 
 /**
- * The matches whose boards show as tiny boards: every match still going, and the latest round's finished ones (grayed).
+ * The matches whose boards show as tiny boards: the latest round that has begun, its finished matches too (checked in the
+ * winner's color), and every other match being played. A next round's match waiting out its break before its first half
+ * (Nov 9: created the moment both its squads are known, 20 s ahead) joins when its round begins; until then the round
+ * just played stays, results and all (it used to vanish within a second of your result).
  */
 export function shownMatches(matches: readonly LocalMatch[]): LocalMatch[] {
-  const latest = Math.max(-1, ...matches.map((m) => m.round));
-  return matches.filter((m) => m.state !== "over" || m.round === latest).sort((a, b) => a.round - b.round || a.index - b.index);
+  const begun = matches.filter((m) => m.state !== "break");
+  const latest = Math.max(-1, ...(begun.length ? begun : matches).map((m) => m.round));
+  return matches.filter((m) => m.round === latest || (m.state !== "over" && m.state !== "break")).sort((a, b) => a.round - b.round || a.index - b.index);
 }
 
 /** The moves a half added to board `i`, from its events (a forced move, a Relay move, a pair's or the final's move). */
