@@ -50,8 +50,8 @@ test("the Quests button opens the server's quests (names, goals, progress, rewar
   const swapped = await d.locator(".qo-name").first().textContent();
   await d.getByRole("button", { name: "Got it" }).click();
   await expect(d).toHaveCount(0);
-  // (The server's: after a reload, the same quests and no reroll left today.)
-  await page.reload();
+  // (The server's: home again (without the test switch, which would set them again), the same quests and no reroll left today.)
+  await page.goto("/");
   await expect(entry(page)).toBeEnabled({ timeout: 20_000 });
   await entry(page).click();
   await expect(dialog(page).locator(".qo-name")).toHaveText([swapped!, "Fifty-Fifty", "Regular"]);
@@ -96,6 +96,7 @@ test("a guest where sign-in is set up: the Quests entry is there, greyed, \"Sign
     await route.fulfill({ response: res, json: { ...((await res.json()) as object), onlineNeedsSignIn: true } });
   });
   await page.goto("/");
+  await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
   await expect(entry(page)).toBeVisible({ timeout: 20_000 });
   await expect(page.locator(".fd-top-quests, .fd-quests-btn").first()).toHaveAttribute("title", "Sign in for quests");
   await expect(entry(page)).toBeDisabled();

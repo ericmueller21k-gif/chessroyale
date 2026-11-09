@@ -173,13 +173,15 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **XP's** (Nov 9; [2026-11-09-xp-storage.md](../decisions/2026-11-09-xp-storage.md)): `xp=<n>` (the app sets your XP to n once your
     account loads: `POST /api/xp/test`, a ledger op) and `xpgame=MINUTES` (a solo game's start, or a lobby's: it counts as a game that
     long with enough moves, test switches or not; only where TEST_SWITCHES is "1": an admin's on production makes a test game, no XP). Any other lobby test switch marks the lobby `tested`: no XP ("No XP: test game.").
+  - **Quests'** (Nov 9, phase 3): `quests=<kind>[:<progress>],…` (e.g. `?quests=warm-up:2,squad-up,regular:9`: your quests replaced by
+    these as home loads, `POST /api/quests/test`; only where TEST_SWITCHES is "1").
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 - **Kill switches** (Oct 15; docs/decisions/2026-10-15-kill-switches.md): Worker runtime variables that rest one part
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
   "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`, `PAUSE_RANKED1V1`,
   `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
-  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."), `PAUSE_REWARDS` (Nov 9: XP, the daily reward and
-  level rewards; games play on, the XP box says "Rewards are paused for a moment.", levels reached are paid at the next game after it:
+  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."), `PAUSE_REWARDS` (Nov 9: XP, the daily reward,
+  level rewards and quests (no progress, no pay; the overlay says so); games play on, the XP box says "Rewards are paused for a moment.", levels reached are paid at the next game after it:
   [2026-11-09-xp-phase2-pause.md](../decisions/2026-11-09-xp-phase2-pause.md)),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";

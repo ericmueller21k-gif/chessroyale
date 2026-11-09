@@ -65,6 +65,15 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   counted game (at most 20 a game). Both go through the ledger in the game's XP grant; what a game paid is kept on its result
   (`results.xp_rewards`) and shown in a toast at the top once the bar fills (`components/RewardBox.tsx`). `PAUSE_REWARDS` grants
   nothing ("Rewards are paused for a moment."). Merge adds the crates and picks; deleting closes them; the download has them.
+- **Quests** (Nov 9, phase 3; `server/quests.ts`, the rules in core's `quests.ts`, the numbers and pool `QUESTS` in settings.ts; decisions
+  `2026-11-09-quests-*.md`): 2 dailies a day and a weekly a week, dealt lazily on the day's first read (GET /api/quests or a game's XP grant)
+  from a seed of the account and the day, once (`quest_days`' nonce claim). Unfinished dailies carry over, topped up to 3 at most; the weekly
+  resets on Mondays (08:00 UTC). One free reroll a day (POST /api/quests/reroll). Progress (`quest_progress`, one row per quest per game) and
+  completion (op `quest:<kind>:<quest id>:<ledger id>`: 300 XP a daily, some a Winter Crate; the weekly 1,500 XP, a crate and a key) go in the
+  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests, with 3 of the server's minutes; a
+  win only when its win XP went in), so each quest pays once. Its XP is a part of the box ("Quest +300") and can level you up; the quests are in
+  the result's rewards (`XpRewards.quests`). Nothing while `PAUSE_REWARDS` is on. A guest's merge drops the guest's quests; deleting removes
+  them; the download has them (store `quests`). The screens: [hub.md](hub.md).
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
   coins into `wallets.coins`, crates (Winter Crates since Nov 9, in `series_crates`; before, counted in `wallets.crates`), both carried over
   when a guest signs in (`grantReward`).
@@ -164,6 +173,9 @@ offered, how long each answer lasts).
 
 ## Tests
 
+- Quests: `packages/core/test/quests.test.ts` (what counts, the pool, seeded picks, the cap, countdowns, the toast's lines),
+  `packages/server/test/quests.test.ts` (dealing, resets, carry-over, the reroll, progress per mode, paid once under replays and races,
+  the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
   XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
 - Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (every

@@ -31,8 +31,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crates are opened on the server, so nobody can make themselves a Pearl crown.
 - **Crates need keys** (Nov 9, XP phase 2; [2026-11-09-xp-phase2-crates.md](../decisions/2026-11-09-xp-phase2-crates.md)): a series crate
   opens, for everyone (admins too), only with one of that crate held (`series_crates`, by series; ledger kind `series_crate`) and one crate
-  key, in one ledger op ("You need a Winter Crate and a crate key to open it."). Crates come from the daily reward, each level (2 and a key)
-  and Squads' placements, all of the newest series (`XP.rewardCrate`); a crate held before (the wallet's old `crates`) became a Winter
+  key, in one ledger op ("You need a Winter Crate and a crate key to open it."). Crates come from the daily reward, each level (2 and a key),
+  some quests (a win quest's crate; the weekly's crate and key: [accounts.md](accounts.md), "Quests") and Squads' placements, all of the newest series (`XP.rewardCrate`); a crate held before (the wallet's old `crates`) became a Winter
   Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
   without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 10th level's boss crate is picked in the Crates tab's
   "Boss crate choice" (`POST /api/locker/pick`; [2026-11-09-xp-phase2-boss-pick.md](../decisions/2026-11-09-xp-phase2-boss-pick.md)).
