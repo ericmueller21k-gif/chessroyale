@@ -28,7 +28,7 @@ export interface FrontNav {
   signIn?: () => void;
 }
 
-export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends";
+export type FrontPage = "home" | "town" | "raid" | "queue" | "profile" | "settings" | "shop" | "lobby" | "friends" | "autochess";
 
 const Icon = ({ d, children }: { d?: string; children?: ComponentChildren }) => (
   <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -103,7 +103,7 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
   );
 }
 
-/** The right column's top slot: the town's (TOWN and its tools, which Town.tsx draws into it), else empty (RightPanel). */
+/** The right column's top slot: the town's (TOWN and its tools, which Town.tsx draws into it), auto chess's (AUTO CHESS and the round, AutoChess.tsx), else empty (RightPanel). */
 export const RIGHT_SLOT_TOOLS = "rc-slot-tools";
 
 /**
@@ -113,13 +113,13 @@ export const RIGHT_SLOT_TOOLS = "rc-slot-tools";
  * "FRIENDS ›" (opens your friends) and the live line under it, then the global chat (components/GlobalChat.tsx) filling the rest.
  * docs/decisions/2026-11-07-typed-chat-column.md.
  */
-export function RightPanel({ onFriends, onSignIn, town = false }: { onFriends: () => void; onSignIn?: () => void; town?: boolean }) {
+export function RightPanel({ onFriends, onSignIn, slot }: { onFriends: () => void; onSignIn?: () => void; slot?: string }) {
   // (A computer's: under 1024 px the column isn't shown, so nothing in it is drawn, fetched or polled.)
   const computer = useMedia("(min-width: 1024px)");
-  return computer ? <RightColumn onFriends={onFriends} onSignIn={onSignIn} town={town} /> : <aside class="fd-right" aria-label="Live" />;
+  return computer ? <RightColumn onFriends={onFriends} onSignIn={onSignIn} slot={slot} /> : <aside class="fd-right" aria-label="Live" />;
 }
 
-function RightColumn({ onFriends, onSignIn, town }: { onFriends: () => void; onSignIn?: () => void; town: boolean }) {
+function RightColumn({ onFriends, onSignIn, slot }: { onFriends: () => void; onSignIn?: () => void; slot?: string }) {
   const live = useLive();
   // (Your friends' news for the badge: requests and invites, refreshed while the column shows.)
   useFriends(true);
@@ -127,9 +127,9 @@ function RightColumn({ onFriends, onSignIn, town }: { onFriends: () => void; onS
   return (
     <aside class="fd-right" aria-label="Live">
       <div class="rc-slot">
-        {town && (
+        {slot && (
           <>
-            <h2 class="rc-h">TOWN</h2>
+            <h2 class="rc-h">{slot}</h2>
             <div class="rc-tools" id={RIGHT_SLOT_TOOLS} />
           </>
         )}
@@ -184,7 +184,7 @@ export function FrontFrame({ children, page, nav }: { children: ComponentChildre
       {nav && <SideMenu page={page} nav={nav} />}
       <main class="fd-center">{children}</main>
       {/* (The global chat on every page with the column: it was home's and the town's only, so the queue, 1 v 1's search among them, had none. Nov 7.) */}
-      {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} town={page === "town"} />}
+      {nav && <RightPanel onFriends={nav.friendsList} onSignIn={nav.signIn} slot={page === "town" ? "TOWN" : page === "autochess" ? "AUTO CHESS" : undefined} />}
       {/* A new invite: front-door pages only (never over a match, nor in the queue). */}
       {nav && page !== "queue" && <InviteToast />}
       {/* Back from the town for being away (town/afk.ts): "You've been dropped from the town" on home. */}

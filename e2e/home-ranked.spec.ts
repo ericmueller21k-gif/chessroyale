@@ -198,7 +198,7 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   expect(new URL(page.url()).search).toBe("");
 });
 
-test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its back button is home", async ({ page }) => {
+test("Other modes under Chess Town: the label, then Boss Battle (the rotating boss faces) and Auto chess (the army picture) side by side at half width each, the card's look; Auto chess opens /autochess, and its gear's Leave is home (no back button since Nov 8)", async ({ page }) => {
   await named(page, "Knight");
   await page.goto("/");
   const main = page.getByRole("main");
@@ -232,7 +232,9 @@ test("Other modes under Chess Town: the label, then Boss Battle (the rotating bo
   await auto.click();
   await expect(page.locator(".ac-title strong")).toHaveText("Auto chess");
   expect(new URL(page.url()).pathname).toBe("/autochess");
-  await page.getByRole("button", { name: "Back to home" }).click();
+  await page.getByRole("button", { name: "Match options" }).click();
+  await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: "Leave", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Leave", exact: true }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe("/");
 });
