@@ -19,6 +19,7 @@ import {
   BOSS_CRATE_PRICE,
   BOSS_TOKENS,
   XP,
+  QUESTS,
   BOSS_PARTY,
   BOSS_DIFFICULTY,
   BOSS_LEVEL,
@@ -115,6 +116,8 @@ export interface FaqSources {
   bossCrates: readonly BossCrateDef[];
   bossTokens: typeof BOSS_TOKENS;
   xp: typeof XP;
+  /** Quests (Nov 9, phase 3): how many, the carry-over, the reroll, the pool. */
+  quests: typeof QUESTS;
   bossCratePrice: typeof BOSS_CRATE_PRICE;
   colors: readonly { id: string; name: string; weight: number }[];
   purity: readonly { low: number; high: number; weight: number }[];
@@ -159,6 +162,7 @@ export const FAQ_DEFAULTS: FaqSources = {
   bossCrates: BOSS_CRATES.filter((c) => !adminFirst({ id: c.boss })),
   bossTokens: BOSS_TOKENS,
   xp: XP,
+  quests: QUESTS,
   bossCratePrice: BOSS_CRATE_PRICE,
   colors: ITEM_COLORS,
   purity: PURITY_BANDS,
@@ -1098,9 +1102,15 @@ Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by th
  */
 export function xpAndLevels(src: FaqSources): FaqSection {
   const X = src.xp;
+  const Q = src.quests;
   const most = X.maxMinutes * X.perMinute + X.win;
   const nth = (k: number) => `${k}${k % 100 >= 11 && k % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][k % 10] ?? "th")}`;
   const n = (k: number, one: string) => `${k} ${one}${k === 1 ? "" : "s"}`;
+  const things = (q: { xp: number; crates?: number; keys?: number }) =>
+    [`**+${q.xp.toLocaleString("en-US")} XP**`, q.crates ? `**${n(q.crates, "crate")}**` : "", q.keys ? `**${n(q.keys, "crate key")}**` : ""].filter(Boolean).join(", ").replace(/, ([^,]*)$/, " and $1");
+  const dailyXp = [...new Set(Q.daily.map((q) => q.xp))];
+  const dailyPays = `a daily quest gives ${dailyXp.length === 1 ? `**+${dailyXp[0]!.toLocaleString("en-US")} XP**` : "XP"}${Q.daily.some((q) => q.crates) ? " (some also a crate)" : ""}`;
+  const weeklyPays = Q.weekly[0] ? `gives ${things(Q.weekly[0])}` : "pays too";
   return {
     id: "xp",
     title: "XP and levels",
@@ -1119,7 +1129,13 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 
 **Level-up rewards:** every level you reach gives you **${n(X.levelCrates, "crate")} and ${n(X.levelKeys, "crate key")}**, and every ${nth(X.bossCrateEvery)} level (${X.bossCrateEvery}, ${2 * X.bossCrateEvery}, ${3 * X.bossCrateEvery}, …) also **a boss crate you choose**: pick whose in the Crates tab ("Choose your boss crate"). It opens like any boss crate you hold, with nothing more to pay. Each level pays once, at the end of the game that reached it (a level reached some other way is paid at your next game that counts). The crates are from the newest series.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up or the daily reward then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward or level rewards; levels you reach are paid at your next game.
+**Quests:** you get **${n(Q.dailyPerDay, "daily quest")}** each day and **${n(1, "weekly quest")}** each week, in the Quests window (it opens by itself the first time you come to the home screen each day when you're signed in, and from the **Quests** button any time). Each shows what to do ("${Q.daily[0]?.goal ?? ""}", "${Q.weekly[0]?.goal ?? ""}"), how far you are and what it pays.
+- **Rewards:** ${dailyPays}; the weekly quest ${weeklyPays}. They're paid the moment a game finishes the quest, and its XP joins that game's XP ("Quest +${Q.daily[0]?.xp ?? 0}"); the result says which quest ("Quest done: …").
+- **What counts:** only games that earn XP (the same rules as above), each game once per quest. Quests ask for modes you can always play: Squads, 50 v 50, boss raids (bots fill them), and any game. A win counts when it earns its win XP. Games on your device count only toward "finish games" quests, and only once they've lasted a little while (our server times them).
+- **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
+- **One free reroll a day:** the arrows on a daily you haven't finished swap it for another quest.
+
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +${X.win} · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up, the daily reward or a finished quest then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns no XP, daily reward, level rewards or quest progress; levels you reach are paid at your next game.
 `,
   };
 }

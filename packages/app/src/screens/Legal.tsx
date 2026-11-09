@@ -203,16 +203,18 @@ function Privacy() {
         kept="your tokens until you spend them or the account is deleted; each token's record for 30 days; a solo battle's start until it ends; a boss crate until you open it."
       />
       <Item
-        title="XP and levels"
+        title="XP, levels and quests"
         what={
           <p>
             Your XP (your level is worked out from it), and for each game you finish: how long you played it and how many moves you made,
-            the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward and your levels'). The
-            crates you hold by series, and the boss crates you have to pick. When a game you play on your device began (our server times it).
+            the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward, your levels' and
+            your quests'). The crates you hold by series, and the boss crates you have to pick. When a game you play on your device began
+            (our server times it). Your quests: which ones you have, when each was given and finished, which games moved each one, and the
+            day of your last reroll.
           </p>
         }
-        why="so your level is yours on every device, a game's XP and rewards are counted once, and the result screen can show what a game gave you."
-        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in."
+        why="so your level and quests are yours on every device, a game's XP, rewards and quest progress are counted once, and the result screen can show what a game gave you."
+        kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
       />
       <Item
         title="Chat"

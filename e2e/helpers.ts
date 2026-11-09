@@ -34,8 +34,41 @@ async function markSeen(context: import("@playwright/test").BrowserContext) {
 /** Whether contexts made now start with the walkthrough seen (set per test from the `tutorialSeen` option, below). */
 let seenDefault = true;
 
-export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void }>({
+/**
+ * The quests overlay's "shown today" key (packages/app/src/quests.ts, QUESTS_SEEN_KEY; Nov 9, phase 3): a signed-in account's first
+ * home visit of the day opens it over home, which would block a signed-in test's clicks, so each context starts with it set past any
+ * day. A test of that first visit sets `test.use({ questsSeen: false })`.
+ */
+const QUESTS_SEEN_KEY = "hunchess.quests.seenDay";
+async function markQuestsSeen(context: import("@playwright/test").BrowserContext) {
+  await context.addInitScript((k: string) => {
+    try {
+      if (!localStorage.getItem(k)) localStorage.setItem(k, "9999999999999");
+    } catch {
+      /* no storage: the overlay may show over home */
+    }
+  }, QUESTS_SEEN_KEY);
+}
+let questsSeenDefault = true;
+
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void; questsSeen: boolean; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
+  questsSeen: [true, { option: true }],
+  questsSeenForTest: [
+    async ({ questsSeen }, use) => {
+      questsSeenDefault = questsSeen;
+      await use();
+      questsSeenDefault = true;
+    },
+    { auto: true },
+  ],
+  seenQuests: [
+    async ({ context, questsSeen }, use) => {
+      if (questsSeen) await markQuestsSeen(context);
+      await use();
+    },
+    { auto: true },
+  ],
   // Sets the default for this test's contexts, then puts it back.
   seenDefaultForTest: [
     async ({ tutorialSeen }, use) => {
@@ -60,6 +93,7 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
       browser.newContext = (async (options?: Parameters<typeof real>[0]) => {
         const ctx = await real(options);
         if (seenDefault) await markSeen(ctx);
+        if (questsSeenDefault) await markQuestsSeen(ctx);
         return ctx;
       }) as typeof browser.newContext;
       await use(browser);

@@ -28,6 +28,7 @@
       "packages/core/src/match.ts",
       "packages/core/src/pauses.ts",
       "packages/core/src/profile.ts",
+      "packages/core/src/quests.ts",
       "packages/core/src/ranked.ts",
       "packages/core/src/rating-curve.ts",
       "packages/core/src/rating.ts",
@@ -164,6 +165,10 @@
     "XP and levels (Nov 9): the XP box on every result screen, the level on home and the profiles; the server's grant": {
       "paths": ["packages/server/src/xp.ts", "packages/server/src/rewards.ts", "packages/app/src/xp.ts", "packages/app/src/components/XpResult.tsx", "packages/app/src/components/RewardBox.tsx"],
       "specs": ["e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts", "e2e/home-ranked.spec.ts", "e2e/public-profile.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/squads-play.spec.ts"]
+    },
+    "Quests (Nov 9, XP phase 3): dealt, counted and paid by the server, the overlay on home and its entry in the top bar, a quest's line in the result's toast": {
+      "paths": ["packages/server/src/quests.ts", "packages/app/src/quests.ts", "packages/app/src/components/QuestsOverlay.tsx"],
+      "specs": ["e2e/quests.spec.ts", "e2e/home-layout.spec.ts", "e2e/xp.spec.ts", "e2e/xp-rewards.spec.ts"]
     },
     "CI's e2e plan, shards and summary (the smoke set proves a shard still plans, runs and reports; ci-select's unit tests run in check; main runs everything)": {
       "paths": [".github/workflows/e2e.yml", "e2e/ci-*.mjs", "e2e/ci-summary.ts"],

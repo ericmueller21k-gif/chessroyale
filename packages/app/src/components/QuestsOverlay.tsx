@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { BossFace } from "./BossCharacter.tsx";
+import type { QuestIcon, QuestView } from "@chessroyale/core";
 import { KeyArt, WinterCrateArt } from "./Items.tsx";
 
 /**
@@ -9,29 +10,15 @@ import { KeyArt, WinterCrateArt } from "./Items.tsx";
  * label and countdown. Each daily has a small reroll button (one free a day: greyed once used, or on a finished quest). The ×,
  * "Got it", Escape or a tap outside close it.
  *
- * A mockup for now (Nov 9): it draws what it's given and calls back; nothing is stored or sent. Home shows it with fake data
- * behind `?quests=mock` (quests-mock.ts) until the server's quests exist.
+ * It draws what it's given and calls back (Nov 9, phase 3: home gives it the server's quests, quests.ts; the server deals, counts,
+ * rerolls and pays them, server/quests.ts). Eric approved its look (the mockup of Nov 9).
  */
 
-/** What a quest's row shows as its picture: a boss's portrait (a boss quest), or pieces of the board's set. */
-export type QuestIcon = { kind: "boss"; boss: string } | { kind: "squad" } | { kind: "board"; piece: "knight" | "rook" | "queen" | "pawn" };
-
-export interface QuestView {
-  id: string;
-  /** Daily (one of the two) or the weekly. */
-  period: "daily" | "weekly";
-  name: string;
-  /** What to do, in plain words ("Beat any boss"). */
-  goal: string;
-  progress: number;
-  target: number;
-  icon: QuestIcon;
-  /** What finishing it pays (granted the moment it's done, by the server). */
-  reward: { xp: number; crates?: number; keys?: number };
-}
+/** A quest's row (core's quests.ts: the server answers these). */
+export type { QuestIcon, QuestView };
 
 export interface QuestsOverlayProps {
-  /** The two dailies (in order), then the weekly. */
+  /** The dailies (two, or three with one carried over; in order), then the weekly. */
   quests: readonly QuestView[];
   /** Until the next daily quests ("12h"). */
   dailyResetIn: string;
@@ -39,6 +26,8 @@ export interface QuestsOverlayProps {
   weeklyResetIn: string;
   /** Today's free reroll is still there. */
   rerollLeft: boolean;
+  /** PAUSE_REWARDS is on: the head says quests are paused, in place of the countdown. */
+  paused?: boolean;
   onReroll: (id: string) => void;
   onClose: () => void;
 }
@@ -170,7 +159,7 @@ function QuestRow({ q, rerollLeft, onReroll }: { q: QuestView; rerollLeft: boole
   );
 }
 
-export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft, onReroll, onClose }: QuestsOverlayProps) {
+export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft, paused, onReroll, onClose }: QuestsOverlayProps) {
   const ok = useRef<HTMLButtonElement>(null);
   // (A layout effect, as the other notices': Escape closes it from its first frame, and "Got it" has the focus.)
   useLayoutEffect(() => {
@@ -198,7 +187,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft,
           </h2>
           <span class="qo-when">
             <ClockIcon />
-            New quests in {dailyResetIn}
+            {paused ? "Quests are paused for a moment." : `New quests in ${dailyResetIn}`}
           </span>
         </header>
         <ul class="qo-rows">

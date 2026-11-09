@@ -557,15 +557,20 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   }
 });
 
-test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the Quests entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row and the card fits", async ({ page }) => {
+test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry opens the overlay over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row, every button 40 px, and the card fits", async ({ page }) => {
   await named(page, "Christopher Wallace");
-  await page.goto("/?quests=mock");
+  await page.goto("/?quests=boss-hunter,squad-up,regular:3");
   const quests = page.getByRole("dialog", { name: "Daily Quests" });
+  // (A guest's day doesn't open it by itself: the entry does, once the quests are set.)
+  const entry = page.getByRole("button", { name: "Quests", exact: true });
+  await expect(entry).toBeEnabled({ timeout: 20_000 });
+  await expect.poll(async () => ((await (await page.request.get("/api/quests")).json()) as { quests: { name: string }[] }).quests.map((q) => q.name), { timeout: 20_000 }).toEqual(["Boss Hunter", "Squad Up", "Regular"]);
+  await entry.click();
   await expect(quests).toBeVisible();
   await expect(quests.locator(".qo-name")).toHaveText(["Boss Hunter", "Squad Up", "Regular"]);
   await expect(quests.locator(".qo-row.weekly .qo-name")).toHaveText("Regular");
-  await expect(quests.getByText("New quests in 12h")).toBeVisible();
-  await expect(quests.getByText("Resets in 4d")).toBeVisible();
+  await expect(quests.getByText(/^New quests in \d+[hm]$/)).toBeVisible();
+  await expect(quests.getByText(/^Resets in \d+[dhm]$/)).toBeVisible();
   // One free reroll a day: both dailies offer it; once used, both grey (still there).
   const rerolls = quests.locator(".qo-reroll");
   await expect(rerolls).toHaveCount(2);
@@ -577,7 +582,6 @@ test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailie
   const computer = await page.evaluate(() => innerWidth >= 1024);
   await expect(page.locator(computer ? ".fd-hero .fd-quests-btn" : ".fd-top .fd-top-quests")).toHaveCount(1);
   await expect(page.locator(computer ? ".fd-top .fd-top-quests" : ".fd-hero .fd-quests-btn")).toHaveCount(0);
-  const entry = page.getByRole("button", { name: "Quests", exact: true });
   await entry.click();
   await expect(quests).toBeVisible();
   await quests.getByRole("button", { name: "Close" }).click();
@@ -617,6 +621,8 @@ test("quests mockup (?quests=mock, Nov 9): the overlay opens over home, 2 dailie
   expect(bar.edge).toBeLessThanOrEqual(0);
   expect(bar.rows).toHaveLength(1);
   expect(bar.entry.sameAsShop).toBe(true);
+  // (Phase 3: no squeeze under 40 px; the logo steps down to its icon instead.)
+  expect(Math.min(bar.entry.w, bar.entry.h)).toBeGreaterThanOrEqual(40);
   expect(bar.sideways).toBe(0);
   await entry.click();
   await expect(quests).toBeVisible();
