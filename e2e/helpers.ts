@@ -203,11 +203,16 @@ export async function soloFromHome(page: Page) {
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
 }
 
-/** Play with friends' sheet: a phone's Friends in home's top bar, a computer's side menu (Eric, Oct 18). */
+/**
+ * Play with friends' sheet: a phone's Friends in home's top bar, then the friends overlay's "Private lobby ›" (Nov 9), a computer's
+ * side menu (Eric, Oct 18).
+ */
 export async function openPlayWithFriends(page: Page) {
   // (A computer's frame from 1024 px: phones and tablets have home's top bar.)
-  if ((page.viewportSize()?.width ?? 0) < 1024) await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+    await page.getByRole("dialog", { name: "Friends", exact: true }).getByRole("button", { name: /^Private lobby ›/ }).click();
+  } else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
   await page.getByRole("dialog", { name: /Play with friends|Join lobby/ }).waitFor();
 }
 

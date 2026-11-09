@@ -25574,6 +25574,142 @@ button.sq-tiny {
     padding: 5px 16px 8px;
   }
 }
+/* ---------------- The friends overlay (Nov 9; components/FriendsOverlay.tsx) ----------------
+ * The Quests overlay's shell (.qo-back, .qo-card, .qo-crest, .qo-x, .qo-title), at a fixed height so nothing moves while the list
+ * loads or a menu opens: the list scrolls inside the box, the footer's links stay at its foot, and a friend's menu covers the
+ * box's foot (over the list), never pushing anything. */
+.fo-card {
+  height: min(560px, calc(100dvh - 62px));
+  min-height: 0;
+}
+.fo-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 2px;
+}
+.fo-list section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fo-label {
+  margin: 0 4px;
+  font: 800 12px Archivo, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fd-muted);
+}
+.fo-list .fr-row {
+  background: var(--qo-row);
+}
+.fo-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 4px;
+}
+.fo-friend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 10px 6px 12px;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--qo-row);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fo-friend.picked {
+  border-color: var(--fd-gold);
+}
+/* (Offline: greyed, as on a computer's list. The dot already says so; the words fade with it.) */
+.fo-friend.off .fr-row-text {
+  opacity: 0.55;
+}
+.fo-name {
+  font-weight: 800;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.fo-more {
+  flex: none;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--fd-muted);
+}
+.fo-private {
+  flex: none;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--fd-gold);
+  background: var(--qo-row);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.fo-note {
+  margin: 0 4px;
+}
+.fo-foot {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 2px 6px 0;
+  font-size: 14px;
+}
+.fo-foot-link {
+  min-height: 36px;
+}
+.fo-foot-link:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fo-menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 2px solid var(--fd-gold);
+  background: var(--qo-card);
+  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.3);
+}
+.fo-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.fo-menu .fd-btn {
+  width: 100%;
+}
+.fo-why {
+  margin: -2px 2px 0;
+  font-size: 13px;
+}
+/* ---------------- (end of the friends overlay) ---------------- */
 /* Home's Quests entry: in your card's top right corner, over nothing, so home never moves for it. */
 .fd-hero {
   position: relative;
