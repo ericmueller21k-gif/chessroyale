@@ -2,7 +2,7 @@
 
 A design for Eric's Nov 9 questions: ranks in 1 v 1, Duo (2 v 2, coming), Squads and 50 v 50, what "MMR" means, leaving and
 dodging, bots taking a leaver's seat, the rating math, tiers and seasons, the result screens, and abuse. No game code is
-changed by this doc. Mockup: [assets/ranked-ladder-results.png](assets/ranked-ladder-results.png) (its HTML beside it).
+changed by this doc. Mockup: [assets/ranked-ladder-results.html](assets/ranked-ladder-results.html) (render it in a browser; its picture is in the director notes, notes/briefs/assets/ranked-ladder-results.png, since images stay out of docs/).
 
 Built today and kept as is: ranked 1 v 1 ([docs/areas/ranked.md](../areas/ranked.md)): a hidden Glicko-1 rating, the
 visible ladder Wood → Radiant (five divisions of 80 RP each), Pearlescent (top 500) and Transcendent (top 100), 5
