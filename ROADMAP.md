@@ -376,6 +376,11 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     an invite does when the other player is already in a match. It's stored data and a client-server change, so it
     takes the full test lane.
 
+## Riders in regular crates (Eric, Nov 9, 2026: next after the shop page)
+
+A few rides that have nothing to do with the bosses, put in the regular crates (HunChess, Gift, Beta) to make them worth buying,
+since rides are the most wanted items. item-builder for the rides' art and the crates' odds.
+
 ## Ranked rewards (Eric, Nov 9, 2026: later, not a priority; don't raise it again until ranked seasons are built)
 
 Eric: "we do want to give a reward for ranking, just like other games do … probably do a personalized crate that contains like

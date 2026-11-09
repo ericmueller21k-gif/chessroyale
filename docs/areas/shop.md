@@ -16,6 +16,20 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **Buying with coins is one transaction** (`buyItem`, one D1 batch: all of it or none): the item goes in only if the
   coins are there (an item owned by then fails the batch), and the coins come off with it, so two taps or two devices
   at once never charge twice or take the coins below zero (`docs/decisions/2026-10-16-atomic-shop-purchase.md`).
+- **The Shop tab's page** (Eric's mockup, Nov 9; [2026-11-09-shop-page.md](../decisions/2026-11-09-shop-page.md); `ShopPage` in
+  `screens/Shop.tsx`). **Look only: no purchase is wired**; a price tapped shows the pop-up "Buying opens soon." (Stripe and coin
+  purchases come next). Under the tabs: "Everything in the shop is 50% off during beta." (from `SHOP.discount`). Then the **special
+  offer** banner (dark with gold, same in both themes): "SPECIAL OFFER", **Crate + Key Bundle**, "3 Keys + 3 Random Crates", "Includes a
+  chance at a [Mythic Crate icon] Mythic Crate.", its price pill; its art `BundleArt` (three mystery crates and three keys on a gold glow).
+  Then the **cards** (2 a row on a phone, the page scrolls; 4 on a computer): Boss Crate (`BossCrateArt`, "?" seal), HunChess Crate,
+  Gift Crate (`WinterCrateArt`), Beta Crate, Crate Key, each with art, name, one line and a price pill. **The discount**
+  (`SHOP.discount`, 0.5; `shopPrice` and `discountLabel` in `core/shop.ts`, whole coins, half up): a red "50% OFF" ribbon on every card
+  and the bundle, the full price struck through beside the discounted one; at 0 no ribbons and no strike. **Limited items**
+  (`SHOP.limited`: Gift, Beta): a gold clock in the card's top-left corner; its tap opens "Limited: a rotating shop item. It leaves the
+  shop when its time is up." (OK, Escape or a tap outside close either pop-up; nothing moves). Prices: `SHOP.prices`. The coin is the
+  top bar's 🪙. **The Mythic Crate** (`MythicCrateArt`: purple and black, gold crown, the HunChess crate's glint tinted lilac) is
+  defined only in the decision note for now (a Fischer Random pull; each of the bundle's crates `SHOP.bundleMythicChance` likely).
+  `BossCrateArt({ boss })` lays a boss's token over the seal (for the inventory, not wired there yet).
 - **Crates** (`core/crates.ts`): two series, **Beta Crate · Series 001** (listed first; it ships in batches, the plan
   is in the history: complete since Oct 14, 28 items: the Classics, the secret agent, the pirate, the ninja and a
   one-off Smiley Face) and
@@ -186,7 +200,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 | Item list, tiers, colors, crate odds, rolls | `packages/core/src/crates.ts` |
 | The Welcome Crate: the crate, its roll, `tradeable`, its text; the grant, opening and notice | `packages/core/src/welcome.ts`; `packages/server/src/welcome.ts`; `components/WelcomeNotice.tsx`; the colorway `components/rides/hunchess.tsx` |
 | Shop cosmetics | `packages/core/src/shop.ts`; drawn by `packages/app/src/components/Cosmetics.tsx` |
-| Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`) | `packages/app/src/components/Items.tsx` |
+| Item drawings, fit, cards (`ItemArt`, `Avatar`); crate and box art (`WinterCrateArt`, `PresentArt`, `BetaCrateArt`, `SupplyBoxArt`; the shop page's `BossCrateArt`, `MythicCrateArt`, `BundleArt`) | `packages/app/src/components/Items.tsx` |
 | The paint every item uses (color, shine, `Region`, `LINE`) and its blemish's blotches | `packages/app/src/components/item-paint.tsx` and `blotches.ts` (moved out of Items.tsx, Oct 31) |
 | Rides' drawings (`RIDES`) | `packages/app/src/components/rides/` (`draw.tsx`: one layer as SVG); their town cells: `scripts/measure-rides.ts` |
 | Crate page, opening strip, reveal, locker UI (`CRATE_LOOKS`: each crate's art and box) | `packages/app/src/screens/Crates.tsx`; the shop `screens/Shop.tsx`; the gambling warning `components/GamblingWarning.tsx` |
@@ -203,7 +217,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 `crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
 reward give, `rewardCrate`), `BOSS_TOKENS` and
-`BOSS_CRATE_PRICE` in settings.ts, `shop.ts` (`SHOP_ITEMS`,
+`BOSS_CRATE_PRICE` and `SHOP` (the Shop page's discount, prices, limited items, the bundle's Mythic chance) in settings.ts, `shop.ts` (`SHOP_ITEMS`,
 `SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts.
 
 ## Tests and tools
@@ -218,6 +232,9 @@ reward give, `rewardCrate`), `BOSS_TOKENS` and
   key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, an open, the padlock,
   the pick, +100 keys). The test helper `stockCrates` (server) and `giveCrates` (e2e) give crates and keys.
 - Unit (Nov 6): `packages/server/test/welcome.test.ts` (the Welcome Crate: 5 not 4, abandoned games, races, the backfill, opening once, never tradeable, no purity, old lockers), `packages/app/test/hunchess-rides.test.ts` (every ride's colorway draws).
+- The Shop page (Nov 9): unit `packages/core/test/shop.test.ts` (the discount's rounding and ribbon); e2e `e2e/shop.spec.ts`, "the Shop
+  tab's page" (the banner, the cards, ribbons and struck prices from `SHOP`, the clock's pop-up, "Buying opens soon", nothing moves; 2 a
+  row on a phone, 4 on a computer; `SHOP_PAGE_SHOTS=<dir>` its stills) and "the shop page's width" (its Shop case is back).
 - e2e: `e2e/welcome-crate.spec.ts` (the Welcome Crate end to end, Nov 6); `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
   its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview
   riding in boxes that don't move, the profile's pawn riding and Wearing; `giveItems` in `e2e/helpers.ts` gives items no crate holds,
