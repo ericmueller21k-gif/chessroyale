@@ -535,3 +535,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   .pr-body.md; watcher). Eric had to sign in to Claude Code again (used his Claude account with the top plan): nothing needed.
 - Nov 9 ~03:45: #564 merged (edd3d01; watcher bu1a39o7l). #568 boss-result fix merged (0acd0cc; cause: ?mate=1 can't mate at
   once vs Wrangler or Sawyer, test now names Hollow); watcher on main's full run. XP phase 1 running (watcher biax7eoce).
+- Nov 9 ~04:05: main green on edd3d01 (#564). Main RED on 0acd0cc (#568): formats.spec.ts:194 Last Stand result, boss 11 px from
+  the God King (Eric's 16 px rule), depends on which boss ?boss=1600 meets. Haiku session_01JuCWRtb3LWVGcYnhGH4KzX on
+  claude/fix-laststand-gap (done signal .pr-body.md, watcher bi70u5yjb); director reviews before merge.
