@@ -20,7 +20,7 @@ placements, "+18" on the result card, `RANKED_1V1` in settings.ts.
 | 4 | Leaving | **Decided (Eric, Nov 9): yes, as written.** **Dodge** (leaving after the match is found but before both first moves) = **−5 RP** (−10 if repeated), no MMR change, a mark on your record, and a short lockout that grows if you keep doing it. **Leave** (after the game starts) = a **full loss** plus **−10 RP**. **Three or more leaves in your last 20 ranked games puts you in the delayed queue** (an extra wait before you're matched), longer at each step. | LoL's dodge tiers and Overwatch's "last 20 games" window, scaled to our short games. Nobody comes out ahead by leaving. |
 | 5 | A bot takes a leaver's seat | The bot plays at **the leaver's own strength minus 100, never above it** (from their judged moves), using the bots we already have. **Teammates lose less** because the rating math knows they had a weaker bot. The leaver takes the worst result plus the leave fee. | It reuses `botSkillForRating`, so there's no new engine work. Apex's "loss forgiveness" falls out of the math with no special case. |
 | 6 | The math | **Keep Glicko-1 for 1 v 1.** Use **OpenSkill** (Weng-Lin, npm `openskill` 4.1.1, **MIT**, about 8 KB minified, server only) for Duo, Squads and 50 v 50. Not TrueSkill: it's patented and Microsoft only licenses it for Xbox or non-commercial use. | OpenSkill handles any number of teams of any size, ties, and 100-player placements (about 3 ms an update). It's the open cousin of TrueSkill. |
-| 7 | Tiers, seasons, decay | **The same tiers and emblems for every mode, with the same MMR → tier mapping** (Pearlescent starts at 2400 MMR plus a top-500 place; that's our "3000 is grandmaster", and yes, the number is arbitrary). **Three-month seasons.** A season keeps your MMR but drops your visible rank one tier. **No RP decay.** Only the top two tiers need recent games to keep their place. | Simple, and the same in every mode. Players re-climb a little each season, which is the fun part, and nobody loses points for taking a break. |
+| 7 | Tiers, seasons, decay | **Seasons decided (Eric, Nov 9): a soft reset and 5 placement games (section 7).** **The same tiers and emblems for every mode, with the same MMR → tier mapping** (Pearlescent starts at 2400 MMR plus a top-500 place; that's our "3000 is grandmaster", and yes, the number is arbitrary). **Three-month seasons.** A season soft-resets MMR (a quarter of the way back to 1500) and you play 5 placement games for your new rank. **No RP decay.** Only the top two tiers need recent games to keep their place. | Simple, and the same in every mode. Players re-climb a little each season, which is the fun part, and nobody loses points for taking a break. |
 | 8 | The result screen | In every mode: **the result → the rank line (emblem, "Gold 2 · 45 RP (+18)", one note line) → the XP box → the buttons.** One shared component in a fixed-height row. Ranked Standing on the profile gets four tabs. | Matches what 1 v 1 already shows. Nothing moves when the numbers arrive (your "nothing shifts" rule). |
 | 9 | Abuse | Party rank-gap limits in Duo and Squads, never pairing friends or same-device accounts in 1 v 1, RP shrinking after the 3rd game against the same opponent in a day, seeding new accounts from their judged moves (anti-smurf), and flags to fair play. Details in section 9. | Each rule closes a known exploit from LoL, Valorant or chess.com, using signals we already have. |
 
@@ -327,16 +327,29 @@ The built 1 v 1 rule, generalized:
   - Squads and 50 v 50: **3 matches** (long matches, and each one compares you with many players).
   - Seeded as in section 1, capped at Radiant 5 (as built).
   - A dodge doesn't count as a placement game; a leave does (as a loss).
-- **Seasons** (the profile already says "Season 1"):
+- **Seasons** (decided, Eric, Nov 9: "a soft reset on the ranks, and then you would have to play 5 more placement games to get
+  your new rating"; the profile already says "Season 1"):
   - **Three months**, the same dates for every mode.
-  - **At a reset:**
-    - MMR is kept, its σ widened a little (to at least 150) so everyone moves faster for a few games.
-    - The **visible rank drops one tier** (400 ladder points, never below Wood 5 0). The catch-up term brings players
-      back near their MMR within a dozen games.
-    - No placements again.
+  - **At a reset (a soft reset, the way most ranked games do it):**
+    - MMR is kept but pulled a quarter of the way back toward the start (1500): `new = 1500 + 0.75 × (old − 1500)`, and its
+      σ widened (to at least 150) so the placement games move it fast. A 2200 player starts the season at 2025; a 1100 at 1200.
+    - The visible rank is hidden ("Placement 0/5") until you play **5 placement games in that mode** (Squads and 50 v 50:
+      3 matches, as their first placements). Then your rank is set from your MMR as it stands, capped at Radiant 5 (as the
+      first placements are).
+    - Your last season's rank and peak stay on your profile ("Season 1 · Gold 2, peak Paragon 4").
     - Top tiers are recounted.
-  - **Rewards are cosmetic only:** a season-peak emblem frame and title per mode. The season's peak is stored.
-  - Rocket League and Fortnite soft-reset the same way ([Fortnite ranks](https://esports.gg/guides/fortnite/fortnite-ranks/)).
+  - How others do it: Valorant soft-resets at each Act and has you play placements again (five at a new Episode, fewer
+    between Acts), dropping leaderboard players to 10% of their RR
+    ([Twinfinite](https://twinfinite.net/?p=781562), [The Spike](https://www.thespike.gg/valorant/ranks)); Rocket League keeps
+    your MMR near where it was and plays 10 placement matches a season
+    ([Dot Esports](https://dotesports.com/rocket-league/news/when-do-rocket-league-ranks-reset),
+    [The Global Gaming](https://theglobalgaming.com/rocket-league/soft-hard-rank-reset-season)); League moved to one reset a
+    year with faster provisional games ([esports.gg](https://esports.gg/news/league-of-legends/league-of-legends-in-2025-new-season-model-rank-resets));
+    Overwatch 2 decays ranks at a season and re-places after a reset
+    ([Blizzard](https://overwatch.blizzard.com/en-us/news/23857518/initializing-systems-updating-competitive-play-for-overwatch-2/)).
+    Five placement games after a soft reset is the common middle.
+  - **Rewards:** see ROADMAP.md, "Ranked rewards" (Eric, Nov 9: later, not a priority). The season's peak and end rank are
+    stored per mode so rewards can be given when they're built.
 - **Decay: none for RP.**
   - Idle time already widens uncertainty (`rdPerDay`), so a returning player moves faster.
   - **Only Pearlescent and Transcendent** need **5 ranked games in that mode in the last 14 days** to hold a top-tier
