@@ -6,6 +6,7 @@ import {
   callOff,
   canOfferDraw,
   clocksRun,
+  conductOf,
   declineDraw,
   firstMoveBy,
   gameControl,
@@ -19,6 +20,7 @@ import {
   tick,
   type Color,
   type DuelClientMessage,
+  type DuelConduct,
   type DuelEnd,
   type DuelGamePhase,
   type DuelOutcome,
@@ -88,6 +90,13 @@ export interface DuelRecord {
   outcomes: Partial<Record<Color, DuelOutcome>> | null;
   /** When the room closes (its results kept until then). */
   closeAt: number | null;
+  /**
+   * Who left early (ranked's leave rules, L1: conductOf), decided once as the game ends, from who was connected then. Missing or
+   * null: not decided yet (or a record from before Nov 9). `excused`: called off by the queue's Cancel the moment it was paired
+   * (the player never saw the game): nobody's dodge.
+   */
+  conduct?: DuelConduct | null;
+  excused?: boolean;
   chat: DuelChat;
 }
 
@@ -242,15 +251,21 @@ export class DuelCore {
   private ended() {
     const end = this.end;
     if (end && this.r.closeAt === null) this.r.closeAt = this.io.now() + RANKED_1V1.resultsKeepMinutes * 60_000;
+    if (end && !this.r.conduct) this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, { w: this.io.connected("w"), b: this.io.connected("b") });
+  }
+
+  /** A dodge to record: an aborted game (or a no-show) that someone left early. */
+  private dodged(): boolean {
+    return Object.values(this.r.conduct ?? {}).includes("dodge");
   }
 
   // ---------------- Recording ----------------
 
-  /** A finished game (not aborted) whose outcome hasn't come back, with tries left. */
+  /** A finished game (not aborted, or aborted by a dodge: ranked's leave rules) whose outcome hasn't come back, with tries left. */
   private toRecord(): boolean {
     const r = this.r;
-    const end = r.game?.end;
-    return !!end && end.result !== "aborted" && r.outcomes === null && r.recordTries < RECORD_TRIES;
+    const end = this.end;
+    return !!end && (end.result !== "aborted" || this.dodged()) && r.outcomes === null && r.recordTries < RECORD_TRIES;
   }
 
   /** Whether a recording try is due now (takeFinished would hand the game over). */
@@ -267,21 +282,23 @@ export class DuelCore {
   takeFinished(): FinishedDuel | null {
     const r = this.r;
     const g = r.game;
-    if (!this.takeFinishedDue() || !g?.end) return null;
+    const end = this.end;
+    if (!this.takeFinishedDue() || !end) return null;
     const now = this.io.now();
     r.recordTries++;
     r.recordAt = now + RECORD_RETRY_MS;
     return {
       id: r.id,
       players: { w: r.players.w.uid, b: r.players.b.uid },
-      control: g.control ?? RANKED_1V1.defaultControl,
-      result: g.end.result,
-      reason: g.end.reason,
-      moves: g.moves,
-      times: g.times,
-      startedAt: g.startsAt ?? g.end.at,
-      endedAt: g.end.at,
+      control: g?.control ?? RANKED_1V1.defaultControl,
+      result: end.result,
+      reason: end.reason,
+      moves: g?.moves ?? [],
+      times: g?.times ?? [],
+      startedAt: g?.startsAt ?? end.at,
+      endedAt: end.at,
       testSeconds: r.testSeconds,
+      conduct: r.conduct ?? {},
     };
   }
 
@@ -290,6 +307,15 @@ export class DuelCore {
     const o = outcomes ?? { w: { change: null, coins: 0 }, b: { change: null, coins: 0 } };
     this.r.outcomes = o;
     for (const c of ["w", "b"] as const) this.io.send(c, { t: "outcome", outcome: o[c] });
+  }
+
+  /**
+   * The queue's Cancel answered this game (pressed the moment it was paired, before the player could see it): called off for
+   * them as an abort, and nobody's dodge.
+   */
+  cancelled(c: Color) {
+    if (!this.end) this.r.excused = true;
+    this.message(c, { t: "resign" });
   }
 
   // ---------------- What players send ----------------

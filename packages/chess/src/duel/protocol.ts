@@ -57,6 +57,11 @@ export interface DuelOutcome {
   /** Null when your rank didn't change (an aborted game, or fair play holding your rank). */
   change: RankChange | null;
   coins: number;
+  /**
+   * Ranked's leave rules (L1, Nov 9): this game was a dodge (you left before it started) or a leave (you abandoned it, or resigned
+   * before your 3rd move), and the rank points it cost on top (0 in placements, or with fair play holding your rank). Missing: neither.
+   */
+  conduct?: { kind: "dodge" | "leave"; rp: number };
   /** An unranked game: a test's clock on a server without test switches (nothing recorded). */
   unranked?: boolean;
   /** The game's XP (Nov 9; server/xp.ts), for the result screen's XP box. Missing: an older server, or none decided (no database). */

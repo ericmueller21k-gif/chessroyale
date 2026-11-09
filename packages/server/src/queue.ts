@@ -43,13 +43,16 @@ export const FILL_IN_ORDER: MatchRules = { group: (tickets) => (tickets.length ?
 /**
  * Ranked 1 v 1: pairs by the hidden rating (each ticket's `info.uid`, `info.rating`, `info.rd` and `info.device`, read
  * by the server), the range widening with the wait and the ratings' uncertainty (core's pairUp): each pair is a group
- * of its own (a game). Tickets without a partner yet stay in line, in order, for the next batch. A ticket without its
+ * of its own (a game). Tickets without a partner yet stay in line, in order, for the next batch, and so do tickets in ranked's
+ * delayed queue (`info.notBefore`, L1) until their wait is over. A ticket without its
  * player (`info.uid`, `info.player`) is never paired (the matchmaker never makes one: duelNext).
  */
 export const PAIR_BY_RATING: MatchRules = {
   group(tickets, now) {
     const entries = tickets
       .filter(duelTicketComplete)
+      // (Ranked's delayed queue, L1: a ticket waits until its `notBefore` before it can be paired.)
+      .filter((t) => !(Number(t.info?.notBefore) > now))
       .map((t) => ({ id: t.id, uid: t.info!.uid as string, rating: Number(t.info?.rating) || 1500, rd: Number(t.info?.rd) || 0, device: typeof t.info?.device === "string" ? t.info.device : null, at: t.at, t }));
     return pairUp(entries, now).map(([a, b]) => ({ key: `duel:${a.id}`, tickets: [a.t, b.t] }));
   },

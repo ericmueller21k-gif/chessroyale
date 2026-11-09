@@ -118,3 +118,16 @@ export function leaveStanding(marks: readonly LeaveMark[], gamesNow: number, now
   const next = dodgeCost(level + 1, s);
   return { marks: n, level, lockedUntil, lock, delaySec: delayFor(n, s), nextDodge: { rp: next.rp, lockoutMin: next.lockoutMs / 60_000 } };
 }
+
+/** The queue's refusal while ranked is locked (the countdown is the app's: home's line above PLAY, from `lockedUntil`). */
+export function lockedLine(lock: LeaveStanding["lock"], s: Leaves = LEAVES): string {
+  return lock === "leaves"
+    ? `Too many ranked games left early: 1 v 1 is locked for ${s.lockHours} hours.`
+    : "You left a ranked game before it started: 1 v 1 is locked for a few minutes.";
+}
+
+/** Where a player stands with the leave rules, as /api/me and the queue read it: their standing, and home's note after a dodge. */
+export interface RankedLeaves extends LeaveStanding {
+  /** Their latest dodge, for home's note ("You left before the game started: −5 RP"): within LEAVES.noteMinutes, no game since. */
+  dodged: { at: number; rp: number } | null;
+}

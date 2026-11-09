@@ -21,7 +21,8 @@ export type PlayAnswer =
  * waits up to holdMs); or `expired`: the queue doesn't know that ticket (it went while the app was asleep, or it never
  * was one): ask again without it.
  */
-export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number } | { expired: true };
+/** `delayMs`: ranked's delayed queue (L1): how long until this ticket can be paired (missing: it can be now). */
+export type DuelPlayAnswer = PlayAnswer | { searching: true; ticket: string; waitedMs: number; delayMs?: number } | { expired: true };
 
 export const busyMessage = (seconds: number) => `Servers are busy, you're in line: about ${seconds} s`;
 
@@ -119,7 +120,10 @@ export class Matchmaker extends DurableObject<Env> {
     const late = this.q.placedIn(t.id);
     if (late) return { code: late, ticket: t.id };
     // Ranked 1 v 1: no opponent yet (unless the servers are full: then busy, as every queue).
-    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at) };
+    if (opts.duel && this.players.n < this.q.cfg.maxPlayers && this.q.position(t.id) > 0) {
+      const delayMs = Math.max(0, Number(t.info?.notBefore ?? 0) - Date.now());
+      return { searching: true, ticket: t.id, waitedMs: Math.max(0, Date.now() - t.at), ...(delayMs > 0 ? { delayMs } : {}) };
+    }
     countCall("mm.busy");
     const waitSeconds = this.q.estimateSeconds(t.id, Date.now(), this.players.n);
     return { busy: true, ticket: t.id, position: this.q.position(t.id), waitSeconds, retryMs: CAPACITY.queue.retryMs, message: busyMessage(waitSeconds) };

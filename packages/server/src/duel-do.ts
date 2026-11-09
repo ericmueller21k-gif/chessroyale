@@ -105,11 +105,15 @@ export class DuelGame extends DurableObject<Env> {
         const sql = d1Sql(this.env.DB);
         await ensureSchema(sql, this.env.DB);
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
-        outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
+        // (Ranked's leave rules, a dodge or a leave charged once: off while PAUSE_LEAVE_PENALTIES is on.)
+        outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)), finished.endedAt, {
+          penalties: !isPaused(this.env, "leave-penalties"),
+        });
+        const played = finished.result !== "aborted";
         // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
-        if (outcomes) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
+        if (outcomes && played) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
-        if (outcomes) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
+        if (outcomes && played) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
       if (!this.record) return;
       const core = this.core();
@@ -163,7 +167,7 @@ export class DuelGame extends DurableObject<Env> {
     const c = this.record.players.w.uid === uid ? "w" : this.record.players.b.uid === uid ? "b" : null;
     if (!c) return;
     const core = this.core();
-    await this.change(core, () => core.message(c, { t: "resign" }));
+    await this.change(core, () => core.cancelled(c));
   }
 
   async exists(): Promise<boolean> {

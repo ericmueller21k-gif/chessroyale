@@ -3,7 +3,7 @@
  * nothing from the server's own files at run time, so accounts.ts can include it without a cycle (ranked.ts has the
  * rest).
  */
-import { RANKED_1V1, mayBeTop, rankView, type RankView, type RankedRecentGame, type RankedSummary } from "@chessroyale/core";
+import { LEAVES, RANKED_1V1, leaveStanding, mayBeTop, rankView, type LeaveMark, type RankView, type RankedLeaves, type RankedRecentGame, type RankedSummary } from "@chessroyale/core";
 import { NO_ADMINS, looksOf, type AdminCheck } from "./locker.ts";
 
 /** A deleted account in its games (accounts.ts DELETED_ID; written here so this file needs nothing of accounts.ts at run time). */
@@ -54,6 +54,23 @@ export const RANKED_SCHEMA = [
     white_points INTEGER,
     black_points INTEGER
   )`,
+  // Leaving ranked games early (L1, Nov 9: ranked.ts recordDodges and recordDuel; core's LEAVES): one row per mark, a dodge
+  // (before both first moves) or a leave (after), keyed by player and game so a game marks a player once. `games`: the player's
+  // ranked games by then (a leave's includes its own), for the last-20 window; `rp`: the rank points it cost; `nonce`: the
+  // recording that wrote it. Kept LEAVES.keepDays (the cron's purgeConduct).
+  `CREATE TABLE IF NOT EXISTS ranked_conduct (
+    user_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    mode TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    games INTEGER NOT NULL,
+    rp INTEGER NOT NULL DEFAULT 0,
+    nonce TEXT NOT NULL,
+    PRIMARY KEY (user_id, match_id)
+  )`,
+  `CREATE INDEX IF NOT EXISTS ranked_conduct_user ON ranked_conduct (user_id, at)`,
+  `CREATE INDEX IF NOT EXISTS ranked_conduct_at ON ranked_conduct (at)`,
   // (The top tiers' place, topPlace below: the ladders above one counted from this index, never the table. Oct 28, 2026.)
   `CREATE INDEX IF NOT EXISTS ranked_1v1_ladder ON ranked_1v1 (ladder)`,
   `CREATE INDEX IF NOT EXISTS ranked_1v1_games_white ON ranked_1v1_games (white_id, ended_at)`,
@@ -156,7 +173,8 @@ export async function rankedSummary(sql: Sql, userId: string, admins: AdminCheck
 /**
  * A guest signing in to an account (accounts.ts, signInWithIdentity's one batch): the guest's rank becomes the
  * account's only if the account has none (online play needs signing in wherever sign-in is set up, so only a server
- * without sign-in has guests with ranks), and its games become the account's. Nothing stays under the guest's id.
+ * without sign-in has guests with ranks), and its games and its marks for leaving early become the account's. Nothing stays
+ * under the guest's id.
  */
 export function rankedMoves(from: string, to: string): Stmt[] {
   return [
@@ -167,7 +185,35 @@ export function rankedMoves(from: string, to: string): Stmt[] {
       from,
     ),
     stmt("DELETE FROM ranked_1v1 WHERE user_id = ?", from),
+    // (Marks for leaving early go with the player, as their games do.)
+    stmt("UPDATE OR IGNORE ranked_conduct SET user_id = ? WHERE user_id = ?", to, from),
+    stmt("DELETE FROM ranked_conduct WHERE user_id = ?", from),
     stmt("UPDATE ranked_1v1_games SET white_id = ? WHERE white_id = ?", to, from),
     stmt("UPDATE ranked_1v1_games SET black_id = ? WHERE black_id = ?", to, from),
   ];
 }
+
+// ---------------- Leaving early (ranked's leave rules, L1; the writes are ranked.ts's) ----------------
+
+/** A player's latest marks, newest first: enough for the last-20 window and the dodge level (both need at most a few dozen). */
+export async function marksOf(sql: Sql, userId: string): Promise<(LeaveMark & { rp: number })[]> {
+  const rows = await sql.all<{ kind: string; at: number; games: number; rp: number }>(
+    "SELECT kind, at, games, rp FROM ranked_conduct WHERE user_id = ? ORDER BY at DESC, rowid DESC LIMIT 60",
+    userId,
+  );
+  return rows.map((r) => ({ kind: r.kind === "leave" ? "leave" : "dodge", at: r.at, games: r.games, rp: r.rp }));
+}
+
+/** A player's standing with ranked's leave rules at `now` (their marks and their ranked games played). */
+export async function rankedLeaves(sql: Sql, userId: string, now: number): Promise<RankedLeaves> {
+  const marks = await marksOf(sql, userId);
+  const row = await sql.first<{ games: number; last_at: number | null; ladder: number | null }>("SELECT games, last_at, ladder FROM ranked_1v1 WHERE user_id = ?", userId);
+  const games = row?.games ?? 0;
+  const last = marks.find((m) => m.kind === "dodge");
+  const fresh = !!last && now - last.at < LEAVES.noteMinutes * 60_000 && (row?.last_at ?? 0) <= last.at;
+  const standing = leaveStanding(marks, games, now);
+  // (Before placements are done there are no rank points to take: what a dodge now would cost says so.)
+  const nextDodge = (row?.ladder ?? null) === null ? { ...standing.nextDodge, rp: 0 } : standing.nextDodge;
+  return { ...standing, nextDodge, dodged: fresh ? { at: last!.at, rp: last!.rp } : null };
+}
+
