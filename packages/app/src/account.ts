@@ -1,6 +1,6 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary, XpGrant } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -578,6 +578,21 @@ export async function onlineGameXp(code: string): Promise<XpGrant | null> {
 export async function setTestXp(xp: number): Promise<void> {
   await api("/api/xp/test", { method: "POST", body: JSON.stringify({ xp }) });
   set({ profile: await api<Profile>("/api/me") });
+}
+
+/** Your quests (Nov 9, phase 3; the server deals the day's on the day's first read: server/quests.ts). */
+export async function fetchQuests(): Promise<QuestsAnswer> {
+  return api<QuestsAnswer>("/api/quests");
+}
+
+/** Today's free reroll of a daily quest: your quests after it (a refusal throws its message). */
+export async function rerollQuestNow(quest: string): Promise<QuestsAnswer> {
+  return (await api<{ quests: QuestsAnswer }>("/api/quests/reroll", { method: "POST", body: JSON.stringify({ quest }) })).quests;
+}
+
+/** The test switch ?quests=<kind>[:<progress>],… (test servers only): your quests set to these. */
+export async function setTestQuests(quests: { kind: string; progress: number }[]): Promise<QuestsAnswer> {
+  return api<QuestsAnswer>("/api/quests/test", { method: "POST", body: JSON.stringify({ quests }) });
 }
 
 /** The name you play under: your profile's, else this device's, else "Player". */

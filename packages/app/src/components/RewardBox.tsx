@@ -10,7 +10,7 @@ import { BetaCrateArt, HunchessCrateArt, KeyArt, WinterCrateArt } from "./Items.
  * boss crate to choose, and the daily reward's crate. A toast at the top of the result screen once the XP box's bar has filled (the
  * friends' invite toast's look): the crate and the key with how many, and the lines ("+2 Winter Crates · +1 crate key", "Daily
  * reward: +1 Winter Crate", "Choose your boss crate in Crates."). It takes no taps (whatever is under it stays tappable) and goes
- * after XP.rewardToastMs; it doesn't come back for that game, and the crates and keys are in your inventory already. Fixed over the
+ * after XP.rewardToastMs; phase 3 adds a quest the game completed ("Quest done: Boss Hunter +300 XP"). It doesn't come back for that game, and the crates and keys are in your inventory already. Fixed over the
  * page, so nothing on the result screen moves.
  */
 
@@ -36,9 +36,12 @@ export function RewardBox({ xp }: { xp: XpGrant }) {
   const crate = crateDef(r.crate);
   const lines = rewardLines(r, crate?.name ?? "Crate");
   const Crate = CRATE_ART[crate?.look ?? "winter"];
-  const crates = r.daily + r.crates;
+  // (Phase 3: a quest's crates and keys join the counts, its line says which quest: "Quest done: Boss Hunter +300 XP".)
+  const done = r.quests ?? [];
+  const crates = r.daily + r.crates + done.reduce((n, q) => n + q.crates, 0);
+  const keys = r.keys + done.reduce((n, q) => n + q.keys, 0);
   const level = r.levels.at(-1);
-  const title = level ? `Level ${level}!` : "Daily reward";
+  const title = level ? `Level ${level}!` : done.length && !r.daily ? (done.length === 1 ? "Quest done!" : "Quests done!") : "Daily reward";
   return (
     <div class="reward-toast" role="status" aria-label={title} data-testid="reward-box">
       <span class="reward-art">
@@ -50,12 +53,12 @@ export function RewardBox({ xp }: { xp: XpGrant }) {
             ×{crates}
           </span>
         )}
-        {r.keys > 0 && (
+        {keys > 0 && (
           <span class="reward-thing" data-thing="keys">
             <span class="reward-thing-art">
               <KeyArt />
             </span>
-            ×{r.keys}
+            ×{keys}
           </span>
         )}
       </span>
@@ -63,6 +66,11 @@ export function RewardBox({ xp }: { xp: XpGrant }) {
         <strong class="reward-title">{title}</strong>
         {lines.level && <span class="reward-line">{lines.level}</span>}
         {lines.daily && <span class="reward-line">Daily reward: {lines.daily}</span>}
+        {lines.quests.map((q) => (
+          <span key={q} class="reward-line reward-quest">
+            {q}
+          </span>
+        ))}
         {lines.pick && <span class="reward-line reward-pick">{lines.pick} in Crates.</span>}
       </span>
     </div>

@@ -13,6 +13,7 @@ import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcom
 import { requestId } from "./ledger.ts";
 import { pickBossCrate } from "./rewards.ts";
 import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
+import { questsAnswer, rerollQuest, setTestQuests } from "./quests.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
@@ -153,6 +154,8 @@ function ageRefusal(request: Request): Response | null {
 export const signInRequired = (env: AccountEnv) => !!((env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) || env.RESEND_API_KEY);
 export const isSignedIn = (user: User | null) => !!(user && (user.email || user.google_sub));
 export const SIGN_IN_TO_PLAY = "Sign in to play online. Guests can play solo against bots.";
+/** A guest's answer from the quests' routes, where sign-in is set up (Nov 9, phase 3). */
+export const SIGN_IN_FOR_QUESTS = "Sign in for quests.";
 
 /** Where to go after signing in: a path on this site only. */
 const safeNext = (next: string | null) => (next && /^\/(?!\/)[\w\-/]*$/.test(next) ? next : "/");
@@ -197,7 +200,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
     path !== "/api/boss/token" &&
-    !path.startsWith("/api/xp")
+    !path.startsWith("/api/xp") &&
+    path !== "/api/quests" &&
+    !path.startsWith("/api/quests/")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
@@ -593,6 +598,25 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     return xp === null ? json({ message: "Bad XP" }, 400) : json({ xp });
   }
 
+  // Quests (Nov 9, phase 3; quests.ts). GET /api/quests: your quests (the day's dealt first, on the day's first read), the resets and
+  // today's reroll. POST /api/quests/reroll {quest}: today's free reroll ({ok, quests} or a refusal). POST /api/quests/test {quests}
+  // (test servers only): your quests set, for tests and stills. A guest where sign-in is set up has none ("Sign in for quests.").
+  if (path === "/api/quests" || path.startsWith("/api/quests/")) {
+    if (signInRequired(env) && !isSignedIn(current)) return json({ message: SIGN_IN_FOR_QUESTS }, 403);
+    const paused = isPaused(env, "rewards", now);
+    if (path === "/api/quests" && request.method === "GET") return json(await questsAnswer(sql, current.id, now, paused));
+    if (path === "/api/quests/reroll" && request.method === "POST") {
+      const b = (await request.json().catch(() => ({}))) as { quest?: unknown } | null;
+      const done = await rerollQuest(sql, current.id, b?.quest, now);
+      return done.ok ? json({ ok: true, quests: await questsAnswer(sql, current.id, now, paused) }) : json({ message: done.message }, 409);
+    }
+    if (path === "/api/quests/test" && request.method === "POST") {
+      if ((env as AdminEnv).TEST_SWITCHES !== "1") return json({ message: "Not allowed" }, 403);
+      const b = (await request.json().catch(() => ({}))) as { quests?: unknown } | null;
+      return (await setTestQuests(sql, current.id, b?.quests, now)) ? json(await questsAnswer(sql, current.id, now, paused)) : json({ message: "Bad quests" }, 400);
+    }
+  }
+
   // POST /api/results: a solo match's result, from the browser. Its XP (Nov 9) is the server's: the time between the game's start
   // and now by the server's clock (`game`: its id from /api/xp/solo/start); the moves, the win, a resign, leaving (`left`: removed
   // for idling) and a test switch are the device's word, so they can only lower it. A result the server never timed (no `game`, or
@@ -623,6 +647,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           signedInOnly: signInRequired(env),
           now,
           paused: isPaused(env, "rewards", now),
+          quest: "solo",
         }).catch((e: unknown) => {
           console.log(`xp for a solo game: ${String(e)}`);
           return null;

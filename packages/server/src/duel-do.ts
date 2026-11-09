@@ -289,6 +289,7 @@ async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: 
       signedInOnly,
       now: Date.now(),
       paused,
+      quest: "duel",
     }).catch((e: unknown) => {
       console.log(`xp for duel ${f.id}: ${String(e)}`);
       return null;

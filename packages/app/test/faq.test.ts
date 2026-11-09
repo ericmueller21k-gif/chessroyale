@@ -484,6 +484,18 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("3 wins a day");
   });
 
+  it("quests (Nov 9, phase 3), from the settings: how many, the rewards, the carry-over, the reroll, the reset", () => {
+    const t = section("xp");
+    expect(t).toContain("you get 2 daily quests each day and 1 weekly quest each week");
+    expect(t).toContain("a daily quest gives +300 XP (some also a crate); the weekly quest gives +1,500 XP, 1 crate and 1 crate key");
+    expect(t).toContain("Unfinished dailies stay, up to 3 waiting");
+    expect(t).toContain("One free reroll a day");
+    const q = section("xp", { ...FAQ_DEFAULTS, quests: { ...FAQ_DEFAULTS.quests, dailyPerDay: 3, maxDailies: 5, weekly: [{ ...FAQ_DEFAULTS.quests.weekly[0]!, xp: 2000, keys: 2 }] } });
+    expect(q).toContain("you get 3 daily quests each day");
+    expect(q).toContain("up to 5 waiting");
+    expect(q).toContain("the weekly quest gives +2,000 XP, 1 crate and 2 crate keys");
+  });
+
   it("the clock vote's time controls, the default, and a raid's clock", () => {
     const t = section("modes");
     expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");

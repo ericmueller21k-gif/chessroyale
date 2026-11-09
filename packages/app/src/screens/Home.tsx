@@ -25,7 +25,7 @@ import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
-import { MOCK_COUNTDOWNS, mockQuests, questsMock } from "../quests-mock.ts";
+import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
 import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
@@ -734,22 +734,16 @@ export function HomeScreen({
   // public profile, the page others see (Eric, Nov 7). A guest with no profile loaded yet gets your own page instead.
   const onIcon = () => openProfile({ you: true, name, section: "icon" });
   const onName = () => (profile ? openProfile({ uid: profile.user.id, name, you: true, public: true }) : openProfile({ you: true, name }));
-  // The daily quests (a mockup, Nov 9: quests-mock.ts): behind `?quests=`, the Quests entry on your card and the overlay, opened
-  // once as home loads (as the day's first visit will), with fake data. Nothing is stored or sent yet.
-  const qmock = questsMock();
-  const [questsOpen, setQuestsOpen] = useState(false);
-  const questsShown = useRef(false);
-  const [rerollLeft, setRerollLeft] = useState(true);
+  // The daily quests (Nov 9, phase 3; quests.ts, the server's server/quests.ts): the Quests entry for everyone (greyed, "Sign in for
+  // quests", where a guest can't have them: nothing hidden), the overlay opened on the XP day's first visit (signed in) and from it.
+  const questsOn = questsForYou();
+  // (Never opening by itself over the queue or another notice: it waits for the next home visit. Review of #575, m3.)
+  const quests = useQuests(questsOn === true, queueing);
   // (A computer (1024 px and up, the top bar hidden there) keeps the entry on your card's top right; a phone's entry is in the top bar.)
   const computer = useMedia("(min-width: 1024px)");
-  const closeQuests = useCallback(() => setQuestsOpen(false), []);
-  useEffect(() => {
-    if (!qmock || questsShown.current) return;
-    questsShown.current = true;
-    if (qmock !== "entry") setQuestsOpen(true);
-  }, [qmock]);
+  const questsLabel = questsOn === false ? "Sign in for quests" : "Quests";
   const hero = (
-    <section class={`fd-hero${qmock && !queueing && computer ? " fd-has-quests" : ""}`} aria-label="You">
+    <section class={`fd-hero${!queueing && computer ? " fd-has-quests" : ""}`} aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
@@ -776,10 +770,10 @@ export function HomeScreen({
         </div>
       </div>
       </div>
-      {/* (The Quests entry, Nov 9 mockup: always there once quests exist (nothing hidden), in the card's top right corner, over
+      {/* (The Quests entry (Nov 9): always there (nothing hidden; greyed until quests are yours), in the card's top right corner, over
           nothing, so nothing on home moves. A computer only: a phone's is in the top bar.) */}
-      {qmock && !queueing && computer && (
-        <button type="button" class="fd-quests-btn" aria-label="Quests" title="Quests" onClick={() => setQuestsOpen(true)}>
+      {!queueing && computer && (
+        <button type="button" class="fd-quests-btn" aria-label="Quests" title={questsLabel} disabled={questsOn !== true} onClick={quests.show}>
           <QuestsIcon />
           <span>Quests</span>
         </button>
@@ -820,14 +814,15 @@ export function HomeScreen({
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
       <WelcomeNotice />
-      {qmock && questsOpen && (
+      {quests.open && quests.answer && !queueing && (
         <QuestsOverlay
-          quests={mockQuests(qmock)}
-          dailyResetIn={MOCK_COUNTDOWNS.daily}
-          weeklyResetIn={MOCK_COUNTDOWNS.weekly}
-          rerollLeft={rerollLeft}
-          onReroll={() => setRerollLeft(false)}
-          onClose={closeQuests}
+          quests={quests.answer.quests}
+          dailyResetIn={questCountdowns(quests.answer, quests.receivedAt).daily}
+          weeklyResetIn={questCountdowns(quests.answer, quests.receivedAt).weekly}
+          rerollLeft={quests.answer.rerollLeft}
+          paused={!!quests.answer.paused}
+          onReroll={quests.reroll}
+          onClose={quests.close}
         />
       )}
     </>
@@ -1102,9 +1097,10 @@ export function HomeScreen({
         <Logo />
         <div class="fd-top-end">
           <AccountBar onProfile={onProfile} tourId="profile" />
-          {qmock && !computer && (
-            // (The Quests entry, Nov 9 mockup: one more square button in a phone's top bar, the quests icon, as the shop's.)
-            <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title="Quests" onClick={() => setQuestsOpen(true)}>
+          {!computer && (
+            // (The Quests entry (Nov 9): one more square button in a phone's top bar, the quests icon, as the shop's; greyed until quests
+            // are yours.)
+            <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title={questsLabel} disabled={questsOn !== true} onClick={quests.show}>
               <QuestsIcon />
             </button>
           )}

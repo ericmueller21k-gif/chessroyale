@@ -256,7 +256,7 @@ describe("each match room's XP", () => {
     const span = { moves: 12, ms: 9 * MIN };
     const x = (over: Partial<Parameters<typeof lobbyXpGame>[1]> = {}, mode = "crowd", opponents = ["p2", "b7"]) =>
       lobbyXpGame(rec, { playerId: "p1", placement: 3, teamWon: true, ...over }, "ua", span, mode, opponents, true, T0);
-    expect(x()).toEqual({ key: `lobby:ABCDE:${T0 + 5_000}`, facts: { ms: 9 * MIN, moves: 12, won: true, resigned: false, abandoned: false, test: false }, cap: { vs: ["ub"] }, signedInOnly: true, now: T0 });
+    expect(x()).toEqual({ key: `lobby:ABCDE:${T0 + 5_000}`, facts: { ms: 9 * MIN, moves: 12, won: true, resigned: false, abandoned: false, test: false }, cap: { vs: ["ub"] }, signedInOnly: true, now: T0, quest: "crowd" });
     // (Classic: a win is 1st; a raid: the crowd's, as its team.)
     expect(x({ placement: 1, teamWon: null }, "classic").facts.won).toBe(true);
     expect(x({ placement: 2, teamWon: null }, "classic").facts.won).toBe(false);

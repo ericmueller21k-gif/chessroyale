@@ -1,4 +1,4 @@
-import { XP, bossCrateDef, isPickableBossCrate, levelOf, levelReward, type XpRewards } from "@chessroyale/core";
+import { XP, bossCrateDef, isPickableBossCrate, levelOf, levelReward, type QuestPaid, type XpRewards } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type LedgerAccount, type Op } from "./ledger.ts";
 
@@ -76,16 +76,17 @@ export async function payLevels(sql: Sql, me: LedgerAccount, xpNow: number, game
 
 /**
  * What a game paid beside its XP (the result screen's rewards): the daily reward and the levels whose legs name this game as their
- * source. A replay of the game's grant answers the same. Undefined: nothing.
+ * source, and the quests it completed (`quests`: quests.ts questsPaidBy, read by the caller). A replay of the game's grant answers
+ * the same. Undefined: nothing.
  */
-export async function gameRewards(sql: Sql, me: LedgerAccount, game: string): Promise<XpRewards | undefined> {
+export async function gameRewards(sql: Sql, me: LedgerAccount, game: string, quests: readonly QuestPaid[] = []): Promise<XpRewards | undefined> {
   const rows = await sql.all<{ op_id: string; reason: string; asset_kind: string; n: number }>(
     "SELECT op_id, reason, asset_kind, SUM(delta) AS n FROM ledger WHERE account = ? AND source_id = ? AND reason IN ('daily', 'level') GROUP BY op_id, reason, asset_kind",
     me.account,
     game,
   );
-  if (!rows.length) return undefined;
-  const r: XpRewards = { crate: XP.rewardCrate, daily: 0, crates: 0, keys: 0, bossPicks: 0, levels: [] };
+  if (!rows.length && !quests.length) return undefined;
+  const r: XpRewards = { crate: XP.rewardCrate, daily: 0, crates: 0, keys: 0, bossPicks: 0, levels: [], ...(quests.length ? { quests: [...quests] } : {}) };
   const levels = new Set<number>();
   for (const row of rows) {
     if (row.reason === "daily") {
@@ -99,7 +100,7 @@ export async function gameRewards(sql: Sql, me: LedgerAccount, game: string): Pr
     else if (row.asset_kind === "boss_pick") r.bossPicks += row.n;
   }
   r.levels = [...levels].sort((a, b) => a - b);
-  return r.daily || r.crates || r.keys || r.bossPicks ? r : undefined;
+  return r.daily || r.crates || r.keys || r.bossPicks || r.quests ? r : undefined;
 }
 
 /** Your series crates, by crate id (only those you hold some of), and your boss crates to pick. */

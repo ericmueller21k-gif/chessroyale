@@ -9167,26 +9167,33 @@ button.fd-logo {
   }
 }
 /*
- * Below 344 px (a 320 px phone) the row holds your pawn, Quests, the shop, Friends and the gear beside "HunChess": the round
- * items are 36 px with 4 px gaps, and the logo 14 px. (Measured Nov 9 with Quests added: at 40 px the pawn overlapped Quests by
- * 25 px.)
+ * Below 344 px (a 320 px phone) the row holds your pawn, Quests, the shop, Friends and the gear beside the logo (Nov 9, phase 3): the
+ * buttons keep their 40 px (home-layout.spec.ts's tap-target check) and the logo steps down to the app's icon (the browser tab's,
+ * 28 px), its words kept for screen readers. (The mockup's 36 px squeeze went under 40 px.)
  */
 @media (max-width: 343px) {
-  /* (Only while the Quests button is in the bar: without it the bar keeps its 40 px buttons, home-layout.spec.ts's tap-target
-     check. Phase 3 must find room at 320 px without going under 40 px.) */
-  .fd-top:has(.fd-top-quests),
-  .fd-top:has(.fd-top-quests) .fd-top-end,
-  .fd-top:has(.fd-top-quests) .fd-top-right {
-    gap: 4px;
+  .fd-top:has(.fd-top-quests) > .fd-logo {
+    flex: none;
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    font-size: 0;
+    color: transparent;
+    background: url("/icons/icon.svg") center / contain no-repeat;
+    border-radius: 7px;
   }
-  .fd-top:has(.fd-top-quests) .fd-logo {
-    font-size: 14px;
+  .fd-top:has(.fd-top-quests) > .fd-logo span {
+    font-size: 0;
   }
-  .fd-top:has(.fd-top-quests) .fd-ring,
-  .fd-top:has(.fd-top-quests) .fd-icon-btn {
-    width: 36px;
-    height: 36px;
-  }
+}
+/* The Quests entry, greyed (muted, not tappable) until quests are yours: a guest where sign-in is set up, or the account still loading. */
+.fd-top-quests:disabled,
+.fd-quests-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fd-quests-btn:disabled:active {
+  transform: none;
 }
 .fd-home-main {
   flex: 1 1 auto;

@@ -176,8 +176,8 @@ describe("phase 2's rewards (Nov 9): the words and the numbers", () => {
 
   it("the lines: \"+1 Winter Crate\", \"+2 Winter Crates · +1 crate key\", \"Choose your boss crate\"", () => {
     const r = { crate: "winter-1", daily: 1, crates: 2, keys: 1, bossPicks: 1, levels: [10] };
-    expect(rewardLines(r, "Winter Crate · Series 1")).toEqual({ daily: "+1 Winter Crate", level: "+2 Winter Crates · +1 crate key", pick: "Choose your boss crate" });
-    expect(rewardLines({ ...r, daily: 0, crates: 4, keys: 2, bossPicks: 2 }, "Winter Crate · Series 1")).toEqual({ daily: null, level: "+4 Winter Crates · +2 crate keys", pick: "Choose your 2 boss crates" });
+    expect(rewardLines(r, "Winter Crate · Series 1")).toEqual({ daily: "+1 Winter Crate", level: "+2 Winter Crates · +1 crate key", pick: "Choose your boss crate", quests: [] });
+    expect(rewardLines({ ...r, daily: 0, crates: 4, keys: 2, bossPicks: 2 }, "Winter Crate · Series 1")).toEqual({ daily: null, level: "+4 Winter Crates · +2 crate keys", pick: "Choose your 2 boss crates", quests: [] });
     expect(crateCount(1, "Beta Crate · Series 001")).toBe("1 Beta Crate");
   });
 

@@ -29,6 +29,7 @@ import { caseOf } from "./fairplay.ts";
 import { socialDeletes } from "./friends.ts";
 import { rankedDownload, rankedErase } from "./ranked.ts";
 import { eraseMoves, ledgerDownload } from "./ledger.ts";
+import { questDeletes, questsDownload } from "./quests.ts";
 
 /** What a store's erase needs to know, worked out before the batch. */
 export interface EraseContext {
@@ -136,6 +137,14 @@ export const ACCOUNT_STORES: AccountStore[] = [
     }),
     // (The series crates go with the ledger's store, below.)
     erase: (u) => [stmt("DELETE FROM solo_games WHERE user_id = ?", u.id)],
+  },
+  {
+    // Quests (quests.ts, Nov 9, phase 3): your dailies and weekly (which, when dealt and finished, the target), each game that moved
+    // one (its key and when), and the day and week last dealt and your last reroll's day. What they paid is in the ledger, below.
+    name: "quests",
+    tables: ["quests", "quest_progress", "quest_days", "quest_games"],
+    export: (sql, u) => questsDownload(sql, u.id),
+    erase: (u) => questDeletes(u.id),
   },
   {
     // The Welcome Crates (welcome.ts, Nov 6: at 5 and 25 finished games): for each, when the player earned it and the finished
