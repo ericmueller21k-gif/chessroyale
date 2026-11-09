@@ -9088,16 +9088,18 @@ button.fd-logo {
  * 25 px.)
  */
 @media (max-width: 343px) {
-  .fd-top,
-  .fd-top .fd-top-end,
-  .fd-top .fd-top-right {
+  /* (Only while the Quests button is in the bar: without it the bar keeps its 40 px buttons, home-layout.spec.ts's tap-target
+     check. Phase 3 must find room at 320 px without going under 40 px.) */
+  .fd-top:has(.fd-top-quests),
+  .fd-top:has(.fd-top-quests) .fd-top-end,
+  .fd-top:has(.fd-top-quests) .fd-top-right {
     gap: 4px;
   }
-  .fd-top .fd-logo {
+  .fd-top:has(.fd-top-quests) .fd-logo {
     font-size: 14px;
   }
-  .fd-top .fd-ring,
-  .fd-top .fd-icon-btn {
+  .fd-top:has(.fd-top-quests) .fd-ring,
+  .fd-top:has(.fd-top-quests) .fd-icon-btn {
     width: 36px;
     height: 36px;
   }
