@@ -544,3 +544,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~04:50: XP review (review/569): no blockers; 2 majors (M1 solo win paid untimed; M2 solo time farmable by waiting) + 7
   minors. Fix round: fresh Opus xhigh session_01JuCWRvmwEqXz5Ka4ggYBNr on claude/xp-phase1 (done signal .review-fixes.md,
   watcher bfrimjxul). Director's call for M2: solo time XP capped at 120 min an XP day (Eric may change). Then a delta re-review.
+- Nov 9 ~05:20: Eric: boss result v2 = no God King; your pawn + name + XP bar facing the boss; a loss plays the boss's attack on
+  your pawn. Mockups sent; brief draft notes/briefs/brief-boss-result-v2.md; build after his OK and after #569 merges.
+  Gap fix PR #570 (Haiku, director reviewed) CI watcher b6ahb6wf2: merge on green (fixes main red now; v2 later removes the duo).
