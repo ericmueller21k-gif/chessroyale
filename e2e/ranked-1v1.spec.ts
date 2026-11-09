@@ -6,7 +6,8 @@ import { BOARD_SEL, named, test, watchFor, watchSpans } from "./helpers.ts";
  * Ranked 1 v 1 through the real server (docs/areas/ranked.md), two players on emulated phones (and computers): both
  * queue (one tap: /1v1, as the home screen's button), meet, vote on the time control on the game's own board (a real
  * drag, a tap and a tap), see "Timer: …" over it, and play to a result with real taps on the board: checkmate,
- * resigning, flagging. Ranks move (placements). Also: a first move that never comes aborts with no rank change, and
+ * resigning, flagging. Ranks move (placements). Also: a first move that never comes aborts as a dodge (ranked's leave
+ * rules, L1: the one who didn't move pays, the other nothing), leaving during the vote (the confirm's words, home's note), and
  * the no-opponent fallback (Keep waiting; Play a bot, unranked). Each test queues in a pool of its own (`?pool=`, a
  * test switch), so tests never meet; `clock=` (each side's seconds, a test switch) makes a flag quick, and `fewAfter=`
  * brings the "Few players online" choice forward.
@@ -24,6 +25,9 @@ async function player(browser: Browser, name: string): Promise<Page> {
 
 /** A pool of this test's own. */
 const poolName = () => `d${test.info().project.name.slice(0, 1)}${Math.random().toString(36).slice(2, 9)}`;
+
+/** Your standing with ranked's leave rules, from the server (your profile). */
+const leavesOf = (page: Page) => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.leaves as { marks: number; dodged: { rp: number } | null } | null));
 
 /** Your 1 v 1 record, from the server (your profile). */
 const record = (page: Page) => page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.ranked1v1 as { games: number; wins: number; losses: number; draws: number; rank: { label: string } }));
@@ -209,7 +213,7 @@ test("every change is drawn, even in the same millisecond as the last draw (the 
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
 });
 
-test("a first move that never comes: the game is aborted, nobody's rank moves", { tag: "@phone-only" }, async ({ browser }) => {
+test("a first move that never comes: the game is aborted, a dodge for the one who didn't move (L1), nothing for the other", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Abort");
   const b = await player(browser, "Bo Abort");
@@ -218,11 +222,15 @@ test("a first move that never comes: the game is aborted, nobody's rank moves", 
   const { white, black } = await bySide(a, b);
   // White never moves: 20 s later it's called off.
   await expect(white.locator(".dv-result-title")).toHaveText("Game aborted", { timeout: 35_000 });
-  await expect(white.locator(".dv-result-why")).toHaveText("Your first move didn't come in time. No rank change.");
+  await expect(white.locator(".dv-result-why")).toHaveText("Your first move didn't come in time.");
   await expect(black.locator(".dv-result-why")).toHaveText(/'s first move didn't come in time\. No rank change\.$/);
-  await expect(white.locator(".dv-result-rank")).toHaveCount(0);
+  // (In placements there are no rank points to take: the dodge only goes on the record.)
+  await expect(white.locator(".dv-result-rank")).toHaveText("Left before it started", { timeout: 15_000 });
+  await expect(black.locator(".dv-result-rank")).toHaveCount(0);
   expect((await record(white)).games).toBe(0);
   expect((await record(black)).games).toBe(0);
+  expect(await leavesOf(white)).toMatchObject({ marks: 1, dodged: { rp: 0 } });
+  expect(await leavesOf(black)).toMatchObject({ marks: 0, dodged: null });
 });
 
 test("a reload mid-game comes back to the same game, its clocks running; a declined offer, then a draw both agree to", { tag: "@phone-only" }, async ({ browser }) => {
@@ -268,20 +276,37 @@ test("a reload mid-game comes back to the same game, its clocks running; a decli
   expect(await record(white)).toMatchObject({ games: 1, draws: 1 });
 });
 
-test("Leave before the first moves: the game is called off, with no result and no rank change", { tag: "@phone-only" }, async ({ browser }) => {
+test("Leave during the time-control vote: a dodge (L1): the confirm says so, the game is called off, home's note; the other loses nothing", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Leave");
   const b = await player(browser, "Bo Leave");
+  // (From the vote: should it close while the menu is open, it's still before the first moves, the same dodge.)
   await meet(a, b, poolName());
-  await waitForPlay(a, b);
-  const { white, black } = await bySide(a, b);
-  await resign(white, "Leave");
-  await expect(white.locator(".dv-result-title")).toHaveText("Game aborted");
-  await expect(white.locator(".dv-result-why")).toHaveText("You left before the first moves. No rank change.");
-  await expect(black.locator(".dv-result-title")).toHaveText("Game aborted");
-  await expect(black.locator(".dv-result-why")).toHaveText(`${white === a ? "Ann Leave" : "Bo Leave"} left before the first moves. No rank change.`);
-  expect((await record(white)).games).toBe(0);
-  expect((await record(black)).games).toBe(0);
+  await a.getByRole("button", { name: "Match options" }).click();
+  await a.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: /Leave/ }).click();
+  // The confirm's words: what leaving now costs (in placements, no rank points yet: it goes on the record).
+  const confirm = a.getByRole("alertdialog");
+  await expect(confirm).toContainText("The game is called off. Leaving before it starts goes on your record.");
+  await confirm.getByRole("button", { name: "Leave" }).click();
+  await expect(a.locator(".dv-result-title")).toHaveText("Game aborted");
+  await expect(a.locator(".dv-result-why")).toHaveText("You left before the first moves.");
+  await expect(a.locator(".dv-result-rank")).toHaveText("Left before it started", { timeout: 15_000 });
+  await expect(b.locator(".dv-result-title")).toHaveText("Game aborted");
+  await expect(b.locator(".dv-result-why")).toHaveText("Ann Leave left before the first moves. No rank change.");
+  await expect(b.locator(".dv-result-rank")).toHaveCount(0);
+  expect((await record(a)).games).toBe(0);
+  expect((await record(b)).games).toBe(0);
+  expect(await leavesOf(a)).toMatchObject({ marks: 1, dodged: { rp: 0 } });
+  expect(await leavesOf(b)).toMatchObject({ marks: 0, dodged: null });
+  // Home: the note at its top says it (dismissed with its X); the other player's home has none.
+  await a.locator(".dv-result").getByRole("button", { name: "Home", exact: true }).click();
+  const note = a.locator(".fd-notice");
+  await expect(note).toHaveText(/You left before the game started/);
+  await note.getByRole("button", { name: "Dismiss" }).click();
+  await expect(note).toHaveCount(0);
+  await b.locator(".dv-result").getByRole("button", { name: "Home", exact: true }).click();
+  await expect(b.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(b.locator(".fd-notice")).toHaveCount(0);
 });
 
 test("nobody to play: the search's Cancel, then Few players online: Keep waiting, or a bot (unranked)", { tag: "@phone-only" }, async ({ browser }) => {

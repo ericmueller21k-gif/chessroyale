@@ -171,10 +171,11 @@ export function resultReason(end: DuelEnd, you: Color, them: string): string {
       return "Not enough material to checkmate.";
     case "agreement":
       return "Draw agreed.";
+    // (Your own: the rank line under it says what it cost, ranked's leave rules L1; theirs costs you nothing.)
     case "abort":
-      return `${byYou ? "You" : them} left before the first moves. No rank change.`;
+      return byYou ? "You left before the first moves." : `${them} left before the first moves. No rank change.`;
     case "no_first_move":
-      return `${byYou ? "Your" : `${them}'s`} first move didn't come in time. No rank change.`;
+      return byYou ? "Your first move didn't come in time." : `${them}'s first move didn't come in time. No rank change.`;
     case "no_show":
       return "Your opponent didn't arrive. No rank change.";
   }

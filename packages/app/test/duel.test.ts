@@ -182,7 +182,9 @@ describe("the 1 v 1 screens' words and clocks", () => {
     // Every reason a sentence: never run into the headline.
     for (const reason of ["checkmate", "resign", "timeout", "timeout_vs_insufficient", "stalemate", "repetition", "fifty_moves", "insufficient_material", "agreement", "abort", "no_first_move", "no_show"] as const)
       expect(resultReason(end({ reason }), "w", "Bob")).toMatch(/^[A-Z0-9].*\.$/);
-    expect(resultReason(end({ reason: "no_first_move", by: "w", result: "aborted" }), "w", "Bob")).toBe("Your first move didn't come in time. No rank change.");
+    // (Your own dodge, L1: the rank line under it says what it cost, so no "No rank change." here.)
+    expect(resultReason(end({ reason: "no_first_move", by: "w", result: "aborted" }), "w", "Bob")).toBe("Your first move didn't come in time.");
+    expect(resultReason(end({ reason: "abort", by: "w", result: "aborted" }), "w", "Bob")).toBe("You left before the first moves.");
     expect(resultReason(end({ reason: "abort", by: "b", result: "aborted" }), "w", "Bob")).toBe("Bob left before the first moves. No rank change.");
     expect(resultReason(end({ reason: "no_show", by: null, result: "aborted" }), "w", "Bob")).toBe("Your opponent didn't arrive. No rank change.");
   });
