@@ -74,9 +74,11 @@ async function waitForPlay(...pages: Page[]) {
 }
 
 /** Resign (or Leave: an abort) from the match's gear and its list, on a phone or a computer; then confirm. */
-async function resign(page: Page, word: "Resign" | "Leave" = "Resign") {
+async function resign(page: Page, word: "Resign" | "Leave" = "Resign", says?: string) {
   await page.getByRole("button", { name: "Match options" }).click();
   await page.getByRole("dialog", { name: "Match options" }).getByRole("button", { name: new RegExp(word) }).click();
+  // (The confirm's words: what going now costs in a ranked game, L1.)
+  if (says) await expect(page.getByRole("alertdialog")).toContainText(says);
   await page.getByRole("alertdialog").getByRole("button", { name: word }).click();
 }
 
@@ -170,11 +172,14 @@ test("resigning, then a flag: Play again queues both again; each game counts", {
   await expect(black.locator(".dv-status")).toContainText("Your first move", { timeout: 10_000 });
   await tapMove(black, "e7e5");
   await expect(white.locator(".dv-status")).toHaveText("Your move", { timeout: 10_000 });
-  await resign(white);
+  // Before your 3rd move it's a leave (L1); in placements there are no rank points to take, so it goes on the record.
+  await resign(white, "Resign", "It counts as a loss, and resigning this early goes on your record.");
   await expect(black.locator(".dv-result-title")).toHaveText("You won");
   await expect(black.locator(".dv-result-why")).toHaveText(/ resigned\.$/);
   await expect(white.locator(".dv-result-why")).toHaveText("You resigned.");
   for (const p of [white, black]) await expect(p.locator(".dv-result-rank")).toHaveText("Placement 1/5", { timeout: 15_000 });
+  expect(await leavesOf(white)).toMatchObject({ marks: 1 });
+  expect(await leavesOf(black)).toMatchObject({ marks: 0 });
 
   // Play again: both back in the queue (the same pool), a new game; this time White's clock runs out.
   for (const p of [a, b]) await p.getByRole("button", { name: "Play again" }).click();

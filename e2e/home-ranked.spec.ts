@@ -125,6 +125,48 @@ test("1 v 1's rank line at its widest (a top tier with four-digit points, its em
   }
 });
 
+test("ranked's leave rules (L1): a lockout greys 1 v 1's PLAY with its countdown in the line above it, one line from 320 px; the delayed queue leaves PLAY on", async ({ page }) => {
+  await named(page, "Dodger");
+  // (The server's standing, faked: a dodge's lockout ending `lockFor` ms after the page asks, or the delayed queue.)
+  let leaves: (() => Record<string, unknown>) | null = null;
+  await page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.user && leaves) body.leaves = leaves();
+    await route.fulfill({ response: res, json: body });
+  });
+  const standing = { marks: 2, level: 2, lock: "dodge", delaySec: 0, nextDodge: { rp: 10, lockoutMin: 30 }, dodged: null };
+  const play = page.getByRole("button", { name: "PLAY", exact: true });
+  const line = page.locator(".fd-go > .fd-hint");
+  for (const width of desktop() ? [1280] : [320, 390]) {
+    if (!desktop()) await page.setViewportSize({ width, height: 740 });
+    leaves = () => ({ ...standing, lockedUntil: Date.now() + 4 * 60_000 + 30_000 });
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(/^You left early: 1 v 1 opens in 4:[23]\d$/);
+    await expect(play).toBeDisabled();
+    const shown = await line.textContent();
+    await expect.poll(() => line.textContent(), { timeout: 3_000 }).not.toBe(shown);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, `${width}: one line`).toBeLessThan(20);
+    expect(await sideways(page), `${width}`).toBe(0);
+  }
+  // Another mode's PLAY isn't locked.
+  await page.getByRole("radio", { name: /^50 v 50/ }).click();
+  await expect(play).toBeEnabled();
+  // A lockout ending in 2 s: PLAY comes back on its own, the line empty.
+  leaves = () => ({ ...standing, lockedUntil: Date.now() + 2_000 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(play).toBeDisabled();
+  await expect(play).toBeEnabled({ timeout: 6_000 });
+  await expect(line).toHaveText("");
+  // The delayed queue: its line, PLAY on (the wait starts with the search).
+  leaves = () => ({ ...standing, marks: 3, lock: null, lockedUntil: null, delaySec: 120 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(line).toHaveText("3 leaves in your last 20: +2 min queue");
+  await expect(play).toBeEnabled();
+});
+
 test("the Boss raid screen (?mode=raid, every choice): each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
   // (Its character select, the tiles and the stage: boss-select.spec.ts. Home's Boss Battle card opens the solo form:
   // home-layout.spec.ts.)
