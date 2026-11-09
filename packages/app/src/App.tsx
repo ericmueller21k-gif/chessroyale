@@ -63,7 +63,7 @@ import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./componen
 import { DuelFront } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
-import { testParams } from "./test-switches.ts";
+import { queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
@@ -1101,8 +1101,8 @@ export function App() {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
       if (type === "botsoff") q.set("type", "botsoff");
-      // (?pool=NAME: a queue of its own, a test switch.)
-      const pool = testParams().get("pool");
+      // (?pool=NAME: a queue of its own, a test switch; kept after leaving a queue drops it from the address.)
+      const pool = queuePool();
       if (pool) q.set("pool", pool);
       // (?afk=0 with it: the pool's 50 v 50 misses as before Nov 4, for a test that idles on purpose.)
       if (pool && testParams().get("afk") === "0") q.set("afk", "0");
@@ -1161,7 +1161,7 @@ export function App() {
     const from = match;
     const q = new URLSearchParams({ type: "default", from: from.code });
     if (from.settings.raid) q.set("mode", "raid");
-    const pool = testParams().get("pool");
+    const pool = queuePool();
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });

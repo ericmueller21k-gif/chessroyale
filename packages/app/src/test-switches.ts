@@ -20,6 +20,26 @@ export function testParams(): URLSearchParams {
   return new URLSearchParams(location.search);
 }
 
+/** `?pool=` as the page opened (read once, as TOWN_ASKED below). */
+const POOL_ASKED = (() => {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? "").get("pool");
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * `?pool=NAME` (a queue of its own, a test switch): the address's now, else the one the page opened with. Leaving a queue
+ * or a match puts the address back to "/" (App's `leave`), and the next PLAY must still queue in the test's own pool, never
+ * in the server's shared one, where it met whatever another test left there (the CI flake of Nov 9: the raid screen's
+ * People only after Join a raid's Cancel). Null where the test switches don't count.
+ */
+export function queuePool(): string | null {
+  if (!testSwitchesAllowed()) return null;
+  return testParams().get("pool") ?? POOL_ASKED;
+}
+
 /**
  * Two switches for trying lengths on a phone (Eric, Oct 24: "have a URL where I can change the URL and make it say 1/2 a
  * second longer or 1 second longer or 3/4 of a second longer, and then I can go test all three of them"), in seconds:

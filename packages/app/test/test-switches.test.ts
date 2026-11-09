@@ -85,6 +85,30 @@ describe("?bannerplus= and ?talkplus= (Eric, Oct 24: a URL to try the lengths)",
   });
 });
 
+describe("?pool= (a queue of its own)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+  it("kept after the address drops it (leaving a queue puts it back to /): the next PLAY still queues in the test's own pool", async () => {
+    vi.stubGlobal("location", { search: "?debug&pool=raidscreen-desktop-abc" });
+    vi.resetModules();
+    const sw = await import("../src/test-switches.ts");
+    vi.stubEnv("DEV", true);
+    expect(sw.queuePool()).toBe("raidscreen-desktop-abc");
+    // (App's leave: history.replaceState(null, "", "/").)
+    vi.stubGlobal("location", { search: "" });
+    expect(sw.queuePool()).toBe("raidscreen-desktop-abc");
+    // One in the address now wins.
+    vi.stubGlobal("location", { search: "?pool=other" });
+    expect(sw.queuePool()).toBe("other");
+    // Never where the test switches don't count.
+    vi.stubEnv("DEV", false);
+    expect(sw.queuePool()).toBeNull();
+  });
+});
+
 describe("?rideScale= (Eric, Nov 1: \"I wanna see it at 75%\")", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

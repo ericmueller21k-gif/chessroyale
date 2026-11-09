@@ -207,8 +207,11 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-  // People only: the raid's queue without bots.
+  // People only: the raid's queue without bots, still in this test's own pool after Cancel put the address back to "/"
+  // (Nov 9: it went to the server's shared queue, meeting whatever other tests had left there).
+  const peopleOnly = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/play?") && r.url().includes("type=botsoff"));
   await main.getByRole("button", { name: /^People only/ }).click();
+  expect(new URL((await peopleOnly).url()).searchParams.get("pool")).toBe(`raidscreen-${test.info().project.name}-${run}`);
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
