@@ -21346,6 +21346,10 @@ button.sq-tiny {
   --ac-cream-ink: #1b1c20;
   --ac-xp: #5b7be8;
   --ac-lip: rgba(0, 0, 0, 0.4);
+  /* The meeting's bubbles, countdown and quick chat and the result's card stand on these (v5 dropped them, Nov 9: Eric saw the
+     chat buttons see-through over the board). */
+  --ac-card: var(--fd-panel-2);
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
   --hop: 8px;
   --pawn: 44px;
   --pad-t: 6px;
@@ -21379,6 +21383,10 @@ button.sq-tiny {
   align-items: flex-start;
   padding: calc(env(safe-area-inset-top) + var(--pad-t)) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   color: var(--fd-text);
+}
+:root[data-theme="light"] .ac-root {
+  --ac-card: #ffffff;
+  --ac-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
 }
 .ac-root[data-lockin] {
   --lock-h: calc(44px + 6px);
