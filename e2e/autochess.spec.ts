@@ -895,7 +895,7 @@ const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<
 // the two sides are the same size; a 12-letter name and the widest numbers (HP 24, XP 12/12) fit. The rows grow into the spare height
 // under the action box up to 1.7x their old height (the bench tile + its label, or the board's old row), so either a row is at that cap
 // or the room under the box is the free margin + 8 px.
-test("the players (Nov 9, round 2): each pawn's drawn figure fills its row's usable height, each block fills its row, the two sides are the same size, a 12-letter name and the widest numbers fit, the rows grow up to 1.7x", async ({ page }) => {
+test("the players (Nov 9, round 3): each pawn's drawn figure fills its row's usable height, the text is one group centred in the row, the two sides are the same size, a 12-letter name and the widest numbers fit, the rows grow up to 1.7x; at rest the pawn with its shadow is 4 px clear of the board's frame, 6 px from the text and 12 px from the viewport's edge", async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => {
     try {
@@ -915,35 +915,59 @@ test("the players (Nov 9, round 2): each pawn's drawn figure fills its row's usa
     document.querySelector(".ac-hp-bot b")!.textContent = "24";
     document.querySelector(".ac-xp-bot b")!.textContent = "12/12";
   });
+  // (The rest pose: each hop that is running is set to its first frame, the scale 1 and no lift, and read at once.)
   const m = await page.evaluate(() => {
-    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const r = (el: Element) => el.getBoundingClientRect();
     const root = document.querySelector(".ac-root")!;
     const px = (name: string) => parseFloat(getComputedStyle(root).getPropertyValue(name));
     // (`--pl-h` is a sum of tokens: hop + pawn + 4 px.)
     const rows = getComputedStyle(document.querySelector(".ac-col")!).gridTemplateRows.split(" ").map(parseFloat);
-    const tile = r(".ac-bench.you .ac-slot").height;
+    const tile = r(document.querySelector(".ac-bench.you .ac-slot")!).height;
     const base = Math.max(tile + px("--rgap") + px("--lab"), px("--hop") + px("--pawn") + 4);
+    const frame = r(document.querySelector(".ac-frame")!);
     const side = (s: string, row: number) => {
-      const piece = document.querySelector<HTMLElement>(`${s} .fd-pawn-box .avatar > piece`)!;
-      const p = piece.getBoundingClientRect();
+      const pawn = document.querySelector<HTMLElement>(`${s} .ac-pawn`)!;
+      for (const a of document.getAnimations() as CSSAnimation[]) {
+        if (a.animationName === "ac-hop" && pawn.contains((a.effect as KeyframeEffect).target as Element)) a.currentTime = 0;
+      }
+      const sq = r(document.querySelector(`${s} .fd-pawn-box .avatar > piece`)!);
+      // The drawn pawn (its outline included) in its square: x 10.25 to 34.75 of 45, y 8.25 to 40.25 of 45.
+      const fig = { l: sq.left + 0.2278 * sq.width, r: sq.left + 0.7722 * sq.width, t: sq.top + 0.1833 * sq.height, b: sq.top + 0.8944 * sq.height };
+      const sh = r(document.querySelector(`${s} .ac-shadow`)!);
+      const box = { l: Math.min(fig.l, sh.left), r: Math.max(fig.r, sh.right), t: fig.t, b: Math.max(fig.b, sh.bottom) };
       const info = document.querySelector(`${s} .ac-info`)!;
+      const ir = r(info);
+      const kids = [...info.children].map(r);
+      const group = { t: Math.min(...kids.map((k) => k.top)), b: Math.max(...kids.map((k) => k.bottom)) };
+      const ph = rows[row]! - px("--rgap");
+      // The room above the figure for the hop (the lift and the stretch at its top), and the 3 px at the foot.
+      const hr = (px("--hop") + 0.065 * ph) / 1.07 + 0.5;
+      const bl = r(document.querySelector(s)!);
       return {
-        w: r(s).width,
-        h: r(s).height,
-        // The default pawn is y 9 to 39.5 of its 45-unit square: 0.678 of the square is the drawn figure.
-        figure: p.height * (30.5 / 45),
-        usable: rows[row]! - px("--rgap") - px("--hop"),
+        w: bl.width,
+        h: bl.height,
+        figure: fig.b - fig.t,
+        usable: ph - hr - 3,
         row: rows[row]!,
+        frameGap: s === ".ac-opp" ? frame.top - box.b : box.t - frame.bottom,
+        textGap: ir.left - box.r,
+        edgeL: box.l,
+        edgeR: innerWidth - box.r,
+        centre: [group.t - ir.top, ir.bottom - group.b],
         fits: [...document.querySelectorAll(`${s} .ac-name, ${s} .ac-bar b`)].every((e) => e.scrollWidth <= e.clientWidth + 1) && info.scrollHeight <= info.clientHeight + 1,
       };
     };
-    const free = innerHeight - r(".ac-dock").bottom;
+    const free = innerHeight - r(document.querySelector(".ac-dock")!).bottom;
     return { tile, base, rowsGrown: rows[1]!, free, freeMargin: px("--free"), me: side(".ac-me", 3), opp: side(".ac-opp", 1), wide: innerWidth < 500 };
   });
   for (const [who, s] of [["you", m.me], ["opponent", m.opp]] as const) {
-    expect(s.figure, `${who}: the drawn pawn is at least 85% of the row's usable height`).toBeGreaterThanOrEqual(0.85 * s.usable);
+    expect(s.figure, `${who}: the drawn pawn is at least 95% of the row's usable height`).toBeGreaterThanOrEqual(0.95 * s.usable);
     expect(s.figure, `${who}: and not taller than the row allows`).toBeLessThanOrEqual(s.usable + 1);
-    expect(s.h, `${who}: the block fills its row`).toBeGreaterThanOrEqual(s.row - 4 - 1);
+    expect(s.frameGap, `${who}: the pawn with its shadow is at least 4 px from the board's frame`).toBeGreaterThanOrEqual(4);
+    expect(s.textGap, `${who}: the pawn is at least 6 px from the text column`).toBeGreaterThanOrEqual(6);
+    expect(s.edgeL, `${who}: the pawn is at least 12 px from the left edge`).toBeGreaterThanOrEqual(12);
+    expect(s.edgeR, `${who}: the pawn is at least 12 px from the right edge`).toBeGreaterThanOrEqual(12);
+    expect(Math.abs(s.centre[0] - s.centre[1]), `${who}: the text group is centred in its row`).toBeLessThanOrEqual(1.5);
     expect(s.fits, `${who}: the name, the numbers and the block's height fit`).toBe(true);
     // (A phone's pawn is clearly bigger than a bench tile; a computer's is about as tall as its row.)
     if (m.wide) expect(s.figure, `${who}: clearly bigger than a bench tile`).toBeGreaterThanOrEqual(1.5 * m.tile);

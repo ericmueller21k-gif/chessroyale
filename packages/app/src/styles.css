@@ -22124,57 +22124,65 @@ button.sq-tiny {
   justify-self: center;
   margin-top: var(--rgap);
 }
-/* ---- The players, Nov 9 (round 2; Eric, phone: "the pawns bigger, the block takes the full height"). The row is `--ph` (its track less
-   the gap to the board). The pawn's DRAWN figure (the cburnett piece's pawn, 0.678 of its square) is `--pD` tall: the row less the
-   hop's room. The square is `--pD` / 0.678 and sits so its feet are on the row's foot and its head is at the hop's room; the layout
-   box only holds the figure's width, so the block beside it keeps its width. The block's name at the top, the bars at the foot, the
-   text and bars grow with `--pD` (the width caps the name: 12 letters fit). Both sides use this block. ---- */
+/* ---- The players, Nov 9 (round 3; round 2 made the block fill its row, Eric, phone: "the pawns bigger"). The pawn's drawn figure
+   (the cburnett pawn with its outline: 0.544 of its square wide, 0.711 tall, from 0.183 to 0.894 down it) is `--pD` x 1.049 tall.
+   It stands on the row's foot line: 3 px above the row's bottom, so its shadow (1 px above the bottom) stays inside the row and
+   clear of the board's frame by 4 px. `--hr` is the room above it for the hop: the hop lifts it 8 px and its stretch (the origin
+   is 92% down) lifts the top a further 0.065 x the row, so the top stays inside the row at the hop's peak too. The text is one
+   group (name over level, HP over XP), centred in the row. The figure's box is 0.7765 x `--pD` wide, so the text is 6 px from it
+   at rest. Both sides use this block. ---- */
 .ac-root {
   --ph: calc(var(--acrow) - var(--rgap));
-  --pD: calc(var(--ph) - var(--hop));
-  --iw: clamp(104px, calc(var(--fw) * 0.3), 150px);
+  --hr: calc((var(--hop) + 0.065 * var(--ph)) / 1.07 + 0.5px);
+  --pD: calc((var(--ph) - var(--hr) - 3px) / 1.049);
+  --iw: clamp(92px, calc(var(--fw) * 0.26), 150px);
 }
 .ac-players .ac-side {
   height: var(--ph);
   align-items: stretch;
-  gap: 4px;
+  gap: 6.5px;
 }
 .ac-players .ac-stage {
   padding-top: 0;
   align-items: stretch;
 }
 .ac-players .ac-pawn {
-  width: calc(var(--pD) * 0.75);
+  width: calc(var(--pD) * 0.7765);
   height: var(--ph);
   pointer-events: none;
 }
 .ac-players .ac-pawn .fd-pawn-box {
   left: calc(var(--pD) * -0.3625);
-  top: calc(var(--ph) - var(--pD) * 1.295);
+  top: calc(var(--ph) - 3px - var(--pD) * 1.319);
   width: calc(var(--pD) * 1.475);
   height: calc(var(--pD) * 1.475);
 }
 .ac-players .ac-shadow {
   top: auto;
-  bottom: calc(var(--pD) * -0.02);
+  bottom: 1px;
   height: calc(var(--pD) * 0.06);
 }
 .ac-players .ac-info {
   width: var(--iw);
   height: var(--ph);
-  justify-content: space-between;
+  justify-content: center;
+  gap: 0;
 }
 .ac-players .ac-name {
   max-width: 100%;
-  font-size: clamp(12px, min(calc(var(--iw) * 0.135), calc(var(--pD) * 0.28)), 20px);
+  font-size: clamp(12px, min(calc(var(--iw) * 0.155), calc(var(--pD) * 0.28)), 20px);
 }
 .ac-players .ac-lv {
   font-size: clamp(11px, calc(var(--pD) * 0.22), 16px);
 }
 .ac-players .ac-info .ac-bars {
   width: 100%;
-  margin-top: 0;
-  gap: clamp(2px, calc(var(--pD) * 0.08), 8px);
+  margin-top: clamp(2px, calc(var(--pD) * 0.1), 6px);
+  gap: 2px;
+}
+.ac-players .ac-name,
+.ac-players .ac-lv {
+  line-height: 1.05;
 }
 .ac-players .ac-bar {
   grid-template-columns: 1.7em minmax(0, 1fr) auto;
