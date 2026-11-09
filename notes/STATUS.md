@@ -509,3 +509,12 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   .round3.md, watcher b6a74kljp).
 - XP design v1 (crates plentiful, keys scarce; 2 crates + 1 key a level; a boss crate you pick every 10 levels; daily reward
   without a key). Waiting on Eric's answers.
+- Nov 9 ~02:10: Eric: rounds 2/3 of the player size were "way too big… I just wanted it a little bit bigger". Dropped
+  claude/autochess-player-size (round-3 session interrupted). Director's own PR #565 (claude/autochess-player-a-bit, f33fe01): pawn
+  44 → 49 (390), 56 (1280), 44 (320); text +1 px; rows and board unchanged. CI watcher blhymkcew.
+  Lesson: "bigger" from Eric means a modest step; show one still before a bigger change.
+- GitHub plans verified (docs.github.com Actions limits): concurrent standard jobs Free 20, Pro 40, Team 60, Enterprise 500. Public
+  repo: minutes free on any plan. Recommended Pro (personal account) over Enterprise ($21/user, needs an org and moving the repo).
+- #564 flaky batch: CI green (4 shards, 8 min). Waiting on Eric's OK for the town-leave guard test's helper edit.
+- #566 squads snap-live (Haiku built, director reviewed the 6-line diff): CI watcher b13hcw9xs. Eric asked for the fix: merge on green.
+- Dash #560 + #561 merged (b7762b8, 3493bcf); watcher bc6et7obw (deploy + main CI).
