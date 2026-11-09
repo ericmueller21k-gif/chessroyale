@@ -911,3 +911,19 @@ which never changed, so none failed.
 
 **The fix:** one box element for the match (`KeptBox`), and `MiniTower` measuring in a layout effect from its last room.
 docs/decisions/2026-11-01-crowd-steady-box.md.
+
+## A defeat that never came (Nov 9, 2026)
+
+**What happened:** main's full run on 729e639 went red on `e2e/boss-result.spec.ts:44` (phone, both tries): after
+`?mate=1` and START, `.results h1` never came. It had passed before, and it passed locally. Only CSS had changed.
+
+**Why:** START with no boss picked plays a random one. `?mate=1` (`bossMateTest`) has the boss play a mate in one from
+1.f3 e5 2.g4, but only among the moves his rules allow, and only on his ordinary move: Wrangler's first move is always
+his long pull (`pigTurn` plays the pull before the mate is looked at) and Sawyer's first move must be a pawn's (his
+split). Both played 2…d5 and the battle went on. 2 bosses of 14: about one run in seven per try, so it came and went.
+
+**How it was found:** the defeat path run once per playable boss (`?boss=<id>`): 12 passed, Wrangler and Sawyer
+failed. `?win=1` passed for all 14.
+
+**The fix:** the spec names Hollow (as `king-attack` and `shop` already do), and the switch's comment in settings.ts
+says which bosses it can't mate at once. docs/decisions/2026-11-09-boss-result-red.md.
