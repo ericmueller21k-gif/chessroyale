@@ -547,3 +547,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~05:20: Eric: boss result v2 = no God King; your pawn + name + XP bar facing the boss; a loss plays the boss's attack on
   your pawn. Mockups sent; brief draft notes/briefs/brief-boss-result-v2.md; build after his OK and after #569 merges.
   Gap fix PR #570 (Haiku, director reviewed) CI watcher b6ahb6wf2: merge on green (fixes main red now; v2 later removes the duo).
+- Nov 9 ~05:20: XP review fixes done (4da22f7): M1, M2 (solo cap 120 min/day), m1–m7 fixed with tests. The "name in the XP box"
+  message wasn't done (it came late); dropped: boss result v2 puts your name over the bar instead. Delta re-review Opus
+  session_01JuCWRvhGT9ZgkTGCREkuYn (branch review/569-delta, watcher bz51y9mxi); full CI watcher byze79h9t. Merge #569 after both.
