@@ -346,7 +346,8 @@ build): online, phase 1 won is the crowd's victory):
   crowd turn begins, no warning; on a computer in the column beside the board, before the gear (Nov 1: no title line); on a
   phone a tiny ⚡ beside the God King's head, Oct 24). A boss's attack on a king: `?boss=hollow&laststand=1` (Boss alone: your first move
   calls the God King's Last Stand, and Hollow lashes him) and `?boss=hollow&mate=1` (Boss alone from 1.f3 e5 2.g4, the
-  boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only).
+  boss to move: he mates at once, lashes your king, then the result; `settings.bossMateTest`, solo only; not Wrangler or
+  Sawyer, whose first move is a power's, so a test names its boss: docs/decisions/2026-11-09-boss-result-red.md).
 - **Resigning never waits for a moment** (Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the top
   line's gear works through every moment (the God King's Last Stand, Lights out, a power's banner, the boss's
   turn). Solo, the battle stops there (Boss alone: "You resigned", the boss won) and the moment's timers, its engine

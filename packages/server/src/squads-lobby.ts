@@ -21,6 +21,7 @@ import {
   botSkillOf,
   botUsesStockfish,
   botVotePick,
+  NO_RANDOM_MOVES,
   buyItem,
   candidatesFrom,
   catchUpCoins,
@@ -331,7 +332,7 @@ export interface SquadsRecord {
   rewardQueue: SquadsReward[];
   /**
    * A test lobby: where it starts, its own clock, the position its first round's boards start from (`fen`), its bots
-   * all at the strongest skill (`strong`), and its opener playing White on their first board (`white`): so a test can
+   * all at the strongest skill, never a random move (`strong`), and its opener playing White on their first board (`white`): so a test can
    * count on what happens.
    */
   test?: { start: SquadsRound; clock?: SquadsClock; fen?: string; strong?: boolean; white?: boolean; mode?: SquadsMode; blocks?: boolean; blockPoints?: number };
@@ -481,7 +482,7 @@ export function parseTestFen(text: string | null): string | null {
  * `start=votes` (Eric, Oct 12): the whole tournament from the first vote, bots in every other seat the moment its
  * opener connects (no fill wait). `relay|pairs|final`: that round, filled after SQUADS_LOBBY.testFillSeconds (time for
  * others to join), the rounds before skipped (relay skips none: it has the votes too, after the wait). `fen`: the first
- * round's boards start from that position (tests); `bots=strong`: every bot at the strongest skill; `seat=white`: the
+ * round's boards start from that position (tests); `bots=strong`: every bot at the strongest skill, never a random move; `seat=white`: the
  * opener plays White on their board in the first round's first half (their match's squads swapped if need be).
  * `mode=classic|mercenary`: that mode, with no Mode vote (without it the Mode vote is held, and the bots don't vote in
  * it: the opener's vote decides, nobody's gives Classic). `bots=blocks` (with or without strong: `bots=strong,blocks`):
@@ -1573,13 +1574,15 @@ export class SquadsCore {
     const cands = candidatesFrom(top, this.s);
     const rng = squadsRng(m.seed, m.key, m.turn, m.half, board, "bot", bot);
     const partner = d.partner ? (half.inputs.choices[d.partner] ?? null) : null;
+    // (A test lobby's `bots=strong`: no random move either, so a test's mate in one is played.)
+    const core = this.r.test?.strong ? NO_RANDOM_MOVES : DEFAULT_SETTINGS;
     let move: string;
-    if (d.duty.role === "move") move = botRelayMove(rng, cands, skill, allowed);
-    else if (m.format === "pairs") move = botPairPick(rng, cands, skill, allowed, partner, !!partner && tokensLeft(m, d.duty.side) > 0 && isOnlyMove(top, partner, this.s));
+    if (d.duty.role === "move") move = botRelayMove(rng, cands, skill, allowed, core);
+    else if (m.format === "pairs") move = botPairPick(rng, cands, skill, allowed, partner, !!partner && tokensLeft(m, d.duty.side) > 0 && isOnlyMove(top, partner, this.s), core);
     else {
       // The final's vote: sometimes a pick a person on the squad has made (so the bots feel like teammates).
       const humans = d.team.filter((id) => !this.botPlays(id)).flatMap((id) => (half.inputs.choices[id] ? [half.inputs.choices[id]!] : []));
-      move = botVotePick(rng, cands, skill, allowed, humans, this.s);
+      move = botVotePick(rng, cands, skill, allowed, humans, this.s, core);
     }
     const elapsed = elapsedNow;
     // Now and then a block of the other squad's likely best reply (before its own move: Relay's is made at once).
