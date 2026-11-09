@@ -2574,8 +2574,8 @@ export const SQUADS_LOBBY = {
   /** The drawn bracket on screen before round 1's matches begin (after the votes). */
   bracketIntroSeconds: 8,
   /**
-   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are counted
-   * there for when crates stop being free (CRATES_FREE). Each person on the squad still playing their seat when its
+   * Placement rewards (unranked), by placement: 1st, 2nd, 3rd-4th, 5th-8th. Coins go in the wallet; crates are crates of the
+   * newest series (XP.rewardCrate since Nov 9), each opened with a crate key. Each person on the squad still playing their seat when its
    * placement is decided (not one who left, nor a seat a bot has taken over); none in a lobby a test control touched.
    */
   rewards: {

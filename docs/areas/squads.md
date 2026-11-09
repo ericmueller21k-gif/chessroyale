@@ -358,7 +358,7 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   players).
 - **Placements and rewards** (unranked). When the bracket decides a squad's placement, each person on it gets a results
   row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
-  wallet, crates counted in `wallets.crates` for when crates stop being free) if still playing their seat. Nothing in
+  wallet, crates of the newest series since Nov 9, each opened with a crate key) if still playing their seat. Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
   the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`).
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
