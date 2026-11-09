@@ -607,3 +607,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~10:20: XP phase 2 done (5ca3f62): PR #574 (draft, full-e2e), stills sent. Independent review Opus
   session_01JuCWRvSpYr8V325ycWCrGx (branch review/574, watcher bn8081s6p); full CI watcher b06jzr4n6. Eric's 100 keys: Shop →
   Crates → "Admin: test grants" → +100 crate keys (after merge).
+- Nov 9 ~10:30: #574 review: M1 (admin ?xp= jump pays real level rewards on prod) + minors. Director fixed M1 (/api/xp/test only
+  with TEST_SWITCHES), m4 (payLevels try/catch), m1/m2 (pause scope documented) in 8afb5f0; tests pass. Delta re-review Opus
+  session_01JuCWRv261G1wCCdQMz3YV4 (review/574-delta, watcher bhmztm3j5); full CI watcher b0qre3ykp. Merge after both.
