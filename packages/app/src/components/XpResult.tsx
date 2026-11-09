@@ -1,23 +1,26 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
-import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, type XpGrant } from "@chessroyale/core";
+import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, xpShownParts, type XpGrant } from "@chessroyale/core";
 import { account, playerName } from "../account.ts";
 import { gameXp, markXpFilled, xpFilled } from "../xp.ts";
 
 /**
  * The XP box on every result screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't
  * want it to skip… It should like go up like a nice satisfying looking thing… on every page"; docs/decisions/2026-11-09-xp-box.md).
- * One fixed box (nothing shifts, whatever it shows): the gain and your level on top, the bar, then the parts ("12 min +120 · Win
- * +50") or why there was none; the top row reads "+37 XP · <your name> · Level 2", so it's plainly yours, not the boss's ("No XP: you left the match."). The bar fills from the old XP to the new over 1.5 to 2.5 s
+ * One fixed box (nothing shifts, whatever it shows): the gain and your level on top, the bar, then the parts ("Win +50": never the
+ * minutes, Eric, Nov 9; core's xpShownParts) or why there was none; the top row reads "+37 XP · <your name> · Level 2", so it's plainly yours, not the boss's ("No XP: you left the match."). The bar fills from the old XP to the new over 1.5 to 2.5 s
  * (core's xpAt: eased, never a jump), the number counting up with it and each part showing as its share starts; a level-up fills
  * to the end, pops "Level 8!" and goes on from empty. Each frame only sets the bar's transform and three texts (its box contains its
  * own layout). Reduced motion: the end at once.
+ *
+ * `compact` (a boss battle's result, Eric, Nov 9: under your pawn, facing the boss): no frame; your name on a line of its own, then
+ * "+N XP" and "Level N" over the bar, then the parts. The same pieces and fill (docs/decisions/2026-11-09-boss-result-v2.md).
  */
 
 const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
 const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** `xp`: the grant (null: none came; undefined: still coming). `none`: what to say when none came (default: "No XP for this game."). */
-export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | null | undefined; none?: string }) {
+export function XpResult({ xp, none = "No XP for this game.", compact = false }: { xp: XpGrant | null | undefined; none?: string; compact?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const fill = useRef<HTMLDivElement>(null);
   const gain = useRef<HTMLSpanElement>(null);
@@ -49,7 +52,9 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
     const ms = xpFillMs(xp.after - from);
     const parts = [...(partsRef.current?.querySelectorAll<HTMLElement>(".xp-part") ?? [])];
     // (Each part shows as the count reaches its share: the first at once.)
-    const starts = xp.parts.map((_, i) => xp.parts.slice(0, i).reduce((sum, p) => sum + p.xp, 0));
+    // (By the shown part's place in all the parts: the hidden time part still takes its share first.)
+    const shown = xpShownParts(xp.parts);
+    const starts = shown.map((s) => xp.parts.slice(0, s.of).reduce((sum, p) => sum + p.xp, 0));
     let shownLevel = levelOf(from);
     const draw = (t: number) => {
       const at = xpAt(from, xp.after, t, ms);
@@ -97,8 +102,9 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   const nothing = xp === null || !!xp?.none;
   const line = xp === undefined ? "Counting your XP…" : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
   const start = filling ? from : xp && !xp.none ? xp.after : still;
+  const shownParts = xp && !xp.none ? xpShownParts(xp.parts) : [];
   return (
-    <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
+    <div class={`xp-box${compact ? " xp-compact" : ""}${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
       <div class="xp-top">
         <span class="xp-gain" ref={gain}>
           {xp === undefined ? "XP" : `+${fmt(filling ? from - (xp?.before ?? 0) : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
@@ -119,10 +125,16 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
         {line !== null ? (
           <span class="xp-why">{line}</span>
         ) : (
-          xp!.parts.map((p, i) => (
+          shownParts.map((p, i) => (
             <span key={i} class={`xp-part${filling ? "" : " shown"}`}>
               {i > 0 && <span class="xp-dot"> · </span>}
-              {p.label} <b>+{fmt(p.xp)}</b>
+              {p.label}
+              {p.xp !== null && (
+                <>
+                  {" "}
+                  <b>+{fmt(p.xp)}</b>
+                </>
+              )}
             </span>
           ))
         )}
