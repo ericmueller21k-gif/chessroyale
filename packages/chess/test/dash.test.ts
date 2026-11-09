@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { BOSS_ADMIN_FIRST, BOSS_CLOCK, BOSS_POWERS, BOSS_ROSTER, adminFirst, bossClockSettings, isPlayable, menuBosses, mulberry32, type Settings } from "@chessroyale/core";
-import { DASH_ANIM, DASH_FX, MatchRunner, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
+import { DASH_ANIM, DASH_FX, MatchRunner, extraMoveCandidates, passTurn, POWER_FX, boardPieces, botRushCorrect, bossThinkMs, chooseRush, dashMoveClock, flagMove, legalMoves, rushFen, rushHeld, rushJudge, rushKeep, rushMovesLeft, rushTimeline, scrambleLeft, scrambleOn, slappedClock } from "../src/index.ts";
 import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.ts";
 
 /**
@@ -11,10 +11,10 @@ import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.
 
 const S = BOSS_POWERS;
 
-function battle(seed: number, opts: { test?: string; bank?: boolean } = {}) {
+function battle(seed: number, opts: { test?: string; bank?: boolean; entrants?: { id: string; name: string; isBot: boolean }[] } = {}) {
   const base = kitSettings({ boss: "dash", test: opts.test ?? "", maxMoves: 60 });
   const settings: Settings = opts.bank ? { ...base, ...bossClockSettings(base) } : base;
-  const r = new MatchRunner({ settings, rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
+  const r = new MatchRunner({ settings, rng: mulberry32(seed), engines: [fakeEngine()], library: [KIT_OPENING], entrants: opts.entrants ?? [{ id: "h0", name: "H", isBot: false }], raidSide: "w" });
   return r;
 }
 const fenOf = (r: MatchRunner) => r.boards.get(r.state.boards[0]!)!.fen;
@@ -328,8 +328,8 @@ describe("Dash v2: the Scramble Rush's scoring", () => {
 
 describe("Dash v2: the Scramble Rush in a battle", () => {
   /** Plays to the Rush (the test switch: warned as the second turn begins, it comes as the third does); returns the position it froze. */
-  async function toRush(seed: number) {
-    const r = battle(seed, { test: "rush" });
+  async function toRush(seed: number, entrants?: { id: string; name: string; isBot: boolean }[]) {
+    const r = battle(seed, { test: "rush", entrants });
     await crowdMove(r);
     await r.playBoss(fakeEngine());
     expect(r.rushDue()).toBe(false);
@@ -373,6 +373,57 @@ describe("Dash v2: the Scramble Rush in a battle", () => {
       await crowdMove(r);
       expect(r.isOver()).toBe(false);
     });
+
+  it("Eric, Nov 8: solo, only your own put-back counts (no bots, no mean); online, the crowd's mean; the verdict is the extra move's", async () => {
+    const crowd = [
+      { id: "h0", name: "H", isBot: false },
+      { id: "h1", name: "I", isBot: false },
+      { id: "h2", name: "J", isBot: false },
+      { id: "h3", name: "K", isBot: false },
+      { id: "b0", name: "B", isBot: true },
+    ];
+    const places = (r: MatchRunner) => ({ h0: placesFor(r, 2), h1: placesFor(r, 6), h2: placesFor(r, 6), h3: placesFor(r, 6) });
+    // Online: everyone's count, the bot's from the seed, and their mean: your 2 carried by the others' 6s.
+    const online = (await toRush(31, crowd)).r;
+    const all = online.finishRush(places(online));
+    expect(Object.keys(all.correct).sort()).toEqual(["b0", "h0", "h1", "h2", "h3"]);
+    expect(all.mean).toBeCloseTo((2 + 18 + all.correct.b0!) / 5, 9);
+    expect(all.held).toBe(true);
+    expect(online.extraMoveDue()).toBe(false);
+    expect(online.boss!.powers!.dash!.rush!.extra).toBeUndefined();
+    // Solo: yours alone, the same placements: 2 of 6, too few, and he moves again (the verdict and the move one field).
+    const { r: solo, plies } = await toRush(31, crowd);
+    const mine = solo.finishRush(places(solo), "h0");
+    expect(mine).toEqual({ correct: { h0: 2 }, mean: 2, held: false });
+    expect(solo.boss!.powers!.dash!.rush).toMatchObject({ correct: 2, extra: "due" });
+    expect(solo.extraMoveDue()).toBe(true);
+    expect(await solo.playExtraMove(fakeEngine())).toBeTruthy();
+    expect(solo.boards.get(solo.state.boards[0]!)!.history.length).toBe(plies + 1);
+    // Solo with all 4 back: held, no extra move.
+    const pass = (await toRush(32, crowd)).r;
+    expect(pass.finishRush({ h0: placesFor(pass, 4) }, "h0").held).toBe(true);
+    expect(pass.extraMoveDue()).toBe(false);
+  });
+
+  it("Nov 8: once due he never skips it: no engine answer (or a move that isn't a quiet candidate) and he plays a quiet one from the seed", async () => {
+    for (const move of [null, "zzzz"]) {
+      const { r, fen, plies } = await toRush(41);
+      r.finishRush({ h0: {} }, "h0");
+      expect(r.extraMoveDue()).toBe(true);
+      const played = r.applyExtraMove(move);
+      expect(played).toBeTruthy();
+      expect(extraMoveCandidates(passTurn(fen)!)).toContain(played);
+      expect(r.boss!.powers!.dash!.rush!.extra).toBe("played");
+      expect(r.boards.get(r.state.boards[0]!)!.history.length).toBe(plies + 1);
+      expect(fenOf(r).split(" ")[1]).toBe(fen.split(" ")[1]);
+    }
+    // (An engine that fails: the same stand-in.)
+    const { r, plies } = await toRush(42);
+    r.finishRush({ h0: {} }, "h0");
+    const broken = { topMoves: async () => Promise.reject(new Error("gone")), scoreMoves: async () => Promise.reject(new Error("gone")) };
+    expect(await r.playExtraMove(broken as never)).toBeTruthy();
+    expect(r.boards.get(r.state.boards[0]!)!.history.length).toBe(plies + 1);
+  });
 
   it("Eric, Nov 6: warned a turn ahead (RAGE!, \"Next turn: Scramble Rush\"), your one move as ever in between, then it comes", async () => {
     const r = battle(4, { test: "rush" });

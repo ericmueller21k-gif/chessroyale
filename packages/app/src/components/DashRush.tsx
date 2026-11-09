@@ -132,7 +132,14 @@ export function rushDock(boss: BossView, view: RushView, now: number): { line: s
   const right = rushJudge(boss.board.fen, rush, view.places).correct;
   if (stage === "place") return { line: `${right} of ${n} back`, sub: `${need} needed. Drag or tap them home.` };
   if (rush.correct === undefined) return { line: `Time's up: ${right} of ${n}`, sub: "The board as it was." };
-  return rush.extra ? { line: `${right} of ${n}: too few`, sub: "He moves again." } : { line: `${right} of ${n}: well done!`, sub: "The board as it was. Your move." };
+  // (The verdict's own count: yours alone solo; online, the crowd's mean, with yours beside it when it differs. Its word follows
+  // `extra`, the same field his extra move goes by, so the line and the move never disagree; Nov 8.)
+  const crowd = rush.correct !== right;
+  const count = crowd ? `Crowd: ${rush.correct} of ${n}` : `${right} of ${n}`;
+  // "you" only for a viewer who put pieces back (not a spectator, nor one who was out; review of #561).
+  const yours = crowd && Object.keys(view.places).length ? ` (On average; you: ${right}.)` : "";
+  if (rush.extra === "skipped") return { line: `${count}: too few`, sub: `No quiet move for him: your move.${yours}` };
+  return rush.extra ? { line: `${count}: too few`, sub: `He moves again.${yours}` } : { line: `${count}: well done!`, sub: `The board as it was. Your move.${yours}` };
 }
 
 // ---------------- His running copy ----------------
@@ -237,7 +244,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
     if (t >= tl.askAt) once(`${key}:ask`, () => kingSay("rushAsk", `${key}:ask`));
     if (rush.correct !== undefined && !rush.extra) once(`${key}:well`, () => kingSay("rushWell", `${key}:well`));
     // (Too few back: his word as time's up; his extra move follows at once.)
-    if (rush.extra) once(`${key}:fail`, () => bossVoice.say(DASH_RUSH_LINES.fail[hash(key) % DASH_RUSH_LINES.fail.length], `${key}:fail`, CRITICAL));
+    if (rush.extra === "due" || rush.extra === "played") once(`${key}:fail`, () => bossVoice.say(DASH_RUSH_LINES.fail[hash(key) % DASH_RUSH_LINES.fail.length], `${key}:fail`, CRITICAL));
   });
   // The clock's tick each second of both countdowns (his "1.00" too: five of them).
   const tick = t < tl.countdownMs ? Math.floor(t / 1000) : t >= tl.placeAt && t < tl.placeUntil ? 100 + Math.floor((t - tl.placeAt) / 1000) : -1;

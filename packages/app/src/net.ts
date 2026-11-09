@@ -25,6 +25,7 @@ import {
   repliesFrom,
   bossMoveFrom,
   funhouseMoveFrom,
+  dashExtraMoveFrom,
   extraMoveFrom,
   bounceFrom,
   fuseFrom,
@@ -979,11 +980,15 @@ export class NetMatch implements GameView {
     return `Maia ${p.rating} · ${GUARD_WORDS[p.brain]}${share} · ${this.maia?.status === "ready" ? "ready" : this.maia?.status === "failed" ? `failed: Stockfish (${this.maia.error ?? "no reason"})` : "loading"}`;
   }
 
-  /** Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). */
+  /**
+   * Hollow's extra move (a failed Lights out), host only: a quiet move within the cap, or "" (he skips it). Dash's (a failed
+   * Scramble Rush): dashExtraMoveFrom, the quiet move closest to the cap when none is within it (he never skips his; Nov 8).
+   */
   private async hostExtra(key: string, fen: string) {
     try {
       const [engine] = await this.engines();
-      this.send({ t: "bossMove", key, move: (await extraMoveFrom(engine!, fen)) ?? "" });
+      const pick = this.boss?.id === "dash" ? dashExtraMoveFrom : extraMoveFrom;
+      this.send({ t: "bossMove", key, move: (await pick(engine!, fen)) ?? "" });
     } catch {
       // No engine here: the server asks someone else, or he skips it.
     }

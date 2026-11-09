@@ -1658,9 +1658,12 @@ export class MatchRunner {
     return dashBattle.rushDue(this.battle);
   }
 
-  /** The Rush is over: each person's placements judged, each bot's from the seed, the verdict (dashBattle.finishRush). */
-  finishRush(places: Readonly<Record<string, Readonly<Record<string, unknown>>>>): { correct: Record<string, number>; mean: number; held: boolean } {
-    return dashBattle.finishRush(this.battle, places);
+  /**
+   * The Rush is over: each person's placements judged, each bot's from the seed, the verdict (dashBattle.finishRush). `only`
+   * (solo: you): only that player's put-back counts, no bots and no mean (Eric, Nov 8).
+   */
+  finishRush(places: Readonly<Record<string, Readonly<Record<string, unknown>>>>, only?: string): { correct: Record<string, number>; mean: number; held: boolean } {
+    return dashBattle.finishRush(this.battle, places, only);
   }
 
   /** Boingo's funhouse: he plays the crowd's move this turn (the funhouse's first, once), before the crowd picks. */

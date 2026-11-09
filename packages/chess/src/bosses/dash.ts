@@ -154,7 +154,10 @@ export const DASH: BossRules = {
     if (clockHitOn(t.seed, t.turn, t.s.dashClockFit, t.test)) t.events.push({ kind: "clockFit", turn: t.turn, count: t.s.dashClockFit.smacks });
     // His Scramble Rush, once a battle, warned a turn ahead as an ultimate is (Eric, Nov 6: RAGE!, "Next turn: Scramble Rush",
     // his line); as the next crowd turn begins it comes, the crowd's turn waiting for it (the runner's rushDue), the board as it is.
+    // (Never while the crowd is in check: he couldn't move again then, as the crowd's turn can't pass, so the verdict and his
+    // extra move could disagree. It waits, still warned, for the next crowd turn out of check; Nov 8.)
     if (rushWarned(d) && t.turn > d.rushWarn!) {
+      if (!passTurn(t.fen)) return;
       const moves = chooseRush(t.fen, t.crowd, t.seed, t.turn, t.s.dashScramble);
       if (moves.length) next.dash = { ...d, rush: { at: t.turn - 1, moves } };
       return;
@@ -377,9 +380,37 @@ export function botRushCorrect(seed: number, botId: string, rush: Pick<DashRush,
   return rush.moves.filter((_, i) => powerRoll(seed, "rush-bot", botId, rush.at, i) < s.botHit).length;
 }
 
-/** The crowd held: its mean put back (people's and bots' alike) at least dashScramble.needCorrect, or all of them when fewer were swept. */
+/**
+ * The crowd held: its mean put back (people's and bots' alike) at least dashScramble.needCorrect, or all of them when fewer were
+ * swept. (Solo, only your own count is passed: finishRush's `only`; Eric, Nov 8.)
+ */
 export const rushHeld = (correct: readonly number[], swept: number, s: RushSettings = BOSS_POWERS.dashScramble): boolean =>
   !correct.length || correct.reduce((a, b) => a + b, 0) / correct.length >= Math.min(s.needCorrect, swept) - 1e-9;
+
+/**
+ * His extra move after a failed Rush (Eric, Nov 8: "if YOU fail, he moves twice"): Hollow's quiet move within the cap
+ * (extraMoveFrom) when there's one; else the quiet candidate closest to no gain at all (the least either way; never a forced mate
+ * in its line, unless every one has one: then one against him before his own). Null only when the crowd's turn can't pass or he has no quiet move.
+ */
+export async function dashExtraMoveFrom(engine: EngineLike, fen: string): Promise<string | null> {
+  const capped = await extraMoveFrom(engine, fen);
+  if (capped) return capped;
+  const passed = passTurn(fen);
+  const candidates = passed ? extraMoveCandidates(passed) : [];
+  if (!passed || !candidates.length) return null;
+  const crowdBest = (await engine.topMoves(fen, 1))[0];
+  const before = crowdBest ? 1 - crowdBest.expected : 0.5;
+  const scored = (await engine.scoreMoves(passed, candidates)).filter((m) => candidates.includes(m.move));
+  // Prefer no forced mate; then one against him (the crowd's); his own only when nothing else is left (review of #561).
+  const quiet = scored.filter((m) => m.mate === undefined);
+  const theirs = scored.filter((m) => m.mate !== undefined && m.mate < 0);
+  const pool = quiet.length ? quiet : theirs.length ? theirs : scored;
+  return [...pool].sort((a, b) => Math.abs(a.expected - before) - Math.abs(b.expected - before) || (a.move < b.move ? -1 : 1))[0]?.move ?? candidates[0]!;
+}
+
+/** His extra move when no engine answer came (or one that isn't a candidate): a quiet candidate from the battle's seed; null: none. */
+export const rushStandIn = (seed: number, at: number, candidates: readonly string[]): string | null =>
+  candidates.length ? [...candidates].sort()[Math.floor(powerRoll(seed, "rush-extra", at) * candidates.length)]! : null;
 
 /** A swept piece's moves left in the put-back (`moved`: each piece's moves so far, by its square before the sweep). */
 export const rushMovesLeft = (moved: Readonly<Record<string, number>> | undefined, from: string, s: Pick<RushSettings, "movesPerPiece"> = BOSS_POWERS.dashScramble): number =>
@@ -513,8 +544,12 @@ export const dashBattle = {
    * The Rush is over: each person's placements (`places`, by player id: square before the sweep → square put on) judged by
    * rushJudge, each bot's from the seed; the crowd held when its mean is at least needCorrect, else his extra move is due. The
    * game's position never changed: nothing on the board changes here. Returns each player's count and the verdict.
+   * `only` (solo: you, while you're in; Eric, Nov 8: "there should be no average when I'm playing in solo mode"): only that
+   * player's put-back counts, no bots, no mean. Online the crowd's mean stays.
+   * A failed Rush with no quiet move for him at all (extraMoveCandidates: none) is "skipped" here, in the verdict itself, so the
+   * screens never say he moves again when he can't; otherwise his extra move always comes (applyExtraMove).
    */
-  finishRush(b: Battle, places: Readonly<Record<string, Readonly<Record<string, unknown>>>>): { correct: Record<string, number>; mean: number; held: boolean } {
+  finishRush(b: Battle, places: Readonly<Record<string, Readonly<Record<string, unknown>>>>, only?: string): { correct: Record<string, number>; mean: number; held: boolean } {
     const boss = b.state.boss!;
     const p = boss.powers!;
     const d = dashOf(p);
@@ -522,11 +557,14 @@ export const dashBattle = {
     if (!r || r.correct !== undefined) return { correct: {}, mean: r?.correct ?? 0, held: r?.extra === undefined };
     const fen = b.boards.get(b.state.boards[0]!)!.fen;
     const correct: Record<string, number> = {};
-    for (const pl of b.alive()) correct[pl.id] = pl.isBot ? botRushCorrect(p.seed, pl.id, r) : rushJudge(fen, r, places[pl.id] ?? {}).correct;
+    const judged = only !== undefined ? b.alive().filter((pl) => pl.id === only) : b.alive();
+    for (const pl of judged) correct[pl.id] = pl.isBot ? botRushCorrect(p.seed, pl.id, r) : rushJudge(fen, r, places[pl.id] ?? {}).correct;
     const counts = Object.values(correct);
     const mean = counts.length ? counts.reduce((a, c) => a + c, 0) / counts.length : r.moves.length;
     const held = rushHeld(counts, r.moves.length);
-    const rush: DashRush = { ...r, correct: Math.round(mean * 10) / 10, ...(held ? {} : { extra: "due" as const }) };
+    const passed = held ? null : passTurn(fen);
+    const extra = held ? undefined : passed && extraMoveCandidates(passed).length ? ("due" as const) : ("skipped" as const);
+    const rush: DashRush = { ...r, correct: Math.floor(mean * 10 + 1e-9) / 10, ...(extra ? { extra } : {}) };
     b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...d, rush } } } };
     return { correct, mean, held };
   },
@@ -538,14 +576,17 @@ export const dashBattle = {
     return r?.extra === "due" && r.at === boss!.crowdMoves && !boss!.result && !b.finalGameOver() && !b.bossToMove();
   },
 
-  /** His extra move: Hollow's quiet one, within the same cap (extraMoveFrom), from this device's engine. */
+  /** His extra move from this device's engine (dashExtraMoveFrom); the engine failing, applyExtraMove's seeded stand-in. */
   async playExtraMove(b: Battle, engine: EngineLike): Promise<string | null> {
-    return dashBattle.applyExtraMove(b, await extraMoveFrom(engine, b.boards.get(b.state.boards[0]!)!.fen));
+    const pick = await dashExtraMoveFrom(engine, b.boards.get(b.state.boards[0]!)!.fen).catch(() => null);
+    return dashBattle.applyExtraMove(b, pick);
   },
 
   /**
    * Plays his extra move (from the host's engine online), as Hollow's after Lights out: the crowd's turn passes (a base), then
-   * his quiet move; one that isn't a candidate, or none, and he skips it. Unscored, never fair play's. Returns it, or null.
+   * his quiet move. Unlike Hollow he never skips it once it's due (Eric, Nov 8: the verdict said he'd move again and he didn't):
+   * a move that isn't a candidate, or none (the engine failed, a host sent ""), and he plays a quiet candidate from the seed
+   * instead (rushStandIn). Unscored, never fair play's. Returns it, or null when it wasn't due.
    */
   applyExtraMove(b: Battle, move: string | null): string | null {
     const boss = b.state.boss!;
@@ -556,7 +597,9 @@ export const dashBattle = {
     const id = b.state.boards[0]!;
     const board = b.boards.get(id)!;
     const passed = passTurn(board.fen);
-    if (!move || !passed || !extraMoveCandidates(passed).includes(move)) {
+    const candidates = passed ? extraMoveCandidates(passed) : [];
+    if (move === null || !candidates.includes(move)) move = rushStandIn(p.seed, r.at, candidates);
+    if (!passed || !move) {
       b.state = { ...b.state, boss: { ...boss, powers: { ...p, dash: { ...d, rush: { ...r, extra: "skipped" } } } } };
       return null;
     }
