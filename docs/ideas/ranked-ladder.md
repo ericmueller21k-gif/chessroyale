@@ -14,8 +14,8 @@ placements, "+18" on the result card, `RANKED_1V1` in settings.ts.
 
 | # | Decision | My recommendation | Why, in one line |
 | --- | --- | --- | --- |
-| 1 | One rank per mode, or "main + flex"? | **A separate rank per mode** (1 v 1, Duo, Squads, 50 v 50). 1 v 1 is your **main rank**: home shows it, and it comes first on the profile. | The modes test different skills. Each mode has its own queue anyway, so separate ranks don't make anyone wait longer. A new mode starts from your other ranks, so placements stay short. |
-| 2 | What is "MMR"? | **MMR = the hidden skill number**, one per mode, all on the same scale (1500 to start, like chess ratings). Players see the **tier, division and RP**. The MMR number stays hidden, as it is today. | That's the meaning LoL, Valorant and Dota give it. Keeping it hidden lets RP absorb leave fees and season resets without bending the skill number. |
+| 1 | One rank per mode, or "main + flex"? | **Decided (Eric, Nov 9): yes.** **A separate rank per mode** (1 v 1, Duo, Squads, 50 v 50). 1 v 1 is your **main rank**: home shows it, and it comes first on the profile. | The modes test different skills. Each mode has its own queue anyway, so separate ranks don't make anyone wait longer. A new mode starts from your other ranks, so placements stay short. |
+| 2 | What is "MMR"? | **Decided (Eric, Nov 9): MMR is shown.** MMR = the skill number behind matchmaking, one per mode, all on the same scale (1500 to start, like chess ratings). The rank (tier, division, RP) leads; **beside each mode's rank on a profile, in gray, "MMR 1612"**. Eric: "There's no reason for us to hide it from the players. I'm not a fan of hiding MMR." | That's the meaning LoL, Valorant and Dota give it. Keeping it hidden lets RP absorb leave fees and season resets without bending the skill number. |
 | 3 | 1 v 1 time controls | **One 1 v 1 MMR** for every time control, as you said. Nothing changes. | Already built that way. The vote picks the control, so nobody can farm one control. |
 | 4 | Leaving | **Dodge** (leaving after the match is found but before both first moves) = **−5 RP** (−10 if repeated), no MMR change, a mark on your record, and a short lockout that grows if you keep doing it. **Leave** (after the game starts) = a **full loss** plus **−10 RP**. **Three or more leaves in your last 20 ranked games puts you in the delayed queue** (an extra wait before you're matched), longer at each step. | LoL's dodge tiers and Overwatch's "last 20 games" window, scaled to our short games. Nobody comes out ahead by leaving. |
 | 5 | A bot takes a leaver's seat | The bot plays at **the leaver's own strength minus 100, never above it** (from their judged moves), using the bots we already have. **Teammates lose less** because the rating math knows they had a weaker bot. The leaver takes the worst result plus the leave fee. | It reuses `botSkillForRating`, so there's no new engine work. Apex's "loss forgiveness" falls out of the math with no special case. |
@@ -79,7 +79,7 @@ would predict neither one well, and matchmaking in each queue would use a number
 
 | Word | What it is | Who sees it |
 | --- | --- | --- |
-| **MMR** | The hidden skill number, one per mode: today's 1 v 1 "hidden rating" (Glicko-1 `rating`), and OpenSkill's μ for the other modes. All on one scale: 1500 to start, where a gap means the same thing as a chess rating gap. Comes with an uncertainty (Glicko RD, OpenSkill σ). | Nobody on screen (as built: "never the hidden rating" on a profile). Admins on the fair-play page. |
+| **MMR** | The skill number, one per mode: today's 1 v 1 "hidden rating" (Glicko-1 `rating`), and OpenSkill's μ for the other modes. All on one scale: 1500 to start, where a gap means the same thing as a chess rating gap. Comes with an uncertainty (Glicko RD, OpenSkill σ). | Everyone (Eric, Nov 9): in gray beside each mode's rank on a profile, "MMR 1612" (rounded; placements show it once placed). Admins also on the fair-play page. |
 | **RP** (rank points) | The visible points inside a division (0-79), as built. | Everyone. |
 | **Rank** | Tier and division ("Gold 2"), or a top tier. | Everyone. |
 | **Ladder** | The single stored number behind a rank (division index × 80 + RP), as built. | Code only. |
@@ -87,10 +87,13 @@ would predict neither one well, and matchmaking in each queue would use a number
 
 - In code and docs, rename "hidden rating" to **MMR** as files are touched (`RANKED_1V1.rating` keeps its stored
   columns: `ranked_1v1.rating`, `rd`). No stored data changes for the name.
-- **Why hide the number:** RP is what moves on screen. Leave fees, season resets and the catch-up term all act on RP,
-  and MMR stays an honest estimate for matchmaking. Showing both invites "my MMR went up but my RP went down" confusion.
-  LoL and Valorant hide MMR for this reason. Chess sites show it, but they have no visible ladder. **Alternative:**
-  show the MMR number only on your own profile. Easy to add later, hard to take back.
+- **Shown, not hidden (Eric, Nov 9).** The recommendation was to hide it (LoL and Valorant do, to avoid "my MMR went up but my RP
+  went down"); Eric: "There's no reason for us to hide it from the players. I'm not a fan of hiding MMR." So every profile shows
+  each mode's MMR in gray beside its rank. RP still carries leave fees and season resets; MMR stays the honest skill estimate. The
+  FAQ explains the difference in one line ("Your rank is your ladder progress; MMR is the skill number we match you by").
+- **Two numbers named like ratings:** the profile already shows Strength ("Rating 1612", the judge's move quality). Next to "MMR",
+  it reads as a third rating. When MMR lands on the profile, the Strength line is relabeled (e.g. "Move quality 1612") so the two
+  aren't confused.
 
 ## 3. 1 v 1 time controls
 
