@@ -630,3 +630,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (phases 1-3) DONE -> back to one Opus at a time (RULES). Follow-ups: m-a (a won solo game past the minutes cap moves no quest:
   require the time OR win leg), m-b (ops note: one quest_games row write per player per game). Next queue: ranked (waiting on Eric's
   decisions), admin cleanup (inventory doc), town intro, duo parked.
+- Nov 9 ~13:50: #575 quests LIVE (7d1ac25) and #576 follow-up LIVE (04440d3); main green. Nothing running. Waiting on Eric: ranked
+  decisions (docs/ideas/ranked-ladder.md summary table). Queue after: ranked L1 (leave/dodge rules) once decided; admin cleanup;
+  town intro; duo parked.
