@@ -624,3 +624,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~12:50: #575 review: no blockers; M1 flaky quests test (1 in 3), m1 replay after reroll/new day moves new quests, m2 solo past
   cap still progresses, m3 overlay can open over the queue, m4 .pr-body, m5 reads note. Fix round: fresh Opus on claude/xp-phase3
   (done signal .review-fixes.md); then delta re-review + full CI.
+- Nov 9 ~12:50: #575 fixes done (84724d3; quest_games claim table for m1); notes removed (e2d9f54). Delta review Opus
+  session_01JuCWRtFPuVcFcaVcFf8jJU (review/575-delta, watcher bds1sr1b5); full CI watcher bcen5qjx7. Merge after both.
