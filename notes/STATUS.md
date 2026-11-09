@@ -580,3 +580,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~07:45: quests mock round 2 done (top bar entry, dim, app icon crest); stills sent; PR #572 (f6cd2b1, behind ?quests=)
   CI watcher brkvismht; merge on green (players see nothing until phase 3). Note: below 344 px the top bar's buttons are 36 px
   and the logo 14 px for everyone.
+- Nov 9 ~08:00: Eric: quests mockups look good. #572 CI red: home-layout.spec.ts:413 (top bar buttons >= 40 px under 360) vs the
+  36 px squeeze; director gated the squeeze to `.fd-top:has(.fd-top-quests)` (343e819), passes locally. PHASE 3 NOTE: at 320 px the
+  Quests button must fit without going under 40 px (e.g. the logo shrinks to its icon) — Eric's tap-target floor.
