@@ -285,6 +285,11 @@ export interface SquadsReward {
   coins: number;
   crates: number;
   recorded: boolean;
+  /** XP (Nov 9; squads-do.ts): their own moves and their time in the lobby's games (`xpSpan`), and how they left, if they did. */
+  moves?: number;
+  playMs?: number;
+  resigned?: true;
+  abandoned?: true;
 }
 
 export type SquadsTimer = "fill" | "begin" | "voteEnd" | "voteNext" | "bracket";
@@ -336,6 +341,9 @@ export interface SquadsRecord {
   botShop?: Record<number, number>;
   /** A test control was used here: nothing more is recorded or rewarded. */
   testUsed?: boolean;
+  /** XP (Nov 9): when the bracket began, and each person's own moves (halves they acted in) and when their last one went in. */
+  bracketAt?: number;
+  played?: Record<string, { moves: number; at: number }>;
   /** The last time a person did anything here (when an idle or abandoned lobby closes). */
   activeAt: number;
   endedAt?: number;
@@ -1028,6 +1036,7 @@ export class SquadsCore {
       }
     }
     this.r.bracket = bracket;
+    this.r.bracketAt = this.io.now();
     this.placeNew();
     // Mercenary: every squad's wallet. A test lobby that starts after round 1 gives the squads still in a wallet to shop
     // with, and its intro is long enough to shop in (their shops are open until their first match starts).
@@ -1606,6 +1615,12 @@ export class SquadsCore {
     // then it's a no-show as any other, or an absent player in sudden death would play random moves for good.
     const present = new Set(out.timeouts.filter((id) => !!half.inputs.choices[id] || !!this.human(id)?.connected));
     this.r.squads = noteActions(this.r.squads, [...out.acted, ...present], out.missed.filter((id) => !present.has(id)), this.s);
+    // (XP: each person's own moves, and when the last went in: their time in the games ends there.)
+    for (const id of out.acted) {
+      if (!this.human(id)) continue;
+      const was = this.r.played?.[id];
+      (this.r.played ??= {})[id] = { moves: (was?.moves ?? 0) + 1, at: now };
+    }
     if (present.size) this.r.squads = this.r.squads.map((sq) => ({ ...sq, players: sq.players.map((p) => (present.has(p.id) ? { ...p, misses: p.misses + 1 } : p)) }));
     const replaced = this.r.squads.flatMap((sq) => sq.players.filter((p) => p.replacedByBot && !was.has(p.id)).map((p) => p.id));
     lm.m = out.match;
@@ -1828,7 +1843,7 @@ export class SquadsCore {
         // (Someone who left before their squad's place was decided has their own row already: a loss as they left.)
         if (p.isBot || this.human(p.id)?.left) continue;
         const reward = this.rewardFor(p.id, placement);
-        this.r.rewardQueue.push({ playerId: p.id, userId: this.r.accounts[p.id] ?? null, squadId: sq, placement, ...reward });
+        this.r.rewardQueue.push({ playerId: p.id, userId: this.r.accounts[p.id] ?? null, squadId: sq, placement, ...reward, ...this.xpSpan(p.id), ...(p.replacedByBot ? { abandoned: true as const } : {}) });
         this.send(p.id, { t: "placed", squadId: sq, placement, ...reward });
       }
     }
@@ -1845,6 +1860,15 @@ export class SquadsCore {
     const playing = !!h && !h.left && !!p && !p.replacedByBot;
     const r = SQUADS_LOBBY.rewards[placement];
     return { coins: playing && !testing ? r.coins : 0, crates: playing && !testing ? r.crates : 0, recorded: !testing && !!this.r.accounts[id] };
+  }
+
+  /**
+   * XP (Nov 9; server/xp.ts): a person's own moves in this lobby's games and their time in them, from the bracket's start to their
+   * last move that went in (knocked out, or watching after: nothing more).
+   */
+  xpSpan(id: string): { moves: number; playMs: number } {
+    const p = this.r.played?.[id];
+    return { moves: p?.moves ?? 0, playMs: p && this.r.bracketAt !== undefined ? Math.max(0, p.at - this.r.bracketAt) : 0 };
   }
 
   /** Takes the rewards out of the record (tests, and a lobby with no D1 to write them to: squads-do.ts writes each in place). */
@@ -1965,7 +1989,7 @@ export class SquadsCore {
       const placement = worstPlacement(this.r.bracket, sq.id);
       leftAs = { how: "resigned", result: { placement, players: this.s.squadCount } };
       const testing = !!this.r.test || !!this.r.testUsed;
-      if (!testing && this.r.accounts[id]) this.r.rewardQueue.push({ playerId: id, userId: this.r.accounts[id]!, squadId: sq.id, placement, coins: 0, crates: 0, recorded: true });
+      if (!testing && this.r.accounts[id]) this.r.rewardQueue.push({ playerId: id, userId: this.r.accounts[id]!, squadId: sq.id, placement, coins: 0, crates: 0, recorded: true, ...this.xpSpan(id), resigned: true });
     }
     h.left = true;
     h.leftAs = leftAs;

@@ -29,6 +29,18 @@ describe("who may use them", () => {
 describe("a new lobby's options", () => {
   const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick&augments=0&start=freestyle`;
 
+  it("XP (Nov 9): a lobby a test switch made is marked tested (no XP); ?xpgame=MINUTES alone isn't, and counts the game that long", () => {
+    expect(lobbyOptions(q("mode=crowd"), true).overrides.tested).toBeUndefined();
+    expect(lobbyOptions(q("mode=crowd&rounds=2"), true).overrides.tested).toBe(true);
+    expect(lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), true).overrides.tested).toBe(true);
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides).toMatchObject({ xpGame: 12 });
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides.tested).toBeUndefined();
+    expect(lobbyOptions(q("mode=crowd&xpgame=999&rounds=2"), true).overrides).toMatchObject({ xpGame: 30, tested: true });
+    // (A player's: dropped, as every switch.)
+    expect(lobbyOptions(q("mode=crowd&xpgame=12&rounds=2"), false).overrides).not.toHaveProperty("xpGame");
+    expect(lobbyOptions(q("mode=crowd&xpgame=12&rounds=2"), false).overrides).not.toHaveProperty("tested");
+  });
+
   it("for a player, every test switch is dropped: the lobby is exactly the one made without them", () => {
     for (const base of ["mode=crowd", "mode=classic", `mode=raid&boss=${playable}`]) {
       expect(lobbyOptions(q(`${base}&${all}`), false)).toEqual(lobbyOptions(q(base), false));

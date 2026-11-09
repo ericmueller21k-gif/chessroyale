@@ -21,8 +21,8 @@ export const LEDGER_SCHEMA = [
     user_id TEXT PRIMARY KEY,
     account TEXT NOT NULL UNIQUE
   )`,
-  // One row per leg: `asset_kind` coins | crates | keys | token | shop | item | boss_crate | welcome, `asset_id` which one (a boss,
-  // a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone; '' for coins, crates and keys), `source_id` where it
+  // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome, `asset_id` which one (a boss,
+  // a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone; '' for coins, crates, keys and XP), `source_id` where it
   // came from (a game, a battle, a crate). Never updated or deleted (the triggers below).
   `CREATE TABLE IF NOT EXISTS ledger (
     op_id TEXT NOT NULL,
@@ -46,7 +46,7 @@ export const LEDGER_TRIGGERS = [
   `CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END`,
 ];
 
-export type AssetKind = "coins" | "crates" | "keys" | "token" | "shop" | "item" | "boss_crate" | "welcome";
+export type AssetKind = "coins" | "crates" | "keys" | "xp" | "token" | "shop" | "item" | "boss_crate" | "welcome";
 
 /** A condition in SQL with its parameters. */
 export interface Cond {
@@ -112,7 +112,7 @@ export interface Leg {
 function countLeg(kind: AssetKind, asset: string, delta: number, source: string | null, add: (o: Cond) => Stmt, spend: (o: Cond) => Stmt): Leg {
   return { kind, asset, delta, source, writes: (o) => [delta > 0 ? add(o) : spend(o)] };
 }
-function walletLeg(kind: "coins" | "crates" | "keys", user: string, delta: number, source: string | null): Leg {
+function walletLeg(kind: "coins" | "crates" | "keys" | "xp", user: string, delta: number, source: string | null): Leg {
   const col = kind === "keys" ? "crate_keys" : kind;
   return countLeg(
     kind,
@@ -132,6 +132,8 @@ export const leg = {
   coins: (user: string, delta: number, source: string | null = null) => walletLeg("coins", user, delta, source),
   crates: (user: string, delta: number, source: string | null = null) => walletLeg("crates", user, delta, source),
   keys: (user: string, delta: number, source: string | null = null) => walletLeg("keys", user, delta, source),
+  /** XP (Nov 9; xp.ts): a game's, or a test's. The wallet's `xp` column. */
+  xp: (user: string, delta: number, source: string | null = null) => walletLeg("xp", user, delta, source),
   tokens: (user: string, boss: string, delta: number, source: string | null = null) =>
     countLeg(
       "token",
@@ -305,6 +307,7 @@ const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
   { kind: "coins", rows: "SELECT user_id, '' AS asset, coins AS n FROM wallets" },
   { kind: "crates", rows: "SELECT user_id, '' AS asset, crates AS n FROM wallets" },
   { kind: "keys", rows: "SELECT user_id, '' AS asset, crate_keys AS n FROM wallets" },
+  { kind: "xp", rows: "SELECT user_id, '' AS asset, xp AS n FROM wallets" },
   { kind: "token", rows: "SELECT user_id, boss AS asset, n FROM boss_tokens" },
   { kind: "shop", rows: "SELECT user_id, item_id AS asset, 1 AS n FROM inventory" },
   { kind: "item", rows: "SELECT user_id, id AS asset, 1 AS n FROM items" },
@@ -337,7 +340,7 @@ const ensureAccount = (userId: string) =>
  * A guest signing in to an account (accounts.ts, the sign-in's one batch): the guest's balances join the account, and the ledger
  * records each move (op `merge:<guest's ledger id>:<asset>`: a leg out of the guest, a leg into the account for what it really gains:
  * nothing for a shop item it has already, or for the guest's Welcome Crates, which are dropped: a guest never earns one). Coins,
- * crates, keys and tokens are added up; items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
+ * crates, keys, XP and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
  */
 export function mergeMoves(from: string, to: string, now: number): Stmt[] {
   const nonce = newId(9);
@@ -363,7 +366,7 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
     ),
     stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt(
-      "INSERT INTO wallets (user_id, coins, crates, crate_keys) SELECT ?, coins, crates, crate_keys FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys",
+      "INSERT INTO wallets (user_id, coins, crates, crate_keys, xp) SELECT ?, coins, crates, crate_keys, xp FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0 OR xp > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys, xp = xp + excluded.xp",
       to,
       from,
     ),

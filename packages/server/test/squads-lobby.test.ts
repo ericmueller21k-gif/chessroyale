@@ -544,7 +544,7 @@ describe("squads lobby: rewards", () => {
     L.core.message(b, { t: "leave" });
     expect(L.last(b, "left")).toMatchObject({ how: "resigned", result: { placement: 5, players: 8 } });
     const bo = L.core.takeRewards();
-    expect(bo).toEqual([{ playerId: b, userId: "ub", squadId: expect.any(Number), placement: 5, coins: 0, crates: 0, recorded: true }]);
+    expect(bo).toEqual([{ playerId: b, userId: "ub", squadId: expect.any(Number), placement: 5, coins: 0, crates: 0, recorded: true, moves: 0, playMs: 0, resigned: true }]);
     L.runUntil(() => L.core.record.phase === "results", 3 * 3_600_000, "the results");
     const rewards = L.core.takeRewards();
     const ann = rewards.find((r) => r.playerId === a)!;

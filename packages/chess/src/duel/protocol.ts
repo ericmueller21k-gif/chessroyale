@@ -1,4 +1,4 @@
-import type { DuelZone, ItemLook, RankChange, RankView } from "@chessroyale/core";
+import type { DuelZone, ItemLook, RankChange, RankView, XpGrant } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, NetChatLine } from "../protocol.ts";
 import type { Color, DuelEnd } from "./rules.ts";
 
@@ -59,6 +59,8 @@ export interface DuelOutcome {
   coins: number;
   /** An unranked game: a test's clock on a server without test switches (nothing recorded). */
   unranked?: boolean;
+  /** The game's XP (Nov 9; server/xp.ts), for the result screen's XP box. Missing: an older server, or none decided (no database). */
+  xp?: XpGrant;
 }
 
 /** The server's answer to an app on another protocol: it reloads (once) to get the new app. */

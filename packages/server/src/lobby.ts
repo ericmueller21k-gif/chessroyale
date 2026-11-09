@@ -290,6 +290,10 @@ export interface LobbyRecord {
     bossPicked?: string;
     /** Boss raid: a fixed strength (a test link's ?boss=<tier>), so it isn't matched to the group. */
     bossFixed?: number;
+    /** A test switch made this lobby (lobby-options.ts; index.ts sets it): no XP for anyone in it (server/xp.ts). */
+    tested?: boolean;
+    /** The test switch `?xpgame=MINUTES`: XP counts this game as that long, with enough moves, test switches or not. */
+    xpGame?: number;
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
@@ -377,6 +381,8 @@ export interface LobbyRecord {
   startedAt?: number;
   /** Boss tokens: how many of each person's picks went in (their own moves), by player id: `bossBattleSpan`. */
   picked?: Record<string, number>;
+  /** XP (Nov 9): when each person's last pick went in (the turn's lock), by player id: their time in the match ends there (`xpSpan`). */
+  pickedAt?: Record<string, number>;
   /** Quick chat (Crowd matches and boss raids, from the lobby before the match: the queue, a private lobby). */
   chat?: ChatRecord;
   /**
@@ -2296,7 +2302,12 @@ export class LobbyCore {
     if (!this.runner || !this.r.round || this.r.phase !== "play") return;
     this.r.phase = "scoring";
     // (Boss tokens: each person's own moves, the picks that went in this turn.)
-    for (const h of this.r.humans) if (this.r.round.picks[h.id]?.move) (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
+    for (const h of this.r.humans) {
+      if (!this.r.round.picks[h.id]?.move) continue;
+      (this.r.picked ??= {})[h.id] = (this.r.picked?.[h.id] ?? 0) + 1;
+      // (XP: their time in the match runs to their last move that went in; watching after it adds nothing.)
+      (this.r.pickedAt ??= {})[h.id] = this.io.now();
+    }
     // (A party: the turn's length comes out of the team's one bank, up to the clock's end.)
     if (this.r.party) this.r.round.teamMs = this.thinkTime(this.r.round, Math.min(this.io.now(), this.r.round.deadline));
     const skills = new Map(this.r.bots.map((b) => [b.id, b.skill]));
@@ -3325,6 +3336,29 @@ export class LobbyCore {
     const left = this.r.left?.find((l) => l.id === playerId);
     const end = left?.at ?? this.r.endedAt ?? this.io.now();
     return { moves: this.r.picked?.[playerId] ?? 0, ms: Math.max(0, end - this.r.startedAt) };
+  }
+
+  /**
+   * XP (Nov 9; server/xp.ts): a person's own moves in the match (their picks that went in) and their time in it as this room
+   * measured it, from the match's start to their last move that went in (knocked out at 8 minutes: 8 minutes; watching after
+   * adds nothing). Null: the match never started.
+   */
+  xpSpan(playerId: string): { moves: number; ms: number } | null {
+    if (!this.r.startedAt) return null;
+    const last = this.r.pickedAt?.[playerId];
+    return { moves: this.r.picked?.[playerId] ?? 0, ms: last === undefined ? 0 : Math.max(0, last - this.r.startedAt) };
+  }
+
+  /**
+   * XP's win cap in a friends' lobby: the people against this person (player ids; bots and people alike, the caller keeps the
+   * accounts). A raid or a Boss Battle party: none (the boss is the opponent). Crowd: the other team. Classic: everyone else.
+   */
+  xpOpponents(playerId: string): string[] {
+    if (this.settings.raid || this.r.party || !this.runner) return [];
+    const rows = this.runner.leaderboard();
+    const team = rows.find((s) => s.id === playerId)?.team ?? null;
+    const ids = new Set([...rows.map((s) => ({ id: s.id, team: s.team ?? null })), ...(this.r.left ?? []).map((l) => ({ id: l.id, team: l.result?.team ?? null }))].filter((s) => s.id !== playerId && (!team || (s.team && s.team !== team))).map((s) => s.id));
+    return [...ids];
   }
 
   /** Fair play: a person's recorded picks this match (for their fair-play summary once it's over). */

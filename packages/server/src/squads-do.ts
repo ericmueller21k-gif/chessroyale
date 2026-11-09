@@ -10,6 +10,7 @@ import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult, type Sql } from "./accounts.ts";
 import { opKeys } from "./ledger.ts";
+import { grantXp } from "./xp.ts";
 import { rankOf } from "./ranked-schema.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
@@ -201,8 +202,9 @@ export class SquadsLobby extends DurableObject<Env> {
     let ok = true;
     try {
       await ensureSchema(sql, this.env.DB);
+      const signedInOnly = signInRequired(await withSecrets(this.env));
       for (const r of [...rec.rewardQueue]) {
-        await writeReward(sql, rec.code, rec.createdAt, r, Date.now());
+        await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly);
         const i = rec.rewardQueue.indexOf(r);
         if (i >= 0) rec.rewardQueue.splice(i, 1);
         written++;
@@ -628,10 +630,21 @@ export class SquadsParty extends DurableObject<Env> {
  * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
  * id>`. Throws if D1 fails, so the lobby keeps it to try again.
  */
-async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number): Promise<void> {
+export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean): Promise<void> {
   if (!r.userId) return;
   if (r.recorded) {
-    const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code };
+    // XP (Nov 9): your moves and time as this lobby counted them; a win is your squad winning the lobby (1st). Once: keyed by this
+    // lobby (code and creation). Never in the way of the result.
+    const xp = await grantXp(sql, r.userId, {
+      key: `squads:${code}:${created}`,
+      facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
+      signedInOnly,
+      now,
+    }).catch((e: unknown) => {
+      console.log(`xp for squads ${code}: ${String(e)}`);
+      return null;
+    });
+    const result = { mode: "squads" as const, online: true, placement: r.placement, players: SQUADS.squadCount, teamWon: r.placement === 1, ranked: false, lobby: code, playMs: r.playMs ?? null, moves: r.moves ?? null, xp };
     await recordResult(sql, r.userId, result, now, { since: created });
     // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
     await grantWelcomeCrate(sql, r.userId, now).catch(() => false);

@@ -185,6 +185,38 @@ describe("resigning online: Crowd 50 v 50 and raids", () => {
     expect(L.core.connect(token, "P1", "phone")).toMatchObject({ ok: false, ended: true, left: { how: "afk" } });
   });
 
+  it("XP's span (Nov 9): a person's own moves that went in, and their time from the match's start to their last one; nothing for watching after; the other team are the opponents", () => {
+    const L = crowd(2);
+    let picks = 0;
+    let lastLock = 0;
+    for (let i = 0; i < 4000 && picks < 6; i++) {
+      const r = L.last("p2", "round");
+      if (L.core.record.phase === "play" && r && !r.watching && L.core.record.round?.key === r.key && !L.core.record.round.picks.p2 && L.now >= r.startsAt) {
+        L.core.message("p2", { t: "pick", key: r.key, move: legalMoves(r.board!.fen)[0]! });
+        picks++;
+      }
+      const before = L.core.record.phase;
+      if (!L.scores()) L.step(2_000);
+      if (before === "play" && L.core.record.phase !== "play" && L.core.record.round?.picks.p2) lastLock = L.now;
+    }
+    // (Its last pick goes in as that turn locks.)
+    L.until(() => L.core.record.phase !== "play");
+    const span = L.core.xpSpan("p2")!;
+    expect(span.moves).toBe(picks);
+    expect(span.ms).toBe(L.core.record.pickedAt!.p2! - L.core.record.startedAt!);
+    expect(span.ms).toBeGreaterThan(0);
+    expect(lastLock === 0 || L.core.record.pickedAt!.p2! >= lastLock).toBe(true);
+    // Watching after adds nothing: time goes on, the span doesn't.
+    L.advance(60_000);
+    expect(L.core.xpSpan("p2")).toEqual(span);
+    // p1 never picked: no moves, no time.
+    expect(L.core.xpSpan("p1")).toEqual({ moves: 0, ms: 0 });
+    const team = (id: string) => L.runner().state.players.find((p) => p.id === id)?.colour;
+    const vs = L.core.xpOpponents("p2");
+    expect(vs.length).toBeGreaterThan(0);
+    for (const id of vs) expect(team(id)).not.toBe(team("p2"));
+  });
+
   it("a rated loss: in a ranked match the resign counts for ranking, and the match stays ranked for everyone who stays", () => {
     const L = crowd(30);
     expect(L.core.ranked()).toBe(true);

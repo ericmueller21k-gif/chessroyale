@@ -224,7 +224,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const pool = await testPool(request, env, url, waitUntil);
       const name = queueName(raid ? "raid" : "crowd", type, pool, region);
       // (With a test's pool, ?afk=0: its 50 v 50 misses as before Nov 4, CrowdMisses off, for a test that idles on purpose.)
-      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null } : {}) };
+      const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null, tested: true } : {}) };
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
       const ticket = url.searchParams.get("ticket");
       let since: number | undefined;

@@ -1,4 +1,4 @@
-import { BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
+import { XP, BOSS_TIERS, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, isPlayable, LOBBY_LIFE, CROWD_KNOCKOUTS, RAID_SETTINGS, DRAW_RULES, QUICK_PACE, definedOnly, modeSettings, speedOption, startOption, type DrawRule, type FinalFormat } from "@chessroyale/core";
 import type { LobbyRecord } from "./lobby.ts";
 
 /**
@@ -10,7 +10,7 @@ import type { LobbyRecord } from "./lobby.ts";
  *     admin, or TEST_SWITCHES on: testSwitchesOn in admin.ts); for anyone else they're dropped, silently, so the lobby
  *     is exactly the one made without them.
  */
-export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start", "afk"] as const;
+export const LOBBY_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw", "power", "format", "speed", "weakbots", "keep", "pace", "augments", "start", "afk", "xpgame"] as const;
 
 /** `?boss=` is the creator's pick only in a raid, as a boss's id: a fixed strength (a tier), or a boss in another mode, is a test's. */
 const testBoss = (q: URLSearchParams) => q.has("boss") && (q.get("mode") !== "raid" || BOSS_TIERS.includes(Number(q.get("boss"))));
@@ -77,6 +77,10 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
     // ?afk=0: a 50 v 50 miss as before Nov 4 (CrowdMisses off), for a test that idles on purpose. Never for players.
     ...(q.get("afk") === "0" ? { crowdMisses: null } : {}),
+    // XP (Nov 9; server/xp.ts): a lobby any test switch made earns no XP ("No XP: test game."), except ?xpgame=MINUTES, which counts
+    // the game as that long with enough moves (for the XP box's tests), whatever other switch is on.
+    ...(LOBBY_TEST_SWITCHES.some((k) => k !== "xpgame" && q.has(k)) || testBoss(q) ? { tested: true } : {}),
+    ...(q.has("xpgame") ? { xpGame: Math.max(0, Math.min(XP.maxMinutes, Math.floor(Number(q.get("xpgame")) || 0))) } : {}),
   };
   // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;
