@@ -62,6 +62,18 @@ export const QuestsIcon = () => (
   </svg>
 );
 
+/**
+ * The quests icon in a phone's top bar (Nov 9): a clipboard with its check, filled so its gold reads (the stylesheet
+ * colors the three parts `.fd-qbar-*`; QuestsIcon above stays the outline for the panels).
+ */
+export const QuestsBarIcon = () => (
+  <svg viewBox="0 0 24 24" width="29" height="29" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect class="fd-qbar-body" x="4" y="4" width="16" height="18" rx="2.5" />
+    <rect class="fd-qbar-clip" x="8" y="2" width="8" height="4" rx="1.2" />
+    <path class="fd-qbar-check" d="M8.5 13.2l2.3 2.3 4.2-4.4" fill="none" />
+  </svg>
+);
+
 /** The quest's picture, in its tile. */
 function QuestPicture({ icon }: { icon: QuestIcon }) {
   if (icon.kind === "boss") return <BossFace boss={{ name: icon.boss, icon: "" }} class="qo-boss" label="" />;

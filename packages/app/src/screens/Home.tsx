@@ -24,7 +24,7 @@ import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
-import { QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
+import { QuestsBarIcon, QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
 import { BotLevelBox } from "../components/BotLevelBox.tsx";
 import { FriendsOverlay } from "../components/FriendsOverlay.tsx";
 import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
@@ -1151,12 +1151,12 @@ export function HomeScreen({
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} tourId="profile" />
+          <AccountBar onProfile={onProfile} tourId="profile" face={!computer} />
           {!computer && (
             // (The Quests entry (Nov 9): one more square button in a phone's top bar, the quests icon, as the shop's; greyed until quests
             // are yours.)
             <button type="button" class="fd-icon-btn fd-top-quests" aria-label="Quests" title={questsLabel} disabled={questsOn !== true} onClick={quests.show}>
-              <QuestsIcon />
+              <QuestsBarIcon />
             </button>
           )}
           <button type="button" class="fd-icon-btn fd-top-shop" data-tour="shop" aria-label="Shop & crates" onClick={onShop}>

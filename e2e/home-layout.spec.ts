@@ -430,6 +430,10 @@ test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits fro
       const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
       expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
     }
+    // The profile is the shop's square (Eric, Nov 9): same size and corners, no gold ring, and nothing animating in it (a still face).
+    const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
+    const profile = await bar.getByRole("button", { name: "Your profile", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, ring: getComputedStyle(el).borderTopWidth, animations: el.getAnimations({ subtree: true }).length }));
+    expect(profile, `profile at ${width}`).toEqual({ ...shop, ring: "0px", animations: 0 });
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });
