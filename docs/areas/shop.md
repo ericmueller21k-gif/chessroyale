@@ -28,7 +28,14 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   2. **its color** (red and yellow common, Pearl the rarest; some items roll a second color, and the Gift-Wrap Tube's
      second stripe color comes from its seed instead, `secondColor`, so it's never stored);
   3. **its purity**: 100% minus a blemish of 0–100% (blotches over that share of its color); shiny at 90%+.
-  Crates are opened on the server, so nobody can make themselves a Pearl crown. `CRATES_FREE` is on while testing.
+  Crates are opened on the server, so nobody can make themselves a Pearl crown.
+- **Crates need keys** (Nov 9, XP phase 2; [2026-11-09-xp-phase2-crates.md](../decisions/2026-11-09-xp-phase2-crates.md)): a series crate
+  opens, for everyone (admins too), only with one of that crate held (`series_crates`, by series; ledger kind `series_crate`) and one crate
+  key, in one ledger op ("You need a Winter Crate and a crate key to open it."). Crates come from the daily reward, each level (2 and a key)
+  and Squads' placements, all of the newest series (`XP.rewardCrate`); a crate held before (the wallet's old `crates`) became a Winter
+  Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
+  without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 10th level's boss crate is picked in the Crates tab's
+  "Boss crate choice" (`POST /api/locker/pick`; [2026-11-09-xp-phase2-boss-pick.md](../decisions/2026-11-09-xp-phase2-boss-pick.md)).
 - **Items** have a slot (head, face, skin, weapon, ride: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
@@ -91,7 +98,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   - **The inventory** (the Crates tab, `TokenStock`): under Keys and Crates, **"Boss tokens"**: every live boss's token with "× N",
     greyed at none (shown, not hidden), an admin's admins-first boss's too; "From boss battles. Spend them on a boss's crate in its shop
     in the town." **Keys are counted now** (`wallets.crate_keys`; the Crates tab's "Keys × ∞" became the real count), and a boss crate
-    takes one; the Crates tab's own crates stay free while testing ("Crates are unlimited while we test.").
+    bought with one takes one; since Nov 9 every series crate takes one to open too.
   - **The token pictures** are the drawings from `claude/boss-art` (`scripts/boss-art/out/token-<name>/`), copied into
     `components/tokens/` (only their import lines changed, and the `!`s the app's typecheck asks for), one chunk loaded the first time a
     token shows (`TokenArt.tsx`: 40 × 40 crisp; `animate` plays its idle, the result box's; a plain gold coin for a boss with none). Every
@@ -118,8 +125,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     item went in; so each opens once, never twice, a double tap or two devices open two only if you hold two, and nobody opens one they
     haven't got ("You have no Babur's Boss Crate to open."). The roll is the server's, never a test switch's. The shop's kill switch
     refuses it too.
-  - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key"; a boss, "+1 token", "+3 tokens";
-    `POST /api/locker/grant`, "Not found" for anyone else; at most `grantMax` (10) at once). Never a drop: the window doesn't count them.
+  - **Admins' test grants** (the Crates tab's "Admin: test grants", admins only: "+1 crate key", "+100 crate keys" (Nov 9); a boss,
+    "+1 token", "+3 tokens"; `POST /api/locker/grant`, "Not found" for anyone else; at most `keysGrantMax` (100) keys and `grantMax` (10)
+    tokens at once). Never a drop: the window doesn't count them. Every admin-only ability: [2026-11-09-admin-abilities.md](../decisions/2026-11-09-admin-abilities.md).
   - **Stored** (each an account's: `account-data.ts`, "bossTokens"; the privacy page's "Boss tokens"): `boss_tokens` (counts),
     `boss_token_drops` (each drop: when, which battle; kept 30 days, the Worker's schedule clears older), `solo_battles` (the open one),
     `boss_crates` (Nov 2: each crate bought and not opened yet, its crate id and when; a new table, so older data reads as none), and
@@ -193,7 +201,8 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 
 ## Settings
 
-`crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`, `CRATES_FREE`), `BOSS_TOKENS` and
+`crates.ts` (`ITEM_DEFS`, `CRATES`, `BOSS_CRATES`, `ITEM_COLORS`, `PURITY_BANDS`), `XP` (the crates and keys a level and the daily
+reward give, `rewardCrate`), `BOSS_TOKENS` and
 `BOSS_CRATE_PRICE` in settings.ts, `shop.ts` (`SHOP_ITEMS`,
 `SHOP_FREE`), `BOT_LOOKS` and `QUICK_CHAT.packPrices` in settings.ts.
 
@@ -205,6 +214,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   the match room's count of picks, buying both ways, not enough, twice at once, admins' grants admin-only, a guest's sign-in), `admin-copies.test.ts` (admins own one of every item, a ride too), `packages/app/test/blotches.test.ts`, `gift-tube.test.ts`,
   `icon-pixels.test.ts`.
 - Unit (Nov 6): `packages/server/test/ledger.test.ts` (an op replayed or raced applies once; each path's key; a 500-op reconciliation with merges and deletes; append-only; each request id replayed; an open raced at each step, held by the test's SQL wrapper, answers one stored item byte for byte; the backfill twice is once; the static guard: no balance write outside `ledger.ts`, the claw's TODO); `ledger-do.test.ts` (a match room stopped between D1 and its storage drops once; Squads retried).
+- Unit (Nov 9): `packages/server/test/rewards.test.ts` (a crate's open takes the crate and a key, refused without, two at once with one
+  key; old crates to Winter; the boss crate pick); e2e `e2e/xp-rewards.spec.ts` (the Crates tab after a level-up, an open, the padlock,
+  the pick, +100 keys). The test helper `stockCrates` (server) and `giveCrates` (e2e) give crates and keys.
 - Unit (Nov 6): `packages/server/test/welcome.test.ts` (the Welcome Crate: 5 not 4, abandoned games, races, the backfill, opening once, never tradeable, no purity, old lockers), `packages/app/test/hunchess-rides.test.ts` (every ride's colorway draws).
 - e2e: `e2e/welcome-crate.spec.ts` (the Welcome Crate end to end, Nov 6); `e2e/shop.spec.ts` (round 2: an admin's grants and both buys, the counts following; a counted Boss alone battle's token box,
   its start pushed back in the local database by `backdateSoloBattle`), `e2e/icon-editor.spec.ts`, `crate-banner.spec.ts`, `profile.spec.ts` (an admin's locker too; rides: the locker's Ride tab, the preview

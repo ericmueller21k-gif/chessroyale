@@ -71,6 +71,8 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
    - `PAUSE_SOLO`: Solo and Boss alone.
    - `PAUSE_SHOP`: getting shop items and opening crates (the locker stays).
    - `PAUSE_FRIENDS`: friends and invites.
+   - `PAUSE_REWARDS`: XP, the daily reward and level rewards (games play on; the result's XP box says "Rewards are paused for
+     a moment."; levels reached meanwhile are paid at the next game after it).
    - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
      messages stop showing, the bosses' chatter goes on).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its

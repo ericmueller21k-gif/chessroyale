@@ -461,6 +461,20 @@ export async function giveItems(page: Page, items: readonly { def: string; color
 }
 
 /**
+ * Gives this page's account `n` crates of a series (`crate`: "winter-1", "beta-001") and `keys` crate keys straight in the local
+ * database (Nov 9, XP phase 2: a series crate takes one you hold and a key to open), as `giveItems` gives items. Reload, or let the
+ * Crates tab load, for the app to see them. (No ledger rows: the local database's ledger check isn't run in tests.)
+ */
+export async function giveCrates(page: Page, crate: string, n: number, keys = n) {
+  const user = await pageAccountId(page);
+  await localSql(
+    page,
+    `INSERT INTO series_crates (user_id, crate, n) VALUES ('${user}', '${crate}', ${n}) ON CONFLICT (user_id, crate) DO UPDATE SET n = n + excluded.n; ` +
+      `INSERT INTO wallets (user_id, crate_keys) VALUES ('${user}', ${keys}) ON CONFLICT (user_id) DO UPDATE SET crate_keys = crate_keys + excluded.crate_keys`,
+  );
+}
+
+/**
  * Pushes this page's open solo boss battle's start back `ms` in the local database: the server times a solo battle by its own clock
  * (packages/server/src/boss-tokens.ts), so a test's short battle can count as one of 5 minutes or more.
  */

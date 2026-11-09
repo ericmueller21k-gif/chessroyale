@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { crateDef, itemDef } from "@chessroyale/core";
-import { named, test } from "./helpers.ts";
+import { giveCrates, named, test } from "./helpers.ts";
 
 /**
  * Two crates (Beta Crate · Series 001 joined Winter, Oct 11, 2026): you choose one, its page shows its own boxes
@@ -10,6 +10,9 @@ import { named, test } from "./helpers.ts";
 test("crates: choose either crate; each shows its own boxes, spins them and opens to its own items", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Two Crates");
+  // (Each opens with a crate held and a key since Nov 9.)
+  await giveCrates(page, "beta-001", 1, 2);
+  await giveCrates(page, "winter-1", 1, 0);
   await page.goto("/shop?crates");
   await expect(page.locator(".crate-row:not(.boss-crate-row):not(.welcome-crate-row)")).toHaveCount(2);
   for (const [id, box] of [
@@ -154,6 +157,8 @@ test("crates: the Fischer Random banner fits its words, phone and computer, with
     requestAnimationFrame(tick);
   });
   const widths = test.info().project.name === "desktop" ? [1024, 1280, 1920] : [320, 390, 430];
+  // (A crate held and a key each, since Nov 9.)
+  await giveCrates(page, "beta-001", widths.length);
   for (const width of widths) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto("/shop?crates&fischer=1");

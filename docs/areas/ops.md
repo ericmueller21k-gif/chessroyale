@@ -141,7 +141,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     idle on purpose; also with a test `pool` on `/api/play`), a boss's fixed strength (`boss=1600`) and a boss outside a raid (`lobby-options.ts`); a queue's
     own `pool` (`/api/play`, `/api/squads/play`, `/api/squads/party`, `/api/1v1/play`: `testPool` in `index.ts`); a 1 v 1
     game's own `clock=SECONDS` (each side's clock, no increment: `/api/1v1/play`); a crate's forced
-    `fischer` and `shiny` (`/api/locker/open`). One check, `testSwitchesOn` (`admin.ts`).
+    `fischer` and `shiny` (`/api/locker/open`: since Nov 9 only where `TEST_SWITCHES` is "1", never an admin's on production). One check,
+    `testSwitchesOn` (`admin.ts`).
   - **The app's** (read only through `testParams()` in `packages/app/src/test-switches.ts`; `/api/auth/config` says
     `testSwitches` where the server has them on, `/api/me` says `admin`): all of the above, and `debug` (the match on
     `window`), `nolanding`, `boss=<id>` (skips the boss menu), `win`, `mate`, `phase`, `laststand`, `side`, `wip` and
@@ -177,7 +178,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
   "1" rests it, deleting it brings it back: `PAUSE_CLASSIC`, `PAUSE_CROWD`, `PAUSE_RAID`, `PAUSE_SQUADS`, `PAUSE_RANKED1V1`,
   `PAUSE_SOLO` (Solo and Boss alone), `PAUSE_SHOP` (buying and crates; the locker stays), `PAUSE_FRIENDS`,
-  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."),
+  `PAUSE_TOWN_CHAT` (typing in the town square; its line is "Chat is paused."), `PAUSE_REWARDS` (Nov 9: XP, the daily reward and
+  level rewards; games play on, the XP box says "Rewards are paused for a moment.", levels reached are paid at the next game after it:
+  [2026-11-09-xp-phase2-pause.md](../decisions/2026-11-09-xp-phase2-pause.md)),
   `PAUSE_BOSS_<ID>` (one boss by its roster id, e.g. `PAUSE_BOSS_PIG` for Wrangler; DEPLOY.md lists them all).
   - **While resting:** the app disables the way in with the part's line ("Squads is resting for a bit. Back soon.";
     `pausedLine`, core's `pauses.ts`), and the server refuses anything new for it with the same line (503,

@@ -3151,6 +3151,7 @@ export const BOSS_TOKENS = {
  *     `bossCrateEvery`th level also a boss crate the player picks among the live bosses (it waits in the Crates tab until picked).
  *     Paid once per level, at the next counted game (so levels reached while rewards were paused, or before phase 2, are paid then);
  *     at most `levelsPerGame` levels a game (the rest at the next).
+ *   - The result screen shows what a game paid beside its XP in a toast at the top once the XP bar has filled, for `rewardToastMs`.
  */
 export const XP = {
   perLevel: 1000,
@@ -3175,6 +3176,7 @@ export const XP = {
   bossCrateEvery: 10,
   levelsPerGame: 20,
   rewardCrate: "winter-1",
+  rewardToastMs: 6000,
 } as const;
 
 /**
