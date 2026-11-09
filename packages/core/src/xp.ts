@@ -6,7 +6,7 @@ import { XP } from "./settings.ts";
  */
 
 /** Why a game earned no XP. */
-export type XpNone = "short" | "resigned" | "left" | "guest" | "test" | "banned";
+export type XpNone = "short" | "resigned" | "left" | "guest" | "test" | "banned" | "limit";
 
 /** What each reason says on the result screen, in plain words. */
 export const XP_NONE_LINES: Readonly<Record<XpNone, string>> = {
@@ -16,7 +16,10 @@ export const XP_NONE_LINES: Readonly<Record<XpNone, string>> = {
   guest: "Sign in to earn XP.",
   test: "No XP: test game.",
   banned: "No XP: this account is banned.",
+  limit: "No XP: daily solo limit reached.",
 };
+/** A solo game's time XP the daily cap (XP.soloMinutesPerDay) trimmed: its part's words. */
+export const XP_SOLO_LIMIT = "Daily solo limit";
 export const isXpNone = (x: unknown): x is XpNone => typeof x === "string" && Object.hasOwn(XP_NONE_LINES, x);
 
 /** One part of a game's XP, as the box lists it ("12 min" +120, "Win" +50). */
@@ -73,9 +76,14 @@ export function gameXp(f: XpFacts): GameXp {
   return { minutes, time: minutes * XP.perMinute, win: f.won ? XP.win : 0 };
 }
 
-/** The box's parts: the time ("12 min"), then the win; a win the cap held back says so, at +0. */
-export function xpParts(g: Exclude<GameXp, { none: XpNone }>, winPaid = true): XpPart[] {
-  return [...(g.time ? [{ label: `${g.minutes} min`, xp: g.time }] : []), ...(g.win ? [winPaid ? { label: "Win", xp: g.win } : { label: "Win (paid once today)", xp: 0 }] : [])];
+/**
+ * The box's parts: the time ("12 min"), then the win; a win the cap held back says so, at +0. `timePaid`: the time XP actually paid
+ * when a cap (solo's daily minutes) trimmed it: "12 min (Daily solo limit)" at what was left, or "Daily solo limit" at +0.
+ */
+export function xpParts(g: Exclude<GameXp, { none: XpNone }>, winPaid = true, timePaid = g.time): XpPart[] {
+  const paid = Math.max(0, Math.min(g.time, timePaid));
+  const time = !g.time ? [] : paid === g.time ? [{ label: `${g.minutes} min`, xp: g.time }] : paid > 0 ? [{ label: `${g.minutes} min (${XP_SOLO_LIMIT})`, xp: paid }] : [{ label: XP_SOLO_LIMIT, xp: 0 }];
+  return [...time, ...(g.win ? [winPaid ? { label: "Win", xp: g.win } : { label: "Win (paid once today)", xp: 0 }] : [])];
 }
 
 /** A grant as the screen shows it, from your XP before and the parts (or the reason there was none). */

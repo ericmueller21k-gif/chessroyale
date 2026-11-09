@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, type XpGrant } from "@chessroyale/core";
 import { account } from "../account.ts";
-import { gameXp } from "../xp.ts";
+import { gameXp, markXpFilled, xpFilled } from "../xp.ts";
 
 /**
  * The XP box on every result screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't
@@ -24,9 +24,20 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   const level = useRef<HTMLSpanElement>(null);
   const pop = useRef<HTMLSpanElement>(null);
   const partsRef = useRef<HTMLDivElement>(null);
-  // (While it's coming, and for a game with none: your XP as your profile has it, standing still.)
-  const still = xp ? xp.before : (account().profile?.xp ?? 0);
-  const filling = !!xp && !xp.none && xp.after > xp.before;
+  // (While it's coming: your XP as your profile had it when the box appeared, standing still, read once: a profile refreshed while
+  // waiting never moves the bar. For a game with none: the server's.)
+  const waited = useRef<number | null>(xp === undefined ? (account().profile?.xp ?? 0) : null);
+  const still = xp ? xp.before : (waited.current ?? 0);
+  // (Where the fill starts, decided once per grant (review m7, Nov 9): never below what the box already showed while waiting, so the
+  // bar never steps back; and a grant whose fill already finished in an earlier box (Squads' card, then its results) isn't
+  // played again.)
+  const plan = useRef<{ xp: XpGrant; from: number; again: boolean } | null>(null);
+  if (xp && plan.current?.xp !== xp) {
+    const shown = waited.current ?? xp.before;
+    plan.current = { xp, from: Math.min(xp.after, Math.max(xp.before, shown)), again: xpFilled(xp) };
+  }
+  const from = xp ? plan.current!.from : still;
+  const filling = !!xp && !xp.none && xp.after > from && !plan.current!.again;
   // (Done: its last state is shown. Never while it's still coming; at once for a game with none or nothing gained.)
   const [filled, setFilled] = useState<XpGrant | null>(null);
   const done = xp !== undefined && (!filling || filled === xp);
@@ -34,13 +45,13 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   // The fill, frame by frame, from its first frame (a layout effect: the box's first paint is the old XP).
   useLayoutEffect(() => {
     if (!xp || xp.none || !filling) return;
-    const ms = xpFillMs(xp.after - xp.before);
+    const ms = xpFillMs(xp.after - from);
     const parts = [...(partsRef.current?.querySelectorAll<HTMLElement>(".xp-part") ?? [])];
     // (Each part shows as the count reaches its share: the first at once.)
     const starts = xp.parts.map((_, i) => xp.parts.slice(0, i).reduce((sum, p) => sum + p.xp, 0));
-    let shownLevel = xp.levelBefore;
+    let shownLevel = levelOf(from);
     const draw = (t: number) => {
-      const at = xpAt(xp.before, xp.after, t, ms);
+      const at = xpAt(from, xp.after, t, ms);
       if (fill.current) fill.current.style.transform = `scaleX(${at.share})`;
       if (gain.current) gain.current.textContent = `+${fmt(at.xp - xp.before)} XP`;
       if (at.level !== shownLevel) {
@@ -60,9 +71,13 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
       }
       parts.forEach((el, i) => el.classList.toggle("shown", i === 0 || at.xp - xp.before >= starts[i]!));
     };
+    const end = () => {
+      markXpFilled(xp);
+      setFilled(xp);
+    };
     if (reduced()) {
       draw(ms);
-      setFilled(xp);
+      end();
       return;
     }
     draw(0);
@@ -72,7 +87,7 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
       const t = now - t0;
       draw(t);
       if (t < ms) raf = requestAnimationFrame(frame);
-      else setFilled(xp);
+      else end();
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -80,12 +95,12 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
 
   const nothing = xp === null || !!xp?.none;
   const line = xp === undefined ? "Counting your XP…" : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
-  const start = filling ? xp!.before : still;
+  const start = filling ? from : xp && !xp.none ? xp.after : still;
   return (
     <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
       <div class="xp-top">
         <span class="xp-gain" ref={gain}>
-          {xp === undefined ? "XP" : `+${fmt(filling ? 0 : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
+          {xp === undefined ? "XP" : `+${fmt(filling ? from - (xp?.before ?? 0) : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
         </span>
         <span class="xp-level" ref={level}>
           Level {levelOf(start)}

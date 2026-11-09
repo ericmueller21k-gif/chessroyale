@@ -1,6 +1,6 @@
 import { XP, gameXp, isXpNone, xpDayStart, xpGrant, xpParts, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
-import { cond, ledgerAccount, leg, opOutcome, opStatements, type Cond, type Op } from "./ledger.ts";
+import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
 
 /**
  * XP (Eric, Nov 9; core's xp.ts has the rules, XP in settings.ts; docs/decisions/2026-11-09-xp-*.md): the one place that decides a
@@ -11,8 +11,9 @@ import { cond, ledgerAccount, leg, opOutcome, opStatements, type Cond, type Op }
  *
  *   - `xp:<game>:<ledger id>`: the minutes' XP (reason "xp").
  *   - `xpwin:<game>:<ledger id>`: the win's (reason "xp-win"), with its cap as the op's guard, checked in the same transaction:
- *     a friends' lobby pays it once an XP day per set of opponents (`vs`), solo `XP.soloWinsPerDay` times an XP day (the leg's
- *     source says which: `vs:<their ledger ids>` or `solo`).
+ *     a friends' lobby pays it once an XP day per opponent (`vs`: none of them beaten yet today), solo `XP.soloWinsPerDay` times
+ *     an XP day (the leg's source says which: `vs:<their ledger ids>` or `solo`).
+ *   - A solo game's time leg has source `solo`: capped at XP.soloMinutesPerDay minutes an XP day, its guard in the same statement.
  * Both go in one batch. What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
  * xp_parts, xp_none: `xpColumns`), so an online result screen can ask for it (GET /api/xp?game=CODE).
  * (Only types come from accounts.ts: it imports this file's helpers while it loads.)
@@ -20,8 +21,8 @@ import { cond, ledgerAccount, leg, opOutcome, opStatements, type Cond, type Op }
 
 /**
  * A solo game the server is timing (Nov 9): one open per account (a new start replaces it), taken off as its result comes in, so
- * it's timed once. `test_minutes`: the test switch ?xpgame=MINUTES (test servers and admins only): it counts as a game that long,
- * with enough moves. A new table: nothing older reads or writes it.
+ * it's timed once. `test_minutes`: the test switch ?xpgame=MINUTES (test servers only; SOLO_TESTED for an admin's elsewhere): it
+ * counts as a game that long, with enough moves. A new table: nothing older reads or writes it.
  */
 export const XP_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS solo_games (
@@ -31,6 +32,12 @@ export const XP_SCHEMA = [
     test_minutes INTEGER
   )`,
 ];
+
+/**
+ * `test_minutes` for a solo game an admin started with ?xpgame where TEST_SWITCHES is off (production): a test game, no XP (review
+ * m1, Nov 9). Any other value is the switch's minutes (TEST_SWITCHES on), or NULL for none.
+ */
+export const SOLO_TESTED = -1;
 
 /** A solo game's id: 18 hex characters. */
 const SOLO_GAME = /^[0-9a-f]{18}$/;
@@ -50,7 +57,11 @@ export async function startSoloGame(sql: Sql, userId: string, now: number, testM
   return id;
 }
 
-/** A solo game's end, as its result comes in: its time by the server's clock (and the test switch's minutes), once. Null: unknown, or finished already. */
+/**
+ * A solo game's end, as its result comes in: its time by the server's clock (and the test switch's minutes), once. Null: unknown,
+ * or finished already. (Taken off before its XP is granted: if the grant then throws, that game's time is lost and a retry can't
+ * get it back, as its result is answered "no XP". Rare (a failed write), and the safe way round: never paid twice.)
+ */
 export async function endSoloGame(sql: Sql, userId: string, game: unknown, now: number): Promise<{ id: string; ms: number; testMinutes: number | null } | null> {
   if (typeof game !== "string" || !SOLO_GAME.test(game)) return null;
   const row = await sql.first<{ started_at: number; test_minutes: number | null }>("DELETE FROM solo_games WHERE user_id = ? AND id = ? RETURNING started_at, test_minutes", userId, game);
@@ -61,9 +72,9 @@ export async function endSoloGame(sql: Sql, userId: string, game: unknown, now: 
 export type WinCap =
   /** None: a matchmade game (strangers), or a friends' lobby with no other account against you. */
   | null
-  /** A friends' lobby: once an XP day per set of opponents (their account ids). */
+  /** A friends' lobby: once an XP day per opponent (their account ids): no win today against any of them yet. */
   | { vs: readonly string[] }
-  /** A solo game (its result is the device's word): XP.soloWinsPerDay an XP day. */
+  /** A solo game (its result is the device's word): XP.soloWinsPerDay wins and XP.soloMinutesPerDay minutes an XP day. */
   | "solo";
 
 export interface XpGame {
@@ -83,25 +94,52 @@ export async function xpOf(sql: Sql, userId: string): Promise<number> {
   return (await sql.first<{ xp: number | null }>("SELECT xp FROM wallets WHERE user_id = ?", userId))?.xp ?? 0;
 }
 
-/** Who this is, for the rules: a guest (no sign-in identity), banned, and their XP now. Null: no such account (deleted). */
-async function standing(sql: Sql, userId: string) {
-  return sql.first<{ signed: number; banned: number; xp: number }>(
+/** A solo time leg's source (the daily cap counts these), and the win's. */
+const SOLO = "solo";
+
+/**
+ * Who this is, for the rules: a guest (no sign-in identity), banned, their XP now, their ledger id (null: none yet) and, for the
+ * solo cap, the solo time XP already paid this XP day: one read. Null: no such account (deleted).
+ */
+async function standing(sql: Sql, userId: string, day: number) {
+  return sql.first<{ signed: number; banned: number; xp: number; account: string | null; solo: number }>(
     `SELECT (u.email IS NOT NULL OR u.google_sub IS NOT NULL) AS signed,
        EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status = 'banned') AS banned,
-       COALESCE((SELECT w.xp FROM wallets w WHERE w.user_id = u.id), 0) AS xp
-     FROM users u WHERE u.id = ?`,
+       COALESCE((SELECT w.xp FROM wallets w WHERE w.user_id = u.id), 0) AS xp,
+       a.account AS account,
+       COALESCE((SELECT SUM(l.delta) FROM ledger l WHERE l.account = a.account AND l.asset_kind = 'xp' AND l.reason = 'xp' AND l.source_id = '${SOLO}' AND l.created_at >= ?), 0) AS solo
+     FROM users u LEFT JOIN ledger_accounts a ON a.user_id = u.id WHERE u.id = ?`,
+    day,
     userId,
   );
 }
 
+/**
+ * Several accounts' ledger ids at once (the friends' cap; review m5): one query per 90 (D1's bound-parameter limit is 100). An
+ * account with none yet gets one (ledgerAccount: once ever per account), so every opponent is named; a deleted one names nobody.
+ */
+async function ledgerIds(sql: Sql, userIds: readonly string[]): Promise<string[]> {
+  const ids = [...new Set(userIds)];
+  const found = new Map<string, string>();
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    for (const r of await sql.all<{ user_id: string; account: string }>(`SELECT user_id, account FROM ledger_accounts WHERE user_id IN (${chunk.map(() => "?").join(", ")})`, ...chunk)) found.set(r.user_id, r.account);
+  }
+  for (const u of ids) {
+    if (found.has(u)) continue;
+    const a = await ledgerAccount(sql, u);
+    if (a) found.set(u, a.account);
+  }
+  return [...new Set(found.values())].sort();
+}
+
 /** The win op's cap: its leg's source and its guard (the day's count, in the same statement as the leg goes in). */
-async function winCap(sql: Sql, account: string, game: XpGame): Promise<{ source: string; when?: Cond }> {
-  const day = xpDayStart(game.now);
+async function winCap(sql: Sql, account: string, game: XpGame, day: number): Promise<{ source: string; when?: Cond }> {
   if (game.cap === "solo") {
     return {
-      source: "solo",
+      source: SOLO,
       when: cond(
-        "(SELECT COUNT(*) FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id = 'solo' AND created_at >= ?) < ?",
+        `(SELECT COUNT(*) FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id = '${SOLO}' AND created_at >= ?) < ?`,
         account,
         day,
         XP.soloWinsPerDay,
@@ -109,17 +147,19 @@ async function winCap(sql: Sql, account: string, game: XpGame): Promise<{ source
     };
   }
   if (game.cap && game.cap.vs.length) {
-    // (Named by their ledger ids, never their account ids: a deleted account's then names nobody.)
-    const ids: string[] = [];
-    for (const u of game.cap.vs) {
-      const a = await ledgerAccount(sql, u);
-      if (a) ids.push(a.account);
-    }
+    // (Named by their ledger ids, never their account ids: a deleted account's then names nobody.) Once an XP day per opponent: any win today against a set that
+    // shares one of them blocks this one (review m4, Nov 9: per set, n alts gave 2^n − 1 wins). The source lists the set
+    // ("vs:<id>,<id>"); the guard looks for each id in it, between commas (ledger ids are hex: no LIKE wildcards).
+    const ids = await ledgerIds(sql, game.cap.vs);
     if (ids.length) {
-      const source = `vs:${[...new Set(ids)].sort().join(",")}`.slice(0, 512);
       return {
-        source,
-        when: cond("NOT EXISTS (SELECT 1 FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id = ? AND created_at >= ?)", account, source, day),
+        source: `vs:${ids.join(",")}`,
+        when: cond(
+          `NOT EXISTS (SELECT 1 FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp-win' AND source_id LIKE 'vs:%' AND created_at >= ? AND (${ids.map(() => "(',' || substr(source_id, 4) || ',') LIKE ?").join(" OR ")}))`,
+          account,
+          day,
+          ...ids.map((id) => `%,${id},%`),
+        ),
       };
     }
   }
@@ -129,17 +169,32 @@ async function winCap(sql: Sql, account: string, game: XpGame): Promise<{ source
 /**
  * A finished game's XP for one player: decided by the rules (core's gameXp) from the server's facts, and granted through the ledger
  * once. Answers what the result screen shows. Null: no such account (deleted mid-match). A failed write throws.
+ *
+ * A solo game's time XP is capped at XP.soloMinutesPerDay minutes an XP day (review M2, Nov 9): its leg's source is "solo", what's
+ * left today is read first and paid (the parts say "Daily solo limit" if that trimmed it), and the guard checks the day's sum again
+ * in the same statement, so two results at once can't pass the cap (the later one is refused: +0).
  */
 export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<XpGrant | null> {
-  const who = await standing(sql, userId);
+  const day = xpDayStart(game.now);
+  const who = await standing(sql, userId, day);
   if (!who) return null;
   const g = gameXp({ ...game.facts, guest: game.signedInOnly && !who.signed, banned: !!who.banned });
   if (g.none) return xpGrant(who.xp, [], g.none);
-  const me = await ledgerAccount(sql, userId);
+  const me = who.account ? { user: userId, account: who.account } : await ledgerAccount(sql, userId);
   if (!me) return null;
-  const ops: { op: Op; nonce: string }[] = [];
-  const time: Op = { id: `xp:${game.key}:${me.account}`, reason: "xp", now: game.now, legs: g.time ? [leg.xp(userId, g.time, game.key)] : [] };
-  const capped = g.win ? await winCap(sql, me.account, game) : null;
+  const solo = game.cap === "solo";
+  const soloLimit = XP.soloMinutesPerDay * XP.perMinute;
+  const timeXp = solo ? Math.max(0, Math.min(g.time, soloLimit - (who.solo ?? 0))) : g.time;
+  const time: Op = {
+    id: `xp:${game.key}:${me.account}`,
+    reason: "xp",
+    now: game.now,
+    ...(solo
+      ? { when: cond(`COALESCE((SELECT SUM(delta) FROM ledger WHERE account = ? AND asset_kind = 'xp' AND reason = 'xp' AND source_id = '${SOLO}' AND created_at >= ?), 0) + ? <= ?`, me.account, day, timeXp, soloLimit) }
+      : {}),
+    legs: timeXp ? [leg.xp(userId, timeXp, solo ? SOLO : game.key)] : [],
+  };
+  const capped = g.win ? await winCap(sql, me.account, game, day) : null;
   const win: Op = {
     id: `xpwin:${game.key}:${me.account}`,
     reason: "xp-win",
@@ -147,17 +202,24 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     ...(capped?.when ? { when: capped.when } : {}),
     legs: g.win ? [leg.xp(userId, g.win, capped!.source)] : [],
   };
-  for (const op of [time, win]) if (op.legs.length) ops.push({ op, nonce: newId() });
-  if (ops.length) await sql.batch(ops.flatMap((o) => opStatements(me, o.op, o.nonce)));
-  // (A replay, its first attempt's: the same game, so the same parts.)
-  const paid = async (op: Op, nonce: string | undefined) => (nonce ? (await opOutcome(sql, op.id, nonce)) !== "refused" : false);
-  const nonceOf = (op: Op) => ops.find((o) => o.op === op)?.nonce;
-  const timePaid = await paid(time, nonceOf(time));
-  const winPaid = await paid(win, nonceOf(win));
-  const parts = xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid);
-  const after = await xpOf(sql, userId);
+  const nonces = new Map<Op, string>();
+  for (const op of [time, win]) if (op.legs.length) nonces.set(op, newId());
+  if (nonces.size) await sql.batch([...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)));
+  // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts.)
+  const after = await sql.first<{ time: number | null; win: string | null; xp: number }>(
+    `SELECT (SELECT delta FROM ledger WHERE op_id = ? AND leg = 0) AS time, (SELECT nonce FROM ledger WHERE op_id = ? AND leg = 0) AS win,
+       COALESCE((SELECT xp FROM wallets WHERE user_id = ?), 0) AS xp`,
+    time.id,
+    win.id,
+    userId,
+  );
+  const timePaid = nonces.has(time) ? (after?.time ?? 0) : 0;
+  const winPaid = nonces.has(win) && after?.win != null;
+  const parts = solo ? xpParts(g, winPaid, timePaid) : xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid);
   const gained = parts.reduce((s, p) => s + p.xp, 0);
-  return xpGrant(Math.max(0, after - gained), parts);
+  // (The cap took all of it: say so as the reason, not a box of +0s.)
+  if (solo && g.time && !gained) return xpGrant(after?.xp ?? who.xp, [], "limit");
+  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts);
 }
 
 /** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none). */

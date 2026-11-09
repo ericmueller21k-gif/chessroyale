@@ -29,13 +29,16 @@ describe("who may use them", () => {
 describe("a new lobby's options", () => {
   const all = `rounds=1&clock=5&finalTurns=2&bossMoves=3&draw=weighted&power=candle&format=boss&speed=bullet&weakbots=1&keep=5&pace=quick&augments=0&start=freestyle`;
 
-  it("XP (Nov 9): a lobby a test switch made is marked tested (no XP); ?xpgame=MINUTES alone isn't, and counts the game that long", () => {
+  it("XP (Nov 9): a lobby a test switch made is marked tested (no XP); ?xpgame=MINUTES alone isn't, and counts the game that long (TEST_SWITCHES on only)", () => {
     expect(lobbyOptions(q("mode=crowd"), true).overrides.tested).toBeUndefined();
     expect(lobbyOptions(q("mode=crowd&rounds=2"), true).overrides.tested).toBe(true);
     expect(lobbyOptions(q(`mode=raid&boss=${BOSS_TIERS[0]}`), true).overrides.tested).toBe(true);
-    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides).toMatchObject({ xpGame: 12 });
-    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides.tested).toBeUndefined();
-    expect(lobbyOptions(q("mode=crowd&xpgame=999&rounds=2"), true).overrides).toMatchObject({ xpGame: 30, tested: true });
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true, true).overrides).toMatchObject({ xpGame: 12 });
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true, true).overrides.tested).toBeUndefined();
+    expect(lobbyOptions(q("mode=crowd&xpgame=999&rounds=2"), true, true).overrides).toMatchObject({ xpGame: 30, tested: true });
+    // (An admin on production, TEST_SWITCHES off: ?xpgame is a test switch like the others: a test game, no XP. Review m1.)
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides).not.toHaveProperty("xpGame");
+    expect(lobbyOptions(q("mode=crowd&xpgame=12"), true).overrides.tested).toBe(true);
     // (A player's: dropped, as every switch.)
     expect(lobbyOptions(q("mode=crowd&xpgame=12&rounds=2"), false).overrides).not.toHaveProperty("xpGame");
     expect(lobbyOptions(q("mode=crowd&xpgame=12&rounds=2"), false).overrides).not.toHaveProperty("tested");

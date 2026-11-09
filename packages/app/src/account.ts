@@ -536,6 +536,8 @@ export async function recordSoloResult(r: {
   moves?: number;
   won?: boolean;
   resigned?: boolean;
+  /** Removed for idling (the server answers "No XP: you left the match."). */
+  left?: boolean;
   test?: boolean;
 }): Promise<XpGrant | null> {
   if (!state.profile) return null;

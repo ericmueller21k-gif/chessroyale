@@ -28,7 +28,12 @@ function withoutTestSwitches(q: URLSearchParams): URLSearchParams {
   return out;
 }
 
-export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides: NonNullable<LobbyRecord["overrides"]>; keepMs?: number } {
+/**
+ * `xpGameOn`: ?xpgame=MINUTES is honored (a game that long, with enough moves, for the XP box's tests) only where TEST_SWITCHES is
+ * "1" (local, e2e, staging). Anywhere else (an admin on production) it's a test switch like the others: the lobby is a test game,
+ * no XP (review m1, Nov 9: it paid real XP to everyone in an admin's lobby).
+ */
+export function lobbyOptions(query: URLSearchParams, test: boolean, xpGameOn = false): { overrides: NonNullable<LobbyRecord["overrides"]>; keepMs?: number } {
   const q = test ? query : withoutTestSwitches(query);
   // Playtest overrides, e.g. POST /api/lobby?rounds=2&clock=15
   const n = (k: string) => (q.has(k) ? Math.max(1, Math.min(600, Number(q.get(k)) || 0)) : undefined);
@@ -77,10 +82,10 @@ export function lobbyOptions(query: URLSearchParams, test: boolean): { overrides
     ...(q.get("weakbots") === "1" ? WEAK_BOTS : {}),
     // ?afk=0: a 50 v 50 miss as before Nov 4 (CrowdMisses off), for a test that idles on purpose. Never for players.
     ...(q.get("afk") === "0" ? { crowdMisses: null } : {}),
-    // XP (Nov 9; server/xp.ts): a lobby any test switch made earns no XP ("No XP: test game."), except ?xpgame=MINUTES, which counts
-    // the game as that long with enough moves (for the XP box's tests), whatever other switch is on.
-    ...(LOBBY_TEST_SWITCHES.some((k) => k !== "xpgame" && q.has(k)) || testBoss(q) ? { tested: true } : {}),
-    ...(q.has("xpgame") ? { xpGame: Math.max(0, Math.min(XP.maxMinutes, Math.floor(Number(q.get("xpgame")) || 0))) } : {}),
+    // XP (Nov 9; server/xp.ts): a lobby any test switch made earns no XP ("No XP: test game."), except ?xpgame=MINUTES where
+    // `xpGameOn`, which counts the game as that long with enough moves (for the XP box's tests), whatever other switch is on.
+    ...(LOBBY_TEST_SWITCHES.some((k) => (k !== "xpgame" || !xpGameOn) && q.has(k)) || testBoss(q) ? { tested: true } : {}),
+    ...(xpGameOn && q.has("xpgame") ? { xpGame: Math.max(0, Math.min(XP.maxMinutes, Math.floor(Number(q.get("xpgame")) || 0))) } : {}),
   };
   // ?keep=SECONDS: its results stay up this long (5 s up to the usual 15 minutes), for tests.
   const keepMs = q.has("keep") ? Math.max(5, Math.min(LOBBY_LIFE.lobbyResultsKeepMinutes * 60, Number(q.get("keep")) || 0)) * 1000 : undefined;

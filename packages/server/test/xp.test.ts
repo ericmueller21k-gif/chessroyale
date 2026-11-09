@@ -99,7 +99,7 @@ describe("granting a game's XP", () => {
 });
 
 describe("the win's caps", () => {
-  it("a friends' lobby: once an XP day per set of opponents; others, or the next day, pay again", async () => {
+  it("a friends' lobby: once an XP day per opponent (any one already beaten today blocks it); others, or the next day, pay again", async () => {
     const { sql } = await world();
     const [ann, bo, cy] = [await signedIn(sql, "ann@example.com"), await signedIn(sql, "bo@example.com"), await signedIn(sql, "cy@example.com")];
     const win = (key: string, vs: string[], now = T0) => grantXp(sql, ann.id, game(key, { cap: { vs }, now }, { won: true }));
@@ -108,8 +108,14 @@ describe("the win's caps", () => {
     // (The time still counts.)
     expect((await win("lobby:AAAAA:2", [bo.id]))?.parts[0]).toEqual({ label: "12 min", xp: 120 });
     expect((await win("lobby:AAAAA:3", [cy.id]))?.parts.at(-1)).toEqual({ label: "Win", xp: 50 });
-    expect((await win("lobby:AAAAA:4", [cy.id, bo.id]))?.parts.at(-1)).toEqual({ label: "Win", xp: 50 });
+    // (Review m4: a new set that shares anyone beaten today pays nothing more: with alts B and C, 2 wins a day, not 2^n − 1.)
+    expect((await win("lobby:AAAAA:4", [cy.id, bo.id]))?.parts.at(-1)).toEqual({ label: "Win (paid once today)", xp: 0 });
     expect((await win("lobby:AAAAA:5", [bo.id, cy.id]))?.parts.at(-1)).toEqual({ label: "Win (paid once today)", xp: 0 });
+    const dee = await signedIn(sql, "dee@example.com");
+    expect((await win("lobby:AAAAA:9", [dee.id, bo.id]))?.parts.at(-1)).toEqual({ label: "Win (paid once today)", xp: 0 });
+    // (Someone new, alone: pays; then a set with them in it doesn't.)
+    expect((await win("lobby:AAAAA:10", [dee.id]))?.parts.at(-1)).toEqual({ label: "Win", xp: 50 });
+    expect((await win("lobby:AAAAA:11", [cy.id, dee.id]))?.parts.at(-1)).toEqual({ label: "Win (paid once today)", xp: 0 });
     expect((await win("lobby:AAAAA:6", [bo.id], xpDayStart(T0) + 86_400_000))?.parts.at(-1)).toEqual({ label: "Win", xp: 50 });
     // (No other account against you, bots only: as a matchmade game.)
     expect((await win("lobby:AAAAA:7", []))?.parts.at(-1)).toEqual({ label: "Win", xp: 50 });
@@ -125,6 +131,40 @@ describe("the win's caps", () => {
     expect(wins.filter((w) => w?.parts.some((p) => p.label === "Win" && p.xp === XP.win)).length).toBe(XP.soloWinsPerDay);
     expect(wins.every((w) => w?.parts[0]?.xp === 120)).toBe(true);
     expect(await xpOf(sql, ann.id)).toBe((XP.soloWinsPerDay + 3) * 120 + XP.soloWinsPerDay * XP.win);
+  });
+});
+
+describe("the solo time cap (review M2): XP.soloMinutesPerDay minutes an XP day", () => {
+  it("full games until the cap, then what's left (\"Daily solo limit\"), then none; the win still pays; the next day again; not online", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    const limit = XP.soloMinutesPerDay * XP.perMinute;
+    const solo = (key: string, minutes: number, won = false, now = T0) => grantXp(sql, ann.id, game(key, { cap: "solo", now }, { ms: minutes * MIN, won }));
+    // (Four 30-minute games fill 120 minutes.)
+    for (let i = 0; i < XP.soloMinutesPerDay / XP.maxMinutes - 1; i++) expect((await solo(`solo:a${i}`, 30))?.parts).toEqual([{ label: "30 min", xp: 300 }]);
+    expect((await solo("solo:b", 20))?.parts).toEqual([{ label: "20 min", xp: 200 }]);
+    expect((await solo("solo:c", 25))?.parts).toEqual([{ label: "25 min (Daily solo limit)", xp: limit - 1_100 }]);
+    expect(await xpOf(sql, ann.id)).toBe(limit);
+    // (Nothing left: the reason, not a box of +0s; with a win, the win alone.)
+    expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 2, levelAfter: 2, parts: [], none: "limit" });
+    expect((await solo("solo:e", 12, true))?.parts).toEqual([
+      { label: "Daily solo limit", xp: 0 },
+      { label: "Win", xp: XP.win },
+    ]);
+    // (Online games aren't capped by it.)
+    expect((await grantXp(sql, ann.id, game("lobby:ABCDE:1")))?.parts).toEqual([{ label: "12 min", xp: 120 }]);
+    // (The next XP day: again.)
+    expect((await solo("solo:f", 12, false, xpDayStart(T0) + 86_400_000))?.parts).toEqual([{ label: "12 min", xp: 120 }]);
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
+  });
+
+  it("at once: results arriving together never pass the cap (the guard is in the same statement)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    const all = await Promise.all(Array.from({ length: 8 }, (_, i) => grantXp(sql, ann.id, game(`solo:${i}`, { cap: "solo" }, { ms: 30 * MIN }))));
+    expect(await xpOf(sql, ann.id)).toBeLessThanOrEqual(XP.soloMinutesPerDay * XP.perMinute);
+    expect(all.reduce((n, g) => n + (g?.after ?? 0) - (g?.before ?? 0), 0)).toBe(await xpOf(sql, ann.id));
+    expect(await ledgerMismatches(sql, ann.id)).toEqual([]);
   });
 });
 

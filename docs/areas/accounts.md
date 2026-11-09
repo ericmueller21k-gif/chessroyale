@@ -56,7 +56,8 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves; none for leaving, a test game, a banned
   account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 1,000 (`levelOf`). Each result row keeps the game's `play_ms`,
   `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
-  `POST /api/results` (table `solo_games`). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
+  `POST /api/results` (table `solo_games`); a solo result it never timed earns nothing, a solo win needs 5 of its minutes, and solo time
+  XP is capped at `XP.soloMinutesPerDay` (120) minutes an XP day. A friends' lobby's win pays once an XP day per opponent. Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
   when a guest signs in (`grantReward`).

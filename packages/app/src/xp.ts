@@ -32,6 +32,11 @@ const SOLO_TEST_SWITCHES = ["rounds", "clock", "finalTurns", "bossMoves", "draw"
 /** This solo game is a test's: a test switch is on (only where they apply: testParams), or practice mode. */
 export const soloTestGame = (practice: boolean): boolean => practice || SOLO_TEST_SWITCHES.some((k) => testParams().has(k));
 
+/** The grants whose box has finished its fill (review m7): a later box for the same game (a remount) shows the end at once. */
+const filledGrants = new WeakSet<XpGrant>();
+export const markXpFilled = (xp: XpGrant): void => void filledGrants.add(xp);
+export const xpFilled = (xp: XpGrant): boolean => filledGrants.has(xp);
+
 /** Each game's XP, asked once, whoever asks: a promise of the grant (null: none came). */
 const answers = new WeakMap<object, { p: Promise<XpGrant | null>; settle?: (x: XpGrant | null) => void }>();
 

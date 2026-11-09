@@ -3132,7 +3132,10 @@ export const BOSS_TOKENS = {
  *   - No XP for leaving the match (idle, removed), for a guest where sign-in is set up, a test game, or a banned account.
  *   - The win bonus is capped where two accounts could trade wins: a friends' lobby pays it once a day per set of opponents, and solo
  *     games (whose result is the device's word) `soloWinsPerDay` times a day. The day starts at `dayStartUtcHour` (08:00 UTC is
- *     midnight Pacific), the same for everyone.
+ *     midnight Pacific), the same for everyone. A solo win also needs `soloWinMinMinutes` of the server's own time (as boss tokens').
+ *   - Solo time XP (the device's word for the moves; the server's clock only proves time passed) is capped at `soloMinutesPerDay`
+ *     minutes an XP day (1,200 XP): a game past it pays what's left ("Daily solo limit"). The director's call (review M2, Nov 9);
+ *     Eric may change the number. A solo result the server never timed earns no XP at all (review M1).
  *   - The result screen's XP box: the bar fills from the old XP to the new over `fillMs` (by how much it gains, between the two),
  *     each part appearing in turn; a level-up fills to the end, pops "Level N!" for `levelUpMs`, and carries on from empty. Online,
  *     the screen asks the server for its game's XP at `asksMs` after the results (the room may still be writing them).
@@ -3145,6 +3148,8 @@ export const XP = {
   win: 50,
   minMoves: 10,
   soloWinsPerDay: 5,
+  soloWinMinMinutes: 5,
+  soloMinutesPerDay: 120,
   dayStartUtcHour: 8,
   fillMs: { min: 1500, max: 2500 },
   levelUpMs: 700,

@@ -312,9 +312,13 @@ describe("boss powers online", () => {
     (BOSS_POWERS as { ultimateTestButton: boolean }).ultimateTestButton = false;
     expect(L.core.ultimateTrigger("p1", true)).toBe(false);
     (BOSS_POWERS as { ultimateTestButton: boolean }).ultimateTestButton = on;
+    // (Refused triggers leave the raid a real game: XP counts.)
+    expect(L.core.record.overrides?.tested).toBeUndefined();
     // An admin, in the middle of the crowd's turn: this turn goes on as it was.
     const r1 = L.last("p1", "round")!;
     expect(L.core.ultimateTrigger("p1", true)).toBe(true);
+    // (A test control touched the raid: a test game, no XP for anyone in it. Review m3.)
+    expect(L.core.record.overrides?.tested).toBe(true);
     expect(L.core.record.round!.key).toBe(r1.key);
     expect(L.core.record.phase).toBe("play");
     crowdMove(L);

@@ -414,7 +414,8 @@ export function App() {
     const feats = me ? matchFeats(runner.player(me.id), match.settings.knockoutsPerStage.length, runner.boss, raid) : null;
     const bossResult = match.phase.bossResult;
     // You resigned: a loss (on your team's record, or against the boss), and you didn't see a boss battle through.
-    const resigned = match.phase.left?.how === "resigned" || match.phase.left?.how === "afk";
+    const how = match.phase.left?.how;
+    const resigned = how === "resigned" || how === "afk";
     const mode = raid ? "boss" : match.settings.mode;
     const solo = match;
     const placement = match.phase.placement;
@@ -448,7 +449,9 @@ export function App() {
         game,
         moves: solo.moves.filter((m) => m.move !== null).length,
         won: !resigned && (mode === "classic" ? placement === 1 : teamWon === true),
-        resigned,
+        resigned: how === "resigned",
+        // (Removed for idling: "No XP: you left the match.", as online. Review m6.)
+        left: how === "afk",
         test: soloTestGame(practiceOn()),
       });
       settleSoloXp(solo, xp);

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
-import { QUICK_CHAT, crateDef, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
+import { QUICK_CHAT, XP, crateDef, defaultChatPicks, itemDef, ownedChatPacks } from "@chessroyale/core";
 import {
   createSession,
   getUser,
@@ -239,6 +239,81 @@ describe("account API", () => {
     const bad = await call(env, "/api/me", { method: "PATCH", body: JSON.stringify({ pawn: "green" }), cookie: me.cookie });
     expect(bad.res.status).toBe(400);
     expect((await call(env, "/api/me", { cookie: me.cookie })).body.user.pawn).toBe("black");
+  });
+
+  describe("POST /api/results: a solo game's XP (review of #569, Nov 9)", () => {
+    const T = Date.UTC(2026, 10, 9, 12, 0);
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+    const at = (t: number) => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(t);
+    };
+    const result = (env: object, cookie: string | undefined, body: object) =>
+      call(env, "/api/results", { method: "POST", body: JSON.stringify({ mode: "classic", placement: 1, players: 64, ...body }), cookie });
+    const start = async (env: object, cookie: string | undefined, body: object = {}) =>
+      (await call(env, "/api/xp/solo/start", { method: "POST", body: JSON.stringify(body), cookie })).body.game as string;
+
+    it("M1: no server-timed game earns nothing (time or win), however many times; a win needs XP.soloWinMinMinutes of the server's time", async () => {
+      const env = { DB: memoryD1() };
+      at(T);
+      const me = await call(env, "/api/me?name=Solo");
+      for (let i = 0; i < 3; i++) expect((await result(env, me.cookie, { won: true, moves: 10 })).body).toEqual({ ok: true, xp: null });
+      // (A game id the server never gave, or one already ended: the same.)
+      expect((await result(env, me.cookie, { game: "0123456789abcdef01", won: true, moves: 10 })).body.xp).toBeNull();
+      const a = await start(env, me.cookie);
+      at(T + 1_000);
+      expect((await result(env, me.cookie, { game: a, won: true, moves: 10 })).body.xp).toMatchObject({ after: 0, parts: [] });
+      expect((await result(env, me.cookie, { game: a, won: true, moves: 10 })).body.xp).toBeNull();
+      // (Under the floor: the minutes, no win; at it: both.)
+      const b = await start(env, me.cookie);
+      at(T + 1_000 + (XP.soloWinMinMinutes - 1) * 60_000 + 59_000);
+      expect((await result(env, me.cookie, { game: b, won: true, moves: 10 })).body.xp.parts).toEqual([{ label: `${XP.soloWinMinMinutes - 1} min`, xp: (XP.soloWinMinMinutes - 1) * XP.perMinute }]);
+      const c = await start(env, me.cookie);
+      at(Date.now() + XP.soloWinMinMinutes * 60_000);
+      expect((await result(env, me.cookie, { game: c, won: true, moves: 10 })).body.xp.parts).toEqual([
+        { label: `${XP.soloWinMinMinutes} min`, xp: XP.soloWinMinMinutes * XP.perMinute },
+        { label: "Win", xp: XP.win },
+      ]);
+      expect((await call(env, "/api/me", { cookie: me.cookie })).body.xp).toBe((2 * XP.soloWinMinMinutes - 1) * XP.perMinute + XP.win);
+    });
+
+    it("m6: a game the device ended for idling (left) answers \"left\"; an app from before XP stores its moves as NULL", async () => {
+      const env = { DB: memoryD1() };
+      at(T);
+      const me = await call(env, "/api/me?name=Idle");
+      const a = await start(env, me.cookie);
+      at(T + 12 * 60_000);
+      expect((await result(env, me.cookie, { game: a, moves: 14, resigned: false, left: true })).body.xp).toMatchObject({ none: "left", parts: [] });
+      await result(env, me.cookie, { mode: "crowd" });
+      const rows = await (env.DB as D1Database).prepare("SELECT moves FROM results ORDER BY id").all<{ moves: number | null }>();
+      expect(rows.results.map((r) => r.moves)).toEqual([14, null]);
+    });
+
+    it("m1: ?xpgame counts the game only where TEST_SWITCHES is on; an admin's elsewhere makes a test game (no XP)", async () => {
+      at(T);
+      const test = { DB: memoryD1(), TEST_SWITCHES: "1" };
+      const t = await call(test, "/api/me?name=Tester");
+      const a = await start(test, t.cookie, { xpgame: 12 });
+      expect((await result(test, t.cookie, { game: a, moves: 0 })).body.xp.parts).toEqual([{ label: "12 min", xp: 120 }]);
+      // (Production: an admin, signed in.)
+      const prod = { DB: memoryD1(), RESEND_API_KEY: "re_test", ADMIN_EMAILS: "boss@example.com" };
+      const me = await call(prod, "/api/me?name=Admin");
+      let code = "";
+      const fakeResend = (async (_url: string, init: RequestInit) => {
+        code = /(\d{6}) is your/.exec(JSON.parse(String(init.body)).subject)![1]!;
+        return new Response("{}", { status: 200 });
+      }) as unknown as typeof fetch;
+      const answered = `${me.cookie}; hc_age=ok`;
+      await call(prod, "/api/auth/email/start", { method: "POST", body: JSON.stringify({ email: "boss@example.com" }), cookie: answered }, fakeResend);
+      const admin = await call(prod, "/api/auth/email/verify", { method: "POST", body: JSON.stringify({ email: "boss@example.com", code }), cookie: answered });
+      expect(admin.body.user.signedIn).toBe(true);
+      const b = await start(prod, admin.cookie, { xpgame: 12 });
+      at(T + 20 * 60_000);
+      expect((await result(prod, admin.cookie, { game: b, moves: 30, won: true })).body.xp).toMatchObject({ none: "test", parts: [] });
+      expect((await call(prod, "/api/me", { cookie: admin.cookie })).body.xp).toBe(0);
+    });
   });
 
   it("POST /api/results: a solo result never becomes your rating, whatever rating (or online, ranked) it claims", async () => {

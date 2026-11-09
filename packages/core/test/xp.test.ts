@@ -51,6 +51,7 @@ describe("XP and levels (Eric, Nov 9)", () => {
       guest: "Sign in to earn XP.",
       test: "No XP: test game.",
       banned: "No XP: this account is banned.",
+      limit: "No XP: daily solo limit reached.",
     });
     expect(isXpNone("left")).toBe(true);
     expect(isXpNone("toString")).toBe(false);
@@ -67,6 +68,12 @@ describe("XP and levels (Eric, Nov 9)", () => {
       { label: "Win (paid once today)", xp: 0 },
     ]);
     expect(xpParts({ minutes: 0, time: 0, win: 0 })).toEqual([]);
+    // (Solo's daily minutes trimmed the time: what was left, or +0, says so. Review M2.)
+    expect(xpParts({ minutes: 12, time: 120, win: 0 }, true, 40)).toEqual([{ label: "12 min (Daily solo limit)", xp: 40 }]);
+    expect(xpParts({ minutes: 12, time: 120, win: 50 }, true, 0)).toEqual([
+      { label: "Daily solo limit", xp: 0 },
+      { label: "Win", xp: 50 },
+    ]);
   });
 
   it("a grant: before, after and both levels; none keeps the XP where it was", () => {

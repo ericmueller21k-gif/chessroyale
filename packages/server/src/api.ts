@@ -11,7 +11,7 @@ import { battleToken, buyBossCrate, endSoloBattle, grantTestItems, openBossCrate
 import { playClaw } from "./claw.ts";
 import { grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice } from "./welcome.ts";
 import { requestId } from "./ledger.ts";
-import { endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
+import { SOLO_TESTED, endSoloGame, gameXpOf, grantXp, setTestXp, startSoloGame } from "./xp.ts";
 import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./global-chat-api.ts";
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
@@ -569,7 +569,10 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   // written it ({xp}: null until then). POST /api/xp/test {xp} (test switches only): sets your XP, for tests and stills.
   if (path === "/api/xp/solo/start" && request.method === "POST") {
     const b = (await request.json().catch(() => ({}))) as { xpgame?: unknown } | null;
-    const minutes = testSwitchesOn(env as AdminEnv, current) && typeof b?.xpgame === "number" && Number.isFinite(b.xpgame) ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b.xpgame))) : null;
+    // (?xpgame=MINUTES counts the game that long only where TEST_SWITCHES is "1" (local, e2e, staging). Anywhere else, an admin's
+    // included, it's a test switch like the others: the game is a test game, no XP (SOLO_TESTED). Review m1, Nov 9.)
+    const asked = typeof b?.xpgame === "number" && Number.isFinite(b.xpgame) && testSwitchesOn(env as AdminEnv, current);
+    const minutes = !asked ? null : (env as AdminEnv).TEST_SWITCHES === "1" ? Math.max(0, Math.min(XP.maxMinutes, Math.floor(b!.xpgame as number))) : SOLO_TESTED;
     return json({ game: await startSoloGame(sql, current.id, now, minutes) });
   }
   if (path === "/api/xp" && request.method === "GET") return json({ xp: await gameXpOf(sql, current.id, url.searchParams.get("game"), now) });
@@ -581,31 +584,39 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // POST /api/results: a solo match's result, from the browser. Its XP (Nov 9) is the server's: the time between the game's start
-  // and now by the server's clock (`game`: its id from /api/xp/solo/start); the moves, the win, a resign and a test switch are the
-  // device's word, so they can only lower it (a win is capped: XP.soloWinsPerDay a day). Answers {ok, xp}.
+  // and now by the server's clock (`game`: its id from /api/xp/solo/start); the moves, the win, a resign, leaving (`left`: removed
+  // for idling) and a test switch are the device's word, so they can only lower it. A result the server never timed (no `game`, or
+  // one already ended) earns no XP at all; a win needs XP.soloWinMinMinutes of the server's time and is capped (XP.soloWinsPerDay
+  // a day), and the time too (XP.soloMinutesPerDay a day). Review M1 and M2, Nov 9. Answers {ok, xp}.
   if (path === "/api/results" && request.method === "POST") {
-    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; test?: unknown }) | null;
+    const b = (await request.json().catch(() => null)) as (Partial<MatchResult> & { game?: unknown; won?: unknown; resigned?: unknown; left?: unknown; test?: unknown }) | null;
     if (!b || typeof b.placement !== "number" || typeof b.players !== "number") return json({ message: "Bad result" }, 400);
     const timed = await endSoloGame(sql, current.id, b.game, now);
-    const moves = typeof b.moves === "number" && Number.isFinite(b.moves) ? Math.max(0, Math.min(10_000, Math.round(b.moves))) : 0;
-    const forced = timed?.testMinutes ?? null;
-    const xp = await grantXp(sql, current.id, {
-      key: `solo:${timed?.id ?? crypto.randomUUID()}`,
-      facts: {
-        ms: forced !== null ? forced * 60_000 : (timed?.ms ?? 0),
-        moves: forced !== null ? Math.max(moves, XP.minMoves) : moves,
-        won: b.won === true,
-        resigned: b.resigned === true,
-        test: forced === null && b.test === true,
-      },
-      cap: "solo",
-      signedInOnly: signInRequired(env),
-      now,
-    }).catch((e: unknown) => {
-      console.log(`xp for a solo game: ${String(e)}`);
-      return null;
-    });
-    const { game: _game, won: _won, resigned: _resigned, test: _test, ...result } = b;
+    // (An app from before XP sends no moves: NULL, as for every result from before.)
+    const moves = typeof b.moves === "number" && Number.isFinite(b.moves) ? Math.max(0, Math.min(10_000, Math.round(b.moves))) : null;
+    const tested = timed?.testMinutes === SOLO_TESTED;
+    const forced = tested ? null : (timed?.testMinutes ?? null);
+    const ms = forced !== null ? forced * 60_000 : (timed?.ms ?? 0);
+    const xp = !timed
+      ? null
+      : await grantXp(sql, current.id, {
+          key: `solo:${timed.id}`,
+          facts: {
+            ms,
+            moves: forced !== null ? Math.max(moves ?? 0, XP.minMoves) : (moves ?? 0),
+            won: b.won === true && ms >= XP.soloWinMinMinutes * 60_000,
+            resigned: b.resigned === true,
+            abandoned: b.left === true,
+            test: tested || (forced === null && b.test === true),
+          },
+          cap: "solo",
+          signedInOnly: signInRequired(env),
+          now,
+        }).catch((e: unknown) => {
+          console.log(`xp for a solo game: ${String(e)}`);
+          return null;
+        });
+    const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, ...result } = b;
     await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed?.ms ?? null, moves, xp } as MatchResult, now);
     // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
     await grantWelcomeCrate(sql, current.id, now).catch(() => false);

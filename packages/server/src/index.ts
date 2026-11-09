@@ -254,7 +254,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const refused = await mayPlay(request, env, waitUntil);
       if (refused) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
-      const { overrides, keepMs } = lobbyOptions(url.searchParams, test);
+      const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1");
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
       return code ? json({ code }) : json({ message: "Couldn't create a lobby. Try again." }, 500);
     }

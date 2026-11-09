@@ -435,7 +435,7 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
       )}
       {/* XP (Nov 9): the box on every result screen; it comes with the outcome (an aborted game earns none). A game against a bot,
           here or in the town, records nothing yet, so it has no box. */}
-      {!snap.town && !snap.bot && <XpResult xp={snap.outcome ? (snap.outcome.xp ?? null) : undefined} none={XP_NONE_LINES.short} />}
+      {!snap.town && !snap.bot && <XpResult xp={snap.outcome ? (snap.outcome.xp ?? null) : undefined} none={snap.outcome?.unranked ? XP_NONE_LINES.test : undefined} />}
       <div class="dv-result-actions">
         {/* A town bot's game: back to the town, at the table, the bot across. */}
         {snap.town ? (

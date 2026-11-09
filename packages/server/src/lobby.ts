@@ -1262,6 +1262,8 @@ export class LobbyCore {
     if (!admin || !BOSS_POWERS.ultimateTestButton || !this.human(playerId) || !this.runner?.boss || this.r.phase === "results") return false;
     const ok = this.runner.triggerUltimate();
     if (ok) console.log(`test trigger: ${playerId} brings the ultimate in ${this.r.code}`);
+    // (A test control touched the battle: no XP for anyone in it, "No XP: test game." Review m3, Nov 9.)
+    if (ok) this.r.overrides = { ...this.r.overrides, tested: true };
     return ok;
   }
 
