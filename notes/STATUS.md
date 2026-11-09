@@ -650,3 +650,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~18:07: #581 home modes and #580 top bar merged (both green; main's full run watched). Live soon. Running: ranked L1
   (session_01JuCWRvvM1dZdrwE8sriDGN, xhigh alone). Queue: crowd party, Squads Bots. Seasons open with Eric.
 - Nov 9 ~18:35: #580/#581 LIVE (bf5d383). #583 (face window + bot box compact, director) in CI. #582 ranked L1: review/582 = 1 blocker, 2 majors, minors; fix helper session_01JuCWRtUFKGjvxcAVvKz7au running (.review-fixes.md signal); then delta review.
+- Nov 9 ~19:10: #583 (face window, no white layer; bot box compact) and #584 (seasons: soft reset + 5 placements; ranked rewards on
+  ROADMAP, don't raise again) merged. Ranked L1 #582: fixes in (854d04d), delta review session_01JuCWRrj6jFXVmLJYzUkmm6 running.
+  SHOP (Eric): approved the Boss Crate look (notes/briefs/assets/boss-crate-mock-approved.png; svg source in boss-crate-mock-make.py):
+  the shop sells ONE "Random Boss Crate" (? seal, no key needed, pricier); in the inventory each shows its boss's coin in the seal.
+  Eric is making a ChatGPT mockup of the shop page; then build the page look only (no Stripe yet). Crate/key art sent to Eric.
