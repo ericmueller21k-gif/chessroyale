@@ -1,6 +1,7 @@
 // Frame-by-frame check of a boss battle's result screen (Eric, Nov 9: the boss and your pawn, his attack on a loss), the way a
 // player gets there (Home → Boss Battle → START, then the battle's real end).
-//   node scripts/frames-boss-result.mjs <out-dir> <boss id> <win|loss|draw> [width: a phone under 800 px, else a computer; default an iPhone 13]
+//   node scripts/frames-boss-result.mjs <out-dir> <boss id> <win|loss|draw|resign> [width: a phone under 800 px, else a computer; default an iPhone 13]
+// (FULL=1: the stills are the whole screen; DSF=2: a computer's at deviceScaleFactor 2 too; PW_CHROMIUM: the browser's path.)
 // Needs the app and API on http://localhost:8788 (E2E_PORT), test switches on (`npx wrangler dev ... --var TEST_SWITCHES:1`, as
 // playwright.config.ts starts it). Saves a PNG each time the boss's frame, the attack's frame or the pawn's place changes for
 // 4 s after the result shows, and prints a timeline (ms, the attack's stage and frame, the pawn's shift, the painted gap between
@@ -15,7 +16,7 @@ mkdirSync(out, { recursive: true });
 const base = `http://localhost:${process.env.E2E_PORT || 8788}`;
 const b = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
 const w = Number(widthArg);
-const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
+const p = await b.newPage(w ? { viewport: { width: w, height: w < 800 ? 760 : 800 }, deviceScaleFactor: w < 800 || process.env.DSF === "2" ? 2 : 1, isMobile: w < 800, hasTouch: w < 800 } : { ...devices["iPhone 13"] });
 p.on("pageerror", (e) => console.log("pageerror", e.message));
 // (The first-time walkthrough seen, as e2e/helpers.ts sets it: it would cover the screen.)
 await p.addInitScript(() => localStorage.setItem("hunchess.tutorial.dismissed", "1"));
@@ -72,6 +73,7 @@ const sampling = p.evaluate(
           gap: bs && pawn ? Math.round((pawn.left - bs[1]) * 10) / 10 : null,
           left: bs ? Math.round(bs[0]) : null,
           right: pawn ? Math.round(pawn.right) : null,
+          past: bs && pawn ? Math.round(bs[1] - pawn.right) : null,
         });
         if (performance.now() - t0 < 4000) requestAnimationFrame(tick);
         else resolve(out);
@@ -86,7 +88,9 @@ for (const at of [200, 500, 800, 1100, 1400, 1800, 2300, 3200]) {
   await p.waitForTimeout(Math.max(0, at - (Date.now() - t0)));
   const row = await p.locator(".results-duo").boundingBox();
   const path = `${out}/${boss}-${kind}-${p.viewportSize().width}-t${at}.png`;
-  if (row) await p.screenshot({ path, clip: { x: Math.max(0, row.x - 24), y: Math.max(0, row.y - 8), width: Math.min(p.viewportSize().width, row.width + 48), height: row.height + 16 } });
+  // (FULL=1: the whole screen, for a still a person sees.)
+  if (process.env.FULL === "1") await p.screenshot({ path });
+  else if (row) await p.screenshot({ path, clip: { x: Math.max(0, row.x - 24), y: Math.max(0, row.y - 8), width: Math.min(p.viewportSize().width, row.width + 48), height: row.height + 16 } });
   shots.push(path);
 }
 const samples = await sampling;
@@ -101,7 +105,7 @@ for (const st of ["-", "wait", "on", "done"]) {
   const ss = samples.filter((s) => s.stage === st);
   if (!ss.length) continue;
   const gaps = ss.map((s) => s.gap).filter((g) => g !== null);
-  console.log(`${st}: min gap ${Math.min(...gaps)} px; leftmost ${Math.min(...ss.map((s) => s.left ?? 1e9))}; rightmost ${Math.max(...ss.map((s) => s.right ?? 0))}; vw ${p.viewportSize().width}`);
+  console.log(`${st}: max past the pawn ${Math.max(...ss.map((s) => s.past ?? -1e9))}; min gap ${Math.min(...gaps)} px; leftmost ${Math.min(...ss.map((s) => s.left ?? 1e9))}; rightmost ${Math.max(...ss.map((s) => s.right ?? 0))}; vw ${p.viewportSize().width}`);
 }
 // Stills: the row now (after 4 s: at rest), and, for a loss, a fresh run's mid-attack frames are in the timeline above.
 const row = await p.locator(".results-duo").boundingBox();

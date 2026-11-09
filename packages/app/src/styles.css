@@ -24765,18 +24765,23 @@ button.sq-tiny {
   padding-left: 32px;
   margin: 0 auto;
 }
+/* (A phone under 360 px: a narrower column, less room on the left: the row fits; the widest bosses come nearer the edge there.) */
 @media (max-width: 359px) {
+  .results-duo {
+    gap: 12px;
+    padding-left: 12px;
+  }
   .rd-you,
   .xp-box.xp-compact {
     width: 160px;
   }
 }
 /* (He stands on your pawn's base line, not on the bottom of your XP under it: his attack aims at your pawn and never crosses your
-   name or your XP. The XP's height (84) and its margin (4), plus where the pawn's base stands in its box (--feet, 12).) */
+   name or your XP. The XP's height (96) and its margin (4), plus where the pawn's base stands in its box (--feet, 12).) */
 .rd-boss {
   position: relative;
   flex: none;
-  margin-bottom: 100px;
+  margin-bottom: 112px;
 }
 .results-duo .boss-char.place-results {
   margin: 100px 0 0;
@@ -24986,10 +24991,10 @@ button.sq-tiny {
 /* Compact (a boss battle's result, under your pawn): no frame; your name on its own line, then the gain and the level over the bar. */
 .xp-box.xp-compact {
   width: 176px;
-  height: 84px;
+  height: 96px;
   margin: 4px 0 0;
   padding: 0;
-  grid-template-rows: 42px 10px 18px;
+  grid-template-rows: 42px 10px 30px;
   row-gap: 5px;
   border: 0;
   border-radius: 0;
@@ -25015,9 +25020,13 @@ button.sq-tiny {
 .xp-compact .xp-level {
   grid-area: level;
 }
+/* (Two lines at most, in its fixed row: "No XP: the game ended before move 10." is wider than the column.) */
 .xp-compact .xp-parts {
   font-size: 12px;
+  line-height: 15px;
   text-align: center;
+  white-space: normal;
+  text-overflow: clip;
 }
 @media (prefers-reduced-motion: reduce) {
   .xp-pop.on {

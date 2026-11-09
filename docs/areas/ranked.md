@@ -7,7 +7,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
 
 ## How it works today
 - **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result card (`screens/Duel.tsx`; its XP on the `outcome` message, `DuelOutcome.xp`; a bot or town game has none) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
-  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("12 min +120 · Win +50"), or why there was none. Its rules
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
   and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height

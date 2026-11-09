@@ -52,7 +52,7 @@ export function ResultDuo({ match, result, xp }: { match: GameView; result: "cro
   // (The pawn's jolts, by CSS, from the first lash: its delay from its first drawing, decided once, so a redraw never moves it.)
   const [lashIn] = useState(() => at + (KING_ATTACK.lashAt - KING_ATTACK.landAt) - Date.now());
   return (
-    <div class={`results-duo rd-${result}${attacking ? " rd-attacking" : ""}`} data-attack={ka ? stage : undefined}>
+    <div class={`results-duo rd-is-${result}${attacking ? " rd-attacking" : ""}`} data-attack={ka ? stage : undefined}>
       <div class="rd-boss">
         <BossCharacter match={match} place="results" />
         {attacking && (

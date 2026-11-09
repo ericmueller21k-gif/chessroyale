@@ -62,6 +62,9 @@ async function topRowFits(box: Locator, centered: boolean) {
   if (centered) expect(Math.abs(n!.x + n!.width / 2 - (b!.x + b!.width / 2)), "the name centered").toBeLessThan(3);
 }
 
+/** The box's fixed height: 78 px, or 96 for the compact box (a boss battle's result, under your pawn, Nov 9; its last row two lines). */
+const boxHeight = async (box: Locator) => (/xp-compact/.test((await box.getAttribute("class")) ?? "") ? 96 : 78);
+
 /** Your account's XP, once it's loaded and the ?xp= switch has set it. */
 async function xpIs(page: Page, xp: number) {
   // (The page's own account first: a request before its session cookie would make a second guest. helpers.ts, pageAccountId.)
@@ -133,7 +136,7 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   // from the box's first frame to its last.
   const shape = (x: Sample) => [x.box[0], x.box[1]! - x.title![1]!, x.box[2], x.box[3], x.actions![1]! - x.title![1]!, x.title![2], x.title![3], x.actions![3]];
   for (const x of all) expect(shape(x), "every part in its place and size").toEqual(shape(all[0]!));
-  expect(all[0]!.box[3], "the box's fixed height").toBe(78);
+  expect(all[0]!.box[3], "the box's fixed height").toBe(await boxHeight(box));
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/xp-counted-${testInfo.project.name}.png` });
   // Home: the real level and its ring (Level 2, 16% of the way round).
   await page.getByRole("button", { name: "Home", exact: true }).click();
@@ -155,7 +158,7 @@ test('"No XP: test game." in the same box, the same size: a test switch on (?mat
   await expect(box.locator(".xp-why")).toHaveText("No XP: test game.", { timeout: 20_000 });
   await expect(box.locator(".xp-gain")).toHaveText("+0 XP");
   await expect(box.locator(".xp-level")).toHaveText("Level 1");
-  expect((await box.boundingBox())!.height).toBe(78);
+  expect((await box.boundingBox())!.height).toBe(await boxHeight(box));
   // (The bar stands at your XP: 250 of 1,000.)
   const share = await box.locator(".xp-fill").evaluate((e) => new DOMMatrixReadOnly(getComputedStyle(e).transform).a);
   expect(share).toBeCloseTo(0.25, 2);
@@ -198,9 +201,10 @@ test("each other \"No XP\" line, in the same box and size (the server's answer f
     await expect(box.locator(".xp-why")).toHaveText(line, { timeout: 20_000 });
     await expect(box.locator(".xp-level")).toHaveText("Level 5");
     const b = (await box.boundingBox())!;
-    expect(b.height, none).toBe(78);
+    expect(b.height, none).toBe(await boxHeight(box));
     // (Whole on its line: not cut.)
-    expect(await box.locator(".xp-parts").evaluate((e) => e.scrollWidth <= e.clientWidth), `${none}: the line fits`).toBe(true);
+    // (Whole: no wider than its row, and no taller: the compact box's row holds two lines.)
+    expect(await box.locator(".xp-parts").evaluate((e) => e.scrollWidth <= e.clientWidth && e.scrollHeight <= e.clientHeight), `${none}: the line fits`).toBe(true);
   }
 });
 

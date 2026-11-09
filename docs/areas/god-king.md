@@ -65,6 +65,9 @@ Lane: `god-king`. The bosses' own rules and art are on [bosses.md](bosses.md).
   board's top rows, so it never rises over the boss bar: `kingAttackPlace`).
   It fits between the slide and the stagger, so the Last Stand takes no longer and nothing changed on the server. See
   [bosses.md](bosses.md), "A boss's attack on a king".
+- **Not on the result screen** (Eric, Nov 9: "get rid of the king in the victory and defeat screen entirely"): a boss battle's
+  result shows the boss and your pawn only, after a Last Stand too ([bosses.md](bosses.md), "The result screen").
+  `GodKingEpilogue` stays in `LastStand.tsx` for the dev preview.
 - **Fair.** A power never changes how a player's own pick was judged, and a move he plays never earns brilliant credit.
 - **Against the Hidden Boss his help doesn't work** (Eric, Oct 14; the boss's passive, `BossRules.blocksKing`): his
   move, his strike and his Last Stand never come (the runner's `kingDecision`, `callStrike`, `lastStandFor`). His menu

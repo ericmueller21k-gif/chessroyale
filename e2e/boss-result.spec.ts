@@ -108,8 +108,8 @@ test("a boss battle's victory and defeat screens: the title in the pixel type, n
   // A boss beats you at once (?mate=1): Defeated, and the boss's victory line. Hollow, named: START's random pick can be
   // Wrangler or Sawyer, whose first move is a power's (the long pull; a pawn move for the split), not the mate, so the
   // battle went on and the result never came (main's red, Nov 9: 2026-11-09-boss-result-red.md).
-  await page.goto("/?debug&pace=quick&mate=1&boss=hollow");
   await watchDuo(page);
+  await page.goto("/?debug&pace=quick&mate=1&boss=hollow");
   await bossAloneFromHome(page);
   await expect(page.locator(".results h1")).toHaveText("Defeated", { timeout: 120_000 });
   // His attack on your pawn (Eric, Nov 9): it plays (its frames advance, his usual figure hidden), your pawn jolts back, then his
@@ -133,8 +133,8 @@ test("a boss battle's victory and defeat screens: the title in the pixel type, n
 test("a boss battle won: Victory!, no trophy or skull, no record text, the boss's defeat line", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
   // You mate the boss at once (?win=1): Victory!, and the boss's defeat line.
-  await page.goto("/?debug&pace=quick&win=1");
   await watchDuo(page);
+  await page.goto("/?debug&pace=quick&win=1");
   await bossAloneFromHome(page);
   // Your move (?win=1: Qxf7 mates him, from h5).
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
