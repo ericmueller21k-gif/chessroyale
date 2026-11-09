@@ -594,3 +594,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Brain and Recon fog duo; closest he liked: two different moves a turn, one picked; but voice chat breaks it; "We can just come
   back to that later"). Ranked design: told the helper to add "Everything ranked touches" (all screens, paths, files).
   Asked Eric what to OK overnight (XP phase 2 incl. CRATES_FREE off; stills branches cleanup).
+- Nov 9 ~09:30: Eric: go XP phase 2 + crates need keys for everyone (no admin free opening, no admin ?fischer); 100 keys for his
+  account (admin grant); an inventory of every admin ability for a later cleanup. Brief notes/briefs/brief-xp-phase2.md. Payments
+  question answered in chat (Stripe/MoR, Apple/Google, legal) — before launch, not now.
