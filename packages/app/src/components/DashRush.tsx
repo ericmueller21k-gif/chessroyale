@@ -228,8 +228,20 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
   const tl = rushTimeline();
   const t = now - view.at;
   const stage = rush ? rushStage(rush, view, now) : "done";
-  const [sel, setSel] = useState<string | null>(null);
-  const [drag, setDrag] = useState<{ from: string; x: number; y: number; moved: boolean; id: number } | null>(null);
+  const [sel, setSelShown] = useState<string | null>(null);
+  const [drag, setDragShown] = useState<{ from: string; x: number; y: number; moved: boolean; id: number } | null>(null);
+  // (The pointer's handlers read these refs, not the state: the next pointer event can come before the re-render that hands the
+  // handlers a new state, so a drag's moves once all read "no drag" and its drop was lost. The state draws; the refs decide.)
+  const selNow = useRef<string | null>(null);
+  const dragNow = useRef<typeof drag>(null);
+  const setSel = (v: string | null) => {
+    selNow.current = v;
+    setSelShown(v);
+  };
+  const setDrag = (v: typeof drag) => {
+    dragNow.current = v;
+    setDragShown(v);
+  };
   const [nope, setNope] = useState<{ square: string; n: number } | null>(null);
   const layer = useRef<HTMLDivElement>(null);
   const runs = rush ? rushRuns(rush).runs : [];
@@ -332,17 +344,19 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
               (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
               return;
             }
-            if (sel) {
-              put(sel, s);
+            if (selNow.current) {
+              put(selNow.current, s);
               setSel(null);
             }
           }}
           onPointerMove={(e) => {
+            const drag = dragNow.current;
             if (!drag || drag.id !== e.pointerId) return;
             const far = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8;
             setDrag({ ...drag, x: e.clientX, y: e.clientY, moved: far });
           }}
           onPointerUp={(e) => {
+            const drag = dragNow.current;
             if (!drag || drag.id !== e.pointerId) return;
             setDrag(null);
             if (!drag.moved) return;
