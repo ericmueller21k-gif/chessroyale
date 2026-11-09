@@ -563,3 +563,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~07:00: boss result v2 done (40a10e8; stills sent). Boss-lane review: Opus session_01JuCWRrUpycNyssSJMZ7cKv (branch
   review/boss-result-v2, watcher b9mhzsp4q). Asked Eric: (1) the attack's blow lands on the pawn during the attack (16 px holds at
   rest); (2) the pawn is small next to the boss (~45 px): bigger?
+- Nov 9 ~07:10: quests mockup done (claude/quests-mock; stills/quests-mock), sent to Eric with its 4 questions (entry place,
+  reroll button, blur, crest). No PR until he approves; then the build wires it (phase 3, after phase 2).
