@@ -365,7 +365,7 @@ type ClockSeen = {
   lineAt: Record<string, number>;
   /** Each frame's sample: the move list's rows and whether the square ring (his move landed) is drawn. */
   samples: { t: number; rows: number; ring: boolean; last: string; phase: string }[];
-  /** The figure's clicks: `anim:click` counted as each frame's cue is set (a smack is one click frame). */
+  /** The figure's clicks: `anim:click` counted as the figure enters each click frame (a smack is one click frame). */
   cues: Record<string, number>;
 };
 const ALL_CLOCK_LINES = [...DASH_FIT_LINES, ...DASH_POPOFF_LINES, ...DASH_LOVE_LINES];
@@ -377,9 +377,16 @@ async function watchClock(page: Page) {
     // (Every smack: the figure's frame cue set as its frame changes; a click is one smack. Only the figure on screen counts: the
     // boss screen mounts a second figure beside the board (BossSide, display none on a phone) that runs the same frames, so
     // counting every element would count each smack twice.)
+    // A click counts once per frame it's on: the figure sets data-cue again whenever its picture changes on the same frame (his
+    // look or the lights: BossCharacter's id), the same "click", and each set is a mutation, so a smack is counted as its
+    // element enters a click frame (its anim and frame), not at each set.
+    const onFrame = new WeakMap<HTMLElement, string>();
     new MutationObserver((muts) => {
       for (const m of muts) {
         const el = m.target as HTMLElement;
+        const at = `${el.dataset.anim}:${el.dataset.frame}:${el.dataset.cue}`;
+        if (onFrame.get(el) === at) continue;
+        onFrame.set(el, at);
         if (el.dataset.cue === "click" && el.getBoundingClientRect().width > 0) {
           const k = `${el.dataset.anim}:click`;
           seen.cues[k] = (seen.cues[k] ?? 0) + 1;
