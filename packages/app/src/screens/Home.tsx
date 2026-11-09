@@ -25,6 +25,7 @@ import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
 import { QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
+import { FriendsOverlay } from "../components/FriendsOverlay.tsx";
 import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
 import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
@@ -599,6 +600,8 @@ export function HomeScreen({
   // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
   const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
+  // (A phone's top-bar Friends: your friends in a centered box, Eric, Nov 9. The sheet above stays for a lobby code.)
+  const [friendsList, setFriendsList] = useState(false);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
   const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode ?? "crowd");
   // The Boss raid screen's pick (its tiles): a boss you can meet, "" for a random one, or the Hidden Boss (dark and
@@ -805,6 +808,23 @@ export function HomeScreen({
             onFriends();
           }}
           onClose={() => setFriends(false)}
+        />
+      )}
+      {friendsList && (
+        <FriendsOverlay
+          onClose={() => setFriendsList(false)}
+          onAllFriends={() => {
+            setFriendsList(false);
+            onFriends();
+          }}
+          onLobbyCode={() => {
+            setFriendsList(false);
+            setFriends(true);
+          }}
+          onSignIn={() => {
+            setFriendsList(false);
+            onSignIn();
+          }}
         />
       )}
       {bossMenu && (
@@ -1111,7 +1131,7 @@ export function HomeScreen({
             type="button"
             class="fd-icon-btn fd-top-friends" data-tour="play-with-friends"
             aria-label={friendsNews ? `Friends, ${friendsNews} new` : "Friends"}
-            onClick={() => setFriends(true)}
+            onClick={() => setFriendsList(true)}
           >
             <FriendsIcon />
             {friendsNews > 0 && (
