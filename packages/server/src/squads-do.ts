@@ -641,6 +641,7 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
       signedInOnly,
       now,
       paused,
+      quest: "squads",
     }).catch((e: unknown) => {
       console.log(`xp for squads ${code}: ${String(e)}`);
       return null;

@@ -1,3 +1,4 @@
+import type { QuestPaid } from "./quests.ts";
 import { XP } from "./settings.ts";
 
 /**
@@ -46,6 +47,8 @@ export interface XpRewards {
   keys: number;
   bossPicks: number;
   levels: number[];
+  /** Quests this game completed (Nov 9, phase 3): each one's XP (also in the box's "Quest" part), crates and keys. Absent: none. */
+  quests?: QuestPaid[];
 }
 
 /** A game's XP, as the result screen shows it: your XP before and after, the levels, its parts; or why there was none. */
@@ -66,7 +69,7 @@ export function levelReward(level: number): { crates: number; keys: number; boss
 }
 
 /** Whether a grant's rewards hold anything. */
-export const hasRewards = (r: XpRewards | undefined | null): r is XpRewards => !!r && (r.daily > 0 || r.crates > 0 || r.keys > 0 || r.bossPicks > 0);
+export const hasRewards = (r: XpRewards | undefined | null): r is XpRewards => !!r && (r.daily > 0 || r.crates > 0 || r.keys > 0 || r.bossPicks > 0 || !!r.quests?.length);
 
 /** "1 Winter Crate", "2 Winter Crates" (a crate's name without its series: "Winter Crate · Series 1" says "Winter Crate"). */
 export function crateCount(n: number, name: string): string {
@@ -75,12 +78,15 @@ export function crateCount(n: number, name: string): string {
 }
 
 /** A reward's lines, in plain words: "+1 Winter Crate", "+2 Winter Crates", "+1 crate key", "Choose your boss crate". */
-export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null } {
-  const level = [r.crates ? `+${crateCount(r.crates, crateName)}` : "", r.keys ? `+${r.keys} crate ${r.keys === 1 ? "key" : "keys"}` : ""].filter(Boolean).join(" · ");
+export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null; quests: string[] } {
+  const things = (crates: number, keys: number) => [crates ? `+${crateCount(crates, crateName)}` : "", keys ? `+${keys} crate ${keys === 1 ? "key" : "keys"}` : ""].filter(Boolean);
+  const level = things(r.crates, r.keys).join(" · ");
   return {
     daily: r.daily ? `+${crateCount(r.daily, crateName)}` : null,
     level: level || null,
     pick: r.bossPicks ? (r.bossPicks === 1 ? "Choose your boss crate" : `Choose your ${r.bossPicks} boss crates`) : null,
+    // (Phase 3: "Quest done: Boss Hunter +300 XP · +1 Winter Crate".)
+    quests: (r.quests ?? []).map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")} XP`, ...things(q.crates, q.keys)].join(" · ")),
   };
 }
 
@@ -105,6 +111,15 @@ export function readRewards(x: unknown): XpRewards | undefined {
     bossPicks: n("bossPicks"),
     levels: Array.isArray(o.levels) ? o.levels.filter((l): l is number => typeof l === "number" && Number.isInteger(l) && l > 1) : [],
   };
+  const whole = (x: unknown) => (typeof x === "number" && Number.isInteger(x) && x >= 0 ? x : 0);
+  const quests = Array.isArray(o.quests)
+    ? o.quests.flatMap((q: unknown) => {
+        if (!q || typeof q !== "object") return [];
+        const v = q as Record<string, unknown>;
+        return typeof v.quest === "string" && typeof v.name === "string" ? [{ quest: v.quest, name: v.name, xp: whole(v.xp), crates: whole(v.crates), keys: whole(v.keys) }] : [];
+      })
+    : [];
+  if (quests.length) r.quests = quests;
   return hasRewards(r) ? r : undefined;
 }
 

@@ -619,5 +619,7 @@ export function lobbyXpGame(
     cap: vs,
     signedInOnly,
     now,
+    // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)
+    quest: mode === "boss" ? "boss" : mode === "crowd" ? "crowd" : "classic",
   };
 }

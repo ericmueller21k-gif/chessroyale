@@ -1,6 +1,7 @@
-import { XP, XP_DAILY, gameXp, isXpNone, readRewards, xpDayStart, xpGrant, xpParts, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
+import { XP, XP_DAILY, gameXp, isXpNone, questPartLabel, readRewards, xpDayStart, xpGrant, xpParts, type QuestGame, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
+import { questStatements, questsPaidBy } from "./quests.ts";
 import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
 
 /**
@@ -90,6 +91,8 @@ export interface XpGame {
   now: number;
   /** The kill switch PAUSE_REWARDS is on (Nov 9): no XP and no rewards for this game; the box says so. */
   paused?: boolean;
+  /** Quests (Nov 9, phase 3; quests.ts): the game's mode for them ("solo" for a solo game). Absent: it moves no quest. */
+  quest?: QuestGame["mode"];
 }
 
 const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -213,7 +216,17 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   };
   const nonces = new Map<Op, string>();
   for (const op of [time, win, ...(daily ? [daily] : [])]) if (op.legs.length) nonces.set(op, newId());
-  if (nonces.size) await sql.batch([...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)));
+  // (Quests, phase 3: this game's progress and any quest it completes, in the same batch, after the win op: a win quest moves only if
+  // the win's XP went in. A failure to read them costs the quests, never the game's XP.)
+  const quests = game.quest
+    ? await questStatements(sql, me, { key: game.key, now: game.now, quest: { mode: game.quest, won: game.facts.won, ms: game.facts.ms }, winOp: win.id }, (op) =>
+        opStatements(me, op, newId()),
+      ).catch((e: unknown) => {
+        console.error("quests", e);
+        return [];
+      })
+    : [];
+  if (nonces.size || quests.length) await sql.batch([...[...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)), ...quests]);
   // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts. The daily reward is this
   // game's if its first leg names this game: another game today paid it otherwise.)
   const after = await sql.first<{ time: number | null; win: string | null; daily: number | null; xp: number }>(
@@ -229,7 +242,14 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   const timePaid = nonces.has(time) ? (after?.time ?? 0) : 0;
   const winPaid = nonces.has(win) && after?.win != null;
   const dailyPaid = daily ? (after?.daily ?? 0) : 0;
-  const parts = [...(solo ? xpParts(g, winPaid, timePaid) : xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid)), ...(dailyPaid ? [{ label: XP_DAILY, xp: dailyPaid }] : [])];
+  // (The quests this game completed, as the ledger has them: a replay answers the same.)
+  const done = game.quest ? await questsPaidBy(sql, me, game.key).catch(() => []) : [];
+  const questXp = done.reduce((s, q) => s + q.xp, 0);
+  const parts = [
+    ...(solo ? xpParts(g, winPaid, timePaid) : xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid)),
+    ...(dailyPaid ? [{ label: XP_DAILY, xp: dailyPaid }] : []),
+    ...(questXp ? [{ label: questPartLabel(done.length), xp: questXp }] : []),
+  ];
   const gained = parts.reduce((s, p) => s + p.xp, 0);
   // (The cap took all of it: say so as the reason, not a box of +0s.)
   if (solo && g.time && !gained) return xpGrant(after?.xp ?? who.xp, [], "limit");
@@ -245,7 +265,7 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   // (Its own try: a failed level payout must not hide the daily reward's crate, already paid above. Delta review n2.)
   let rewards: Awaited<ReturnType<typeof gameRewards>> | undefined;
   try {
-    rewards = await gameRewards(sql, me, game.key);
+    rewards = await gameRewards(sql, me, game.key, done);
   } catch (e) {
     console.error("gameRewards", e);
   }

@@ -3180,6 +3180,57 @@ export const XP = {
 } as const;
 
 /**
+ * Quests (Eric, Nov 9; XP phase 3; the approved design's sections 3 and 5, notes/briefs/design-xp-quests.md;
+ * docs/decisions/2026-11-09-quests-*.md; core's quests.ts has the rules, server/quests.ts deals them and pays them):
+ *   - **Dailies:** `dailyPerDay` new ones each XP day (it starts at XP.dayStartUtcHour, 08:00 UTC), dealt the first time your quests
+ *     are read that day (home, or a game's end). Unfinished ones carry over, but at most `maxDailies` wait (Hearthstone's kindness
+ *     rule): a day's deal tops you up to it, never past it. `rerollsPerDay` free reroll a day, on an unfinished daily.
+ *   - **The weekly:** one, dealt each week (from Monday at XP.dayStartUtcHour UTC: `weekStartDay`, 1 = Monday); it doesn't carry.
+ *   - **Progress:** only a game that earned XP (a counted game: XP's rules) counts, once per game per quest, decided on the server:
+ *     online games by their match room's facts; a solo game (its moves and its win are the device's word) only for "finish games"
+ *     quests, and only with `soloMinMinutes` of the server's own time (as the daily reward's). A win counts only if the game's win
+ *     XP was paid (a friends' lobby's once a day per opponent). Nothing while PAUSE_REWARDS is on.
+ *   - **Rewards:** paid by the server through the ledger the moment a game completes a quest, once per quest, in the same batch as
+ *     that game's XP: its XP joins the game's XP box ("Quest +300"), its crates (of XP.rewardCrate) and key show in the result's toast.
+ *   - **The pool:** only modes always playable (bots fill Squads, 50 v 50 and raids); no auto chess (played on your device), no
+ *     ranked 1 v 1 (it needs another person), no "fight boss X" (a raid's boss is drawn at random; Boss alone is played on your
+ *     device). `counts`: which counted games move it: "any" any game, "win" a won online game, "boss" an online boss raid,
+ *     "bossWin" a won raid, "squads" a Squads game, "crowd" a 50 v 50 game. `weight`: how often it's dealt (wins rarer: the
+ *     design's "win quests stay rare"). `icon`: the row's picture ("boss": a live boss's portrait).
+ */
+export type QuestCounts = "any" | "win" | "boss" | "bossWin" | "squads" | "crowd";
+export interface QuestDef {
+  id: string;
+  name: string;
+  goal: string;
+  target: number;
+  counts: QuestCounts;
+  weight: number;
+  xp: number;
+  crates?: number;
+  keys?: number;
+  icon: { kind: "boss" } | { kind: "squad" } | { kind: "board"; piece: "knight" | "rook" | "queen" | "pawn" };
+}
+export const QUESTS = {
+  dailyPerDay: 2,
+  maxDailies: 3,
+  rerollsPerDay: 1,
+  weekStartDay: 1,
+  soloMinMinutes: 3,
+  daily: [
+    { id: "boss-hunter", name: "Boss Hunter", goal: "Beat a boss in a raid", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
+    { id: "raid-party", name: "Raid Party", goal: "Play 2 boss raids", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
+    { id: "squad-up", name: "Squad Up", goal: "Play 2 Squads games", target: 2, counts: "squads", weight: 2, xp: 300, icon: { kind: "squad" } },
+    { id: "fifty-fifty", name: "Fifty-Fifty", goal: "Play a 50 v 50 game", target: 1, counts: "crowd", weight: 2, xp: 300, icon: { kind: "board", piece: "queen" } },
+    { id: "warm-up", name: "Warm Up", goal: "Finish 3 games", target: 3, counts: "any", weight: 2, xp: 300, icon: { kind: "board", piece: "pawn" } },
+    { id: "winner", name: "Winner", goal: "Win 2 online games", target: 2, counts: "win", weight: 1, xp: 300, crates: 1, icon: { kind: "board", piece: "rook" } },
+  ] as readonly QuestDef[],
+  weekly: [
+    { id: "regular", name: "Regular", goal: "Complete 10 games", target: 10, counts: "any", weight: 1, xp: 1500, crates: 1, keys: 1, icon: { kind: "board", piece: "knight" } },
+  ] as readonly QuestDef[],
+} as const;
+
+/**
  * Boingo's claw machine (Eric, Nov 6; docs/decisions/2026-11-06-claw-machine.md): one boss token in, a chance at that boss's Boss
  * Crate. Decided by the server as the coin goes in (server/claw.ts): `winChance` of the time the crate goes into your inventory,
  * unopened. The claw's ride on screen only shows that answer: the stop tap never changes it. At 0.25 a crate costs 4 tokens on

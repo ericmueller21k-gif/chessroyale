@@ -46,6 +46,7 @@ import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -209,6 +210,8 @@ const SCHEMA = [
   ...RANKED_SCHEMA,
   // XP (Nov 9): the solo game the server is timing for each account (xp.ts).
   ...XP_SCHEMA,
+  // Quests (Nov 9, phase 3): each account's quests, each game that moved one, and the day last dealt (quests.ts).
+  ...QUESTS_SCHEMA,
 ];
 
 /**
@@ -586,6 +589,8 @@ export async function signInWithIdentity(
         // (The balances themselves, with their ledger legs: ledger.ts.)
         ...mergeMoves(current.id, owner.id, now),
         ...rankedMoves(current.id, owner.id),
+        // (Quests, Nov 9: the guest's go; the account keeps its own. What they paid is in the balances moved above.)
+        ...questDeletes(current.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
         stmt("DELETE FROM users WHERE id = ?", current.id),
