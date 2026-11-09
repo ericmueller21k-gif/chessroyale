@@ -143,7 +143,7 @@ describe("the solo time cap (review M2): XP.soloMinutesPerDay minutes an XP day"
     // (Four 30-minute games fill 120 minutes.)
     for (let i = 0; i < XP.soloMinutesPerDay / XP.maxMinutes - 1; i++) expect((await solo(`solo:a${i}`, 30))?.parts).toEqual([{ label: "30 min", xp: 300 }]);
     expect((await solo("solo:b", 20))?.parts).toEqual([{ label: "20 min", xp: 200 }]);
-    expect((await solo("solo:c", 25))?.parts).toEqual([{ label: "25 min (Daily solo limit)", xp: limit - 1_100 }]);
+    expect((await solo("solo:c", 25))?.parts).toEqual([{ label: "Daily solo limit", xp: limit - 1_100 }]);
     expect(await xpOf(sql, ann.id)).toBe(limit);
     // (Nothing left: the reason, not a box of +0s; with a win, the win alone.)
     expect(await solo("solo:d", 12)).toEqual({ before: limit, after: limit, levelBefore: 2, levelAfter: 2, parts: [], none: "limit" });

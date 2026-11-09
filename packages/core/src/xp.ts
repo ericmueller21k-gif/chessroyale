@@ -78,12 +78,14 @@ export function gameXp(f: XpFacts): GameXp {
 
 /**
  * The box's parts: the time ("12 min"), then the win; a win the cap held back says so, at +0. `timePaid`: the time XP actually paid
- * when a cap (solo's daily minutes) trimmed it: "12 min (Daily solo limit)" at what was left, or "Daily solo limit" at +0.
+ * when a cap (solo's daily minutes) trimmed it: "Daily solo limit" at what was left (+0 for none); a held-back win's +0 is then left
+ * out, so the line fits a 320 px phone ("Daily solo limit +300 · Win (paid once today) +0" doesn't).
  */
 export function xpParts(g: Exclude<GameXp, { none: XpNone }>, winPaid = true, timePaid = g.time): XpPart[] {
   const paid = Math.max(0, Math.min(g.time, timePaid));
-  const time = !g.time ? [] : paid === g.time ? [{ label: `${g.minutes} min`, xp: g.time }] : paid > 0 ? [{ label: `${g.minutes} min (${XP_SOLO_LIMIT})`, xp: paid }] : [{ label: XP_SOLO_LIMIT, xp: 0 }];
-  return [...time, ...(g.win ? [winPaid ? { label: "Win", xp: g.win } : { label: "Win (paid once today)", xp: 0 }] : [])];
+  const trimmed = !!g.time && paid < g.time;
+  const time = !g.time ? [] : trimmed ? [{ label: XP_SOLO_LIMIT, xp: paid }] : [{ label: `${g.minutes} min`, xp: g.time }];
+  return [...time, ...(g.win && (winPaid || !trimmed) ? [winPaid ? { label: "Win", xp: g.win } : { label: "Win (paid once today)", xp: 0 }] : [])];
 }
 
 /** A grant as the screen shows it, from your XP before and the parts (or the reason there was none). */

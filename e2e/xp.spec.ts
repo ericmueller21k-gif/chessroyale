@@ -186,7 +186,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
     const res = await route.fetch();
     await route.fulfill({
       response: res,
-      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 100, levelAfter: 101, parts: [{ label: "30 min (Daily solo limit)", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
+      json: { ok: true, xp: { before: 99_950, after: 100_250, levelBefore: 100, levelAfter: 101, parts: [{ label: "30 min", xp: 300 }, { label: "Win (paid once today)", xp: 0 }] } },
     });
   });
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
@@ -194,7 +194,7 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
   const box = page.getByTestId("xp-box");
   await expect(box).toHaveClass(/xp-done/, { timeout: 120_000 });
   await expect(box.locator(".xp-gain")).toHaveText("+300 XP");
-  await expect(box.locator(".xp-parts")).toHaveText("30 min (Daily solo limit) +300 · Win (paid once today) +0");
+  await expect(box.locator(".xp-parts")).toHaveText("30 min +300 · Win (paid once today) +0");
   await expect(box.locator(".xp-level")).toHaveText("Level 101");
   for (const sel of [".xp-top", ".xp-parts"]) expect(await box.locator(sel).evaluate((e) => e.scrollWidth <= e.clientWidth), `${sel} fits at 320 px`).toBe(true);
   const b = (await box.boundingBox())!;
