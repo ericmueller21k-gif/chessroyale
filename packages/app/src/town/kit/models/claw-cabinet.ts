@@ -8,7 +8,7 @@
  * `cable1`..`cable4`, `prong-open|half|shut`, `held`, `fall`, `tray`, `pile<i>`, `coin`, `arrow`, `chase0..2` (the sign's lit bulbs).
  */
 import { CHUTE, PILE } from "../../../claw/view.ts";
-import { FUN_PALETTE } from "../../shops/boingo-art.ts";
+import { FUN_PALETTE } from "../../shops/boingo-palette.ts";
 import { gridOf } from "../bake.ts";
 import type { Model, Shape, V3 } from "../prims.ts";
 
@@ -42,7 +42,7 @@ const crate = (at: V3, part: string, layer = 1, s: number = CLAW_Y.crate, hide?:
 const [cx, cz] = [Math.round(inX(CHUTE.x)), Math.round(inZ(CHUTE.z))];
 
 export const CLAW_CABINET: Model = {
-  // Boingo's own colors (shops/boingo-art.ts FUN_PALETTE), each key a ramp of three of them: [dark, base, light].
+  // Boingo's own colors (shops/boingo-palette.ts FUN_PALETTE), each key a ramp of three of them: [dark, base, light].
   palette: {
     k: ramp("k", "k", "k"),
     h: ramp("H", "h", "f"), // the pink body

@@ -1,6 +1,6 @@
 # Runs on every pull request (and on main): the typecheck and the unit tests. A red check means don't merge.
 # The e2e suite (Playwright on emulated phones and computers) runs in its own workflow: e2e.yml.
-# Three jobs side by side (Nov 6): `unit` (the typecheck and every test outside packages/chess/test), `chess` (packages/chess's
+# Three jobs side by side (Nov 6): `unit` (every test outside packages/chess/test), `chess` (the typecheck since Nov 9, and packages/chess's
 # tests: the boss simulations, 61% of the test time) and `check`, green when both are: the one to read, as before.
 name: check
 on:
@@ -41,7 +41,6 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
       - name: Unit tests (all but packages/chess, which `chess` runs)
         run: npx vitest run --exclude "packages/chess/test/**"
 
@@ -55,6 +54,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # (The typecheck runs here, the shorter job, so it's off the unit job's critical path: the Nov 9 audit, F7.)
+      - run: npm run typecheck
       - name: packages/chess's tests
         run: npx vitest run packages/chess/test
 
