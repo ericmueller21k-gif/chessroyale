@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { WelcomeNotice } from "../components/WelcomeNotice.tsx";
 import { BOSS_TIERS, FRONT_DOOR, adminPlayable, bossDef, bossIdFromLink, bossThreat, isPlayable, menuBosses, CROWD_SETTINGS, DEFAULT_SETTINGS as S, MATCHMAKING, MATCHMAKING_TYPES, PRIOR_RATING, RAID_SETTINGS, SQUADS, pausedLine, type BossDifficultyId, type MatchmakingType, type ModeChoiceId, type Pausable } from "@chessroyale/core";
 import { useAccount } from "./Profile.tsx";
@@ -24,6 +24,8 @@ import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
+import { MOCK_COUNTDOWNS, mockQuests, questsMock } from "../quests-mock.ts";
 import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
@@ -732,8 +734,20 @@ export function HomeScreen({
   // public profile, the page others see (Eric, Nov 7). A guest with no profile loaded yet gets your own page instead.
   const onIcon = () => openProfile({ you: true, name, section: "icon" });
   const onName = () => (profile ? openProfile({ uid: profile.user.id, name, you: true, public: true }) : openProfile({ you: true, name }));
+  // The daily quests (a mockup, Nov 9: quests-mock.ts): behind `?quests=`, the Quests entry on your card and the overlay, opened
+  // once as home loads (as the day's first visit will), with fake data. Nothing is stored or sent yet.
+  const qmock = questsMock();
+  const [questsOpen, setQuestsOpen] = useState(false);
+  const questsShown = useRef(false);
+  const [rerollLeft, setRerollLeft] = useState(true);
+  const closeQuests = useCallback(() => setQuestsOpen(false), []);
+  useEffect(() => {
+    if (!qmock || questsShown.current) return;
+    questsShown.current = true;
+    if (qmock !== "entry") setQuestsOpen(true);
+  }, [qmock]);
   const hero = (
-    <section class="fd-hero" aria-label="You">
+    <section class={`fd-hero${qmock && !queueing ? " fd-has-quests" : ""}`} aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
@@ -760,6 +774,14 @@ export function HomeScreen({
         </div>
       </div>
       </div>
+      {/* (The Quests entry, Nov 9 mockup: always there once quests exist (nothing hidden), in the card's top right corner, over
+          nothing, so nothing on home moves.) */}
+      {qmock && !queueing && (
+        <button type="button" class="fd-quests-btn" aria-label="Quests" title="Quests" onClick={() => setQuestsOpen(true)}>
+          <QuestsIcon />
+          <span>Quests</span>
+        </button>
+      )}
     </section>
   );
   // The sheets and menus either view can open (and chat moderation's notice).
@@ -796,6 +818,16 @@ export function HomeScreen({
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
       <WelcomeNotice />
+      {qmock && questsOpen && (
+        <QuestsOverlay
+          quests={mockQuests(qmock)}
+          dailyResetIn={MOCK_COUNTDOWNS.daily}
+          weeklyResetIn={MOCK_COUNTDOWNS.weekly}
+          rerollLeft={rerollLeft}
+          onReroll={() => setRerollLeft(false)}
+          onClose={closeQuests}
+        />
+      )}
     </>
   );
   if (queueing)
