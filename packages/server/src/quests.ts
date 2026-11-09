@@ -253,7 +253,7 @@ export const questOpId = (kind: string, questId: string, account: string) => `qu
 
 /**
  * A counted game's quest statements, for its XP grant's batch (xp.ts grantXp; after its ops: a win quest waits for the win op's first
- * leg `winOp`, a solo game's progress for its time op's `timeOp`): this attempt's claim on the game (`quest_games`; a replay's claim
+ * leg `winOp`, a solo game's progress for its time op's `timeOp` or its win op's): this attempt's claim on the game (`quest_games`; a replay's claim
  * doesn't go in, so its progress doesn't either), progress for each unfinished quest it moves, then each one's completion op (applied
  * only if its guard counts the target). Deals the day's quests first if it's the day's first read.
  */
@@ -278,7 +278,7 @@ export async function questStatements(
       stmt(
         `INSERT INTO quest_progress (quest_id, user_id, game, at) SELECT ?, ?, ?, ?
          WHERE EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND done_at IS NULL)
-         AND EXISTS (SELECT 1 FROM quest_games WHERE user_id = ? AND game = ? AND attempt = ?)${winOnly ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}${game.timeOp ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}
+         AND EXISTS (SELECT 1 FROM quest_games WHERE user_id = ? AND game = ? AND attempt = ?)${winOnly ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}${game.timeOp ? " AND (EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0) OR EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0))" : ""}
          ON CONFLICT (quest_id, game) DO NOTHING`,
         q.id,
         me.user,
@@ -290,7 +290,8 @@ export async function questStatements(
         game.key,
         attempt,
         ...(winOnly ? [game.winOp] : []),
-        ...(game.timeOp ? [game.timeOp] : []),
+        // (A solo game counts while it earned XP: its time or its win, Nov 9 delta review m-a: a won game past the minutes cap counts.)
+        ...(game.timeOp ? [game.timeOp, game.winOp] : []),
       ),
     );
     ops.push({

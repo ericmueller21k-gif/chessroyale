@@ -16,3 +16,6 @@ The brief (notes/briefs/brief-xp-phase3.md) and the approved design's section 3.
 - **Solo games** (their moves and win are the device's word) count only for "finish games" quests (Warm Up, Regular), and only with
   `soloMinMinutes` (3) of the server's own clock, as the daily reward. A win counts only when its win XP went in (the ledger's
   `xpwin` op), so a friends' lobby's second win against the same player today moves nothing.
+
+- **A solo game counts while it earns XP: its time or its win** (Nov 9, delta review of #575, m-a). Past the day's solo minutes a
+  LOST game earns nothing and moves no quest; a WON one still earns its win XP (within the daily solo win cap) and so counts.
