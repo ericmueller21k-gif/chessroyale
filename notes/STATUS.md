@@ -675,3 +675,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   + top 8 fixed waits, then retries 0 on main; (2) F3 trace all core modules + fail check on unmapped new files; (3) F4 desktop flows
   → phone-only review, split autochess/crowd specs. FOR ERIC: F10 (helper model rule: CLAUDE.md "same model always" vs RULES Nov 8
   "Haiku for UI/simple") and F9 (turn on auto-delete head branches; bulk-delete merged branches). #588 live-ops design (docs).
+- Nov 9 ~22:10: #587 haptics LIVE; #588 live-ops design and #589 sweep quick wins merged; main 993103d GREEN. Running: flaky batch (session_01JuCWRvnVy1qgtFZ27K1vPx, claude/flaky-nov9b; NOT claude/flaky-batch-2, a stale Oct branch). Waiting on Eric: F10 model rule, F9 branch cleanup.
