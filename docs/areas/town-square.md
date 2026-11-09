@@ -1223,7 +1223,7 @@ title; a bot waiting, two playing (the board's pixels change), a tap on their ga
   `data-ready` (a frame is drawn) and `data-sit` ("1" while you sit at a table); with the test switches on, `window.__townAt(kind, id)` (where to tap a boss, a home or
   the Colosseum's gate) and `window.__townGather()` (the three nearest bots come and stand beside you), `window.__townAt("statue", "bronze" | "marble")`, `window.__townAt("table", i)` (a table by its index in `TABLES`), `window.__townAt("lamp", i)` (a park lamp's glass, by its index in `LAMPS`), `window.__townAt("light", id)` (a lit pixel of a home's, or `"coliseum"`'s, first light with nothing in front of it) and
   `window.__townCam()` (the zoom, the lens, the focus, the statue up close, whether its quote shows and its letters' size),
-  `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on)
+  `window.__townSeat(i, n)` (the nearest free bots sit on table i's first n stools, and every bot holds still from then on), `window.__townStill()` (no bot sets off from then on; the walks under way end: a check that a walker's name tag could nudge, Nov 9)
   and `window.__townTables()` (each table's state: "still", "waiting:<free stool>" or "playing"); the bots (Oct 27):
   `window.__townAt("bot", i)` (where to tap BOTS[i]), `window.__townCall(i)` (BOTS[i] comes to stand beside you, out from home first if it's there, and every bot
   holds still; -1: only the holding still) and `window.__townBots()` (each bot: its name, square, the table it sits at, whether

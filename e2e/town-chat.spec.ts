@@ -1,6 +1,7 @@
 import { devices, expect, request as apiRequest, type Browser, type Page, type Request } from "@playwright/test";
 import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
 import { NAME_COLORS } from "../packages/app/src/town/names.ts";
+import { TOWN_CHAT } from "@chessroyale/core";
 import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
 
 /**
@@ -1417,6 +1418,7 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await openSignedIn(cy);
   await send(bo, `Bo says something rude ${run}`);
   await send(cy, `Cy says hello ${run}`);
+  const cySaidAt = Date.now();
   const boLine = lineOf(page, `Bo says something rude ${run}`);
   const cyLine = lineOf(page, `Cy says hello ${run}`);
   await expect(boLine).toHaveCount(1, { timeout: 10_000 });
@@ -1468,7 +1470,8 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await cyLine.locator(".tc-name").click();
   await menu.getByRole("button", { name: "Mute" }).click();
   await expect(cyLine).toHaveCount(0);
-  await cy.waitForTimeout(15_500);
+  // (Cy's next line once the server's one-a-player gap since his first has passed: what's left of it, not the whole of it again.)
+  await cy.waitForTimeout(Math.max(0, cySaidAt + TOWN_CHAT.gapMs + 500 - Date.now()));
   await send(cy, `Cy again ${run}`);
   await expect(lineOf(bo, `Cy again ${run}`), "others still see Cy").toHaveCount(1, { timeout: 10_000 });
   await expect(lineOf(page, `Cy again ${run}`), "muted here").toHaveCount(0);

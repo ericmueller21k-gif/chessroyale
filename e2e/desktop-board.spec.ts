@@ -281,11 +281,30 @@ for (const screen of Object.keys(ROOM) as Screen[]) {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.waitForTimeout(500);
     await watchSize(page);
+    // (Until what each screen goes through has happened, polled, not a fixed 8 or 15 s that, on the duel, saw only its countdown.)
     if (screen === "alone" || screen === "raid") await playBoss(page, 2);
     else if (screen === "duel") {
-      // (The bot's move and yours: the board as you play.)
-      await page.waitForTimeout(8_000);
-    } else await page.waitForTimeout(15_000);
+      // Your first move and the bot's reply: the board as you play (its line: "Your first move", "Their move", then "Your move").
+      await expect(page.locator(".dv-status")).toContainText("Your first move", { timeout: 30_000 });
+      const white = (await page.locator(".dv-strip.dv-you").getAttribute("data-side")) === "w";
+      const box = (await page.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
+      for (const sq of white ? ["e2", "e4"] : ["e7", "e5"]) {
+        const col = white ? sq.charCodeAt(0) - 97 : 104 - sq.charCodeAt(0);
+        const row = white ? 8 - Number(sq[1]) : Number(sq[1]) - 1;
+        await page.mouse.click(box.x + ((col + 0.5) * box.width) / 8, box.y + ((row + 0.5) * box.height) / 8);
+      }
+      await expect(page.locator(".dv-status")).toHaveText("Your move", { timeout: 30_000 });
+    } else if (screen === "crowd") {
+      // A turn's end: the scoring, the reveal and the next turn's play.
+      await expect.poll(() => phase(page), { timeout: 60_000, intervals: [100] }).toBe("reveal");
+      await expect.poll(() => phase(page), { timeout: 30_000, intervals: [100] }).toBe("play");
+    } else if (screen === "vote") {
+      // A vote's end (its result) and the next one's start.
+      await expect.poll(() => page.evaluate(() => (window as any).match?.phase.vote?.index ?? 0), { timeout: 60_000 }).toBeGreaterThanOrEqual(1);
+    } else {
+      // Squads: the half played out and its show after.
+      await expect.poll(() => page.evaluate(() => [...(window as any).squads.matches.values()].some((m: any) => m.state === "show")), { timeout: 60_000 }).toBe(true);
+    }
     const seen = await sizesSeen(page);
     expect(seen.length, `${screen}: one board size through the game: ${JSON.stringify(seen)}`).toBe(1);
     expect(Math.abs(seen[0]![0] - NOW[screen]["1280x800"]), `${screen}: that size`).toBeLessThanOrEqual(1);
