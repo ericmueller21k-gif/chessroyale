@@ -24,6 +24,7 @@ import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { account, mustSignInToPlayOnline } from "../account.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { ChatNotice } from "../components/ChatNotice.tsx";
 import { homeRankLine, ranked1v1Rank } from "../ranked.ts";
@@ -745,8 +746,9 @@ export function HomeScreen({
           <button type="button" class="fd-hero-iconbtn" aria-label="Edit icon" onClick={onIcon}>
             <UserIcon icon={profile?.user.icon ?? "♟"} />
           </button>
-          {/* (An admin's test level: a ring round the icon and "LVL 38" above it. Placeholders: FrontDoor.tsx, TEST_LEVEL.) */}
-          {testSwitchesAllowed() && <LevelRing />}
+          {/* (Your level, Nov 9: a ring round the icon and "LVL 7" above it, from your XP, wherever you can earn XP: signed in, or
+              anyone where sign-in isn't set up.) */}
+          {profile && account().config && !mustSignInToPlayOnline() && <LevelRing xp={profile.xp ?? 0} />}
         </span>
         <div class="fd-hero-text">
           <button type="button" class="fd-hero-namebtn" aria-label="View your profile" onClick={onName}>

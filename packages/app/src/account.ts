@@ -1,6 +1,6 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
-import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary } from "@chessroyale/core";
+import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
 /**
@@ -39,6 +39,8 @@ export interface Profile {
   chatMod?: { block?: ChatBlock; notice?: ChatNotice };
   /** Chat is on for this account (its opt-in, off by default; a guest's is on the device: chat-on.ts). */
   chatOn?: boolean;
+  /** Your XP (Nov 9): your level and its ring come from it (core's levelOf). Missing from an older server. */
+  xp?: number;
 }
 
 /** A moderator's warning or chat ban, shown to you once (components/ChatNotice.tsx). */
@@ -526,14 +528,42 @@ export async function recordSoloResult(r: {
   bossElo?: number | null;
   /** Whether the eval bar was on (testers only since Oct 15), so we can see later who played without it. */
   evalBar: boolean;
-}): Promise<void> {
-  if (!state.profile) return;
+  /**
+   * XP (Nov 9): the game's id from startSoloGame (the server times it by its own clock), your moves, whether you won or resigned,
+   * and whether a test switch was on: the device's word, which can only lower the XP (server/xp.ts).
+   */
+  game?: string | null;
+  moves?: number;
+  won?: boolean;
+  resigned?: boolean;
+  test?: boolean;
+}): Promise<XpGrant | null> {
+  if (!state.profile) return null;
   try {
-    await api("/api/results", { method: "POST", body: JSON.stringify(r) });
+    const answer = await api<{ xp?: XpGrant | null }>("/api/results", { method: "POST", body: JSON.stringify(r) });
     set({ profile: await api<Profile>("/api/me") });
+    return answer.xp ?? null;
   } catch {
     // Not important enough to bother the player.
+    return null;
   }
+}
+
+/** A solo game begins (XP, Nov 9): the server notes when, by its own clock; its id goes back with the result. Null: no account yet. */
+export async function startSoloGame(body: { xpgame?: number }): Promise<string | null> {
+  if (!state.profile) return null;
+  return (await api<{ game: string | null }>("/api/xp/solo/start", { method: "POST", body: JSON.stringify(body) })).game;
+}
+
+/** Your XP from an online game (its lobby's code), once its room has written it; null until then. */
+export async function onlineGameXp(code: string): Promise<XpGrant | null> {
+  return (await api<{ xp: XpGrant | null }>(`/api/xp?game=${encodeURIComponent(code)}`)).xp;
+}
+
+/** The test switch ?xp=<n> (test servers and admins only): sets your XP, then your profile again. */
+export async function setTestXp(xp: number): Promise<void> {
+  await api("/api/xp/test", { method: "POST", body: JSON.stringify({ xp }) });
+  set({ profile: await api<Profile>("/api/me") });
 }
 
 /** The name you play under: your profile's, else this device's, else "Player". */
@@ -561,6 +591,8 @@ export interface PublicProfile {
   online: boolean;
   /** They hide when they're online (Settings → Friends): `online` false and `lastSeen` null. */
   hidden?: boolean;
+  /** Their level (Nov 9: from their XP). Missing from an older server. */
+  level?: number;
   rating: number | null;
   topPercent: number | null;
   /** Banned for fair play (the profile says so; nothing else about fair play is shown). */

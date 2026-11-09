@@ -17,7 +17,7 @@ describe("the FAQ's contents", () => {
   const anchors = faqAnchors(page);
 
   it("has every section the brief lists, in order", () => {
-    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "crates", "fair-play", "privacy", "credits"]);
+    expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "xp", "crates", "fair-play", "privacy", "credits"]);
   });
 
   it("every table-of-contents entry has a matching section, and every sub-entry a heading in it", () => {
@@ -455,6 +455,24 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(moved).toContain("reaches 12 of your moves");
     expect(moved).toContain("up to 4");
     expect(moved).toContain("for 5 tokens of that boss, or 2 tokens and 1 crate key");
+  });
+
+  it("XP and levels (Nov 9), from the settings: a level's XP, a game's, the move minimum, each \"No XP\" reason, the caps", () => {
+    const t = section("xp");
+    expect(t).toContain("Each level takes 1,000 XP, the same for every level, with no top level. You start at Level 1.");
+    expect(t).toContain("10 XP for each whole minute you played, up to 30 minutes, plus 50 XP for a win. So a game earns at most 350 XP.");
+    expect(t).toContain("A game counts from your 10th move.");
+    expect(t).toContain('"No XP: the game ended before move 10."');
+    expect(t).toContain('"No XP: you resigned before move 10."');
+    expect(t).toContain("if you left the match");
+    expect(t).toContain("sign in to earn XP");
+    expect(t).toContain("5 wins a day");
+    expect(t).toContain("08:00 UTC (midnight Pacific)");
+    const moved = section("xp", { ...FAQ_DEFAULTS, xp: { ...FAQ_DEFAULTS.xp, perLevel: 1500, perMinute: 12, maxMinutes: 25, win: 40, minMoves: 8, soloWinsPerDay: 3 } });
+    expect(moved).toContain("Each level takes 1,500 XP");
+    expect(moved).toContain("12 XP for each whole minute you played, up to 25 minutes, plus 40 XP for a win. So a game earns at most 340 XP.");
+    expect(moved).toContain("from your 8th move");
+    expect(moved).toContain("3 wins a day");
   });
 
   it("the clock vote's time controls, the default, and a raid's clock", () => {

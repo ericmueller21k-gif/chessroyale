@@ -17,6 +17,8 @@ import { useMedia } from "../components/QuickChat.tsx";
 import { SIDE_PANEL } from "../components/SquadsParts.tsx";
 import { FlagIcon, MatchMenu, type MatchExit } from "../components/MatchMenu.tsx";
 import { ReplayButton } from "../components/MoveReplay.tsx";
+import { XpResult, useGameXp } from "../components/XpResult.tsx";
+import { XP_NONE_LINES } from "@chessroyale/core";
 
 /**
  * Squads' screens (docs/areas/squads.md, "The screens"), by the lobby's phase: the waiting room (the queue's seats, 32 of
@@ -219,6 +221,7 @@ function OutCard({ client, actions, onSpectate }: { client: SquadsClient; action
         {squadName(p.squadId)} placed {placementText(p.placement)} of 8 squads.{" "}
         {p.coins || p.crates ? `+${p.coins} coins${p.crates ? ` · ${p.crates} crate` : ""}` : client.lobby?.test ? "Test lobby: no rewards." : ""}
       </p>
+      <SquadsXp client={client} />
       <div class="sq-card-actions">
         <button type="button" class="fd-btn" onClick={onSpectate}>
           Spectate the bracket
@@ -230,6 +233,16 @@ function OutCard({ client, actions, onSpectate }: { client: SquadsClient; action
     </div>
     </div>
   );
+}
+
+/**
+ * Your XP from this lobby (Nov 9), once your squad's place is decided: the same box as every result screen, asked for by the lobby's
+ * code (its room writes it with your result). A test lobby records nothing: "No XP: test game."
+ */
+function SquadsXp({ client }: { client: SquadsClient }) {
+  const test = !!client.lobby?.test;
+  const xp = useGameXp(client.placed ?? client, { code: test ? null : client.code });
+  return <XpResult xp={xp} none={test ? XP_NONE_LINES.test : undefined} />;
 }
 
 /** Your squad's finished Pairs match's same-move tokens, every use and the judge's verdict (the post-match breakdown). */
@@ -305,6 +318,7 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
           {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : ""}
         </p>
       )}
+      {placed && <SquadsXp client={client} />}
       <ol class="sq-places">
         {order.map((id) => {
           const sq = lobby.squads.find((s) => s.id === id)!;

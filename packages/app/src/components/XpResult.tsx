@@ -1,0 +1,125 @@
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
+import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, type XpGrant } from "@chessroyale/core";
+import { account } from "../account.ts";
+import { gameXp } from "../xp.ts";
+
+/**
+ * The XP box on every result screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't
+ * want it to skip… It should like go up like a nice satisfying looking thing… on every page"; docs/decisions/2026-11-09-xp-box.md).
+ * One fixed box (nothing shifts, whatever it shows): the gain and your level on top, the bar, then the parts ("12 min +120 · Win
+ * +50") or why there was none ("No XP: you left the match."). The bar fills from the old XP to the new over 1.5 to 2.5 s
+ * (core's xpAt: eased, never a jump), the number counting up with it and each part showing as its share starts; a level-up fills
+ * to the end, pops "Level 8!" and goes on from empty. Each frame only sets the bar's transform and three texts (its box contains its
+ * own layout). Reduced motion: the end at once.
+ */
+
+const fmt = (n: number) => Math.round(n).toLocaleString("en-US");
+const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** `xp`: the grant (null: none came; undefined: still coming). `none`: what to say when none came (default: "No XP for this game."). */
+export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | null | undefined; none?: string }) {
+  const fill = useRef<HTMLDivElement>(null);
+  const gain = useRef<HTMLSpanElement>(null);
+  const level = useRef<HTMLSpanElement>(null);
+  const pop = useRef<HTMLSpanElement>(null);
+  const partsRef = useRef<HTMLDivElement>(null);
+  // (While it's coming, and for a game with none: your XP as your profile has it, standing still.)
+  const still = xp ? xp.before : (account().profile?.xp ?? 0);
+  const filling = !!xp && !xp.none && xp.after > xp.before;
+  const [done, setDone] = useState(!filling);
+
+  // The fill, frame by frame, from its first frame (a layout effect: the box's first paint is the old XP).
+  useLayoutEffect(() => {
+    if (!xp || xp.none || !filling) return;
+    const ms = xpFillMs(xp.after - xp.before);
+    const parts = [...(partsRef.current?.querySelectorAll<HTMLElement>(".xp-part") ?? [])];
+    // (Each part shows as the count reaches its share: the first at once.)
+    const starts = xp.parts.map((_, i) => xp.parts.slice(0, i).reduce((sum, p) => sum + p.xp, 0));
+    let shownLevel = xp.levelBefore;
+    const draw = (t: number) => {
+      const at = xpAt(xp.before, xp.after, t, ms);
+      if (fill.current) fill.current.style.transform = `scaleX(${at.share})`;
+      if (gain.current) gain.current.textContent = `+${fmt(at.xp - xp.before)} XP`;
+      if (at.level !== shownLevel) {
+        shownLevel = at.level;
+        if (level.current) level.current.textContent = `Level ${at.level}`;
+        // (The pop: its animation started again for each new level.)
+        const el = pop.current;
+        if (el) {
+          el.textContent = `Level ${at.level}!`;
+          el.classList.remove("on");
+          void el.offsetWidth;
+          el.classList.add("on");
+        }
+      }
+      parts.forEach((el, i) => el.classList.toggle("shown", i === 0 || at.xp - xp.before >= starts[i]!));
+    };
+    if (reduced()) {
+      draw(ms);
+      setDone(true);
+      return;
+    }
+    draw(0);
+    let raf = 0;
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const t = now - t0;
+      draw(t);
+      if (t < ms) raf = requestAnimationFrame(frame);
+      else setDone(true);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [xp]);
+
+  // (A game with none, or nothing gained: its last state at once.)
+  useEffect(() => {
+    if (!filling) setDone(true);
+  }, [xp]);
+
+  const nothing = xp === null || !!xp?.none;
+  const line = xp === undefined ? "Counting your XP…" : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
+  const start = filling ? xp!.before : still;
+  return (
+    <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite">
+      <div class="xp-top">
+        <span class="xp-gain" ref={gain}>
+          {xp === undefined ? "XP" : `+${fmt(filling ? 0 : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
+        </span>
+        <span class="xp-level" ref={level}>
+          Level {levelOf(start)}
+        </span>
+      </div>
+      <div class="xp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={XP.perLevel} aria-valuenow={xpInLevel(xp?.after ?? still)}>
+        <div class="xp-fill" ref={fill} style={{ transform: `scaleX(${levelProgress(start)})` }} />
+        <span class="xp-pop" ref={pop} aria-hidden="true" />
+      </div>
+      <div class="xp-parts" ref={partsRef}>
+        {line !== null ? (
+          <span class="xp-why">{line}</span>
+        ) : (
+          xp!.parts.map((p, i) => (
+            <span key={i} class={`xp-part${filling ? "" : " shown"}`}>
+              {i > 0 && <span class="xp-dot"> · </span>}
+              {p.label} <b>+{fmt(p.xp)}</b>
+            </span>
+          ))
+        )}
+        {line === null && !xp!.parts.length && <span class="xp-why">{fmt(xpInLevel(xp!.after))} / {fmt(XP.perLevel)} XP</span>}
+      </div>
+    </div>
+  );
+}
+
+/** A result screen's XP for its match (online: by its lobby code; solo: when its result comes back). Undefined: still coming. */
+export function useGameXp(match: object, opts: { code?: string | null; solo?: boolean }): XpGrant | null | undefined {
+  const [xp, setXp] = useState<XpGrant | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    void gameXp(match, opts).then((x) => live && setXp(x));
+    return () => {
+      live = false;
+    };
+  }, [match]);
+  return xp;
+}

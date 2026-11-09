@@ -15,10 +15,13 @@ import { pawnLook } from "../looks.ts";
 import { FlagIcon, MOUSE_LAYOUT, MatchMenu } from "../components/MatchMenu.tsx";
 import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
+import { XpResult, useGameXp } from "../components/XpResult.tsx";
 
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
   const [review, setReview] = useState(false);
+  // XP (Nov 9): an online game's by its lobby code, as its room writes it; a solo game's with its result (App.tsx).
+  const xp = useGameXp(match, match.serverPaced ? { code: (match as { code?: string }).code ?? null } : { solo: true });
   // A computer has the side bar (its Settings); a boss battle's gear is left out there (Eric, round 2).
   const sidebar = useMedia(MOUSE_LAYOUT);
   // Out at a cut (Crowd): the breakdown measures you against the line you missed.
@@ -166,6 +169,8 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
               : "Unranked: solo games don't count for ranking."}
           </p>
         )}
+        {/* XP (Nov 9): the bar filling from your old XP to the new, on every result screen. */}
+        <XpResult xp={xp} />
         {/* Online: quick chat, for the GGs. */}
         <ChatSection match={match} />
         {me && (

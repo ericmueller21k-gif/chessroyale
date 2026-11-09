@@ -44,11 +44,8 @@ export function seenLine(p: Pick<PublicProfile, "online" | "hidden" | "lastSeen"
   return { dot: false, text: `Last seen ${when === "Yesterday" ? "yesterday" : when} · ${joined}` };
 }
 
-/**
- * The level line: "Level 38" only where the test switches count (an admin; the real levels aren't built yet, so `level` is
- * FrontDoor's TEST_LEVEL placeholder), else empty. The line keeps its height either way.
- */
-export const levelLine = (allowed: boolean, level: number): string => (allowed ? `Level ${level}` : "");
+/** The level line (Nov 9: real, from their XP): "Level 7"; empty from an older server (the line keeps its height either way). */
+export const levelLine = (level: number | undefined): string => (typeof level === "number" && level >= 1 ? `Level ${level}` : "");
 
 /** An icon of their own (a drawing, or an older account's emoji), as opposed to the default pawn: it goes behind their pawn; the default gets the theme's light yellow. */
 export const hasOwnIcon = (icon: string | undefined): icon is string => !!icon && icon !== "♟";

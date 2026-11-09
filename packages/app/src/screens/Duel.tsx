@@ -1,3 +1,5 @@
+import { XpResult } from "../components/XpResult.tsx";
+import { XP_NONE_LINES } from "@chessroyale/core";
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { controlLabel, duelControl, type RankView } from "@chessroyale/core";
@@ -431,6 +433,9 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
           </span>
         </span>
       )}
+      {/* XP (Nov 9): the box on every result screen; it comes with the outcome (an aborted game earns none). A game against a bot,
+          here or in the town, records nothing yet, so it has no box. */}
+      {!snap.town && !snap.bot && <XpResult xp={snap.outcome ? (snap.outcome.xp ?? null) : undefined} none={XP_NONE_LINES.short} />}
       <div class="dv-result-actions">
         {/* A town bot's game: back to the town, at the table, the bot across. */}
         {snap.town ? (
