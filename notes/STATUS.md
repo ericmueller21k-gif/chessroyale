@@ -497,3 +497,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   the action box, computer top block cramped and unlike the bottom. Round 2 (fresh Haiku session_01JuCWRrbfjnj717fC811q8d): rows grow
   into the empty space, drawn pawn ≥ 85% of the row, top = bottom; done signal .round2.md. Lesson: Haiku took "about as tall as the
   bench row" literally; brief Haiku with measurable targets and have it look at its own stills.
+- Nov 9 ~01:30: #563 (meet chat cards) LIVE 4a5f1f7. Eric asked for the XP / levels / daily reward / quests design (no code yet):
+  draft v0 notes/briefs/design-xp-quests.md, 11 open questions sent to Eric. Waiting on his answers (and Hearthstone screenshots).
