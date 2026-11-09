@@ -9223,26 +9223,43 @@ button.fd-logo {
   fill: var(--fd-blue);
   stroke: var(--fd-blue);
 }
+/*
+ * The profile square's face (Eric, Nov 9: "a zoom in of your guy's head, but there should still be padding around all the sides,
+ * just like for the rest of the icons"): a rounded window inset `--pad` from the square's edges (the square's own background
+ * around it), your pawn inside it at `--face` with its head in view. The window clips with `clip-path`, never `overflow: hidden`
+ * (the Quests spec's "cut" guard).
+ */
 .fd-top .fd-top-face {
-  clip-path: inset(0 round 12px);
+  --pad: 6px;
+  --face: 56px;
+  --face-y: 4px;
   border: 0;
   border-radius: 12px;
   background: var(--fd-panel-2);
 }
 .fd-top .fd-top-face .fd-pawn-ring {
   position: absolute;
+  inset: var(--pad);
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  background: var(--fd-panel);
+  clip-path: inset(0 round 8px);
+}
+.fd-top .fd-top-face .fd-pawn-ring .fd-pawn-box {
+  inset: auto;
   left: 50%;
-  top: 5px;
-  width: 72px;
-  height: 72px;
+  top: var(--face-y);
+  width: var(--face);
+  height: var(--face);
   transform: translateX(-50%);
 }
-/* Below 360 px the square is 40 px (0.91 of 44): the pawn scales with it. */
+/* Below 360 px the square is 40 px: the face scales with it. */
 @media (max-width: 359px) {
-  .fd-top .fd-top-face .fd-pawn-ring {
-    width: 65px;
-    height: 65px;
-    top: 4.5px;
+  .fd-top .fd-top-face {
+    --pad: 5.5px;
+    --face: 51px;
+    --face-y: 3.5px;
   }
 }
 .fd-home-main {
@@ -25865,47 +25882,68 @@ button.sq-tiny {
   text-overflow: ellipsis;
   line-height: 1.2;
 }
-.bl-card {
-  width: min(100%, 360px);
-  gap: 8px;
+/* The Bot level box: compact (Eric, Nov 9: "about half the size … more condensed"): the Quests shell's look, smaller; each
+   number close to its level. */
+.qo-card.bl-card {
+  width: min(100%, 264px);
+  padding: 26px 10px 10px;
+  gap: 6px;
+  border-radius: 18px;
 }
 .bl-card:focus {
   outline: none;
 }
+.bl-card .qo-x {
+  top: -12px;
+  right: -12px;
+  width: 36px;
+  height: 36px;
+}
 .qo-title.bl-title {
-  font-size: 22px;
+  font-size: 17px;
+  padding: 3px 14px 6px;
+}
+.bl-card .qo-when {
+  font-size: 11px;
+  padding: 2px 10px;
 }
 .bl-rows {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 .bl-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 44px;
-  padding: 0 14px;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--qo-row);
   box-shadow: inset 0 0 0 2px transparent;
   color: var(--fd-text);
-  font: 600 15px Archivo, system-ui, sans-serif;
+  font: 600 14px Archivo, system-ui, sans-serif;
   text-align: left;
   cursor: pointer;
 }
 .bl-row span {
-  font-weight: 400;
+  font-weight: 700;
   font-size: 13px;
-  color: var(--fd-sub);
+  color: var(--fd-gold-text);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .bl-row.on {
   box-shadow: inset 0 0 0 3px var(--fd-gold);
   color: var(--fd-gold-text);
   font-weight: 800;
+}
+.qo-ok.bl-ok {
+  margin-top: 2px;
+  min-height: 40px;
+  font-size: 15px;
 }
 .bl-ok:disabled {
   opacity: 0.45;

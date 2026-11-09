@@ -47,7 +47,8 @@ export function BotLevelBox({ rating, onStart, onClose }: { rating: number | nul
     () =>
       BOT_LEVELS.map((l) => {
         const mean = botLevelMean(l.id, rating);
-        const about = mean === "random" ? "Every bot's level is random" : `~${averageOf(mean)}`;
+        // (A plain number: "~700" read as minus 700 on a phone, Eric, Nov 9. Random: every bot's level is its own.)
+        const about = mean === "random" ? "Mixed" : String(averageOf(mean));
         return { id: l.id, label: l.label, about };
       }),
     [rating],

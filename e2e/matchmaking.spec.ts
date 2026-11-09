@@ -48,7 +48,7 @@ test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the
   await expect(page.locator(".fd-hint")).toHaveText("Start at once with 99 bots");
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const box = page.getByRole("dialog", { name: "Bot level" });
-  await expect(box.getByRole("radio")).toHaveText([/^My level~\d+$/, "Very easy~700", /^Easy~(900|950|1000)$/, /^Medium~(1100|1150|1200)$/, /^Hard~1[45]\d0$/, /^Very hard~1[89]\d0$/, "RandomEvery bot's level is random"]);
+  await expect(box.getByRole("radio")).toHaveText([/^My level\d+$/, "Very easy700", /^Easy(900|950|1000)$/, /^Medium(1100|1150|1200)$/, /^Hard1[45]\d0$/, /^Very hard1[89]\d0$/, "RandomMixed"]);
   await expect(box.getByRole("button", { name: "OK", exact: true })).toBeDisabled();
   await box.getByRole("button", { name: "Close" }).click();
   await expect(box).toHaveCount(0);
