@@ -560,3 +560,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   asked for a real-look mockup first, then build on approval. Opus high session for claude/quests-mock (QuestsOverlay behind
   ?quests=mock, fake data; stills on stills/quests-mock; done signal .pr-body.md). Two Opus now: boss result v2 + quests mock
   (allowed while XP is built).
+- Nov 9 ~07:00: boss result v2 done (40a10e8; stills sent). Boss-lane review: Opus session_01JuCWRrUpycNyssSJMZ7cKv (branch
+  review/boss-result-v2, watcher b9mhzsp4q). Asked Eric: (1) the attack's blow lands on the pawn during the attack (16 px holds at
+  rest); (2) the pawn is small next to the boss (~45 px): bigger?
