@@ -530,3 +530,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~03:20: Eric APPROVED the XP design ("I'm good with the XP design"; all recommendations), plus: the XP bar animates
   smoothly on every result screen. Design v2 + phase-1 brief notes/briefs/brief-xp-phase1.md. Eric is "debating" allowing a second
   Opus alongside for XP: director recommended yes, temporarily, asked him to confirm. Still need his OK for #564.
+- Nov 9 ~03:20: Eric OK'd #564 (guard helper) and "Yes" to a second Opus for XP. #564: .pr-body removed + main merged (3073237);
+  CI watcher b5db4f6ux; merge on green. XP phase 1: Opus xhigh session_01JuCWRtw76FM64wxGBykpww on claude/xp-phase1 (done signal
+  .pr-body.md; watcher). Eric had to sign in to Claude Code again (used his Claude account with the top plan): nothing needed.

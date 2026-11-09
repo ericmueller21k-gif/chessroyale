@@ -116,3 +116,6 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 
 - **Taps are logical (Eric, Nov 6):** anything a player would naturally tap goes to its relevant page or pop-up. On the home card, the pawn opens the inventory, and the icon (and level) opens the icon picker. Eric will name more cases as they come up; don't over-engineer.
 - **No browser zoom (Eric, Nov 6):** no pinch or double-tap zoom on phones or computers. The viewport meta has user-scalable=no, plus touch-action: manipulation and iOS gesture blocking.
+- **Nov 9: two Opus helpers allowed while XP is built** (Eric: "I'm debating if we may break our rule of having another, just have
+  Opus do it alongside, so we can continue to build other stuff"; then "Yes"). XP's builder is one; at most one other Opus beside it.
+  Back to one Opus when XP's phases are done. Other workers stay off the result screens while XP phase 1 is open.
