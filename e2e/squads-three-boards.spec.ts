@@ -163,7 +163,11 @@ test("a Relay match on 3 boards plays to a result: 12 tiny boards, the finished 
   // Best 2 of 3: White wins all three (side 0 White on boards 1 and 3): 2–1.
   expect(r.points).toEqual([2, 1]);
   expect(r.winner).toBe(0);
-  // The finished boards: not grayed, a border and a check mark in the winning squad's color.
+  // The finished boards: not grayed, a border and a check mark in the winning squad's color. Still there once the match
+  // is over and the next round's matches wait out their break (Nov 9: they used to hide yours within a second).
+  await expect
+    .poll(() => page.evaluate(() => { const s = (window as any).squads; const ms = [...s.matches.values()]; const m = ms.find((x: any) => x.sides.some((sd: any) => sd.seats.includes(s.myId))); return m?.state === "over" && ms.some((x: any) => x.round > m.round && x.state === "break"); }), { timeout: 30_000 })
+    .toBe(true);
   const ours = page.locator(".sq-match.ours .sq-tiny.is-won");
   await expect(ours).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator(".sq-match.ours .sq-done")).toHaveCount(3);

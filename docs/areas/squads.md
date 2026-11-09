@@ -339,7 +339,9 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   anyone still seated recorded as leaving, `wrapped`, `keepMs` 0) and closes.
 - **Armageddon.** A drawn final: the rules' `armageddonChooser`; that squad's people pick a color during
   `armageddonIntroSeconds` (the last pick stands; nobody: the bots' Black), then `startArmageddon`.
-- **Spectating and leaving.** Everyone gets every match (the tiny boards). A knocked-out squad's people watch on, or
+- **Spectating and leaving.** Everyone gets every match (the tiny boards: `shownMatches`, the latest round that has
+  begun with its finished matches checked, and every match being played; a next round's match waiting out its break
+  joins when its round begins, Nov 9). A knocked-out squad's people watch on, or
   `leave` (their socket closes) and queue again.
 - **Who's watching** (Eric, Oct 14; DECISIONS.md, "Squads: jump to my next board, and who's watching"). Each screen
   sends `view` (the match and board it shows full size, or none) only when that changes, and again after a reconnect.
@@ -363,7 +365,7 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   fast, normal and long map to them, an unknown id gives Blitz) or `clock=BANK,TOPUP,FREE,INC[,CAP]` (a team clock in
   seconds; without CAP the old 20 s ceiling, so older links keep their meaning; `testLobbyOptions`), that fills 5 s after it opens, skipping the rounds before (squads with more people go
   through). For tests also `fen=` (the first round's boards start there: a legal position, White to move),
-  `bots=strong` (every bot at the strongest skill), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
+  `bots=strong` (every bot at the strongest skill, never a random move: Nov 9), `bots=blocks` (bots block whenever they can; `bots=strong,blocks`
   for both), `seat=white` (the opener plays White on their first board) and `blockPoints=N` (Mercenary, 0-20: every
   squad starts every match with N block points; none otherwise, so a test can block in round 1). `mode=mercenary|classic` sets the mode
   (no Mode vote); without it the Mode vote is held and the bots sit it out, so the opener's vote decides. A Mercenary
@@ -500,7 +502,7 @@ door's look; every class is `sq-`.
   - **Who's watching** (Oct 14; `Watchers` in SquadsParts.tsx): right after the line above the board, a small pixel eye
     and the profile pawns (`Avatar`, with their items) of the other people showing that board full size, overlapping,
     up to `watching.shown` (4), then "+N"; their names on hover. Not you, not the board's own players this turn
-    (`notWatchers`). Each pawn is the watcher's color on that board (white for anyone outside the match). The pawns
+    (`notWatchers`: whoever moves there this turn; a squad's waiting seat on 3 boards shows, Nov 9). Each pawn is the watcher's color on that board (white for anyone outside the match). The pawns
     stand a little taller than the line and spill into the gaps around it, so the board doesn't move as people come and
     go. Static, and it listens for who's watching itself (`client.onViewers`): a `viewers` message redraws these pawns
     and nothing else (each pawn memoized), never the whole screen; a clock tick or a move doesn't redraw them.

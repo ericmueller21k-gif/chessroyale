@@ -94,7 +94,8 @@ const sideWord = (c: Colour) => (c === "w" ? "White" : "Black");
 
 /** The match to watch when you have none of your own: the final, else the latest round's first live match. */
 export function spectateDefault(client: SquadsClient): BoardRef | null {
-  const live = shownMatches([...client.matches.values()]).filter((m) => m.state !== "over");
+  // (Every match not over, a next round's still in its break too: the final is the one to watch the moment it's made.)
+  const live = [...client.matches.values()].filter((m) => m.state !== "over").sort((a, b) => a.round - b.round || a.index - b.index);
   const pick = live.find((m) => m.round === 2) ?? live[live.length - 1] ?? shownMatches([...client.matches.values()]).pop();
   return pick ? { key: pick.key, board: 0 } : null;
 }

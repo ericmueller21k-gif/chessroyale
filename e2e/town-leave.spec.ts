@@ -59,11 +59,16 @@ const tapPoint = async (p: Page, kind: "boss" | "home", id: string) => {
   const cv = (await canvas(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 };
-/** Opens a boss's or a home's card by tapping it (it may stroll a step; the card's own tap then opens it). */
+/**
+ * Opens a boss's or a home's card by tapping it (it may stroll a step; the card's own tap then opens it). A tap that met
+ * someone else first (Babur strolling in front of his circus, Nov 9) opened their card, which then covers the home's point:
+ * closed first, or every later tap lands on that card (as e2e/town.spec.ts).
+ */
 async function openCard(p: Page, kind: "boss" | "home", name: string, id: string) {
   const card = p.getByRole("dialog", { name, exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
+    if (await p.locator(".town-card").isVisible()) await p.keyboard.press("Escape");
     if (!(await tapPoint(p, kind, id))) await p.evaluate((i) => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.(i), id);
     await expect.poll(() => tapPoint(p, kind, id), { message: `${name} comes into view` }).not.toBeNull();
     const at = await tapPoint(p, kind, id);
