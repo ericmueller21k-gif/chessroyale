@@ -518,3 +518,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - #564 flaky batch: CI green (4 shards, 8 min). Waiting on Eric's OK for the town-leave guard test's helper edit.
 - #566 squads snap-live (Haiku built, director reviewed the 6-line diff): CI watcher b13hcw9xs. Eric asked for the fix: merge on green.
 - Dash #560 + #561 merged (b7762b8, 3493bcf); watcher bc6et7obw (deploy + main CI).
+- Nov 9 ~02:40: Eric upgraded to GitHub Pro and set $0 "usage blocked" budgets on every product (Actions still run: public repo).
+  First main run on Pro (cc4cd0a): max runner wait 3 s (was 4-8 min); slowest shard 18.6 min.
+- #565 and #566 merged and live (cc4cd0a). Main e2e RED on cc4cd0a: match-menu.spec.ts:240 phone 360x640, opponent 3.8 px from the
+  gear (#565's bigger words). Fix forward PR #567 (claude/autochess-gear-clear, deed0a6): bigger words only at >= 360 wide and
+  >= 700 tall. Passes locally both projects. CI watcher boam8v6gj; merge on green.
+- Still waiting on Eric: OK for #564 (town-leave guard test helper), the XP design answers.
