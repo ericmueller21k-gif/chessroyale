@@ -8,7 +8,7 @@
  */
 
 import { CHAT_PACKS, chatPackItem, type ChatPicks } from "./chat.ts";
-import { QUICK_CHAT } from "./settings.ts";
+import { QUICK_CHAT, SHOP } from "./settings.ts";
 
 export type ShopSlot = "king" | "chat";
 /** The slots you equip one item in (chat packs aren't equipped: you use every one you own). */
@@ -101,3 +101,14 @@ export function equippedLook(state: Pick<ShopState, "equipped"> | null | undefin
   const item = shopItem(state?.equipped?.[slot] ?? "");
   return (item && item.slot === slot ? item : starterItem(slot)).look;
 }
+
+/**
+ * A shop price after the discount (`SHOP.discount`, 0.5 = 50% off): whole coins, rounded to the nearest (half up), never below 0.
+ * The Shop tab shows the full price struck through beside it whenever the discount is on.
+ */
+export const shopPrice = (full: number, discount: number = SHOP.discount): number =>
+  Math.max(0, Math.round(full * (1 - Math.min(1, Math.max(0, discount)))));
+
+/** The discount's ribbon ("50% OFF"), or null with no discount (no ribbons then). */
+export const discountLabel = (discount: number = SHOP.discount): string | null =>
+  discount > 0 ? `${Math.round(Math.min(1, discount) * 100)}% OFF` : null;

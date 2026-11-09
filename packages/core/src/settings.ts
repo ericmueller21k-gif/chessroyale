@@ -2721,6 +2721,24 @@ export const GOD_KING_SHOP = false;
 export const CHAT_PACKS_SHOP = false;
 
 /**
+ * The Shop tab's page (Eric, Nov 9: his mockup, our art; docs/decisions/2026-11-09-shop-page.md). Look only for now: no purchase is
+ * wired (a tapped price says "Buying opens soon"); Stripe and coin purchases come next.
+ */
+export const SHOP = {
+  /** The beta discount on everything in the shop (0.5 = 50% off; 0 = none: no ribbons, no struck prices). */
+  discount: 0.5,
+  /**
+   * Full prices in coins (the director's numbers from the coin economy: a game pays about 1.8 coins a minute, at most 70, about
+   * 20 paying games a day). The page shows them struck through, the discounted price beside them (`shopPrice` in shop.ts).
+   */
+  prices: { key: 250, hunchess: 100, gift: 150, beta: 150, boss: 400, bundle: 900 },
+  /** The limited, rotating items: a gold clock on their card. */
+  limited: ["gift", "beta"] as readonly string[],
+  /** The bundle's 3 random crates: each this likely to be a Mythic Crate (a Fischer Random pull: Legendary or Mythic). Wired with purchases. */
+  bundleMythicChance: 0.05,
+};
+
+/**
  * Quick chat in matches and in the lobby before them (preset phrases and emoji only; see DECISIONS.md, "Quick chat
  * in matches" and "Lobby chat"). The server enforces the limits; the app mirrors them to gray out its buttons.
  */
