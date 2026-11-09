@@ -655,3 +655,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   SHOP (Eric): approved the Boss Crate look (notes/briefs/assets/boss-crate-mock-approved.png; svg source in boss-crate-mock-make.py):
   the shop sells ONE "Random Boss Crate" (? seal, no key needed, pricier); in the inventory each shows its boss's coin in the seal.
   Eric is making a ChatGPT mockup of the shop page; then build the page look only (no Stripe yet). Crate/key art sent to Eric.
+- Nov 9 ~20:30: #582 ranked L1 MERGED (63a684b; full lane done: review, fixes, delta, director's D1 fix, CI test-pool fix). Main's run
+  watched. #585 shop page (Eric's mockup, beta 50% discount, Mythic Crate; look only) in CI. Nothing running. Next queue: riders in
+  regular crates (Eric, ROADMAP); then wiring shop purchases (coins) + Stripe (Eric's accounts); crowd party (xhigh); Squads Bots
+  (xhigh); ranked L2+ (rank line, team ranks, seasons S1).
