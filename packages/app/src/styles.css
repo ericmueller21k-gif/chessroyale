@@ -22110,6 +22110,50 @@ button.sq-tiny {
   justify-self: center;
   margin-top: var(--rgap);
 }
+/* ---- The players, Nov 9 (Eric, phone): the pawn about as tall as a bench tile (never under 44 px), and each block fills its
+   bench row's height (the row's grid track less the gap to the board). Its text, bars and width grow with the board. The board's
+   size still comes from `--pl-h`, so nothing else moves. ---- */
+.ac-root {
+  --ps: max(44px, var(--acs));
+  --ph: calc(var(--acrow) - var(--rgap));
+  --iw: clamp(96px, calc(var(--fw) * 0.3), 150px);
+}
+.ac-players .ac-side {
+  height: var(--ph);
+  align-items: stretch;
+}
+.ac-players .ac-pawn {
+  width: calc(var(--ps) * 1.107);
+  height: var(--ps);
+}
+.ac-players .ac-info {
+  width: var(--iw);
+}
+.ac-players .ac-name {
+  max-width: 100%;
+  font-size: clamp(12px, calc(var(--fw) * 0.035), 20px);
+}
+.ac-players .ac-lv {
+  font-size: clamp(10.5px, calc(var(--fw) * 0.03), 16px);
+}
+.ac-players .ac-info .ac-bars {
+  width: 100%;
+  margin-top: auto;
+  gap: 3px;
+}
+.ac-players .ac-bar {
+  grid-template-columns: 1.7em minmax(0, 1fr) auto;
+  font-size: clamp(10.5px, calc(var(--fw) * 0.03), 16px);
+}
+.ac-players .ac-bar small {
+  font-size: 0.8em;
+}
+.ac-players .ac-bar i {
+  height: clamp(6px, calc(var(--fw) * 0.02), 10px);
+}
+.ac-players .ac-bar b {
+  font-size: 1em;
+}
 .ac-bench {
   flex-direction: row;
   gap: 0;

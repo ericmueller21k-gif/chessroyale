@@ -834,7 +834,8 @@ for (const i of [0, 1]) expect(light(look.you[i]!.bg), "yours lighter than their
   for (const sel of [".ac-me", ".ac-opp"]) {
     const bars = await page.locator(`${sel} .ac-bar i`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     expect(bars, `${sel}: HP and XP`).toHaveLength(2);
-    for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(8);
+    // (Nov 9, Eric: taller bars; the cap was 8 px, now 10 px, `.ac-players .ac-bar i`.)
+    for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(10);
     const pawn = (await page.locator(`${sel} .ac-pawn`).boundingBox())!;
     const first = (await page.locator(`${sel} .ac-bar`).first().boundingBox())!;
     expect(first.x, `${sel}: the bars are right of the pawn`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 2);
@@ -887,6 +888,43 @@ const recordHops = (p: Page) =>
     }).observe(document, { attributes: true, attributeFilter: ["class"], subtree: true });
   });
 const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<"me" | "opp", { on: number[]; off: number[] }>);
+
+// Nov 9 (Eric, phone): each pawn about as tall as a bench tile, each block (pawn, name, level, HP and XP) filling its bench row's height,
+// the two blocks the same size, and the widest texts (a 12-letter name, HP 24, XP 12/12) inside the block at every size.
+test("the players (Nov 9): each pawn about as tall as a bench tile, each block fills its bench row (the grid's track), the two blocks the same size; a 12-letter name and the widest numbers fit", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem("brc.name", "Abcdefghijkl");
+    } catch {
+      // No storage.
+    }
+  });
+  await page.goto(PLAIN);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  await expect(page.locator(".ac-me .ac-name")).toHaveText("Abcdefghijkl");
+  await page.evaluate(() => {
+    document.querySelector(".ac-hp-you b")!.textContent = "24";
+    document.querySelector(".ac-xp-you b")!.textContent = "12/12";
+    document.querySelector(".ac-hp-bot b")!.textContent = "24";
+    document.querySelector(".ac-xp-bot b")!.textContent = "12/12";
+  });
+  const m = await page.evaluate(() => {
+    const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const rows = getComputedStyle(document.querySelector(".ac-col")!).gridTemplateRows.split(" ").map(parseFloat);
+    const side = (s: string, row: number) => ({ w: r(s).width, h: r(s).height, pawn: r(`${s} .ac-pawn`).height, row: rows[row]!, fits: [...document.querySelectorAll(`${s} .ac-name, ${s} .ac-bar b`)].every((e) => e.scrollWidth <= e.clientWidth + 1) });
+    return { tile: r(".ac-bench.you .ac-slot").height, me: side(".ac-me", 3), opp: side(".ac-opp", 1) };
+  });
+  for (const [who, s] of [["you", m.me], ["opponent", m.opp]] as const) {
+    expect(s.pawn, `${who}: the pawn about as tall as a bench tile`).toBeGreaterThanOrEqual(0.8 * m.tile);
+    expect(s.h, `${who}: the block fills its bench row`).toBeGreaterThanOrEqual(0.9 * s.row);
+    expect(s.fits, `${who}: the name and the numbers fit`).toBe(true);
+  }
+  expect(Math.abs(m.me.w - m.opp.w), "the two blocks are as wide").toBeLessThanOrEqual(0.5);
+  expect(Math.abs(m.me.h - m.opp.h), "the two blocks are as tall").toBeLessThanOrEqual(0.5);
+  expect(m.me.pawn, "the two pawns are the same size").toBeCloseTo(m.opp.pawn, 0);
+  expect(errors).toEqual([]);
+});
 
 test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", async ({ page }) => {
   test.setTimeout(120_000);
