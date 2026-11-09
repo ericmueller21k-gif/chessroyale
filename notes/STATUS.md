@@ -668,3 +668,10 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   and fixes them; proposal sent (prod smoke bot via Actions cron, error/abandon alerts from the Worker cron to Eric + a triage
   scheduled task, gradual deploys); waiting on his go and where alerts should go. (2) TIME CONTROLS: revisit later, "no mode should
   feel rushed"; Squads' default may need to be longer (~10 min); let players choose where it fits. Don't start until he says.
+- Nov 9 ~21:30: BLOAT SWEEP ran (late: the scheduled pair was lost in the session move, recreated). Report: notes/pipeline-audit-2026-11-09.md.
+  Trend: nothing grew >10% without a feature; flakes halved (2.21 → 1.28 a run); full main CI median 20.8 min; PR e2e 17.7.
+  Director quick wins in #589 (F7 typecheck move, F2b "no test failed" note, F8 boingo palette split); F5 word cap in rules-common.
+  QUEUED helper PRs: (1) F1+F6 flaky batch 2 (dash:241, home-ranked y, sound:61, town-chat:1194, formats:194, squads-three-boards:181)
+  + top 8 fixed waits, then retries 0 on main; (2) F3 trace all core modules + fail check on unmapped new files; (3) F4 desktop flows
+  → phone-only review, split autochess/crowd specs. FOR ERIC: F10 (helper model rule: CLAUDE.md "same model always" vs RULES Nov 8
+  "Haiku for UI/simple") and F9 (turn on auto-delete head branches; bulk-delete merged branches). #588 live-ops design (docs).

@@ -46,7 +46,7 @@ realize, organize, meter, canceled, traveled. Don't rename existing code identif
 - **Stills and GIFs stay out of the repo.** On your own machine, deliver them on an orphan branch `stills/<PR#>` (images only, never on
   your work branch); the director deletes it after the merge. Save them untracked (for example `<worktree>/stills/`, never `git add`) and report their paths to the director, who sends them to Eric. Commit an image only when a test reads it as a fixture.
 - **The PR body:** at most 40 lines. What changed for players, the changed checks (old → new) and the test results. No restating the brief.
-- **The decision note:** at most 10 lines. Eric's words, the call, and why.
+- **The decision note:** at most 10 lines and about 120 words (Nov 9 audit F5: 40 of 76 notes ran over). Eric's words, the call, and why. Long design belongs on the area page or in docs/ideas/, linked from the note.
 - **Area pages (docs/areas):** add at most 5 lines per PR. Edit in place instead of appending history.
 - **Prefer number checks to pixel checks** in new e2e tests: read positions and state through the test hooks (`__townCam` and similar) instead of sampling the canvas. Use pixels only when the pixels are the point, such as a sky gap.
 
