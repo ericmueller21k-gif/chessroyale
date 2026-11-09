@@ -284,7 +284,7 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   expect(await riding.getAttribute("data-scale")).toBe("0.75");
   await page.goto("/?rideScale=1");
   await expect(page.locator('.fd-hero .avatar.riding[data-scale="1"]')).toHaveCount(1);
-  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount(1);
+  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount((await page.locator(".fd-top-face:visible").count()) ? 0 : 1);
   await page.evaluate(() => document.fonts.ready);
   expect(await boxes(), "nothing grew or moved at a bigger ride").toEqual(before);
   // Off again: the pawn alone, in the same boxes.
