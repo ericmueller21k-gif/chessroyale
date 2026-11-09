@@ -75,7 +75,7 @@ export function XpResult({ xp, none = "No XP for this game.", compact = false }:
           el.onanimationend = () => box.current?.classList.remove("xp-popping");
         }
       }
-      parts.forEach((el, i) => el.classList.toggle("shown", i === 0 || at.xp - xp.before >= starts[i]!));
+      parts.forEach((el, i) => el.classList.toggle("shown", at.xp - xp.before >= starts[i]!));
     };
     const end = () => {
       markXpFilled(xp);
