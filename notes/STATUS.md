@@ -485,3 +485,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   .pr-body.md.
 - #560 pop-off fix pushed (c3dc94a; flake causes: 8 moves got mated; Rush's fit3 counted; data-cue double count); CI watcher bgj613tv5.
 - GitHub Pro: no gain while public (jobs started within 3 s with 20 shards at once). Matters only if the repo goes private.
+- Nov 9 ~00:50: Eric (phone screenshot): auto chess player pawns bigger; each player block (pawn, name, Lv, HP, XP) fills its bench
+  row's height; top matches bottom. Eric allowed Haiku for more jobs "for now", but the director must verify their quality (stills,
+  diff) before merging; he wants it live. Haiku session_01JuCWRsAA78FR7bBoFC1qsE on claude/autochess-player-size (stills on
+  stills/autochess-player).
