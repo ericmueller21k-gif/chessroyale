@@ -565,3 +565,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   rest); (2) the pawn is small next to the boss (~45 px): bigger?
 - Nov 9 ~07:10: quests mockup done (claude/quests-mock; stills/quests-mock), sent to Eric with its 4 questions (entry place,
   reroll button, blur, crest). No PR until he approves; then the build wires it (phase 3, after phase 2).
+- Nov 9 ~07:20: boss result v2 review (review/boss-result-v2): no blockers; minors: XpResult.tsx:82 "Win +50" shows at the fill's
+  first frame (drop `i === 0 ||`), ResultDuo with no character off-center (moot if every boss has one), reduced motion n/a.
+  Waiting on Eric: blows land on the pawn OK? pawn bigger? Then fix the minor + pawn size, open PR, CI, merge.
