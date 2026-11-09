@@ -28,7 +28,7 @@ placements, "+18" on the result card, `RANKED_1V1` in settings.ts.
 settings block), whether a season reset should drop one tier or none (7), and the **season length**. Everything else
 has a default I'd go with.
 
-**Build order** (section 13): the shared ladder and leave rules first (1 v 1 dodges are open right now: aborting during
+**Build order** (section 14; every file it touches: section 12): the shared ladder and leave rules first (1 v 1 dodges are open right now: aborting during
 the time-control vote costs nothing), then Squads, then 50 v 50, then Duo when it exists.
 
 ---
@@ -425,7 +425,114 @@ Additive only; nothing existing changes meaning.
 - `ABUSE`: `{ samePairPerDay: 3, minLevel: 2 }`.
 - The replacement bot: `botBelow: 100`, `botFloor: 600`.
 
-## 12. What I checked in the repo
+## 12. Everything ranked touches
+
+Eric (Nov 9): "be considerate of all the spots that we'll have to touch in the game that involve that as well." Every
+place that ranks for 50 v 50 and Squads (and the leave rules, for 1 v 1 too) would change or add, with its file, so
+build briefs can be written straight from it. "L1", "T2" and the other codes are the phases in section 14. Paths are
+from main at 74b8def.
+
+**Duo is parked** (Eric hasn't settled its design). Where it would slot in, nothing more:
+- one more mode id (`duo`) in `ranked_ratings`, `RANKED_MODES` and `queueName`;
+- one more tab in Ranked Standing (shown "Coming soon" until then);
+- the shared rank line on its result screen;
+- its own queue in `matchmaker.ts`;
+- phase D1.
+
+Nothing below waits on it.
+
+### The front door (lane `hub`)
+
+| Spot | Change | Files | Phase |
+| --- | --- | --- | --- |
+| Home's RANKED row (50 v 50 · 1 v 1 · Squads) and the line under PLAY | The line under the row shows the picked mode's rank ("Squads · Gold 3 · 45 RP", "Placement 1/3", "Unranked"). A lockout or delayed queue shows there, greying PLAY with its countdown (nothing hidden). | `packages/app/src/screens/Home.tsx` (the RANKED row, `onRanked1v1`, `rest()`), `packages/app/src/ranked.ts` (`ranked1v1Label`, `homeRankLine`) | L1, T2, T3 |
+| Home's line under your name (the main rank) | The 1 v 1 rank, or your most-played mode's with a mode tag (section 1) | `Home.tsx`, `packages/app/src/ranked.ts` (`homeRankLine`, `yourRankShown`) | T2 |
+| Home's note after a dodge | One line in home's note slot: "You left before the game started: −5 RP" | `Home.tsx`; the note's data from `/api/me` | L1 |
+| The queue and its waiting screen | The delayed-queue countdown and the lockout in the wait line's place. A party over the rank gap is refused, with the reason on the party screen. | `packages/app/src/screens/Queue.tsx`, `components/DuelQueueBar.tsx`, `screens/SquadsParty.tsx`, `packages/app/src/duel.ts`, `squads.ts`, `net.ts` | L1, T2 |
+| The 1 v 1 versus stage | Unchanged (it already shows ranks). Aborting from here becomes a dodge: the Abort confirm says "−5 RP" | `components/DuelStage.tsx`, `screens/Duel.tsx` (the match menu's Abort), `components/MatchMenu.tsx` | L1 |
+| The match menu's Resign / Leave confirms (every mode) | In a ranked match the confirm says what it costs: "Leave: counts as a leave, worst result and −10 RP" / "Dodge: −5 RP" (the words only, same box) | `packages/app/src/components/MatchMenu.tsx`, `packages/app/src/match-exit.ts` | L1, T2, T3 |
+| The public profile's Ranked Standing card | Four tabs (1v1 · Duo · Squads · 50 v 50); each mode's emblem, pill, RP, peak, W-L or placements, streak, leaves in the last 20; Duo "Coming soon" | `packages/app/src/screens/PublicProfile.tsx`, `public-profile.ts`, `public-profile.css`, `components/ProfileParts.tsx` | L2, T2, T3 |
+| Your own profile and its rank pill | The same summary per mode | `screens/Profile.tsx`, `screens/PlayerProfile.tsx`, `components/DuelRankPill.tsx` | L2 |
+| Recent Matches on the profile | A Squads or 50 v 50 row shows its RP change, as a ranked 1 v 1's does | `PublicProfile.tsx`, server `rankedSummary` / the profile route | T2, T3 |
+| The emblem | No new art. `RankEmblem` is reused as is. | `components/RankEmblem.tsx`, `packages/app/src/emblems/` | — |
+| The FAQ | The ranks entry covers every mode: one rank per mode, placements, the leave rules and the delayed queue, seasons. FAQ text must match the code exactly (high effort). | `packages/app/src/faq/content.ts`, `faq/markdown.ts`, `screens/Faq.tsx` | L1, T2, S1 |
+| The privacy policy | Ranked ratings per mode, leave records (90 days), season peaks | `packages/app/src/screens/Legal.tsx` (`Privacy`) | L1, T2 |
+| Admin's `?rank=` switch | Takes a mode (`?rank=squads:gold-3`) so every screen can be checked | `packages/app/src/ranked.ts` (`rankFromSwitch`), `test-switches.ts` | L2 |
+
+### In the match (lane: the director)
+
+| Spot | Change | Files | Phase |
+| --- | --- | --- | --- |
+| Squads' turn-order badges | Today: the 1 v 1 emblem and rating (Nov 7). In ranked Squads: the **Squads** rank's emblem | `packages/server/src/squads-do.ts` (`badgeOf`, `PlayerBadge`), `packages/chess/src/squads/protocol.ts`, `screens/SquadsMatch.tsx` (`sq-to-emblem`) | T2 |
+| In-game strips and pills | 1 v 1's strip pill unchanged. 50 v 50's standings and lists show no rank (the board's room). Squads keeps its badge row. | `screens/Duel.tsx` (`DuelStrip`), `screens/Crowd.tsx`, `components/MiniTower.tsx`, `RaceTower.tsx` | — (deliberately unchanged) |
+| 1 v 1's result card | The shared rank line (`RankChange`) in place of `rankLine` and the emblem; the note line | `screens/Duel.tsx` (`rankLine`, `rankAfter`, `dv-result-*`), new `components/RankChange.tsx`, `styles.css` | L2 |
+| Squads' knocked-out card and results | The rank line above the XP box | `screens/Squads.tsx` (`SquadsXp` and its cards), `squads-view.ts` | T2 |
+| 50 v 50's results | The rank line under the placement, above the XP box | `screens/Results.tsx` (`XpResult` beside it) | T3 |
+| The XP box | Unchanged; the rank line sits above it | `components/XpResult.tsx` | — |
+| Unranked games' screens (raids, Classic, solo, bot, town) | No rank line, as today | — | — |
+
+### Server paths (lanes `ranked`, the director, `fairplay`, `ops`)
+
+| Spot | Change | Files | Phase |
+| --- | --- | --- | --- |
+| The rating math (pure) | Generalized RP rule, OpenSkill wrapper (σ floor, idle growth, share played, bot slot), seeding, leave fees, dodge levels, the delayed-queue rule | `packages/core/src/ranked.ts`, new `packages/core/src/ranked-teams.ts`, `settings.ts` (`RANKED_MODES`, `LEAVES`, `SEASONS`, `ABUSE`) | L1, T1 |
+| 1 v 1's dodge | An abort after "found" (or no first move, no-show) records a dodge for the one who left; quick resign and abandon record a leave | `packages/chess/src/duel/rules.ts` (`canAbort`, `finish` reasons), `packages/server/src/duel-room.ts`, `duel-do.ts`, `packages/server/src/ranked.ts` (`recordDuel`) | L1 |
+| The queue: lockouts and the delayed queue | A ticket carries its player's earliest pairing time; the queue answers "locked" with when | `packages/server/src/matchmaker.ts` (`duelNext`, the Squads and Crowd queues), `queue.ts` (`Ticket`, `QueueCore`) | L1 |
+| Pairing and lobbies by MMR | Squads: parties packed by squad MMR within the rank gap (`formSquads`); 50 v 50 fills as today, the lobby's MMRs only feed the rating | `packages/chess/src/squads/lobby.ts` (`formSquads`), `packages/server/src/squads-party.ts`, `matchmaker.ts`, `queue.ts` (`PAIR_BY_RATING`) | T2 |
+| Reading each player's MMR as they join | One read per player on joining (as `joiningProfileOf` reads `users.rating`) | `packages/server/src/lobby-do.ts` (`joiningProfileOf`), `squads-do.ts` | T2, T3 |
+| Recording a match's ranks | One D1 batch per finished match: each human's `ranked_ratings` row and the results columns. Retried as `recordDuel` is. | `packages/server/src/lobby-do.ts` (`saveResults`, `takeLeftResults`), `squads-do.ts` (rewards and results writes), `packages/server/src/ranked.ts`, `ranked-schema.ts` | T2, T3 |
+| The bot that takes a leaver's seat | Its rating from the leaver (`min(strength, MMR) − 100`) in place of the fixed `LEAVING.botSkill` / `replacementBotSkill` | `packages/server/src/lobby.ts` (`handOver`'s bot, line ~983), `squads-lobby.ts` (`replacedByBot`, line ~1573), `squads-bots.ts`, `packages/chess/src/runner.ts` (`handOver`), `settings.ts` (`botSkillForRating`) | T2, T3 |
+| The outcome message | Each mode's end message carries `{ before, after, points, placed, note }` as 1 v 1's `outcome` does (optional fields: older apps ignore them) | `packages/chess/src/duel/protocol.ts` (`DuelOutcome`), `packages/chess/src/squads/protocol.ts`, `packages/chess/src/protocol.ts` (Crowd's results) | L1, T2, T3 |
+| `/api/me` and `/api/profile/:id` | `RankedSummary` per mode, the dodge level and any lockout | `packages/server/src/accounts.ts`, `ranked-schema.ts` (`rankedSummary`, `rankOf`, `topPlace`), `index.ts` | L2, T2 |
+| Top tiers per mode | `topPlace` counts within a mode (index `(mode, ladder)`); the one-minute cache keyed by mode | `ranked-schema.ts` | T2 |
+| Kill switches | `PAUSE_RANKED_SQUADS`, `PAUSE_RANKED_CROWD` (ranked off: the mode still plays unranked, says so); leave penalties off by `PAUSE_LEAVE_PENALTIES` if they misfire | `packages/server/src/kill-switches.ts`, `docs/areas/ops.md` | L1, T2, T3 |
+| Seasons | The reset job (one tier down, σ widened), peaks, top-tier activity | `packages/server/src/index.ts` (`scheduled`), `ranked.ts` | S1 |
+| The cron's purge | `ranked_conduct` after 90 days | `index.ts` (`scheduled`) | L1 |
+
+### Fair play, accounts, admin
+
+| Spot | Change | Files | Phase |
+| --- | --- | --- | --- |
+| Fair play's hold | A held player's rank doesn't move in any mode (as 1 v 1 today); `eligibleForRanked` covers every ranked queue | `packages/server/src/fairplay.ts`, `ranked.ts` | T2 |
+| New flags | The same pair too often, quick-resign runs, one device on 2+ ranked accounts, losing runs with moves far below strength | `packages/server/src/fairplay.ts`, `fairplay-schema.ts`, `packages/core/src/fairplay.ts` | A1 |
+| The case page | Shows each mode's rank, MMR and leave record | `packages/server/src/admin.ts` (`/admin/fairplay`) | A1 |
+| Refunds after a ban | RP back to opponents of the last 30 days | `fairplay.ts`, `ranked.ts` | A1 |
+| Account download | `ranked_ratings`, `ranked_conduct`, season peaks, the new results columns | `packages/server/src/account-data.ts` (`rankedDownload`, the results column lists `KEPT_RESULT`) | L1, T2 |
+| Account delete | The same rows erased (`rankedErase`) | `account-data.ts`, `ranked.ts` | L1, T2 |
+| Guest merge | The guest's ranks move to an account without them, as `ranked_1v1` does | `packages/server/src/ranked.ts` (the merge), `accounts.ts` | T2 |
+| Ops admin | Counts: dodges and leaves a day, delayed-queue players, per-mode ranked games | `packages/server/src/ops-admin.ts`, `ops.ts` | L1 |
+
+### Stored data (full lane)
+
+The tables are in section 10. Where each schema lives:
+- `packages/server/src/ranked-schema.ts` (`RANKED_SCHEMA`, `RANKED_COLUMNS`): `ranked_ratings`, `ranked_conduct`,
+  `ranked_seasons`, `ranked_season_peaks`, `ranked_1v1.season`;
+- `packages/server/src/accounts.ts` (`SCHEMA`, `COLUMNS`): the `results` columns and the dodge level on `users`.
+
+Each goes in through the repo's usual fingerprinted migration (`ensureSchema`).
+
+### Tests
+
+| Kind | Where | Phase |
+| --- | --- | --- |
+| Unit (pure) | `packages/core/test/ranked.test.ts` (generalized RP rule, leave fees, dodge levels), new `packages/core/test/ranked-teams.test.ts` (OpenSkill wrapper, share played, the bot slot, party exception), `packages/core/test/bot-lobby.test.ts` (the replacement bot's rating) | L1, T1 |
+| Server | `packages/server/test/ranked-store.test.ts` (records, races, retries, top places per mode), `matchmaker.test.ts` and `squads-queue.test.ts` (lockouts, the delayed queue, the rank gap), `squads-lobby.test.ts`, `squads-do.test.ts`, `lobby.test.ts`, `lobby-do-rating.test.ts` (recording, leavers), `account-data.test.ts` (download, delete, merge), `fairplay*.test.ts` (holds, flags), `fairplay-admin.test.ts` | L1-A1 |
+| The duel rules | `packages/chess/test/` (the duel's abort reasons) | L1 |
+| e2e (and `e2e/areas.json`: a new "Ranked" area mapping `ranked-teams.ts`, `RankChange.tsx` and the ranked server files to its specs) | `e2e/ranked-1v1.spec.ts` (a dodge from the vote, the note on home), `e2e/home-ranked.spec.ts` (the row's line per mode, the lockout), `e2e/public-profile.spec.ts` and `e2e/profile.spec.ts` (the four tabs), `e2e/squads.spec.ts` (the rank line on its cards), `e2e/crowd.spec.ts` (on Results), `e2e/resign.spec.ts` (the confirms' words), `e2e/faq.spec.ts`, `e2e/xp.spec.ts` (the box under the rank line), `e2e/fairplay.spec.ts`, `e2e/account-delete.spec.ts` | L1-T3 |
+| The rating sim | `packages/sim/scripts/` (a new `ranked-teams-sim.ts` beside the 1 v 1 ranked sim; report `reports/ranked-teams.md`) | T1 |
+
+### Docs
+
+- `docs/areas/ranked.md` grows a "Every mode" part.
+- `docs/areas/matchmaking.md` ("Ranking today" becomes this).
+- `docs/areas/crowd.md` and `docs/areas/squads.md` (leaving, bots, results).
+- `docs/areas/hub.md` (home and the profile card).
+- `docs/areas/fairplay.md` (new flags, refunds), `docs/areas/accounts.md` (download, delete, merge).
+- `docs/areas/ops.md` (kill switches).
+- `docs/rules/eric.md`, if any rule's guard test changes.
+- Each phase's decision file in `docs/decisions/`.
+
+## 13. What I checked in the repo
 
 - `core/ranked.ts` (Glicko-1, ladder, `pointsFor`), `RANKED_1V1`, `duel/rules.ts` (`canAbort`: the dodge gap).
 - `docs/areas/crowd.md`: placements through cuts, `LEAVING`, the AFK rule, bots at `botSkillForRating`.
@@ -436,7 +543,7 @@ Additive only; nothing existing changes meaning.
   doc follows it where it still fits.
 - Measured `openskill` 4.1.1 in Node: update sizes, speed, bundle size. Read its source for `weight` (declared, unused).
 
-## 13. Build order (phases sized for one helper each, one at a time)
+## 14. Build order (phases sized for one helper each, one at a time)
 
 | Phase | What | Lane, effort | Needs |
 | --- | --- | --- | --- |
