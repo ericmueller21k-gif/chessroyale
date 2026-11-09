@@ -554,3 +554,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   the delta re-review (D1, D2 fixed by the director in f3c3808) and a green full suite. Watching its deploy and main's run.
   Next: boss result v2 (waiting on Eric's OK of the mockup); XP phase 2 (daily reward, level-up crates/keys, CRATES_FREE off,
   PAUSE_REWARDS) and phase 3 (quests, overlay) after.
+- Nov 9 ~06:00: Eric: go on boss result v2; also remove minutes from the XP box everywhere (anti-stall). Opus high
+  session_01JuCWRtk9Y2FQ3eorkEGzBi on claude/boss-result-v2 (done signal .pr-body.md, watcher bsigdvb06); boss lane + a review.
