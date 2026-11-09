@@ -113,6 +113,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     call (`presenceOf`). No new D1 writes per request. One new request: while a friends list is on screen, for a
     player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
     read, one hub call).
+  - **Quests at a game's end** (Nov 9, phase 3; review of #575, m5): each player's XP grant adds 3 to 5 D1 queries (the `quest_days`
+    read, the quests twice on a new day, the day's deal batch, the paid quests), in turn in the room's `saveResults` loop: about 300
+    to 500 more for a 100-player Crowd game. Fine for now; if it shows, read `quest_days` and the quests in one query.
   - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
     (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
     The account is a key only for a cookie shaped like a session token (43 characters, as `randomToken` makes them; the
