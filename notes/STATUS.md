@@ -639,3 +639,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Opus high `session_01JuCWRuqyoJTdnoQC82xj7L` (claude/friends-overlay, brief-friends-overlay.md). Eric OK'd 2 Opus at medium/high
   at once (Nov 9). Director: #577 profile backdrop own-layer (CSS). Next after home-modes lands: Squads Bots (start at once, 31 bots
   at the chosen level; server, xhigh, alone). Still waiting on Eric: ranked decisions.
+- Nov 9 ~17:15: Eric corrected: 50 v 50 Party = queue with up to 7 friends into PUBLIC matchmaking (random sides, ranked counts),
+  not the private lobby; Squads Party already does that. Sent corrections to both Opus helpers (home-modes: 50v50 Party greyed
+  "Soon"; friends-overlay: add "Private lobby ›" opening the old sheet). Ranked: decisions 1, 2, 4 decided (#578); seasons open.
+  xhigh queue (one at a time): crowd party (server matchmaker), Squads Bots, ranked L1 (leave rules), private lobby overhaul later.
