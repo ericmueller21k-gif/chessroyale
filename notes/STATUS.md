@@ -556,3 +556,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   PAUSE_REWARDS) and phase 3 (quests, overlay) after.
 - Nov 9 ~06:00: Eric: go on boss result v2; also remove minutes from the XP box everywhere (anti-stall). Opus high
   session_01JuCWRtk9Y2FQ3eorkEGzBi on claude/boss-result-v2 (done signal .pr-body.md, watcher bsigdvb06); boss lane + a review.
+- Nov 9 ~06:15: Eric agreed with the quests tweaks (2 daily + 1 weekly, no auto chess, keys on the weekly, "Got it", reroll) and
+  asked for a real-look mockup first, then build on approval. Opus high session for claude/quests-mock (QuestsOverlay behind
+  ?quests=mock, fake data; stills on stills/quests-mock; done signal .pr-body.md). Two Opus now: boss result v2 + quests mock
+  (allowed while XP is built).
