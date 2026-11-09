@@ -1,4 +1,4 @@
-# Boss result v2: you vs. the boss, no God King (Eric, Nov 9) — DRAFT, waiting on Eric's OK of the mockup
+# Boss result v2: you vs. the boss, no God King (Eric, Nov 9) — APPROVED (Eric, Nov 9: "go ahead with the boss result redesign … add the already boss animations we have built, remove the king")
 
 Eric (Nov 9): "when you lose, it should do that same God King attack animation, like the boss is kind of standing there
 attacking you … get rid of the king in the victory and defeat screen entirely, even though I know he has some quotes he says …
@@ -16,3 +16,15 @@ Mockups: assets/boss-result-v2-win.png, assets/boss-result-v2-loss.png.
 - The boss's line stays (his bubble); the God King's epilogue line goes.
 - Depends on XP phase 1 (#569) merging first (it owns XpResult).
 - Lane: targeted (+ boss kit since boss animations are wired); frames checked with real taps (npm run frames:boss).
+
+## Also in this job (Eric, Nov 9)
+- **Remove the time part from the XP box everywhere** ("remove the 12 min, we dont want players to know they could just stall to get
+  more XP"): the parts line never shows minutes ("12 min +120"); it shows only the win's part ("Win +50") when there is one, and the
+  "Daily solo limit" note stays as a word without minutes. The total "+N XP" stays. Update the FAQ's XP section so it doesn't
+  say XP comes from minutes played (it can say XP comes from finishing games, more for longer games, plus a win bonus, capped per
+  game). The rules don't change (30-minute cap per game, 120 solo minutes a day).
+- Reuse what exists: YourPawn (already drawn in the Last Stand duo inside GodKingEpilogue), BossCharacter and its existing attack
+  animation (the one it plays on a king), XpResult. Remove GodKingEpilogue from the result screen (and its lines there), not
+  elsewhere.
+- Your name over the bar: on boss results the XP sits under your pawn (name, then "+N XP" and "Level N" over the bar), the bar the
+  same length as #569's box. Other result screens keep the XP box as merged.
