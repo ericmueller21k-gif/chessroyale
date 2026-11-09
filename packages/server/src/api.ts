@@ -200,7 +200,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
     path !== "/api/boss/solo/start" &&
     path !== "/api/boss/solo/finish" &&
     path !== "/api/boss/token" &&
-    !path.startsWith("/api/xp")
+    !path.startsWith("/api/xp") &&
+    path !== "/api/quests" &&
+    !path.startsWith("/api/quests/")
   )
     return null;
   const google = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
