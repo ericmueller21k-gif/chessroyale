@@ -577,3 +577,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~07:25: Eric: the attack landing on the pawn is good; "the pawn is fine" meant the quest crest (he still wants to SEE the
   app-icon crest). Boss result pawn "way too small", show it dressed up: Haiku session_01JuCWRsaru8sh3761MT3s2m on
   claude/boss-result-v2 (~1.6x pawn, dressed stills; done signal .round2.md, watcher blhf1m8ex). Hold #571's merge for it.
+- Nov 9 ~07:45: quests mock round 2 done (top bar entry, dim, app icon crest); stills sent; PR #572 (f6cd2b1, behind ?quests=)
+  CI watcher brkvismht; merge on green (players see nothing until phase 3). Note: below 344 px the top bar's buttons are 36 px
+  and the logo 14 px for everyone.
