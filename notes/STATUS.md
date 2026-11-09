@@ -610,3 +610,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~10:30: #574 review: M1 (admin ?xp= jump pays real level rewards on prod) + minors. Director fixed M1 (/api/xp/test only
   with TEST_SWITCHES), m4 (payLevels try/catch), m1/m2 (pause scope documented) in 8afb5f0; tests pass. Delta re-review Opus
   session_01JuCWRv261G1wCCdQMz3YV4 (review/574-delta, watcher bhmztm3j5); full CI watcher b0qre3ykp. Merge after both.
+- Nov 9 ~10:45: #574 delta review: B1 = the FAQ's XP section had merge conflict markers (from the helper's main merge f6f8df1);
+  fixed + guard test (faq.test.ts), n1/n2 (payLevels and gameRewards fail apart and log), stale "?xp= admins" mentions fixed;
+  .pr-body removed. Final head 3702e7d; full CI watcher. LESSON: grep merged files for conflict markers (tsc can't see them in
+  template strings).
