@@ -633,3 +633,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~13:50: #575 quests LIVE (7d1ac25) and #576 follow-up LIVE (04440d3); main green. Nothing running. Waiting on Eric: ranked
   decisions (docs/ideas/ranked-ladder.md summary table). Queue after: ranked L1 (leave/dodge rules) once decided; admin cleanup;
   town intro; duo parked.
+- Nov 9 ~17:00: Eric's batch (top bar color + pawn-face profile button; profile circle glitch; phone friends overlay; home hint
+  line + taller mode cards; Solo queue / Party / Bots for 50 v 50 and Squads; bot level box). Running: Haiku `session_01JuCWRt413tTcyKwjPhQB2s`
+  (claude/topbar-color, brief-topbar-color.md); Opus high `session_01JuCWRtPKeQ8Cn7EpMM9bSP` (claude/home-modes, brief-home-modes.md);
+  Opus high `session_01JuCWRuqyoJTdnoQC82xj7L` (claude/friends-overlay, brief-friends-overlay.md). Eric OK'd 2 Opus at medium/high
+  at once (Nov 9). Director: #577 profile backdrop own-layer (CSS). Next after home-modes lands: Squads Bots (start at once, 31 bots
+  at the chosen level; server, xhigh, alone). Still waiting on Eric: ranked decisions.
