@@ -614,3 +614,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   fixed + guard test (faq.test.ts), n1/n2 (payLevels and gameRewards fail apart and log), stale "?xp= admins" mentions fixed;
   .pr-body removed. Final head 3702e7d; full CI watcher. LESSON: grep merged files for conflict markers (tsc can't see them in
   template strings).
+- Nov 9 ~11:30: XP phase 2 MERGED (#574, f7d93d8) after review, fix (M1), delta review (B1 FAQ conflict markers fixed + guard),
+  2 e2e tests stocked with crates/keys, full suite green. Watching deploy + main run. Eric: +100 keys via Shop → Crates → "Admin:
+  test grants". Next queue: quests phase 3 (wire QuestsOverlay; at 320 px keep top bar buttons >= 40 px); ranked (waiting on Eric's
+  decisions); duo parked; town intro; admin cleanup (inventory in docs/decisions/2026-11-09-admin-abilities.md).
