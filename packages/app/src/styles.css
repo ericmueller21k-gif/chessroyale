@@ -22194,9 +22194,11 @@ button.sq-tiny {
   height: var(--acs);
 }
 
-/* (Under 360 px wide, v5: the fight's and the result's words a size smaller, and 36 px kept free at the foot for them to grow into, so
+/* (The players' words a size bigger only on phones 360 px wide AND 700 px tall or more, Nov 9: at 360 x 640 the opponent's taller block
+   came within 4 px of the gear, main e2e match-menu.spec.ts:240.)
+   (Under 360 px wide, v5: the fight's and the result's words a size smaller, and 36 px kept free at the foot for them to grow into, so
    they fit under the board.) */
-@media (min-width: 360px) {
+@media (min-width: 360px) and (min-height: 700px) {
   .ac-name {
     font-size: 13px;
   }
