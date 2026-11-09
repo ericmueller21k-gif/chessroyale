@@ -9232,10 +9232,18 @@ button.fd-logo {
 .fd-top .fd-top-face .fd-pawn-ring {
   position: absolute;
   left: 50%;
-  top: -31px;
-  width: 184px;
-  height: 184px;
+  top: 5px;
+  width: 72px;
+  height: 72px;
   transform: translateX(-50%);
+}
+/* Below 360 px the square is 40 px (0.91 of 44): the pawn scales with it. */
+@media (max-width: 359px) {
+  .fd-top .fd-top-face .fd-pawn-ring {
+    width: 65px;
+    height: 65px;
+    top: 4.5px;
+  }
 }
 .fd-home-main {
   flex: 1 1 auto;
