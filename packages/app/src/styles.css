@@ -9232,9 +9232,9 @@ button.fd-logo {
 .fd-top .fd-top-face .fd-pawn-ring {
   position: absolute;
   left: 50%;
-  top: -18px;
-  width: 122px;
-  height: 122px;
+  top: -31px;
+  width: 184px;
+  height: 184px;
   transform: translateX(-50%);
 }
 .fd-home-main {
