@@ -1,4 +1,4 @@
-# XP, levels, daily rewards and quests: design draft (v0, Nov 9, 2026)
+# XP, levels, daily rewards and quests: design draft (v1, Nov 9, 2026)
 
 Status: **draft for Eric**. No code yet. Once Eric answers the open questions (end of this page), this becomes the build brief.
 
@@ -38,9 +38,9 @@ Status: **draft for Eric**. No code yet. Once Eric answers the open questions (e
 - **No XP** if you left or were removed for being idle. The match room already marks those as abandoned.
 - **Guests:** no XP. The result screen says "Sign in to earn XP." (The boss-token rule is the same: guest progress moving into an account invites many-guests-into-one abuse.)
 
-### 2. The daily reward (bonus XP + crate + key)
+### 2. The daily reward (bonus XP + crate; the key moved to quests and levels, Nov 9)
 Eric listed the daily XP bonus and the daily crate and key separately. **I'd make them one reward, one rule.** It's easier to explain, and there's only one thing to remember:
-- **"Daily reward: play one game today (at least 15 of your moves): +200 XP, 1 crate and 1 key."** It's paid at the end of the day's first game that counts.
+- **"Daily reward: play one game today (at least 15 of your moves): +200 XP and 1 crate."** It's paid at the end of the day's first game that counts. No key, so keys stay scarce (see 4).
 - **The day resets at one time for everyone,** with a countdown in the overlay ("New quests in 5h"). Proposed: 08:00 UTC, which is midnight Pacific and 3 am Eastern. A fixed time can't be gamed by changing your phone's time zone.
 - No login streaks for now. Streaks punish missing a day, and they're easy to add later.
 
@@ -61,12 +61,29 @@ Eric listed the daily XP bonus and the daily crate and key separately. **I'd mak
 - **Quests only ask for modes you can always play.** Bots fill Squads, 50 v 50 and the bosses, so those work. "Win" quests stay rare.
 - **Progress comes from the same "a game finished" record that pays XP,** one place on the server, so a quest can't disagree with your XP.
 
-### 4. Level-up rewards
-- **Proposed: every level gives 1 crate + 1 key.** Optionally, something special every 10 levels later (a profile border, a title).
-- **Watch the economy:**
-  - at about 1 level a day, plus the daily reward and quests, a regular player gets 2–3 crates a day;
-  - while crates are free, that doesn't matter;
-  - before `CRATES_FREE` goes off, we set the numbers so rare items stay rare.
+### 4. Level-up rewards and the crate economy (Eric, Nov 9: "like League of Legends")
+**Eric's direction:** crates are plentiful and keys are scarce, so players usually have a few unopened crates and a reason to want keys. Keys will be buyable later; real money was already planned on Oct 16 (in-game currency → crates and keys).
+- **Every level: 2 series crates + 1 key.** I'd start at 2, not 3: crates should pile up slowly, not by the hundred, or they stop feeling like anything. It's one number in settings.
+- **Every 10th level: also a boss crate,** opened as it is (no key and no tokens: it's already paid for).
+  - **You pick which boss's crate** from the live bosses. This is my suggestion; random is the alternative.
+  - Boss crates hold no keys. They hold boss items, as today.
+- **Series crates now need a key to open** (today they're free while testing). Boss crates keep their own price: 3 tokens, or 1 token + 1 key.
+- **Which series crate drops:** the newest series (Winter today), so a new series comes out with a push. Older ones stay openable.
+- **Keys stay scarce:**
+  - the daily reward gives XP and a crate, **no key** (a change from v0);
+  - the weekly quest gives 1 key;
+  - level-ups give 1 each.
+  - A regular player then earns about 8 keys and 20 crates a week (target ratio: about 2.5 crates per key). It's tunable, and the week sim checks it before launch.
+  - Optionally later, **key fragments** (3 = 1 key) from daily quests. They let us tune finer without handing out whole keys.
+- **Keys are never only for sale.** Every key price must also be earnable by playing. That's kinder, and it reads better under loot-box rules.
+- **Before keys are sold** (Eric's Oct 16 list, still to do):
+  - a payment provider and pricing, with costs;
+  - the published odds per crate (app stores require it);
+  - the country-by-country loot-box check (some countries treat paid crates as gambling);
+  - refunds;
+  - the terms and FAQ lines that say "never bought";
+  - accounts under 18? (Accounts are 13+ today.)
+  - **Nothing in this project sells anything.** It only makes keys their own currency, so selling them later is a small step.
 
 ### 5. The daily overlay (Hearthstone style)
 - **When it shows:** the first time you open the app each day (signed in), over home.
@@ -161,7 +178,7 @@ Eric listed the daily XP bonus and the daily crate and key separately. **I'd mak
 4. **Daily reset:** one time for everyone (08:00 UTC = midnight Pacific)? Or each player's local midnight?
 5. **Solo games vs bots count?** Yes, using the server's clock, as boss tokens do.
 6. **Auto chess:** no XP until it's played online (today it runs only on your device).
-7. **Level-up reward:** 1 crate + 1 key every level?
+7. **Level-up reward:** 2 crates + 1 key every level, plus a boss crate (you pick the boss) every 10 levels? Daily reward without a key?
 8. **Quests:** unfinished dailies carry over (up to 3), plus 1 free reroll a day?
 9. **Guests:** no XP, with a "Sign in to earn XP" line?
 10. **Crates stop being free** (`CRATES_FREE` off) as part of this, so the rewards mean something?
