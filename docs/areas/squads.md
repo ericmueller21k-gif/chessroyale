@@ -17,6 +17,9 @@ Bullet on the left and the longest on the right since Eric's Oct 16; nobody voti
 move.
 
 ## How it works today
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the knocked-out card and the results (`screens/Squads.tsx`, `SquadsXp`; a win is your squad 1st; a test lobby: "No XP: test game.") shows `XpResult`, a fixed 78 px box: the
+  bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("12 min +120 · Win +50"), or why there was none. Its rules
+  and storage: [accounts.md](accounts.md), "XP and levels".
 
 - **The board on a computer** (Oct 29; docs/decisions/2026-10-29-desktop-board-size.md, [board.md](board.md)): the window's height
   less 230 px (the tiny boards over it, the clocks' line under it; a relay 250), never wider than its column: 848 px at

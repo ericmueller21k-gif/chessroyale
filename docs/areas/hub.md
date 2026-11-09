@@ -134,13 +134,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     color, then the RP ("Gold 3 · 45 RP"), "Placement 2/5", or "Unranked" before your first ranked game (a blank line of the
     same height while your account loads). No rating rank's name: `RATING_RANKS` is retired
     ([2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)).
-  - **An admin's test rank and level** (Oct 28, Eric: "lvl - 38 … show it at 3/4 like I'm 3/4 to level 39"; only where
-    `testSwitchesAllowed()`: an admin, or a server with `TEST_SWITCHES` on; a player sees home as before). The rank line shows
-    the address's `?rank=` (`?rank=gold-3`, `?rank=transcendent`; it replaced the first placeholder, "Opal III"), and your icon
-    has a thin **green ring** filled clockwise from the top to **3/4** over a faint track, with a tiny **"LVL 38"** (the line's
-    gray) centered above it, as wide as the icon (`LevelRing`, `TEST_LEVEL` in `components/FrontDoor.tsx`). **The level is a
-    placeholder** until the real levels exist. The ring and the level are drawn outside the icon's box and take
-    no room, so home is the same size and shape with or without them (and doesn't move when the account loads).
+  - **An admin's test rank** (Oct 28: `?rank=gold-3`, only where `testSwitchesAllowed()`) shows in the rank line; a player sees their real
+    rank. **Your level** (real since Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): a thin **green ring** round your
+    icon, filled clockwise from the top to your share of the level, and a tiny **"LVL 7"** above it (`LevelRing` in `components/FrontDoor.tsx`,
+    from `/api/me`'s `xp`), for everyone who can earn XP (signed in, or anyone where sign-in isn't set up). Both are drawn outside the
+    icon's box and take no room, so home is the same size and shape with or without them.
   - **Your ride on home** (Eric, Nov 1: he equipped Riding Chirp and "it doesn't show on the main page on desktop"): the big pawn on
     your card, your ring (a phone's top bar) and the side menu's Profile item ride the ride you wear
     (`DressedPawn`'s `ride`, as the locker's preview and the profiles do; [2026-10-31-rides.md](../decisions/2026-10-31-rides.md)), its
@@ -180,8 +178,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     viewer, opened by a tap on another player's name or face anywhere (`PlayerName`, the queue's pawns, the town card, a lobby; the
     address `/profile/<id>`). Back, "Player Profile", ••• (Block, Report); their dressed pawn in a circle over their icon (blurred and
     faded; the theme's light yellow with the default pawn) with a green dot while they're online; their name; "Online now · Joined
-    Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 38" (an admin's `TEST_LEVEL` placeholder only,
-    else no line, and no room kept for one); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
+    Oct 2026" (or "Last seen 2h ago · …", or just "Joined …" if they hide it); "Level 7" (everyone's, from their XP, since Nov 9; the line is there while the page loads); **Challenge** (today's invite) and **Add Friend** (today's request), both greyed on your
     own page, for a guest, while loading and for someone you blocked; then three cards: **Ranked Standing** (1v1 / 50 v 50 /
     Squads menu, "Season 1": the 1v1 emblem, tier and division, RP, peak rank, win rate, W / L, win streak; "Placement 2/5",
     "Unranked", "Banned" and "Coming soon" in the same room), **Recent Matches** (the last five games in any mode, a ranked 1 v 1's
@@ -343,7 +340,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - e2e: `e2e/front-door.spec.ts`, `home-ranked.spec.ts` (the RANKED row at 320-390 px and on a computer, home keeping still through every click
   (PLAY, the line above it, the board preview, Chess Town's button and the panel within 1 px, at 320 and 390 px and 1280-1920 px), "home, said
   once" (Oct 28: no ⓘ, titles only, the line above PLAY, the cards' pictures beside their words, PLAY's height, Chess Town's button PLAY's size, a phone fits) and "test rank
-  and level" (an admin's `?rank=`, ring and LVL 38; a player sees neither, and their real 1 v 1 rank), 1 v 1's PLAY,
+  and level" (an admin's `?rank=`; everyone's real level ring and LVL from their XP, Nov 9; a player's real 1 v 1 rank), 1 v 1's PLAY,
   the Boss raid screen (`?mode=raid`) and each of its choices, `/bosses`), `boss-select.spec.ts` (the character select: a
   tap's drop, sound and line, "?", the Hidden Boss dark and locked and never named, the pick reaching Boss alone, a Solo
   raid and a raid you make, resting bosses, the layout at 320-1280 px, the card turning; Boss alone's menu and

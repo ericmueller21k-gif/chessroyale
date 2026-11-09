@@ -50,6 +50,13 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   browser's word, so they never count for ranking (even the ones from before Oct 7, stored with `ranked` NULL) nor
   toward "Boss tiers beaten" (docs/decisions/2026-10-16-server-side-rating.md). Each
   result keeps whether its player had the eval bar on (`results.eval_bar`, NULL from older apps; see [hub.md](hub.md)).
+- **XP and levels** (Nov 9; [2026-11-09-xp-rules.md](../decisions/2026-11-09-xp-rules.md), [storage](../decisions/2026-11-09-xp-storage.md),
+  [the box](../decisions/2026-11-09-xp-box.md)): every counted game's XP is decided on the server (`server/xp.ts` `grantXp`, the rules in
+  core's `xp.ts`, the numbers `XP` in settings.ts) and granted through the ledger (asset kind `xp`, the wallet's `xp` column), once per game
+  per player. 10 XP a whole minute you played (up to 30), +50 a win, from 10 of your own moves; none for leaving, a test game, a banned
+  account, or a guest where sign-in is set up. Your level is 1 + XP ÷ 1,000 (`levelOf`). Each result row keeps the game's `play_ms`,
+  `moves` and its XP (`xp_before`, `xp_parts`, `xp_none`); a solo game is timed by the server between `POST /api/xp/solo/start` and its
+  `POST /api/results` (table `solo_games`). Merging a guest adds its XP; deleting closes it in the ledger; the download has it all.
 - **Squads' placements** (unranked): a result with mode "squads" (placement 1, 2, 3 or 5 of 8 squads) and its reward:
   coins into `wallets.coins`, crates counted in `wallets.crates` (for when crates stop being free), both carried over
   when a guest signs in (`grantReward`).
@@ -149,6 +156,8 @@ offered, how long each answer lasts).
 
 ## Tests
 
+- XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
+  XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
 - Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (every
   sign-in behind the answer, a too-young device refused, the guest's defaults, nothing but the answer kept), with the
   rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts`; `account-data.test.ts` (every

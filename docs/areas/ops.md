@@ -169,6 +169,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **No record from a switched game:** for a player the switches can't apply, so everything the server records
     (results, ranking, fair-play signals, Squads' coins and crates, crate items) comes from a game made without them.
     Solo results are posted by the browser and are never ranked and earn nothing.
+  - **XP's** (Nov 9; [2026-11-09-xp-storage.md](../decisions/2026-11-09-xp-storage.md)): `xp=<n>` (the app sets your XP to n once your
+    account loads: `POST /api/xp/test`, a ledger op) and `xpgame=MINUTES` (a solo game's start, or a lobby's: it counts as a game that
+    long with enough moves, test switches or not). Any other lobby test switch marks the lobby `tested`: no XP ("No XP: test game.").
   - **A new test switch:** read it through `testParams()` (app) or behind `testSwitchesOn` (server), and list it here.
 - **Kill switches** (Oct 15; docs/decisions/2026-10-15-kill-switches.md): Worker runtime variables that rest one part
   of the game, set in the dashboard (how: `DEPLOY.md`, "Kill switches and the maintenance banner"). `PAUSE_<NAME>` =
