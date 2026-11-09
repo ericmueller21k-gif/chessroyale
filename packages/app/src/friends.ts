@@ -145,7 +145,13 @@ async function refreshOnline(): Promise<void> {
     const body = res.ok ? ((await res.json()) as { online?: Record<string, { online: boolean; busy: boolean }> }) : null;
     if (!body?.online || !state) return;
     const live = body.online;
-    const friends = state.friends.map((f) => ({ ...f, ...(live[f.id] ?? { online: false, busy: false }) }));
+    const now = Date.now();
+    const friends = state.friends.map((f) => {
+      const next = { ...f, ...(live[f.id] ?? { online: false, busy: false }) };
+      // (Online at the last look and not now: they left about now, which beats D1's last-seen from the list's load.)
+      if (f.online && !next.online && !f.hidden) next.lastSeen = now;
+      return next;
+    });
     const rank = (f: { online: boolean; busy: boolean }) => (f.online ? (f.busy ? 1 : 0) : 2);
     // (The server's order: online, then in a match, then the rest, each by name.)
     friends.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));

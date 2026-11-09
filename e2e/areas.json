@@ -544,6 +544,7 @@
       "paths": [
         "packages/app/src/App.tsx",
         "packages/app/src/screens/Home.tsx",
+        "packages/app/src/components/BotLevelBox.tsx",
         "packages/app/src/components/Walkthrough.tsx",
         "packages/app/src/tutorial.ts",
         "packages/app/src/components/FrontDoor.tsx",
@@ -705,6 +706,7 @@
       "paths": [
         "packages/app/src/friends.ts",
         "packages/app/src/components/Friends.tsx",
+        "packages/app/src/components/FriendsOverlay.tsx",
         "packages/app/src/screens/Friends.tsx",
         "packages/server/src/friends.ts",
         "packages/server/src/friends-api.ts"

@@ -40,17 +40,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     text). One box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
-    pick's options or words: 50 v 50's Matchmaking (**Default**, **Bots off**, **Solo**: each its title only, 44 px
-    buttons filling the row; Oct 28, Eric: "3 times in this screen it says the same thing", so the sub-labels and the ⓘ
-    with its pop-up are gone: what each does is the line above PLAY, and the ranking rule is in the FAQ's "Your rating");
-    Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
-    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank's emblem (48 px, its box
+    pick's options or words (Nov 9, [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): 50 v 50's
+    **Solo queue** (the public queue), **Party** (greyed, "Soon": queueing together into the public matchmaking, up to
+    `CROWD_PARTY_MAX` = 8, sides random, ranked, a later job; Eric, Nov 9) and **Bots** (you and 99 bots in your
+    browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
+    My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
+    `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since
+    Nov 9; a stored "botsoff", a test's, still queues people only); Squads' **Solo queue**, **Party** ([squads.md](squads.md); Party
+    opens the party sheet at once, and PLAY opens it again while Party is picked; its line "Queue with up to 3 friends") and **Bots**, greyed ("Soon") until its server part;
+    for 1 v 1 (always people) your rank's emblem (48 px, its box
     there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
     Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
-    Transcendent · 1234 RP"), over "Chess vs one player near your level" (Oct 28: "Ranked" dropped so it fits beside
-    the emblem; RANKED heads the row; [2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)). Then **the line above PLAY** (Oct 28, Eric: "swap the line
-    of text below Play and put it above play") and PLAY. The line is a fixed height whatever it says (two lines' room on a
-    phone, one line on a computer), its text bottom-aligned so it sits on PLAY, and empty with no mode picked. After the
+    Transcendent · 1234 RP"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
+    the line above PLAY). Then **the line above PLAY** (Oct 28, Eric: "swap the line
+    of text below Play and put it above play") and PLAY. The line is exactly one line whatever it says, phone and computer (Nov 9,
+    [2026-11-09-home-modes-hint-line.md](../decisions/2026-11-09-home-modes-hint-line.md): ellipsized if ever too long, every line
+    written to fit 320 px), and never empty: "Tap a game mode to get started" with no mode picked. The room it freed on a phone (16.9 px)
+    went to the Other modes cards (72.9 px tall there, their foot where it was), PLAY and Chess Town rising by it. After the
     first pick no click on home moves or resizes anything (a mode, an option). The first pick wakes the greyed options (their default selected) and moves nothing: the
     panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
@@ -138,7 +144,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
-  - **Play with friends** (a phone's **Friends** in the top bar, a computer's side menu): **Get friend code** makes a
+  - **Play with friends** (a phone's friends overlay's **Private lobby ›** since Nov 9, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
@@ -215,7 +221,18 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **Where:** a phone's way in is **Friends** in home's top bar (its sheet's "Your friends ›"), or Friends on your own
+  - **The friends overlay (phone, Nov 9; [docs/decisions/2026-11-09-friends-overlay.md](../decisions/2026-11-09-friends-overlay.md)):**
+    the top bar's **Friends** opens a centered box in the Quests overlay's shell (`components/FriendsOverlay.tsx`; the same dim,
+    card, crest and ✕; the dim or Escape closes it), a fixed height with the list scrolling inside: invites to you (Join, ✕),
+    friend requests (Accept, Decline), then your friends in the server's order (online, in a match, the rest), the offline
+    ones greyed with "Last online 2h ago" (`FriendEntry.lastSeen`, the account's `users.last_seen`, null while they hide it;
+    "Offline" without one). Tap a friend: a menu over the box's foot with **Invite to play** (`InviteButton`: your lobby or
+    party, or one made in home's mode; greyed with its reason when they're offline) and **View profile**. Above the list,
+    **Private lobby ›** ("Make one or join with a code": Play with friends' sheet, signed out too; Eric, Nov 9); its footer,
+    "Requests sent and blocked ›" (`/friends`).
+    Signed out: "Sign in to add friends …" and Sign in; no friends: "Add friends from their profile: tap their name anywhere";
+    paused: `pausedLine("friends")`.
+  - **Where:** a phone's way in is **Friends** in home's top bar (the overlay above; its "Requests sent and blocked ›"), or Friends on your own
     profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's right column has "FRIENDS ›" (Nov 7: the list and its Invite buttons went with Eric's mockup; requests' count
     beside it). Both open the friends list (`/friends`): invites to you (Join,

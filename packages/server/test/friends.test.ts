@@ -233,7 +233,9 @@ describe("online status", () => {
     const asked: string[][] = [];
     const s2 = await friendsState(sql, a, T0, async (list) => (asked.push(list), presence(list)));
     expect(asked.map((l) => [...l].sort())).toEqual([[z, b].sort()]);
-    expect(s2.friends.find((f) => f.name === "Cy")).toMatchObject({ online: false, busy: false, hidden: true });
+    expect(s2.friends.find((f) => f.name === "Cy")).toMatchObject({ online: false, busy: false, hidden: true, lastSeen: null });
+    // (Shown, a friend's last-seen comes with the list: the friends overlay's "Last online 2h ago", Nov 9.)
+    expect(typeof s2.friends.find((f) => f.name === "Bo")?.lastSeen).toBe("number");
     await sql.run("UPDATE users SET last_seen = ? WHERE id = ?", T0, c);
     expect(await publicProfile(sql, c, T0)).toMatchObject({ online: false, lastSeen: null, hidden: true });
     await setFriendSettings(sql, c, { showOnline: true });

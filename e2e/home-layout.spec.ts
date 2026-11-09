@@ -99,7 +99,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     // Nothing picked yet: PLAY dimmed, and the panel there, greyed with nothing selected (Eric, Oct 25).
     await expect(play).toBeDisabled();
     await expect(page.locator(".fd-mode-panel.idle")).toBeVisible();
-    await expect(page.getByRole("radio", { name: /^Default/ })).toBeDisabled();
+    await expect(page.getByRole("radio", { name: /^Solo queue/ })).toBeDisabled();
     await pickMode(page, "50 v 50");
     await expect(page.locator(".fd-mode-panel")).toBeVisible();
     await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
@@ -137,7 +137,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(Math.abs(solo.y - auto.y), `${w}: Boss Battle and Auto chess side by side`).toBeLessThan(2);
     expect(Math.abs(solo.width - auto.width), `${w}: the two half cards the same width`).toBeLessThan(2);
     expect(Math.abs(solo.width * 2 + 10 - town.width), `${w}: two half cards and their gap are Chess Town's width`).toBeLessThan(2);
-    await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
+    await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Start at once/);
     if (w >= 1280) {
       // Beside your card: the Boss raid card ends level with your card's bottom, and the room above is free (for a live
       // game).

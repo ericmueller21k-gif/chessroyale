@@ -196,18 +196,36 @@ export async function pickMode(page: Page, mode?: string) {
   if (await page.locator(".fd-mode-panel.idle").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
 }
 
-/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
+/**
+ * Home → 50 v 50's Bots → PLAY → the Bot level box's OK (in the mode the URL or the picker chose, else 50 v 50): you and bots, after
+ * the seats fill. The box keeps this device's last pick; with none, Medium (the bots of before Nov 9).
+ */
 export async function soloFromHome(page: Page) {
   await pickMode(page);
-  await page.getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
 }
 
-/** Play with friends' sheet: a phone's Friends in home's top bar, a computer's side menu (Eric, Oct 18). */
+/** The Bot level box (PLAY with Bots): its OK, picking Medium first when nothing is picked. */
+export async function startBotLevel(page: Page) {
+  const box = page.getByRole("dialog", { name: "Bot level" });
+  await box.waitFor();
+  const ok = box.getByRole("button", { name: "OK", exact: true });
+  if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
+  await ok.click();
+}
+
+/**
+ * Play with friends' sheet: a phone's Friends in home's top bar, then the friends overlay's "Private lobby ›" (Nov 9), a computer's
+ * side menu (Eric, Oct 18).
+ */
 export async function openPlayWithFriends(page: Page) {
   // (A computer's frame from 1024 px: phones and tablets have home's top bar.)
-  if ((page.viewportSize()?.width ?? 0) < 1024) await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
+  if ((page.viewportSize()?.width ?? 0) < 1024) {
+    await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+    await page.getByRole("dialog", { name: "Friends", exact: true }).getByRole("button", { name: /^Private lobby ›/ }).click();
+  } else await page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Play with friends" }).click();
   await page.getByRole("dialog", { name: /Play with friends|Join lobby/ }).waitFor();
 }
 

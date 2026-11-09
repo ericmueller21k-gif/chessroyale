@@ -116,3 +116,25 @@ describe("friends in the app", () => {
     expect(inviteToast()).toBeNull();
   });
 });
+
+describe("the friends overlay's words (Nov 9)", async () => {
+  const { friendStatus } = await import("../src/components/Friends.tsx");
+  const { inviteBlocked } = await import("../src/components/FriendsOverlay.tsx");
+  const f = (o: Partial<ReturnType<typeof friend>> & { lastSeen?: number | null }) => ({ ...friend("f9", "Ivy"), ...o });
+  it("a friend's line: online, in a match, last online when (the profile's words), offline without a time, hidden", () => {
+    expect(friendStatus(f({}), NOW)).toBe("Online");
+    expect(friendStatus(f({ busy: true }), NOW)).toBe("In a match");
+    expect(friendStatus(f({ online: false, lastSeen: NOW - 2 * 3_600_000 }), NOW)).toBe("Last online 2h ago");
+    expect(friendStatus(f({ online: false, lastSeen: NOW - 5 * 60_000 }), NOW)).toBe("Last online 5m ago");
+    expect(friendStatus(f({ online: false, lastSeen: null }), NOW)).toBe("Offline");
+    expect(friendStatus(f({ online: false }), NOW)).toBe("Offline");
+    expect(friendStatus(f({ online: false, hidden: true, lastSeen: null }), NOW)).toBe("Online status hidden");
+  });
+  it("Invite to play: greyed with a reason when they're offline or there's nothing to invite to", () => {
+    expect(inviteBlocked(f({}), "new")).toBeNull();
+    expect(inviteBlocked(f({ busy: true }), "game")).toBeNull();
+    expect(inviteBlocked(f({ online: false, hidden: true }), "new")).toBeNull();
+    expect(inviteBlocked(f({ online: false }), "new")).toBe("Offline: you can invite them once they're online.");
+    expect(inviteBlocked(f({}), null)).toBe("You can invite friends from home, between matches.");
+  });
+});
