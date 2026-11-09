@@ -527,3 +527,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~03:10: #567 merged (729e639). Main full run on 729e639: 19.3 min total, runner waits 3 s (Pro works). RED on two:
   squads-watch:167 (fixed by #564, waiting on Eric's OK) and boss-result.spec.ts:44 phone, both tries ("Defeated" never shown;
   passes locally). Opus helper session_01JuCWRtPbmgkwnC1WZ6Ma44 on claude/fix-boss-result-red (done signal .pr-body.md).
+- Nov 9 ~03:20: Eric APPROVED the XP design ("I'm good with the XP design"; all recommendations), plus: the XP bar animates
+  smoothly on every result screen. Design v2 + phase-1 brief notes/briefs/brief-xp-phase1.md. Eric is "debating" allowing a second
+  Opus alongside for XP: director recommended yes, temporarily, asked him to confirm. Still need his OK for #564.

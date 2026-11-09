@@ -1,6 +1,8 @@
-# XP, levels, daily rewards and quests: design draft (v1, Nov 9, 2026)
+# XP, levels, daily rewards and quests: design (v2, APPROVED by Eric, Nov 9, 2026)
 
-Status: **draft for Eric**. No code yet. Once Eric answers the open questions (end of this page), this becomes the build brief.
+Status: **approved** (Eric, Nov 9: "Yeah, I'm good with the XP design"; on the open questions: "5, 6, 4. That's fine": all the
+recommendations stand). Added by Eric: **the XP bar animates** on every result screen (see 6). Build: brief-xp-phase1.md.
+Director's call on question 11 (friends' private lobbies): full XP for time; the win bonus counts once per opponent per day there.
 
 ## What Eric asked for (Nov 9)
 - **XP and levels:** a simple linear level system with no top level. XP is mostly from how long a game lasted, plus a small amount for winning.
@@ -96,6 +98,11 @@ Eric listed the daily XP bonus and the daily crate and key separately. **I'd mak
 - **Eric: Hearthstone screenshots would help** with the look. Please send them when convenient.
 
 ### 6. The XP line on every result screen
+**Eric (Nov 9): "after a game, it shows your meter bar and then it shows it like moving. I don't want it to skip, say, like to 50
+experience. It should like go up like a nice satisfying looking thing… on every page where we would see that."** So the bar fills
+smoothly from your old XP to the new (never a jump), the number counts up with it, and each part ("12 min", "Win", "Daily
+reward") adds its share in turn; a level-up fills the bar to the end, pops "Level 8!", and carries on from empty with the rest.
+One shared component on every screen.
 - **Where:** each end screen gets one XP box at a fixed size, with nothing shifting when it fills:
   - Boss
   - 50 v 50 / Crowd ("You're out" and the final)
