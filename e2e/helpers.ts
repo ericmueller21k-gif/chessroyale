@@ -196,11 +196,24 @@ export async function pickMode(page: Page, mode?: string) {
   if (await page.locator(".fd-mode-panel.idle").count()) await row.getByRole("radio", { name: /^50 v 50/ }).click();
 }
 
-/** Home → Matchmaking: Solo → PLAY (in the mode the URL or the picker chose, else 50 v 50): you and bots, after the seats fill. */
+/**
+ * Home → 50 v 50's Bots → PLAY → the Bot level box's OK (in the mode the URL or the picker chose, else 50 v 50): you and bots, after
+ * the seats fill. The box keeps this device's last pick; with none, Medium (the bots of before Nov 9).
+ */
 export async function soloFromHome(page: Page) {
   await pickMode(page);
-  await page.getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
+}
+
+/** The Bot level box (PLAY with Bots): its OK, picking Medium first when nothing is picked. */
+export async function startBotLevel(page: Page) {
+  const box = page.getByRole("dialog", { name: "Bot level" });
+  await box.waitFor();
+  const ok = box.getByRole("button", { name: "OK", exact: true });
+  if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
+  await ok.click();
 }
 
 /**

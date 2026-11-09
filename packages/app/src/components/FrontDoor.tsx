@@ -107,12 +107,15 @@ export function DressedPawn({
   );
 }
 
-/** Your pawn in a gold ring: it opens your profile. */
-export function MyPawnButton({ onClick }: { onClick: () => void }) {
+/**
+ * Your pawn in a gold ring: it opens your profile. `face` (a phone's top bar, Nov 9): the same square as the shop's, showing
+ * only the pawn's face, still (no ride), with no ring; the stylesheet's `.fd-top-face` does the cropping.
+ */
+export function MyPawnButton({ onClick, face = false }: { onClick: () => void; face?: boolean }) {
   const p = account().profile;
   return (
-    <button type="button" class="fd-ring" aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} size="ring" ride own />
+    <button type="button" class={face ? "fd-ring fd-top-face" : "fd-ring"} aria-label="Your profile" onClick={onClick}>
+      <DressedPawn look={p?.locker?.look} size="ring" ride={!face} own />
     </button>
   );
 }
@@ -121,10 +124,10 @@ export function MyPawnButton({ onClick }: { onClick: () => void }) {
  * Your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). No coins (Eric,
  * Oct 18: "nobody needs to see their coins" there; the shop and your profile show them).
  */
-export function AccountBar({ onProfile, tourId }: { onProfile: () => void; tourId?: string }) {
+export function AccountBar({ onProfile, tourId, face = false }: { onProfile: () => void; tourId?: string; face?: boolean }) {
   return (
     <div class="fd-top-right" data-tour={tourId}>
-      <MyPawnButton onClick={onProfile} />
+      <MyPawnButton onClick={onProfile} face={face} />
     </div>
   );
 }

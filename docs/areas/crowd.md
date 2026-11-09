@@ -172,6 +172,10 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   0.75 s of Maia a team turn on a computer, about 3 s on a phone (`reports/crowd-bots.md`). Test:
   `npx tsx packages/sim/scripts/crowd-bots-sim.ts tuned 10` (an engine-best player among 99 bots; `summary` writes
   `reports/crowd-bots.md`).
+  **Solo's Bot level** (Nov 9; [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md)): home's Bots asks
+  the bots' average (`BOT_LEVELS`: 700, 950, 1150 = the curve above, 1500, 1900, your own rating, or Random, uniform 600 to 2200), carried
+  as `Settings.botLevel` into `botStrength` (each bot's rating fixed by name + level; the curve narrows near 600 and 2200 so a level's
+  average holds). Solo only: online lobbies' bots are as above.
   **In 50 v 50 they spread over the good lines** (Nov 2; `CROWD_BOTS`, `botLean`, `botPickSpread` in core/match.ts;
   docs/decisions/2026-11-02-crowd-bot-spread.md; Eric: "unique lines favored over optimal play"): each team turn draws
   one shared lean from the turn's seed (a focus on the engine's numbers and a taste per line, the same for every bot of

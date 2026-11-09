@@ -99,7 +99,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     // Nothing picked yet: PLAY dimmed, and the panel there, greyed with nothing selected (Eric, Oct 25).
     await expect(play).toBeDisabled();
     await expect(page.locator(".fd-mode-panel.idle")).toBeVisible();
-    await expect(page.getByRole("radio", { name: /^Default/ })).toBeDisabled();
+    await expect(page.getByRole("radio", { name: /^Solo queue/ })).toBeDisabled();
     await pickMode(page, "50 v 50");
     await expect(page.locator(".fd-mode-panel")).toBeVisible();
     await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
@@ -137,7 +137,7 @@ test("computer: the play column in the phone's order (the RANKED row, its panel,
     expect(Math.abs(solo.y - auto.y), `${w}: Boss Battle and Auto chess side by side`).toBeLessThan(2);
     expect(Math.abs(solo.width - auto.width), `${w}: the two half cards the same width`).toBeLessThan(2);
     expect(Math.abs(solo.width * 2 + 10 - town.width), `${w}: two half cards and their gap are Chess Town's width`).toBeLessThan(2);
-    await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Solo vs/);
+    await expect(page.locator(".fd-hint")).toHaveText(/Starts within|Usually about|Start at once/);
     if (w >= 1280) {
       // Beside your card: the Boss raid card ends level with your card's bottom, and the room above is free (for a live
       // game).
@@ -430,6 +430,10 @@ test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits fro
       const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
       expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
     }
+    // The profile is the shop's square (Eric, Nov 9): same size and corners, no gold ring, and nothing animating in it (a still face).
+    const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
+    const profile = await bar.getByRole("button", { name: "Your profile", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, ring: getComputedStyle(el).borderTopWidth, animations: el.getAnimations({ subtree: true }).length }));
+    expect(profile, `profile at ${width}`).toEqual({ ...shop, ring: "0px", animations: 0 });
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });

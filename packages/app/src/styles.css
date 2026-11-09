@@ -8747,6 +8747,7 @@ button.history-label {
   --fd-gold-text: #f2c14e;
   --fd-gold-ink: #1a1406;
   --fd-gold-soft: #3a2f12;
+  --fd-blue: #7fb2f0;
   --fd-green: #4ade80;
   --fd-seat: #262a33;
   --fd-line: #2d313b;
@@ -8765,6 +8766,7 @@ button.history-label {
   --fd-off: #3a3f48;
   --fd-gold-text: #9a6a06;
   --fd-gold-soft: #fbefcc;
+  --fd-blue: #2d64a8;
   --fd-green: #16a34a;
   --fd-seat: #e4e1da;
   --fd-line: #dcd8d0;
@@ -9194,6 +9196,54 @@ button.fd-logo {
 }
 .fd-quests-btn:disabled:active {
   transform: none;
+}
+/*
+ * The phone's top bar in colour (Eric, Nov 9: "the 5 we have should all have some color"): the icons a size bigger (29 px in
+ * the same 44 px squares, 40 px below 360 px where the squares shrink), the Quests clipboard and the shop's bag gold, Friends
+ * blue, Settings a plain dark outline. Flat fills, the same outline weight. The profile is the shop's square too: no gold
+ * ring, your pawn's face only (cropped, still: no ride, no animation). A computer's top right keeps its ring.
+ */
+.fd-top .fd-icon-btn svg {
+  width: 29px;
+  height: 29px;
+}
+.fd-top .fd-top-shop svg {
+  fill: var(--fd-gold);
+  stroke: var(--fd-gold-text);
+}
+.fd-top .fd-top-quests .fd-qbar-body,
+.fd-top .fd-top-quests .fd-qbar-clip {
+  fill: var(--fd-gold);
+  stroke: var(--fd-gold-text);
+}
+.fd-top .fd-top-quests .fd-qbar-check {
+  stroke: var(--fd-gold-ink);
+}
+.fd-top .fd-top-friends svg {
+  fill: var(--fd-blue);
+  stroke: var(--fd-blue);
+}
+.fd-top .fd-top-face {
+  clip-path: inset(0 round 12px);
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel-2);
+}
+.fd-top .fd-top-face .fd-pawn-ring {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 72px;
+  height: 72px;
+  transform: translateX(-50%);
+}
+/* Below 360 px the square is 40 px (0.91 of 44): the pawn scales with it. */
+@media (max-width: 359px) {
+  .fd-top .fd-top-face .fd-pawn-ring {
+    width: 65px;
+    height: 65px;
+    top: 4.5px;
+  }
 }
 .fd-home-main {
   flex: 1 1 auto;
@@ -25762,3 +25812,103 @@ button.sq-tiny {
 .qo-thing .key-art svg {
   transform: scale(1.3);
 }
+
+/* ===== Home modes (Nov 9, Eric; docs/decisions/2026-11-09-home-modes-*.md) =====
+ * A. The line above PLAY is always exactly one line (ellipsized if ever too long; every line is written to fit 320 px). On a phone it
+ *    had two lines' room (2.6em of 13 px): the freed 16.9 px lifts PLAY and Chess Town, and the Other modes cards grow by the same, so
+ *    their bottom edge stays where it was. A computer's line was one line already: its layout is unchanged.
+ * B. The options under RANKED: three equal buttons, a title and a short sub line each, in the panel's one box.
+ * C. The Bot level box (components/BotLevelBox.tsx): the Quests overlay's dim and card, with its own rows.
+ */
+.fd-go > .fd-hint > span {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1023px) {
+  .fd-go > .fd-hint {
+    height: 1.3em;
+  }
+  /* (56 px + the line's freed 16.9 px.) The content stays centered in the taller box, the pictures a touch bigger. */
+  .fd-root .rd-pair .rd-card.rd-half {
+    min-height: 72.9px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 40px;
+    height: 40px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (max-width: 359px) {
+  .fd-root .rd-pair .rd-card.rd-half .rd-face {
+    width: 34px;
+    height: 34px;
+  }
+  .fd-root .rd-pair .rd-card.rd-half .rd-face svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+.fd-modes.fd-types.fd-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.fd-modes.fd-types.fd-three button {
+  min-width: 0;
+  padding: 0 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.bl-card {
+  width: min(100%, 360px);
+  gap: 8px;
+}
+.bl-card:focus {
+  outline: none;
+}
+.qo-title.bl-title {
+  font-size: 22px;
+}
+.bl-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bl-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--qo-row);
+  box-shadow: inset 0 0 0 2px transparent;
+  color: var(--fd-text);
+  font: 600 15px Archivo, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+.bl-row span {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--fd-sub);
+  white-space: nowrap;
+}
+.bl-row.on {
+  box-shadow: inset 0 0 0 3px var(--fd-gold);
+  color: var(--fd-gold-text);
+  font-weight: 800;
+}
+.bl-ok:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* ===== end Home modes ===== */

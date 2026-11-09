@@ -545,6 +545,7 @@
       "paths": [
         "packages/app/src/App.tsx",
         "packages/app/src/screens/Home.tsx",
+        "packages/app/src/components/BotLevelBox.tsx",
         "packages/app/src/components/Walkthrough.tsx",
         "packages/app/src/tutorial.ts",
         "packages/app/src/components/FrontDoor.tsx",

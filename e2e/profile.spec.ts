@@ -263,8 +263,12 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   await wearItem(page, "ride", ride!);
   await page.reload();
   await expect(page.locator(".fd-hero .avatar.riding[data-ride=\"riding-chirp\"]")).toHaveCount(1);
-  // Your ring rides too (a phone's top bar; a computer's side menu's Profile item: its top right ring went, Nov 7).
-  await expect(page.locator(":is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding")).toHaveCount(1);
+  // A computer's side menu's Profile item rides too (its top right ring went, Nov 7). A phone's top bar shows your pawn's face,
+  // still: never riding (Eric, Nov 9).
+  if (await page.locator(".fd-top-face:visible").count()) {
+    await expect(page.locator(".fd-top-face .avatar")).toHaveCount(1);
+    await expect(page.locator(".fd-top-face .avatar.riding")).toHaveCount(0);
+  } else await expect(page.locator(".fd-side .fd-menu-icon:visible .avatar.riding")).toHaveCount(1);
   await page.evaluate(() => document.fonts.ready);
   expect(await boxes(), "nothing grew or moved when the pawn mounted").toEqual(before);
   // The ride fills the pawn's own box and its idle plays.
@@ -280,7 +284,7 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   expect(await riding.getAttribute("data-scale")).toBe("0.75");
   await page.goto("/?rideScale=1");
   await expect(page.locator('.fd-hero .avatar.riding[data-scale="1"]')).toHaveCount(1);
-  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount(1);
+  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount((await page.locator(".fd-top-face:visible").count()) ? 0 : 1);
   await page.evaluate(() => document.fonts.ready);
   expect(await boxes(), "nothing grew or moved at a bigger ride").toEqual(before);
   // Off again: the pawn alone, in the same boxes.
@@ -342,13 +346,14 @@ test.describe("rides lazy", () => {
     await page.reload();
     const home = ".fd-hero, .fd-hero .fd-pawn-box, .fd-hero .avatar.riding, .fd-ring:visible .fd-pawn-box, .fd-ring:visible .avatar.riding, .fd-side .fd-menu-icon:visible .avatar.riding";
     await expect(page.locator('.fd-hero .avatar.riding[data-ride="riding-chirp"][data-drawn="0"]')).toHaveCount(1);
-    // (Your ring: a phone's top bar; a computer's side menu's Profile item since Nov 7.)
-    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="0"]')).toHaveCount(1);
+    // (A computer's side menu's Profile item since Nov 7; a phone's top bar shows a still face, no ride, since Nov 9.)
+    const ringRides = (await page.locator(".fd-top-face:visible").count()) ? 0 : 1;
+    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="0"]')).toHaveCount(ringRides);
     await page.evaluate(() => document.fonts.ready);
     const homeBefore = await settled(home);
     open();
     await expect(page.locator('.fd-hero .avatar.riding[data-drawn="1"]')).toHaveCount(1);
-    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="1"]')).toHaveCount(1);
+    await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="1"]')).toHaveCount(ringRides);
     expect(await boxes(home), "home: nothing moved when the ride came").toEqual(homeBefore);
     // Your profile's pawn, the same.
     open = await holdDrawing(page, "riding-chirp");

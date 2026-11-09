@@ -990,7 +990,7 @@ export function App() {
    * bots first, and a raid has 49 of them in the crowd with a boss matched to you. Boss alone: you against the boss
    * picked from the menu, at once.
    */
-  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean; town?: string } = {}) => {
+  const startSolo = async (mode?: ModeChoiceId, opts: { fill?: boolean; town?: string; botLevel?: number | "random" } = {}) => {
     // (Solo and Boss alone resting, a kill switch: not even from a results screen's "again".)
     if (isPaused("solo")) {
       leave();
@@ -1001,7 +1001,8 @@ export function App() {
     const [engines] = await Promise.all([enginePool(), loadOpenings()]);
     setLoading(false);
     const fill = !!opts.fill;
-    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill) }, practiceOn(), fill);
+    // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
+    const m = new SoloMatch(engines, playerName(), { ...DEFAULT_SETTINGS, ...overridesFromUrl(mode, fill), ...(opts.botLevel !== undefined ? { botLevel: opts.botLevel } : {}) }, practiceOn(), fill);
     // A boss battle (Boss alone, a Solo raid): the server notes its start, to time it for a boss token (boss-tokens.ts).
     // (`town`: a boss challenged from the town: the server announces it in the town's chat, and how it ended.)
     if (m.settings.raid) noteSoloBattle(m, opts.town);
@@ -1882,7 +1883,7 @@ export function App() {
       leave();
     },
     // (Solo again as it was: through the queue screen, or Boss alone straight in.)
-    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0 }) : leave()),
+    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0, ...(match.settings.botLevel !== undefined ? { botLevel: match.settings.botLevel } : {}) }) : leave()),
     homeText: townReturn.current ? "Back to town" : undefined,
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
