@@ -26,7 +26,7 @@ export interface Profile {
   user: { id: string; name: string; icon: string; signedIn: boolean; email: string | null; google: boolean; pawn?: PawnColor };
   /** The shop: coins, items owned and what's equipped (missing from an older server). */
   shop?: ShopState;
-  /** Crate items you own, what you wear, and your crates and keys (null: unlimited while testing). */
+  /** Crate items you own, what you wear, and your crates and keys. */
   locker?: Locker;
   stats: { all: ModeStats; classic: ModeStats; crowd: ModeStats; boss?: ModeStats };
   rating: number | null;
@@ -275,7 +275,6 @@ export async function setPawnColor(c: PawnColor): Promise<void> {
   }
 }
 
-/** Gets a shop item (free while testing). */
 /** The chat's opt-in, kept on a signed-in account (chat-on.ts): the profile as it is after it. */
 export async function updateChatOn(on: boolean): Promise<void> {
   const p = state.profile;
@@ -284,6 +283,7 @@ export async function updateChatOn(on: boolean): Promise<void> {
   set({ profile: await api<Profile>("/api/me", { method: "PATCH", body: JSON.stringify({ chatOn: on }) }) });
 }
 
+/** Gets a shop item (free while SHOP_FREE is on, else paid in coins). */
 export async function buyShopItem(item: string): Promise<void> {
   if (!state.profile) return;
   const shop = await api<ShopState>("/api/shop/buy", { method: "POST", body: JSON.stringify({ item }) });
@@ -312,9 +312,14 @@ export interface Locker {
   items: ItemInstance[];
   equipped: Partial<Record<ItemSlot, string>>;
   look: ItemLook;
+  /** Series crates you hold, all series together (Nov 9: each opens with a crate key; an older server: null). */
   crates: number | null;
-  /** Crate keys (an older server: null, unlimited). */
+  /** Series crates you hold by crate id ("winter-1"; only those you have some of; missing from an older server). */
+  seriesCrates?: Record<string, number>;
+  /** Crate keys (an older server: null). */
   keys: number | null;
+  /** Boss crates to pick (every 10th level's, Nov 9; missing from an older server). */
+  bossPicks?: number;
   /** Boss tokens you have, by boss id (only those you have some of; missing from an older server). */
   tokens?: Record<string, number>;
   /** Boss crates you bought and haven't opened, by crate id ("boss-tiger"; only those you have some of; missing from an older server). */
@@ -451,6 +456,13 @@ export async function openCrate(crate: string, force: { fischer?: boolean; shiny
   const r = await postOnce<{ roll: CrateRoll; item: ItemInstance; locker: Locker }>("/api/locker/open", { crate, ...force });
   if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
   return { roll: r.roll, item: r.item };
+}
+
+/** Picks a level's boss crate (Nov 9): into your boss crates, unopened. Answers the crate's id. */
+export async function pickBossCrate(crate: string): Promise<string> {
+  const r = await postOnce<{ crate: string; locker: Locker }>("/api/locker/pick", { crate });
+  if (state.profile) set({ profile: { ...state.profile, locker: r.locker } });
+  return r.crate;
 }
 
 /** Wears a crate item in its slot (null empties the slot). */

@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   BOSS_CRATES,
   CRATES,
-  CRATES_FREE,
   FISCHER,
+  XP,
   ITEM_COLORS,
   GOD_KING_SHOP,
   PAWN_COLORS,
@@ -42,6 +42,7 @@ import {
   isHunchess,
   isWelcomeCrate,
   showsPurity,
+  pickableBossCrates,
   type BossCrateDef,
   type CrateDef,
   type CrateLook,
@@ -52,7 +53,7 @@ import {
   type PawnColor,
   type PresentTier,
 } from "@chessroyale/core";
-import { deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, setPawnColor } from "../account.ts";
+import { account, deleteLockerItems, equipLockerItem, equipShopItem, grantTestItems, myPawnColor, openCrate, pickBossCrate, setPawnColor } from "../account.ts";
 import { TokenArt } from "../components/TokenArt.tsx";
 import { Avatar, BetaCrateArt, FischerArt, HunchessBoxArt, HunchessCrateArt, ItemArt, KeyArt, PresentArt, SupplyBoxArt, WinterCrateArt } from "../components/Items.tsx";
 import { FightBanner } from "../components/FightBanner.tsx";
@@ -60,7 +61,7 @@ import { GamblingWarning } from "../components/GamblingWarning.tsx";
 import { KingEffectPreview } from "../components/Cosmetics.tsx";
 import { play, unlockAudio } from "../sound.ts";
 import { useAccount } from "./Profile.tsx";
-import { testParams, testSwitchesAllowed } from "../test-switches.ts";
+import { testParams } from "../test-switches.ts";
 import { welcomeResumeRow, welcomeRows, type WelcomeRowView } from "../welcome-rows.ts";
 
 const tierIndex = (def: string) => TIERS.findIndex((t) => t.id === itemDef(def)?.tier);
@@ -124,13 +125,21 @@ function getUnseen(): Unseen | null {
   return unseenHere;
 }
 
-/** A crate by its id: the Crates tab's own (free while testing), or a boss's (bought in its shop, held until you open it: Nov 2). */
+/** A crate by its id: the Crates tab's own (a series crate: one you hold opens with a crate key, Nov 9), or a boss's (bought in its shop, picked at a level or won, held until you open it). */
 const anyCrate = (id: string): CrateDef | undefined => crateDef(id) ?? bossCrateDef(id) ?? (isWelcomeCrate(id) ? WELCOME_CRATE : undefined);
 const isBossCrate = (c: CrateDef): c is BossCrateDef => "boss" in c;
 /** "Babur's", "Puddles'" (as his home's and his crate's names have it). */
 const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
-/** How many of a boss crate your locker holds, unopened. */
-const heldOf = (locker: { bossCrates?: Record<string, number> } | undefined, c: CrateDef) => locker?.bossCrates?.[c.id] ?? 0;
+/** How many of a crate your locker holds, unopened (a boss crate's, or since Nov 9 a series crate's). */
+const heldOf = (locker: { bossCrates?: Record<string, number>; seriesCrates?: Record<string, number> } | undefined, c: CrateDef) =>
+  locker?.bossCrates?.[c.id] ?? locker?.seriesCrates?.[c.id] ?? 0;
+/** Your crate keys (none before the locker loads). */
+const keysOf = (locker: { keys?: number | null } | undefined) => locker?.keys ?? 0;
+/**
+ * The test switches ?fischer and ?shiny for a crate's roll (Nov 9): only where the server's TEST_SWITCHES is "1" (local, e2e,
+ * staging) or on the dev server, never an admin's elsewhere (Eric: no admin special ability for opening). The server checks too.
+ */
+const crateSwitchesHere = () => import.meta.env.DEV || !!account().config?.testSwitches;
 
 /** A crate's name with its series on a line of its own ("Beta Crate", then "Series 001"): no line ends on the " · ". */
 function CrateName({ name }: { name: string }) {
@@ -167,7 +176,9 @@ export function CratesPanel() {
   useEffect(() => {
     if (open || welcomeOpen !== null) window.scrollTo(0, 0);
   }, [open, welcomeOpen]);
-  const count = (n: number | null | undefined) => (n === null || n === undefined ? "∞" : String(n));
+  const count = (n: number | null | undefined) => String(n ?? 0);
+  const [picking, setPicking] = useState(false);
+  if (picking) return <BossPickPage onBack={() => setPicking(false)} />;
   if (open) return <CratePage crate={open} resume={resume?.crate === open.id ? resume : undefined} onBack={() => setOpen(null)} />;
   if (welcomeOpen !== null) {
     const row = welcome.find((r) => r.n === welcomeOpen)!;
@@ -188,21 +199,31 @@ export function CratesPanel() {
       {welcome.map((row) => (
         <WelcomeRow key={row.n} row={row} onOpen={() => setWelcomeOpen(row.n)} />
       ))}
+      <BossPickRow picks={locker?.bossPicks ?? 0} onOpen={() => setPicking(true)} />
       <TokenStock tokens={locker?.tokens ?? {}} admin={!!profile?.admin} />
       {profile?.admin && <AdminGrants />}
+      {/* The series crates (Nov 9): each with how many you hold; a padlock while it can't be opened (none held, or no key), greyed at
+          none (shown, not hidden: its page still shows what's inside). */}
       {CRATES.map((c) => {
         const { Crate } = CRATE_LOOKS[c.look];
+        const n = heldOf(locker, c);
+        const locked = !n || !keysOf(locker);
         return (
-          <button type="button" key={c.id} class="ff-window crate-row" data-crate={c.id} onClick={() => setOpen(c)}>
+          <button type="button" key={c.id} class={`ff-window crate-row series-crate-row${n ? "" : " none"}${locked ? " locked" : ""}`} data-crate={c.id} data-held={n} onClick={() => setOpen(c)}>
             <span class="crate-row-art">
               <Crate />
+              {locked && (
+                <span class="welcome-lock crate-lock">
+                  <Padlock />
+                </span>
+              )}
             </span>
             <span class="crate-row-text">
               <strong>
                 <CrateName name={c.name} />
               </strong>
               <span class="crate-row-blurb">{c.blurb}</span>
-              <span>{c.items.length} items</span>
+              <span class="crate-row-held">{n ? `You have ${n} · ${c.items.length} items` : `You have none · ${c.items.length} items`}</span>
             </span>
             <span class="ff-cursor" aria-hidden="true">
               ▶
@@ -210,7 +231,7 @@ export function CratesPanel() {
           </button>
         );
       })}
-      {CRATES_FREE && <p class="shop-note">Crates are unlimited while we test.</p>}
+      <p class="small muted crates-how">Each crate opens with a crate key. Crates and keys come from leveling up and the daily reward.</p>
       {/* The boss crates (Eric, Nov 2: a buy in a boss's shop "adds the crate to your inventory"): each with how many you hold,
           greyed at none (shown, not hidden: its page still shows what's inside); opened here as any crate. */}
       <h3 class="ff-title">Boss crates</h3>
@@ -331,6 +352,80 @@ function TokenStock({ tokens, admin }: { tokens: Record<string, number>; admin: 
   );
 }
 
+/**
+ * A level's boss crate to choose (Nov 9: every 10th level), always there (shown, not hidden): greyed with none to choose, "Choose your
+ * boss crate" when one waits. Its page lists the live bosses' crates.
+ */
+function BossPickRow({ picks, onOpen }: { picks: number; onOpen: () => void }) {
+  const [first] = pickableBossCrates();
+  const Crate = first ? CRATE_LOOKS[first.look].Crate : BetaCrateArt;
+  return (
+    <button type="button" class={`ff-window crate-row boss-pick-row${picks ? "" : " none"}`} data-picks={picks} onClick={onOpen}>
+      <span class="crate-row-art">
+        <Crate />
+      </span>
+      <span class="crate-row-text">
+        <strong>{picks ? (picks === 1 ? "Choose your boss crate" : `Choose your ${picks} boss crates`) : "Boss crate choice"}</strong>
+        <span class="crate-row-blurb">Every {XP.bossCrateEvery}th level, you pick a boss's crate. It opens without tokens or a key.</span>
+        <span class="crate-row-held">{picks ? `${picks} to choose` : "None to choose"}</span>
+      </span>
+      <span class="ff-cursor" aria-hidden="true">
+        ▶
+      </span>
+    </button>
+  );
+}
+
+/** Choosing a level's boss crate (Nov 9): every live boss's crate, each a tap (greyed with none to choose); the answer under them. */
+function BossPickPage({ onBack }: { onBack: () => void }) {
+  const picks = useAccount().profile?.locker?.bossPicks ?? 0;
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<string | null>(null);
+  const choose = (c: BossCrateDef) => {
+    setBusy(true);
+    setSaid(null);
+    unlockAudio();
+    play("menuSelect");
+    void pickBossCrate(c.id)
+      .then(() => setSaid(`${c.name} is in your inventory.`))
+      .catch((e: unknown) => setSaid(e instanceof Error ? e.message : "Something went wrong."))
+      .finally(() => setBusy(false));
+  };
+  return (
+    <div class="crate-page boss-pick-page">
+      <button type="button" class="btn btn-secondary btn-small" onClick={onBack}>
+        ‹ Crates
+      </button>
+      <h3 class="ff-title">{picks ? (picks === 1 ? "Choose your boss crate" : `Choose your ${picks} boss crates`) : "Boss crate choice"}</h3>
+      <p class="small muted">
+        Every {XP.bossCrateEvery}th level gives you a boss crate: pick whose. It goes into your boss crates and opens like any of them,
+        without tokens or a key.
+      </p>
+      <p class="small boss-pick-said" aria-live="polite">
+        {said ?? (picks ? `${picks} to choose.` : `None to choose. Your next is at level ${Math.ceil((levelNow() + 1) / XP.bossCrateEvery) * XP.bossCrateEvery}.`)}
+      </p>
+      <div class="boss-pick-grid">
+        {pickableBossCrates().map((c) => {
+          const { Crate } = CRATE_LOOKS[c.look];
+          return (
+            <button type="button" key={c.id} class="ff-window boss-pick" data-crate={c.id} disabled={!picks || busy} onClick={() => choose(c)}>
+              <span class="crate-row-art">
+                <Crate />
+                <span class="crate-row-token">
+                  <TokenArt boss={c.boss} />
+                </span>
+              </span>
+              <span class="boss-pick-name">{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+/** Your level now (the profile's XP). */
+const levelNow = () => 1 + Math.floor(Math.max(0, account().profile?.xp ?? 0) / XP.perLevel);
+
 /** Admins only: test grants to yourself (crate keys, any boss's tokens), for trying the boss crates (the server checks it's you). */
 function AdminGrants() {
   const [boss, setBoss] = useState("tiger");
@@ -349,6 +444,10 @@ function AdminGrants() {
       <div class="admin-grants-row">
         <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ keys: 1 })}>
           +1 crate key
+        </button>
+        {/* (Eric, Nov 9: up to 100 keys at once, now that every crate takes one: BOSS_TOKENS.keysGrantMax.) */}
+        <button type="button" class="btn btn-secondary btn-small" disabled={busy} onClick={() => give({ keys: 100 })}>
+          +100 crate keys
         </button>
       </div>
       <div class="admin-grants-row">
@@ -372,15 +471,18 @@ function AdminGrants() {
 }
 
 function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen; onBack: () => void }) {
-  // A boss crate opens only one you hold (the server's, once each), never with a test switch.
+  // A boss crate opens only one you hold (the server's, once each), never with a test switch; a series crate one you hold, with a key.
   const boss = isBossCrate(crate) ? crate : null;
-  const held = heldOf(useAccount().profile?.locker, crate);
-  // Test switches (test-switches.ts; the server checks too): ?fischer=1, ?shiny=1 force the roll, until changed with
-  // the boxes below. (Read on every render: whether you may is known once your account is.)
+  const locker = useAccount().profile?.locker;
+  const held = heldOf(locker, crate);
+  const keys = keysOf(locker);
+  const canOpen = boss ? held > 0 : held > 0 && keys > 0;
+  // Test switches (the server checks too): ?fischer=1, ?shiny=1 force the roll, until changed with the boxes below; only where the
+  // server's TEST_SWITCHES is on (crateSwitchesHere). (Read on every render: whether you may is known once the config is.)
   const [fischerSet, setForceFischer] = useState<boolean | null>(null);
   const [shinySet, setForceShiny] = useState<boolean | null>(null);
-  const forceFischer = testSwitchesAllowed() && (fischerSet ?? testParams().get("fischer") === "1");
-  const forceShiny = testSwitchesAllowed() && (shinySet ?? testParams().get("shiny") === "1");
+  const forceFischer = crateSwitchesHere() && (fischerSet ?? testParams().get("fischer") === "1");
+  const forceShiny = crateSwitchesHere() && (shinySet ?? testParams().get("shiny") === "1");
   const [opening, setOpening] = useState(!!resume);
   const look = CRATE_LOOKS[crate.look];
   // Commonest first; Legendary and Mythic (Fischer Random) last.
@@ -401,9 +503,17 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           <CrateName name={crate.name} />
         </strong>
         <span class="small">{crate.blurb}</span>
-        {boss && (
+        {boss ? (
           <span class="small crate-held" data-held={held}>
             {held ? `You have ${held}.` : `You have none. ${possessive(tokenBossName(boss.boss))} shop in the town sells it.`}
+          </span>
+        ) : (
+          <span class="small crate-held" data-held={held} data-keys={keys}>
+            {!held
+              ? "You have none. Leveling up and the daily reward give you crates."
+              : !keys
+                ? `You have ${held}. You need a crate key to open one: each level gives you one.`
+                : `You have ${held}, and ${keys} ${keys === 1 ? "key" : "keys"}.`}
           </span>
         )}
       </div>
@@ -486,7 +596,7 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           ))}
         </div>
       </details>
-      {CRATES_FREE && !boss && testSwitchesAllowed() && (
+      {!boss && crateSwitchesHere() && (
         <div class="test-switches">
           <span class="muted small">Testing:</span>
           <label class="check small">
@@ -497,11 +607,11 @@ function CratePage({ crate, resume, onBack }: { crate: CrateDef; resume?: Unseen
           </label>
         </div>
       )}
-      {/* (A boss crate: greyed with none to open, shown, not hidden.) */}
+      {/* (Greyed with none to open, or a series crate with no key: shown, not hidden.) */}
       <button
         type="button"
         class="ff-button"
-        disabled={!!boss && held < 1}
+        disabled={!canOpen}
         onClick={() => {
           // (A tap: the moment a phone allows sound, so the strip's clicks are heard.)
           unlockAudio();
@@ -721,10 +831,11 @@ export function CrateOpening({
   onClose: () => void;
 }) {
   const [result, setResult] = useState<{ roll: CrateRoll; item: ItemInstance } | null>(resume ?? null);
-  // "Open another": a boss crate only while you hold one more (greyed at none); the Crates tab's own, always.
-  // (A Welcome Crate: another only while a second waits.)
-  const welcomeLeft = useAccount().profile?.locker?.welcome?.unopened ?? 0;
-  const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : !isBossCrate(crate) || heldOf(useAccount().profile?.locker, crate) > 0;
+  // "Open another": only while you hold one more (greyed at none), a series crate also a key (Nov 9). (A Welcome Crate: another only
+  // while a second waits.)
+  const lockerNow = useAccount().profile?.locker;
+  const welcomeLeft = lockerNow?.welcome?.unopened ?? 0;
+  const more = isWelcomeCrate(crate.id) ? welcomeLeft > 0 : heldOf(lockerNow, crate) > 0 && (isBossCrate(crate) || keysOf(lockerNow) > 0);
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState<"spin" | "fischer" | "unwrap" | "spin2" | "reveal">(resume ? "reveal" : "spin");
   const [round, setRound] = useState(0);

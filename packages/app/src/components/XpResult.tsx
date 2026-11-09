@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, type XpGrant } from "@chessroyale/core";
 import { account, playerName } from "../account.ts";
 import { gameXp, markXpFilled, xpFilled } from "../xp.ts";
+import { RewardBox } from "./RewardBox.tsx";
 
 /**
  * The XP box on every result screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't
@@ -97,38 +98,43 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
   const nothing = xp === null || !!xp?.none;
   const line = xp === undefined ? "Counting your XP…" : xp === null ? none : xp.none ? XP_NONE_LINES[xp.none] : null;
   const start = filling ? from : xp && !xp.none ? xp.after : still;
+  // (Phase 2, Nov 9: what the game paid beside its XP, a level's crates and key or the daily reward's crate, in a box over the screen
+  // once the bar has filled: RewardBox. Outside the XP box: its containment would hold a fixed box inside it.)
   return (
-    <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
-      <div class="xp-top">
-        <span class="xp-gain" ref={gain}>
-          {xp === undefined ? "XP" : `+${fmt(filling ? from - (xp?.before ?? 0) : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
-        </span>
-        {/* (Whose XP it is (Eric, Nov 9: "it looks like the boss is the one leveling up"): your name, centered, shrinking first.) */}
-        <span class="xp-name" data-testid="xp-name">
-          {playerName()}
-        </span>
-        <span class="xp-level" ref={level}>
-          Level {levelOf(start)}
-        </span>
+    <>
+      <div class={`xp-box${nothing ? " xp-none" : ""}${xp === undefined ? " xp-wait" : ""}${done ? " xp-done" : ""}`} data-testid="xp-box" aria-live="polite" ref={box}>
+        <div class="xp-top">
+          <span class="xp-gain" ref={gain}>
+            {xp === undefined ? "XP" : `+${fmt(filling ? from - (xp?.before ?? 0) : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
+          </span>
+          {/* (Whose XP it is (Eric, Nov 9: "it looks like the boss is the one leveling up"): your name, centered, shrinking first.) */}
+          <span class="xp-name" data-testid="xp-name">
+            {playerName()}
+          </span>
+          <span class="xp-level" ref={level}>
+            Level {levelOf(start)}
+          </span>
+        </div>
+        <div class="xp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={XP.perLevel} aria-valuenow={xpInLevel(xp?.after ?? still)}>
+          <div class="xp-fill" ref={fill} style={{ transform: `scaleX(${levelProgress(start)})` }} />
+          <span class="xp-pop" ref={pop} aria-hidden="true" />
+        </div>
+        <div class="xp-parts" ref={partsRef}>
+          {line !== null ? (
+            <span class="xp-why">{line}</span>
+          ) : (
+            xp!.parts.map((p, i) => (
+              <span key={i} class={`xp-part${filling ? "" : " shown"}`}>
+                {i > 0 && <span class="xp-dot"> · </span>}
+                {p.label} <b>+{fmt(p.xp)}</b>
+              </span>
+            ))
+          )}
+          {line === null && !xp!.parts.length && <span class="xp-why">{fmt(xpInLevel(xp!.after))} / {fmt(XP.perLevel)} XP</span>}
+        </div>
       </div>
-      <div class="xp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={XP.perLevel} aria-valuenow={xpInLevel(xp?.after ?? still)}>
-        <div class="xp-fill" ref={fill} style={{ transform: `scaleX(${levelProgress(start)})` }} />
-        <span class="xp-pop" ref={pop} aria-hidden="true" />
-      </div>
-      <div class="xp-parts" ref={partsRef}>
-        {line !== null ? (
-          <span class="xp-why">{line}</span>
-        ) : (
-          xp!.parts.map((p, i) => (
-            <span key={i} class={`xp-part${filling ? "" : " shown"}`}>
-              {i > 0 && <span class="xp-dot"> · </span>}
-              {p.label} <b>+{fmt(p.xp)}</b>
-            </span>
-          ))
-        )}
-        {line === null && !xp!.parts.length && <span class="xp-why">{fmt(xpInLevel(xp!.after))} / {fmt(XP.perLevel)} XP</span>}
-      </div>
-    </div>
+      {done && xp && !xp.none && xp.rewards && <RewardBox xp={xp} />}
+    </>
   );
 }
 

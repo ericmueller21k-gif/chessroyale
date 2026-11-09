@@ -10,7 +10,7 @@ import { BackButton } from "../components/FrontDoor.tsx";
 import { isPaused, useServerStatus } from "../status.ts";
 
 /**
- * The shop: cosmetics by category. Get an item (free while we test); it goes to your locker, where you wear it
+ * The shop: cosmetics by category. Get an item; it goes to your locker, where you wear it
  * with your crate items (one place to wear things, Eric, Oct 8, 2026). Chat packs are yours to use once you have
  * them. Your choices are saved to your account.
  */
@@ -79,7 +79,6 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
         <LockerPanel onShop={() => setArea("shop")} />
       ) : (
         <>
-      {SHOP_FREE && <p class="shop-note">Everything is free while we test the shop.</p>}
       {!shop ? (
         // (Still loading on a first visit: the guest account is being made. Unavailable only once that's known.)
         <p class="muted">{config && (!config.accounts || profile) ? "The shop needs your account, which isn't available here." : "Loading the shop…"}</p>

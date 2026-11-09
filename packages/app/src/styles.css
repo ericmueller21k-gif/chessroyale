@@ -7475,8 +7475,75 @@ button.history-label {
   width: 28px;
   height: 28px;
 }
-.boss-crate-row.none {
+.boss-crate-row.none,
+.series-crate-row.none,
+.boss-pick-row.none {
   opacity: 0.55;
+}
+/* A series crate you can't open yet (Nov 9: none held, or no key): the Welcome Crate's padlock on its corner. */
+.crate-lock {
+  z-index: 1;
+}
+.crates-how {
+  margin: 0;
+}
+/* Choosing a level's boss crate (Nov 9): every live boss's crate as a tile, its token on the corner. */
+.boss-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+.boss-pick {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.boss-pick:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.boss-pick-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.boss-pick-said {
+  min-height: 1.45em;
+  margin: 0;
+}
+/* The result screen's rewards box (components/RewardBox.tsx; Nov 9): the token box's dialog, the crate and the key with their
+   counts, the lines under them. */
+.reward-box {
+  text-align: center;
+  justify-items: center;
+}
+.reward-title {
+  font-size: 20px;
+}
+.reward-art {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 800;
+}
+.reward-thing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.reward-thing-art {
+  width: 64px;
+  height: 64px;
+}
+.reward-line {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
 }
 .crate-row-held {
   font-size: 12px;
