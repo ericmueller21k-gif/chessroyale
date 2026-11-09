@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { XP } from "../src/settings.ts";
-import { XP_NONE_LINES, gameXp, isXpNone, levelOf, levelProgress, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpStretches } from "../src/xp.ts";
+import { XP_NONE_LINES, crateCount, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpStretches } from "../src/xp.ts";
+import { pausedLine, pauseVariable } from "../src/pauses.ts";
 
 const min = 60_000;
 const counted = { ms: 12 * min + 40_000, moves: XP.minMoves, won: false };
@@ -52,6 +53,7 @@ describe("XP and levels (Eric, Nov 9)", () => {
       test: "No XP: test game.",
       banned: "No XP: this account is banned.",
       limit: "No XP: daily solo limit reached.",
+      paused: "Rewards are paused for a moment.",
     });
     expect(isXpNone("left")).toBe(true);
     expect(isXpNone("toString")).toBe(false);
@@ -150,5 +152,39 @@ describe("the XP box's fill (Eric, Nov 9: it never skips)", () => {
   it("the end of a fill is exactly the grant's XP; nothing gained stays put", () => {
     expect(xpAt(100, 280, 99_999)).toEqual({ xp: 280, level: 1, share: 0.28 });
     expect(xpAt(500, 500, 0)).toEqual({ xp: 500, level: 1, share: 0.5 });
+  });
+});
+
+describe("phase 2's rewards (Nov 9): the words and the numbers", () => {
+  it("each level: XP.levelCrates crates and XP.levelKeys keys; every XP.bossCrateEvery-th also a boss crate to pick", () => {
+    expect(levelReward(2)).toEqual({ crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 0 });
+    expect(levelReward(10)).toEqual({ crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: 1 });
+    expect(levelReward(20).bossPicks).toBe(1);
+    expect(levelReward(11).bossPicks).toBe(0);
+  });
+
+  it("the lines: \"+1 Winter Crate\", \"+2 Winter Crates · +1 crate key\", \"Choose your boss crate\"", () => {
+    const r = { crate: "winter-1", daily: 1, crates: 2, keys: 1, bossPicks: 1, levels: [10] };
+    expect(rewardLines(r, "Winter Crate · Series 1")).toEqual({ daily: "+1 Winter Crate", level: "+2 Winter Crates · +1 crate key", pick: "Choose your boss crate" });
+    expect(rewardLines({ ...r, daily: 0, crates: 4, keys: 2, bossPicks: 2 }, "Winter Crate · Series 1")).toEqual({ daily: null, level: "+4 Winter Crates · +2 crate keys", pick: "Choose your 2 boss crates" });
+    expect(crateCount(1, "Beta Crate · Series 001")).toBe("1 Beta Crate");
+  });
+
+  it("a stored grant's rewards read back, and anything unreadable as none", () => {
+    const r = { crate: "winter-1", daily: 1, crates: 0, keys: 0, bossPicks: 0, levels: [] };
+    expect(readRewards(JSON.stringify(r))).toEqual(r);
+    expect(readRewards("{nope")).toBeUndefined();
+    expect(readRewards(null)).toBeUndefined();
+    expect(readRewards(JSON.stringify({ ...r, daily: 0 }))).toBeUndefined();
+    expect(readRewards({ daily: -3, crates: 2.5, keys: 1, levels: ["x", 3] })).toEqual({ crate: XP.rewardCrate, daily: 0, crates: 0, keys: 1, bossPicks: 0, levels: [3] });
+    // A grant with none carries no rewards; one with nothing paid none either.
+    expect(xpGrant(100, [], "paused", r)).not.toHaveProperty("rewards");
+    expect(xpGrant(100, [{ label: "12 min", xp: 120 }], undefined, r).rewards).toEqual(r);
+  });
+
+  it("PAUSE_REWARDS says so in plain words", () => {
+    expect(XP_NONE_LINES.paused).toBe("Rewards are paused for a moment.");
+    expect(pausedLine("rewards")).toBe("Rewards are paused for a moment.");
+    expect(pauseVariable("rewards")).toBe("PAUSE_REWARDS");
   });
 });
