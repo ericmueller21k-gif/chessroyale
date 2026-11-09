@@ -619,3 +619,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   test grants". Next queue: quests phase 3 (wire QuestsOverlay; at 320 px keep top bar buttons >= 40 px); ranked (waiting on Eric's
   decisions); duo parked; town intro; admin cleanup (inventory in docs/decisions/2026-11-09-admin-abilities.md).
 - Nov 9 ~11:35: #574 LIVE (f7d93d8), main green. Starting XP phase 3 (quests): brief notes/briefs/brief-xp-phase3.md.
+- Nov 9 ~12:25: XP phase 3 (quests) done (e11d12c): PR #575 (draft, full-e2e); stills sent. Independent review Opus
+  session_01JuCWRt4d1RBtnzyj5sUDyn (review/575, watcher bikddxl5y); full CI watcher bsrsr77o7.
