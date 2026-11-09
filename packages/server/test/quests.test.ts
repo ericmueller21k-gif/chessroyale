@@ -30,6 +30,11 @@ async function world() {
   return { sql, d1 };
 }
 const signedIn = async (sql: Sql, email: string, now = T0) => signInWithIdentity(sql, (await createGuest(sql, now, "Player")).user, "email", email, {}, now);
+/** A signed-in account with a fixed id, so the deal (seeded by the account and the day) is the same every run (review of #575, M1). */
+const fixedAccount = async (sql: Sql, id: string, email: string, now = T0) => {
+  await sql.run("INSERT INTO users (id, name, email, created_at, last_seen) VALUES (?, 'Player', ?, ?, ?)", id, email, now, now);
+  return { id };
+};
 /** A counted game of 12 minutes and 12 of your own moves (short of the daily reward's 15, so only quests add to its XP). */
 const game = (key: string, quest: XpGame["quest"], facts: Partial<XpGame["facts"]> = {}, over: Partial<XpGame> = {}): XpGame => ({
   key,
@@ -88,7 +93,8 @@ describe("dealing: lazily, from a seed, on the day's first read", () => {
 describe("resets and the carry-over cap", () => {
   it("the next XP day: finished dailies go, unfinished ones wait, topped up to QUESTS.maxDailies (3), never past it", async () => {
     const { sql } = await world();
-    const ann = await signedIn(sql, "ann@example.com");
+    // (A fixed id: the deal is the same every run. Review of #575, M1: a random id made the last check flaky.)
+    const ann = await fixedAccount(sql, "questsdealfixed01", "ann@example.com");
     // Day 1: two unfinished.
     const d1 = (await quests(sql, ann.id)).filter((q) => q.period === "daily");
     expect(d1.length).toBe(QUESTS.dailyPerDay);
@@ -105,9 +111,11 @@ describe("resets and the carry-over cap", () => {
     await set(sql, ann.id, [["warm-up", 2], ["squad-up"], ["fifty-fifty"], ["regular"]], xpDayStart(T0) + 2 * DAY + MIN);
     await grantXp(sql, ann.id, game("lobby:AAAAA:1", "classic", {}, { now: xpDayStart(T0) + 2 * DAY + 2 * MIN }));
     expect(await progress(sql, ann.id, xpDayStart(T0) + 2 * DAY + 3 * MIN)).toEqual({ "Warm Up": "3/3", "Squad Up": "0/2", "Fifty-Fifty": "0/1", Regular: "1/10" });
+    const warmUp = (await quests(sql, ann.id, xpDayStart(T0) + 2 * DAY + 3 * MIN)).find((q) => q.name === "Warm Up")!.id;
     const d4 = (await quests(sql, ann.id, xpDayStart(T0) + 3 * DAY)).filter((q) => q.period === "daily");
     expect(d4.length).toBe(3);
-    expect(d4.map((q) => q.name)).not.toContain("Warm Up");
+    // (The finished quest itself is gone; a new quest of the same kind may be dealt on a later day.)
+    expect(d4.map((q) => q.id)).not.toContain(warmUp);
     expect(d4.slice(0, 2).map((q) => q.name)).toEqual(["Squad Up", "Fifty-Fifty"]);
   });
 
