@@ -232,6 +232,15 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     Watch for it from before it can appear (`watchFor`, or `watchSquares` in `boss-powers.spec.ts` for which squares).
   - Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the
     test's own times next to it: where the two don't overlap is the answer.
+- **The flaky batch of Nov 9** (`docs/decisions/2026-11-09-flaky-batch.md`):
+  - A test that fails on both tries in one run and passes locally is usually a condition, not timing: read the CI
+    trace's last snapshot (what's on screen, the turn order, the cards open) before changing a wait. Two of three were
+    app bugs.
+  - A test that taps until something opens closes whatever else its earlier taps opened first: an open card covers the
+    point a canvas hook returns (hooks see the canvas, not the page over it).
+  - A test lobby's "strong" bots must be deterministic for what the test relies on: no random move.
+  - A list that hides "what's done" must not key off "what's been created": a next round made ahead of its start
+    isn't the round being played.
 
 ## Eric's rules hold
 
