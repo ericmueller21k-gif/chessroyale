@@ -34,7 +34,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   or at their next ask); one the queue doesn't know (gone while the app slept, or made up) is answered `expired` and the
   app asks afresh. Cancel takes the ticket out (one still on its way back with the first ask is canceled when it
   comes); a pairing made that very moment is called off for that player (`DuelGame.abandon`: an abort before any move,
-  nothing recorded). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
+  nothing recorded, and nobody's dodge). After `fewPlayersSeconds` (45) the app offers "Few players online right now" with Keep waiting and
   Play a bot (unranked).
 - **The stage** (Eric, Oct 16: "your character's sitting there, and then there's like kind of this empty platform thing
   like waiting, and then when your opponent joins, like their pawn loads up next to you"; `components/DuelStage.tsx`,
@@ -88,7 +88,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     between (Bullet 2+1, Blitz 5+3); Bullet against Rapid, Blitz 3+2; one pick counts alone; none: Blitz 3+2;
   - **the overlay** (`overlayMs`, 1.5 s): "Timer: Blitz 3+2" over the board (a line, not a banner); the pawns are gone;
   - **play:** each first move within `firstMoveSeconds` (20; White's from the start, Black's from White's) or the game
-    is aborted (no result, no rank change). The clocks start after Black's first move; then Fischer: the mover's
+    is aborted (no result; a dodge for the side that didn't move: "Leaving early", below). The clocks start after Black's first move; then Fischer: the mover's
     thinking off their clock, the increment on after the move. Ends: checkmate; resigning (before both first moves,
     resigning is Abort); flagging (a loss, a draw when the side on time has a lone king, or a king and one knight or one
     bishop: `canMate`); stalemate, threefold repetition (a position count kept with the game), the 50-move rule (at
@@ -105,6 +105,50 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   an ordinary move the moment your turn shows, so the clock charges one the time from your opponent's move reaching the
   server to yours reaching it, about a round trip (chess.com charges 0.1 s); the bot game, on the device, about a frame.
   Nothing marks a premove for the server (1 v 1 has no timing signal), so nothing a premove does changes a rank.
+- **Leaving early** (phase L1, Nov 9; Eric: "Quitting during time control. Yeah, that's fine. Quitting mid-game. Yeah, full
+  loss."; the design: [docs/ideas/ranked-ladder.md](../ideas/ranked-ladder.md) section 4; the calls:
+  [2026-11-09-ranked-l1-leave-rules.md](../decisions/2026-11-09-ranked-l1-leave-rules.md)). Every number in `LEAVES`
+  (settings.ts); the math in core's `ranked-leaves.ts`; who left decided by the duel rules' `conductOf`; nothing from an app.
+  - **Who left, and how** (decided once, as the game ends, from who had a socket open then; kept on the room's record as
+    `conduct`):
+    - a **dodge** (before both first moves): Abort (also during the versus moment and the vote), a first move that didn't come,
+      never connecting (`no_show`). Abort or a missed first move with exactly one player gone: the one who's gone (they left
+      first); both there: the one it's about; both gone: nobody (a server that dropped both looks the same). Before the game
+      began (still waiting for both), Abort is the presser's. The queue's Cancel pressed the moment it paired
+      (`DuelGame.abandon` → the room's `cancelled`) is nobody's: they never saw the game;
+    - a **leave** (after): resigning before your `quickResignMoves`th move (3), or a flag while you had no socket and your
+      opponent did (abandoning: in 1 v 1 your clock is the hold). A flag that's a draw isn't one;
+  - **What it costs** (`recordDuel`, `recordDodges` in `server/src/ranked.ts`): a dodge: no hidden-rating change, the game
+    still called off for both, and `dodgeRp` (5, then 10 from dodge level 2) off the dodger's ladder; a leave: the loss as
+    ever, then `leaveRp` (10) more (its `points` on the result card and the game's row include it). Never below Wood 5 0; none
+    in placements (no ladder yet) or while fair play holds them. Each is a row in `ranked_conduct`, keyed by player and game:
+    a dodge's fee applies only with its own row (its nonce), a leave's only with the game's own row, so a retry, a second
+    recording or two at once charge once;
+  - **The dodge level** (one per account): +1 per dodge, −1 every `dodgeDecayHours` (12) without one, worked out from the
+    dodges kept (never stored). The lockout from ranked by the level a dodge brought: none, 5 minutes, 30, 2 hours, 12 hours
+    at most (`dodgeLockoutMin`), from that dodge;
+  - **The last 20** (`marksInWindow`): marks among your latest `window` (20) ranked games and dodges (each mark keeps the
+    player's game count then, so every clean game pushes the oldest out). 3-4: each search waits 2 minutes before it can be
+    paired; 5+: 5 minutes (`delayed`), and home's note says "Finish games to clear this"; 8+ (`lockAt`): 1 v 1 locked
+    `lockHours` (24) from the latest mark. Not built yet: the second 8+ in a season (7 days and a fair-play case: phases S1
+    and A1);
+  - **The queue** (`index.ts`'s `/api/1v1/play`, first ask): a lockout is refused (403 `{ message, lockedUntil, lock }`); the
+    delayed queue gives the ticket `notBefore`, which `PAIR_BY_RATING` won't pair before (the ticket keeps its place), and
+    the "still looking" answers carry `delayMs`;
+  - **On screen:** home's line above PLAY with 1 v 1 picked: "You left early: 1 v 1 opens in 4:32" (or "Too many leaves: …")
+    with PLAY greyed until it's over (drawn again as it ends), or "3 leaves in your last 20: +2 min queue" with PLAY on (the
+    wait starts with the search); the stage's line: "Delayed queue · 1:42" in place of "Finding opponent…" while it counts
+    down; home's note (its note slot, dismissable for the tab): "You left before the game started: −5 RP" for
+    `noteMinutes` (30) unless a game comes after it, or from 5 marks "You left 5 of your last 20 ranked games early. Finish
+    games to clear this."; the match menu's confirms (the words only, the same box): Abort "The game is called off. Leaving
+    before it starts costs 5 RP." (with the lockout it would bring: "10 RP and a 30-minute wait before your next 1 v 1"),
+    Resign before your 3rd move "It counts as a loss, and resigning this early costs 10 RP more." (in placements: "…goes on
+    your record"); the result card's line after your own dodge: "Left before it started: −5 RP". A bot's or the town's game
+    says none of it. All from `/api/me`'s `leaves` (`RankedLeaves`: the standing, what a dodge now costs, the note), read
+    again when an outcome says you left (or 2 s after leaving an aborted game whose outcome hadn't come);
+  - **Its kill switch:** `PAUSE_LEAVE_PENALTIES` ([ops.md](ops.md)): nothing charged or marked, no lockout or delayed queue,
+    `/api/me`'s `leaves` null (the confirms' words as before);
+  - **The other player:** loses nothing, and goes back to the queue as ever (Play again).
 - **Quick chat** as in other online matches (`MatchChat`, `ChatPanel`), one channel (no teams: every line a player
   owns goes to both), the limits of `QUICK_CHAT`, mute by account on the device (`chat-mod.ts` in the app) and on the
   server (`chatPrefs`), and #252's chat bans (read as each player connects, again at most every `CHAT_MOD.recheckMs` as
@@ -208,6 +252,7 @@ by the clock (`voteAt`); everything else comes as a message.
 | Table / column | What | Kept |
 | --- | --- | --- |
 | `ranked_1v1` (user_id, rating, rd, games, wins, losses, draws, ladder, last_game, last_at, coin_day, coin_games, peak, streak; index `ranked_1v1_ladder` on ladder, Oct 28) | A player's hidden rating, record and ladder place; the UTC day of their last paying game and how many paid that day; the highest ladder reached and the current run of wins (from Oct 28) | With the account; deleted with it; in the download; a guest's moves to an account without one on sign-in |
+| `ranked_conduct` (user_id, match_id, at, mode, kind, games, rp, nonce; PK (user_id, match_id); indexes on (user_id, at) and at; Nov 9) | Each dodge and leave (ranked's leave rules): which game, when, the mode ("1v1"), which kind, the player's ranked games by then (the last-20 window), the rank points it cost, the recording that wrote it | `LEAVES.keepDays` (90), then the 15-minute cron (`purgeConduct`); deleted with the account; in the download (`leaves`: game, at, mode, kind, rp); a guest's move to the account on sign-in |
 | `ranked_1v1_games` (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, checked, nonce, white_points, black_points) | Each ranked game (never an aborted one): moves (UCI), think times (ms), how it ended; fair play's engine check by side; the rank points it moved for each side (from Oct 28) | `gamesKeepDays` (30) after it ends (the 15-minute cron, `purgeDuelGames`); longer only while a player in it has a fair-play case open (watch or review) or an appeal of a ban waiting (`purgeEvidence`'s rule); on account deletion that player becomes "deleted" in it; the download has a player's games (opponent by name, not the check) |
 
 No `results` rows for 1 v 1 (Crowd's stats and `users.rating` stay as they were). The privacy policy's "1 v 1 (ranked)"
@@ -223,6 +268,9 @@ entry says the same.
 | Ranks and games in D1; the schema, a guest's merge, the profile's read | `packages/server/src/ranked.ts`, `ranked-schema.ts` |
 | The queue | `packages/server/src/matchmaker.ts` (duel mode, `duelNext`, `cancel`), `queue.ts` (`PAIR_BY_RATING`) |
 | Routes, the cron's purge | `packages/server/src/index.ts` (`duelRoute`, `scheduled`) |
+| Leaving early: the math (fees, dodge levels, the last 20, the standing) | `packages/core/src/ranked-leaves.ts`; numbers `LEAVES` |
+| Leaving early: who left (`conductOf`), the room's record of it, recording it, reading it | `packages/chess/src/duel/rules.ts`, `packages/server/src/duel-room.ts`, `ranked.ts` (`recordDuel`, `recordDodges`, `purgeConduct`), `ranked-schema.ts` (`marksOf`, `rankedLeaves`) |
+| Leaving early on screen: home's line and note, the confirms, the stage's countdown | `packages/app/src/ranked.ts` (`leavesLine`, `leavesNote`, `abortNote`, `resignNote`), `screens/Home.tsx` (`LeavesLine`, PLAY), `App.tsx` (the note), `screens/Duel.tsx`, `duel.ts` |
 | Fair play's engine check of 1 v 1 games | `packages/server/src/fairplay-duel.ts`; the case page in `admin.ts` |
 | The app: queue, online game, bot game, the way in | `packages/app/src/duel.ts` |
 | The screens (`DuelFront`: the stage, then the board); the stage; the vote on the board; the hint; the rank pill; the emblem | `packages/app/src/screens/Duel.tsx`, `components/DuelStage.tsx`, `DuelVote.tsx`, `VoteHint.tsx`, `DuelRankPill.tsx`, `RankEmblem.tsx`; styles `dv-` and `re-` in `styles.css` |
@@ -236,8 +284,9 @@ entry says the same.
 ## Settings
 
 `RANKED_1V1` (controls, the vote and the game's timings, pairing, the hidden rating, tiers, the top tiers and their
-floor, rank points, placements, coins, games kept, the bot); `CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the
-kill switch `PAUSE_RANKED1V1`.
+floor, rank points, placements, coins, games kept, the bot); `LEAVES` (leaving early: the fees, the dodge lockouts and their
+decay, the last-20 window, the delayed queue's waits, the 8-mark lock, the quick resign, home's note, how long marks are kept);
+`CAPACITY.queue` (the queue's asks); `QUICK_CHAT`, `CHAT_MOD`; the kill switches `PAUSE_RANKED1V1`, `PAUSE_LEAVE_PENALTIES`.
 
 ## Tests and tools
 
@@ -264,6 +313,18 @@ kill switch `PAUSE_RANKED1V1`.
   `packages/app/test/duel.test.ts` (the hint once per device, an expired ticket, the clock sample, a move resent after
   a reconnect, clocks, the result's words, the home screen's label), `faq.test.ts` (1 v 1's words follow the
   settings).
+- Leaving early (L1, Nov 9): `packages/core/test/ranked-leaves.test.ts` (dodge levels and their decay, the fees and lockouts,
+  the floor, the quick resign, the last-20 window and the delayed queue, the standing), `packages/chess/test/duel-rules.test.ts`
+  ("who left early": every abort, no-show, no-first-move, quick-resign and flag path), `packages/server/test/duel-room.test.ts`
+  (the room's record of it, decided once; the queue's Cancel excused), `ranked-store.test.ts` ("leaving early": a dodge's fee
+  and mark, charged once under a retry and two recordings at once, the levels and lockouts, placements, fair play's hold, the
+  kill switch, a leave's loss plus its fee, the last 20 and home's note, the purge, the download, deleting, a guest's merge, the
+  profile), `duel-queue.test.ts` (the delayed queue in the line and the Matchmaker's `delayMs`), `kill-switches.test.ts` (a
+  locked-out search refused; `PAUSE_LEAVE_PENALTIES` lifts it), `account-data.test.ts` (the table pinned and covered),
+  `packages/app/test/ranked-leaves.test.ts` (home's line and note, the confirms' words), `faq.test.ts` (the FAQ's words follow
+  `LEAVES`); e2e: `ranked-1v1.spec.ts` (a dodge from the vote: the confirm's words, the result, home's note; a first move that
+  never comes; a quick resign's confirm), `home-ranked.spec.ts` (a lockout greying PLAY with its countdown, one line from 320
+  px; the delayed queue's line).
 - Tiers and emblems (Oct 28): `packages/core/test/ranked.test.ts` (every ladder to its tier, division and RP at the
   edges; the top tiers' floor, top 500 and top 100; stored ladders 0-4000 keep their hidden rating; each pill's
   contrast), `packages/server/test/ranked-store.test.ts` ("the top tiers": the place counted, ties sharing it, the
@@ -318,3 +379,5 @@ kill switch `PAUSE_RANKED1V1`.
 - Anything the game object starts has an end (a result, an abort, a no-show, closing after its results): a test for
   each.
 - A new table (or column) goes in `ACCOUNT_STORES` or `NO_ACCOUNT_DATA` and the privacy policy in the same PR.
+- A fee is charged once: its write goes in the same batch as the row that proves it's this recording's (a nonce), never on its
+  own. The leave rules' standing (lockouts, the delayed queue) is worked out from the kept marks, never stored.

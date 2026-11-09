@@ -73,6 +73,8 @@ message, without a code change: each is a Worker variable (docs/areas/ops.md, "K
    - `PAUSE_FRIENDS`: friends and invites.
    - `PAUSE_REWARDS`: XP, the daily reward and level rewards (games play on; the result's XP box says "Rewards are paused for
      a moment."; levels reached meanwhile are paid at the next game after it).
+   - `PAUSE_LEAVE_PENALTIES`: ranked's leave rules (dodges and leaves: no rank points taken, nothing marked, and no lockout or
+     delayed queue applies while it's on). Games play as usual. For when the rules misfire.
    - `PAUSE_TOWN_CHAT`: typing in the town square's chat, everywhere at once (the field says "Chat is paused."; players'
      messages stop showing, the bosses' chatter goes on).
    - One boss, never met while it's set (its id, from `BOSS_ROSTER` in `packages/core/src/boss.ts`, isn't always its

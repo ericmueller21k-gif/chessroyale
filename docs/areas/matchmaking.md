@@ -56,7 +56,9 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 - **Ranked 1 v 1** ([ranked.md](ranked.md)): its own queue (`ranked1v1-default`, the same matchmaker object) of
   single players paired by the hidden rating (`PAIR_BY_RATING`, core's `pairUp`: the range widens with the wait and
   the ratings' deviations), each pair a game object of its own (`DuelGame`). Its own rank and tiers; routes under
-  `/api/1v1/`.
+  `/api/1v1/`. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a locked-out player's first ask is
+  refused with when; one in the delayed queue gets a ticket with `notBefore` that `PAIR_BY_RATING` won't pair before (it
+  keeps its place in line; the answers say `delayMs`).
 - **Ranking today** (other modes) is the rating on your profile (its rank, chart and "Top N%"). A match
   counts for ranking only if at least `RANKING.rankedMinHumanShare` (30%) of its seats are real players
   (`isRankedMatch`; 30 of a 50 v 50's 100, 15 of a raid's 50). Solo and practice never count (only `online = 1`

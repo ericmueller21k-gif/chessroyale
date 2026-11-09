@@ -23,7 +23,7 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { expireTownCache } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
-import { countRoute, opsStats, routeOf } from "./ops.ts";
+import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { pruneChatMod } from "./chat-mod.ts";
@@ -400,7 +400,11 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       // Ranked's leave rules (L1): a lockout refuses the search (until when, and why); the delayed queue holds the ticket from
       // pairing for its wait. The server's own record, never the app's word; none while PAUSE_LEAVE_PENALTIES is on.
       const leaves = isPaused(env, "leave-penalties") ? null : await rankedLeaves(sql, me.id, now);
-      if (leaves?.lockedUntil) return json({ message: lockedLine(leaves.lock), lockedUntil: leaves.lockedUntil, lock: leaves.lock }, 403);
+      if (leaves?.lockedUntil) {
+        countCall("ranked.locked");
+        return json({ message: lockedLine(leaves.lock), lockedUntil: leaves.lockedUntil, lock: leaves.lock }, 403);
+      }
+      if (leaves?.delaySec) countCall("ranked.delayed");
       const delay = leaves?.delaySec ? { notBefore: now + leaves.delaySec * 1000 } : {};
       const { player, rating, rd } = await duelEntrant(sql, me, now, isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));

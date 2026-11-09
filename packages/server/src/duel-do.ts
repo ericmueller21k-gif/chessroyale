@@ -110,6 +110,8 @@ export class DuelGame extends DurableObject<Env> {
           penalties: !isPaused(this.env, "leave-penalties"),
         });
         const played = finished.result !== "aborted";
+        // (Ops' counts, /admin/ops: dodges and leaves charged.)
+        if (outcomes) for (const o of [outcomes.w, outcomes.b]) if (o.conduct) countCall(`ranked.${o.conduct.kind}`);
         // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
         if (outcomes && played) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
