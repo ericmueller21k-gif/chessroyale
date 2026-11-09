@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { named, test, watchFor, openBossRaid, openPlayWithFriends, pickMode } from "./helpers.ts";
+import { named, test, watchFor, openBossRaid, pickMode } from "./helpers.ts";
 
 /**
  * Matchmaking types (DECISIONS.md, "Matchmaking types"): Default (bots after the fill time; 8 s locally), Bots off
@@ -19,40 +19,60 @@ const path = (p: Page) => new URL(p.url()).pathname;
 const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 
-test("home: Default, Bots off and Solo, each its title only; the line above PLAY says what each does; Solo fills its seats fast and starts", async ({ page }) => {
+test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the line above PLAY says what each does; Party opens 50 v 50's party; Bots asks the bot level and starts", async ({ page }) => {
   await named(page, "Typer");
   await page.goto("/?debug");
   await pickMode(page, "50 v 50");
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
-  await expect(types.getByRole("radio")).toHaveText(["Default", "Bots off", "Solo"]);
-  await expect(types.getByRole("radio", { name: /^Default/ })).toHaveAttribute("aria-checked", "true");
-  // Default: bots after the server's fill time (8 s on the test server), said by the line above PLAY (the ⓘ is gone, Oct 28).
+  await expect(types.getByRole("radio")).toHaveText(["Solo queuejoin a lobby", "Partyup to 8 friends", "Bots99 bots, now"]);
+  await expect(types.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
+  // Solo queue: bots after the server's fill time (8 s on the test server), said by the line above PLAY.
   await expect(page.locator(".fd-hint")).toHaveText(/^(Starts within 8 s; bots fill any empty seats|Usually about \d+ s to find a match)$/);
   await expect(page.getByRole("button", { name: "About matchmaking" })).toHaveCount(0);
-  // Bots off: no warning box (Eric, Oct 18: the box moved the page), the line above PLAY says it.
-  await types.getByRole("radio", { name: /^Bots off/ }).click();
-  await expect(page.getByRole("note")).toHaveCount(0);
-  await expect(page.locator(".fd-hint")).toHaveText("People only: starts when 100 have joined");
-  // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18).
+  // Party: its sheet at once (make a lobby or join by code), the line says who comes.
+  await types.getByRole("radio", { name: /^Party/ }).click();
+  const party = page.getByRole("dialog", { name: "50 v 50 party" });
+  await expect(party).toBeVisible();
+  await expect(party.getByRole("button", { name: "Get friend code" })).toBeVisible();
+  await expect(party.getByRole("button", { name: "Join lobby" })).toBeVisible();
+  await party.getByRole("button", { name: "Close" }).click();
+  await expect(page.locator(".fd-hint")).toHaveText("Invite up to 8 friends; bots fill the rest");
+  // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18); PLAY opens the sheet again.
   await page.reload();
   await pickMode(page, "50 v 50");
-  await expect(page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ })).toHaveAttribute("aria-checked", "true");
-  // Play with friends: lobbies only now (Solo is here).
-  await openPlayWithFriends(page);
-  await expect(page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: /Solo vs/ })).toHaveCount(0);
-  await page.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "50 v 50 party" })).toBeVisible();
+  await page.getByRole("dialog", { name: "50 v 50 party" }).getByRole("button", { name: "Close" }).click();
   // Big enough to tap, and nothing wider than the screen.
   for (const r of await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio").all()) expect((await r.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 
-  // Solo: the queue screen, your bots fill the 100 seats in a couple of seconds, then the match begins.
-  await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
-  await expect(page.locator(".fd-hint")).toContainText("Solo vs 99 bots · starts at once");
-  const t0 = Date.now();
-  await pickMode(page);
+  // Bots: the Bot level box (Eric, Nov 9): OK greyed until a level is picked; ✕ cancels and nothing starts.
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
+  await expect(page.locator(".fd-hint")).toHaveText("Start at once with 99 bots");
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  const box = page.getByRole("dialog", { name: "Bot level" });
+  await expect(box.getByRole("radio")).toHaveText([/^My level~\d+$/, "Very easy~700", /^Easy~(900|950|1000)$/, /^Medium~(1100|1150|1200)$/, /^Hard~1[45]\d0$/, /^Very hard~1[89]\d0$/, "RandomEvery bot's level is random"]);
+  await expect(box.getByRole("button", { name: "OK", exact: true })).toBeDisabled();
+  await box.getByRole("button", { name: "Close" }).click();
+  await expect(box).toHaveCount(0);
+  await expect(page.locator(".fd-seats")).toHaveCount(0);
+  // Tapping the dim cancels too.
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await box.getByRole("radio", { name: /^Hard/ }).click();
+  await expect(box.getByRole("button", { name: "OK", exact: true })).toBeEnabled();
+  await page.mouse.click(5, 5);
+  await expect(box).toHaveCount(0);
+  // (Not remembered until OK: the next box opens with nothing picked.)
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await expect(box.getByRole("button", { name: "OK", exact: true })).toBeDisabled();
+  await box.getByRole("radio", { name: /^Very easy/ }).click();
+
+  // OK: the queue screen, your bots fill the 100 seats in a couple of seconds, then the match begins, the bots at Very easy.
+  const t0 = Date.now();
+  await box.getByRole("button", { name: "OK", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Solo");
   await expect(page.locator(".fd-queue-rank")).toHaveText("Unranked: solo games don't count for ranking");
@@ -66,15 +86,19 @@ test("home: Default, Bots off and Solo, each its title only; the line above PLAY
   await expect.poll(() => phase(page), { timeout: 10_000 }).toBe("vote");
   // (Its bots are the match's: the same 99.)
   expect(await page.evaluate(() => (window as any).match.standings().length)).toBe(100);
+  // (At the level picked, which this device keeps for the next box.)
+  expect(await page.evaluate(() => (window as any).match.settings.botLevel)).toBe(700);
+  expect(await page.evaluate(() => localStorage.getItem("hunchess.botLevel"))).toBe("very-easy");
 });
 
+// (Bots off has no button on home since Nov 9: this device's stored "botsoff", as a test's, still queues people only.)
 test("Bots off: people only, it waits; one tap switches to Default, keeping your place; then bots fill: Unranked", { tag: "@phone-only" }, async ({ page, browser }) => {
   test.setTimeout(3 * 60_000);
   await named(page, "Patient");
   const q = pool("mm-off");
+  await page.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
   await page.goto(`/?debug&pool=${q}`);
   await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Bots off");
   await expect(page.locator(".fd-queue-line")).toContainText("No bots");
@@ -82,9 +106,9 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   // Someone else with Bots off: the same lobby.
   const other = await (await browser.newContext()).newPage();
   await named(other, "Also patient");
+  await other.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
   await other.goto(`/?debug&pool=${q}`);
   await pickMode(other);
-  await other.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots off/ }).click();
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => code(other)).toBe(first);
   await expect(page.locator(".fd-count-n")).toHaveText("2");

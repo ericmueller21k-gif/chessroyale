@@ -83,8 +83,9 @@ test("1 v 1: picked, your rank and what it is in the panel under the row, kept u
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Party/ })).toHaveCount(0);
   // Your rank (the server's: a new account is in its placements) and what 1 v 1 is, in the panel under the row.
-  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Chess vs one player near your level$/);
-  await expect(page.locator(".fd-hint")).toHaveText("");
+  await expect(page.locator(".fd-mode-panel")).toHaveText(/^Your rank: Placement 0\/5Win to climb, lose to drop$/);
+  // (What 1 v 1 is: the line above PLAY, one line, since Nov 9.)
+  await expect(page.locator(".fd-hint")).toHaveText("Ranked chess vs one player near your level");
   const row = (await page.getByRole("radiogroup", { name: "RANKED" }).boundingBox())!;
   const rank = (await page.locator(".fd-rank1v1").boundingBox())!;
   const play = (await page.getByRole("button", { name: "PLAY", exact: true }).boundingBox())!;
@@ -246,10 +247,15 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
   const sizes = desktop() ? [[1280, 800], [1440, 900], [1920, 1080]] : [[390, 844], [320, 640]];
   const radio = (name: RegExp) => page.getByRole("radio", { name });
   const steps: [string, () => Promise<unknown>][] = [
-    ["Default", () => radio(/^Default/).click()],
-    ["Bots off", () => radio(/^Bots off/).click()],
-    ["Solo", () => radio(/^Solo$/).click()],
-    ["Default again", () => radio(/^Default/).click()],
+    ["Solo queue (50 v 50)", () => radio(/^Solo queue/).click()],
+    ["Party (50 v 50)", async () => {
+      await radio(/^Party/).click();
+      await expect(page.getByRole("dialog", { name: "50 v 50 party" })).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+    }],
+    ["Bots (50 v 50)", () => radio(/^Bots/).click()],
+    ["Solo queue again", () => radio(/^Solo queue/).click()],
     ["1 v 1", () => radio(/^1 v 1/).click()],
     ["Squads", () => radio(/^Squads/).click()],
     ["Party", async () => {
@@ -304,7 +310,7 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
         return Math.max(0, ...boxes.map((c) => Math.max(c.bottom - p.bottom, p.top - c.top, c.right - p.right, p.left - c.left)));
       });
       expect(spill, `${w}×${h}, after ${step}: inside the panel`).toBeLessThanOrEqual(0.5);
-      // The line above PLAY fits its fixed room (one line on a computer, two on a phone), whatever it says.
+      // The line above PLAY fits its fixed room (one line, phone and computer, since Nov 9), whatever it says.
       expect(await page.locator(".fd-hint").evaluate((e) => e.scrollHeight - e.clientHeight), `${w}×${h}, after ${step}: the line above PLAY`).toBeLessThanOrEqual(1);
     }
     // (The panel: there all along.)
@@ -328,7 +334,8 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
   const ranked = page.getByRole("radiogroup", { name: "RANKED" });
   const matchmaking = page.getByRole("radiogroup", { name: "Matchmaking" });
   const play = page.getByRole("button", { name: "PLAY", exact: true });
-  const options = [/^Default/, /^Bots off/, /^Solo$/];
+  // (The options' names since Nov 9, Eric: Solo queue, Party, Bots. Only the names changed here.)
+  const options = [/^Solo queue/, /^Party/, /^Bots/];
   const parts: Record<string, string> = { board: ".fd-livewin", hint: ".fd-hint", play: ".fd-play", label: ".fd-other-label", boss: ".rd-card", auto: ".fd-auto-card", panel: ".fd-mode-panel" };
   const measure = async () => {
     const out: Record<string, { x: number; y: number; width: number; height: number }> = {};
@@ -373,8 +380,8 @@ test("Eric's rule (Oct 18, Oct 25): home's options panel is always there, greyed
     for (const [step, act] of steps) {
       await act();
       if (step === "50 v 50") {
-        await expect(matchmaking.getByRole("radio", { name: /^Default/ }), `${w}×${h}: Default selected once a mode is picked`).toHaveAttribute("aria-checked", "true");
-        await expect(matchmaking.getByRole("radio", { name: /^Default/ })).toBeEnabled();
+        await expect(matchmaking.getByRole("radio", { name: /^Solo queue/ }), `${w}×${h}: Solo queue selected once a mode is picked`).toHaveAttribute("aria-checked", "true");
+        await expect(matchmaking.getByRole("radio", { name: /^Solo queue/ })).toBeEnabled();
         await expect(page.locator(".fd-mode-panel.idle")).toHaveCount(0);
       }
       same(before, await measure(), `${w}×${h}, after ${step}`);
@@ -407,12 +414,14 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     // (The computer's live window: on screen, waited for as in the keeps-still test, so the boxes below are the settled ones.)
     if (desktop()) await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
     const hint0 = await rect(".fd-hint");
-    await expect(page.locator(".fd-hint"), `${at}: nothing picked, nothing said`).toHaveText("");
+    // (Nov 9, Eric: "let's make that line always say something", one line.)
+    await expect(page.locator(".fd-hint"), `${at}: nothing picked`).toHaveText("Tap a game mode to get started");
     await pickMode(page, "50 v 50");
     const group = page.getByRole("radiogroup", { name: "Matchmaking" });
-    // Titles only, side by side, equal, whole, tappable, and filling the row: the group is as wide as the RANKED row, with the
-    // buttons' margins even on both sides.
-    await expect(group.getByRole("radio"), `${at}: titles only`).toHaveText(["Default", "Bots off", "Solo"]);
+    // Since Nov 9 a title and a short sub line each (Solo queue, Party, Bots), side by side, equal, whole, tappable, and filling the
+    // row: the group is as wide as the RANKED row, with the buttons' margins even on both sides.
+    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "Partyup to 8 friends", "Bots99 bots, now"]);
+    for (const r of await group.getByRole("radio").all()) expect(await r.evaluate((e) => e.scrollWidth - e.clientWidth), `${at}: each option whole`).toBeLessThanOrEqual(0);
     const g = (await group.boundingBox())!;
     const ranked = await rect(".fd-ranked");
     expect(Math.abs(g.x - ranked.x), `${at}: the group as wide as the RANKED row`).toBeLessThanOrEqual(1);
@@ -430,19 +439,36 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     expect(Math.abs(left - right), `${at}: the buttons fill the row`).toBeLessThanOrEqual(1);
     expect(left, `${at}: the buttons fill the row (their margin is the group's 5 px)`).toBeLessThanOrEqual(6);
     // Every pick says what PLAY does, in the one box above PLAY; nothing is said under PLAY.
-    const says: [string, RegExp][] = [
-      ["Default", /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
-      ["Bots off", /^People only: starts when 100 have joined$/],
-      ["Solo", /^Solo vs 99 bots · starts at once$/],
+    // (Every line one line, whole: Nov 9.)
+    const oneLine = async (what: string) => {
+      const e = page.locator(".fd-go > .fd-hint > span");
+      expect(await e.evaluate((x) => x.scrollWidth - x.clientWidth), `${at}: ${what}: whole`).toBeLessThanOrEqual(0);
+      expect((await e.boundingBox())!.height, `${at}: ${what}: one line`).toBeLessThan(20);
+    };
+    const says: [RegExp, RegExp | string][] = [
+      [/^Solo queue/, /^(Starts within \d+ s; bots fill any empty seats|Usually about \d+ s to find a match)$/],
+      [/^Bots/, "Start at once with 99 bots"],
     ];
     for (const [pick, line] of says) {
-      await group.getByRole("radio", { name: new RegExp(`^${pick}`) }).click();
+      await group.getByRole("radio", { name: pick }).click();
       await expect(page.locator(".fd-hint"), `${at}: ${pick}`).toHaveText(line);
+      await oneLine(String(pick));
     }
+    await group.getByRole("radio", { name: /^Party/ }).click();
+    await page.getByRole("dialog", { name: "50 v 50 party" }).getByRole("button", { name: "Close" }).click();
+    await expect(page.locator(".fd-hint"), `${at}: Party`).toHaveText("Invite up to 8 friends; bots fill the rest");
+    await oneLine("Party");
+    await group.getByRole("radio", { name: /^Solo queue/ }).click();
     await page.getByRole("radio", { name: /^Squads/ }).click();
+    // Squads: Solo queue, Party, and Bots shown greyed ("Soon": its server part is a follow-up).
+    const squads = page.getByRole("radiogroup", { name: "Squads" });
+    await expect(squads.getByRole("radio"), `${at}: Squads' options`).toHaveText(["Solo queuejoin a squad", "Partyup to 3 friends", "BotsSoon"]);
+    await expect(squads.getByRole("radio", { name: /^Bots/ }), `${at}: Squads' Bots greyed`).toBeDisabled();
     await expect(page.locator(".fd-hint"), `${at}: Squads`).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
+    await oneLine("Squads");
     await page.getByRole("radio", { name: /^1 v 1/ }).click();
-    await expect(page.locator(".fd-hint"), `${at}: 1 v 1`).toHaveText("");
+    await expect(page.locator(".fd-hint"), `${at}: 1 v 1`).toHaveText("Ranked chess vs one player near your level");
+    await oneLine("1 v 1");
     await page.getByRole("radio", { name: /^50 v 50/ }).click();
     const hint = await rect(".fd-hint");
     const playBox = (await play.boundingBox())!;
@@ -476,8 +502,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       expect(whole, `${at}: card ${i}: the words whole, each on one line`).toBe(true);
       heights.push(c.height);
     }
-    expect(heights[0]!, `${at}: the pair shorter (was 84 on a phone, 64 on a computer)`).toBeLessThanOrEqual(57);
-    expect(heights[1]!, `${at}: the pair shorter`).toBeLessThanOrEqual(57);
+    // (Nov 9: a phone's pair grew by the line's freed 16.9 px, to 72.9; a computer's is as it was.)
+    for (const ht of heights) expect(Math.abs(ht - (desktop() ? 56 : 72.9)), `${at}: the pair's height (56 px; 72.9 on a phone since Nov 9)`).toBeLessThanOrEqual(1);
 
     // PLAY: taller than it was (64 px on a phone and on a computer; 48 px in a short window), and home as before: a phone
     // still fits with no scrolling and keeps its last card's foot where it was (25 px up from the screen's edge); a
@@ -488,6 +514,8 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       const fit = await page.evaluate(() => ({ scroll: document.documentElement.scrollHeight - innerHeight, foot: innerHeight - [...document.querySelectorAll(".rd-card")].pop()!.getBoundingClientRect().bottom }));
       expect(fit.scroll, `${at}: home fits, no scrolling`).toBeLessThanOrEqual(0);
       expect(fit.foot, `${at}: the last card's foot no lower than it was`).toBeGreaterThanOrEqual(24);
+      // (Nov 9: the cards grew upward only, their foot where it was: 25 px up from the screen's edge.)
+      expect(fit.foot, `${at}: the last card's foot where it was`).toBeLessThanOrEqual(26);
     } else {
       await expect(page.locator(".fd-livewin-sq").first()).toBeVisible();
       expect((await rect(".fd-livewin-sq")).width, `${at}: the live window's board`).toBeGreaterThan(h >= 800 ? 230 : 150);
