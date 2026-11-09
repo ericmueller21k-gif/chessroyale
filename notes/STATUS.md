@@ -664,3 +664,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   92f1529 (shop) GREEN with the same specs. FLAKY: queue for the flaky-test batch (fix the cause, not retries). #585 shop LIVE.
   #586 key (board king's head, keys stacked ×3) and #587 haptics in CI; merge in that order.
 - Nov 9 ~21:00: #586 key LIVE. Bloat sweeps recreated on this session (old pair disabled, dead session). Eric: give times in US Central (and UTC).
+- Nov 9 ~21:05: #587 haptics merged. Eric's notes (no action yet): (1) live-ops when launched: alerts + an agent that sees errors
+  and fixes them; proposal sent (prod smoke bot via Actions cron, error/abandon alerts from the Worker cron to Eric + a triage
+  scheduled task, gradual deploys); waiting on his go and where alerts should go. (2) TIME CONTROLS: revisit later, "no mode should
+  feel rushed"; Squads' default may need to be longer (~10 min); let players choose where it fits. Don't start until he says.
