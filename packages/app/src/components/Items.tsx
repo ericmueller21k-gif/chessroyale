@@ -1611,12 +1611,12 @@ export function WinterCrateArt() {
  * square, its bow's center at 32, 50: a gold bow holding a gold king on navy, the shaft and its teeth. The only key the game draws:
  * the key's tile, the rewards, the quests and the shop bundle's stack.
  */
-function KeyShape() {
+function KeyShape({ kingTurn = 0 }: { kingTurn?: number }) {
   return (
     <>
       <circle cx="32" cy="50" r="17" fill="#fbbf24" {...LINE} />
       <circle cx="32" cy="50" r="12.5" fill="#1b2f74" stroke="#1d1d1f" {...lw(2)} />
-      <g fill="#fbbf24" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)}>
+      <g fill="#fbbf24" stroke="#1d1d1f" stroke-linejoin="round" {...lw(1)} transform={kingTurn ? `rotate(${kingTurn} 32 50)` : undefined}>
         <path d="M31.1 38.4 h1.8 v1.9 h1.9 v1.8 h-1.9 v2.1 h-1.8 v-2.1 h-1.9 v-1.8 h1.9 Z" />
         <path d="M27.2 48.8 Q26.4 43.8 32 43.6 Q37.6 43.8 36.8 48.8 Z" />
         <rect x="27" y="48.6" width="10" height="2" rx="0.8" />
@@ -1796,7 +1796,7 @@ function MysteryCrate({ at }: { at: string }) {
 
 /**
  * The shop's Crate + Key Bundle (Eric's mockup, Nov 9, in our own art): three mystery crates stacked (two below, one on top) and
- * three crate keys stacked beside them, on a soft gold glow, with a few still sparkles. 200 × 140.
+ * three crate keys stacked at 45° beside them, on a soft gold glow, with a few still sparkles. 200 × 140.
  */
 export function BundleArt() {
   const sparkle = (x: number, y: number, r: number) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
@@ -1822,10 +1822,10 @@ export function BundleArt() {
         <MysteryCrate at="translate(-1 69) scale(0.78)" />
         <MysteryCrate at="translate(63 69) scale(0.78)" />
         <MysteryCrate at="translate(31 16) scale(0.78)" />
-        {/* (Three keys stacked straight, evenly, each a little over the one above it: Eric, Nov 9.) */}
-        {[44, 72, 100].map((y) => (
-          <g key={y} transform={`translate(147 ${y}) scale(0.86) translate(-32 -50)`}>
-            <KeyShape />
+        {/* (Three keys at 45°, stacked close: each bow's ring over the next one's, every king upright and in view; Eric, Nov 9.) */}
+        {[2, 1, 0].map((k) => (
+          <g key={k} transform={`translate(${136 + k * 15.5} ${60 + k * 15.5}) rotate(-45) scale(0.74) translate(-32 -50)`}>
+            <KeyShape kingTurn={45} />
           </g>
         ))}
         <g fill="#fff4c8">
