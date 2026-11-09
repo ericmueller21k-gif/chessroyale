@@ -237,12 +237,17 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   // game's rewards as the ledger has them, so a replay answers the same.)
   // (A failure here leaves the levels owed (paid at the next game, never twice) and must not cost the box this game's XP, already in:
   // review of #574, m4.)
-  let rewards: Awaited<ReturnType<typeof gameRewards>> | undefined;
   try {
     await payLevels(sql, me, after?.xp ?? 0, game.key, game.now);
+  } catch (e) {
+    console.error("payLevels", e);
+  }
+  // (Its own try: a failed level payout must not hide the daily reward's crate, already paid above. Delta review n2.)
+  let rewards: Awaited<ReturnType<typeof gameRewards>> | undefined;
+  try {
     rewards = await gameRewards(sql, me, game.key);
-  } catch {
-    rewards = undefined;
+  } catch (e) {
+    console.error("gameRewards", e);
   }
   return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, rewards);
 }
@@ -283,7 +288,7 @@ export async function gameXpOf(sql: Sql, userId: string, code: unknown, now: num
 }
 
 /**
- * The test switch `?xp=<n>` (test servers and admins only: the caller checks testSwitchesOn): sets an account's XP to `n` through
+ * The test switch `?xp=<n>` (test servers only: the route answers only where TEST_SWITCHES is "1", review of #574 M1): sets an account's XP to `n` through
  * the ledger (reason "test"), so a test can start a game just short of a level. Answers the XP now.
  */
 export async function setTestXp(sql: Sql, userId: string, n: unknown, now: number): Promise<number | null> {

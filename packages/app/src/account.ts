@@ -574,7 +574,7 @@ export async function onlineGameXp(code: string): Promise<XpGrant | null> {
   return (await api<{ xp: XpGrant | null }>(`/api/xp?game=${encodeURIComponent(code)}`)).xp;
 }
 
-/** The test switch ?xp=<n> (test servers and admins only): sets your XP, then your profile again. */
+/** The test switch ?xp=<n> (test servers only, since Nov 9: review of #574 M1): sets your XP, then your profile again. */
 export async function setTestXp(xp: number): Promise<void> {
   await api("/api/xp/test", { method: "POST", body: JSON.stringify({ xp }) });
   set({ profile: await api<Profile>("/api/me") });

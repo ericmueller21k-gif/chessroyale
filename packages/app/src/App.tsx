@@ -396,7 +396,7 @@ export function App() {
     } catch {
       // No storage.
     }
-    // (The test switch ?xp=<n>: your XP set to n once your account has loaded, to reach a level-up; test servers and admins only.)
+    // (The test switch ?xp=<n>: your XP set to n once your account has loaded, to reach a level-up; test servers only, since Nov 9.)
     // (Read once the account has loaded: only then does the server's config say whether the test switches apply.)
     void loadAccount(name).then(() => {
       const xp = Number(testParams().get("xp"));

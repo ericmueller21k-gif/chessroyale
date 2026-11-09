@@ -16,6 +16,10 @@ describe("the FAQ's contents", () => {
   const page = faqPage();
   const anchors = faqAnchors(page);
 
+  it("no section carries a merge's conflict markers (Nov 9: a merge left them in the XP section, inside the text)", () => {
+    expect(JSON.stringify(page.sections)).not.toMatch(/(^|\\n)(<<<<<<<|=======|>>>>>>>)( |\\n|$)/);
+  });
+
   it("has every section the brief lists, in order", () => {
     expect(page.toc.map((t) => t.id)).toEqual(["modes", "scoring", "boss-brain", "boss-powers", "god-king", "xp", "crates", "fair-play", "privacy", "credits"]);
   });

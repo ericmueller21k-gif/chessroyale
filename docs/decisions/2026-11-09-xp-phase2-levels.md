@@ -5,7 +5,7 @@ the player picks.
 
 - **Every level owed is paid at a counted game**, not only the level that game crossed: each level 2 up to your level now whose op
   (`level:<n>:<ledger id>`) isn't in the ledger. So levels reached before phase 2 (phase 1 shipped the same day), through a test
-  switch's jump (`?xp=`), a guest's merge or while rewards were paused are paid at the next counted game, and nothing is paid twice
+  switch's jump (`?xp=`, test servers only), a guest's merge or while rewards were paused are paid at the next counted game, and nothing is paid twice
   (setting XP down and up again pays nothing more). One count first, so the usual game costs one read.
 - **At most 20 levels a game** (`XP.levelsPerGame`): a test switch's jump to level 100 can't make one batch of hundreds of statements;
   the rest come at the next games.
