@@ -5,7 +5,7 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
 [god-king.md](god-king.md).
 
 ## How it works today
-- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): a boss battle's result screen (Boss alone and raids; Boss alone timed by the server's clock) shows `XpResult`, a fixed 78 px box: the
+- **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): a boss battle's result screen (Boss alone and raids; Boss alone timed by the server's clock) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
   bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("12 min +120 · Win +50"), or why there was none. Its rules
   and storage: [accounts.md](accounts.md), "XP and levels".
 

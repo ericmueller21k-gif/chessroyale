@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 import { test, bossAloneFromHome, submitMove } from "./helpers.ts";
 
 /**
@@ -45,6 +45,14 @@ async function sampleXp(page: Page) {
 type Sample = { t: number; share: number; gain: string; level: string; pop: string | null; box: number[]; title: number[] | null; actions: number[] | null; wait: boolean; done: boolean };
 const samples = (page: Page) => page.evaluate(() => (window as unknown as { __xp: Sample[] }).__xp);
 
+/** The box's top row: the gain, your name and the level never overlap; `centered`: the name's middle is the box's (within 3 px). */
+async function topRowFits(box: Locator, centered: boolean) {
+  const [g, n, l, b] = await Promise.all([".xp-gain", ".xp-name", ".xp-level", ""].map((s) => (s ? box.locator(s) : box).boundingBox()));
+  expect(g!.x + g!.width, "the gain ends before the name").toBeLessThanOrEqual(n!.x + 0.5);
+  expect(n!.x + n!.width, "the name ends before the level").toBeLessThanOrEqual(l!.x + 0.5);
+  if (centered) expect(Math.abs(n!.x + n!.width / 2 - (b!.x + b!.width / 2)), "the name centered").toBeLessThan(3);
+}
+
 /** Your account's XP, once it's loaded and the ?xp= switch has set it. */
 async function xpIs(page: Page, xp: number) {
   // (The page's own account first: a request before its session cookie would make a second guest. helpers.ts, pageAccountId.)
@@ -74,6 +82,10 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   await expect(box.locator(".xp-gain")).toHaveText("+170 XP");
   await expect(box.locator(".xp-level")).toHaveText("Level 2");
   await expect(box.locator(".xp-parts")).toHaveText("12 min +120 · Win +50");
+  // Whose XP (Eric, Nov 9): your name in the top row, centered in the box, between the gain and the level.
+  const name = ((await (await page.request.get("/api/me")).json()) as { user: { name: string } }).user.name;
+  await expect(box.getByTestId("xp-name")).toHaveText(name);
+  await topRowFits(box, true);
   const all = await samples(page);
   // The fill, from the grant's first frame (before it, "Counting your XP…" at your XP as it was).
   const fill = all.filter((s) => !s.wait);
@@ -190,9 +202,16 @@ test("at 320 px, the widest line and a long count fit their box", { tag: "@phone
     });
   });
   await page.goto("/?debug&pace=quick&mate=1&boss=gingerbread");
+  // (The longest name there is, 16 wide letters: it shrinks, ellipsized, and never covers the gain or the level.)
+  await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
+  expect((await page.request.patch("/api/me", { data: { name: "WWWWWWWWWWWWWWWW" } })).ok()).toBe(true);
+  await page.reload();
   await bossAloneFromHome(page);
   const box = page.getByTestId("xp-box");
   await expect(box).toHaveClass(/xp-done/, { timeout: 120_000 });
+  await expect(box.getByTestId("xp-name")).toHaveText("WWWWWWWWWWWWWWWW");
+  expect(await box.getByTestId("xp-name").evaluate((e) => e.scrollWidth > e.clientWidth), "the long name is ellipsized").toBe(true);
+  await topRowFits(box, false);
   await expect(box.locator(".xp-gain")).toHaveText("+300 XP");
   await expect(box.locator(".xp-parts")).toHaveText("30 min +300 · Win (paid once today) +0");
   await expect(box.locator(".xp-level")).toHaveText("Level 101");

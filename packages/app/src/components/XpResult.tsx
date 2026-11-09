@@ -1,13 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { XP, XP_NONE_LINES, levelOf, levelProgress, xpAt, xpFillMs, xpInLevel, type XpGrant } from "@chessroyale/core";
-import { account } from "../account.ts";
+import { account, playerName } from "../account.ts";
 import { gameXp, markXpFilled, xpFilled } from "../xp.ts";
 
 /**
  * The XP box on every result screen (Eric, Nov 9: "after a game, it shows your meter bar and then it shows it like moving. I don't
  * want it to skip… It should like go up like a nice satisfying looking thing… on every page"; docs/decisions/2026-11-09-xp-box.md).
  * One fixed box (nothing shifts, whatever it shows): the gain and your level on top, the bar, then the parts ("12 min +120 · Win
- * +50") or why there was none ("No XP: you left the match."). The bar fills from the old XP to the new over 1.5 to 2.5 s
+ * +50") or why there was none; the top row reads "+37 XP · <your name> · Level 2", so it's plainly yours, not the boss's ("No XP: you left the match."). The bar fills from the old XP to the new over 1.5 to 2.5 s
  * (core's xpAt: eased, never a jump), the number counting up with it and each part showing as its share starts; a level-up fills
  * to the end, pops "Level 8!" and goes on from empty. Each frame only sets the bar's transform and three texts (its box contains its
  * own layout). Reduced motion: the end at once.
@@ -101,6 +101,10 @@ export function XpResult({ xp, none = "No XP for this game." }: { xp: XpGrant | 
       <div class="xp-top">
         <span class="xp-gain" ref={gain}>
           {xp === undefined ? "XP" : `+${fmt(filling ? from - (xp?.before ?? 0) : (xp?.after ?? 0) - (xp?.before ?? 0))} XP`}
+        </span>
+        {/* (Whose XP it is (Eric, Nov 9: "it looks like the boss is the one leveling up"): your name, centered, shrinking first.) */}
+        <span class="xp-name" data-testid="xp-name">
+          {playerName()}
         </span>
         <span class="xp-level" ref={level}>
           Level {levelOf(start)}

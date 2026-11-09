@@ -24807,13 +24807,29 @@ button.sq-tiny {
   text-align: left;
   font-variant-numeric: tabular-nums;
 }
+/* The gain, your name, your level: the name centered between them (equal side tracks), the one that shrinks (ellipsized) first. */
 .xp-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, max-content) 1fr;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  column-gap: 8px;
   line-height: 20px;
   white-space: nowrap;
+}
+.xp-gain {
+  justify-self: start;
+}
+.xp-level {
+  justify-self: end;
+}
+.xp-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
 }
 .xp-gain {
   font-weight: 800;
