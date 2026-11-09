@@ -376,6 +376,13 @@ Added Oct 14, 2026 (Eric; notes only, nothing built):
     an invite does when the other player is already in a match. It's stored data and a client-server change, so it
     takes the full test lane.
 
+## Ranked rewards (Eric, Nov 9, 2026: later, not a priority; don't raise it again until ranked seasons are built)
+
+Eric: "we do want to give a reward for ranking, just like other games do … probably do a personalized crate that contains like
+colors … if you got a higher rank, you get like a different color of like one item." At a season's end, each mode's peak (or end)
+rank earns a reward: a crate or item whose color shows the rank reached (a higher rank, a rarer color of the same item). Built
+with seasons (ranked phase S1, docs/ideas/ranked-ladder.md), item-builder for the art.
+
 ## Needs Eric
 
 - **Maia-3 bosses for players:** done Oct 14. The site serves the Maia box's complete source
