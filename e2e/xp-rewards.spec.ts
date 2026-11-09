@@ -104,8 +104,8 @@ test("a level-up: its toast (\"Level 2!\", 2 Winter Crates and a key); the Crate
 
 test("every 10th level: a boss crate to choose; its toast says so, the Crates tab's choice picks Babur's crate, which is then yours to open", async ({ page }, testInfo) => {
   test.setTimeout(4 * 60_000);
-  // 9,990 XP (the levels below never paid: a test switch's jump), then +170: Level 10, every level from 2 paid at once.
-  await wonGame(page, 9_990);
+  // 8,900 XP (the levels below never paid: a test switch's jump), then +170: Level 10, every level from 2 paid at once.
+  await wonGame(page, 8_900);
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Level 10!");
   await expect(toast).toContainText("+18 Winter Crates · +9 crate keys");
