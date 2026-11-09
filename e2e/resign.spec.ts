@@ -1,5 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
-import { named, test, bossAloneFromHome, openBossRaid, pickMode } from "./helpers.ts";
+import { named, test, bossAloneFromHome, openBossRaid, pickMode, startBotLevel } from "./helpers.ts";
 
 /**
  * Resign in every mode (Eric, Oct 13; DECISIONS.md, "Resign: leaving a match in every mode"): the gear in the top line
@@ -107,8 +107,9 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   // The votes (before move 1): Leave.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30");
   await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
   await expect.poll(() => phase(page), { timeout: 30_000 }).toBe("vote");
   const leave = await openConfirm(page, /^Leave the match\?$/, /^You'll go home\. Nothing goes on your record\.$/);
   await leave.getByRole("button", { name: "Leave" }).click();
@@ -118,8 +119,9 @@ test("solo 50 v 50: Leave in the votes goes home with nothing recorded; Resign m
   // Again, past the votes: Resign.
   await page.goto("/?debug&pace=quick&mode=crowd&rounds=2&clock=30&augments=0");
   await pickMode(page);
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Solo/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  await startBotLevel(page);
   await expect.poll(() => phase(page), { timeout: 60_000 }).toMatch(/^(play|watching)$/);
   const confirm = await openConfirm(page, /^Resign\?$/, /^The match ends here for you and counts as a loss\.$/);
   await confirm.getByRole("button", { name: /Resign/ }).click();

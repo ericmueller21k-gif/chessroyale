@@ -40,17 +40,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     text). One box of one fixed size for every mode (Eric, Oct 18:
     "it should never change size";
     [docs/decisions/2026-10-18-home-steady-layout.md](../decisions/2026-10-18-home-steady-layout.md)), holding the
-    pick's options or words: 50 v 50's Matchmaking (**Default**, **Bots off**, **Solo**: each its title only, 44 px
-    buttons filling the row; Oct 28, Eric: "3 times in this screen it says the same thing", so the sub-labels and the ⓘ
-    with its pop-up are gone: what each does is the line above PLAY, and the ranking rule is in the FAQ's "Your rating");
-    Squads' **Solo queue** or **Party** ([squads.md](squads.md); Party opens the party sheet at
-    once, and PLAY opens it again while Party is picked); for 1 v 1 (always people) your rank's emblem (48 px, its box
+    pick's options or words (Nov 9, [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): 50 v 50's
+    **Solo queue** (the public queue), **Party** (greyed, "Soon": queueing together into the public matchmaking, up to
+    `CROWD_PARTY_MAX` = 8, sides random, ranked, a later job; Eric, Nov 9) and **Bots** (you and 99 bots in your
+    browser: PLAY opens **the Bot level box**, [2026-11-09-home-modes-bot-level.md](../decisions/2026-11-09-home-modes-bot-level.md):
+    My level, Very easy … Very hard, Random, each with its average; OK greyed until a pick, remembered on the device, `BOT_LEVELS`;
+    `components/BotLevelBox.tsx`), each a title and a sub line, three equal buttons in the 44 px row (Bots off has no button since
+    Nov 9; a stored "botsoff", a test's, still queues people only); Squads' **Solo queue**, **Party** ([squads.md](squads.md); Party
+    opens the party sheet at once, and PLAY opens it again while Party is picked; its line "Queue with up to 3 friends") and **Bots**, greyed ("Soon") until its server part;
+    for 1 v 1 (always people) your rank's emblem (48 px, its box
     there before your profile loads; none in placements) beside your rank, "Your rank: Gold 2 · 45 RP" or "Your rank:
     Placement 2/5" (`ranked1v1Rank`, from your profile; whole on one line at 320 px at its widest, "Your rank:
-    Transcendent · 1234 RP"), over "Chess vs one player near your level" (Oct 28: "Ranked" dropped so it fits beside
-    the emblem; RANKED heads the row; [2026-10-28-ranked-tiers.md](../decisions/2026-10-28-ranked-tiers.md)). Then **the line above PLAY** (Oct 28, Eric: "swap the line
-    of text below Play and put it above play") and PLAY. The line is a fixed height whatever it says (two lines' room on a
-    phone, one line on a computer), its text bottom-aligned so it sits on PLAY, and empty with no mode picked. After the
+    Transcendent · 1234 RP"), over "Win to climb, lose to drop" (Nov 9; what 1 v 1 is, "Ranked chess vs one player near your level", is
+    the line above PLAY). Then **the line above PLAY** (Oct 28, Eric: "swap the line
+    of text below Play and put it above play") and PLAY. The line is exactly one line whatever it says, phone and computer (Nov 9,
+    [2026-11-09-home-modes-hint-line.md](../decisions/2026-11-09-home-modes-hint-line.md): ellipsized if ever too long, every line
+    written to fit 320 px), and never empty: "Tap a game mode to get started" with no mode picked. The room it freed on a phone (16.9 px)
+    went to the Other modes cards (72.9 px tall there, their foot where it was), PLAY and Chess Town rising by it. After the
     first pick no click on home moves or resizes anything (a mode, an option). The first pick wakes the greyed options (their default selected) and moves nothing: the
     panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is

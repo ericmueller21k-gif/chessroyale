@@ -35,7 +35,7 @@ test("home: the live line comes from the server, the RANKED row changes the line
   await expect(page.getByRole("radiogroup", { name: "RANKED" }).getByRole("radio")).toHaveText([/^50 v 50/, /^1 v 1/, /^Squads/]);
   await page.getByRole("radio", { name: /Squads/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText(/^Solo queue: bots fill any empty seat after \d+ s$/);
-  await expect(page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio")).toHaveText(["Solo queueyou join a squad", "Partywith up to 3 friends"]);
+  await expect(page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio")).toHaveText(["Solo queuejoin a squad", "Partyup to 3 friends", "BotsSoon"]);
   await expect(page.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
   await expect(page.getByRole("radiogroup", { name: "Matchmaking" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
