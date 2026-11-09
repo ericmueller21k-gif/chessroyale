@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CLAW_CABINET } from "../src/town/kit/models/claw-cabinet.ts";
-import { FUN_PALETTE } from "../src/town/shops/boingo-art.ts";
+import { FUN_PALETTE } from "../src/town/shops/boingo-palette.ts";
 import { bakeFace, gridTexel, rampsOf, toHex } from "../src/town/kit/bake.ts";
 import { facesOf, texOf } from "../src/town/kit/prims.ts";
 
