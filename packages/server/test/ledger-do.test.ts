@@ -201,7 +201,8 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
       await lobby.alarm();
       await rt.settle();
     };
-    const wallet = (id: string) => db.prepare("SELECT coins, crates FROM wallets WHERE user_id = ?").get(id);
+    // (A placement's crates are Winter Crates since Nov 9: series_crates.)
+    const wallet = (id: string) => db.prepare("SELECT w.coins, (SELECT COALESCE(SUM(s.n), 0) FROM series_crates s WHERE s.user_id = w.user_id) AS crates FROM wallets w WHERE w.user_id = ?").get(id);
     const results = (id: string) => (db.prepare("SELECT COUNT(*) AS n FROM results WHERE user_id = ? AND mode = 'squads'").get(id) as { n: number }).n;
     const annWon: SquadsReward = { playerId: "p1", userId: ann.id, squadId: 0, placement: 1, coins: 100, crates: 1, recorded: true };
 
@@ -221,7 +222,7 @@ describe("Squads rewards, at least once (squads-do.ts: squads:<code>:<created>:<
     const acct = (await ledgerAccount(sql, ann.id))!.account;
     expect(db.prepare("SELECT op_id, leg, asset_kind, delta FROM ledger WHERE reason = 'reward' ORDER BY leg").all()).toEqual([
       { op_id: `squads:SQUAD:${created}:${acct}`, leg: 0, asset_kind: "coins", delta: 100 },
-      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 1, asset_kind: "crates", delta: 1 },
+      { op_id: `squads:SQUAD:${created}:${acct}`, leg: 1, asset_kind: "series_crate", delta: 1 },
     ]);
     // The room wrote it and stopped before storing that it had: it's written again on waking, and nothing changes.
     await queue(annWon);

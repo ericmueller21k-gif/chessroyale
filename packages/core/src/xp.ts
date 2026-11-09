@@ -6,7 +6,7 @@ import { XP } from "./settings.ts";
  */
 
 /** Why a game earned no XP. */
-export type XpNone = "short" | "resigned" | "left" | "guest" | "test" | "banned" | "limit";
+export type XpNone = "short" | "resigned" | "left" | "guest" | "test" | "banned" | "limit" | "paused";
 
 /** What each reason says on the result screen, in plain words. */
 export const XP_NONE_LINES: Readonly<Record<XpNone, string>> = {
@@ -17,7 +17,11 @@ export const XP_NONE_LINES: Readonly<Record<XpNone, string>> = {
   test: "No XP: test game.",
   banned: "No XP: this account is banned.",
   limit: "No XP: daily solo limit reached.",
+  // (The kill switch PAUSE_REWARDS, Nov 9: nothing is granted while it's on; the game still plays and its result is kept.)
+  paused: "Rewards are paused for a moment.",
 };
+/** The daily reward's part in the box ("Daily reward +200"; Nov 9, phase 2). */
+export const XP_DAILY = "Daily reward";
 /** A solo game's time XP the daily cap (XP.soloMinutesPerDay) trimmed: its part's words. */
 export const XP_SOLO_LIMIT = "Daily solo limit";
 export const isXpNone = (x: unknown): x is XpNone => typeof x === "string" && Object.hasOwn(XP_NONE_LINES, x);
@@ -28,6 +32,22 @@ export interface XpPart {
   xp: number;
 }
 
+/**
+ * What a game paid beside its XP (Nov 9, phase 2): the daily reward's crate, and each level's crates and key (and every 10th level's
+ * boss crate to pick). `crate`: which series the crates are (XP.rewardCrate when paid); `levels`: the levels whose rewards this game
+ * paid (a level reached before, while rewards were paused, is paid at the next counted game).
+ */
+export interface XpRewards {
+  crate: string;
+  /** The daily reward's crates (0: not today's first counted game of 15 moves). */
+  daily: number;
+  /** Crates and keys from levels, and boss crates to pick. */
+  crates: number;
+  keys: number;
+  bossPicks: number;
+  levels: number[];
+}
+
 /** A game's XP, as the result screen shows it: your XP before and after, the levels, its parts; or why there was none. */
 export interface XpGrant {
   before: number;
@@ -36,6 +56,56 @@ export interface XpGrant {
   levelAfter: number;
   parts: XpPart[];
   none?: XpNone;
+  /** What else it paid (phase 2): absent when nothing (and on every grant from before). */
+  rewards?: XpRewards;
+}
+
+/** One level's rewards (XP.levelCrates crates, XP.levelKeys keys, and on every XP.bossCrateEvery-th a boss crate to pick). */
+export function levelReward(level: number): { crates: number; keys: number; bossPicks: number } {
+  return { crates: XP.levelCrates, keys: XP.levelKeys, bossPicks: level > 1 && level % XP.bossCrateEvery === 0 ? 1 : 0 };
+}
+
+/** Whether a grant's rewards hold anything. */
+export const hasRewards = (r: XpRewards | undefined | null): r is XpRewards => !!r && (r.daily > 0 || r.crates > 0 || r.keys > 0 || r.bossPicks > 0);
+
+/** "1 Winter Crate", "2 Winter Crates" (a crate's name without its series: "Winter Crate · Series 1" says "Winter Crate"). */
+export function crateCount(n: number, name: string): string {
+  const one = name.split(" · ")[0]!;
+  return `${n} ${n === 1 ? one : `${one.replace(/Crate$/, "Crates")}`}`;
+}
+
+/** A reward's lines, in plain words: "+1 Winter Crate", "+2 Winter Crates", "+1 crate key", "Choose your boss crate". */
+export function rewardLines(r: XpRewards, crateName: string): { daily: string | null; level: string | null; pick: string | null } {
+  const level = [r.crates ? `+${crateCount(r.crates, crateName)}` : "", r.keys ? `+${r.keys} crate ${r.keys === 1 ? "key" : "keys"}` : ""].filter(Boolean).join(" · ");
+  return {
+    daily: r.daily ? `+${crateCount(r.daily, crateName)}` : null,
+    level: level || null,
+    pick: r.bossPicks ? (r.bossPicks === 1 ? "Choose your boss crate" : `Choose your ${r.bossPicks} boss crates`) : null,
+  };
+}
+
+/** A grant's rewards from what's stored (JSON), or none: anything unreadable reads as none. */
+export function readRewards(x: unknown): XpRewards | undefined {
+  let v: unknown = x;
+  if (typeof x === "string") {
+    try {
+      v = JSON.parse(x);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!v || typeof v !== "object") return undefined;
+  const o = v as Record<string, unknown>;
+  const n = (k: string) => (typeof o[k] === "number" && Number.isInteger(o[k]) && (o[k] as number) >= 0 ? (o[k] as number) : 0);
+  const r: XpRewards = {
+    crate: typeof o.crate === "string" ? o.crate : XP.rewardCrate,
+    daily: n("daily"),
+    crates: n("crates"),
+    keys: n("keys"),
+    bossPicks: n("bossPicks"),
+    levels: Array.isArray(o.levels) ? o.levels.filter((l): l is number => typeof l === "number" && Number.isInteger(l) && l > 1) : [],
+  };
+  return hasRewards(r) ? r : undefined;
 }
 
 /** Your level at this much XP: 1 at 0, one more every XP.perLevel, no top. */
@@ -89,9 +159,10 @@ export function xpParts(g: Exclude<GameXp, { none: XpNone }>, winPaid = true, ti
 }
 
 /** A grant as the screen shows it, from your XP before and the parts (or the reason there was none). */
-export function xpGrant(before: number, parts: readonly XpPart[], none?: XpNone): XpGrant {
+export function xpGrant(before: number, parts: readonly XpPart[], none?: XpNone, rewards?: XpRewards): XpGrant {
   const after = before + (none ? 0 : parts.reduce((s, p) => s + p.xp, 0));
-  return { before, after, levelBefore: levelOf(before), levelAfter: levelOf(after), parts: none ? [] : [...parts], ...(none ? { none } : {}) };
+  const paid = !none && hasRewards(rewards) ? { rewards } : {};
+  return { before, after, levelBefore: levelOf(before), levelAfter: levelOf(after), parts: none ? [] : [...parts], ...(none ? { none } : {}), ...paid };
 }
 
 /** The XP day (the win caps): it starts at XP.dayStartUtcHour UTC. Answers when the day holding `t` began. */

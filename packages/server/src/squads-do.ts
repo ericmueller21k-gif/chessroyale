@@ -204,7 +204,7 @@ export class SquadsLobby extends DurableObject<Env> {
       await ensureSchema(sql, this.env.DB);
       const signedInOnly = signInRequired(await withSecrets(this.env));
       for (const r of [...rec.rewardQueue]) {
-        await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly);
+        await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly, isPaused(this.env, "rewards"));
         const i = rec.rewardQueue.indexOf(r);
         if (i >= 0) rec.rewardQueue.splice(i, 1);
         written++;
@@ -630,7 +630,7 @@ export class SquadsParty extends DurableObject<Env> {
  * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
  * id>`. Throws if D1 fails, so the lobby keeps it to try again.
  */
-export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean): Promise<void> {
+export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<void> {
   if (!r.userId) return;
   if (r.recorded) {
     // XP (Nov 9): your moves and time as this lobby counted them; a win is your squad winning the lobby (1st). Once: keyed by this
@@ -640,6 +640,7 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
       facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
       signedInOnly,
       now,
+      paused,
     }).catch((e: unknown) => {
       console.log(`xp for squads ${code}: ${String(e)}`);
       return null;

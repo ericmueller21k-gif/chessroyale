@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { CRATES_FREE } from "@chessroyale/core";
+import { XP } from "@chessroyale/core";
 import { SQUADS_PROTOCOL, type PartyServerMessage } from "@chessroyale/chess/squads";
 import { Matchmaker, type PlayAnswer } from "../src/matchmaker.ts";
 import { queueName } from "../src/queue.ts";
@@ -236,9 +236,9 @@ describe("Squads results and rewards in the database", () => {
     expect(p.stats.all.matches).toBe(1);
     expect(p.stats.crowd.matches).toBe(0);
     expect((await shopState(sql, user.id)).coins).toBe(140);
-    expect((await sql.first<{ crates: number }>("SELECT crates FROM wallets WHERE user_id = ?", user.id))!.crates).toBe(1);
-    // While crates are free the locker says "unlimited"; the count waits for when they aren't.
-    expect((await lockerState(sql, user.id)).crates).toBe(CRATES_FREE ? null : 1);
+    // (Nov 9, XP phase 2: a placement's crate is a crate of the newest series, held until opened with a key.)
+    expect((await lockerState(sql, user.id)).crates).toBe(1);
+    expect((await lockerState(sql, user.id)).seriesCrates).toEqual({ [XP.rewardCrate]: 1 });
     // A ranked flag on a Squads result is ignored: it's unranked.
     const row = await sql.first<{ ranked: number }>("SELECT ranked FROM results WHERE user_id = ?", user.id);
     expect(row!.ranked).toBe(0);
@@ -254,7 +254,7 @@ describe("Squads results and rewards in the database", () => {
     const owner = await signInWithIdentity(sql, guest.user, "email", "ann@example.com", {}, 3_000);
     expect(owner.id).toBe(first.user.id);
     expect((await shopState(sql, owner.id)).coins).toBe(60);
-    expect((await sql.first<{ crates: number }>("SELECT crates FROM wallets WHERE user_id = ?", owner.id))!.crates).toBe(1);
+    expect((await lockerState(sql, owner.id)).seriesCrates).toEqual({ [XP.rewardCrate]: 1 });
   });
 });
 

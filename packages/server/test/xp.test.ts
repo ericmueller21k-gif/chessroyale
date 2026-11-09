@@ -47,6 +47,8 @@ describe("granting a game's XP", () => {
         { label: "12 min", xp: 120 },
         { label: "Win", xp: 50 },
       ],
+      // (Phase 2: a 12-move game is short of the daily reward's 15; the levels owed are paid, 2 to 8: the test switch's six too.)
+      rewards: { crate: XP.rewardCrate, daily: 0, crates: 7 * XP.levelCrates, keys: 7 * XP.levelKeys, bossPicks: 0, levels: [2, 3, 4, 5, 6, 7, 8] },
     });
     expect(await xpOf(sql, ann.id)).toBe(7_070);
     expect(await ledgerMismatches(sql, ann.id)).toEqual([]);

@@ -8,6 +8,7 @@ import { eligibleForRanked } from "./fairplay.ts";
 import { chatBlock } from "./chat-mod.ts";
 import { recordDuel, type FinishedDuel } from "./ranked.ts";
 import { grantXp } from "./xp.ts";
+import { isPaused } from "./kill-switches.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
 import { countCall } from "./ops.ts";
 import { serverError } from "./problems.ts";
@@ -106,7 +107,7 @@ export class DuelGame extends DurableObject<Env> {
         // (A player fair play is holding, in review, keeps their rank as it is, and earns nothing.)
         outcomes = await recordDuel(sql, finished, async (uid) => !(await eligibleForRanked(sql, uid).catch(() => true)));
         // XP (Nov 9; server/xp.ts): each side's moves and the game's length as this room kept them; once, keyed by the game.
-        if (outcomes) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)));
+        if (outcomes) outcomes = await withXp(sql, finished, outcomes, signInRequired(await withSecrets(this.env)), isPaused(this.env, "rewards"));
         // (A finished ranked game: maybe the Welcome Crate for either player, once ever: welcome.ts.)
         if (outcomes) for (const uid of [finished.players.w, finished.players.b]) await grantWelcomeCrate(sql, uid, Date.now()).catch(() => false);
       }
@@ -277,7 +278,7 @@ function validPlayer(p: DuelPlayerView | undefined): p is DuelPlayerView {
  * Each side's XP for a finished ranked game (server/xp.ts): your own moves (White the odd plies, Black the even), the game's length
  * by this room's clock, a win; a resign before the minimum says so; a test's clock earns none. Never in the way of the outcome.
  */
-async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: Record<Color, DuelOutcome>, signedInOnly: boolean): Promise<Record<Color, DuelOutcome>> {
+async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: Record<Color, DuelOutcome>, signedInOnly: boolean, paused = false): Promise<Record<Color, DuelOutcome>> {
   const out = { ...outcomes };
   for (const c of ["w", "b"] as const) {
     const won = f.result === (c === "w" ? "1-0" : "0-1");
@@ -287,6 +288,7 @@ async function withXp(sql: ReturnType<typeof d1Sql>, f: FinishedDuel, outcomes: 
       facts: { ms: f.endedAt - f.startedAt, moves: c === "w" ? Math.ceil(f.moves.length / 2) : Math.floor(f.moves.length / 2), won, resigned: f.reason === "resign" && lost, test: !!f.testSeconds },
       signedInOnly,
       now: Date.now(),
+      paused,
     }).catch((e: unknown) => {
       console.log(`xp for duel ${f.id}: ${String(e)}`);
       return null;

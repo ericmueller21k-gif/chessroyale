@@ -31,7 +31,7 @@ import { GlobalChat } from "../src/global-chat.ts";
 import { LiveBoard } from "../src/live.ts";
 import { equipLocker, openCrate } from "../src/locker.ts";
 import { countBossBattle, grantTestItems, startSoloBattle } from "../src/boss-tokens.ts";
-import { memoryDb } from "./memory-db.ts";
+import { memoryDb, stockCrates } from "./memory-db.ts";
 
 /**
  * Deleting an account and downloading its data (account-data.ts; docs/decisions/2026-10-15-delete-my-account-and-download-my-data.md):
@@ -79,6 +79,9 @@ async function world() {
   const pack = SHOP_ITEMS.find((i) => i.slot === "chat" && !i.starter)!;
   expect((await buyItem(sql, a.id, pack.id, T0 + 3)).ok).toBe(true);
   await setChatPicks(sql, a.id, { emoji: null });
+  // (A crate takes one you hold and a key since Nov 9.)
+  await stockCrates(sql, a.id, CRATES[0]!.id, 1, T0 + 3);
+  await stockCrates(sql, bo.user.id, CRATES[0]!.id, 1, T0 + 3);
   const crate = await openCrate(sql, a.id, CRATES[0]!.id, {}, T0 + 4);
   if (!crate.ok) throw new Error(crate.message);
   // (An item of Bo's, which stays his.)
@@ -150,12 +153,13 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce white_points black_points",
   reports: "id reporter target reason at match line line_at",
   results:
-    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none",
+    "id user_id mode online placement players team team_won avg_score rating played_at brilliant best_move cuts cuts_survived strikes strikes_survived survived last_stand boss_elo boss_id lobby ranked held eval_bar abandoned play_ms moves xp_before xp_parts xp_none xp_rewards",
+  series_crates: "user_id crate n",
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
   solo_games: "user_id id started_at test_minutes",
   users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online pawn_color age_ok_at chat_on",
-  wallets: "user_id coins crates crate_keys xp",
+  wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
 
@@ -207,7 +211,9 @@ describe("download my data", () => {
       ["boss", null],
     ]);
     expect(d.results[0]).not.toHaveProperty("held");
-    expect(d.shop.wallet).toEqual({ coins: 50, crates: 2, crate_keys: 1, xp: 0 });
+    // (Nov 9: crates are held by series; the placement's 2 are Winter Crates, in the XP store's seriesCrates.)
+    expect(d.shop.wallet).toEqual({ coins: 50, crates: 0, crate_keys: 1, xp: 0, boss_picks: 0 });
+    expect(d.xp.seriesCrates).toContainEqual({ crate: "winter-1", n: 2 });
     expect(d.bossTokens.tokens).toEqual([{ boss: "gingerbread", n: 1 }, { boss: "tiger", n: 2 }]);
     expect(d.bossTokens.drops).toEqual([{ boss: "gingerbread", at: new Date(T0 + 4).toISOString(), battle: "ABCDE" }]);
     expect(d.bossTokens.soloBattle).toEqual({ started_at: new Date(T0 + 4).toISOString() });

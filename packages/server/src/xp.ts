@@ -1,6 +1,7 @@
-import { XP, gameXp, isXpNone, xpDayStart, xpGrant, xpParts, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
+import { XP, XP_DAILY, gameXp, isXpNone, readRewards, xpDayStart, xpGrant, xpParts, type XpFacts, type XpGrant, type XpNone, type XpPart } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./ledger.ts";
+import { dailyOp, gameRewards, payLevels } from "./rewards.ts";
 
 /**
  * XP (Eric, Nov 9; core's xp.ts has the rules, XP in settings.ts; docs/decisions/2026-11-09-xp-*.md): the one place that decides a
@@ -14,7 +15,9 @@ import { cond, ledgerAccount, leg, opStatements, type Cond, type Op } from "./le
  *     a friends' lobby pays it once an XP day per opponent (`vs`: none of them beaten yet today), solo `XP.soloWinsPerDay` times
  *     an XP day (the leg's source says which: `vs:<their ledger ids>` or `solo`).
  *   - A solo game's time leg has source `solo`: capped at XP.soloMinutesPerDay minutes an XP day, its guard in the same statement.
- * Both go in one batch. What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
+ * Both go in one batch, with phase 2's daily reward (rewards.ts: `daily:<XP day>:<ledger id>`, once a day, for a game of
+ * XP.dailyMinMoves of your own moves); then the level rewards owed at the XP it reached (rewards.ts payLevels: `level:<n>:<ledger id>`,
+ * once per level). Nothing at all while rewards are paused (PAUSE_REWARDS: `paused`). What the screen shows is answered (`XpGrant`) and kept on the game's result row (results.xp_before,
  * xp_parts, xp_none: `xpColumns`), so an online result screen can ask for it (GET /api/xp?game=CODE).
  * (Only types come from accounts.ts: it imports this file's helpers while it loads.)
  */
@@ -85,6 +88,8 @@ export interface XpGame {
   /** Sign-in is set up here: a guest earns nothing (as boss tokens: guests could be many, merging into one account). */
   signedInOnly: boolean;
   now: number;
+  /** The kill switch PAUSE_REWARDS is on (Nov 9): no XP and no rewards for this game; the box says so. */
+  paused?: boolean;
 }
 
 const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -181,9 +186,12 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   if (!who) return null;
   const g = gameXp({ ...game.facts, guest: game.signedInOnly && !who.signed, banned: !!who.banned });
   if (g.none) return xpGrant(who.xp, [], g.none);
+  if (game.paused) return xpGrant(who.xp, [], "paused");
   const me = who.account ? { user: userId, account: who.account } : await ledgerAccount(sql, userId);
   if (!me) return null;
   const solo = game.cap === "solo";
+  // (The daily reward: a game of XP.dailyMinMoves of your own moves; solo, also XP.dailySoloMinMinutes of the server's own time.)
+  const daily = game.facts.moves >= XP.dailyMinMoves && (!solo || game.facts.ms >= XP.dailySoloMinMinutes * 60_000) ? dailyOp(me, day, game.key, game.now) : null;
   const soloLimit = XP.soloMinutesPerDay * XP.perMinute;
   const timeXp = solo ? Math.max(0, Math.min(g.time, soloLimit - (who.solo ?? 0))) : g.time;
   const time: Op = {
@@ -204,33 +212,41 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
     legs: g.win ? [leg.xp(userId, g.win, capped!.source)] : [],
   };
   const nonces = new Map<Op, string>();
-  for (const op of [time, win]) if (op.legs.length) nonces.set(op, newId());
+  for (const op of [time, win, ...(daily ? [daily] : [])]) if (op.legs.length) nonces.set(op, newId());
   if (nonces.size) await sql.batch([...nonces].flatMap(([op, nonce]) => opStatements(me, op, nonce)));
-  // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts.)
-  const after = await sql.first<{ time: number | null; win: string | null; xp: number }>(
+  // (What went in, and the wallet after, in one read. A replay: its first attempt's leg, so the same parts. The daily reward is this
+  // game's if its first leg names this game: another game today paid it otherwise.)
+  const after = await sql.first<{ time: number | null; win: string | null; daily: number | null; xp: number }>(
     `SELECT (SELECT delta FROM ledger WHERE op_id = ? AND leg = 0) AS time, (SELECT nonce FROM ledger WHERE op_id = ? AND leg = 0) AS win,
+       (SELECT delta FROM ledger WHERE op_id = ? AND asset_kind = 'xp' AND source_id = ?) AS daily,
        COALESCE((SELECT xp FROM wallets WHERE user_id = ?), 0) AS xp`,
     time.id,
     win.id,
+    daily?.id ?? "",
+    game.key,
     userId,
   );
   const timePaid = nonces.has(time) ? (after?.time ?? 0) : 0;
   const winPaid = nonces.has(win) && after?.win != null;
-  const parts = solo ? xpParts(g, winPaid, timePaid) : xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid);
+  const dailyPaid = daily ? (after?.daily ?? 0) : 0;
+  const parts = [...(solo ? xpParts(g, winPaid, timePaid) : xpParts({ ...g, time: timePaid ? g.time : 0 }, winPaid)), ...(dailyPaid ? [{ label: XP_DAILY, xp: dailyPaid }] : [])];
   const gained = parts.reduce((s, p) => s + p.xp, 0);
   // (The cap took all of it: say so as the reason, not a box of +0s.)
   if (solo && g.time && !gained) return xpGrant(after?.xp ?? who.xp, [], "limit");
-  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts);
+  // (The levels owed at the XP it reached: paid once each, their legs naming this game, so its result answers them; then this
+  // game's rewards as the ledger has them, so a replay answers the same.)
+  await payLevels(sql, me, after?.xp ?? 0, game.key, game.now);
+  return xpGrant(Math.max(0, (after?.xp ?? 0) - gained), parts, undefined, await gameRewards(sql, me, game.key));
 }
 
-/** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none). */
-export function xpColumns(x: XpGrant | null | undefined): [number | null, string | null, string | null] {
-  if (!x) return [null, null, null];
-  return [x.before, x.none ? null : JSON.stringify(x.parts), x.none ?? null];
+/** A grant as the result row keeps it (results: xp_before, xp_parts, xp_none, xp_rewards). */
+export function xpColumns(x: XpGrant | null | undefined): [number | null, string | null, string | null, string | null] {
+  if (!x) return [null, null, null, null];
+  return [x.before, x.none ? null : JSON.stringify(x.parts), x.none ?? null, x.rewards ? JSON.stringify(x.rewards) : null];
 }
 
 /** A result row's grant again (for GET /api/xp): null if it has none (a result from before XP, or one the server never decided). */
-export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null; xp_none: string | null }): XpGrant | null {
+export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards?: string | null }): XpGrant | null {
   if (r.xp_before === null) return null;
   if (isXpNone(r.xp_none)) return xpGrant(r.xp_before, [], r.xp_none as XpNone);
   let parts: XpPart[] = [];
@@ -240,7 +256,7 @@ export function xpFromRow(r: { xp_before: number | null; xp_parts: string | null
   } catch {
     // (Unreadable: no parts.)
   }
-  return xpGrant(r.xp_before, parts);
+  return xpGrant(r.xp_before, parts, undefined, readRewards(r.xp_rewards));
 }
 
 /** How long a result screen may ask for its game's XP. */
@@ -249,8 +265,8 @@ const ASK_WITHIN_MS = 2 * 3_600_000;
 /** Your XP from an online game (its lobby's code), as its result row keeps it: the result screen asks. Null: not written yet. */
 export async function gameXpOf(sql: Sql, userId: string, code: unknown, now: number): Promise<XpGrant | null> {
   if (typeof code !== "string" || !/^[A-Z2-9]{5}$/.test(code)) return null;
-  const row = await sql.first<{ xp_before: number | null; xp_parts: string | null; xp_none: string | null }>(
-    "SELECT xp_before, xp_parts, xp_none FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at > ? ORDER BY played_at DESC, id DESC LIMIT 1",
+  const row = await sql.first<{ xp_before: number | null; xp_parts: string | null; xp_none: string | null; xp_rewards: string | null }>(
+    "SELECT xp_before, xp_parts, xp_none, xp_rewards FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at > ? ORDER BY played_at DESC, id DESC LIMIT 1",
     userId,
     code,
     now - ASK_WITHIN_MS,

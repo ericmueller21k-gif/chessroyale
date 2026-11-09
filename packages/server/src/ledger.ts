@@ -5,7 +5,7 @@ import type { Sql, Stmt } from "./accounts.ts";
  * The ledger (docs/decisions/2026-11-06-ledger.md; the audit of Nov 6, §1): every change to a balance or an inventory, one row per
  * leg, append-only. This is the only module that writes a balance table (wallets, boss_tokens, inventory, items, boss_crates,
  * welcome_crates): each change goes in with its ledger rows in one batch (one transaction), so the two never disagree. The balance
- * tables stay the fast read and keep their checks; the ledger is the history beside them (`ledger.test.ts` reconciles the two and
+ * tables stay the fast read and keep their checks (and, Nov 9, series_crates and wallets.boss_picks); the ledger is the history beside them (`ledger.test.ts` reconciles the two and
  * guards that nothing else writes them; the paths not moved here yet are listed there, for part II).
  *
  * An op is one event (a buy, a drop, an open), keyed by `op_id`: the same op applied twice applies once. Its first leg goes in only
@@ -21,8 +21,9 @@ export const LEDGER_SCHEMA = [
     user_id TEXT PRIMARY KEY,
     account TEXT NOT NULL UNIQUE
   )`,
-  // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome, `asset_id` which one (a boss,
-  // a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone; '' for coins, crates, keys and XP), `source_id` where it
+  // One row per leg: `asset_kind` coins | crates | keys | xp | token | shop | item | boss_crate | welcome | series_crate | boss_pick,
+  // `asset_id` which one (a boss, a shop item, an item's id, a boss crate's kind, a Welcome Crate's milestone, a series crate's id
+  // ("winter-1"); '' for coins, crates, keys, XP and boss picks), `source_id` where it
   // came from (a game, a battle, a crate). Never updated or deleted (the triggers below).
   `CREATE TABLE IF NOT EXISTS ledger (
     op_id TEXT NOT NULL,
@@ -38,6 +39,14 @@ export const LEDGER_SCHEMA = [
     PRIMARY KEY (op_id, leg)
   )`,
   `CREATE INDEX IF NOT EXISTS ledger_account ON ledger (account, asset_kind, asset_id)`,
+  // Series crates you hold, unopened, by crate (Nov 9, XP phase 2: the daily reward's and each level's; Squads' placements' since): a
+  // count per crate, as boss tokens are. Each takes a crate key to open (locker.ts openCrate). A new table: older data has none.
+  `CREATE TABLE IF NOT EXISTS series_crates (
+    user_id TEXT NOT NULL,
+    crate TEXT NOT NULL,
+    n INTEGER NOT NULL CHECK (n >= 0),
+    PRIMARY KEY (user_id, crate)
+  )`,
 ];
 
 /** Append-only in the database too: an UPDATE or a DELETE on the ledger is refused (a second lock beside the code's). */
@@ -46,7 +55,7 @@ export const LEDGER_TRIGGERS = [
   `CREATE TRIGGER IF NOT EXISTS ledger_no_delete BEFORE DELETE ON ledger BEGIN SELECT RAISE(ABORT, 'the ledger is append-only'); END`,
 ];
 
-export type AssetKind = "coins" | "crates" | "keys" | "xp" | "token" | "shop" | "item" | "boss_crate" | "welcome";
+export type AssetKind = "coins" | "crates" | "keys" | "xp" | "token" | "shop" | "item" | "boss_crate" | "welcome" | "series_crate" | "boss_pick";
 
 /** A condition in SQL with its parameters. */
 export interface Cond {
@@ -95,7 +104,7 @@ export const opKeys = {
   onlineDrop: (code: string, startedAt: number): OpKey => (a) => `drop:${code}:${startedAt}:${a}`,
   /** A Squads placement reward: its lobby's code and when that lobby was made. */
   squadsReward: (code: string, createdAt: number): OpKey => (a) => `squads:${code}:${createdAt}:${a}`,
-  /** An action the app sent with its request id: `boss-crate`, `open`, `grant`, `claw`. */
+  /** An action the app sent with its request id: `boss-crate`, `open`, `grant`, `claw`, `pick`. */
   request: (kind: string, request: string): OpKey => (a) => `${kind}:${a}:${request}`,
 };
 
@@ -112,8 +121,8 @@ export interface Leg {
 function countLeg(kind: AssetKind, asset: string, delta: number, source: string | null, add: (o: Cond) => Stmt, spend: (o: Cond) => Stmt): Leg {
   return { kind, asset, delta, source, writes: (o) => [delta > 0 ? add(o) : spend(o)] };
 }
-function walletLeg(kind: "coins" | "crates" | "keys" | "xp", user: string, delta: number, source: string | null): Leg {
-  const col = kind === "keys" ? "crate_keys" : kind;
+function walletLeg(kind: "coins" | "crates" | "keys" | "xp" | "boss_pick", user: string, delta: number, source: string | null): Leg {
+  const col = kind === "keys" ? "crate_keys" : kind === "boss_pick" ? "boss_picks" : kind;
   return countLeg(
     kind,
     "",
@@ -134,6 +143,18 @@ export const leg = {
   keys: (user: string, delta: number, source: string | null = null) => walletLeg("keys", user, delta, source),
   /** XP (Nov 9; xp.ts): a game's, or a test's. The wallet's `xp` column. */
   xp: (user: string, delta: number, source: string | null = null) => walletLeg("xp", user, delta, source),
+  /** Boss crates to pick (Nov 9: every 10th level's; the wallet's `boss_picks`): one is spent as it's picked (rewards.ts). */
+  bossPicks: (user: string, delta: number, source: string | null = null) => walletLeg("boss_pick", user, delta, source),
+  /** Series crates you hold, unopened (Nov 9; `series_crates`): earned by the daily reward and levels, spent by an open. */
+  seriesCrates: (user: string, crate: string, delta: number, source: string | null = null) =>
+    countLeg(
+      "series_crate",
+      crate,
+      delta,
+      source,
+      (o) => stmt(`INSERT INTO series_crates (user_id, crate, n) SELECT ?, ?, ? WHERE ${o.sql} ON CONFLICT (user_id, crate) DO UPDATE SET n = n + excluded.n`, user, crate, delta, ...o.params),
+      (o) => stmt(`UPDATE series_crates SET n = n + ? WHERE user_id = ? AND crate = ? AND ${o.sql}`, delta, user, crate, ...o.params),
+    ),
   tokens: (user: string, boss: string, delta: number, source: string | null = null) =>
     countLeg(
       "token",
@@ -313,6 +334,8 @@ const HOLDINGS: readonly { kind: AssetKind; rows: string }[] = [
   { kind: "item", rows: "SELECT user_id, id AS asset, 1 AS n FROM items" },
   { kind: "boss_crate", rows: "SELECT user_id, crate AS asset, COUNT(*) AS n FROM boss_crates GROUP BY user_id, crate" },
   { kind: "welcome", rows: "SELECT user_id, CAST(milestone AS TEXT) AS asset, 1 AS n FROM welcome_crates WHERE opened_at IS NULL" },
+  { kind: "series_crate", rows: "SELECT user_id, crate AS asset, n FROM series_crates" },
+  { kind: "boss_pick", rows: "SELECT user_id, '' AS asset, boss_picks AS n FROM wallets" },
 ];
 /** One account's balances (`?1`, its id), as rows (kind, asset, n), a table at a time. */
 const BALANCES = HOLDINGS.map((h) => `SELECT '${h.kind}' AS kind, asset, n FROM (${h.rows}) WHERE user_id = ?1`);
@@ -340,7 +363,7 @@ const ensureAccount = (userId: string) =>
  * A guest signing in to an account (accounts.ts, the sign-in's one batch): the guest's balances join the account, and the ledger
  * records each move (op `merge:<guest's ledger id>:<asset>`: a leg out of the guest, a leg into the account for what it really gains:
  * nothing for a shop item it has already, or for the guest's Welcome Crates, which are dropped: a guest never earns one). Coins,
- * crates, keys, XP and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
+ * crates, keys, XP, boss picks, series crates and tokens are added up (XP: a guest earns none where sign-in is set up, so only XP from before then); items and boss crates move; then the guest's ledger id goes, so nothing names the guest.
  */
 export function mergeMoves(from: string, to: string, now: number): Stmt[] {
   const nonce = newId(9);
@@ -366,7 +389,7 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
     ),
     stmt("INSERT OR IGNORE INTO inventory (user_id, item_id, acquired_at) SELECT ?, item_id, acquired_at FROM inventory WHERE user_id = ?", to, from),
     stmt(
-      "INSERT INTO wallets (user_id, coins, crates, crate_keys, xp) SELECT ?, coins, crates, crate_keys, xp FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0 OR xp > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys, xp = xp + excluded.xp",
+      "INSERT INTO wallets (user_id, coins, crates, crate_keys, xp, boss_picks) SELECT ?, coins, crates, crate_keys, xp, boss_picks FROM wallets WHERE user_id = ? AND (coins > 0 OR crates > 0 OR crate_keys > 0 OR xp > 0 OR boss_picks > 0) ON CONFLICT (user_id) DO UPDATE SET coins = coins + excluded.coins, crates = crates + excluded.crates, crate_keys = crate_keys + excluded.crate_keys, xp = xp + excluded.xp, boss_picks = boss_picks + excluded.boss_picks",
       to,
       from,
     ),
@@ -377,7 +400,12 @@ export function mergeMoves(from: string, to: string, now: number): Stmt[] {
       from,
     ),
     stmt("UPDATE boss_crates SET user_id = ? WHERE user_id = ?", to, from),
-    ...["inventory", "wallets", "boss_tokens", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, from)),
+    stmt(
+      "INSERT INTO series_crates (user_id, crate, n) SELECT ?, crate, n FROM series_crates WHERE user_id = ? AND n > 0 ON CONFLICT (user_id, crate) DO UPDATE SET n = n + excluded.n",
+      to,
+      from,
+    ),
+    ...["inventory", "wallets", "boss_tokens", "series_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, from)),
   ];
 }
 
@@ -399,7 +427,7 @@ export function eraseMoves(userId: string, now: number): Stmt[] {
         nonce,
       ),
     ),
-    ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
+    ...["wallets", "inventory", "items", "boss_tokens", "boss_crates", "series_crates", "welcome_crates", "ledger_accounts"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId)),
   ];
 }
 
