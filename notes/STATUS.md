@@ -550,3 +550,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~05:20: XP review fixes done (4da22f7): M1, M2 (solo cap 120 min/day), m1–m7 fixed with tests. The "name in the XP box"
   message wasn't done (it came late); dropped: boss result v2 puts your name over the bar instead. Delta re-review Opus
   session_01JuCWRvhGT9ZgkTGCREkuYn (branch review/569-delta, watcher bz51y9mxi); full CI watcher byze79h9t. Merge #569 after both.
+- Nov 9 ~06:00: main green after #570 (d62e998). XP phase 1 MERGED (#569, 3a92acd) after the independent review, the fix round,
+  the delta re-review (D1, D2 fixed by the director in f3c3808) and a green full suite. Watching its deploy and main's run.
+  Next: boss result v2 (waiting on Eric's OK of the mockup); XP phase 2 (daily reward, level-up crates/keys, CRATES_FREE off,
+  PAUSE_REWARDS) and phase 3 (quests, overlay) after.
