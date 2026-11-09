@@ -349,3 +349,22 @@ test("nothing below the screen's bottom edge at the phone sizes with their brows
     expect(await rowsLaidOut(page), `${w}×${h}`).toEqual({ heights: 1, moveRights: 1, moveWidths: 1, wrapped: 0, ellipsis: true });
   }
 });
+
+test("your turn snaps you live (Eric, Nov 9): stepped back with « while waiting, your turn comes on that board: it's live, \"back to live\" is gone, and your move plays", async ({ page }) => {
+  test.setTimeout(240_000);
+  await relayLobby(page);
+  let s = await nextDuty(page);
+  await play(page, quiet(s.fen!));
+  // After your move the big board goes to your next board (Jump to my next board, on by default): wait for it, then step back there.
+  const shownBoard = () => page.locator(".sq-to-list").getAttribute("aria-label");
+  const afterMove = await shownBoard();
+  await expect.poll(shownBoard, { timeout: 30_000 }).not.toBe(afterMove);
+  await page.getByRole("button", { name: "Previous move" }).click();
+  await expect(page.locator(".history-nav.browsing")).toBeVisible();
+  // Your turn comes on that board: the big board is it, live, and your move can be played on it.
+  s = await nextDuty(page, s.seq);
+  await expect(page.locator(".history-nav.browsing")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to the live position" })).toHaveCount(0);
+  await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${s.duty!.board + 1}`);
+  await play(page, quiet(s.fen!));
+});

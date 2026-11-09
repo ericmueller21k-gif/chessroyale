@@ -6,7 +6,7 @@
 #   Playwright config, packages/core, the runner, the protocol, …) or a path the table doesn't know runs every spec, as
 #   does the `full-e2e` label (adding it starts a new run). settings.ts, e2e/helpers.ts and a few shared app modules
 #   (`traced` in areas.json) are followed through the code instead: the specs of what uses what the diff changes.
-# - A push to main (and a manual run) runs every spec on 10 shards, about 28 minutes (Nov 6), plus any wait for runners:
+# - A push to main (and a manual run) runs every spec on 15 shards (10 until Nov 9: about 28 minutes, Nov 6), plus any wait for runners:
 #   the full run after each merge. One main run at a time: a push waits for the run going, and only the newest
 #   waiting push runs (it covers the others).
 #

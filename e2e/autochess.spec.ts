@@ -3120,6 +3120,10 @@ test("the meeting before round 1 (Eric, Oct 24): both custom pawns stand in the 
   await expect(page.locator(".ac-meet-count")).toHaveText(/^Starting in [12]$/);
   const lines = await page.locator(".ac-meet-chat .ac-chat").allInnerTexts();
   expect(lines).toEqual([...QUICK_CHAT]);
+  // (Each on its own card, never see-through over the board: v5 dropped their color, Nov 9.)
+  for (const sel of [".ac-meet-count", ".ac-meet-chat .ac-chat"]) {
+    expect(await page.locator(sel).first().evaluate((e) => getComputedStyle(e).backgroundColor), `${sel} has a background`).not.toBe("rgba(0, 0, 0, 0)");
+  }
   const count = (await page.locator(".ac-meet-count").boundingBox())!;
   const chat = (await page.locator(".ac-meet-chat").boundingBox())!;
   for (const b of [mine, theirs, count, chat]) {

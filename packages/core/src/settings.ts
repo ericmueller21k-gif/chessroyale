@@ -1698,19 +1698,21 @@ export const BOSS_POWERS = {
   dashClockFit: { every: [4, 5] as readonly [number, number], smacks: 5, smackMs: 150 },
   /**
    * Dash's pop-off (Eric, Nov 7: "I gotta pop off for a second, bro", then he smacks it 10 times really fast, then says again how
-   * much he loves that clock): once a battle, on one of his turns from `from` to `to` (drawn from the battle's seed), before his
-   * move lands. `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks
-   * at `hitMs` a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
+   * much he loves that clock; Eric, Nov 8: twice a battle, docs/decisions/2026-11-08-dash-popoff-twice.md): twice a battle, on two
+   * of his turns from `from` to `to` (drawn from the battle's seed), at least `gap` of his turns apart, before his move lands. Each
+   * is `smacks` (3) smacks at smackMs (dashClockFit's) with the pop-off line, `popMs` long; then `hits` (10) fast smacks at `hitMs`
+   * a smack with the love line, `loveMs` long. 4.6 s in all: his thinking waits for it, and no one's clock runs meanwhile.
    */
-  dashPopOff: { from: 8, to: 20, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
+  dashPopOff: { from: 8, to: 20, gap: 6, smacks: 3, hits: 10, hitMs: 70, popMs: 2000, loveMs: 2600 },
   /**
    * Dash's Scramble Rush (Eric, Nov 6; bosses/dash.ts; docs/decisions/2026-11-06-dash-v2.md), once a battle: as a crowd turn
    * begins, from turn `from` on, the first time his rage meter is `atMeter` full (Time Scramble's meter: it comes at full). A
    * countdown of `countdownMs` ("1.00" to "0.00"); inside it his copies sweep the board from `scatterAt` for `scatterMs`, moving
    * `pieces` of yours and `pieces` of his (never a king) to empty squares of ranks `ranks`. His line and the God King's
    * (`linesMs`), then `placeMs` to put them back; then the board as it was, and `resultMs` for the verdict. Under `needCorrect`
-   * of the six back (the crowd's people's mean, its bots' too: each bot puts each back with `botHit`), he moves again at once
-   * (Hollow's quiet extra move). The game's position never changes: only what the screens show. Warned a turn ahead as any
+   * of the six back (online, the crowd's people's mean, its bots' too: each bot puts each back with `botHit`; solo, only your own
+   * put-back, no bots, no mean: Eric, Nov 8), he moves again at once (Hollow's quiet extra move; never skipped once due:
+   * docs/decisions/2026-11-08-dash-solo-rush.md). The game's position never changes: only what the screens show. Warned a turn ahead as any
    * ultimate is (Eric, Nov 6, playtesting: "there's no warning"): RAGE!, "Next turn: Scramble Rush", then it comes as the next crowd turn
    * begins. In the put-back each swept piece moves at most `movesPerPiece` times (Eric, Nov 6: "you can only move a piece up
    * to 2 times"); a try after that shakes it, "No more tries".
