@@ -51,24 +51,8 @@ async function markQuestsSeen(context: import("@playwright/test").BrowserContext
 }
 let questsSeenDefault = true;
 
-export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void; questsSeen: boolean; seenQuests: void }>({
+export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean; seenWalkthrough: void; questsSeen: boolean; questsSeenForTest: void; seenQuests: void }>({
   tutorialSeen: [true, { option: true }],
-  questsSeen: [true, { option: true }],
-  questsSeenForTest: [
-    async ({ questsSeen }, use) => {
-      questsSeenDefault = questsSeen;
-      await use();
-      questsSeenDefault = true;
-    },
-    { auto: true },
-  ],
-  seenQuests: [
-    async ({ context, questsSeen }, use) => {
-      if (questsSeen) await markQuestsSeen(context);
-      await use();
-    },
-    { auto: true },
-  ],
   // Sets the default for this test's contexts, then puts it back.
   seenDefaultForTest: [
     async ({ tutorialSeen }, use) => {
@@ -78,10 +62,27 @@ export const test = base.extend<{ closeOwnContexts: void; tutorialSeen: boolean;
     },
     { auto: true },
   ],
+  questsSeen: [true, { option: true }],
+  questsSeenForTest: [
+    async ({ questsSeen }, use) => {
+      questsSeenDefault = questsSeen;
+      await use();
+      questsSeenDefault = true;
+    },
+    { auto: true },
+  ],
   // The page's own context (every page it opens, and every reload, keeps what the page saved).
   seenWalkthrough: [
-    async ({ context, tutorialSeen }, use) => {
+    async ({ context, tutorialSeen, questsSeenForTest: _ }, use) => {
       if (tutorialSeen) await markSeen(context);
+      await use();
+    },
+    { auto: true },
+  ],
+  // (After both defaults are set: the context is made by the first fixture that asks for it, with the defaults then in force.)
+  seenQuests: [
+    async ({ context, questsSeen, questsSeenForTest: _ }, use) => {
+      if (questsSeen) await markQuestsSeen(context);
       await use();
     },
     { auto: true },

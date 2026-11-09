@@ -85,8 +85,8 @@ export function rewardLines(r: XpRewards, crateName: string): { daily: string | 
     daily: r.daily ? `+${crateCount(r.daily, crateName)}` : null,
     level: level || null,
     pick: r.bossPicks ? (r.bossPicks === 1 ? "Choose your boss crate" : `Choose your ${r.bossPicks} boss crates`) : null,
-    // (Phase 3: "Quest done: Boss Hunter +300 XP · +1 Winter Crate".)
-    quests: (r.quests ?? []).map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")} XP`, ...things(q.crates, q.keys)].join(" · ")),
+    // (Phase 3: "Quest done: Boss Hunter +300 XP · +1 Winter Crate"; "+300 XP" never split over two lines.)
+    quests: (r.quests ?? []).map((q) => [`Quest done: ${q.name} +${q.xp.toLocaleString("en-US")}\u00a0XP`, ...things(q.crates, q.keys)].join(" · ")),
   };
 }
 

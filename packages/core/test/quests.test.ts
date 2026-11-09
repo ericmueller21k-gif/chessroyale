@@ -51,6 +51,6 @@ describe("quests' rules", () => {
     expect(hasRewards(r)).toBe(true);
     expect(readRewards(JSON.stringify(r))).toEqual(r);
     expect(readRewards(JSON.stringify({ ...r, quests: [{ nope: 1 }] }))).toBeUndefined();
-    expect(rewardLines(r, "Winter Crate · Series 1").quests).toEqual(["Quest done: Regular +1,500 XP · +1 Winter Crate · +1 crate key"]);
+    expect(rewardLines(r, "Winter Crate · Series 1").quests).toEqual(["Quest done: Regular +1,500\u00a0XP · +1 Winter Crate · +1 crate key"]);
   });
 });
