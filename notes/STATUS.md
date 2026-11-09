@@ -568,3 +568,9 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~07:20: boss result v2 review (review/boss-result-v2): no blockers; minors: XpResult.tsx:82 "Win +50" shows at the fill's
   first frame (drop `i === 0 ||`), ResultDuo with no character off-center (moot if every boss has one), reduced motion n/a.
   Waiting on Eric: blows land on the pawn OK? pawn bigger? Then fix the minor + pawn size, open PR, CI, merge.
+- Nov 9 ~07:25: Eric on quests mock: "absolutely exactly what I'm envisioning"; size maybe 15% shorter later (leave now); entry in
+  the phone's top bar (one more square button); dim not blur; crest = the app icon (icons/icon.svg). Haiku round 2
+  session_01JuCWRrpj45cyZ7YCZ8g8YB on claude/quests-mock (done signal .round2.md, watcher bh815whvb); then merge the mock (behind
+  ?quests=mock) so phase 3 builds on it.
+- Eric on boss result v2: read as "Yes" (blows land on the pawn) and "the pawn is fine for now". Director fixed the review minor
+  (Win +50 timing). PR #571 (f319d33), CI watcher bhxccw9l5; merge on green.
