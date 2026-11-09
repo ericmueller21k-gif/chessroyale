@@ -13,7 +13,7 @@ like … invite to lobby, view profile." Brief: `notes/briefs/brief-friends-over
 - A friend's menu sits over the box's foot (not under the row): it covers, never pushes (nothing shifts). Invite to play is
   always in it, greyed with "Offline: you can invite them once they're online." A friend who hides their status can be invited
   (we can't tell), as one in a match can (the invite waits in their list).
-- Until home's Party option (another helper) lands, the share-a-code / join-by-code sheet is reached from the box's footer
-  ("Lobby code ›"), so phones keep it either way; e2e's `openPlayWithFriends` goes that way. The director drops the link (and
-  the sheet, if nothing else calls it) once Party has it.
+- The private lobby (a code or link, up to 100: e.g. a streamer's chat) is reached from the box's footer ("Private lobby ›",
+  the share-a-code / join-by-code sheet). It stays (Eric, Nov 9): home's Party option will be a real-matchmaking party, not the
+  private lobby. e2e's `openPlayWithFriends` goes that way.
 - `friendStatus` says "Last online …" on every friends list (the /friends page and the computer's panel too): one set of words.

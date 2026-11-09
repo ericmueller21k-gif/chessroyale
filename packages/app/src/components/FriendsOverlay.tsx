@@ -130,7 +130,7 @@ export function FriendsOverlay({
             Requests sent and blocked ›
           </button>
           <button type="button" class="fd-link fo-foot-link" onClick={onLobbyCode}>
-            Lobby code ›
+            Private lobby ›
           </button>
         </div>
         {friend && <FriendMenu f={friend} onNote={(t, e) => say(t, !!e)} onClose={() => setPicked(null)} onProfile={onClose} />}
