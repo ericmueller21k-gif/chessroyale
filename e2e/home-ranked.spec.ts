@@ -248,12 +248,6 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
   const radio = (name: RegExp) => page.getByRole("radio", { name });
   const steps: [string, () => Promise<unknown>][] = [
     ["Solo queue (50 v 50)", () => radio(/^Solo queue/).click()],
-    ["Party (50 v 50)", async () => {
-      await radio(/^Party/).click();
-      await expect(page.getByRole("dialog", { name: "50 v 50 party" })).toBeVisible();
-      await page.keyboard.press("Escape");
-      await expect(page.getByRole("dialog")).toHaveCount(0);
-    }],
     ["Bots (50 v 50)", () => radio(/^Bots/).click()],
     ["Solo queue again", () => radio(/^Solo queue/).click()],
     ["1 v 1", () => radio(/^1 v 1/).click()],
@@ -420,7 +414,7 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
     const group = page.getByRole("radiogroup", { name: "Matchmaking" });
     // Since Nov 9 a title and a short sub line each (Solo queue, Party, Bots), side by side, equal, whole, tappable, and filling the
     // row: the group is as wide as the RANKED row, with the buttons' margins even on both sides.
-    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "Partyup to 8 friends", "Bots99 bots, now"]);
+    await expect(group.getByRole("radio"), `${at}: the three options`).toHaveText(["Solo queuejoin a lobby", "PartySoon", "Bots99 bots, now"]);
     for (const r of await group.getByRole("radio").all()) expect(await r.evaluate((e) => e.scrollWidth - e.clientWidth), `${at}: each option whole`).toBeLessThanOrEqual(0);
     const g = (await group.boundingBox())!;
     const ranked = await rect(".fd-ranked");
@@ -454,12 +448,16 @@ test("home, said once (Eric, Oct 28): no ⓘ; the three options are titles only 
       await expect(page.locator(".fd-hint"), `${at}: ${pick}`).toHaveText(line);
       await oneLine(String(pick));
     }
-    await group.getByRole("radio", { name: /^Party/ }).click();
-    await page.getByRole("dialog", { name: "50 v 50 party" }).getByRole("button", { name: "Close" }).click();
-    await expect(page.locator(".fd-hint"), `${at}: Party`).toHaveText("Invite up to 8 friends; bots fill the rest");
-    await oneLine("Party");
+    // (50 v 50's Party: greyed, "Soon", until its matchmaker piece is built; Eric, Nov 9.)
+    await expect(group.getByRole("radio", { name: /^Party/ }), `${at}: Party greyed`).toBeDisabled();
     await group.getByRole("radio", { name: /^Solo queue/ }).click();
     await page.getByRole("radio", { name: /^Squads/ }).click();
+    await page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio", { name: /^Party/ }).click();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator(".fd-hint"), `${at}: Squads' Party`).toHaveText("Queue with up to 3 friends");
+    await oneLine("Squads' Party");
+    await page.getByRole("radiogroup", { name: "Squads" }).getByRole("radio", { name: /^Solo queue/ }).click();
     // Squads: Solo queue, Party, and Bots shown greyed ("Soon": its server part is a follow-up).
     const squads = page.getByRole("radiogroup", { name: "Squads" });
     await expect(squads.getByRole("radio"), `${at}: Squads' options`).toHaveText(["Solo queuejoin a squad", "Partyup to 3 friends", "BotsSoon"]);

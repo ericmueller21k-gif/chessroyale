@@ -176,9 +176,6 @@ The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine
   the bots' average (`BOT_LEVELS`: 700, 950, 1150 = the curve above, 1500, 1900, your own rating, or Random, uniform 600 to 2200), carried
   as `Settings.botLevel` into `botStrength` (each bot's rating fixed by name + level; the curve narrows near 600 and 2200 so a level's
   average holds). Solo only: online lobbies' bots are as above.
-- **A 50 v 50 party** (Nov 9; [2026-11-09-home-modes-options.md](../decisions/2026-11-09-home-modes-options.md)): a private Crowd
-  lobby (home's Party) seats `CROWD_PARTY_MAX` (9) people, you and 8 friends (`lobbyPeopleCap`; the 10th is told "This lobby is full.");
-  bots fill the other seats when the host starts. Tests: `packages/server/test/lobby.test.ts`, "a 50 v 50 party".
   **In 50 v 50 they spread over the good lines** (Nov 2; `CROWD_BOTS`, `botLean`, `botPickSpread` in core/match.ts;
   docs/decisions/2026-11-02-crowd-bot-spread.md; Eric: "unique lines favored over optimal play"): each team turn draws
   one shared lean from the turn's seed (a focus on the engine's numbers and a taste per line, the same for every bot of

@@ -61,18 +61,18 @@ function saveMode(mode: ModeChoiceId) {
 
 const MATCHMAKING_KEY = "brc.matchmaking";
 /**
- * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Party "party", Bots "solo"): this device's choice. "botsoff"
- * (people only) has no button on home since Nov 9; stored (a test's), it still queues people only under Solo queue.
+ * How you're matched (home's 50 v 50 options, Nov 9: Solo queue "default", Bots "solo"; Party is greyed until it's built): this device's
+ * choice. "botsoff" (people only) has no button on home since Nov 9; stored (a test's), it still queues people only under Solo queue.
  */
-export function chosenMatchmaking(): MatchmakingType | "party" {
+export function chosenMatchmaking(): MatchmakingType {
   try {
     const v = localStorage.getItem(MATCHMAKING_KEY);
-    return v === "party" || MATCHMAKING_TYPES.includes(v as MatchmakingType) ? (v as MatchmakingType | "party") : "default";
+    return MATCHMAKING_TYPES.includes(v as MatchmakingType) ? (v as MatchmakingType) : "default";
   } catch {
     return "default";
   }
 }
-function saveMatchmaking(t: MatchmakingType | "party") {
+function saveMatchmaking(t: MatchmakingType) {
   try {
     localStorage.setItem(MATCHMAKING_KEY, t);
   } catch {
@@ -316,7 +316,6 @@ function copyInviteLink(code: Promise<string>) {
  */
 function FriendsSheet({
   mode,
-  party,
   code: initialCode,
   loading,
   onlineLocked,
@@ -328,8 +327,6 @@ function FriendsSheet({
   onClose,
 }: {
   mode: ModeChoiceId;
-  /** Home's 50 v 50 Party (Nov 9): the same lobby part, as "50 v 50 party" (you and up to CROWD_PARTY_MAX - 1 friends). */
-  party?: boolean;
   code?: string;
   loading: boolean;
   onlineLocked?: boolean;
@@ -356,7 +353,7 @@ function FriendsSheet({
     <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="friends-title">
         <div class="fd-sheet-head">
-          <h2 id="friends-title">{initialCode ? `Join lobby ${initialCode}` : party ? "50 v 50 party" : "Play with friends"}</h2>
+          <h2 id="friends-title">{initialCode ? `Join lobby ${initialCode}` : "Play with friends"}</h2>
           <button type="button" class="fd-icon-btn" aria-label="Close" onClick={onClose}>
             ✕
           </button>
@@ -372,7 +369,7 @@ function FriendsSheet({
           <>
             {!initialCode && (
               <>
-                <p class="fd-sub">{resting ?? (party ? `Invite up to ${CROWD_PARTY_MAX - 1} friends with your lobby's link; bots fill the rest when you start.` : mode === "raid" ? "Make a lobby and share its code. Empty seats fill with bots when you start." : "Makes a lobby and copies its link: send it to your friends. Empty seats fill with bots when you start.")}</p>
+                <p class="fd-sub">{resting ?? (mode === "raid" ? "Make a lobby and share its code. Empty seats fill with bots when you start." : "Makes a lobby and copies its link: send it to your friends. Empty seats fill with bots when you start.")}</p>
                 <FdButton primary disabled={loading || !!resting} onClick={onCreate}>
                   {label}
                 </FdButton>
@@ -408,13 +405,13 @@ function FriendsSheet({
 
 /**
  * 50 v 50's options (Eric, Nov 9: "solo queue, party, and then … bots"), left to right, each a title and a short sub line as Squads'
- * (what each does in full is the line above PLAY). Solo queue is the public queue (it was Default), Party a private lobby of you and
- * up to 8 friends (it was Play with friends' lobby), Bots a game in your browser at the level you pick (it was Solo). Bots off is
- * gone from home. docs/decisions/2026-11-09-home-modes-options.md.
+ * (what each does in full is the line above PLAY). Solo queue is the public queue (it was Default), Bots a game in your browser at
+ * the level you pick (it was Solo). Party (queueing together into the public matchmaking, up to CROWD_PARTY_MAX, ranked; Eric, Nov 9)
+ * shows greyed, "Soon", until its matchmaker piece is built. Bots off is gone from home. docs/decisions/2026-11-09-home-modes-options.md.
  */
-const types: { id: "default" | "party" | "solo"; label: string; sub: string }[] = [
+const types: { id: "default" | "party" | "solo"; label: string; sub: string; soon?: boolean }[] = [
   { id: "default", label: "Solo queue", sub: "join a lobby" },
-  { id: "party", label: "Party", sub: `up to ${CROWD_PARTY_MAX - 1} friends` },
+  { id: "party", label: "Party", sub: "Soon", soon: true },
   { id: "solo", label: "Bots", sub: `${CROWD_SIZE - 1} bots, now` },
 ];
 
@@ -598,23 +595,21 @@ export function HomeScreen({
       }
     } else saveMode(m);
   };
-  // How you're matched (50 v 50: Solo queue, Party or Bots). Guests (online needs signing in) can only play Bots; Classic online is
-  // coming (Bots works). ("botsoff", a test's stored pick, shows as Solo queue and queues people only.)
+  // How you're matched (50 v 50: Solo queue or Bots; Party greyed). Guests (online needs signing in) can only play Bots; Classic online
+  // is coming (Bots works). ("botsoff", a test's stored pick, shows as Solo queue and queues people only.)
   const [picked, setPicked] = useState(chosenMatchmaking);
   const soloOnly = !!onlineLocked;
   const type = soloOnly ? "solo" : picked;
   // (The option shown picked: Bots off has no button since Nov 9.)
   const option = type === "botsoff" ? "default" : type;
-  // 50 v 50's Party sheet (Nov 9: the "Play with friends" lobby part, as "50 v 50 party") and the Bot level box (PLAY with Bots).
-  const [crowdParty, setCrowdParty] = useState(false);
+  // The Bot level box (PLAY with Bots).
   const [botBox, setBotBox] = useState(false);
   // (Nothing picked yet: the options show greyed, none selected and none tappable: Eric, Oct 25.)
   const pickType = (t: "default" | "party" | "solo") => {
-    if (!mode || (soloOnly && t !== "solo")) return;
+    // (Party: greyed until it's built.)
+    if (!mode || t === "party" || (soloOnly && t !== "solo")) return;
     setPicked(t);
     saveMatchmaking(t);
-    // (Party opens its sheet at once, as Squads' Party does; PLAY opens it again.)
-    if (t === "party") setCrowdParty(true);
   };
   // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
   const [party, setParty] = useState(false);
@@ -689,9 +684,8 @@ export function HomeScreen({
     if (!mode || resting) return;
     if (mode === "squads") return onlineLocked ? onSignIn() : party ? onParty() : onSquads();
     if (mode === "1v1") return onlineLocked ? onSignIn() : onRanked1v1();
-    // (Bots: the Bot level box first; its OK starts the game. Party: its sheet.)
+    // (Bots: the Bot level box first; its OK starts the game.)
     if (type === "solo") return setBotBox(true);
-    if (type === "party") return setCrowdParty(true);
     if (mode === "crowd") onPlay("crowd", type);
   };
   const fill = live?.fillSeconds ?? 60;
@@ -717,7 +711,7 @@ export function HomeScreen({
     onlineLocked ? (
       signIn("Squads")
     ) : party ? (
-      `Invite up to ${SQUADS.partyMax - 1} friends to your squad`
+      `Queue with up to ${SQUADS.partyMax - 1} friends`
     ) : (
       `Solo queue: bots fill any empty seat after ${fill} s`
     )
@@ -735,8 +729,6 @@ export function HomeScreen({
     </>
   ) : type === "solo" ? (
     `Start at once with ${bots} bots`
-  ) : type === "party" ? (
-    `Invite up to ${CROWD_PARTY_MAX - 1} friends; bots fill the rest`
   ) : type === "botsoff" ? (
     `People only: starts when ${CROWD_SIZE} have joined`
   ) : wait ? (
@@ -830,27 +822,6 @@ export function HomeScreen({
             onFriends();
           }}
           onClose={() => setFriends(false)}
-        />
-      )}
-      {crowdParty && (
-        <FriendsSheet
-          mode={lobbyModeOf(mode ?? "crowd")}
-          party={mode !== "classic"}
-          loading={loading}
-          onlineLocked={onlineLocked}
-          resting={rest(lobbyModeOf(mode ?? "crowd"))}
-          onCreate={() => {
-            const m = lobbyModeOf(mode ?? "crowd");
-            // (Its link copied as the lobby opens, asked for in this tap, as a phone's browser wants.)
-            copyInviteLink(new Promise((resolve, reject) => onCreateLobby(m, (code) => (code ? resolve(code) : reject(new Error("no lobby"))))));
-          }}
-          onJoin={onJoinLobby}
-          onSignIn={onSignIn}
-          onFriends={() => {
-            setCrowdParty(false);
-            onFriends();
-          }}
-          onClose={() => setCrowdParty(false)}
         />
       )}
       {botBox && (
@@ -1074,7 +1045,7 @@ export function HomeScreen({
       ) : (
         <div class="fd-modes fd-types fd-three" role="radiogroup" aria-label="Matchmaking">
           {types.map((t) => {
-            const off = soloOnly && t.id !== "solo";
+            const off = !!t.soon || (soloOnly && t.id !== "solo");
             const idle = !mode;
             return (
               <button
@@ -1084,7 +1055,7 @@ export function HomeScreen({
                 aria-checked={!idle && option === t.id}
                 aria-disabled={idle || off || undefined}
                 class={`${option === t.id && !idle ? "on" : ""}${off ? " off" : ""}`}
-                title={off ? "Online: sign in to play" : undefined}
+                title={t.soon ? `Queue with up to ${CROWD_PARTY_MAX - 1} friends (soon)` : off ? "Online: sign in to play" : undefined}
                 onClick={() => pickType(t.id)}
               >
                 {t.label}

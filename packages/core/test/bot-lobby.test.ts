@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOT_LEVELS, BOT_LOBBY, CROWD_PARTY_MAX, WEAK_BOT_SKILL, botLevelMean, botRatingForSkill, botRatingOf, botSkillForRating, botStrength, lobbyPeopleCap } from "../src/index.ts";
+import { BOT_LEVELS, BOT_LOBBY, WEAK_BOT_SKILL, botLevelMean, botRatingForSkill, botRatingOf, botSkillForRating, botStrength } from "../src/index.ts";
 
 const names = Array.from({ length: 3000 }, (_, i) => `Bot name ${i}`);
 
@@ -73,10 +73,5 @@ describe("solo's Bot level (BOT_LEVELS, Nov 9)", () => {
     expect(botLevelMean("random", 1500)).toBe("random");
     expect(botLevelMean("very-easy", 1500)).toBe(700);
   });
-  it("a 50 v 50 party seats you and up to 8 friends; other lobbies their whole size", () => {
-    expect(lobbyPeopleCap({ mode: "crowd", raid: false, lobbySize: 100 }, true)).toBe(CROWD_PARTY_MAX);
-    expect(lobbyPeopleCap({ mode: "crowd", raid: false, lobbySize: 100 }, false)).toBe(100);
-    expect(lobbyPeopleCap({ mode: "crowd", raid: true, lobbySize: 50 }, true)).toBe(50);
-    expect(lobbyPeopleCap({ mode: "classic", raid: false, lobbySize: 64 }, true)).toBe(64);
-  });
+
 });

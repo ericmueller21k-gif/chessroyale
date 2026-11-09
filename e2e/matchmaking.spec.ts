@@ -19,38 +19,32 @@ const path = (p: Page) => new URL(p.url()).pathname;
 const run = Date.now().toString(36).slice(-5);
 const pool = (name: string) => `${name}-${test.info().project.name[0]}${run}`;
 
-test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the line above PLAY says what each does; Party opens 50 v 50's party; Bots asks the bot level and starts", async ({ page }) => {
+test("home (Nov 9): Solo queue, Party and Bots, each a title and a sub line; the line above PLAY says what each does; Party greyed (soon); Bots asks the bot level and starts", async ({ page }) => {
   await named(page, "Typer");
   await page.goto("/?debug");
   await pickMode(page, "50 v 50");
   const types = page.getByRole("radiogroup", { name: "Matchmaking" });
   await expect(types.getByRole("radio")).toHaveCount(3);
-  await expect(types.getByRole("radio")).toHaveText(["Solo queuejoin a lobby", "Partyup to 8 friends", "Bots99 bots, now"]);
+  await expect(types.getByRole("radio")).toHaveText(["Solo queuejoin a lobby", "PartySoon", "Bots99 bots, now"]);
   await expect(types.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
   // Solo queue: bots after the server's fill time (8 s on the test server), said by the line above PLAY.
   await expect(page.locator(".fd-hint")).toHaveText(/^(Starts within 8 s; bots fill any empty seats|Usually about \d+ s to find a match)$/);
   await expect(page.getByRole("button", { name: "About matchmaking" })).toHaveCount(0);
-  // Party: its sheet at once (make a lobby or join by code), the line says who comes.
-  await types.getByRole("radio", { name: /^Party/ }).click();
-  const party = page.getByRole("dialog", { name: "50 v 50 party" });
-  await expect(party).toBeVisible();
-  await expect(party.getByRole("button", { name: "Get friend code" })).toBeVisible();
-  await expect(party.getByRole("button", { name: "Join lobby" })).toBeVisible();
-  await party.getByRole("button", { name: "Close" }).click();
-  await expect(page.locator(".fd-hint")).toHaveText("Invite up to 8 friends; bots fill the rest");
-  // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18); PLAY opens the sheet again.
+  // Party (queueing together into the public matchmaking, Eric, Nov 9): greyed until it's built; a tap does nothing.
+  await expect(types.getByRole("radio", { name: /^Party/ })).toBeDisabled();
+  await types.getByRole("radio", { name: /^Party/ }).click({ force: true });
+  await expect(types.getByRole("radio", { name: /^Solo queue/ })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Remembered on this device (the way of being matched; the mode is picked again after a reload, Eric, Oct 18).
+  await types.getByRole("radio", { name: /^Bots/ }).click();
   await page.reload();
   await pickMode(page, "50 v 50");
-  await expect(page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Party/ })).toHaveAttribute("aria-checked", "true");
-  await page.getByRole("button", { name: "PLAY", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "50 v 50 party" })).toBeVisible();
-  await page.getByRole("dialog", { name: "50 v 50 party" }).getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ })).toHaveAttribute("aria-checked", "true");
   // Big enough to tap, and nothing wider than the screen.
   for (const r of await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio").all()) expect((await r.boundingBox())!.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 
   // Bots: the Bot level box (Eric, Nov 9): OK greyed until a level is picked; ✕ cancels and nothing starts.
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
   await expect(page.locator(".fd-hint")).toHaveText("Start at once with 99 bots");
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const box = page.getByRole("dialog", { name: "Bot level" });
