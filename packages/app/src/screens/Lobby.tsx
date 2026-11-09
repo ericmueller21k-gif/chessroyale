@@ -1,4 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
+import { lobbyPeopleCap } from "@chessroyale/core";
 import type { NetMatch } from "../net.ts";
 import { QueueScreen } from "./Queue.tsx";
 import { PlayerName } from "../components/PlayerName.tsx";
@@ -52,7 +53,7 @@ export function LobbyScreen({ match, onLeave, onLetBotsFill }: { match: NetMatch
         <InviteFriends />
       </div>
       <h2 class="muted small">
-        Players ({humans.length} of {match.settings.lobbySize}){match.settings.raid ? "" : " · empty seats fill with bots"}
+        Players ({humans.length} of {lobbyPeopleCap(match.settings, true)}){match.settings.raid ? "" : " · empty seats fill with bots"}
       </h2>
       <ul class="lobby-players">
         {humans.map((p) => (

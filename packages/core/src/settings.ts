@@ -370,6 +370,11 @@ export interface Settings {
    * botSkillSpread (the sims) still spreads skills evenly on a log scale across it.
    */
   botSkillRange: readonly [number, number];
+  /**
+   * Solo's bot level (home's 50 v 50 Bots, the Bot level box; Eric, Nov 9): the average rating its bots are drawn around (BOT_LEVELS),
+   * or "random" (each bot's rating uniform over BOT_LOBBY.ratings' range). Unset: BOT_LOBBY's own curve, as before (online lobbies).
+   */
+  botLevel?: number | "random";
   botRandomMoveChance: number;
   /** Crowd 50 v 50's bots (CROWD_BOTS): spread over the good lines with each turn's shared lean. Unset: botPick as before. */
   crowdBots?: CrowdBotSpread;
@@ -668,6 +673,42 @@ export const BOT_LOBBY = {
 };
 export type BotLobbySettings = typeof BOT_LOBBY;
 
+/**
+ * Home's 50 v 50 Bots: the Bot level box (Eric, Nov 9: "select the average bot MMR … my level … very easy … they kind of fluctuate a few
+ * hundred points up and down around [it] … random, which is just pure randomness for every bot").
+ * docs/decisions/2026-11-09-home-modes-bot-level.md. Each level sets the bell curve's mean (BOT_LOBBY.ratings' sd, min, max and step
+ * stay, narrowed near the range's ends: botRatingOf); `mine` is your own rating (clamped to the curve's range; Medium when the app knows none); `random` draws each bot uniform
+ * over the range. Medium's 1150 is BOT_LOBBY's own mean, so Medium plays exactly as solo did before. Solo only.
+ */
+export const BOT_LEVELS = [
+  { id: "mine", label: "My level", mean: null },
+  { id: "very-easy", label: "Very easy", mean: 700 },
+  { id: "easy", label: "Easy", mean: 950 },
+  { id: "medium", label: "Medium", mean: 1150 },
+  { id: "hard", label: "Hard", mean: 1500 },
+  { id: "very-hard", label: "Very hard", mean: 1900 },
+  { id: "random", label: "Random", mean: null },
+] as const;
+export type BotLevelId = (typeof BOT_LEVELS)[number]["id"];
+
+/** A Bot level's setting (Settings.botLevel): its mean, your rating for "mine" (clamped; Medium's without one), or "random". */
+export function botLevelMean(id: BotLevelId, yourRating: number | null): number | "random" {
+  if (id === "random") return "random";
+  const { min, max, mean } = BOT_LOBBY.ratings;
+  if (id === "mine") return yourRating == null || !Number.isFinite(yourRating) ? mean : Math.max(min, Math.min(max, Math.round(yourRating)));
+  return BOT_LEVELS.find((l) => l.id === id)!.mean ?? mean;
+}
+
+/**
+ * The humans a lobby seats: a 50 v 50 party (a private Crowd lobby, home's Party; Eric, Nov 9: "you can invite up to 8 people") takes
+ * CROWD_PARTY_MAX, bots filling the rest; every other lobby its whole size.
+ */
+export function lobbyPeopleCap(s: Pick<Settings, "mode" | "raid" | "lobbySize">, priv: boolean): number {
+  return priv && s.mode === "crowd" && !s.raid ? Math.min(s.lobbySize, CROWD_PARTY_MAX) : s.lobbySize;
+}
+/** A 50 v 50 party's people: you and up to 8 friends (Eric, Nov 9). */
+export const CROWD_PARTY_MAX = 9;
+
 /** 32-bit FNV-1a of a string (a bot's name: its fixed rating). */
 function nameHash(name: string): number {
   let h = 0x811c9dc5;
@@ -675,10 +716,19 @@ function nameHash(name: string): number {
   return h >>> 0;
 }
 
-/** A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. */
-export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY): number {
-  const { mean, sd, min, max, step } = b.ratings;
-  let a = nameHash(name);
+/**
+ * A bot's rating, from its name alone (the same every match): BOT_LOBBY.ratings' bell curve. `level` (solo's Bot level, BOT_LEVELS):
+ * the curve around that mean instead, or uniform over the range for "random", still fixed by the name within the level (the name and
+ * the level seed it; BOT_LOBBY's own mean keeps the name's rating of before).
+ */
+export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> = BOT_LOBBY, level?: number | "random"): number {
+  const { min, max, step } = b.ratings;
+  const mean = typeof level === "number" ? Math.max(min, Math.min(max, level)) : b.ratings.mean;
+  // (Near the range's ends a level's curve narrows (to 1.5 times its room), so the clamp doesn't drag its average off the level's:
+  // Very easy's 700 sits 100 above the floor, a bot below 600 would play as 600 anyway.)
+  const sd = Math.min(b.ratings.sd, 1.5 * (mean - min), 1.5 * (max - mean));
+  const own = level === undefined || level === b.ratings.mean;
+  let a = nameHash(own ? name : `${name}|${level}`);
   const next = () => {
     // (mulberry32, inline: rng.ts imports nothing from here, and this file stays free of imports.)
     a = (a + 0x6d2b79f5) >>> 0;
@@ -687,6 +737,7 @@ export function botRatingOf(name: string, b: Pick<BotLobbySettings, "ratings"> =
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+  if (level === "random") return Math.round((min + next() * (max - min)) / step) * step;
   const u1 = Math.max(next(), 1e-9);
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * next());
   return Math.max(min, Math.min(max, Math.round((mean + sd * z) / step) * step));
@@ -722,8 +773,8 @@ export function botRatingForSkill(skill: number, b: Pick<BotLobbySettings, "skil
  * A bot's rating and temperature as its seat gets them: its name's rating (botRatingOf), as loose as `botSkillRange`
  * allows at least (the ?weakbots=1 switch: then the rating that temperature plays like).
  */
-export function botStrength(name: string, settings: Pick<Settings, "botSkillRange"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
-  const rating = botRatingOf(name);
+export function botStrength(name: string, settings: Pick<Settings, "botSkillRange" | "botLevel"> = DEFAULT_SETTINGS): { rating: number; skill: number } {
+  const rating = botRatingOf(name, BOT_LOBBY, settings.botLevel);
   const skill = botSkillForRating(rating);
   const floor = settings.botSkillRange[0];
   return skill >= floor ? { rating, skill } : { rating: Math.min(rating, botRatingForSkill(floor)), skill: floor };

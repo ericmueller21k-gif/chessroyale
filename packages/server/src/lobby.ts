@@ -4,7 +4,7 @@ import type { BossLobby } from "./bosses/base.ts";
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
 import { QUICK_CHAT, botChatLines, canSay, canSayToAll, chatCheck, chatSay, chatSent, mulberry32, noChatSent, ownedChatPacks, type BotChatMoment, type ChatSent } from "@chessroyale/core";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
-import { BOSS_BRAIN, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
+import { lobbyPeopleCap, BOSS_BRAIN, BOSS_PARTY, BOSS_POWERS, DEFAULT_SETTINGS, JUDGES, isTeamMatch, type JudgeConfig, FRONT_DOOR, LEAVING, LOBBY_LIFE, MATCHMAKING, isRankedMatch, type PlayerState, brilliance, cleanLook, matchFeats, type ItemLook, type MatchFeats, botVotes, castPregameVote, closePregameVote, raidBossElo, bossDef, clockAfterVote, cutSeconds, pregameVotes, voteResultMs, type Augment, type DrawRule, type Settings } from "@chessroyale/core";
 import {
   MatchRunner,
   BOT_NAMES,
@@ -827,7 +827,8 @@ export class LobbyCore {
     else if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
-    if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
+    // (A 50 v 50 party, a private Crowd lobby, seats CROWD_PARTY_MAX people; bots fill the rest: lobbyPeopleCap.)
+    if (this.r.humans.length >= lobbyPeopleCap(this.settings, !this.r.auto && !this.r.party)) return { ok: false as const, message: "This lobby is full." };
     // A party's battle: only its members, each by their own pass into their own seat, from their own account.
     const pl = this.r.party;
     const admit = pl && typeof party.pass === "string" && Object.hasOwn(pl.admits, party.pass) ? pl.admits[party.pass]! : null;

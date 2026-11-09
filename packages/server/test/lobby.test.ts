@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
+import { CROWD_PARTY_MAX, CROWD_KNOCKOUTS, CROWD_START, DEFAULT_SETTINGS, FRONT_DOOR, OPENING_ALLOWANCE, crowdFinalists, PREGAME_VOTES, RAID_SETTINGS, modeSettings, mulberry32, type Settings, voteResultMs } from "@chessroyale/core";
 import { kingStrikeMs, lastStandMs, START_FEN, applyMove, bossIntroTimeline, freestyleBoard, isChess960Fen, legalMoves, pieceAt, sanLineToUci, toSan, type BoardScore, type MatchRunner, type Opening, type ServerMessage } from "@chessroyale/chess";
 import { LobbyCore, newLobbyRecord } from "../src/lobby.ts";
 
@@ -85,6 +85,16 @@ describe("lobby", () => {
     expect(L.core.record.humans[0]!.evalBar).toBe(false);
     L.core.connect(token, "Ann", "computer");
     expect(L.core.record.humans[0]!.evalBar).toBe(false);
+  });
+
+  it("a 50 v 50 party (a private Crowd lobby) seats you and up to 8 friends (CROWD_PARTY_MAX); bots fill the rest", () => {
+    const L = setup(modeSettings("crowd", { augments: true }));
+    for (let i = 0; i < CROWD_PARTY_MAX; i++) expect(L.core.connect(undefined, `P${i}`, "phone").ok).toBe(true);
+    const tenth = L.core.connect(undefined, "Late", "phone");
+    expect(tenth.ok).toBe(false);
+    expect(L.core.record.humans.length).toBe(CROWD_PARTY_MAX);
+    L.core.message("p1", { t: "start" });
+    expect(L.core.record.phase).not.toBe("lobby");
   });
 
   it("lets players join, makes the first the host, and fills empty seats with bots on start", () => {
