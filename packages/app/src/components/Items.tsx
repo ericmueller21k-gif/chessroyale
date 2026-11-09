@@ -1606,13 +1606,31 @@ export function WinterCrateArt() {
   );
 }
 
-/** A key's drawing on the 100 × 100 square (its bow's center at 32, 50): the key's tile and the shop bundle's fanned keys. */
-function KeyShape() {
+/**
+ * HunChess's own key (Eric, Nov 9: "our own proprietary key … just the head of the king [from] the king piece that we use for the
+ * normal chessboard"), on the 100 × 100 square, its bow's center at 32, 50: a gold bow, and in its navy middle the top of our board's
+ * king (the cburnett set's: its cross, its center bulb and its crown, cut off at the crown's band) in gold. The only key the game
+ * draws: the key's tile, the rewards, the quests and the shop bundle's stack.
+ */
+function KeyShape({ id = "k" }: { id?: string }) {
   return (
     <>
-      <circle cx="32" cy="50" r="16" fill="#fbbf24" {...LINE} />
-      <circle cx="32" cy="50" r="6" fill="#1b2f74" stroke="#1d1d1f" {...lw(2)} />
-      <path d="M47 46 H86 V54 H80 V62 H72 V54 H66 V60 H58 V54 H47 Z" fill="#fbbf24" {...LINE} />
+      <defs>
+        <clipPath id={`${id}-head`}>
+          <rect x="0" y="0" width="45" height="30.6" />
+        </clipPath>
+      </defs>
+      <circle cx="32" cy="50" r="17" fill="#fbbf24" {...LINE} />
+      <circle cx="32" cy="50" r="12.5" fill="#1b2f74" stroke="#1d1d1f" {...lw(2)} />
+      {/* (The board's king, Chess_klt45.svg, its top only: scaled into the bow.) */}
+      <g transform="translate(16.25 37.6) scale(0.7)" clip-path={`url(#${id}-head)`} fill="#fbbf24" stroke="#1d1d1f" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2">
+        <path fill="none" stroke-width="4.4" d="M22.5 11.63V6M20 8h5" />
+        <path fill="none" stroke="#fbbf24" stroke-width="2" d="M22.5 11.63V6M20 8h5" />
+        <path stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5" />
+        <path d="M12.5 37c5.5 3.5 14.5 3.5 20 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-2.5-7.5-12-10.5-16-4-3 6 6 10.5 6 10.5v7" />
+        <path fill="none" d="M12.5 30c5.5-3 14.5-3 20 0" />
+      </g>
+      <path d="M48.5 46 H86 V54 H80 V62 H72 V54 H66 V60 H58 V54 H48.5 Z" fill="#fbbf24" {...LINE} />
     </>
   );
 }
@@ -1785,7 +1803,7 @@ function MysteryCrate({ at }: { at: string }) {
 
 /**
  * The shop's Crate + Key Bundle (Eric's mockup, Nov 9, in our own art): three mystery crates stacked (two below, one on top) and
- * three crate keys fanned beside them, on a soft gold glow, with a few still sparkles. 200 × 140.
+ * three crate keys stacked beside them (×3), on a soft gold glow, with a few still sparkles. 200 × 140.
  */
 export function BundleArt() {
   const sparkle = (x: number, y: number, r: number) => `M${x} ${y - r} Q${x} ${y} ${x + r} ${y} Q${x} ${y} ${x} ${y + r} Q${x} ${y} ${x - r} ${y} Q${x} ${y} ${x} ${y - r} Z`;
@@ -1811,11 +1829,15 @@ export function BundleArt() {
         <MysteryCrate at="translate(-1 69) scale(0.78)" />
         <MysteryCrate at="translate(63 69) scale(0.78)" />
         <MysteryCrate at="translate(31 16) scale(0.78)" />
-        {[38, 70, 102].map((y, i) => (
-          <g key={y} transform={`translate(${143 + (i === 1 ? -5 : 0)} ${y}) rotate(-32) scale(0.9) translate(-32 -50)`}>
-            <KeyShape />
+        {/* (Three keys flat and stacked tight, the back ones peeking up and to the right, and "×3": Eric, Nov 9.) */}
+        {[2, 1, 0].map((k) => (
+          <g key={k} transform={`translate(${140 + k * 4} ${66 - k * 6}) scale(0.82) translate(-32 -50)`}>
+            <KeyShape id={`bd-key${k}`} />
           </g>
         ))}
+        <text x="186" y="100" text-anchor="middle" font-size="19" font-family="'Archivo Black', Archivo, system-ui, sans-serif" fill="#fbbf24" stroke="#1d1d1f" stroke-width="3.2" paint-order="stroke" stroke-linejoin="round">
+          ×3
+        </text>
         <g fill="#fff4c8">
           <path d={sparkle(14, 26, 5)} />
           <path d={sparkle(118, 10, 4)} />
