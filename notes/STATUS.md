@@ -476,3 +476,12 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   get a fresh run without it: merge main into the branch (a real change), or add the `full-e2e` label (starts a new full run).
 - #560: flake-fix helper session_01JuCWRtScazpRhLc3z4JwQb (Opus; done signal .fix-note.md on claude/dash-popoff-fam).
   #561: red only on town-leave:144 (known intermittent); after #560 merges, merge main into it for a fresh run, then merge.
+
+### Nov 9 ~00:50
+- Eric: "Sure try it" (15 shards). PR #562 claude/ci-15-shards (MAX_SHARDS 10 → 15; decision 2026-11-09-ci-15-shards.md); its own run
+  is full on 15 shards; watcher b208n69d1. Watch for runner waits when runs overlap (free plan ~20 jobs).
+- Eric asked how to help fix flaky tests: nothing needed from him. Flaky-batch helper (Opus) session_01JuCWRrvcWnXz94jyGNYsG6 on
+  claude/flaky-batch-nov9: squads-three-boards:152, town-leave:144/193, squads-watch:167 (dash.spec left to #560/#561). Watcher on
+  .pr-body.md.
+- #560 pop-off fix pushed (c3dc94a; flake causes: 8 moves got mated; Rush's fit3 counted; data-cue double count); CI watcher bgj613tv5.
+- GitHub Pro: no gain while public (jobs started within 3 s with 20 shards at once). Matters only if the repo goes private.
