@@ -341,9 +341,8 @@ The built 1 v 1 rule, generalized:
 
 ## 8. The post-game screen and the profile
 
-**Mockup:** [assets/ranked-ladder-results.png](assets/ranked-ladder-results.png) (dark, 360 px phone, DSF 2; the HTML beside it).
+**Mockup:** [assets/ranked-ladder-results.html](assets/ranked-ladder-results.html) (dark, 360 px phone; its picture: the director notes, notes/briefs/assets/ranked-ladder-results.png).
 
-![Result cards and the profile's Ranked Standing](assets/ranked-ladder-results.png)
 
 - **One order everywhere:** the result (title and reason) → **the rank line** → **the XP box** (as built) → the buttons.
 - **The rank line** is one shared component (`RankChange`, lifted from Duel.tsx's `rankLine` and the emblem), in a
