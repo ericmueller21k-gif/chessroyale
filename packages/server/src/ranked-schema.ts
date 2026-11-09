@@ -173,8 +173,8 @@ export async function rankedSummary(sql: Sql, userId: string, admins: AdminCheck
 /**
  * A guest signing in to an account (accounts.ts, signInWithIdentity's one batch): the guest's rank becomes the
  * account's only if the account has none (online play needs signing in wherever sign-in is set up, so only a server
- * without sign-in has guests with ranks), and its games and its marks for leaving early become the account's. Nothing stays
- * under the guest's id.
+ * without sign-in has guests with ranks), and its games and its marks for leaving early become the account's (the marks' places
+ * in the last-20 window rebased onto the account's games). Nothing stays under the guest's id.
  */
 export function rankedMoves(from: string, to: string): Stmt[] {
   return [
@@ -184,10 +184,19 @@ export function rankedMoves(from: string, to: string): Stmt[] {
       to,
       from,
     ),
-    stmt("DELETE FROM ranked_1v1 WHERE user_id = ?", from),
-    // (Marks for leaving early go with the player, as their games do.)
-    stmt("UPDATE OR IGNORE ranked_conduct SET user_id = ? WHERE user_id = ?", to, from),
+    // (Marks for leaving early go with the player, as their games do: each one's place in the last-20 window rebased from the
+    // guest's ranked games onto the account's, so it's as many games back as it was, never newer than now. Before the guest's
+    // rank row goes: both counts are read here.)
+    stmt(
+      `UPDATE OR IGNORE ranked_conduct SET user_id = ?1,
+         games = MAX(0, MIN(games - COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?2), 0) + COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?1), 0),
+           COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?1), 0)))
+       WHERE user_id = ?2`,
+      to,
+      from,
+    ),
     stmt("DELETE FROM ranked_conduct WHERE user_id = ?", from),
+    stmt("DELETE FROM ranked_1v1 WHERE user_id = ?", from),
     stmt("UPDATE ranked_1v1_games SET white_id = ? WHERE white_id = ?", to, from),
     stmt("UPDATE ranked_1v1_games SET black_id = ? WHERE black_id = ?", to, from),
   ];

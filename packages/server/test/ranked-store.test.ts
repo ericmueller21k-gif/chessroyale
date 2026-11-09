@@ -663,6 +663,63 @@ describe("leaving early (ranked's leave rules, L1, Nov 9)", () => {
     expect(await sql.all("SELECT * FROM ranked_conduct")).toEqual([]);
   });
 
+  it("a leave in the game that completes placements: the loss and the mark, no fee (the FAQ: in placements it only goes on the record)", async () => {
+    const { sql, a, b } = await setup();
+    const fourth = () => sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 1500, 200, 4, 2, 2, 0, NULL, ?)", a.id, T0 - 60 * MIN);
+    await fourth();
+    await onLadder(sql, b.id, 400);
+    const g = game(a.id, b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"], conduct: { w: "leave" } });
+    const out = await recordDuel(sql, g, notHeld);
+    expect(out!.w.change!.placed).toBe(true);
+    expect(out!.w.conduct).toEqual({ kind: "leave", rp: 0 });
+    expect(await marksOf(sql, a.id)).toEqual([{ kind: "leave", at: g.endedAt, games: 5, rp: 0 }]);
+    // The ladder it placed at, untouched: the same as the same loss with nobody leaving.
+    const plain = await setup();
+    await plain.sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 1500, 200, 4, 2, 2, 0, NULL, ?)", plain.a.id, T0 - 60 * MIN);
+    await onLadder(plain.sql, plain.b.id, 400);
+    await recordDuel(plain.sql, game(plain.a.id, plain.b.id, "0-1", { reason: "resign", moves: ["e2e4", "e7e5"] }), notHeld);
+    expect(await ladderOf(sql, a.id)).toBe(await ladderOf(plain.sql, plain.a.id));
+    expect(await ladderOf(sql, a.id)).not.toBeNull();
+  });
+
+  it("a dodge's fee landing between a game's read and its write isn't overwritten: the game is read again, the fee kept", async () => {
+    const { sql, a, b } = await setup();
+    const c = (await createGuest(sql, T0, "Cy")).user;
+    await onLadder(sql, a.id, 400);
+    await onLadder(sql, b.id, 400);
+    // Ann dodges a game against Cy (another tab) just as her game against Bob is being written.
+    let raced = false;
+    const racing: Sql = {
+      ...sql,
+      async batch(statements) {
+        if (!raced && statements.some((s) => s.sql.includes("INSERT OR IGNORE INTO ranked_1v1_games") && s.params[0] === "won")) {
+          raced = true;
+          await recordDuel(sql, dodged(a.id, c.id, "w", { id: "dodged" }), notHeld);
+        }
+        return sql.batch(statements);
+      },
+    };
+    const out = await recordDuel(racing, game(a.id, b.id, "1-0", { id: "won" }), notHeld);
+    expect(raced).toBe(true);
+    expect(await marksOf(sql, a.id)).toEqual([expect.objectContaining({ kind: "dodge", rp: 5 })]);
+    // The win's points on top of the ladder after the fee: 395, not 400.
+    expect(await ladderOf(sql, a.id)).toBe(395 + out!.w.change!.points!);
+  });
+
+  it("a guest's marks moved to an account with more games: still as many games back (in the window), never newer than now", async () => {
+    const { sql, a, b } = await setup();
+    // The guest: a leave in its first game, then a dodge.
+    await recordDuel(sql, game(a.id, b.id, "0-1", { id: "left", reason: "resign", moves: ["e2e4", "e7e5"], conduct: { w: "leave" } }), notHeld);
+    await recordDuel(sql, dodged(a.id, b.id, "w", { id: "dodge", endedAt: T0 + 10 * MIN }), notHeld);
+    expect(await marksOf(sql, a.id)).toEqual([expect.objectContaining({ kind: "dodge", games: 1 }), expect.objectContaining({ kind: "leave", games: 1 })]);
+    // The account: 30 ranked games of its own (it keeps its rank).
+    const owner = await signInWithIdentity(sql, null, "email", "owner@example.com", {}, T0);
+    await onLadder(sql, owner.id, 400, 30);
+    await signInWithIdentity(sql, a, "email", "owner@example.com", {}, T0);
+    expect((await marksOf(sql, owner.id)).map((m) => m.games)).toEqual([30, 30]);
+    expect((await rankedLeaves(sql, owner.id, T0 + 11 * MIN)).marks).toBe(2);
+  });
+
   it("the profile carries the standing (null with the kill switch on)", async () => {
     const { sql, a, b } = await setup();
     await recordDuel(sql, dodged(a.id, b.id, "w", { endedAt: Date.now() - 1000 }), notHeld);

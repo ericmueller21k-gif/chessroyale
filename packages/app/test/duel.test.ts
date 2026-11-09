@@ -182,11 +182,29 @@ describe("the 1 v 1 screens' words and clocks", () => {
     // Every reason a sentence: never run into the headline.
     for (const reason of ["checkmate", "resign", "timeout", "timeout_vs_insufficient", "stalemate", "repetition", "fifty_moves", "insufficient_material", "agreement", "abort", "no_first_move", "no_show"] as const)
       expect(resultReason(end({ reason }), "w", "Bob")).toMatch(/^[A-Z0-9].*\.$/);
-    // (Your own dodge, L1: the rank line under it says what it cost, so no "No rank change." here.)
-    expect(resultReason(end({ reason: "no_first_move", by: "w", result: "aborted" }), "w", "Bob")).toBe("Your first move didn't come in time.");
-    expect(resultReason(end({ reason: "abort", by: "w", result: "aborted" }), "w", "Bob")).toBe("You left before the first moves.");
-    expect(resultReason(end({ reason: "abort", by: "b", result: "aborted" }), "w", "Bob")).toBe("Bob left before the first moves. No rank change.");
-    expect(resultReason(end({ reason: "no_show", by: null, result: "aborted" }), "w", "Bob")).toBe("Your opponent didn't arrive. No rank change.");
+    // (Ranked's leave rules, L1: the words follow who the room charged (`left`). Your own dodge: no "No rank change." (the rank
+    // line under it says what it cost); the other player's: "No rank change." for you.)
+    const aborted = (reason: DuelEnd["reason"], by: "w" | "b" | null) => end({ reason, by, result: "aborted" });
+    expect(resultReason(aborted("no_first_move", "w"), "w", "Bob", { w: "dodge" })).toBe("Your first move didn't come in time.");
+    expect(resultReason(aborted("no_first_move", "w"), "b", "Ann", { w: "dodge" })).toBe("Ann's first move didn't come in time. No rank change.");
+    expect(resultReason(aborted("abort", "w"), "w", "Bob", { w: "dodge" })).toBe("You left before the first moves.");
+    expect(resultReason(aborted("abort", "w"), "b", "Ann", { w: "dodge" })).toBe("Ann left before the first moves. No rank change.");
+    // You pressed Abort after Bob had been gone past the grace: Bob's dodge, not yours (and the other way round).
+    expect(resultReason(aborted("abort", "w"), "w", "Bob", { b: "dodge" })).toBe("Bob left before the first moves. No rank change.");
+    expect(resultReason(aborted("abort", "w"), "b", "Ann", { b: "dodge" })).toBe("You left before the first moves.");
+    // Your first move was due, but Bob had gone: his.
+    expect(resultReason(aborted("no_first_move", "w"), "w", "Bob", { b: "dodge" })).toBe("Bob left before the first moves. No rank change.");
+    // Nobody charged (both gone, or the queue's Cancel before you could see it), or the recording came back without a charge
+    // (the kill switch): "No rank change." for both.
+    expect(resultReason(aborted("abort", "w"), "w", "Bob", {})).toBe("You left before the first moves. No rank change.");
+    expect(resultReason(aborted("abort", "w"), "w", "Bob", { w: "dodge" }, { change: null, coins: 0 })).toBe("You left before the first moves. No rank change.");
+    expect(resultReason(aborted("abort", "w"), "w", "Bob", { w: "dodge" }, { change: null, coins: 0, conduct: { kind: "dodge", rp: 10 } })).toBe("You left before the first moves.");
+    // A no-show: to the one who came, and to the one who didn't (coming late).
+    expect(resultReason(aborted("no_show", "b"), "w", "Bob", { b: "dodge" })).toBe("Your opponent didn't arrive. No rank change.");
+    expect(resultReason(aborted("no_show", "b"), "b", "Ann", { b: "dodge" })).toBe("You didn't arrive in time.");
+    expect(resultReason(aborted("no_show", null), "w", "Bob", {})).toBe("Your opponent didn't arrive. No rank change.");
+    // A bot's game (no `left`): "No rank change." either way.
+    expect(resultReason(aborted("abort", "w"), "w", "Bot")).toBe("You left before the first moves. No rank change.");
   });
 
   it("the home screen's label: your rank from your profile (placements before any game), nothing before it loads", async () => {

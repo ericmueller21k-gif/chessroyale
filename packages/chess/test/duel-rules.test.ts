@@ -289,6 +289,8 @@ describe("1 v 1: who left early (ranked's leave rules, L1)", () => {
   it("a no-show: the one who didn't come; nobody if neither did", () => {
     expect(conductOf(end("no_show", "b"), null, { w: true, b: false })).toEqual({ b: "dodge" });
     expect(conductOf(end("no_show", null), null, { w: false, b: false })).toEqual({});
+    // One the server never told about the game (its code never reached them): nobody's.
+    expect(conductOf(end("no_show", "b"), null, { w: true, b: false }, { knew: { w: true, b: false } })).toEqual({});
   });
   it("resigning before your 3rd move is a leave; from it, an honest loss", () => {
     let { s, t } = playing();

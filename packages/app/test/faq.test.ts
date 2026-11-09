@@ -777,6 +777,12 @@ describe("ranked's leave rules in the FAQ (L1): every number from LEAVES", () =>
     expect(t).toContain("a loss, then 10 RP more.");
     expect(t).toContain("counted over your last 20 ranked games and dodges. With 3 or more, every 1 v 1 search waits 2 minutes longer before you can be matched (5 minutes with 5 or more). With 8 or more, 1 v 1 is locked for 24 hours.");
     expect(t).toContain("kept 90 days");
+    // (The review's fixes: Cancel, the grace before you count as gone, a no-show only once told, the window's games.)
+    expect(t).toContain("Pressing Cancel the moment a match is found, before the game opens on your screen, isn't a dodge; once it has opened, Cancel is the same as Abort.");
+    expect(t).toContain("you count as gone only after 12 seconds without a connection");
+    expect(t).toContain("while you've been gone over 12 seconds and your opponent is still there");
+    expect(t).toContain("not turning up once your device was told a match was found");
+    expect(t).toContain("Every ranked game you finish that counts for your rank pushes an old one out of the count.");
     expect(ranked1v1(RANKED_1V1)).toContain(t);
   });
   it("follows the settings when they change", () => {
@@ -785,5 +791,6 @@ describe("ranked's leave rules in the FAQ (L1): every number from LEAVES", () =>
     expect(t).toContain("a loss, then 15 RP more.");
     expect(t).toContain("With 9 or more, 1 v 1 is locked for 48 hours.");
     expect(t).toContain("before your 4th move");
+    expect(rankedLeaving({ ...LEAVES, goneGraceMs: 20_000 })).toContain("only after 20 seconds without a connection");
   });
 });

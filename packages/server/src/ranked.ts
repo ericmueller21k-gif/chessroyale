@@ -112,7 +112,7 @@ const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" 
  *     (the count is kept on their ranked_1v1 row, written in the same batch), each a ledger op (`ranked:<game>:<color>`,
  *     ledger.ts), so a game pays a player once even if its row were ever written again;
  *   - the game's row goes in only if neither player's record changed since it was read (another game of theirs ending
- *     at the same moment): then everything else in the batch applies only if that row is this recording's (its
+ *     at the same moment, or a dodge's fee off their ladder): then everything else in the batch applies only if that row is this recording's (its
  *     nonce), so a game recorded twice changes nothing the second time. A row that didn't go in is read again and
  *     retried.
  *   - ranked's leave rules (L1, `g.conduct`; off with `penalties: false`, the kill switch PAUSE_LEAVE_PENALTIES): a leaver's
@@ -155,14 +155,15 @@ export async function recordDuel(
       const count = coinCount(before[c].coins, day, () => earned > 0);
       const coins = count.pays ? earned : 0;
       let change: RankChange | null = null;
-      // Ranked's leave rules (L1): a leave is the loss, then LEAVES.leaveRp more rank points (none in placements, or while held).
+      // Ranked's leave rules (L1): a leave is the loss, then LEAVES.leaveRp more rank points (none in placements, the game that
+      // completes them included: it only goes on the record; nor while held).
       const leaving = penalties && g.conduct?.[c] === "leave";
       let fee = 0;
       if (!isHeld[c]) {
         const r = rankedGame(me, opp, score, now);
         change = r.change;
         let n = r.next;
-        if (leaving && n.ladder !== null) {
+        if (leaving && n.ladder !== null && !change.placed) {
           const ladder = ladderAfterFee(n.ladder, LEAVES.leaveRp)!;
           fee = n.ladder - ladder;
           n = { ...n, ladder };
@@ -225,10 +226,13 @@ export async function recordDuel(
     // (A player whose account was deleted during the game is the shared id "deleted" in it, as in their other games.)
     const who = "CASE WHEN EXISTS (SELECT 1 FROM users WHERE id = ?) THEN ? ELSE '" + DELETED_ID + "' END";
     const gamesNow = "COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?), 0)";
+    // (And each ladder as read: a dodge's fee from another game landing meanwhile changes no games, only the ladder, which this
+    // batch's write would otherwise overwrite.)
+    const ladderNow = "(SELECT ladder FROM ranked_1v1 WHERE user_id = ?)";
     await sql.batch([
       stmt(
         `INSERT OR IGNORE INTO ranked_1v1_games (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, nonce, white_points, black_points)
-         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ?`,
+         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ? AND ${ladderNow} IS ? AND ${ladderNow} IS ?`,
         g.id,
         g.players.w,
         g.players.w,
@@ -249,6 +253,10 @@ export async function recordDuel(
         before.w.record.games,
         g.players.b,
         before.b.record.games,
+        g.players.w,
+        before.w.record.ladder,
+        g.players.b,
+        before.b.record.ladder,
       ),
       ...writes,
     ]);

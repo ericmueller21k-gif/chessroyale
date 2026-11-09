@@ -1,6 +1,6 @@
 import type { DuelZone, ItemLook, RankChange, RankView, XpGrant } from "@chessroyale/core";
 import type { ChatBlock, ChatRefusal, NetChatLine } from "../protocol.ts";
-import type { Color, DuelEnd } from "./rules.ts";
+import type { Color, DuelConduct, DuelEnd } from "./rules.ts";
 
 /**
  * Ranked 1 v 1's messages between the app and a game's object (docs/areas/ranked.md, "The protocol"). Every message
@@ -50,6 +50,11 @@ export interface DuelView {
   canOffer: Record<Color, boolean>;
   connected: Record<Color, boolean>;
   end: DuelEnd | null;
+  /**
+   * Who left early (ranked's leave rules, L1: the room's conductOf), decided as it ended: the result card's words follow it (the
+   * one charged reads their own line, the other "No rank change."). Missing: not ended, or an older server.
+   */
+  left?: DuelConduct;
 }
 
 /** What a finished game did for you: your rank's change and your coins (none for an aborted game). */

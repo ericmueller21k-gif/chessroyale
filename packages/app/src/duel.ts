@@ -17,6 +17,7 @@ import {
   tick,
   type Color,
   type DuelClientMessage,
+  type DuelConduct,
   type DuelEnd,
   type DuelGamePhase,
   type DuelOutcome,
@@ -81,6 +82,8 @@ export interface DuelSnapshot {
   canOffer: Record<Color, boolean>;
   connected: Record<Color, boolean>;
   end: DuelEnd | null;
+  /** Who left early (ranked's leave rules, L1), as the server decided as it ended (missing: nobody said, a bot's game). */
+  left?: DuelConduct;
   /** What the game did for you (your rank, your coins), once the server has recorded it. */
   outcome: DuelOutcome | null;
   /** The game can't be shown (refused, ended before you got there), and why. */
@@ -378,6 +381,7 @@ export class NetDuel implements DuelSession {
       canOffer: v?.canOffer ?? { w: false, b: false },
       connected: v?.connected ?? { w: false, b: false },
       end: v?.end ?? null,
+      ...(v?.left ? { left: v.left } : {}),
       outcome: this.outcome,
       gone: this.gone,
     };

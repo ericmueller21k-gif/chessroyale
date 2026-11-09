@@ -163,8 +163,8 @@ function Privacy() {
               against a bot (it's played on your device).
             </p>
             <p>
-              Leaving ranked games early, which can delay your queue: each time you left one before it started, or soon after it did
-              (which game, when, and the rank points it cost), and how many ranked games you'd played by then.
+              Leaving ranked games early, which can delay your queue: each time you left one before it started, or by resigning very early
+              or abandoning it (which game, when, and the rank points it cost), and how many ranked games you'd played by then.
             </p>
           </>
         }

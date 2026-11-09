@@ -142,6 +142,40 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
     expect(b).toBeTruthy();
   });
 
+  it("ranked's leave rules read again (L1): a lockout takes a ticket made before it out of line; the delayed queue holds it once, never pushed on", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const a = q.enqueue(null, T0, info("a", 1500));
+    // Only the account's own ticket.
+    expect(q.restrict(a.id, "someone", { drop: true, notBefore: null })).toBe(false);
+    expect(q.waiting).toBe(1);
+    expect(q.restrict(a.id, "a", { drop: true, notBefore: null })).toBe(true);
+    expect(q.waiting).toBe(0);
+    expect(q.known(a.id)).toBe(false);
+    const b = q.enqueue(null, T0, info("b", 1500));
+    q.restrict(b.id, "b", { drop: false, notBefore: T0 + 120_000 });
+    q.restrict(b.id, "b", { drop: false, notBefore: T0 + 999_000 });
+    expect(b.info?.notBefore).toBe(T0 + 120_000);
+    q.enqueue(null, T0, info("c", 1500));
+    expect(q.admit(T0 + 1000, 0, PAIR_BY_RATING)).toEqual([]);
+    // A placed ticket keeps its game.
+    const p = new QueueCore(cfg(), T0, nextId);
+    const d = p.enqueue(null, T0, info("d", 1500));
+    p.enqueue(null, T0, info("e", 1500));
+    const [g] = p.admit(T0, 0, PAIR_BY_RATING);
+    p.place(g!.tickets, "GAMED", T0);
+    expect(p.restrict(d.id, "d", { drop: true, notBefore: null })).toBe(false);
+    expect(p.placedIn(d.id)).toBe("GAMED");
+  });
+
+  it("a placement is delivered once: the first ask answered with its code (ranked's leave rules: a no-show is charged only then)", () => {
+    const q = new QueueCore(cfg(), T0, nextId);
+    const a = q.enqueue(null, T0, info("a", 1500));
+    expect(q.deliver(a.id)).toBeNull();
+    q.place([a], "GAMEA", T0);
+    expect(q.deliver(a.id)).toEqual({ code: "GAMEA", uid: "a" });
+    expect(q.deliver(a.id)).toBeNull();
+  });
+
   it("its own queue name", () => {
     expect(queueName("ranked1v1", "default")).toBe("ranked1v1-default");
     expect(queueName("ranked1v1", "default", "e2e-1")).toBe("ranked1v1-default-e2e-1");
@@ -154,10 +188,13 @@ describe("pairing in the queue (PAIR_BY_RATING)", () => {
  */
 function duels(throws = 0) {
   const made = new Map<string, { w: DuelPlayerView; b: DuelPlayerView; testSeconds: number | null }>();
-  const D = { made, ns: {} as unknown, calls: 0 };
+  const D = { made, ns: {} as unknown, calls: 0, told: [] as string[] };
   D.ns = {
     idFromName: (name: string) => name,
     get: (code: string) => ({
+      async delivered(uid: string) {
+        D.told.push(`${code}:${uid}`);
+      },
       async create(c: string, players: { w: DuelPlayerView; b: DuelPlayerView }, opts: { testSeconds?: number | null }) {
         if (++D.calls <= throws) throw new Error("Durable Object reset because its code was updated.");
         if (made.has(c)) return false;
@@ -213,6 +250,36 @@ describe("the Matchmaker's 1 v 1 queue", () => {
     const bob = await mm.duelNext(null, info("bob", 1500));
     expect(bob).toMatchObject({ searching: true });
     expect("delayMs" in bob).toBe(false);
+    expect(D.made.size).toBe(0);
+  });
+
+  it("each player's ask answered with the game's code tells the game, once (ranked's leave rules: a no-show is a dodge only then)", async () => {
+    const D = duels();
+    const mm = matchmaker(D.ns);
+    const first = await mm.duelNext(null, info("ann", 1500));
+    const bob = await mm.duelNext(null, info("bob", 1500));
+    const code = "code" in bob ? bob.code : null;
+    expect(code).toBeTruthy();
+    // Bob was told by his own ask; Ann not yet (her phone asleep, say).
+    expect(D.told).toEqual([`${code}:bob`]);
+    const ann = await mm.duelNext(ticketOf(first));
+    expect("code" in ann && ann.code).toBe(code);
+    await mm.duelNext(ticketOf(first));
+    expect(D.told.sort()).toEqual([`${code}:ann`, `${code}:bob`]);
+  });
+
+  it("a ticket in line asked about again after a dodge elsewhere (L1): a lockout answers expired at once; the delayed queue holds it", async () => {
+    const D = duels();
+    const mm = matchmaker(D.ns);
+    const first = await mm.duelNext(null, info("ann", 1500));
+    // Ann (another tab) is locked out now: her old ticket is taken out of line, never paired.
+    expect(await mm.duelNext(ticketOf(first), undefined, { uid: "ann", drop: true, notBefore: null })).toEqual({ expired: true });
+    const bob = await mm.duelNext(null, info("bob", 1500));
+    expect(bob).toMatchObject({ searching: true });
+    // Bob reaches the delayed queue meanwhile: his next ask holds his ticket, Cy close in rating or not.
+    const held = await mm.duelNext(ticketOf(bob), undefined, { uid: "bob", drop: false, notBefore: Date.now() + 120_000 });
+    expect(held).toMatchObject({ searching: true });
+    expect(await mm.duelNext(null, info("cy", 1500))).toMatchObject({ searching: true });
     expect(D.made.size).toBe(0);
   });
 

@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -376,8 +376,12 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment). Ranked's leave rules
  *     (L1): a player locked out (a dodge's lockout, or too many marks) is refused, 403 { message, lockedUntil, lock }; one in
  *     the delayed queue gets a ticket that can't be paired before its wait is over (`notBefore`; the answers' `delayMs`).
- *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
- *     abort before any move: nothing recorded, and no dodge: they never saw it; the other player hears it at once).
+ *     Read again on every ask that carries a ticket (a dodge in another tab meanwhile): a lockout takes the ticket out of
+ *     line (the same 403), the delayed queue holds it. An ask answered with the game's code tells the game (a no-show is
+ *     a dodge only once told: Matchmaker.told).
+ *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired already: that game ends for its player as their own Abort
+ *     or Resign (ranked's leave rules decide what it costs), unless they never connected to it (pressed the moment it was
+ *     found: called off, no dodge). The other player hears it at once.
  *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
@@ -391,7 +395,17 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
     if (refused) return refused;
     if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
     try {
-      if (ticket) return json(await (await queue()).duelNext(ticket));
+      if (ticket) {
+        // Ranked's leave rules read again on each ask (L1): a ticket made before a dodge elsewhere (a second tab or device) is
+        // taken out of line by a lockout and held by the delayed queue. A read that fails changes nothing.
+        const check = isPaused(env, "leave-penalties") ? null : await leavesRecheck(request, env, waitUntil).catch(() => null);
+        const answer = await (await queue()).duelNext(ticket, undefined, check ? { uid: check.uid, drop: !!check.leaves.lockedUntil, notBefore: check.leaves.delaySec ? Date.now() + check.leaves.delaySec * 1000 : null } : undefined);
+        if (check?.leaves.lockedUntil && !("code" in answer)) {
+          countCall("ranked.locked");
+          return json({ message: lockedLine(check.leaves.lock), lockedUntil: check.leaves.lockedUntil, lock: check.leaves.lock }, 403);
+        }
+        return json(answer);
+      }
       const me = await accountOf(request, env, waitUntil);
       if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const sql = d1Sql(env.DB);
@@ -434,6 +448,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   if (m[2]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "That game has ended." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: "That game has ended." }, 404);
+}
+
+/** The asking account and its standing with ranked's leave rules (L1), for an ask that carries a ticket; null: no account, or no database. */
+async function leavesRecheck(request: Request, env: Env, waitUntil: WaitUntil): Promise<{ uid: string; leaves: RankedLeaves } | null> {
+  if (!env.DB) return null;
+  const me = await accountOf(request, env, waitUntil);
+  if (!me) return null;
+  return { uid: me.id, leaves: await rankedLeaves(d1Sql(env.DB), me.id, Date.now()) };
 }
 
 /**

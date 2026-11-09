@@ -2648,6 +2648,12 @@ export const LEAVES = {
   lockHours: 24,
   /** Resigning before your this-many-th move is a leave (a dodge in disguise). */
   quickResignMoves: 3,
+  /**
+   * A player counts as gone (for who left: duel rules' conductOf) only once their last socket has been closed this long: a
+   * phone backgrounding, a Wi-Fi to cellular handoff, a reload or a deploy's dropped sockets come back well within it. Within it,
+   * an Abort pressed is the presser's own, and a flag is a plain loss.
+   */
+  goneGraceMs: 12_000,
   /** Home's note after a dodge ("You left before the game started: −5 RP") shows this long, unless a game comes after it. */
   noteMinutes: 30,
   /** A mark is kept this long, then the 15-minute cron deletes it. */

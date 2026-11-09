@@ -305,23 +305,31 @@ export function scoreOf(s: Pick<DuelState, "end">, c: Color): number | null {
 
 /**
  * Who left a ranked game early, and how (ranked's leave rules, phase L1: docs/areas/ranked.md "Leaving"), from how it ended
- * and who was connected at that moment (`present`: the room's sockets). Decided once, as the game ends:
- *   - a **dodge** (before both first moves): never connecting (`no_show`, the one who didn't come); Abort or a first move
- *     that didn't come (`abort`, `no_first_move`): whoever was gone when it happened if only one was (they left first),
- *     else the one it's about (`by`: pressed Abort, or sat on their first move). Both gone: nobody (nothing tells a player
- *     who left from a server that dropped them both). Before the game began (`s` null: still waiting for both), the one who
- *     pressed Abort;
+ * and who was there at that moment (`present`: the room's word, a player counting as gone only once their last socket has been
+ * closed LEAVES.goneGraceMs: a backgrounded phone, a network handoff or a deploy's dropped sockets aren't leaving). Decided once,
+ * as the game ends:
+ *   - a **dodge** (before both first moves): never connecting (`no_show`, the one who didn't come, only if the server actually
+ *     told them the game was found: `knew`); Abort or a first move that didn't come (`abort`, `no_first_move`): whoever was
+ *     gone when it happened if only one was (they left first), else the one it's about (`by`: pressed Abort, or sat on their
+ *     first move). Both gone: nobody (nothing tells a player who left from a server that dropped them both). Before the game
+ *     began (`s` null: still waiting for both), the one who pressed Abort;
  *   - a **leave** (after): resigning before your LEAVES.quickResignMoves-th move, or a flag while you were gone and your
  *     opponent was there (abandoning: your clock was the hold). A flag that's a draw (the other side can't mate) isn't one;
  *   - everything else: nobody (checkmate, a draw, an honest resignation or flag).
  */
 export type DuelConduct = Partial<Record<Color, "dodge" | "leave">>;
 
-export function conductOf(end: DuelEnd, s: Pick<DuelState, "moves"> | null, present: Record<Color, boolean>, quickResignMoves = LEAVES.quickResignMoves): DuelConduct {
+export function conductOf(
+  end: DuelEnd,
+  s: Pick<DuelState, "moves"> | null,
+  present: Record<Color, boolean>,
+  { knew = { w: true, b: true }, quickResignMoves = LEAVES.quickResignMoves }: { knew?: Record<Color, boolean>; quickResignMoves?: number } = {},
+): DuelConduct {
   const by = end.by;
   switch (end.reason) {
     case "no_show":
-      return by ? { [by]: "dodge" } : {};
+      // (A player the server never told about the game, a phone asleep as it paired, can't have dodged it.)
+      return by && knew[by] ? { [by]: "dodge" } : {};
     case "abort":
     case "no_first_move": {
       // (Before the game began, both players never yet there together: the one who pressed it.)

@@ -1,5 +1,5 @@
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
-import { QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
+import { LEAVES, QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
 import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
@@ -91,12 +91,21 @@ export interface DuelRecord {
   /** When the room closes (its results kept until then). */
   closeAt: number | null;
   /**
-   * Who left early (ranked's leave rules, L1: conductOf), decided once as the game ends, from who was connected then. Missing or
-   * null: not decided yet (or a record from before Nov 9). `excused`: called off by the queue's Cancel the moment it was paired
-   * (the player never saw the game): nobody's dodge.
+   * Who left early (ranked's leave rules, L1: conductOf), decided once as the game ends, from who was there then. Missing or
+   * null: not decided yet (or a record from before Nov 9). `excused`: called off by the queue's Cancel by a player who never
+   * connected to it (they never saw the game): nobody's dodge.
    */
   conduct?: DuelConduct | null;
   excused?: boolean;
+  /** Each side has connected at least once (it saw the game). */
+  seen?: Partial<Record<Color, true>>;
+  /**
+   * Since when each side has had no socket (cleared as it connects): a side counts as gone for who left only once this is
+   * LEAVES.goneGraceMs old. One whose close the room never heard (a deploy) is counted from when the room noticed.
+   */
+  goneAt?: Partial<Record<Color, number>>;
+  /** The queue handed this side the game's code (an ask answered with it): a no-show is a dodge only then. */
+  delivered?: Partial<Record<Color, true>>;
   chat: DuelChat;
 }
 
@@ -169,6 +178,7 @@ export class DuelCore {
       canOffer: { w: !!g && canOfferDraw(g, "w"), b: !!g && canOfferDraw(g, "b") },
       connected: { w: this.io.connected("w"), b: this.io.connected("b") },
       end: this.end,
+      ...(this.end && this.r.conduct ? { left: this.r.conduct } : {}),
     };
   }
 
@@ -186,7 +196,13 @@ export class DuelCore {
 
   /** A player connected (or reconnected): the game as it is, the chat so far; when both are here, the versus moment. */
   connect(c: Color) {
+    // (Moved on first with the time it went still kept: a flag that fell while it was gone was a flag while gone.)
     this.advance();
+    this.r.seen = { ...this.r.seen, [c]: true };
+    if (this.r.goneAt?.[c] !== undefined) {
+      const { [c]: _back, ...rest } = this.r.goneAt;
+      this.r.goneAt = rest;
+    }
     const outcome = this.r.outcomes?.[c];
     this.io.send(c, { t: "welcome", you: c, game: this.view(), v: DUEL_PROTOCOL });
     if (outcome) this.io.send(c, { t: "outcome", outcome });
@@ -197,6 +213,7 @@ export class DuelCore {
 
   /** A player's last socket closed: the other sees them gone (their clock keeps running; they can come back). */
   disconnect(c: Color) {
+    if (!this.io.connected(c)) this.r.goneAt = { ...this.r.goneAt, [c]: this.io.now() };
     this.io.send(other(c), { t: "presence", connected: { w: this.io.connected("w"), b: this.io.connected("b") } });
   }
 
@@ -224,8 +241,10 @@ export class DuelCore {
       this.r.noShow = { result: "aborted", reason: "no_show", by: here.length === 1 ? other(here[0]!) : null, at: this.r.joinBy };
     }
     if (this.r.game) this.r.game = tick(this.r.game, now);
-    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
+    // (A side seen before with no socket now whose close the room never heard, a deploy's: gone from now.)
+    for (const c of ["w", "b"] as const) if (this.r.seen?.[c] && !this.io.connected(c) && this.r.goneAt?.[c] === undefined) this.r.goneAt = { ...this.r.goneAt, [c]: now };
     this.ended();
+    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
   }
 
   alarm() {
@@ -251,7 +270,21 @@ export class DuelCore {
   private ended() {
     const end = this.end;
     if (end && this.r.closeAt === null) this.r.closeAt = this.io.now() + RANKED_1V1.resultsKeepMinutes * 60_000;
-    if (end && !this.r.conduct) this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, { w: this.io.connected("w"), b: this.io.connected("b") });
+    if (end && !this.r.conduct) {
+      const present = { w: !this.away("w", end.at), b: !this.away("b", end.at) };
+      const knew = { w: !!(this.r.delivered?.w || this.r.seen?.w), b: !!(this.r.delivered?.b || this.r.seen?.b) };
+      this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, present, { knew });
+    }
+  }
+
+  /**
+   * Gone at `at`, for who left (conductOf): no socket for LEAVES.goneGraceMs by then. A side never seen is gone; one seen whose
+   * close the room never heard (a deploy) isn't yet.
+   */
+  private away(c: Color, at: number): boolean {
+    const since = this.r.goneAt?.[c];
+    if (since !== undefined) return at - since >= LEAVES.goneGraceMs;
+    return !this.io.connected(c) && !this.r.seen?.[c];
   }
 
   /** A dodge to record: an aborted game (or a no-show) that someone left early. */
@@ -310,12 +343,18 @@ export class DuelCore {
   }
 
   /**
-   * The queue's Cancel answered this game (pressed the moment it was paired, before the player could see it): called off for
-   * them as an abort, and nobody's dodge.
+   * The queue's Cancel answered this game (DuelGame.abandon): the player's own Abort or Resign (conductOf decides), unless
+   * they never connected to it (pressed the moment it was found, before they could see it): then called off, nobody's dodge.
    */
   cancelled(c: Color) {
-    if (!this.end) this.r.excused = true;
+    if (this.end) return;
+    if (!this.r.game && !this.r.seen?.[c]) this.r.excused = true;
     this.message(c, { t: "resign" });
+  }
+
+  /** The queue handed this side the game's code (the matchmaker's answer to its ask): from now on a no-show is its dodge. */
+  delivered(c: Color) {
+    this.r.delivered = { ...this.r.delivered, [c]: true };
   }
 
   // ---------------- What players send ----------------
@@ -366,8 +405,8 @@ export class DuelCore {
           drawOffer: s.drawOffer,
           canOffer: { w: canOfferDraw(s, "w"), b: canOfferDraw(s, "b") },
         });
-        if (s.end) this.broadcastGame();
         this.ended();
+        if (s.end) this.broadcastGame();
         return;
       }
       case "resign": {
@@ -380,8 +419,8 @@ export class DuelCore {
           if (!r.ok) return;
           this.r.game = r.state;
         }
-        this.broadcastGame();
         this.ended();
+        this.broadcastGame();
         return;
       }
       case "draw":
@@ -391,8 +430,8 @@ export class DuelCore {
         if (!r.ok) return;
         this.r.game = r.state;
         if (r.state.end) {
-          this.broadcastGame();
           this.ended();
+          this.broadcastGame();
         } else this.both({ t: "draw", drawOffer: r.state.drawOffer, canOffer: { w: canOfferDraw(r.state, "w"), b: canOfferDraw(r.state, "b") } });
         return;
       }

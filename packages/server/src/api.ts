@@ -668,7 +668,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       await endSession(sql, token);
     }
     const g = await createGuest(sql, now, "Player");
-    return json(await profile(sql, g.user), 200, { "set-cookie": sessionCookie(g.token) });
+    return json(await profile(sql, g.user, admins, leaves), 200, { "set-cookie": sessionCookie(g.token) });
   }
 
   // ---- Email: a 6-digit code (each step behind the age gate: no email is taken from a device that hasn't answered) ----
