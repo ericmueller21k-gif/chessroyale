@@ -229,6 +229,10 @@ describe("progress: only counted games, by mode, decided by the server", () => {
     const past = await grantXp(sql, ann.id, game("solo:ffffffffffffffffff", "solo", { ms: XP.maxMinutes * MIN }, { cap: "solo" }));
     expect(past?.none).toBe("limit");
     expect((await progress(sql, ann.id)).Regular).toBe(`${full}/10`);
+    // (A WON game past the minutes cap still earns its win XP, so it counts: delta review m-a, Nov 9.)
+    const won = await grantXp(sql, ann.id, game("solo:eeeeeeeeeeeeeeeeee", "solo", { ms: XP.maxMinutes * MIN, won: true }, { cap: "solo" }));
+    expect(won?.parts.some((p) => p.label.startsWith("Win"))).toBe(true);
+    expect((await progress(sql, ann.id)).Regular).toBe(`${full + 1}/10`);
   });
 
   it("a win counts only if its XP was paid: a friends' lobby's second win today against the same player moves nothing", async () => {
