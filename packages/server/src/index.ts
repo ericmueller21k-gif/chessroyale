@@ -1,5 +1,5 @@
 import { stockfishRefuses } from "@chessroyale/chess";
-import { OPS, RAID_SETTINGS, bossIdFromLink, modeSettings } from "@chessroyale/core";
+import { OPS, RAID_SETTINGS, bossIdFromLink, lockedLine, modeSettings, type RankedLeaves } from "@chessroyale/core";
 import { Lobby } from "./lobby-do.ts";
 import { SquadsLobby, SquadsParty } from "./squads-do.ts";
 import { squadsTestAllowed, testLobbyOptions } from "./squads-lobby.ts";
@@ -11,7 +11,7 @@ import { MATCH_ENDED } from "./lobby.ts";
 import { d1Sql, ensureSchema, lobbyResult, purgeEmailCodes, sha256, type User } from "./accounts.ts";
 import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
-import { duelEntrant, purgeDuelGames } from "./ranked.ts";
+import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
 import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
@@ -23,7 +23,7 @@ import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
 import { expireTownCache } from "./town-chat-api.ts";
 import { handleFriendsApi } from "./friends-api.ts";
-import { countRoute, opsStats, routeOf } from "./ops.ts";
+import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { pruneChatMod } from "./chat-mod.ts";
@@ -89,7 +89,7 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games (ranked.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
@@ -107,6 +107,8 @@ export default {
         await pruneChatMod(sql, Date.now()).catch(failed("chat"));
         // Ranked 1 v 1's games past keeping (ranked.ts: RANKED_1V1.gamesKeepDays, longer for a player in a fair-play review).
         await purgeDuelGames(sql, Date.now()).catch(failed("duels"));
+        // Marks for leaving ranked games early past keeping (ranked.ts: LEAVES.keepDays).
+        await purgeConduct(sql, Date.now()).catch(failed("conduct"));
         // Boss token drops past keeping (boss-tokens.ts: DROPS_KEEP_DAYS; the window needs one day).
         await purgeTokenDrops(sql, Date.now()).catch(failed("tokens"));
         // The item ledger's daily check (ledger.ts): every account whose balances and ledger disagree, logged with what differs, and
@@ -371,9 +373,15 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
  *     a ticket; the app asks again with it at once (each ask waits up to CAPACITY.queue.holdMs) until it's paired. A
  *     ticket the queue doesn't know (gone while the app slept) is `expired`: the app asks afresh. Signed in where
  *     sign-in is set up, not banned (mayPlay), as every mode; refused while PAUSE_RANKED1V1 rests the mode.
- *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment).
- *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired just now: that game is called off for its player (an
- *     abort before any move: nothing recorded; the other player hears it at once).
+ *     Test switches: `pool` (a queue of its own), `clock=SECONDS` (each side's clock, no increment). Ranked's leave rules
+ *     (L1): a player locked out (a dodge's lockout, or too many marks) is refused, 403 { message, lockedUntil, lock }; one in
+ *     the delayed queue gets a ticket that can't be paired before its wait is over (`notBefore`; the answers' `delayMs`).
+ *     Read again on every ask that carries a ticket (a dodge in another tab meanwhile): a lockout takes the ticket out of
+ *     line (the same 403), the delayed queue holds it. An ask answered with the game's code tells the game (a no-show is
+ *     a dodge only once told: Matchmaker.told).
+ *   POST /api/1v1/cancel?ticket= → {}: Cancel. A ticket paired already: that game ends for its player as their own Abort
+ *     or Resign (ranked's leave rules decide what it costs), unless they never connected to it (pressed the moment it was
+ *     found: called off, no dodge). The other player hears it at once.
  *   GET /api/1v1/game/CODE → { open, phase } | 404; /api/1v1/game/CODE/ws: its WebSocket (the two players only).
  */
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
@@ -387,19 +395,39 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
     if (refused) return refused;
     if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
     try {
-      if (ticket) return json(await (await queue()).duelNext(ticket));
+      if (ticket) {
+        // Ranked's leave rules read again on each ask (L1): a ticket made before a dodge elsewhere (a second tab or device) is
+        // taken out of line by a lockout and held by the delayed queue. A read that fails changes nothing.
+        const check = isPaused(env, "leave-penalties") ? null : await leavesRecheck(request, env, waitUntil).catch(() => null);
+        const answer = await (await queue()).duelNext(ticket, undefined, check ? { uid: check.uid, drop: !!check.leaves.lockedUntil, notBefore: check.leaves.delaySec ? Date.now() + check.leaves.delaySec * 1000 : null } : undefined);
+        if (check?.leaves.lockedUntil && !("code" in answer)) {
+          countCall("ranked.locked");
+          return json({ message: lockedLine(check.leaves.lock), lockedUntil: check.leaves.lockedUntil, lock: check.leaves.lock }, 403);
+        }
+        return json(answer);
+      }
       const me = await accountOf(request, env, waitUntil);
       if (!me) return json({ message: SIGN_IN_TO_PLAY }, 401);
       const sql = d1Sql(env.DB);
       await ensureSchema(sql, env.DB);
-      const { player, rating, rd } = await duelEntrant(sql, me, Date.now(), isAdmin(env, me));
+      const now = Date.now();
+      // Ranked's leave rules (L1): a lockout refuses the search (until when, and why); the delayed queue holds the ticket from
+      // pairing for its wait. The server's own record, never the app's word; none while PAUSE_LEAVE_PENALTIES is on.
+      const leaves = isPaused(env, "leave-penalties") ? null : await rankedLeaves(sql, me.id, now);
+      if (leaves?.lockedUntil) {
+        countCall("ranked.locked");
+        return json({ message: lockedLine(leaves.lock), lockedUntil: leaves.lockedUntil, lock: leaves.lock }, 403);
+      }
+      if (leaves?.delaySec) countCall("ranked.delayed");
+      const delay = leaves?.delaySec ? { notBefore: now + leaves.delaySec * 1000 } : {};
+      const { player, rating, rd } = await duelEntrant(sql, me, now, isAdmin(env, me));
       const clock = Number(url.searchParams.get("clock"));
       const testSeconds = url.searchParams.has("clock") && Number.isFinite(clock) && clock > 0 && (await testSwitches(request, env, waitUntil)) ? Math.min(3600, Math.round(clock)) : null;
       // (The first answer also carries the hidden rating, rounded: the bot a player may choose meets them there.)
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
@@ -420,6 +448,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   if (m[2]) return (await stub.exists()) ? stub.fetch(request) : json({ message: "That game has ended." }, 404);
   const status = request.method === "GET" ? await stub.status() : null;
   return status ? json({ open: true, phase: status.phase }) : json({ open: false, message: "That game has ended." }, 404);
+}
+
+/** The asking account and its standing with ranked's leave rules (L1), for an ask that carries a ticket; null: no account, or no database. */
+async function leavesRecheck(request: Request, env: Env, waitUntil: WaitUntil): Promise<{ uid: string; leaves: RankedLeaves } | null> {
+  if (!env.DB) return null;
+  const me = await accountOf(request, env, waitUntil);
+  if (!me) return null;
+  return { uid: me.id, leaves: await rankedLeaves(d1Sql(env.DB), me.id, Date.now()) };
 }
 
 /**

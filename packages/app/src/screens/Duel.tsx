@@ -3,7 +3,7 @@ import { XP_NONE_LINES } from "@chessroyale/core";
 import type { ComponentChildren, VNode } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { controlLabel, duelControl, type RankView } from "@chessroyale/core";
-import { other, type Color, type DuelEnd } from "@chessroyale/chess/duel";
+import { other, type Color, type DuelConduct, type DuelEnd, type DuelOutcome } from "@chessroyale/chess/duel";
 import { Board } from "../components/Board.tsx";
 import { seatKey } from "../board/yours.ts";
 import { Avatar } from "../components/Items.tsx";
@@ -17,7 +17,7 @@ import { DuelRankPill } from "../components/DuelRankPill.tsx";
 import { DuelStage, type StageSide } from "../components/DuelStage.tsx";
 import { clockAt, type DuelQueue, type DuelSession, type DuelSide, type DuelSnapshot } from "../duel.ts";
 import { account } from "../account.ts";
-import { ranked1v1Rank, yourRankShown } from "../ranked.ts";
+import { abortNote, ranked1v1Rank, resignNote, yourLeaves, yourRankShown } from "../ranked.ts";
 import { RankEmblem } from "../components/RankEmblem.tsx";
 import { clockShown } from "../clock-text.ts";
 
@@ -70,6 +70,7 @@ function youOnStage(): StageSide {
 function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => void, onCancel: () => void, onBot: () => void, onAway: () => void) {
   const s = queue.state;
   const waited = s.kind === "searching" ? Math.max(0, now - s.since) : 0;
+  const delayLeft = s.kind === "searching" && s.delayUntil ? Math.max(0, s.delayUntil - now) : 0;
   return (
     <DuelStage
       label="Finding opponent"
@@ -86,7 +87,8 @@ function searchStage(queue: DuelQueue, now: number, few: boolean, onKeep: () => 
       }
       waiting={
         <>
-          <span class="dv-st-finding">Finding opponent…</span>
+          {/* The delayed queue (ranked's leave rules, L1): its countdown in the line's place, then the search as ever. */}
+          <span class="dv-st-finding">{delayLeft > 0 ? `Delayed queue · ${clockShown(delayLeft)}` : "Finding opponent…"}</span>
           <span class="dv-wait">{clockShown(waited)}</span>
         </>
       }
@@ -148,7 +150,7 @@ export function resultTitle(end: DuelEnd, you: Color): string {
  * Why it ended, in a sentence of its own under the headline, from your side (`them`: the other player's name).
  * ("You won" / "Bob resigned.": two lines, never run together.)
  */
-export function resultReason(end: DuelEnd, you: Color, them: string): string {
+export function resultReason(end: DuelEnd, you: Color, them: string, left?: DuelConduct, outcome?: DuelOutcome | null): string {
   const byYou = end.by === you;
   switch (end.reason) {
     case "checkmate":
@@ -170,12 +172,27 @@ export function resultReason(end: DuelEnd, you: Color, them: string): string {
     case "agreement":
       return "Draw agreed.";
     case "abort":
-      return `${byYou ? "You" : them} left before the first moves. No rank change.`;
     case "no_first_move":
-      return `${byYou ? "Your" : `${them}'s`} first move didn't come in time. No rank change.`;
     case "no_show":
-      return "Your opponent didn't arrive. No rank change.";
+      return calledOff(end, you, them, left, outcome);
   }
+}
+
+/**
+ * An aborted game's sentence (ranked's leave rules, L1). It's about the one who left (`left`, the room's decision: the one
+ * charged, else whoever `by` names). Your own dodge has no "No rank change." (the rank line under it says what it cost); the
+ * other player's costs you nothing, and says so. Without `left` (a bot's or the town's game): "No rank change." either way.
+ */
+function calledOff(end: DuelEnd, you: Color, them: string, left?: DuelConduct, outcome?: DuelOutcome | null): string {
+  const charged: Color | null = left?.w === "dodge" ? "w" : left?.b === "dodge" ? "b" : null;
+  const about = charged ?? end.by;
+  // (Charged, unless the recording came back without it: the leave rules' kill switch, or fair play holding you.)
+  const costsYou = charged === you && !(outcome && !outcome.conduct);
+  const free = costsYou ? "" : " No rank change.";
+  const mine = about === you;
+  if (end.reason === "no_show") return mine ? `You didn't arrive in time.${free}` : `Your opponent didn't arrive.${free}`;
+  if (end.reason === "no_first_move" && about === end.by) return (mine ? "Your first move didn't come in time." : `${them}'s first move didn't come in time.`) + free;
+  return (mine ? "You left before the first moves." : `${them} left before the first moves.`) + free;
 }
 
 /** Your rank after the game (an admin's `?rank=` in its place), or null: none to show (yet). */
@@ -188,6 +205,10 @@ function rankAfter(snap: DuelSnapshot): RankView | null {
 function rankLine(snap: DuelSnapshot): string | null {
   if (snap.town) return "Casual game";
   if (snap.bot) return "Unranked game";
+  // (A dodge, ranked's leave rules L1: what it cost you, once the server has recorded it.)
+  if (snap.end?.result === "aborted" && snap.outcome?.conduct?.kind === "dodge") return `Left before it started${snap.outcome.conduct.rp ? `: −${snap.outcome.conduct.rp} RP` : ""}`;
+  // (Yours, its recording on its way.)
+  if (snap.end?.result === "aborted" && snap.left?.[snap.you] === "dodge" && !snap.outcome) return "Updating your rank…";
   if (!snap.end || snap.end.result === "aborted") return null;
   const o = snap.outcome;
   if (!o) return "Updating your rank…";
@@ -305,11 +326,16 @@ function DuelBoard({ session, snap, now, onHome, onAgain }: { session: DuelSessi
   const first = snap.firstMoveBy !== null && !over ? Math.max(0, Math.ceil((snap.firstMoveBy - now) / 1000)) : null;
   // Abort before both first moves (nothing recorded); after, resign (a loss). Nothing once it's over.
   const abortable = !over && snap.moves.length < 2;
+  // In a ranked game the confirm says what leaving costs (ranked's leave rules, L1: the words only, the same box); a bot's or the
+  // town's game costs nothing.
+  const leaves = !snap.town && !snap.bot ? yourLeaves() : null;
+  const placed = (account().profile?.ranked1v1?.rank.ladder ?? null) !== null;
+  const mine = you === "w" ? Math.ceil(snap.moves.length / 2) : Math.floor(snap.moves.length / 2);
   const exit: MatchExit | null = over
     ? null
     : abortable
-      ? { kind: "leave", note: "The game is called off: no result, and no rank change.", go: () => session.resign() }
-      : { kind: "resign", note: "It counts as a loss.", go: () => session.resign() };
+      ? { kind: "leave", note: abortNote(leaves), go: () => session.resign() }
+      : { kind: "resign", note: resignNote(leaves, mine, placed), go: () => session.resign() };
   const theirName = snap.players[them].name;
   const people: ChatPeople = {
     nameOf: (id) => (id === "w" || id === "b" ? snap.players[id].name : "?"),
@@ -422,7 +448,7 @@ function DuelResult({ snap, onHome, onAgain }: { snap: DuelSnapshot; onHome: () 
   return (
     <div class={`dv-result${title === "You won" ? " won" : title === "You lost" ? " lost" : ""}`} role="status">
       <strong class="dv-result-title">{title}</strong>
-      <p class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name)}</p>
+      <p class="dv-result-why">{resultReason(end, you, snap.players[other(you)].name, snap.left, snap.outcome)}</p>
       {(line || coins > 0) && (
         <span class={`dv-result-line${ranked ? " dv-result-ranked" : ""}`}>
           {ranked && <RankEmblem rank={rankAfter(snap)} class="dv-result-emblem" />}

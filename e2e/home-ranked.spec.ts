@@ -126,6 +126,60 @@ test("1 v 1's rank line at its widest (a top tier with four-digit points, its em
   }
 });
 
+test("ranked's leave rules (L1): a lockout greys 1 v 1's PLAY with its countdown in the line above it, one line from 320 px; the delayed queue leaves PLAY on", async ({ page }) => {
+  await named(page, "Dodger");
+  // (The server's standing, faked: a dodge's lockout ending `lockFor` ms after the page asks, or the delayed queue.)
+  let leaves: (() => Record<string, unknown>) | null = null;
+  await page.route("**/api/me*", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (body?.user && leaves) body.leaves = leaves();
+    await route.fulfill({ response: res, json: body });
+  });
+  const standing = { marks: 2, level: 2, lock: "dodge", delaySec: 0, nextDodge: { rp: 10, lockoutMin: 30 }, dodged: null };
+  const play = page.getByRole("button", { name: "PLAY", exact: true });
+  const line = page.locator(".fd-go > .fd-hint");
+  for (const width of desktop() ? [1280] : [390, 320]) {
+    if (!desktop()) await page.setViewportSize({ width, height: 740 });
+    leaves = () => ({ ...standing, lockedUntil: Date.now() + 4 * 60_000 + 30_000 });
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(/^You left early: 1 v 1 opens in 4:[23]\d$/);
+    await expect(play).toBeDisabled();
+    const shown = await line.textContent();
+    await expect.poll(() => line.textContent(), { timeout: 3_000 }).not.toBe(shown);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth), `${width}`).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, `${width}: one line`).toBeLessThan(20);
+    expect(await sideways(page), `${width}`).toBe(0);
+  }
+  // The widest line (the 24-hour lock, in hours) and the delayed queue's: one line too (at 320 px on a phone).
+  for (const [make, text] of [
+    [() => ({ ...standing, marks: 8, lock: "leaves", lockedUntil: Date.now() + 23 * 3_600_000 + 59 * 60_000 + 50_000 }), /^Too many leaves: 1 v 1 opens in 23:59:\d\d$/],
+    [() => ({ ...standing, marks: 7, lock: null, lockedUntil: null, delaySec: 300 }), /^7 leaves in your last 20: \+5 min queue$/],
+  ] as const) {
+    leaves = make;
+    await page.goto("/?mode=1v1&nolanding");
+    await expect(line).toHaveText(text);
+    const words = line.locator(".fd-leaves");
+    expect(await words.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
+    expect((await words.boundingBox())!.height, "one line").toBeLessThan(20);
+  }
+  // Another mode's PLAY isn't locked.
+  await page.getByRole("radio", { name: /^50 v 50/ }).click();
+  await expect(play).toBeEnabled();
+  // A lockout ending in 2 s: PLAY comes back on its own, the line 1 v 1's usual one.
+  leaves = () => ({ ...standing, lockedUntil: Date.now() + 2_000 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(play).toBeDisabled();
+  await expect(play).toBeEnabled({ timeout: 6_000 });
+  await expect(line).toHaveText("Ranked chess vs one player near your level");
+  // The delayed queue: its line, PLAY on (the wait starts with the search).
+  leaves = () => ({ ...standing, marks: 3, lock: null, lockedUntil: null, delaySec: 120 });
+  await page.goto("/?mode=1v1&nolanding");
+  await expect(line).toHaveText("3 leaves in your last 20: +2 min queue");
+  await expect(play).toBeEnabled();
+});
+
 test("the Boss raid screen (?mode=raid, every choice): each choice reaches its flow (a raid's queue, people only, a Solo raid, Boss alone's menu, a raid with friends); Back is home", async ({ page }) => {
   // (Its character select, the tiles and the stage: boss-select.spec.ts. Home's Boss Battle card opens the solo form:
   // home-layout.spec.ts.)
@@ -153,8 +207,11 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
-  // People only: the raid's queue without bots.
+  // People only: the raid's queue without bots, still in this test's own pool after Cancel put the address back to "/"
+  // (Nov 9: it went to the server's shared queue, meeting whatever other tests had left there).
+  const peopleOnly = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/play?") && r.url().includes("type=botsoff"));
   await main.getByRole("button", { name: /^People only/ }).click();
+  expect(new URL((await peopleOnly).url()).searchParams.get("pool")).toBe(`raidscreen-${test.info().project.name}-${run}`);
   await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
   await page.getByRole("button", { name: "Cancel" }).click();
   await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();

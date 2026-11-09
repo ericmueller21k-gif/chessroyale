@@ -30,6 +30,7 @@
       "packages/core/src/profile.ts",
       "packages/core/src/quests.ts",
       "packages/core/src/ranked.ts",
+      "packages/core/src/ranked-leaves.ts",
       "packages/core/src/rating-curve.ts",
       "packages/core/src/rating.ts",
       "packages/core/src/rng.ts",

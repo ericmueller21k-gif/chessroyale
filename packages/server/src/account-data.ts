@@ -205,12 +205,12 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => socialDeletes(u.id),
   },
   {
-    // Ranked 1 v 1 (ranked.ts): the player's rank (the hidden rating too: it's theirs) and their kept games, each with
+    // Ranked 1 v 1 (ranked.ts): the player's rank (the hidden rating too: it's theirs), their marks for leaving early, and their kept games, each with
     // the opponent's name. Deleting: the rank goes, and in the games kept for a while the player becomes the shared id
     // "deleted" (the opponent's games stay theirs). Fair play's check of a game (`checked`) isn't in the download, as
     // the rest of detection's records.
     name: "ranked1v1",
-    tables: ["ranked_1v1", "ranked_1v1_games"],
+    tables: ["ranked_1v1", "ranked_1v1_games", "ranked_conduct"],
     export: (sql, u) => rankedDownload(sql, u.id),
     erase: (u) => rankedErase(u.id),
   },

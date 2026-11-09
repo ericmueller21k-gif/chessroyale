@@ -5,6 +5,7 @@ import {
   canMate,
   canOfferDraw,
   clockLeft,
+  conductOf,
   declineDraw,
   firstMoveBy,
   move,
@@ -254,5 +255,65 @@ describe("1 v 1: resigning, aborting and draws", () => {
     ({ s, t } = play(s, t, ["e8g8"]));
     expect(s.drawOffer).toBeNull();
     expect(canOfferDraw(s, "w")).toBe(false);
+  });
+});
+
+describe("1 v 1: who left early (ranked's leave rules, L1)", () => {
+  const both = { w: true, b: true };
+  const end = (reason: Parameters<typeof conductOf>[0]["reason"], by: Color | null, result: "aborted" | "1-0" | "0-1" | "1/2-1/2" = "aborted") => ({ result, reason, by, at: 0 });
+
+  it("Abort during the vote or before both first moves: a dodge for the one who pressed it", () => {
+    const { s, t } = playing();
+    const r = resign(s, "b", t + 10);
+    expect(r.state.end?.reason).toBe("abort");
+    expect(conductOf(r.state.end!, r.state, both)).toEqual({ b: "dodge" });
+    // During the vote too.
+    const v = resign(newDuel(0), "w", 100);
+    expect(conductOf(v.state.end!, v.state, both)).toEqual({ w: "dodge" });
+  });
+  it("Abort after the other player left: theirs (they left first)", () => {
+    expect(conductOf(end("abort", "w"), newDuel(0), { w: true, b: false })).toEqual({ b: "dodge" });
+    // Still waiting for the other to arrive (no game yet): the one who pressed it.
+    expect(conductOf(end("abort", "w"), null, { w: true, b: false })).toEqual({ w: "dodge" });
+  });
+  it("no first move: a dodge for the side to move, or for whoever was gone; both gone: nobody", () => {
+    const { s, t } = playing();
+    const r = tick(s, t + FIRST);
+    expect(r.end?.reason).toBe("no_first_move");
+    expect(conductOf(r.end!, r, both)).toEqual({ w: "dodge" });
+    expect(conductOf(r.end!, r, { w: false, b: true })).toEqual({ w: "dodge" });
+    // White still there, Black gone (closed the app during the vote): Black's.
+    expect(conductOf(r.end!, r, { w: true, b: false })).toEqual({ b: "dodge" });
+    expect(conductOf(r.end!, r, { w: false, b: false })).toEqual({});
+  });
+  it("a no-show: the one who didn't come; nobody if neither did", () => {
+    expect(conductOf(end("no_show", "b"), null, { w: true, b: false })).toEqual({ b: "dodge" });
+    expect(conductOf(end("no_show", null), null, { w: false, b: false })).toEqual({});
+    // One the server never told about the game (its code never reached them): nobody's.
+    expect(conductOf(end("no_show", "b"), null, { w: true, b: false }, { knew: { w: true, b: false } })).toEqual({});
+  });
+  it("resigning before your 3rd move is a leave; from it, an honest loss", () => {
+    let { s, t } = playing();
+    ({ s, t } = play(s, t, ["e2e4", "e7e5", "g1f3", "b8c6"]));
+    // White has made 2 moves, Black 2.
+    const early = resign(s, "w", t + 10).state;
+    expect(early.end?.reason).toBe("resign");
+    expect(conductOf(early.end!, early, both)).toEqual({ w: "leave" });
+    ({ s, t } = play(s, t, ["f1c4"]));
+    // White 3 (a plain loss), Black still 2 (a leave).
+    expect(conductOf(resign(s, "w", t + 10).state.end!, s, both)).toEqual({});
+    expect(conductOf(resign(s, "b", t + 10).state.end!, s, both)).toEqual({ b: "leave" });
+  });
+  it("a flag while gone, the opponent there: a leave (abandoning); otherwise a plain loss", () => {
+    expect(conductOf(end("timeout", "w", "0-1"), null, { w: false, b: true })).toEqual({ w: "leave" });
+    expect(conductOf(end("timeout", "w", "0-1"), null, both)).toEqual({});
+    expect(conductOf(end("timeout", "w", "0-1"), null, { w: false, b: false })).toEqual({});
+    // A flag that's a draw (the other side can't mate): nobody.
+    expect(conductOf(end("timeout_vs_insufficient", "w", "1/2-1/2"), null, { w: false, b: true })).toEqual({});
+  });
+  it("checkmate, draws and the rest: nobody", () => {
+    for (const reason of ["checkmate", "stalemate", "repetition", "fifty_moves", "insufficient_material", "agreement"] as const) {
+      expect(conductOf(end(reason, "w", "0-1"), null, { w: false, b: true })).toEqual({});
+    }
   });
 });

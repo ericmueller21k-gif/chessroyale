@@ -61,7 +61,12 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     panel was there from the first view (Oct 25; it used to come in with the first pick, Oct 24, which raised the RANKED
     row and the board). PLAY, the cards and the line stay put. 1 v 1's PLAY is
     `startRanked1v1()`: its queue at once, at `/1v1` ([ranked.md](ranked.md)); resting (`PAUSE_RANKED1V1`), PLAY is
-    off with its line, as the other modes.
+    off with its line, as the other modes. Ranked's leave rules (L1, Nov 9; [ranked.md](ranked.md), "Leaving early"): a
+    lockout greys 1 v 1's PLAY with its countdown in the line ("You left early: 1 v 1 opens in 4:32", one line from 320 px;
+    `LeavesLine`, the only part drawn each second), PLAY back by itself as it ends; the delayed queue's line ("3 leaves in your
+    last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
+    before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
+    that ended) goes first.
   - **Chess Town's button** (Eric, Oct 31 and Nov 1; it was the full-width Boss Arena card, Oct 26, "Party up and take on the bosses";
     [docs/decisions/2026-11-01-home-chess-town.md](../decisions/2026-11-01-home-chess-town.md)): right under PLAY, **exactly PLAY's size at
     every width** (`.fd-town` is in each of PLAY's size rules in `styles.css`: 97 px on a phone, 76 px on a computer, 60 px in a short

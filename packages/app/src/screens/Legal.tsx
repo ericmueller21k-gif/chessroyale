@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -162,14 +162,19 @@ function Privacy() {
               their moves is kept with the game. A game called off before both first moves keeps nothing, and neither does a game
               against a bot (it's played on your device).
             </p>
+            <p>
+              Leaving ranked games early, which can delay your queue: each time you left one before it started, or by resigning very early
+              or abandoning it (which game, when, and the rank points it cost), and how many ranked games you'd played by then.
+            </p>
           </>
         }
-        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, and checking reported games for fair play."
+        why="your rank and record (on your profile, for anyone: your rank, your highest, your run of wins, and your last five games with whom you played and the rank points; never the hidden rating), matching you with players near your strength, the rank points and waits for leaving ranked games early, and checking reported games for fair play."
         kept={
           <>
             your rank with your account. A game usually {RANKED_1V1.gamesKeepDays} days after it ends; longer only while a
-            fair-play review of a player in it is open, or their appeal of a ban. If you delete your account, your rank goes,
-            and in the games still kept you become the shared "deleted" account (your opponent's games stay theirs).
+            fair-play review of a player in it is open, or their appeal of a ban. Each time you left early, {LEAVES.keepDays} days. If
+            you delete your account, your rank and those go, and in the games still kept you become the shared "deleted" account
+            (your opponent's games stay theirs).
           </>
         }
       />

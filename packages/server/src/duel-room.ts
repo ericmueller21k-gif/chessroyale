@@ -1,11 +1,12 @@
 import { hearsTyped, typedReads, typedSay, typedSeat, type TypedSeats } from "./typed-chat.ts";
-import { QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
+import { LEAVES, QUICK_CHAT, RANKED_1V1, canSay, chatCheck, chatSay, chatSent, noChatSent, ownedChatPacks, type ChatSent } from "@chessroyale/core";
 import { START_FEN, type ChatBlock, type ChatRefusal, type NetChatLine } from "@chessroyale/chess";
 import {
   DUEL_PROTOCOL,
   callOff,
   canOfferDraw,
   clocksRun,
+  conductOf,
   declineDraw,
   firstMoveBy,
   gameControl,
@@ -19,6 +20,7 @@ import {
   tick,
   type Color,
   type DuelClientMessage,
+  type DuelConduct,
   type DuelEnd,
   type DuelGamePhase,
   type DuelOutcome,
@@ -88,6 +90,22 @@ export interface DuelRecord {
   outcomes: Partial<Record<Color, DuelOutcome>> | null;
   /** When the room closes (its results kept until then). */
   closeAt: number | null;
+  /**
+   * Who left early (ranked's leave rules, L1: conductOf), decided once as the game ends, from who was there then. Missing or
+   * null: not decided yet (or a record from before Nov 9). `excused`: called off by the queue's Cancel by a player who never
+   * connected to it (they never saw the game): nobody's dodge.
+   */
+  conduct?: DuelConduct | null;
+  excused?: boolean;
+  /** Each side has connected at least once (it saw the game). */
+  seen?: Partial<Record<Color, true>>;
+  /**
+   * Since when each side has had no socket (cleared as it connects): a side counts as gone for who left only once this is
+   * LEAVES.goneGraceMs old. One whose close the room never heard (a deploy) is counted from when the room noticed.
+   */
+  goneAt?: Partial<Record<Color, number>>;
+  /** The queue handed this side the game's code (an ask answered with it): a no-show is a dodge only then. */
+  delivered?: Partial<Record<Color, true>>;
   chat: DuelChat;
 }
 
@@ -160,6 +178,7 @@ export class DuelCore {
       canOffer: { w: !!g && canOfferDraw(g, "w"), b: !!g && canOfferDraw(g, "b") },
       connected: { w: this.io.connected("w"), b: this.io.connected("b") },
       end: this.end,
+      ...(this.end && this.r.conduct ? { left: this.r.conduct } : {}),
     };
   }
 
@@ -177,7 +196,13 @@ export class DuelCore {
 
   /** A player connected (or reconnected): the game as it is, the chat so far; when both are here, the versus moment. */
   connect(c: Color) {
+    // (Moved on first with the time it went still kept: a flag that fell while it was gone was a flag while gone.)
     this.advance();
+    this.r.seen = { ...this.r.seen, [c]: true };
+    if (this.r.goneAt?.[c] !== undefined) {
+      const { [c]: _back, ...rest } = this.r.goneAt;
+      this.r.goneAt = rest;
+    }
     const outcome = this.r.outcomes?.[c];
     this.io.send(c, { t: "welcome", you: c, game: this.view(), v: DUEL_PROTOCOL });
     if (outcome) this.io.send(c, { t: "outcome", outcome });
@@ -188,6 +213,7 @@ export class DuelCore {
 
   /** A player's last socket closed: the other sees them gone (their clock keeps running; they can come back). */
   disconnect(c: Color) {
+    if (!this.io.connected(c)) this.r.goneAt = { ...this.r.goneAt, [c]: this.io.now() };
     this.io.send(other(c), { t: "presence", connected: { w: this.io.connected("w"), b: this.io.connected("b") } });
   }
 
@@ -209,14 +235,18 @@ export class DuelCore {
   advance() {
     const now = this.io.now();
     const before = `${this.phase(now)}:${!!this.end}`;
-    if (!this.r.game && !this.r.noShow && now >= this.r.joinBy) {
+    const noShowAt = this.noShowAt();
+    if (!this.r.game && !this.r.noShow && now >= noShowAt) {
       const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
-      // (The one who didn't turn up, when one did.)
-      this.r.noShow = { result: "aborted", reason: "no_show", by: here.length === 1 ? other(here[0]!) : null, at: this.r.joinBy };
+      // (The one who didn't turn up, when one did: never seen, or gone past the grace by now.)
+      const absent = here.length === 1 ? other(here[0]!) : null;
+      this.r.noShow = { result: "aborted", reason: "no_show", by: absent && this.away(absent, noShowAt) ? absent : null, at: noShowAt };
     }
     if (this.r.game) this.r.game = tick(this.r.game, now);
-    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
+    // (A side seen before with no socket now whose close the room never heard, a deploy's: gone from now.)
+    for (const c of ["w", "b"] as const) if (this.r.seen?.[c] && !this.io.connected(c) && this.r.goneAt?.[c] === undefined) this.r.goneAt = { ...this.r.goneAt, [c]: now };
     this.ended();
+    if (`${this.phase(now)}:${!!this.end}` !== before) this.broadcastGame();
   }
 
   alarm() {
@@ -227,7 +257,7 @@ export class DuelCore {
   get nextAlarm(): number | null {
     const r = this.r;
     const times: number[] = [];
-    if (!r.game && !r.noShow) times.push(r.joinBy);
+    if (!r.game && !r.noShow && Number.isFinite(this.noShowAt())) times.push(this.noShowAt());
     if (r.game && !r.game.end) {
       const d = nextDeadline(r.game);
       if (d !== null) times.push(d);
@@ -242,15 +272,50 @@ export class DuelCore {
   private ended() {
     const end = this.end;
     if (end && this.r.closeAt === null) this.r.closeAt = this.io.now() + RANKED_1V1.resultsKeepMinutes * 60_000;
+    if (end && !this.r.conduct) {
+      const present = { w: !this.away("w", end.at), b: !this.away("b", end.at) };
+      const knew = { w: !!(this.r.delivered?.w || this.r.seen?.w), b: !!(this.r.delivered?.b || this.r.seen?.b) };
+      this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, present, { knew });
+    }
+  }
+
+  /**
+   * When a game that hasn't begun is called a no-show: at joinBy, unless one side is here and the other had connected and
+   * gone only a moment before (within LEAVES.goneGraceMs): then once that grace runs out, so a phone that blinked can still
+   * come back and play, and one that closed the app is still charged (the delta review of #582, D1).
+   */
+  private noShowAt(): number {
+    const r = this.r;
+    const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
+    // (Both here: the game starts, startIfBoth, whatever the clock says.)
+    if (here.length === 2) return Infinity;
+    if (here.length !== 1) return r.joinBy;
+    const gone = r.goneAt?.[other(here[0]!)];
+    return gone !== undefined && r.joinBy - gone < LEAVES.goneGraceMs ? gone + LEAVES.goneGraceMs : r.joinBy;
+  }
+
+  /**
+   * Gone at `at`, for who left (conductOf): no socket for LEAVES.goneGraceMs by then. A side never seen is gone; one seen whose
+   * close the room never heard (a deploy) isn't yet.
+   */
+  private away(c: Color, at: number): boolean {
+    const since = this.r.goneAt?.[c];
+    if (since !== undefined) return at - since >= LEAVES.goneGraceMs;
+    return !this.io.connected(c) && !this.r.seen?.[c];
+  }
+
+  /** A dodge to record: an aborted game (or a no-show) that someone left early. */
+  private dodged(): boolean {
+    return Object.values(this.r.conduct ?? {}).includes("dodge");
   }
 
   // ---------------- Recording ----------------
 
-  /** A finished game (not aborted) whose outcome hasn't come back, with tries left. */
+  /** A finished game (not aborted, or aborted by a dodge: ranked's leave rules) whose outcome hasn't come back, with tries left. */
   private toRecord(): boolean {
     const r = this.r;
-    const end = r.game?.end;
-    return !!end && end.result !== "aborted" && r.outcomes === null && r.recordTries < RECORD_TRIES;
+    const end = this.end;
+    return !!end && (end.result !== "aborted" || this.dodged()) && r.outcomes === null && r.recordTries < RECORD_TRIES;
   }
 
   /** Whether a recording try is due now (takeFinished would hand the game over). */
@@ -267,21 +332,23 @@ export class DuelCore {
   takeFinished(): FinishedDuel | null {
     const r = this.r;
     const g = r.game;
-    if (!this.takeFinishedDue() || !g?.end) return null;
+    const end = this.end;
+    if (!this.takeFinishedDue() || !end) return null;
     const now = this.io.now();
     r.recordTries++;
     r.recordAt = now + RECORD_RETRY_MS;
     return {
       id: r.id,
       players: { w: r.players.w.uid, b: r.players.b.uid },
-      control: g.control ?? RANKED_1V1.defaultControl,
-      result: g.end.result,
-      reason: g.end.reason,
-      moves: g.moves,
-      times: g.times,
-      startedAt: g.startsAt ?? g.end.at,
-      endedAt: g.end.at,
+      control: g?.control ?? RANKED_1V1.defaultControl,
+      result: end.result,
+      reason: end.reason,
+      moves: g?.moves ?? [],
+      times: g?.times ?? [],
+      startedAt: g?.startsAt ?? end.at,
+      endedAt: end.at,
       testSeconds: r.testSeconds,
+      conduct: r.conduct ?? {},
     };
   }
 
@@ -290,6 +357,21 @@ export class DuelCore {
     const o = outcomes ?? { w: { change: null, coins: 0 }, b: { change: null, coins: 0 } };
     this.r.outcomes = o;
     for (const c of ["w", "b"] as const) this.io.send(c, { t: "outcome", outcome: o[c] });
+  }
+
+  /**
+   * The queue's Cancel answered this game (DuelGame.abandon): the player's own Abort or Resign (conductOf decides), unless
+   * they never connected to it (pressed the moment it was found, before they could see it): then called off, nobody's dodge.
+   */
+  cancelled(c: Color) {
+    if (this.end) return;
+    if (!this.r.game && !this.r.seen?.[c]) this.r.excused = true;
+    this.message(c, { t: "resign" });
+  }
+
+  /** The queue handed this side the game's code (the matchmaker's answer to its ask): from now on a no-show is its dodge. */
+  delivered(c: Color) {
+    this.r.delivered = { ...this.r.delivered, [c]: true };
   }
 
   // ---------------- What players send ----------------
@@ -340,8 +422,8 @@ export class DuelCore {
           drawOffer: s.drawOffer,
           canOffer: { w: canOfferDraw(s, "w"), b: canOfferDraw(s, "b") },
         });
-        if (s.end) this.broadcastGame();
         this.ended();
+        if (s.end) this.broadcastGame();
         return;
       }
       case "resign": {
@@ -354,8 +436,8 @@ export class DuelCore {
           if (!r.ok) return;
           this.r.game = r.state;
         }
-        this.broadcastGame();
         this.ended();
+        this.broadcastGame();
         return;
       }
       case "draw":
@@ -365,8 +447,8 @@ export class DuelCore {
         if (!r.ok) return;
         this.r.game = r.state;
         if (r.state.end) {
-          this.broadcastGame();
           this.ended();
+          this.broadcastGame();
         } else this.both({ t: "draw", drawOffer: r.state.drawOffer, canOffer: { w: canOfferDraw(r.state, "w"), b: canOfferDraw(r.state, "b") } });
         return;
       }

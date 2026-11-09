@@ -28,6 +28,7 @@ import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
 import { ShopScreen } from "./screens/Shop.tsx";
 import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, recordSoloResult, setTestXp } from "./account.ts";
+import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
 import { setLiveBusy, startLive } from "./live.ts";
@@ -62,7 +63,7 @@ import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./componen
 import { DuelFront } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
-import { testParams } from "./test-switches.ts";
+import { queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
@@ -350,6 +351,9 @@ export function App() {
   const [bossParty, setBossParty] = useState<PartyClient | null>(null);
   const [bossPartyError, setBossPartyError] = useState<string | null>(null);
   const [squadsNote, setSquadsNote] = useState<string | null>(() => (squadsLinkCode && !squadsRejoin ? "That match has ended." : null));
+  // Home's notes from ranked's leave rules this tab has dismissed (by their words and dodge: a new dodge's note shows again).
+  const [leavesDismissed, setLeavesDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const dismissLeaves = (text: string) => setLeavesDismissed((d) => new Set([...d, text]));
   /**
    * The lobby has closed: home (the address too, so reopening the app lands there) with a note, and your result if
    * you played (from the server, asked before this so the note shows whole, never growing a button a moment later).
@@ -1097,8 +1101,8 @@ export function App() {
       const q = new URLSearchParams();
       if (mode === "raid") q.set("mode", "raid");
       if (type === "botsoff") q.set("type", "botsoff");
-      // (?pool=NAME: a queue of its own, a test switch.)
-      const pool = testParams().get("pool");
+      // (?pool=NAME: a queue of its own, a test switch; kept after leaving a queue drops it from the address.)
+      const pool = queuePool();
       if (pool) q.set("pool", pool);
       // (?afk=0 with it: the pool's 50 v 50 misses as before Nov 4, for a test that idles on purpose.)
       if (pool && testParams().get("afk") === "0") q.set("afk", "0");
@@ -1157,7 +1161,7 @@ export function App() {
     const from = match;
     const q = new URLSearchParams({ type: "default", from: from.code });
     if (from.settings.raid) q.set("mode", "raid");
-    const pool = testParams().get("pool");
+    const pool = queuePool();
     if (pool) q.set("pool", pool);
     try {
       const res = await fetch(`/api/play?${q}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seat: from.seat }) });
@@ -1442,6 +1446,10 @@ export function App() {
   const noLanding = testParams().has("nolanding");
   const inviteCode = invite === "open" ? linkCode : undefined;
   const notice = ended ? (ended.why === "idle" ? "That lobby has closed." : ended.why === "left" ? leftNote(ended.how) : "That match has ended.") : (squadsNote ?? undefined);
+  // Ranked's leave rules (L1): home's note after a dodge, or while finishing games would clear a delay; dismissed for the tab.
+  const leaves = leavesNote(profile?.leaves ?? null);
+  const leavesKey = `${leaves}|${profile?.leaves?.dodged?.at ?? ""}`;
+  const leavesShown = !notice && leaves && !leavesDismissed.has(leavesKey) ? leaves : null;
   // Ranked 1 v 1: the search and the versus moment (one stage, in the home screen's frame, as every queue), then the game.
   if ((duel || (duelQueue && !duelAway)) && !match && !squads) {
     const overlayD = profileOpen && (
@@ -1772,7 +1780,9 @@ export function App() {
         error={error}
         joinCode={mustSignInToPlayOnline() ? undefined : inviteCode}
         notice={
-          !ended && notice
+          leavesShown
+            ? { text: leavesShown, onDismiss: () => dismissLeaves(leavesKey) }
+            : !ended && notice
             ? { text: notice, onDismiss: () => setSquadsNote(null) }
             : ended && notice
             ? {

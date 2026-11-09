@@ -43,7 +43,8 @@ import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccou
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
-import { RANKED_COLUMNS, RANKED_SCHEMA, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
+import type { RankedLeaves } from "@chessroyale/core";
+import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
 import { QUESTS_SCHEMA, questDeletes } from "./quests.ts";
@@ -824,10 +825,15 @@ export interface Profile {
   chatOn: boolean;
   /** Your XP (Nov 9): your level and its ring come from it (core's levelOf, levelProgress). */
   xp: number;
+  /**
+   * Ranked's leave rules (L1, Nov 9; ranked.ts rankedLeaves): a lockout, the delayed queue, what a dodge would cost now, and home's
+   * note after a dodge. Null while PAUSE_LEAVE_PENALTIES is on (nothing applies).
+   */
+  leaves: RankedLeaves | null;
 }
 
 /** Your profile. `admins`: who's an admin (admin.ts): an admin's shop and locker have one of every item, never stored. */
-export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS): Promise<Profile> {
+export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS, opts: { leaves?: boolean } = {}): Promise<Profile> {
   const admin = admins(user);
   // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
   // once ever (welcome.ts). Never in the way of the profile.
@@ -854,6 +860,7 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
     ranked1v1: await rankedSummary(sql, user.id, admins),
     xp: await xpOf(sql, user.id),
+    leaves: opts.leaves === false ? null : await rankedLeaves(sql, user.id, Date.now()).catch(() => null),
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,

@@ -5,6 +5,7 @@ export * from "./match.ts";
 export * from "./rating.ts";
 export * from "./votes.ts";
 export * from "./ranked.ts";
+export * from "./ranked-leaves.ts";
 export * from "./boss.ts";
 export * from "./boss-tokens.ts";
 export { RATING_CURVE } from "./rating-curve.ts";

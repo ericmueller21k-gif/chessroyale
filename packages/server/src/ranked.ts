@@ -5,12 +5,13 @@
  * the game, never from anything an app sends. The tables, a guest's merge and the profile's read are in
  * ranked-schema.ts (accounts.ts includes them; this file needs accounts.ts).
  */
-import { RANKED_1V1, duelCoins, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
-import type { Color, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
+import { LEAVES, RANKED_1V1, dodgeCost, dodgeLevelAt, duelCoins, ladderAfterFee, newRankedRecord, rankedGame, ratingNow, type RankChange, type RankedRecord } from "@chessroyale/core";
+import type { Color, DuelConduct, DuelOutcome, DuelPlayerView, DuelResult, DuelReason } from "@chessroyale/chess/duel";
 import { DELETED_ID, randomToken, stmt, type Sql, type Stmt, type User } from "./accounts.ts";
 import { lockerState } from "./locker.ts";
 import { cond, leg, ledgerAccount, opStatements, type LedgerAccount } from "./ledger.ts";
-import { rankOf } from "./ranked-schema.ts";
+import { marksOf, rankOf } from "./ranked-schema.ts";
+export { marksOf, rankedLeaves } from "./ranked-schema.ts";
 import { seatName } from "./text-filter.ts";
 
 export interface RankedRow {
@@ -95,6 +96,8 @@ export interface FinishedDuel {
   endedAt: number;
   /** A test's clock (seconds a side): unranked where test switches are off (duel-do.ts). */
   testSeconds?: number | null;
+  /** Who left early (ranked's leave rules: duel rules' conductOf), as the game's room decided it. Missing: nobody. */
+  conduct?: DuelConduct;
 }
 
 const scoreFor = (result: DuelResult, c: Color): number => (result === "1/2-1/2" ? 0.5 : (result === "1-0") === (c === "w") ? 1 : 0);
@@ -109,14 +112,23 @@ const resultWord = (score: number) => (score >= 1 ? "win" : score <= 0 ? "loss" 
  *     (the count is kept on their ranked_1v1 row, written in the same batch), each a ledger op (`ranked:<game>:<color>`,
  *     ledger.ts), so a game pays a player once even if its row were ever written again;
  *   - the game's row goes in only if neither player's record changed since it was read (another game of theirs ending
- *     at the same moment): then everything else in the batch applies only if that row is this recording's (its
+ *     at the same moment, or a dodge's fee off their ladder): then everything else in the batch applies only if that row is this recording's (its
  *     nonce), so a game recorded twice changes nothing the second time. A row that didn't go in is read again and
  *     retried.
- * Returns what it did for each player (null: an aborted game). A game recorded before (a try whose answer was lost)
- * answers each player's rank as it stands, with no points or coins named.
+ *   - ranked's leave rules (L1, `g.conduct`; off with `penalties: false`, the kill switch PAUSE_LEAVE_PENALTIES): a leaver's
+ *     loss counts as ever, then LEAVES.leaveRp more rank points, and a mark (ranked_conduct) in the same batch, only with this
+ *     recording's game row. An aborted game that someone dodged records the dodge (recordDodges); any other records nothing.
+ * Returns what it did for each player (null: an aborted game nobody dodged). A game recorded before (a try whose answer was
+ * lost) answers each player's rank as it stands, with no points or coins named.
  */
-export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: string) => Promise<boolean>, now = g.endedAt): Promise<Record<Color, DuelOutcome> | null> {
-  if (g.result === "aborted") return null;
+export async function recordDuel(
+  sql: Sql,
+  g: FinishedDuel,
+  held: (userId: string) => Promise<boolean>,
+  now = g.endedAt,
+  { penalties = true }: { penalties?: boolean } = {},
+): Promise<Record<Color, DuelOutcome> | null> {
+  if (g.result === "aborted") return penalties && g.conduct && Object.values(g.conduct).includes("dodge") ? recordDodges(sql, g, held) : null;
   // (Black's count: never more than White's.)
   const fewest = Math.floor(g.moves.length / 2);
   const isHeld: Record<Color, boolean> = { w: await held(g.players.w), b: await held(g.players.b) };
@@ -143,10 +155,20 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
       const count = coinCount(before[c].coins, day, () => earned > 0);
       const coins = count.pays ? earned : 0;
       let change: RankChange | null = null;
+      // Ranked's leave rules (L1): a leave is the loss, then LEAVES.leaveRp more rank points (none in placements, the game that
+      // completes them included: it only goes on the record; nor while held).
+      const leaving = penalties && g.conduct?.[c] === "leave";
+      let fee = 0;
       if (!isHeld[c]) {
         const r = rankedGame(me, opp, score, now);
         change = r.change;
-        const n = r.next;
+        let n = r.next;
+        if (leaving && n.ladder !== null && !change.placed) {
+          const ladder = ladderAfterFee(n.ladder, LEAVES.leaveRp)!;
+          fee = n.ladder - ladder;
+          n = { ...n, ladder };
+          if (change.points !== null) change = { ...change, points: change.points - fee };
+        }
         after[c] = n;
         writes.push(
           stmt(
@@ -175,21 +197,42 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
           ),
         );
       }
+      if (leaving) {
+        // (The mark, kept LEAVES.keepDays: the player's games after this one, so the last-20 window counts it. Only with this game's row.)
+        writes.push(
+          stmt(
+            `INSERT OR IGNORE INTO ranked_conduct (user_id, match_id, at, mode, kind, games, rp, nonce)
+             SELECT ?, ?, ?, '1v1', 'leave', ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?) AND ${mine}`,
+            g.players[c],
+            g.id,
+            g.endedAt,
+            after[c]?.games ?? me.games,
+            fee,
+            nonce,
+            g.players[c],
+            g.id,
+            nonce,
+          ),
+        );
+      }
       if (coins > 0 && !(c in ledgerIds)) ledgerIds[c] = await ledgerAccount(sql, g.players[c]);
       const payee = coins > 0 ? ledgerIds[c] : null;
       if (payee) {
         // (Paid only if this recording's game row went in: `mine`.)
         writes.push(...opStatements(payee, { id: `ranked:${g.id}:${c}`, reason: "ranked", now: g.endedAt, when: cond(mine, g.id, nonce), legs: [leg.coins(g.players[c], coins, g.id)] }, nonce));
       }
-      outcome[c] = { change, coins };
+      outcome[c] = { change, coins, ...(leaving ? { conduct: { kind: "leave" as const, rp: fee } } : {}) };
     }
     // (A player whose account was deleted during the game is the shared id "deleted" in it, as in their other games.)
     const who = "CASE WHEN EXISTS (SELECT 1 FROM users WHERE id = ?) THEN ? ELSE '" + DELETED_ID + "' END";
     const gamesNow = "COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?), 0)";
+    // (And each ladder as read: a dodge's fee from another game landing meanwhile changes no games, only the ladder, which this
+    // batch's write would otherwise overwrite.)
+    const ladderNow = "(SELECT ladder FROM ranked_1v1 WHERE user_id = ?)";
     await sql.batch([
       stmt(
         `INSERT OR IGNORE INTO ranked_1v1_games (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, nonce, white_points, black_points)
-         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ?`,
+         SELECT ?, ${who}, ${who}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${gamesNow} = ? AND ${gamesNow} = ? AND ${ladderNow} IS ? AND ${ladderNow} IS ?`,
         g.id,
         g.players.w,
         g.players.w,
@@ -210,6 +253,10 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
         before.w.record.games,
         g.players.b,
         before.b.record.games,
+        g.players.w,
+        before.w.record.ladder,
+        g.players.b,
+        before.b.record.ladder,
       ),
       ...writes,
     ]);
@@ -227,12 +274,77 @@ export async function recordDuel(sql: Sql, g: FinishedDuel, held: (userId: strin
       const now2 = { w: await rankedRecordOf(sql, g.players.w), b: await rankedRecordOf(sql, g.players.b) };
       const asItStands = async (c: Color): Promise<DuelOutcome> => {
         const v = await rankOf(sql, now2[c].record);
-        return { change: isHeld[c] ? null : { before: v, after: v, points: null, placed: false }, coins: 0 };
+        const mark = await markOf(sql, g.players[c], g.id);
+        return { change: isHeld[c] ? null : { before: v, after: v, points: null, placed: false }, coins: 0, ...(mark ? { conduct: mark } : {}) };
       };
       return { w: await asItStands("w"), b: await asItStands("b") };
     }
   }
   throw new Error(`ranked 1 v 1: game ${g.id} couldn't be recorded (its players' records kept changing)`);
+}
+
+// ---------------- Leaving early (ranked's leave rules, L1; docs/areas/ranked.md "Leaving") ----------------
+
+/** A player's mark for one game (its kind and the rank points it cost), or null. */
+async function markOf(sql: Sql, userId: string, matchId: string): Promise<{ kind: "dodge" | "leave"; rp: number } | null> {
+  const row = await sql.first<{ kind: string; rp: number }>("SELECT kind, rp FROM ranked_conduct WHERE user_id = ? AND match_id = ?", userId, matchId);
+  return row ? { kind: row.kind === "leave" ? "leave" : "dodge", rp: row.rp } : null;
+}
+
+/**
+ * A dodge (the game called off before both first moves, by the one who left: duel rules' conductOf), recorded once per player
+ * and game: the mark (ranked_conduct, keyed by player and game) and its fee off their ladder (LEAVES.dodgeRp by the dodge level
+ * it brings; none in placements, nor while fair play holds them), in one batch: the fee only with this recording's own mark
+ * (its nonce), so a retry, or a second recording of the same game, takes nothing more. No hidden-rating change: a game that
+ * never happened says nothing about skill. The lockout it brings is read from the marks (leaveStanding), never stored.
+ */
+async function recordDodges(sql: Sql, g: FinishedDuel, held: (userId: string) => Promise<boolean>): Promise<Record<Color, DuelOutcome>> {
+  const out: Record<Color, DuelOutcome> = { w: { change: null, coins: 0 }, b: { change: null, coins: 0 } };
+  for (const c of ["w", "b"] as const) {
+    if (g.conduct?.[c] !== "dodge") continue;
+    const uid = g.players[c];
+    const had = await markOf(sql, uid, g.id);
+    if (!had) {
+      const dodges = (await marksOf(sql, uid)).filter((m) => m.kind === "dodge").map((m) => m.at).reverse();
+      const level = dodgeLevelAt(dodges, g.endedAt) + 1;
+      const { record, stored } = await rankedRecordOf(sql, uid);
+      const fee = stored && !(await held(uid)) ? dodgeCost(level).rp : 0;
+      const ladder = stored ? record.ladder : null;
+      const rp = ladder === null ? 0 : ladder - ladderAfterFee(ladder, fee)!;
+      const nonce = randomToken(9);
+      await sql.batch([
+        stmt(
+          `INSERT OR IGNORE INTO ranked_conduct (user_id, match_id, at, mode, kind, games, rp, nonce)
+           SELECT ?, ?, ?, '1v1', 'dodge', ?, ?, ? WHERE EXISTS (SELECT 1 FROM users WHERE id = ?)`,
+          uid,
+          g.id,
+          g.endedAt,
+          record.games,
+          rp,
+          nonce,
+          uid,
+        ),
+        stmt(
+          `UPDATE ranked_1v1 SET ladder = MAX(0, ladder - ?) WHERE user_id = ? AND ladder IS NOT NULL AND ? > 0
+             AND EXISTS (SELECT 1 FROM ranked_conduct WHERE user_id = ? AND match_id = ? AND nonce = ?)`,
+          rp,
+          uid,
+          rp,
+          uid,
+          g.id,
+          nonce,
+        ),
+      ]);
+    }
+    const mark = had ?? (await markOf(sql, uid, g.id));
+    if (mark) out[c] = { ...out[c], conduct: mark };
+  }
+  return out;
+}
+
+/** Marks past LEAVES.keepDays are deleted (the 15-minute cron). */
+export async function purgeConduct(sql: Sql, now: number): Promise<void> {
+  await sql.run("DELETE FROM ranked_conduct WHERE at < ?", now - LEAVES.keepDays * DAY);
 }
 
 /**
@@ -273,10 +385,12 @@ export function duelGamesOf(sql: Sql, userId: string, limit = 50): Promise<DuelG
   );
 }
 
-/** The account's part of "Download my data": its rank and its kept games (the opponent by name; not fair play's check). */
+/** The account's part of "Download my data": its rank, its marks for leaving early, and its kept games (the opponent by name; not fair play's check). */
 export async function rankedDownload(sql: Sql, userId: string): Promise<unknown> {
   return {
     rank: await sql.first("SELECT rating, rd, games, wins, losses, draws, ladder, last_at, coin_day, coin_games, peak, streak FROM ranked_1v1 WHERE user_id = ?", userId),
+    // (Leaving ranked games early: each dodge and leave kept LEAVES.keepDays, the rank points it cost.)
+    leaves: await sql.all("SELECT match_id AS game, at, mode, kind, rp FROM ranked_conduct WHERE user_id = ? ORDER BY at", userId),
     games: await sql.all(
       `SELECT CASE WHEN g.white_id = ?1 THEN 'white' ELSE 'black' END AS color, u.name AS opponent, g.control, g.result, g.reason, g.moves, g.times,
          g.started_at, g.ended_at, CASE WHEN g.white_id = ?1 THEN g.white_points ELSE g.black_points END AS points
@@ -287,10 +401,11 @@ export async function rankedDownload(sql: Sql, userId: string): Promise<unknown>
   };
 }
 
-/** Deleting the account: its rank goes; in its games it becomes the shared id "deleted" (the opponent's games stay theirs). */
+/** Deleting the account: its rank and its marks go; in its games it becomes the shared id "deleted" (the opponent's games stay theirs). */
 export function rankedErase(userId: string): Stmt[] {
   return [
     stmt("DELETE FROM ranked_1v1 WHERE user_id = ?", userId),
+    stmt("DELETE FROM ranked_conduct WHERE user_id = ?", userId),
     stmt("UPDATE ranked_1v1_games SET white_id = ? WHERE white_id = ?", DELETED_ID, userId),
     stmt("UPDATE ranked_1v1_games SET black_id = ? WHERE black_id = ?", DELETED_ID, userId),
   ];
