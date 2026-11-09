@@ -618,3 +618,4 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   2 e2e tests stocked with crates/keys, full suite green. Watching deploy + main run. Eric: +100 keys via Shop → Crates → "Admin:
   test grants". Next queue: quests phase 3 (wire QuestsOverlay; at 320 px keep top bar buttons >= 40 px); ranked (waiting on Eric's
   decisions); duo parked; town intro; admin cleanup (inventory in docs/decisions/2026-11-09-admin-abilities.md).
+- Nov 9 ~11:35: #574 LIVE (f7d93d8), main green. Starting XP phase 3 (quests): brief notes/briefs/brief-xp-phase3.md.
