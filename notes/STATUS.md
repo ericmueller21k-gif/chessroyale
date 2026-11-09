@@ -659,3 +659,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   watched. #585 shop page (Eric's mockup, beta 50% discount, Mythic Crate; look only) in CI. Nothing running. Next queue: riders in
   regular crates (Eric, ROADMAP); then wiring shop purchases (coins) + Stripe (Eric's accounts); crowd party (xhigh); Squads Bots
   (xhigh); ranked L2+ (rank line, team ranks, seasons S1).
+- Nov 9 ~20:50: main 63a684b (L1) red: squads-three-boards.spec.ts:181 [desktop] (turn order "Turn order on board 3") and
+  town-chat.spec.ts:1194 [phone] (edge chip "Go to Wrangler's Stall" moved 30 px as the log faded), both failed their retry; main
+  92f1529 (shop) GREEN with the same specs. FLAKY: queue for the flaky-test batch (fix the cause, not retries). #585 shop LIVE.
+  #586 key (board king's head, keys stacked ×3) and #587 haptics in CI; merge in that order.
