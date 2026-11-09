@@ -43,7 +43,7 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   test.setTimeout(4 * 60_000);
   await wonGame(page, 0, 20);
   const box = page.getByTestId("xp-box");
-  await expect(box.locator(".xp-parts")).toHaveText("12 min +120 · Win +50 · Daily reward +200");
+  await expect(box.locator(".xp-parts")).toHaveText("Win +50 · Daily reward +200");
   await expect(box.locator(".xp-gain")).toHaveText("+370 XP");
   const toast = page.getByTestId("reward-box");
   await expect(toast).toContainText("Daily reward");
@@ -56,7 +56,7 @@ test("the daily reward: the day's first counted game of 15 moves says \"Daily re
   await expect(toast).toHaveCount(0, { timeout: 10_000 });
   // The next game today: its own XP, no daily reward.
   await wonGame(page, 370, 20);
-  await expect(page.getByTestId("xp-box").locator(".xp-parts")).toHaveText("12 min +120 · Win +50");
+  await expect(page.getByTestId("xp-box").locator(".xp-parts")).toHaveText("Win +50");
   await expect(page.getByTestId("reward-box")).toHaveCount(0);
   expect((await locker(page)).seriesCrates).toEqual({ "winter-1": 1 });
 });

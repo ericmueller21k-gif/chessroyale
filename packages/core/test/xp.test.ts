@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { XP } from "../src/settings.ts";
-import { XP_NONE_LINES, crateCount, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpStretches } from "../src/xp.ts";
+import { XP_NONE_LINES, crateCount, gameXp, isXpNone, levelOf, levelProgress, levelReward, readRewards, rewardLines, xpAt, xpDayStart, xpFillMs, xpGrant, xpInLevel, xpParts, xpShownParts, xpStretches } from "../src/xp.ts";
 import { pausedLine, pauseVariable } from "../src/pauses.ts";
 
 const min = 60_000;
@@ -58,6 +58,17 @@ describe("XP and levels (Eric, Nov 9)", () => {
     expect(isXpNone("left")).toBe(true);
     expect(isXpNone("toString")).toBe(false);
     expect(isXpNone(1)).toBe(false);
+  });
+
+  it("the parts as a screen shows them: never the minutes (Eric, Nov 9); the daily limit as words alone; the win as it is", () => {
+    expect(xpShownParts(xpParts({ minutes: 12, time: 120, win: 50 }))).toEqual([{ label: "Win", xp: 50, of: 1 }]);
+    expect(xpShownParts(xpParts({ minutes: 12, time: 120, win: 0 }))).toEqual([]);
+    expect(xpShownParts(xpParts({ minutes: 12, time: 120, win: 50 }, true, 0))).toEqual([
+      { label: "Daily solo limit", xp: null, of: 0 },
+      { label: "Win", xp: 50, of: 1 },
+    ]);
+    expect(xpShownParts(xpParts({ minutes: 30, time: 300, win: 50 }, false))).toEqual([{ label: "Win (paid once today)", xp: 0, of: 1 }]);
+    for (const m of [1, 9, 30]) expect(xpShownParts([{ label: `${m} min`, xp: m * 10 }])).toEqual([]);
   });
 
   it("the parts: the minutes, then the win; a win the cap held back shows at +0; nothing for 0 minutes", () => {

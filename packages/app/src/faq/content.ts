@@ -1092,7 +1092,10 @@ Shiny comes about 1 time in ${num(1 / (shiny || 1), 0)}. Crates are opened by th
   };
 }
 
-/** XP and levels (Nov 9): every number from XP in settings.ts. */
+/**
+ * XP and levels (Nov 9): every number from XP in settings.ts. No minutes and no per-minute numbers (Eric, Nov 9: "we dont want
+ * players to know they could just stall to get more XP"): more for a longer game, a win bonus, a cap per game. The rules are the same.
+ */
 export function xpAndLevels(src: FaqSources): FaqSection {
   const X = src.xp;
   const most = X.maxMinutes * X.perMinute + X.win;
@@ -1104,19 +1107,23 @@ export function xpAndLevels(src: FaqSources): FaqSection {
     body: `
 **Every game you finish earns XP, and XP raises your level.** Each level takes ${X.perLevel.toLocaleString("en-US")} XP, the same for every level, with no top level. You start at Level 1. Your level and how far you are into it show on home (the ring round your icon) and on your profile.
 
-**A game's XP:** ${X.perMinute} XP for each whole minute you played, up to ${X.maxMinutes} minutes, plus ${X.win} XP for a win. So a game earns at most ${most} XP. A win is: beating the boss, winning your ranked 1 v 1, your team winning a 50 v 50, your squad winning its Squads lobby, or 1st place in Classic.
+**A game's XP:** finishing a game earns XP, more for a longer game, plus ${X.win} XP for a win. A game earns at most ${most} XP. A win is: beating the boss, winning your ranked 1 v 1, your team winning a 50 v 50, your squad winning its Squads lobby, or 1st place in Classic.
 
-- **Your minutes** are your time in the game, as our server measured it: from the start to your last move. Knocked out after 8 minutes, you get 8 minutes; watching after that adds nothing. In a game played on your device (against bots, or a boss alone) our server times it itself, from its start to its result.
+- **What counts is your own game,** as our server measured it, up to your last move: knocked out early, watching the rest adds nothing. A game played on your device (against bots, or a boss alone) our server times itself.
 - **A game counts from your ${nth(X.minMoves)} move.** Over sooner, it earns no XP for anyone in it ("No XP: the game ended before move ${X.minMoves}."), and resigning sooner says so ("No XP: you resigned before move ${X.minMoves}."). A resign after that is a loss that counts.
 - **No XP** if you left the match (gone too long, or removed for being away), in a test game, for a banned account, or as a guest: sign in to earn XP. Auto chess, and a 1 v 1 against a bot (here or in the town), earn none for now.
-- **Wins that pay less often:** in a lobby you make with friends, the win's XP comes once a day for each opponent: beat someone and wins against them pay nothing more that day (the time always counts). In games on your device, ${X.soloWinsPerDay} wins a day, each from ${X.soloWinMinMinutes} minutes of play.
-- **Games on your device** earn time XP for up to ${X.soloMinutesPerDay} minutes a day (${(X.soloMinutesPerDay * X.perMinute).toLocaleString("en-US")} XP); past that the box says "Daily solo limit". Online games have no daily limit. A day starts at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC (midnight Pacific), the same for everyone.
+- **Wins that pay less often:** in a lobby you make with friends, the win's XP comes once a day for each opponent: beat someone and wins against them pay nothing more that day (the game's own XP always counts). In games on your device, ${X.soloWinsPerDay} wins a day, and a very quick win pays no win bonus.
+- **Games on your device** earn XP up to a daily limit (${(X.soloMinutesPerDay * X.perMinute).toLocaleString("en-US")} XP a day before win bonuses); past that the box says "Daily solo limit". Online games have no daily limit. A day starts at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC (midnight Pacific), the same for everyone.
 
-**The daily reward:** your first game of the day that counts and has at least ${X.dailyMinMoves} of your own moves gives you **+${X.dailyBonus} XP** ("Daily reward +${X.dailyBonus}") and **${n(X.dailyCrates, "crate")}**, once a day. In a game on your device it also needs ${X.dailySoloMinMinutes} minutes of play. The day starts at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC.
+<<<<<<< HEAD
+**The daily reward:** your first game of the day that counts and has at least ${X.dailyMinMoves} of your own moves gives you **+${X.dailyBonus} XP** ("Daily reward +${X.dailyBonus}") and **${n(X.dailyCrates, "crate")}**, once a day. In a game on your device it must also last a little while (our server times it). The day starts at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC.
 
 **Level-up rewards:** every level you reach gives you **${n(X.levelCrates, "crate")} and ${n(X.levelKeys, "crate key")}**, and every ${nth(X.bossCrateEvery)} level (${X.bossCrateEvery}, ${2 * X.bossCrateEvery}, ${3 * X.bossCrateEvery}, …) also **a boss crate you choose**: pick whose in the Crates tab ("Choose your boss crate"). It opens like any boss crate you hold, with nothing more to pay. Each level pays once, at the end of the game that reached it (a level reached some other way is paid at your next game that counts). The crates are from the newest series.
 
-After each game the result screen's XP box fills from your old XP to the new, with what it was for ("12 min +120 · Win +50 · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up or the daily reward then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns nothing; levels you reach are paid at your next game.
+After each game the result screen's XP box fills from your old XP to the new, with what it was for ("Win +50 · Daily reward +${X.dailyBonus}"), or says why there was none. A level-up or the daily reward then shows what it gave you. If rewards are paused for a moment (we're fixing something), the box says so and the game earns nothing; levels you reach are paid at your next game.
+=======
+After each game the result screen's XP box fills from your old XP to the new, with your win bonus when there is one ("Win +${X.win}"), or says why there was none.
+>>>>>>> origin/main
 `,
   };
 }

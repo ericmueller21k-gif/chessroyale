@@ -24856,32 +24856,102 @@ button.sq-tiny {
   text-shadow: 3px 3px 0 #e8b84a;
   margin: 12px 0 14px;
 }
-.gk-epilogue-you {
-  position: absolute;
-  left: calc(50% + 44px);
-  bottom: 0;
-  pointer-events: none;
-}
-
-/* ---- The Last Stand's result (Eric, Nov 8): one row, the boss on the left, the God King and your pawn on the right; each
-   bubble over its own speaker, inside the screen's 16 px gutters, never both at once (RESULT_TALK). ---- */
+/* ---- A boss battle's result (Eric, Nov 9; components/ResultDuo.tsx): one row, the boss on the left, your pawn on the right with
+   your name, XP and level under it; no God King. A loss: the boss's attack on a king where he stands, your pawn jolting back. ---- */
 .results-duo {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  /* (At least 16 px between the boss's painted figure and the God King's: the e2e gap check, Eric's rule. A mirrored boss (artFacesLeft)
-     paints past his box's right edge: Folio's wing 7 px and Alfil's ankus 11 px from the God King at 36 px (Nov 9, every boss measured).
-     The boss is moved 16 px left (a translate, so the row's width and the God King and his pawn stay where they were: their speech
-     bubble keeps its gutter); every boss then has 23 px at worst.) */
-  gap: 36px;
+  /* (At least 16 px between the boss's painted figure and your pawn's art box at rest (a win, a draw, before and after his attack):
+     the e2e gap check, Eric's rule (nothing touches); Smudgy's victory came to 12 px at an 8 px gap. His attack's blow is meant to
+     land on your pawn: see docs/decisions/2026-11-09-boss-result-v2.md. The room on the left is for the bosses drawn wider than
+     their box (Folio's quill, Wrangler's rope: up to 34 px past it), so they keep the 16 px gutter at 360 px; measured for every
+     boss with scripts/frames-boss-result.mjs.) */
+  gap: 16px;
+  padding-left: 32px;
   margin: 0 auto;
+}
+/* (A phone under 360 px: a narrower column, less room on the left: the row fits; the widest bosses come nearer the edge there.) */
+@media (max-width: 359px) {
+  .results-duo {
+    gap: 12px;
+    padding-left: 12px;
+  }
+  .rd-you,
+  .xp-box.xp-compact {
+    width: 160px;
+  }
+}
+/* (He stands on your pawn's base line, not on the bottom of your XP under it: his attack aims at your pawn and never crosses your
+   name or your XP. The XP's height (96) and its margin (4), plus where the pawn's base stands in its box (--feet, 12).) */
+.rd-boss {
+  position: relative;
+  flex: none;
+  margin-bottom: 112px;
 }
 .results-duo .boss-char.place-results {
   margin: 100px 0 0;
-  translate: -16px 0;
 }
-.results-duo .gk-epilogue {
-  margin: 0 0 10px;
+/* His attack in his place: his usual figure hides (his words stay); the attack's frame, at his scale (2), stands on his feet. */
+.rd-attacking .boss-char-sprite {
+  visibility: hidden;
+}
+.rd-attack {
+  position: absolute;
+  left: calc(50% - var(--ra-fx) * 2px);
+  bottom: calc((var(--ra-fy) - var(--ra-h)) * 2px);
+  width: calc(var(--ra-w) * 2px);
+  height: calc(var(--ra-h) * 2px);
+  pointer-events: none;
+}
+/* (Drawn facing our left: mirrored about his feet, toward your pawn.) */
+.rd-attack.flip {
+  transform: scaleX(-1);
+  transform-origin: calc(var(--ra-fx) * 2px) 100%;
+}
+.rd-you {
+  flex: none;
+  width: 176px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* Eric, Nov 9 (round 2): your pawn is bigger, 1.6x (about 77 px tall at 390; it was about 48). It grows up and to the right from
+   its box's left edge (the margin keeps that edge where it was, so the gap to the boss, measured from the box, doesn't move), and its
+   feet stay on the base line. The layout box stays 58 x 62, so the XP under it, the row and the boss don't move or jump. The column
+   is 176 px (160 under 360), and the bigger pawn stays inside it, so the 16 px gutters hold at 320, 360 and 390 px. */
+.rd-you .you-pawn {
+  --pk: 1.6;
+  --pw: calc(68px * var(--pk));
+}
+.rd-you .you-pawn-bob {
+  margin-left: -34px;
+}
+/* Each lash: your pawn jolts back (away from him) and flashes, as the king does at his mate (KingAttack.tsx). */
+.rd-pawn.rd-hit {
+  animation: rd-knock 170ms ease-out 10 both;
+}
+@keyframes rd-knock {
+  0% {
+    translate: 0 0;
+    filter: none;
+  }
+  20% {
+    translate: 6px 0;
+    filter: brightness(1.9) drop-shadow(0 0 4px #9c6cff);
+  }
+  55% {
+    filter: none;
+  }
+  100% {
+    translate: 0 0;
+    filter: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rd-pawn.rd-hit {
+    animation: none;
+  }
 }
 /* The boss's words start at his box's left edge (his tail over his middle): inside the gutter on a phone, the row is centered. */
 .results-duo .boss-char .bc-bubble {
@@ -25034,6 +25104,46 @@ button.sq-tiny {
 }
 .xp-wait .xp-why {
   color: var(--muted);
+}
+/* Compact (a boss battle's result, under your pawn): no frame; your name on its own line, then the gain and the level over the bar. */
+.xp-box.xp-compact {
+  width: 176px;
+  height: 96px;
+  margin: 4px 0 0;
+  padding: 0;
+  grid-template-rows: 42px 10px 30px;
+  row-gap: 5px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.xp-compact .xp-top {
+  grid-template-columns: auto auto;
+  grid-template-rows: 18px 20px;
+  grid-template-areas: "name name" "gain level";
+  justify-content: space-between;
+  row-gap: 4px;
+}
+.xp-compact .xp-name {
+  grid-area: name;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 18px;
+  color: var(--text);
+}
+.xp-compact .xp-gain {
+  grid-area: gain;
+}
+.xp-compact .xp-level {
+  grid-area: level;
+}
+/* (Two lines at most, in its fixed row: "No XP: the game ended before move 10." is wider than the column.) */
+.xp-compact .xp-parts {
+  font-size: 12px;
+  line-height: 15px;
+  text-align: center;
+  white-space: normal;
+  text-overflow: clip;
 }
 @media (prefers-reduced-motion: reduce) {
   .xp-pop.on {

@@ -529,10 +529,11 @@
     "results, resign and leaving a match": {
       "paths": [
         "packages/app/src/screens/Results.tsx",
+        "packages/app/src/components/ResultDuo.tsx",
         "packages/app/src/match-exit.ts",
         "packages/app/src/components/MatchMenu.tsx"
       ],
-      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts"]
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
     "home and the front door": {
       "paths": [

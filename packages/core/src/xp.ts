@@ -26,7 +26,7 @@ export const XP_DAILY = "Daily reward";
 export const XP_SOLO_LIMIT = "Daily solo limit";
 export const isXpNone = (x: unknown): x is XpNone => typeof x === "string" && Object.hasOwn(XP_NONE_LINES, x);
 
-/** One part of a game's XP, as the box lists it ("12 min" +120, "Win" +50). */
+/** One part of a game's XP ("12 min" +120, "Win" +50); a screen shows them through xpShownParts (never the minutes). */
 export interface XpPart {
   label: string;
   xp: number;
@@ -156,6 +156,15 @@ export function xpParts(g: Exclude<GameXp, { none: XpNone }>, winPaid = true, ti
   const trimmed = !!g.time && paid < g.time;
   const time = !g.time ? [] : trimmed ? [{ label: XP_SOLO_LIMIT, xp: paid }] : [{ label: `${g.minutes} min`, xp: g.time }];
   return [...time, ...(g.win && (winPaid || !trimmed) ? [winPaid ? { label: "Win", xp: g.win } : { label: "Win (paid once today)", xp: 0 }] : [])];
+}
+
+/**
+ * The parts as a screen shows them (Eric, Nov 9: "remove the 12 min, we dont want players to know they could just stall to get more
+ * XP"): never the time's part; the daily solo limit as its words alone (no number: its XP is time XP); the win's as it is. The
+ * total ("+N XP") still counts them all. `xp` null: no number shown. `of`: the part's index in `parts` (its share of the fill).
+ */
+export function xpShownParts(parts: readonly XpPart[]): { label: string; xp: number | null; of: number }[] {
+  return parts.flatMap((p, of) => (/^\d+ min$/.test(p.label) ? [] : [{ label: p.label, xp: p.label === XP_SOLO_LIMIT ? null : p.xp, of }]));
 }
 
 /** A grant as the screen shows it, from your XP before and the parts (or the reason there was none). */
