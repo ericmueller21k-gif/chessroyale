@@ -834,8 +834,8 @@ for (const i of [0, 1]) expect(light(look.you[i]!.bg), "yours lighter than their
   for (const sel of [".ac-me", ".ac-opp"]) {
     const bars = await page.locator(`${sel} .ac-bar i`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
     expect(bars, `${sel}: HP and XP`).toHaveLength(2);
-    // (Nov 9, Eric: taller bars; the cap was 8 px, now 10 px, `.ac-players .ac-bar i`.)
-    for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(10);
+    // (Nov 9, round 2: the bars grow with the row, up to 13 px on a phone, `.ac-players .ac-bar i`; the cap was 8 px, then 10 px.)
+    for (const h of bars) expect(h, `${sel}: a thin bar`).toBeLessThanOrEqual(13);
     const pawn = (await page.locator(`${sel} .ac-pawn`).boundingBox())!;
     const first = (await page.locator(`${sel} .ac-bar`).first().boundingBox())!;
     expect(first.x, `${sel}: the bars are right of the pawn`).toBeGreaterThanOrEqual(pawn.x + pawn.width - 2);
@@ -889,9 +889,13 @@ const recordHops = (p: Page) =>
   });
 const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<"me" | "opp", { on: number[]; off: number[] }>);
 
-// Nov 9 (Eric, phone): each pawn about as tall as a bench tile, each block (pawn, name, level, HP and XP) filling its bench row's height,
-// the two blocks the same size, and the widest texts (a 12-letter name, HP 24, XP 12/12) inside the block at every size.
-test("the players (Nov 9): each pawn about as tall as a bench tile, each block fills its bench row (the grid's track), the two blocks the same size; a 12-letter name and the widest numbers fit", async ({ page }) => {
+// Nov 9, round 2 (Eric, phone: "the pawns bigger, the block takes the full height, the top matches the bottom"). The pawn's DRAWN figure
+// (the default pawn's square, 0.678 of it tall, `piece` in `.avatar`) is the row's usable height (the row less the gap and the hop's room),
+// at least 85%; the block fills its row (the info box, name at the top, bars at the foot) with its text and bars inside it at every size;
+// the two sides are the same size; a 12-letter name and the widest numbers (HP 24, XP 12/12) fit. The rows grow into the spare height
+// under the action box up to 1.7x their old height (the bench tile + its label, or the board's old row), so either a row is at that cap
+// or the room under the box is the free margin + 8 px.
+test("the players (Nov 9, round 2): each pawn's drawn figure fills its row's usable height, each block fills its row, the two sides are the same size, a 12-letter name and the widest numbers fit, the rows grow up to 1.7x", async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => {
     try {
@@ -900,6 +904,8 @@ test("the players (Nov 9): each pawn about as tall as a bench tile, each block f
       // No storage.
     }
   });
+  // (The phone project's 390 x 664 is shorter than a phone: the check runs at the brief's 390 x 844 too.)
+  if (phone()) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(page.locator(".ac-me .ac-name")).toHaveText("Abcdefghijkl");
@@ -911,18 +917,44 @@ test("the players (Nov 9): each pawn about as tall as a bench tile, each block f
   });
   const m = await page.evaluate(() => {
     const r = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+    const root = document.querySelector(".ac-root")!;
+    const px = (name: string) => parseFloat(getComputedStyle(root).getPropertyValue(name));
+    // (`--pl-h` is a sum of tokens: hop + pawn + 4 px.)
     const rows = getComputedStyle(document.querySelector(".ac-col")!).gridTemplateRows.split(" ").map(parseFloat);
-    const side = (s: string, row: number) => ({ w: r(s).width, h: r(s).height, pawn: r(`${s} .ac-pawn`).height, row: rows[row]!, fits: [...document.querySelectorAll(`${s} .ac-name, ${s} .ac-bar b`)].every((e) => e.scrollWidth <= e.clientWidth + 1) });
-    return { tile: r(".ac-bench.you .ac-slot").height, me: side(".ac-me", 3), opp: side(".ac-opp", 1) };
+    const tile = r(".ac-bench.you .ac-slot").height;
+    const base = Math.max(tile + px("--rgap") + px("--lab"), px("--hop") + px("--pawn") + 4);
+    const side = (s: string, row: number) => {
+      const piece = document.querySelector<HTMLElement>(`${s} .fd-pawn-box .avatar > piece`)!;
+      const p = piece.getBoundingClientRect();
+      const info = document.querySelector(`${s} .ac-info`)!;
+      return {
+        w: r(s).width,
+        h: r(s).height,
+        // The default pawn is y 9 to 39.5 of its 45-unit square: 0.678 of the square is the drawn figure.
+        figure: p.height * (30.5 / 45),
+        usable: rows[row]! - px("--rgap") - px("--hop"),
+        row: rows[row]!,
+        fits: [...document.querySelectorAll(`${s} .ac-name, ${s} .ac-bar b`)].every((e) => e.scrollWidth <= e.clientWidth + 1) && info.scrollHeight <= info.clientHeight + 1,
+      };
+    };
+    const free = innerHeight - r(".ac-dock").bottom;
+    return { tile, base, rowsGrown: rows[1]!, free, freeMargin: px("--free"), me: side(".ac-me", 3), opp: side(".ac-opp", 1), wide: innerWidth < 500 };
   });
   for (const [who, s] of [["you", m.me], ["opponent", m.opp]] as const) {
-    expect(s.pawn, `${who}: the pawn about as tall as a bench tile`).toBeGreaterThanOrEqual(0.8 * m.tile);
-    expect(s.h, `${who}: the block fills its bench row`).toBeGreaterThanOrEqual(0.9 * s.row);
-    expect(s.fits, `${who}: the name and the numbers fit`).toBe(true);
+    expect(s.figure, `${who}: the drawn pawn is at least 85% of the row's usable height`).toBeGreaterThanOrEqual(0.85 * s.usable);
+    expect(s.figure, `${who}: and not taller than the row allows`).toBeLessThanOrEqual(s.usable + 1);
+    expect(s.h, `${who}: the block fills its row`).toBeGreaterThanOrEqual(s.row - 4 - 1);
+    expect(s.fits, `${who}: the name, the numbers and the block's height fit`).toBe(true);
+    // (A phone's pawn is clearly bigger than a bench tile; a computer's is about as tall as its row.)
+    if (m.wide) expect(s.figure, `${who}: clearly bigger than a bench tile`).toBeGreaterThanOrEqual(1.5 * m.tile);
   }
   expect(Math.abs(m.me.w - m.opp.w), "the two blocks are as wide").toBeLessThanOrEqual(0.5);
   expect(Math.abs(m.me.h - m.opp.h), "the two blocks are as tall").toBeLessThanOrEqual(0.5);
-  expect(m.me.pawn, "the two pawns are the same size").toBeCloseTo(m.opp.pawn, 0);
+  expect(Math.abs(m.me.figure - m.opp.figure), "the two pawns are the same size").toBeLessThanOrEqual(1);
+  // The rows: at most 1.7x their old height; and either at that cap or the room under the action box is the free margin + 8 px.
+  expect(m.rowsGrown, "the rows grow to at most 1.7x").toBeLessThanOrEqual(1.7 * m.base + 0.5);
+  expect(m.rowsGrown >= m.base - 0.5, "the rows never shrink").toBe(true);
+  expect(m.rowsGrown >= 1.7 * m.base - 0.5 || m.free <= m.freeMargin + 8 + 0.5, "the space under the action box is the free margin + 8 px, or the rows have reached 1.7x").toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -3152,8 +3184,8 @@ test("the meeting before round 1 (Eric, Oct 24): both custom pawns stand in the 
   expect(mid(theirs), "theirs is right").toBeGreaterThan(fx);
   expect(mine.x + mine.width, "they don't overlap").toBeLessThanOrEqual(theirs.x);
   expect(Math.abs(mine.y + mine.height / 2 - fy), "they stand on the board's middle row").toBeLessThanOrEqual(frame.height * 0.2);
-  // About twice a corner pawn's size.
-  expect(mine.height / corner.height, "each about twice a corner pawn").toBeGreaterThanOrEqual(1.6);
+  // (Nov 9, round 2: the middle pawns are at least as tall as a corner pawn, which grows with its row: they were twice the old 44 px one.)
+  expect(mine.height / corner.height, "each at least as tall as a corner pawn").toBeGreaterThanOrEqual(1.0);
   // The countdown under them, the quick chat: four lines from the list.
   await expect(page.locator(".ac-meet-count")).toHaveText(/^Starting in [12]$/);
   const lines = await page.locator(".ac-meet-chat .ac-chat").allInnerTexts();
