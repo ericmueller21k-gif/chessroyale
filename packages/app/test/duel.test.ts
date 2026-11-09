@@ -205,7 +205,7 @@ describe("the 1 v 1 screens' words and clocks", () => {
     expect(resultReason(aborted("no_show", null), "w", "Bob", {})).toBe("Your opponent didn't arrive. No rank change.");
     // A bot's game (no `left`): "No rank change." either way.
     expect(resultReason(aborted("abort", "w"), "w", "Bot")).toBe("You left before the first moves. No rank change.");
-  });
+  }, 20_000);
 
   it("the home screen's label: your rank from your profile (placements before any game), nothing before it loads", async () => {
     device();

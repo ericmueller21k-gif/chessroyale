@@ -184,8 +184,28 @@ describe("1 v 1's room: who left early (ranked's leave rules, L1)", () => {
     back.come("b");
     back.go("b");
     back.come("w");
+    // (Gone at T0: at the join time, still within the grace, so the room waits it out.)
     back.at(T0 + RANKED_1V1.joinSeconds * 1000);
+    expect(back.core().end).toBeNull();
+    back.at(T0 + LEAVES.goneGraceMs);
+    expect(back.core().end).toMatchObject({ reason: "no_show", by: "b" });
     expect(back.record.conduct).toEqual({ b: "dodge" });
+  });
+  it("a moment away just before the join time (the delta review of #582, D1): the room waits out the grace; back in time, the game starts", () => {
+    const r = room();
+    r.come("b");
+    r.set(T0 + 8000);
+    r.go("b");
+    r.set(T0 + 9000);
+    r.come("w");
+    r.at(T0 + RANKED_1V1.joinSeconds * 1000);
+    expect(r.core().end).toBeNull();
+    expect(r.core().nextAlarm).toBe(T0 + 8000 + LEAVES.goneGraceMs);
+    r.set(T0 + 15_000);
+    r.come("b");
+    expect(r.record.game).not.toBeNull();
+    expect(r.core().end).toBeNull();
+    expect(r.record.conduct ?? {}).toEqual({});
   });
   it("the queue's Cancel the moment it was paired (never connected to it): called off, and nobody's dodge (nothing to record)", () => {
     const r = room();

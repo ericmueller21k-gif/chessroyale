@@ -780,7 +780,7 @@ describe("ranked's leave rules in the FAQ (L1): every number from LEAVES", () =>
     // (The review's fixes: Cancel, the grace before you count as gone, a no-show only once told, the window's games.)
     expect(t).toContain("Pressing Cancel the moment a match is found, before the game opens on your screen, isn't a dodge; once it has opened, Cancel is the same as Abort.");
     expect(t).toContain("you count as gone only after 12 seconds without a connection");
-    expect(t).toContain("while you've been gone over 12 seconds and your opponent is still there");
+    expect(t).toContain("while you've been gone 12 seconds or more and your opponent is still there");
     expect(t).toContain("not turning up once your device was told a match was found");
     expect(t).toContain("Every ranked game you finish that counts for your rank pushes an old one out of the count.");
     expect(ranked1v1(RANKED_1V1)).toContain(t);

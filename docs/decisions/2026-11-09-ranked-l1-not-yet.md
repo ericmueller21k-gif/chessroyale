@@ -11,3 +11,7 @@
   hashes the device (two accounts on one device never meet); checking a device's latest lockout too is left for A1.
 - While fair play holds a player (in review), their ranked games don't count (`games` doesn't move), so their marks don't age out
   of the last-20 window during the hold. The FAQ says "every ranked game you finish that counts for your rank".
+- From the delta review (#582): "told" is counted when the matchmaker answers, not when the app hears it (an ask held 2.5 s whose
+  phone sleeps meanwhile can still be charged a no-show; count from the app's own next step if playtests show it); a locked
+  account's ticket caught mid-seating isn't dropped (it expires); the Abort confirm could say "Bo is away: if they're not back in
+  12 seconds, leaving costs you nothing" (L2).

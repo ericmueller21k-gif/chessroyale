@@ -235,10 +235,12 @@ export class DuelCore {
   advance() {
     const now = this.io.now();
     const before = `${this.phase(now)}:${!!this.end}`;
-    if (!this.r.game && !this.r.noShow && now >= this.r.joinBy) {
+    const noShowAt = this.noShowAt();
+    if (!this.r.game && !this.r.noShow && now >= noShowAt) {
       const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
-      // (The one who didn't turn up, when one did.)
-      this.r.noShow = { result: "aborted", reason: "no_show", by: here.length === 1 ? other(here[0]!) : null, at: this.r.joinBy };
+      // (The one who didn't turn up, when one did: never seen, or gone past the grace by now.)
+      const absent = here.length === 1 ? other(here[0]!) : null;
+      this.r.noShow = { result: "aborted", reason: "no_show", by: absent && this.away(absent, noShowAt) ? absent : null, at: noShowAt };
     }
     if (this.r.game) this.r.game = tick(this.r.game, now);
     // (A side seen before with no socket now whose close the room never heard, a deploy's: gone from now.)
@@ -255,7 +257,7 @@ export class DuelCore {
   get nextAlarm(): number | null {
     const r = this.r;
     const times: number[] = [];
-    if (!r.game && !r.noShow) times.push(r.joinBy);
+    if (!r.game && !r.noShow && Number.isFinite(this.noShowAt())) times.push(this.noShowAt());
     if (r.game && !r.game.end) {
       const d = nextDeadline(r.game);
       if (d !== null) times.push(d);
@@ -275,6 +277,21 @@ export class DuelCore {
       const knew = { w: !!(this.r.delivered?.w || this.r.seen?.w), b: !!(this.r.delivered?.b || this.r.seen?.b) };
       this.r.conduct = this.r.excused ? {} : conductOf(end, this.r.game, present, { knew });
     }
+  }
+
+  /**
+   * When a game that hasn't begun is called a no-show: at joinBy, unless one side is here and the other had connected and
+   * gone only a moment before (within LEAVES.goneGraceMs): then once that grace runs out, so a phone that blinked can still
+   * come back and play, and one that closed the app is still charged (the delta review of #582, D1).
+   */
+  private noShowAt(): number {
+    const r = this.r;
+    const here = (["w", "b"] as const).filter((c) => this.io.connected(c));
+    // (Both here: the game starts, startIfBoth, whatever the clock says.)
+    if (here.length === 2) return Infinity;
+    if (here.length !== 1) return r.joinBy;
+    const gone = r.goneAt?.[other(here[0]!)];
+    return gone !== undefined && r.joinBy - gone < LEAVES.goneGraceMs ? gone + LEAVES.goneGraceMs : r.joinBy;
   }
 
   /**
