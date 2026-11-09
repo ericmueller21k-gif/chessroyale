@@ -590,3 +590,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   bgcy9l93r). Web research allowed for this job (Eric). Boss result pawn Haiku still running (watcher blhf1m8ex).
 - Nov 9 ~09:10: boss result pawn 1.6x + dressed stills done (a34efb9 after cleanup); stills sent to Eric; CI running; merge #571 on
   green AND Eric's OK of the stills. Note: the pawn's gutters weren't measured at 320/360 (the spec checks 390 only).
+- Nov 9 ~09:20: Eric OK'd the bigger dressed pawn: merge #571 on green (CI watcher b2rn0ehzt). Duo PARKED (Eric rejected Hand and
+  Brain and Recon fog duo; closest he liked: two different moves a turn, one picked; but voice chat breaks it; "We can just come
+  back to that later"). Ranked design: told the helper to add "Everything ranked touches" (all screens, paths, files).
+  Asked Eric what to OK overnight (XP phase 2 incl. CRATES_FREE off; stills branches cleanup).
