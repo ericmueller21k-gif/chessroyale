@@ -43,8 +43,10 @@ async function resultOf(page: Page, project: string, name: string) {
 
 test("a boss battle's victory and defeat screens: the title in the pixel type, no trophy or skull, no record text, the boss's line", async ({ page }, testInfo) => {
   test.setTimeout(3 * 60_000);
-  // A boss beats you at once (?mate=1): Defeated, and the boss's victory line.
-  await page.goto("/?debug&pace=quick&mate=1");
+  // A boss beats you at once (?mate=1): Defeated, and the boss's victory line. Hollow, named: START's random pick can be
+  // Wrangler or Sawyer, whose first move is a power's (the long pull; a pawn move for the split), not the mate, so the
+  // battle went on and the result never came (main's red, Nov 9: 2026-11-09-boss-result-red.md).
+  await page.goto("/?debug&pace=quick&mate=1&boss=hollow");
   await bossAloneFromHome(page);
   await expect(page.locator(".results h1")).toHaveText("Defeated", { timeout: 120_000 });
   await resultOf(page, testInfo.project.name, "defeat");

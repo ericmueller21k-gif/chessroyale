@@ -103,7 +103,9 @@ export interface Settings {
   bossPowerTest: string;
   /**
    * Test switch, solo (?mate=1): the boss battle starts after 1.f3 e5 2.g4 with the crowd White and the boss to move, and
-   * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once.
+   * the boss plays a mate in one whenever it has one: its attack on the crowd's king, then the result, at once. Not with a
+   * boss whose first move is a power's (Wrangler's long pull; Sawyer's pawn move for his split): that first move comes
+   * first, so name a boss with ?boss= (e.g. hollow) wherever the mate must come at once (2026-11-09-boss-result-red.md).
    */
   bossMateTest?: boolean;
   /**

@@ -233,6 +233,11 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Before blaming the game for a test that fails now and then, log every frame of the moment in the page and the
     test's own times next to it: where the two don't overlap is the answer.
 
+- **A defeat that never came** (Nov 9, [story](../docs/history/lessons.md#a-defeat-that-never-came-nov-9-2026)):
+  - A test that leans on a test switch names the boss (`?boss=`) unless it checks every boss on purpose: START's pick is
+    random, and a switch can fail for one boss in seven (`?mate=1` against Wrangler's pull or Sawyer's pawn first move).
+  - A spec that fails now and then on a random pick: run it once per boss (`?boss=<id>`) before calling it flaky.
+
 ## Eric's rules hold
 
 - **An options panel that disappeared** (Oct 25, [story](../docs/history/lessons.md#an-options-panel-that-disappeared-oct-25-2026)):
