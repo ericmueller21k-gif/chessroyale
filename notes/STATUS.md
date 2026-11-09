@@ -588,3 +588,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   penalties and queue delays, bots at the leaver's strength, library math, tiers, post-game screens). Research+design Opus high
   session_01JuCWRvjqERZdHUakRak83c on claude/ranked-ladder-design (docs/ideas/ranked-ladder.md; done signal .done.md, watcher
   bgcy9l93r). Web research allowed for this job (Eric). Boss result pawn Haiku still running (watcher blhf1m8ex).
+- Nov 9 ~09:10: boss result pawn 1.6x + dressed stills done (a34efb9 after cleanup); stills sent to Eric; CI running; merge #571 on
+  green AND Eric's OK of the stills. Note: the pawn's gutters weren't measured at 320/360 (the spec checks 390 only).
