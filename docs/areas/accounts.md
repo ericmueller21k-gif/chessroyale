@@ -68,9 +68,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Quests** (Nov 9, phase 3; `server/quests.ts`, the rules in core's `quests.ts`, the numbers and pool `QUESTS` in settings.ts; decisions
   `2026-11-09-quests-*.md`): 2 dailies a day and a weekly a week, dealt lazily on the day's first read (GET /api/quests or a game's XP grant)
   from a seed of the account and the day, once (`quest_days`' nonce claim). Unfinished dailies carry over, topped up to 3 at most; the weekly
-  resets on Mondays (08:00 UTC). One free reroll a day (POST /api/quests/reroll). Progress (`quest_progress`, one row per quest per game) and
+  resets on Mondays (08:00 UTC). One free reroll a day (POST /api/quests/reroll). Progress (`quest_progress`, one row per quest per game, only from the attempt that first counted the game:
+  `quest_games`) and
   completion (op `quest:<kind>:<quest id>:<ledger id>`: 300 XP a daily, some a Winter Crate; the weekly 1,500 XP, a crate and a key) go in the
-  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests, with 3 of the server's minutes; a
+  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests, with 3 of the server's minutes and only while its time XP is paid (not past the day's solo minutes); a
   win only when its win XP went in), so each quest pays once. Its XP is a part of the box ("Quest +300") and can level you up; the quests are in
   the result's rewards (`XpRewards.quests`). Nothing while `PAUSE_REWARDS` is on. A guest's merge drops the guest's quests; deleting removes
   them; the download has them (store `quests`). The screens: [hub.md](hub.md).

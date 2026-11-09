@@ -30,7 +30,10 @@ import { cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
  *     deal tops them up to QUESTS.maxDailies at most. A new week replaces the weekly.
  *   - **Progress** (`quest_progress`, one row per quest per game): written in the same batch as the game's XP (xp.ts grantXp), only
  *     for a counted game (no XP, no progress), only while the quest is unfinished, and for a win quest only if the game's win XP is in
- *     the ledger (its op's first leg: a friends' lobby pays a win once a day per opponent). A replay writes nothing more.
+ *     the ledger (its op's first leg: a friends' lobby pays a win once a day per opponent), and for a solo game only if its time XP
+ *     is (past the day's solo minutes: no XP, no progress; review of #575, m2). Only the attempt that first counted the game moves
+ *     quests (`quest_games`: its claim names the attempt), so a replay (Squads' reward queue, the duel room's retry) after a reroll or
+ *     a new day's deal moves nothing, the new quests included (review of #575, m1).
  *   - **Completion** (op `quest:<kind>:<quest id>:<ledger id>`, reason "quest", in that same batch): its guard counts the progress in
  *     the same transaction, so the game that brings it to its target pays it, once; two games at once, two tabs or a replay can't pay
  *     it twice. Its legs (XP, crates of XP.rewardCrate, keys) name the game as their source, so that game's result answers it.
@@ -60,6 +63,15 @@ export const QUESTS_SCHEMA = [
     PRIMARY KEY (quest_id, game)
   )`,
   `CREATE INDEX IF NOT EXISTS quest_progress_user ON quest_progress (user_id)`,
+  // Each counted game's claim on quests (review of #575, m1): the attempt (a nonce) that first counted it; only that attempt's progress
+  // goes in. Rows older than the day before are cleared at the day's deal (retries come within minutes).
+  `CREATE TABLE IF NOT EXISTS quest_games (
+    user_id TEXT NOT NULL,
+    game TEXT NOT NULL,
+    attempt TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, game)
+  )`,
   // Per account: the XP day and week last dealt, the day of the last reroll, and the nonce of the attempt that last claimed either.
   `CREATE TABLE IF NOT EXISTS quest_days (
     user_id TEXT PRIMARY KEY,
@@ -148,6 +160,7 @@ export async function ensureQuests(sql: Sql, userId: string, now: number): Promi
     const kept = dailies.filter((q) => !gone.includes(q));
     const deal = pickQuests(QUESTS.daily, kept.map((q) => q.kind), dailiesToDeal(kept.filter((q) => q.done_at === null).length), `${userId}:${day}`);
     deal.forEach((def, i) => out.push(insertQuest(userId, "daily", def, day, i, ours)));
+    out.push(stmt("DELETE FROM quest_games WHERE user_id = ? AND at < ?", userId, day - 86_400_000));
   }
   if (!at || at.week !== week) {
     out.push(...drop(held.filter((q) => q.period === "weekly" && q.assigned_at < week).map((q) => q.id)));
@@ -239,19 +252,23 @@ export async function rerollQuest(sql: Sql, userId: string, questId: unknown, no
 export const questOpId = (kind: string, questId: string, account: string) => `quest:${kind}:${questId}:${account}`;
 
 /**
- * A counted game's quest statements, for its XP grant's batch (xp.ts grantXp; after its win op, whose first leg `winOp` a win quest
- * waits for): progress for each unfinished quest it moves, then each one's completion op (applied only if its guard counts the
- * target). Deals the day's quests first if it's the day's first read. Empty: nothing moves.
+ * A counted game's quest statements, for its XP grant's batch (xp.ts grantXp; after its ops: a win quest waits for the win op's first
+ * leg `winOp`, a solo game's progress for its time op's `timeOp`): this attempt's claim on the game (`quest_games`; a replay's claim
+ * doesn't go in, so its progress doesn't either), progress for each unfinished quest it moves, then each one's completion op (applied
+ * only if its guard counts the target). Deals the day's quests first if it's the day's first read.
  */
 export async function questStatements(
   sql: Sql,
   me: LedgerAccount,
-  game: { key: string; now: number; quest: QuestGame; winOp: string },
+  game: { key: string; now: number; quest: QuestGame; winOp: string; timeOp?: string },
   opStatements: (op: Op) => Stmt[],
 ): Promise<Stmt[]> {
   await ensureQuests(sql, me.user, game.now);
   const rows = (await rowsOf(sql, me.user)).filter((q) => q.done_at === null);
-  const out: Stmt[] = [];
+  const attempt = newId();
+  const out: Stmt[] = [
+    stmt("INSERT INTO quest_games (user_id, game, attempt, at) VALUES (?, ?, ?, ?) ON CONFLICT (user_id, game) DO NOTHING", me.user, game.key, attempt, game.now),
+  ];
   const ops: Op[] = [];
   for (const q of rows) {
     const def = questDef(q.kind);
@@ -260,7 +277,8 @@ export async function questStatements(
     out.push(
       stmt(
         `INSERT INTO quest_progress (quest_id, user_id, game, at) SELECT ?, ?, ?, ?
-         WHERE EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND done_at IS NULL)${winOnly ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}
+         WHERE EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND done_at IS NULL)
+         AND EXISTS (SELECT 1 FROM quest_games WHERE user_id = ? AND game = ? AND attempt = ?)${winOnly ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}${game.timeOp ? " AND EXISTS (SELECT 1 FROM ledger WHERE op_id = ? AND leg = 0)" : ""}
          ON CONFLICT (quest_id, game) DO NOTHING`,
         q.id,
         me.user,
@@ -268,7 +286,11 @@ export async function questStatements(
         game.now,
         q.id,
         me.user,
+        me.user,
+        game.key,
+        attempt,
         ...(winOnly ? [game.winOp] : []),
+        ...(game.timeOp ? [game.timeOp] : []),
       ),
     );
     ops.push({
@@ -350,7 +372,7 @@ export async function setTestQuests(sql: Sql, userId: string, list: unknown, now
 }
 
 /** An account's quest rows, gone (deleting the account; a guest's merge into the account it signs in to: the account keeps its own). */
-export const questDeletes = (userId: string): Stmt[] => ["quest_progress", "quests", "quest_days"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId));
+export const questDeletes = (userId: string): Stmt[] => ["quest_progress", "quests", "quest_days", "quest_games"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId));
 
 /** The account's part of "Download my data": its quests (each one's kind, when dealt and finished, its progress) and its reroll's day. */
 export const questsDownload = async (sql: Sql, userId: string) => ({
@@ -360,4 +382,5 @@ export const questsDownload = async (sql: Sql, userId: string) => ({
     userId,
   ),
   days: await sql.first("SELECT day, week, reroll_day FROM quest_days WHERE user_id = ?", userId),
+  games: await sql.all("SELECT game, at FROM quest_games WHERE user_id = ? ORDER BY at", userId),
 });

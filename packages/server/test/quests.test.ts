@@ -218,6 +218,19 @@ describe("progress: only counted games, by mode, decided by the server", () => {
     expect(await progress(sql, ann.id)).toEqual({ "Warm Up": "1/3", Winner: "0/2", "Boss Hunter": "0/1", Regular: "1/10" });
   });
 
+  it("a solo game past the day's solo minutes (no XP) moves no quest: no XP, no progress (review of #575, m2)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await set(sql, ann.id, [["squad-up"], ["warm-up"], ["regular"]]);
+    // (XP.soloMinutesPerDay of solo time: games of XP.maxMinutes, lost, so no win XP either.)
+    const full = XP.soloMinutesPerDay / XP.maxMinutes;
+    for (let i = 0; i < full; i++) await grantXp(sql, ann.id, game(`solo:${String(i).repeat(18)}`, "solo", { ms: XP.maxMinutes * MIN }, { cap: "solo" }));
+    expect((await progress(sql, ann.id)).Regular).toBe(`${full}/10`);
+    const past = await grantXp(sql, ann.id, game("solo:ffffffffffffffffff", "solo", { ms: XP.maxMinutes * MIN }, { cap: "solo" }));
+    expect(past?.none).toBe("limit");
+    expect((await progress(sql, ann.id)).Regular).toBe(`${full}/10`);
+  });
+
   it("a win counts only if its XP was paid: a friends' lobby's second win today against the same player moves nothing", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
@@ -261,6 +274,25 @@ describe("completion: paid once through the ledger, in the game's XP", () => {
     expect(later?.parts.map((p) => p.label)).toEqual(["12 min"]);
     expect(await xpOf(sql, ann.id)).toBe(120 + 300 + 120);
     expect((await sql.all("SELECT * FROM ledger WHERE reason = 'quest'")).length).toBe(1);
+  });
+
+  it("a replayed grant after a reroll moves only the quests its first attempt moved, never the new one (review of #575, m1)", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    // (Every daily kind held but Fifty-Fifty, so the reroll can only deal Fifty-Fifty, which a Crowd game counts.)
+    await set(sql, ann.id, [["warm-up"], ["squad-up"], ["boss-hunter"], ["raid-party"], ["winner"], ["regular"]]);
+    const first = await grantXp(sql, ann.id, game("lobby:AAAAA:1", "crowd"));
+    const squad = (await quests(sql, ann.id)).find((q) => q.name === "Squad Up")!;
+    expect(await rerollQuest(sql, ann.id, squad.id, T0)).toEqual({ ok: true });
+    expect((await progress(sql, ann.id))["Fifty-Fifty"]).toBe("0/1");
+    // (The room retries the same game's grant: Squads' reward queue, the duel room's alarm.)
+    const again = await grantXp(sql, ann.id, game("lobby:AAAAA:1", "crowd"));
+    expect(again).toEqual(first);
+    expect(await progress(sql, ann.id)).toMatchObject({ "Warm Up": "1/3", "Fifty-Fifty": "0/1", Regular: "1/10" });
+    expect(await sql.all("SELECT * FROM ledger WHERE reason = 'quest'")).toEqual([]);
+    // (The same after the next day's deal.)
+    await grantXp(sql, ann.id, game("lobby:AAAAA:1", "crowd", {}, { now: T0 + DAY }));
+    expect((await progress(sql, ann.id, T0 + DAY))["Fifty-Fifty"]).toBe("0/1");
   });
 
   it("two games at once (two rooms, two tabs) finishing the same quest pay it once; a target of 2 reached by two at once, once", async () => {

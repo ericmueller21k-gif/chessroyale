@@ -219,7 +219,7 @@ export async function grantXp(sql: Sql, userId: string, game: XpGame): Promise<X
   // (Quests, phase 3: this game's progress and any quest it completes, in the same batch, after the win op: a win quest moves only if
   // the win's XP went in. A failure to read them costs the quests, never the game's XP.)
   const quests = game.quest
-    ? await questStatements(sql, me, { key: game.key, now: game.now, quest: { mode: game.quest, won: game.facts.won, ms: game.facts.ms }, winOp: win.id }, (op) =>
+    ? await questStatements(sql, me, { key: game.key, now: game.now, quest: { mode: game.quest, won: game.facts.won, ms: game.facts.ms }, winOp: win.id, ...(solo ? { timeOp: time.id } : {}) }, (op) =>
         opStatements(me, op, newId()),
       ).catch((e: unknown) => {
         console.error("quests", e);

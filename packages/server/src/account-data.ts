@@ -142,7 +142,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     // Quests (quests.ts, Nov 9, phase 3): your dailies and weekly (which, when dealt and finished, the target), each game that moved
     // one (its key and when), and the day and week last dealt and your last reroll's day. What they paid is in the ledger, below.
     name: "quests",
-    tables: ["quests", "quest_progress", "quest_days"],
+    tables: ["quests", "quest_progress", "quest_days", "quest_games"],
     export: (sql, u) => questsDownload(sql, u.id),
     erase: (u) => questDeletes(u.id),
   },

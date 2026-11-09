@@ -149,6 +149,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   ops_errors: "fingerprint hour source kind message version count first_seen last_seen sample",
   ops_reports: "id at kind account version note diag",
   quest_days: "user_id day week reroll_day nonce",
+  quest_games: "user_id game attempt at",
   quest_progress: "quest_id user_id game at",
   quests: "id user_id period kind target assigned_at slot done_at",
   queue_waits: "id mode at players wait_ms",
