@@ -489,3 +489,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   row's height; top matches bottom. Eric allowed Haiku for more jobs "for now", but the director must verify their quality (stills,
   diff) before merging; he wants it live. Haiku session_01JuCWRsAA78FR7bBoFC1qsE on claude/autochess-player-size (stills on
   stills/autochess-player).
+- Nov 9 ~01:00: Eric's squads bug (missed his turn while looking back at old moves): brief notes/briefs/brief-squads-snap-live.md.
+  QUEUED: Haiku fix + Opus diff review, when a helper slot frees (2 running: flaky batch Opus, auto chess player size Haiku).
+- #563 (meet chat cards fix, director's own) CI watcher bw4z86g7p; merge when green (Eric wants it live).
