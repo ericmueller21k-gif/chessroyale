@@ -601,3 +601,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   Eric the mockup + doc. His decisions: (1) separate rank per mode (rec yes, 1v1 main), (2) MMR hidden + tier/RP shown, (4) the RP
   fees (dodge -5/-10, leave loss -10, delayed queue 3 in 20), (7) season reset one tier or none, season length (rec 3 months).
   Build order: L1 leave rules first (1v1 dodges are free today). XP phase 2 running (Opus, watcher b33e7b9eg).
+- Nov 9 ~10:00: #571 boss result v2 merged (aed4384; watcher bo1pd6rp5 on deploy + main CI). #573 ranked design docs merged
+  (21f99e4; mockup PNG moved to notes/briefs/assets since docs/ can't hold images). XP phase 2 running (watcher b33e7b9eg).
+  Waiting on Eric's ranked decisions.
