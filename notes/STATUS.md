@@ -541,3 +541,6 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 9 ~04:40: XP phase 1 done (ac426be): PR #569 (draft, full-e2e label), stills sent to Eric. Independent review: Opus xhigh
   session_01JuCWRuxsmthWCNcC1mpHoX (done signal branch review/569; watcher bvm2iak0l). Full CI watcher biylg3c3o.
   Open: PAUSE_REWARDS kill switch not built; 1v1 vs bot / town tables earn no XP (no result recorded).
+- Nov 9 ~04:50: XP review (review/569): no blockers; 2 majors (M1 solo win paid untimed; M2 solo time farmable by waiting) + 7
+  minors. Fix round: fresh Opus xhigh session_01JuCWRvmwEqXz5Ka4ggYBNr on claude/xp-phase1 (done signal .review-fixes.md,
+  watcher bfrimjxul). Director's call for M2: solo time XP capped at 120 min an XP day (Eric may change). Then a delta re-review.
