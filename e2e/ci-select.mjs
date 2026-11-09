@@ -6,7 +6,7 @@
 // that use that, each counted as changed (traceChanges, below). Docs: docs/areas/ops.md, "CI e2e".
 //
 // Usage:
-//   node e2e/ci-select.mjs full "<why>"     every spec on 10 shards (a push to main, a manual run, the full-e2e
+//   node e2e/ci-select.mjs full "<why>"     every spec on 15 shards (a push to main, a manual run, the full-e2e
 //                                           label)
 //   node e2e/ci-select.mjs diff <base>       the specs for what changed from <base> to HEAD (a pull request: HEAD^1,
 //                                           its merge commit's first parent, which is main as it is now)
@@ -21,7 +21,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 /** Shards for every spec (a push to main), as before; a pull request uses as few as its specs need, up to this. */
-export const MAX_SHARDS = 10;
+export const MAX_SHARDS = 15;
 /**
  * The test time a pull request's shard aims at: seconds, summed over both projects (ci-timings.json's unit), so about
  * half of it on the clock with 2 workers. With setup, a shard then takes about 5 minutes.
