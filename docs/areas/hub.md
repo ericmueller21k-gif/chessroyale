@@ -59,7 +59,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     lockout greys 1 v 1's PLAY with its countdown in the line ("You left early: 1 v 1 opens in 4:32", one line from 320 px;
     `LeavesLine`, the only part drawn each second), PLAY back by itself as it ends; the delayed queue's line ("3 leaves in your
     last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
-    before the game started: −5 RP" after a dodge, or "…Finish games to clear this." from 5 marks; another notice (a match
+    before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
     that ended) goes first.
   - **Chess Town's button** (Eric, Oct 31 and Nov 1; it was the full-width Boss Arena card, Oct 26, "Party up and take on the bosses";
     [docs/decisions/2026-11-01-home-chess-town.md](../decisions/2026-11-01-home-chess-town.md)): right under PLAY, **exactly PLAY's size at

@@ -129,7 +129,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     at most (`dodgeLockoutMin`), from that dodge;
   - **The last 20** (`marksInWindow`): marks among your latest `window` (20) ranked games and dodges (each mark keeps the
     player's game count then, so every clean game pushes the oldest out). 3-4: each search waits 2 minutes before it can be
-    paired; 5+: 5 minutes (`delayed`), and home's note says "Finish games to clear this"; 8+ (`lockAt`): 1 v 1 locked
+    paired; 5+: 5 minutes (`delayed`), and home's note says "Finish ranked games to clear your leaves."; 8+ (`lockAt`): 1 v 1 locked
     `lockHours` (24) from the latest mark. Not built yet: the second 8+ in a season (7 days and a fair-play case: phases S1
     and A1);
   - **The queue** (`index.ts`'s `/api/1v1/play`, first ask): a lockout is refused (403 `{ message, lockedUntil, lock }`); the
@@ -139,8 +139,7 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     with PLAY greyed until it's over (drawn again as it ends), or "3 leaves in your last 20: +2 min queue" with PLAY on (the
     wait starts with the search); the stage's line: "Delayed queue · 1:42" in place of "Finding opponent…" while it counts
     down; home's note (its note slot, dismissable for the tab): "You left before the game started: −5 RP" for
-    `noteMinutes` (30) unless a game comes after it, or from 5 marks "You left 5 of your last 20 ranked games early. Finish
-    games to clear this."; the match menu's confirms (the words only, the same box): Abort "The game is called off. Leaving
+    `noteMinutes` (30) unless a game comes after it, or from 5 marks "Finish ranked games to clear your leaves." (the count is in the line); the match menu's confirms (the words only, the same box): Abort "The game is called off. Leaving
     before it starts costs 5 RP." (with the lockout it would bring: "10 RP and a 30-minute wait before your next 1 v 1"),
     Resign before your 3rd move "It counts as a loss, and resigning this early costs 10 RP more." (in placements: "…goes on
     your record"); the result card's line after your own dodge: "Left before it started: −5 RP". A bot's or the town's game

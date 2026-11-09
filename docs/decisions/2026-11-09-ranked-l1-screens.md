@@ -6,7 +6,8 @@
   place). Both lines fit one line at 320 px.
 - Home's note after a dodge ("You left before the game started: −5 RP"; no number in placements) shows 30 minutes
   (`noteMinutes`) or until a game comes after it, dismissable for the tab. The design's "Finish games to clear this" (5+ marks)
-  uses the same slot.
+  uses the same slot, as "Finish ranked games to clear your leaves." (the count is in the line above PLAY; with it the note took
+  three lines on a phone).
 - The confirms' words follow what a dodge would cost now (the lockout it would bring included); "goes on your record" in
   placements. The result card's own-dodge line: "Left before it started: −5 RP"; its "No rank change." stays only for the other
   player's dodge.

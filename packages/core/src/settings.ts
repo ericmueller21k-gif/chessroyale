@@ -2589,7 +2589,7 @@ export const LEAVES = {
   window: 20,
   /**
    * The delayed queue: with at least `at` marks in the window, each ranked search waits `waitSec` before it can be paired
-   * (the most `at` reached applies). From `noteAt` marks home also says "Finish games to clear this".
+   * (the most `at` reached applies). From `noteAt` marks home's note also says "Finish ranked games to clear your leaves."
    */
   delayed: [
     { at: 3, waitSec: 120 },

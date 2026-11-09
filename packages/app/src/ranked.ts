@@ -104,7 +104,8 @@ export function leavesLine(l: RankedLeaves | null, now: number): string | null {
 /** Home's note (the note slot at its top) from your standing: just after a dodge, or while finishing games would clear a delay. */
 export function leavesNote(l: RankedLeaves | null): string | null {
   if (l?.dodged) return `You left before the game started${l.dodged.rp > 0 ? `: −${l.dodged.rp} RP` : ""}`;
-  if (l && l.marks >= LEAVES.noteAt) return `You left ${l.marks} of your last ${LEAVES.window} ranked games early. Finish games to clear this.`;
+  // (The count is in the line above PLAY: "5 leaves in your last 20: +5 min queue".)
+  if (l && l.marks >= LEAVES.noteAt) return "Finish ranked games to clear your leaves.";
   return null;
 }
 

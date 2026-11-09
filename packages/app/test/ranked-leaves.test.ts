@@ -41,7 +41,7 @@ describe("home's note", () => {
     expect(leavesNote({ ...clean, dodged: { at: NOW, rp: 0 } })).toBe("You left before the game started");
   });
   it("from 5 marks: finish games to clear it", () => {
-    expect(leavesNote({ ...clean, marks: 5, delaySec: 300 })).toBe("You left 5 of your last 20 ranked games early. Finish games to clear this.");
+    expect(leavesNote({ ...clean, marks: 5, delaySec: 300 })).toBe("Finish ranked games to clear your leaves.");
     expect(leavesNote({ ...clean, marks: 4, delaySec: 120 })).toBeNull();
   });
 });
