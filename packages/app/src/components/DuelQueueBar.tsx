@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { DuelQueue } from "../duel.ts";
 import { clockShown } from "../clock-text.ts";
 import { isMuted, play } from "../sound.ts";
+import { haptic } from "../haptics.ts";
 
 /**
  * Browsing while queued for 1 v 1 (Eric, Oct 16: "a back button or they can view inventory"; docs/areas/ranked.md,
@@ -45,16 +46,11 @@ export function confirmLeaveDuelQueue(leave: () => void) {
   emit();
 }
 
-/** An opponent found while you browse: a sound and a short buzz (none while sound is off). */
+/** An opponent found while you browse: a sound and a short buzz (the buzz off with Sound or Vibration off). */
 export function duelFoundAlert() {
   play("bannerStart");
-  if (!isMuted()) {
-    try {
-      navigator.vibrate?.([90, 60, 160]);
-    } catch {
-      // No vibration here.
-    }
-  }
+  // (Quiet with Sound off too, as it always was: Oct 16, docs/decisions/2026-10-16-1v1-browse-while-queued.md.)
+  if (!isMuted()) haptic("duelFound");
 }
 
 /** The bar and the confirm, over every screen (main.tsx). */

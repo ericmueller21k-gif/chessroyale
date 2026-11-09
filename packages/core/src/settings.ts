@@ -3956,6 +3956,57 @@ export const SQUADS: SquadsSettings = {
  */
 export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };
 
+/** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
+export type HapticPattern = number | readonly number[];
+
+/**
+ * Haptics (Eric, Nov 9: "when you tap [a piece] … it should vibrate. And then when we drop it on a square … vibrate";
+ * docs/decisions/2026-11-09-haptics.md; `packages/app/src/haptics.ts`). Each kind's pattern, in ms; Settings → Sound,
+ * "Vibration" switches them all off on the device. On an iPhone each pulse is one system tick (no lengths), at most
+ * `iosTicks` of them.
+ * - `select`: a tap that picks up one of your pieces (not a press held to drag: `holdMs` and longer is a hold).
+ * - `move`: a move you make (a tap on its square, or a dragged piece let go on one; a premove placed; a promotion picked).
+ * - The boss moments, each once, on the device that sees it, keyed in `cues` by the art's id and cue (and its animation,
+ *   where the same cue plays in another one): Big Boy's toy block landing and his Big Bounce's crash, Babur's balloon
+ *   popping, Ginger's ice freezing over a piece, Boingo's pie splat; and QUEEN SLAIN! (Boss.tsx).
+ * - `duelFound` (a 1 v 1 opponent found while you browse) and `crateHold` (a crate held) were the game's two buzzes
+ *   before Nov 9.
+ */
+export const HAPTICS = {
+  holdMs: 350,
+  iosTicks: 3,
+  /** Between two ticks of a pattern on an iPhone (ms): the pulse and the gap after it, together. */
+  iosTickGapMs: 90,
+  patterns: {
+    select: 10,
+    move: 15,
+    bigboyBlock: 35,
+    bigboyBounce: [30, 60, 30, 60, 30],
+    baburPop: 25,
+    gingerFreeze: [20, 40, 20],
+    boingoPie: 40,
+    queenSlain: [40, 60, 40],
+    duelFound: [90, 60, 160],
+    crateHold: 15,
+  },
+  /** The art's cues that vibrate: "<art id> <cue>", or "<art id> <animation> <cue>" for a cue that's in other animations too. */
+  cues: {
+    "toy-block clack": "bigboyBlock",
+    "bigboy crash": "bigboyBounce",
+    "tigerPump pop": "baburPop",
+    "ice-overlay freeze crackle": "gingerFreeze",
+    "pie-splat splat": "boingoPie",
+  },
+} as const satisfies {
+  holdMs: number;
+  iosTicks: number;
+  iosTickGapMs: number;
+  patterns: Record<string, HapticPattern>;
+  cues: Record<string, string>;
+};
+
+export type HapticKind = keyof typeof HAPTICS.patterns;
+
 /** What the shop offers, in percent, by kind (pawn, knight, bishop, rook, queen): a row adds up to 100. */
 export interface ShopOdds {
   readonly p: number;

@@ -4,6 +4,7 @@ import { SQUARE } from "../characters/effects.ts";
 import { EFFECTS, animLength, type EffectName } from "../characters/power-art.ts";
 import { renderFrame, type Character, type Frame } from "../characters/sprite.ts";
 import { play, type SoundName } from "../sound.ts";
+import { cueHaptic } from "../haptics.ts";
 
 /**
  * A boss power's pixel art on screen: an effect sprite on the board (the ice over a frozen piece, a pie, the
@@ -204,6 +205,7 @@ export function SpriteAnim({ ch, anim, since, then, sounds = {}, id = "", class:
           if (sound && !played.has(tag)) {
             played.add(tag);
             play(sound);
+            cueHaptic(ch.id, f.anim, fr.cue!);
           }
         }
         prev = s;
@@ -265,7 +267,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
     const shown = new Map<string, string>();
     const draw = () => {
       const now = Date.now();
-      const want = new Map<string, { key: string; frames: { ch: Character; frame: Frame; sound?: SoundName; tag: string }[] }>();
+      const want = new Map<string, { key: string; frames: { ch: Character; frame: Frame; sound?: SoundName; anim: string; tag: string }[] }>();
       for (const it of live.current) {
         const fx = EFFECTS[it.name];
         const a = it.anim ?? fx.start ?? fx.loop!;
@@ -273,7 +275,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
         const frame = fx.ch.anims[s.anim]!.frames[s.frame]!;
         const w = want.get(it.square) ?? { key: "", frames: [] };
         w.key += `${it.name}:${s.anim}:${s.frame};`;
-        w.frames.push({ ch: fx.ch, frame, sound: frame.cue && !it.quiet ? fx.sounds[frame.cue] : undefined, tag: `${fx.ch.id}:${it.square}:${s.tag}:${s.frame}` });
+        w.frames.push({ ch: fx.ch, frame, sound: frame.cue && !it.quiet ? fx.sounds[frame.cue] : undefined, anim: s.anim, tag: `${fx.ch.id}:${it.square}:${s.tag}:${s.frame}` });
         want.set(it.square, w);
       }
       for (const sq of new Set([...shown.keys(), ...want.keys()])) {
@@ -289,6 +291,7 @@ export function BoardEffects({ items, orientation, class: cls = "", style }: { i
           if (fr.sound && !played.has(fr.tag)) {
             played.add(fr.tag);
             play(fr.sound);
+            cueHaptic(fr.ch.id, fr.anim, fr.frame.cue!);
           }
         }
         if (w) shown.set(sq, w.key);

@@ -1,4 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
+import { HAPTICS } from "@chessroyale/core";
 import { BOARD_SEL, named, test } from "./helpers.ts";
 
 /**
@@ -264,4 +265,54 @@ test("a phone: a premove by tap-tap and one by a drag, each played as the turn c
   await expect(black.locator(".dv-status")).toHaveText("Your move");
   expect(await pieceOn(black, "f8")).toBe("bb");
   expect(await pieceOn(white, "c5")).toBe("");
+});
+
+/** A finger pressed on a square and held `ms`, then (`to`) dragged there, or let go where it is (real touch events). */
+async function heldPress(page: Page, from: string, ms: number, to?: string) {
+  const a = await center(page, from);
+  const b = to ? await center(page, to) : a;
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: a.x, y: a.y }] });
+  await page.waitForTimeout(ms);
+  if (to) for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: a.x + ((b.x - a.x) * i) / 8, y: a.y + ((b.y - a.y) * i) / 8 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await cdp.detach();
+}
+
+test("a phone: haptics: a tap picking up a piece ticks, a move ticks; a held press or a drag's start doesn't; Vibration off, nothing", async ({ browser }) => {
+  test.skip(isComputer(), "haptics are a phone's (a computer has nothing to shake)");
+  test.setTimeout(3 * 60_000);
+  const { white, black } = await game(browser, ["Ann Buzz", "Bo Buzz"]);
+  // White's navigator.vibrate records each pattern (haptics.ts calls it as each haptic plays).
+  await white.evaluate(() => {
+    const w = window as unknown as { __buzz: unknown[] };
+    w.__buzz = [];
+    navigator.vibrate = (p: VibratePattern) => (w.__buzz.push(p), true);
+  });
+  const buzzes = () => white.evaluate(() => (window as unknown as { __buzz: unknown[] }).__buzz);
+  const { select: S, move: M } = HAPTICS.patterns;
+
+  // A tap on e2 picks the pawn up: `select`. A tap on e4 moves it: `move`.
+  const e2 = await center(white, "e2");
+  await white.touchscreen.tap(e2.x, e2.y);
+  await expect.poll(buzzes).toEqual([S]);
+  const e4 = await center(white, "e4");
+  await white.touchscreen.tap(e4.x, e4.y);
+  await expect.poll(buzzes).toEqual([S, M]);
+  await tapMove(black, "e7e5");
+  await lastMoveIs(white, "e7e5");
+
+  // Pressed and held on d2, let go: nothing. Pressed and held on g1, then dragged to f3: only the move.
+  await heldPress(white, "d2", HAPTICS.holdMs + 250);
+  await heldPress(white, "g1", HAPTICS.holdMs + 250, "f3");
+  await lastMoveIs(black, "g1f3");
+  expect(await buzzes()).toEqual([S, M, M]);
+
+  // Settings → Sound, "Vibration" off: nothing, a tap-select and a move alike.
+  await white.evaluate(() => localStorage.setItem("brc.vibration", "0"));
+  await tapMove(black, "b8c6");
+  await lastMoveIs(white, "b8c6");
+  await tapMove(white, "f1c4");
+  await lastMoveIs(black, "f1c4");
+  expect(await buzzes()).toEqual([S, M, M]);
 });

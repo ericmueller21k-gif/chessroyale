@@ -8,6 +8,7 @@ import { renderFrame, type Anim, type Character, type Frame } from "../character
 import { drawnFacing } from "../characters/sprite-kit.ts";
 import type { BossView, GameView, Phase } from "../game.ts";
 import { play, warmSounds } from "../sound.ts";
+import { cueHaptic } from "../haptics.ts";
 import { EFFECTS, POWER_MOMENTS } from "../characters/power-art.ts";
 import { prewarmBigBoy } from "./BigBoy.tsx";
 import { prewarmGinger } from "./Ginger.tsx";
@@ -362,6 +363,7 @@ function Character({ boss, stage, place }: { boss: BossView; stage: Stage; place
         if (sound && !played.has(s.tag)) {
           played.add(s.tag);
           play(sound);
+          cueHaptic(kit.ch.id, s.anim, frame.cue!);
         }
       }
       raf = requestAnimationFrame(draw);

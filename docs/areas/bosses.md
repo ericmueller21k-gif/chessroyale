@@ -697,6 +697,14 @@ review (`Breakdown` with `inline`) shows under the stats, every move, with the f
 top part is left and the review right. Decision: `docs/decisions/2026-11-02-boss-result-layout.md`. Guard: `e2e/resign.spec.ts`
 ("Boss alone: Cancel keeps playing...", the result page's checks).
 
+- **Haptics at a few boss moments** (Eric, Nov 9; docs/decisions/2026-11-09-haptics.md): a buzz where the art plays its
+  cue's sound (BossCharacter, SpriteAnim and the board's batch in `BossEffect.tsx` call `cueHaptic` beside `play`, so it's
+  once, on the device that sees it, and never for a quiet sprite), by `HAPTICS.cues` (settings.ts): Big Boy's toy block
+  landing (`bigboyBlock`, 35 ms), his Big Bounce's crash (`bigboyBounce`, 30/60/30/60/30), Babur's balloon popping
+  (`baburPop`, 25 ms), Ginger's ice freezing over a piece (`gingerFreeze`, 20/40/20; not a blizzard's, which is quiet,
+  nor its thaw), Boingo's pie splat (`boingoPie`, 40 ms); and QUEEN SLAIN! as its banner comes (`queenSlain`, 40/60/40,
+  Boss.tsx, once per banner). Settings → Sound, "Vibration" turns them off. A new moment is a line in `HAPTICS.cues`.
+
 ## Where the code is
 
 Each boss lives in its own files, one per layer, on a shared base. The shared files only put them together.
@@ -842,7 +850,7 @@ sheet's words in `PROMOTION_OPT_OUT` (`boss-kit-lib.ts`), with the decision file
 `BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers, Alfil's `tusks*` and `slam*`, Chub & Chirp's `hopMax`, `hopNodes` and `carrot*`, Smudgy's `camo*` and `repaint*`, Moo & Moon's `moonbeam*` (`moonbeamTarget` among them), `fullMoonMoves` and `flurryBeams`, the circus tiger's `balloon*` (`balloonStages`, `balloonStageSec`, `balloonOdds`, `balloonPops`, `balloonLandsInRow`, `balloonColors`, `balloonBands`, `balloonLooks`, `balloonNodes`) and `hoops*` (`hoopsCount`, `hoopsCrowdMoves`, `hoopsBand`, `hoopsTarget`, `hoopsLooks`, `hoopsNodes`, `hoopsTimeMs`), the hippo gardener's `seed*`, `waterOdds`, `plantTurns`, `waterBand`, `waterTarget`, `jackpotMax`, `waterLooks`, `waterNodes`, `waterBudget` and `waterTimeMs` among them, Folio's `draft*`, `foldTurns`, `crease*` and `revision*`; the meter: `rageFull`, `ragePerMove`,
 `rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss), `SAWYER_LOOKS` (how his split
 looks), the `boss*` keys of `Settings`,
-`BOSS_DIFFICULTY`, `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
+`BOSS_DIFFICULTY`, `HAPTICS` (the boss moments' buzzes: `patterns` and `cues`), `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
 sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `boss.ts`.
 
 ## Tests and tools
