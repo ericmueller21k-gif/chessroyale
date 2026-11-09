@@ -626,3 +626,7 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   (done signal .review-fixes.md); then delta re-review + full CI.
 - Nov 9 ~12:50: #575 fixes done (84724d3; quest_games claim table for m1); notes removed (e2d9f54). Delta review Opus
   session_01JuCWRtFPuVcFcaVcFf8jJU (review/575-delta, watcher bds1sr1b5); full CI watcher bcen5qjx7. Merge after both.
+- Nov 9 ~13:20: #575 quests MERGED (7d1ac25) after review, fix round, delta review (no blockers), full suite green. XP project
+  (phases 1-3) DONE -> back to one Opus at a time (RULES). Follow-ups: m-a (a won solo game past the minutes cap moves no quest:
+  require the time OR win leg), m-b (ops note: one quest_games row write per player per game). Next queue: ranked (waiting on Eric's
+  decisions), admin cleanup (inventory doc), town intro, duo parked.
