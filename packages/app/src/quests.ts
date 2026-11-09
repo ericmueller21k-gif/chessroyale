@@ -63,14 +63,25 @@ export function questCountdowns(a: QuestsAnswer, receivedAt: number, now = Date.
   return { daily: questCountdown(a.dailyResetAt - a.now - gone), weekly: questCountdown(a.weeklyResetAt - a.now - gone) };
 }
 
+/** Another of home's notices is up (the chat notice, the Welcome Crate's): the overlay doesn't open by itself over it. */
+export function otherNoticeUp(): boolean {
+  const p = account().profile;
+  const welcome = p?.locker?.welcome;
+  return !!p?.chatMod?.notice || (welcome?.notice === true && welcome.status !== "locked");
+}
+
 /**
  * Home's quests: fetched as home shows (whenever quests are yours), opened once on the day's first visit, and from the Quests
- * button. `reroll`: today's free reroll (the answer replaces the list).
+ * button. `reroll`: today's free reroll (the answer replaces the list). `busy` (queueing, or another notice up; review of #575,
+ * m3): as the answer comes in, the overlay doesn't open by itself and the day isn't marked seen, so it stays due until the next
+ * home visit.
  */
-export function useQuests(on: boolean) {
+export function useQuests(on: boolean, busy = false) {
   const [answer, setAnswer] = useState<{ a: QuestsAnswer; at: number } | null>(null);
   const [open, setOpen] = useState(false);
   const live = useRef(true);
+  const busyNow = useRef(busy);
+  busyNow.current = busy;
   useEffect(() => {
     live.current = true;
     if (!on) return;
@@ -79,7 +90,7 @@ export function useQuests(on: boolean) {
       .then((a) => {
         if (!live.current) return;
         setAnswer({ a, at: Date.now() });
-        if (questsDueToday(a)) {
+        if (questsDueToday(a) && !busyNow.current && !otherNoticeUp()) {
           markQuestsSeen(a);
           setOpen(true);
         }

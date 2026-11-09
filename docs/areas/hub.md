@@ -12,7 +12,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   label ("Resets in 4d"), each with its picture (a live boss's portrait, Squads' pawns, the board's pieces), goal, bar and count ("Done!"), and its
   reward in the shop's art (the Winter crate, the key); a reroll on each daily (one a day: greyed once used or on a done quest); "Got it", ×, Escape
   or a tap outside close it. **By itself** on the XP day's first home visit, signed in, on this device (`hunchess.quests.seenDay`), never over the
-  walkthrough. The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
+  walkthrough, the queue or another notice (chat's, the Welcome Crate's): then it stays due, and the day counts as seen only when it shows
+  (review of #575, m3). The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so
   every button keeps 40 px) and a computer's top right corner on your card, over nothing (icon only on a short card); for everyone, greyed ("Sign in
   for quests") for a guest where sign-in is set up. A game that finishes a quest says so in its result's toast ("Quest done: Boss Hunter +300 XP").
   Guards: `e2e/home-layout.spec.ts`, "quests (Nov 9, phase 3 …)", and `e2e/quests.spec.ts`, phone and computer.

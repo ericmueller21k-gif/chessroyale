@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { asSignedIn, bossAloneFromHome, submitMove, test } from "./helpers.ts";
+import { asSignedIn, bossAloneFromHome, pickMode, submitMove, test } from "./helpers.ts";
 
 /**
  * Quests (XP phase 3, Nov 9; docs/decisions/2026-11-09-quests-*.md), phone and computer: the overlay with the server's quests from the
@@ -85,6 +85,35 @@ test.describe("the day's first home visit", () => {
     // A new day (this device last showed it yesterday): again.
     const day = (await answer(page)).day;
     await page.evaluate((d) => localStorage.setItem("hunchess.quests.seenDay", String(d - 86_400_000)), day);
+    await page.reload();
+    await expect(dialog(page)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("not by itself over the queue: the answer coming in while you queue keeps the day due for the next home visit (review of #575, m3)", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("brc.matchmaking", "botsoff"));
+    await page.goto(`/?pool=quests-queue-${test.info().project.name}`);
+    await expect(entry(page)).toBeEnabled({ timeout: 20_000 });
+    await asSignedIn(page);
+    // (A slow network: the quests' answer held until you're in the queue.)
+    let release = () => {};
+    const held = new Promise<void>((r) => (release = r));
+    await page.route("**/api/quests", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.reload();
+    await pickMode(page);
+    await page.getByRole("button", { name: "PLAY", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible({ timeout: 20_000 });
+    const came = page.waitForResponse((r) => r.url().endsWith("/api/quests"));
+    release();
+    await came;
+    await page.waitForTimeout(1_000);
+    await expect(dialog(page)).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("hunchess.quests.seenDay"))).toBeNull();
+    // (Out of the queue, the next home visit: it opens.)
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.unroute("**/api/quests");
     await page.reload();
     await expect(dialog(page)).toBeVisible({ timeout: 20_000 });
   });

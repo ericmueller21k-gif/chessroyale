@@ -737,7 +737,8 @@ export function HomeScreen({
   // The daily quests (Nov 9, phase 3; quests.ts, the server's server/quests.ts): the Quests entry for everyone (greyed, "Sign in for
   // quests", where a guest can't have them: nothing hidden), the overlay opened on the XP day's first visit (signed in) and from it.
   const questsOn = questsForYou();
-  const quests = useQuests(questsOn === true);
+  // (Never opening by itself over the queue or another notice: it waits for the next home visit. Review of #575, m3.)
+  const quests = useQuests(questsOn === true, queueing);
   // (A computer (1024 px and up, the top bar hidden there) keeps the entry on your card's top right; a phone's entry is in the top bar.)
   const computer = useMedia("(min-width: 1024px)");
   const questsLabel = questsOn === false ? "Sign in for quests" : "Quests";
@@ -813,7 +814,7 @@ export function HomeScreen({
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
       <WelcomeNotice />
-      {quests.open && quests.answer && (
+      {quests.open && quests.answer && !queueing && (
         <QuestsOverlay
           quests={quests.answer.quests}
           dailyResetIn={questCountdowns(quests.answer, quests.receivedAt).daily}
