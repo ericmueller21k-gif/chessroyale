@@ -198,8 +198,8 @@ export interface PendingResult {
   span: { moves: number; ms: number };
   opponents: string[];
   battle: { moves: number; ms: number } | null;
-  /** Tries that failed so far. */
-  tries?: number;
+  /** When a try first failed (MATCH_SAVE.strictMinutes counts from it). */
+  failedAt?: number;
 }
 
 /**

@@ -7,7 +7,7 @@
  *     repo). Anyone else gets "Not found";
  *   - the automated reviewer: `Authorization: Bearer <FAIRPLAY_REVIEW_TOKEN>` (a Worker secret), API only.
  * Every decision goes in the case's log with who made it ("admin:<email>" or "reviewer") and why. The reviewer never
- * decides appeals, nor changes a ban (fairplay.ts, decide).
+ * bans, decides appeals, nor changes a ban (fairplay.ts, decide).
  */
 import { CHAT_MOD, FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import { toSan, type ChatBlock } from "@chessroyale/chess";

@@ -132,8 +132,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
 - **A match's end** (Nov 10, the outside review's finding 9; `MATCH_SAVE`): results wait in the lobby's record (`saveQueue`) until
-  written, `perWake` (20) players a wake (about 20 D1 calls each), every write keyed; a failure retries each minute for up to 24 h
-  and shows on the ops page as a server error (`Lobby.saveResults`; `Lobby.resultsLost` if it gave up).
+  written in the background (never holding up the match's alarm), `perWake` (20) players a wake (about 20 D1 calls each), every write
+  keyed; a failure retries each minute for up to 24 h (fair play, XP and rewards stop holding a result up `strictMinutes`, 30, after
+  its first failure) and shows on the ops page as a server error (`Lobby.saveResults`; `Lobby.resultsLost` if it gave up).
 - **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`; solo at most
   `ENGINE_SERVER.soloDailySearches`, and only for accounts: [engine.md](engine.md));
   fair play's deep re-checks by `FAIRPLAY.deep.dailySearches` (D1 `fairplay_budget`) on their own instance; the

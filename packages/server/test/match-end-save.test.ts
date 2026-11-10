@@ -247,7 +247,7 @@ describe("a match's end: saved once, a few players a wake, a failure kept and re
     expect(w.count("results")).toBe(2);
   }, 60_000);
 
-  it("one result that keeps failing never holds up the others; after MATCH_SAVE.strictTries its fair play stops holding it up", async () => {
+  it("one result that keeps failing never holds up the others; MATCH_SAVE.strictMinutes after its first failure its fair play stops holding it up", async () => {
     const w = await world(3);
     const bad = w.rec.accounts!.p2!;
     // Fair play's row always fails for one player (a lasting bug, say); everything else works.
@@ -261,10 +261,15 @@ describe("a match's end: saved once, a few players a wake, a failure kept and re
     expect(await w.lobby.writeResults()).toBe(false);
     // The other two went in; the failing one waits at the back.
     expect(w.count("results")).toBe(2);
-    expect(w.rec.saveQueue!.map((p) => [p.userId, p.tries])).toEqual([[bad, 1]]);
-    for (let i = 1; i < MATCH_SAVE.strictTries; i++) expect(await w.lobby.writeResults()).toBe(false);
+    const first = w.rec.saveQueue![0]!.failedAt!;
+    expect(w.rec.saveQueue!.map((p) => p.userId)).toEqual([bad]);
+    expect(first).toBeGreaterThan(Date.now() - 60_000);
+    // However many tries fail within MATCH_SAVE.strictMinutes of the first (a short D1 outage, say), its fair play still holds it up.
+    for (let i = 0; i < 5; i++) expect(await w.lobby.writeResults()).toBe(false);
     expect(w.count("results")).toBe(2);
-    // Tried MATCH_SAVE.strictTries times: its result goes in without its fair play row (logged).
+    expect(w.rec.saveQueue![0]!.failedAt).toBe(first);
+    // MATCH_SAVE.strictMinutes on: its result goes in without its fair play row (logged).
+    w.rec.saveQueue![0]!.failedAt = first - MATCH_SAVE.strictMinutes * 60_000;
     expect(await w.lobby.writeResults()).toBe(true);
     expect(w.rec.saveQueue).toEqual([]);
     expect(w.count("results")).toBe(3);

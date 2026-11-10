@@ -222,7 +222,7 @@ export class Lobby extends DurableObject<Env> {
           written++;
         } catch (e) {
           failure = e;
-          p.tries = (p.tries ?? 0) + 1;
+          p.failedAt ??= Date.now();
           take(p);
           rec.saveQueue.push(p);
         }
@@ -252,13 +252,15 @@ export class Lobby extends DurableObject<Env> {
     // Results due go in the record first, stored with it, then are written (a few at a time: writeResults).
     this.queueResults(core, this.record);
     await this.store(this.record);
-    if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) await this.writeResults();
     // The alarm: the match's next event, or when the lobby closes, whichever comes first; with results waiting, their next try.
     await this.armAlarm(core, closing);
     // The live line hears about it in the background (it never holds up the match).
     void this.reportLive(core).catch(() => undefined);
     // Many judges: the engine server's searches run in the background; each answer is a new event for the lobby.
     for (const req of this.serverQueue.splice(0)) this.ctx.waitUntil(this.serve(req));
+    // The results, written in the background too: a slow D1 never holds up the match's next event (the review of #610, m2). The alarm
+    // just armed is already their next try (a second on), which finds the write done, or still running and shares it.
+    if (this.record.saveQueue?.length && Date.now() >= this.saveRetryAt) this.ctx.waitUntil(this.writeResults());
   }
 
   /**
@@ -702,12 +704,12 @@ export interface SaveContext {
  * them in review), then their XP, then the result row with its rating (one batch), the Welcome Crate and a boss battle's token.
  * Every write is keyed to this lobby (its code and creation), so writing it again (a retry, a restart) adds nothing: fair play's row
  * and the result once per lobby (`since`), XP and rewards by their ledger keys. A failure throws (the caller keeps it to try again),
- * except that fair play, XP, the Welcome Crate and the token stop holding the result up after MATCH_SAVE.strictTries tries (then
- * logged): a lasting bug in one of them never costs the result.
+ * except that fair play, XP, the Welcome Crate and the token stop holding the result up MATCH_SAVE.strictMinutes after its first failed
+ * try (then logged): a lasting bug in one of them never costs the result, and a minute or two of D1 trouble never costs them.
  */
 export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingResult): Promise<void> {
   const since = rec.createdAt;
-  const lenient = (p.tries ?? 0) >= MATCH_SAVE.strictTries;
+  const lenient = p.failedAt !== undefined && Date.now() - p.failedAt >= MATCH_SAVE.strictMinutes * 60_000;
   const soft = <T>(what: string, run: Promise<T>, fallback: T): Promise<T> =>
     run.catch((e: unknown) => {
       if (!lenient) throw e;

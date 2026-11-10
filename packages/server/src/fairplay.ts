@@ -225,8 +225,8 @@ export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", not
 /**
  * A decision on a case by `by` ("admin:<email>" or "reviewer"), with a written reason for the log, and optionally a
  * note for the player (`notice`, in the email). A ban, or clearing someone who was in review or banned, emails them.
- * The automated reviewer never decides appeals: it can't change a banned case or one with an open appeal, and it bans only a
- * case at the ban bar (FAIRPLAY.levels, as detection's own).
+ * The automated reviewer never bans and never decides appeals: it reviews, watches and clears, and can't change a banned case or one
+ * with an open appeal.
  */
 export async function decide(
   sql: Sql,
@@ -246,11 +246,10 @@ export async function decide(
   const before = await caseOf(sql, userId);
   if (!user && !before) return { ok: false, status: 404, message: "no such player" };
   if (by === "reviewer") {
+    // (A ban is a person's, always: the ban bar's evidence still comes from the judges' numbers, which devices send, so a leaked token
+    // or a steered reviewer could ban an honest player at it. The outside review of Nov 10, finding 6, and its review's M1.)
+    if (status === "banned") return { ok: false, status: 409, message: "a ban is for a person: choose review or watch, or leave it for one" };
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
-    // (A ban only at the ban bar, as detection's own (FAIRPLAY.levels, playerLevel): never on the reviewer's word alone, so a leaked
-    // token or a steered reviewer can't ban an honest player. The outside review of Nov 10, finding 6.)
-    if (status === "banned" && (await levelNow(sql, userId, before, now)).level !== "ban")
-      return { ok: false, status: 409, message: "a ban needs the ban bar (policy.levels), which this case doesn't meet: choose review or watch, or leave it for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
@@ -409,17 +408,20 @@ export async function recordFairPlay(
   const account = await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", userId);
   // An account deleted mid-match (account-data.ts): nothing recorded.
   if (!account) return { summary: matchSignals(match.moves, referenceStrength([], null)), verdict: { level: "none", reasons: [] }, acted: "none" };
+  // (`since`: once per lobby, as recordResult's: a lobby writing its end again (a retry, a restart) records nothing more, and weighs the
+  // match as its first try did, its own row left out.)
+  const once = match.since !== undefined && match.lobby !== null;
   const history = await sql.all<HistoryRow>(
-    "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
+    `SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ${once ? "AND NOT (lobby = ? AND played_at >= ?)" : ""}
+     ORDER BY played_at DESC, id DESC LIMIT 20`,
     userId,
+    ...(once ? [match.lobby, match.since] : []),
   );
   const rating = account.rating ?? null;
   const summary = matchSignals(match.moves, referenceStrength(history.slice(0, 10).map((h) => h.perf), rating));
   const c = await caseOf(sql, userId);
-  const verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);
+  let verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
-  // (`since`: once per lobby, as recordResult's: a lobby writing its end again (a retry, a restart) records nothing more.)
-  const once = match.since !== undefined && match.lobby !== null;
   const added = await sql.first<{ id: number }>(
     `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
@@ -437,7 +439,9 @@ export async function recordFairPlay(
     now + (flagged ? FAIRPLAY.evidenceDays : FAIRPLAY.evidenceDaysUnflagged) * DAY,
     ...(once ? [userId, match.lobby, match.since] : []),
   );
-  if (!added) return { summary, verdict, acted: "none" };
+  // (A retry whose row went in on an earlier try, which stopped before the steps below: the level from what's stored, as relevel's, so a
+  // person's decision since counts; then the same steps, both safe to repeat. The review of #610, m1.)
+  if (!added) verdict = await levelNow(sql, userId, c, now);
   // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
   if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
   const acted = await actOn(sql, userId, verdict, now, mail);
