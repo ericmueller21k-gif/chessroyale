@@ -1,3 +1,4 @@
+- Nov 10 19:45 UTC: started cheater demo (claude/cheater-demo, on engine-pool) and Discord alerts (claude/discord-alerts) beside the #618 review.
 - Nov 10 19:40 UTC: engine pool PR #618 (full-e2e). Review on review/engine-pool (ONE round). Then cheater demo + Discord alerts.
 - Nov 10 19:30 UTC: #611 (Fable b3) MERGED 384fd84. xp.spec:75 flaky = same solo-boss-quest cause -> PR #617 (light). Engine pool helper running.
 - Nov 10 18:45 UTC: QUEUED after engine pool: (1) CHEATER DEMO: admin-only test accounts w/o email (dummy emails, test flag, off leaderboards) + script playing real 50v50 on hunchess.com: "Engine Eddie" (Stockfish top), "Strong Sam" (Maia strongest), + a 2nd judging account; expect Eddie pooled, Sam not; Eric views /admin/fairplay. (2) DISCORD ALERTS step 1 of docs/ideas/live-ops.md (Eric adds Worker secret ALERT_WEBHOOK; told him how).
