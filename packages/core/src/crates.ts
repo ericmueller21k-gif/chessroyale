@@ -177,8 +177,9 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
   // (Nov 4: Wrangler's, one of the pen knights in his barn, saddled; in his crate from the start. Its line is the drawing's.)
   { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
-  // Outfits (Nov 10): worn over everything else. The Banana Suit, in the regular crates (ROADMAP "Riders in regular crates").
-  { id: "banana-suit", name: "Banana Suit", tier: "epic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },
+  // Outfits (Nov 10): worn over everything else, a secret slot (the locker shows it only to someone who owns one). The Banana
+  // Suit is the Mythic Crate's secret item (MYTHIC_CRATE_ITEMS); no crate rolls it yet.
+  { id: "banana-suit", name: "Banana Suit", tier: "mythic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },
 ];
 
 /** A HunChess colorway's id: its ride's id and this ("balloon-pup-hunchess"), so it never collides with or stacks on the ride. */
@@ -286,8 +287,6 @@ export const CRATES: readonly CrateDef[] = [
       "ninja-gi",
       // A one-off.
       "smiley-face",
-      // An outfit (Nov 10).
-      "banana-suit",
     ],
     fischer: [
       { tier: "legendary", weight: 80 },
@@ -322,7 +321,6 @@ export const CRATES: readonly CrateDef[] = [
       "gift-tube",
       "candy-cane",
       "fire-ice-crown",
-      "banana-suit",
     ],
     // (The tube and the cane share Legendary's 80, 40 each; the crown has Mythic's 20.)
     fischer: [
@@ -356,6 +354,16 @@ export const liveStrip = (crate: CrateDef) => crate.strip.filter((x) => (x.tier 
 export const crateDef = (id: string) => CRATES.find((c) => c.id === id);
 
 /**
+ * The Mythic Crate's contents (Eric, Nov 10: its secret item, the Banana Suit). The crate itself is still the shop's look-only
+ * teaser (`MythicCrateArt`, the bundle's line): nothing buys, rolls or opens it yet, so it's not in CRATES. Admins own a copy of
+ * every item, this one too (admin-copies.ts); tests give it straight.
+ */
+export const MYTHIC_CRATE_ITEMS: readonly string[] = ["banana-suit"];
+
+/** Whether a locker holds any outfit (the Outfit slot is secret until you own one: Eric, Nov 10). */
+export const ownsOutfit = (items: readonly { def: string }[]) => items.some((i) => itemDef(i.def)?.slot === "outfit");
+
+/**
  * A boss's crate (Nov 2, shops round 2; docs/decisions/2026-11-02-boss-tokens.md): sold by the Shopkeeper inside the boss's home,
  * for its tokens (BOSS_CRATE_PRICE), never opened free from the Crates tab (so it isn't in CRATES, and `crateDef` doesn't know it).
  * It's a crate like the others, rolled the same way on the server: the boss's ride (Mythic) behind Fischer Random, the only item
@@ -369,7 +377,7 @@ export interface BossCrateDef extends CrateDef {
 }
 
 /** What every boss crate holds besides its boss's ride: the Beta Crate's Common to Epic items. */
-export const BOSS_CRATE_POOL: readonly string[] = CRATES.find((c) => c.id === "beta-001")!.items.filter((id) => !["legendary", "mythic"].includes(itemDef(id)!.tier) && itemDef(id)!.slot !== "outfit");
+export const BOSS_CRATE_POOL: readonly string[] = CRATES.find((c) => c.id === "beta-001")!.items.filter((id) => !["legendary", "mythic"].includes(itemDef(id)!.tier));
 
 const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
   id: `boss-${boss}`,

@@ -27,7 +27,9 @@ import {
   shownLook,
   mountOf,
   hiddenByOutfit,
-  BOSS_CRATE_POOL,
+  ownsOutfit,
+  BOSS_CRATES,
+  MYTHIC_CRATE_ITEMS,
   OUTFIT,
   type CrateDef,
   type ItemLook,
@@ -51,9 +53,7 @@ describe("crates", () => {
       expect(new Set(c.items).size).toBe(c.items.length);
     }
     // (A HunChess colorway, Nov 6: in none of these, only the Welcome Crate: welcome.test.ts.)
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess ? 0 : d.slot === "outfit" ? 2 : 1);
-    // (An outfit, Nov 10: in both regular crates, Epic: ROADMAP "Riders in regular crates".)
-    expect(CRATES.filter((c) => c.items.includes("banana-suit")).map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess || d.slot === "outfit" ? 0 : 1);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
@@ -89,20 +89,20 @@ describe("crates", () => {
     expect(itemChance(beta, "antlers")).toBe(0);
   });
 
-  it("Beta, complete (28 items, and the Banana Suit since Nov 10): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
+  it("Beta, complete (28 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
     const boxes = Object.fromEntries((["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((t) => [t, beta.items.filter((id) => itemDef(id)?.tier === t)]));
     expect(boxes).toEqual({
       common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana", "ninja-headband", "shuriken"],
       uncommon: ["viking-helm", "little-crown", "briefcase", "eyepatch", "hook", "ninja-mask", "nunchucks"],
       rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass", "katana"],
-      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi", "banana-suit"],
+      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi"],
       legendary: ["pirate-hat", "smiley-face"],
       mythic: ["tommy-gun", "parrot"],
     });
-    expect(beta.items).toHaveLength(29);
+    expect(beta.items).toHaveLength(28);
     // Boxes 40/26/18/14 shared evenly (5, 3.71, 3.6 and 3.5% each); Fischer Random 2%: Legendary 80 (0.8% each),
     // Mythic 20 (0.2% each).
-    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.028, legendary: 0.008, mythic: 0.002 };
+    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.002 };
     for (const [tier, ids] of Object.entries(boxes)) for (const id of ids) expect(itemChance(beta, id), id).toBeCloseTo(chance[tier]!, 6);
     // The ladder holds item by item: any one item is rarer than any one item of the tier below.
     const each = TIERS.map((t) => chance[t.id]!);
@@ -194,8 +194,8 @@ describe("crates", () => {
       expect(count[d]! / n).toBeGreaterThan(0.125);
       expect(count[d]! / n).toBeLessThan(0.135);
     }
-    // Epic (five items since the Banana Suit, Nov 10) about 14% in all, 2.8% each.
-    const epic = ["snowman", "present", "gingerbread", "chimney", "banana-suit"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    // Epic (four items) about 14% in all, 3.5% each.
+    const epic = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(epic).toBeGreaterThan(0.13);
     expect(epic).toBeLessThan(0.15);
     expect(fischer / n).toBeGreaterThan(0.015);
@@ -417,12 +417,13 @@ describe("outfits (Eric, Nov 10)", () => {
   const it_ = (def: string) => ({ def, color: "red", blemish: 10, seed: 3 });
   const look: ItemLook = { head: it_("top-hat"), face: it_("ski-goggles"), skin: it_("snowman"), weapon: it_("katana"), ride: it_("moon-ride"), outfit: it_("banana-suit") };
 
-  it("a slot of its own; the Banana Suit is Epic, in both regular crates, never a boss crate's", () => {
+  it("a secret slot of its own; the Banana Suit is Mythic, the Mythic Crate's secret item, in no crate that rolls yet", () => {
     expect(SLOT_NAMES.outfit).toBe("Outfit");
-    expect(ITEM_DEFS.filter((d) => d.slot === "outfit").map((d) => [d.id, d.name, d.tier])).toEqual([["banana-suit", "Banana Suit", "epic"]]);
-    expect(BOSS_CRATE_POOL).not.toContain("banana-suit");
-    expect(itemChance(beta, "banana-suit")).toBeCloseTo(0.028, 6);
-    expect(itemChance(crate, "banana-suit")).toBeCloseTo(0.028, 6);
+    expect(ITEM_DEFS.filter((d) => d.slot === "outfit").map((d) => [d.id, d.name, d.tier])).toEqual([["banana-suit", "Banana Suit", "mythic"]]);
+    expect(MYTHIC_CRATE_ITEMS).toEqual(["banana-suit"]);
+    for (const c of [...CRATES, ...BOSS_CRATES]) expect(c.items, c.id).not.toContain("banana-suit");
+    expect(ownsOutfit([{ def: "top-hat" }])).toBe(false);
+    expect(ownsOutfit([{ def: "top-hat" }, { def: "banana-suit" }])).toBe(true);
     expect(cleanLook({ outfit: it_("banana-suit") }).outfit?.def).toBe("banana-suit");
     expect(cleanLook({ outfit: it_("top-hat") }).outfit).toBeUndefined();
   });

@@ -266,7 +266,7 @@ function endView(view: "front" | "back"): RiderViewDraft {
 export const bananaSuit: RiderDraft = {
   id: "banana-suit",
   name: "Banana Suit",
-  tier: "epic",
+  tier: "mythic",
   description: "Fully committed to the bit. Opponents keep slipping up.",
   frame: [14, -6, 72, 105],
   idle: { ms: IDLE_MS },

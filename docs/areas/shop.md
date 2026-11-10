@@ -59,9 +59,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
 - **Outfits** (Nov 10; [2026-11-10-outfit-slot.md](../decisions/2026-11-10-outfit-slot.md)): the `outfit` slot. One on, every other worn item is
   hidden (core's `shownLook`: only the outfit, and eyewear, `eyewear: true` (goggles, shades) while `OUTFIT.eyewear`), everywhere a look is
-  drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. The locker's Outfit tab; other items greyed with
-  "Hidden by your outfit" (`hiddenByOutfit`). An outfit is drawn with the rides' kit (`components/rides/banana-suit.tsx`, the pawn's head
-  in its face hole), in every view, even where rides aren't. **Banana Suit**: Epic, Beta and Winter crates (2.8% each), not boss crates.
+  drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the
+  locker's Outfit tab shows only once you own an outfit (`ownsOutfit`); with one on, other items greyed with "Hidden by your outfit"
+  (`hiddenByOutfit`). Drawn with the rides' kit (`components/rides/banana-suit.tsx`, the pawn's head in its face hole), in every view, even
+  where rides aren't. **Banana Suit**: Mythic, the Mythic Crate's secret item (`MYTHIC_CRATE_ITEMS`; the crate is still look-only: no roll yet).
 - **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
   [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two

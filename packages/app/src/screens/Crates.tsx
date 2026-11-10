@@ -19,6 +19,7 @@ import {
   isAdminCopy,
   hiddenByOutfit,
   isShiny,
+  ownsOutfit,
   itemChance,
   liveStrip,
   presentChance,
@@ -981,7 +982,7 @@ function Reveal({ item, again = true, onAgain, onClose }: { item: ItemInstance; 
 // ---------------- Locker ----------------
 
 type LockerTab = ItemSlot | "all";
-const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride", "outfit"];
+const LOCKER_TABS: readonly LockerTab[] = ["all", "head", "face", "skin", "weapon", "ride"];
 const tabName = (t: LockerTab) => (t === "all" ? "All" : SLOT_NAMES[t]);
 
 /**
@@ -1002,6 +1003,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const pawn = myPawnColor();
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
+  // (The Outfit slot is secret, Eric, Nov 10: its tab shows only once you own an outfit; his exception to "nothing hidden".)
+  const outfits = ownsOutfit(locker.items);
   // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
   const stacks = stackItems(locker.items)
     .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
@@ -1034,8 +1037,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
           ))}
         </div>
       </div>
-      <div class="shop-tabs locker-tabs" role="tablist">
-        {LOCKER_TABS.map((t) => (
+      <div class={`shop-tabs locker-tabs${outfits ? " with-outfit" : ""}`} role="tablist">
+        {(outfits ? [...LOCKER_TABS, "outfit" as const] : LOCKER_TABS).map((t) => (
           <button type="button" role="tab" key={t} aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
             {tabName(t)}
           </button>

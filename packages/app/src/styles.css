@@ -8295,13 +8295,17 @@ button.history-label {
 .locker-subhead {
   margin-top: 10px;
 }
-/* Seven tabs (Outfit, Nov 10): two even rows of four on a phone, one row on a wider screen; never a lone stretched tab. */
 .locker-tabs {
+  flex-wrap: wrap;
+}
+/* With the secret Outfit tab (only once you own an outfit, Nov 10): seven tabs, two even rows of four on a phone, one row on a
+   wider screen; never a lone stretched tab. Without it, the layout above, as before. */
+.locker-tabs.with-outfit {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
 }
 @media (min-width: 600px) {
-  .locker-tabs {
+  .locker-tabs.with-outfit {
     grid-template-columns: repeat(7, 1fr);
   }
 }
