@@ -344,7 +344,7 @@ describe("1 v 1's room: playing", () => {
     expect(r.last("w", "outcome")).toBeDefined();
   });
 
-  it("a recording with no outcome (failed, or lost mid-way to an eviction) is tried again later, a few times; never once it's in", () => {
+  it("a recording with no outcome (failed, or lost mid-way to an eviction) is tried again later, for hours (Nov 10); never once it's in", () => {
     const r = playing();
     r.send("w", { t: "move", uci: "e2e4", ply: 0 });
     r.send("b", { t: "move", uci: "e7e5", ply: 1 });
@@ -362,9 +362,24 @@ describe("1 v 1's room: playing", () => {
       r.set(end + k * 15_000);
       expect(r.core().takeFinished()).not.toBeNull();
     }
-    // Four tries: no more, and no alarm for it.
+    // After four tries 15 s apart (before Nov 10, the last), then every RANKED_1V1.recordRetrySeconds.
     r.set(end + 60_000);
     expect(r.core().takeFinished()).toBeNull();
+    expect(r.core().nextAlarm).toBe(end + 45_000 + RANKED_1V1.recordRetrySeconds * 1000);
+    r.set(end + 45_000 + RANKED_1V1.recordRetrySeconds * 1000);
+    expect(r.core().takeFinished()).not.toBeNull();
+    // Past its closing time, still trying: the closing waits for the next try (the alarm never spins on a closing that's due).
+    const hours = RANKED_1V1.recordRetryHours * 3_600_000;
+    r.set(r.record.closeAt! + 1000);
+    expect(r.core().toRecord()).toBe(true);
+    expect(r.core().takeFinished()).not.toBeNull();
+    expect(r.core().nextAlarm).toBe(r.record.closeAt! + 1000 + RANKED_1V1.recordRetrySeconds * 1000);
+    // RANKED_1V1.recordRetryHours after the end: given up, no more tries, and the alarm is the closing.
+    r.set(end + hours - 1);
+    expect(r.core().takeFinished()).not.toBeNull();
+    r.set(end + hours);
+    expect(r.core().takeFinished()).toBeNull();
+    expect(r.core().recordGivenUp()).toBe(true);
     expect(r.core().nextAlarm).toBe(r.record.closeAt);
     // Once an outcome is in, never again.
     const r2 = playing();

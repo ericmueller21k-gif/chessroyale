@@ -2571,6 +2571,13 @@ export const RANKED_1V1 = {
   drawOfferEveryMoves: 3,
   /** A finished game's results stay up this long, then the game's object deletes everything it stored. */
   resultsKeepMinutes: 10,
+  /**
+   * Recording a finished game (server/duel-room.ts): tried at once, then 15 s after each try for the first four, then every
+   * `recordRetrySeconds`, up to `recordRetryHours` after the game ended (as Squads' rewards: the outside review of Nov 10, finding 7);
+   * the room waits to close for it that long (then it closes, and says so on the ops page).
+   */
+  recordRetrySeconds: 60,
+  recordRetryHours: 24,
   /** In the queue: after this long, "Few players online right now" offers Keep waiting and Play a bot (unranked). */
   fewPlayersSeconds: 45,
   /**
