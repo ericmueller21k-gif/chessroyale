@@ -99,11 +99,14 @@ decisions. In this order:
    - the privacy policy and terms (Eric's sign-off);
    - loot-box rules before any real-money crates;
    - judges drawn by a device's *measured* speed (each one's first job timed), not its claim; until then the claim is
-     capped at `JUDGES.maxNps` (docs/decisions/2026-11-10-judge-pairing.md);
+     capped at `JUDGES.maxNps` and 3 times the lobby's median, which still leaves small lobbies a bigger share
+     (docs/decisions/2026-11-10-judge-pairing.md);
    - Squads' engine server picks its own top moves (a `topMoves` search, or `fallbackTop`'s candidates added to the
      verdict's moves), not only scores the devices' list; then its answers fill `TOP_CACHE` again, and the main lobby's
      re-check gets the same (outside review finding 3; PR #601 review, major 2);
    - a lone host's values checked for truth, not only shape (`hostBoardOk`): a server sample of its boards;
+   - a Squads job that pays something (a token refund, a brilliant) settled `"one"` (one device, or two of one
+     party agreeing) gets a server spot check, as the main lobby's lone answers do (PR #601 delta review, minor 3);
    - a host whose boards fail `hostBoardOk` (every pick scored the same) is counted: after one or two, another device
      hosts and fair play is told (PR #601 review, minor 4);
    - the matchmaker's reservations per account, not per ticket: an account that queued twice holds two, one never

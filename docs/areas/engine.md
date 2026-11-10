@@ -40,9 +40,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `stockfishRefuses` lets through must be searched with the server answering on (`engine-container.test.ts`). It
   runs when `engine/`, `uci.ts` or the check change, or by hand, in about a minute.
 - **Who scores, online: many judges.** Each board's scoring job (position, picks, bots; no names) goes to **two
-  devices** drawn by the lobby, weighted by the speed each reported on joining (capped at `JUDGES.maxNps` 3M, weight
-  squared: `speedWeight` 2), the second from the first's class (computer with computer) when it can, never two of one
-  account (2026-11-10-judge-pairing.md). A device sends the engine's raw output;
+  devices** drawn by the lobby, weighted by the speed each reported on joining (capped at `JUDGES.maxNps` 3M and at
+  `medianCap` 3 times the lobby's median, weight squared: `speedWeight` 2), the second (and a refill or referee) from
+  the first's class (computer with computer) when that class has `pairClassMin` 3 other accounts left, else from
+  anyone; never two of one account (2026-11-10-judge-pairing.md). A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
   identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`

@@ -8,4 +8,17 @@ Measured (unit sim, `device-trust.test.ts`, 20,000 draws; 20 computers at 2M, 80
 - mixed pairs (one answer used alone): linear 47.6%; weight 2 only 15.6%; weight 2 + class **0%**;
 - phone + phone pairs (slower, but together): about 8% (the phones' share of the first judge's weight);
 - a two-account attacker at the cap, both judges of one board: 1.1% before (linear, 5M), **1.9%** after.
-A replacement or referee judge (one at a time) is drawn from everyone, as before.
+
+**Round 2 (delta review, blocker 1): a claimed class.** The class is the device's own word, so two accounts claiming
+"computer" in a lobby of phones got both judges 67% of the time (the second came only from "their" class). Calls:
+- pair by class only when the first's class has `pairClassMin` **3** other accounts left; else the second from anyone;
+- a speed counts at most `medianCap` **3** times the lobby's median (and `maxNps`): 3, not the review's 4, because 4
+  left a 62-phone lobby at 6.9%, over the 5% aim;
+- a refill beside a remaining judge, and a dispute's referee (when the two share a class), come from that class under
+  the same threshold; a late answer's referee (nothing waits on it) from anyone.
+Two attacker accounts claiming "computer" at 3M, both judges of one board (20,000 draws, `device-trust.test.ts`):
+review's lobby (20 computers 2M + 78 phones) 0.35%; 98 phones 1.5% (was 66.8%); 98 phones, no speed lie 0.02%;
+3 computers + 95 phones **3.3% (the worst case)**; 62 phones 2.9%; 98 computers, attackers claiming "phone" 0.1%.
+The review's lobby keeps real computers together: mixed pairs 0% (linear 47%), a computer judges first 70%.
+Left over: a small lobby (about 20 devices) still gives two claimed accounts a bigger share; measured speed fixes it
+(ROADMAP).
