@@ -1,4 +1,5 @@
 import { mulberry32, type Rng } from "./rng.ts";
+import { OUTFIT } from "./settings.ts";
 
 /**
  * Crates: cosmetic items in stacked layers of rarity. Every drop rolls three things independently:
@@ -27,14 +28,15 @@ export const tierInfo = (id: ItemTier) => TIERS.find((t) => t.id === id)!;
 
 /**
  * Where an item goes on your pawn. A skin replaces the pawn itself (votes and the cut screen, not the board). A ride (Oct 31)
- * is something your pawn sits on (a grasshopper, a moon): drawn under it in the town square, the locker and the profile.
+ * is something your pawn sits on (a grasshopper, a moon): drawn under it in the town square, the locker and the profile. An
+ * outfit (Nov 10: the Banana Suit) is worn over everything: while it's on, only it (and eyewear: `shownLook`) is drawn.
  */
-export type ItemSlot = "head" | "face" | "skin" | "weapon" | "ride";
+export type ItemSlot = "head" | "face" | "skin" | "weapon" | "ride" | "outfit";
 
 /** Every slot, in the locker's order: one item worn in each at most (the server checks a slot is one of these). */
-export const ITEM_SLOTS: readonly ItemSlot[] = ["head", "face", "skin", "weapon", "ride"];
+export const ITEM_SLOTS: readonly ItemSlot[] = ["head", "face", "skin", "weapon", "ride", "outfit"];
 
-export const SLOT_NAMES: Record<ItemSlot, string> = { head: "Head", face: "Face", skin: "Skin", weapon: "Weapon", ride: "Ride" };
+export const SLOT_NAMES: Record<ItemSlot, string> = { head: "Head", face: "Face", skin: "Skin", weapon: "Weapon", ride: "Ride", outfit: "Outfit" };
 
 /**
  * Colors, commonest first: `weight` is the chance out of 100. `hex` paints the item; Opal, Oceanic and Pearl
@@ -89,6 +91,8 @@ export interface ItemDef {
    * present's box, a smiley under a pirate hat's brim). Eric, Oct 30: a tag on each item, not a list in the drawing code.
    */
   faceLayer?: "above" | "below";
+  /** Face items over the eyes (goggles, shades): still shown over an outfit's face hole (OUTFIT.eyewear; Eric, Nov 10). */
+  eyewear?: true;
   /** Rolls a second color too (both with the usual color odds), e.g. a present's box and its ribbon. */
   colors?: 2;
   /**
@@ -112,7 +116,7 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "antlers", name: "Antlers", tier: "uncommon", slot: "head", description: "Guides the sleigh through the endgame." },
   { id: "scarf", name: "Scarf", tier: "uncommon", slot: "face", faceLayer: "below", description: "A long knit scarf. Your pawn's mom insisted." },
   { id: "santa-hat", name: "Santa Hat", tier: "rare", slot: "head", description: "Knows who's been naughty in the opening." },
-  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", faceLayer: "above", colors: 2, description: "Frame in one color, see-through lenses in another. For black-diamond lines." },
+  { id: "ski-goggles", name: "Ski Goggles", tier: "rare", slot: "face", faceLayer: "above", eyewear: true, colors: 2, description: "Frame in one color, see-through lenses in another. For black-diamond lines." },
   { id: "snowman", name: "Snowman", tier: "epic", slot: "skin", description: "Your pawn, built of snow, with a scarf." },
   { id: "present", name: "Present", tier: "epic", slot: "head", colors: 2, description: "Worn as a helmet. Box in one color, ribbon in another. Now with a visor, for peeking." },
   { id: "gingerbread", name: "Gingerbread Man", tier: "epic", slot: "skin", description: "Run, run, as fast as you can. Iced, with gumdrop buttons." },
@@ -128,7 +132,7 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "viking-helm", name: "Viking Helm", tier: "uncommon", slot: "head", description: "Pushes into any zone. The horns are for show; so is the plan." },
   { id: "little-crown", name: "Little Crown", tier: "uncommon", slot: "head", description: "Dreaming of promotion." },
   { id: "eyepatch", name: "Eyepatch", tier: "uncommon", slot: "face", faceLayer: "below", description: "Half the vision, twice the swagger." },
-  { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", faceLayer: "above", description: "Can't see the board. Looks great, though." },
+  { id: "dark-shades", name: "Dark Shades", tier: "rare", slot: "face", faceLayer: "above", eyewear: true, description: "Can't see the board. Looks great, though." },
   { id: "suit-and-tie", name: "Suit and Tie", tier: "epic", slot: "skin", colors: 2, description: "A sharp suit in one color, the tie in another. License to promote." },
   { id: "smiley-face", name: "Smiley Face", tier: "legendary", slot: "face", faceLayer: "below", description: "Have a nice game." },
   { id: "tommy-gun", name: "Tommy Gun", tier: "mythic", slot: "weapon", colors: 2, description: "A classic drum-fed Tommy gun, metal in one color, wood in another. For settling the endgame." },
@@ -173,6 +177,8 @@ const BASE_ITEM_DEFS: readonly ItemDef[] = [
   { id: "log-roller", name: "The Log Roller", tier: "mythic", slot: "ride", description: "Timber's favorite commute. Keep your feet moving and never, ever look down." },
   // (Nov 4: Wrangler's, one of the pen knights in his barn, saddled; in his crate from the start. Its line is the drawing's.)
   { id: "pen-pony", name: "Pen Pony", tier: "mythic", slot: "ride", description: "One of Wrangler's pen knights, saddled up. It won't go straight, but it hops like nobody's business." },
+  // Outfits (Nov 10): worn over everything else. The Banana Suit, in the regular crates (ROADMAP "Riders in regular crates").
+  { id: "banana-suit", name: "Banana Suit", tier: "epic", slot: "outfit", description: "Fully committed to the bit. Opponents keep slipping up." },
 ];
 
 /** A HunChess colorway's id: its ride's id and this ("balloon-pup-hunchess"), so it never collides with or stacks on the ride. */
@@ -280,6 +286,8 @@ export const CRATES: readonly CrateDef[] = [
       "ninja-gi",
       // A one-off.
       "smiley-face",
+      // An outfit (Nov 10).
+      "banana-suit",
     ],
     fischer: [
       { tier: "legendary", weight: 80 },
@@ -314,6 +322,7 @@ export const CRATES: readonly CrateDef[] = [
       "gift-tube",
       "candy-cane",
       "fire-ice-crown",
+      "banana-suit",
     ],
     // (The tube and the cane share Legendary's 80, 40 each; the crown has Mythic's 20.)
     fischer: [
@@ -360,7 +369,7 @@ export interface BossCrateDef extends CrateDef {
 }
 
 /** What every boss crate holds besides its boss's ride: the Beta Crate's Common to Epic items. */
-export const BOSS_CRATE_POOL: readonly string[] = CRATES.find((c) => c.id === "beta-001")!.items.filter((id) => !["legendary", "mythic"].includes(itemDef(id)!.tier));
+export const BOSS_CRATE_POOL: readonly string[] = CRATES.find((c) => c.id === "beta-001")!.items.filter((id) => !["legendary", "mythic"].includes(itemDef(id)!.tier) && itemDef(id)!.slot !== "outfit");
 
 const bossCrate = (boss: string, name: string, ride: string): BossCrateDef => ({
   id: `boss-${boss}`,
@@ -529,6 +538,20 @@ export function itemChance(crate: CrateDef, def: string): number {
 
 /** What a player wears (votes and the cut screen): an item instance per slot, as sent to others online. */
 export type ItemLook = Partial<Record<ItemSlot, { def: string; color: string; color2?: string; blemish: number; seed: number }>>;
+
+/**
+ * What a look shows (Eric, Nov 10: "if you're wearing an outfit, then you can't do anything else but have the outfit on"): with
+ * an outfit on, only the outfit, and the face item if it's eyewear (goggles, shades; OUTFIT.eyewear) over its face hole. The
+ * rest stays equipped underneath (the locker keeps them), just not drawn. Every place that draws a look draws this.
+ */
+export function shownLook<L extends ItemLook | null | undefined>(look: L): L {
+  if (!look?.outfit) return look;
+  const face = look.face && OUTFIT.eyewear && itemDef(look.face.def)?.eyewear ? look.face : undefined;
+  return { outfit: look.outfit, ...(face ? { face } : {}) } as L;
+}
+
+/** What a pawn is drawn on or in (Nov 10): its outfit if one is on, else its ride (both drawn by the rides' machinery). */
+export const mountOf = (look: ItemLook | null | undefined) => look?.outfit ?? look?.ride;
 
 /** Keeps only well-formed slots (a look from another player, or from storage). */
 export function cleanLook(raw: unknown): ItemLook {

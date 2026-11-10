@@ -34,19 +34,23 @@ describe("the rides", () => {
     expect(rides.map((d) => d.id).sort()).toEqual(
       ["riding-chirp", "moon-ride", "hollow-bulb", "smudgy-brush", "alfil-howdah", "balloon-pup", "bigboy-buggy", "boingo-pogo", "folio-crane", "ginger-sled", "jefferson-giraffe", "puddles-mower", "sawyer-dozer", "rodeo-bull", "cheetah-shoes", "log-roller", "pen-pony"].sort(),
     );
-    expect(Object.keys(RIDES).sort()).toEqual(rides.map((d) => d.id).sort());
-    expect(Object.keys(RIDE_CELLS).sort()).toEqual(rides.map((d) => d.id).sort());
-    for (const def of rides) {
+    // (Nov 10: an outfit is drawn with the rides' kit too, so it's among the drawings: the Banana Suit.)
+    const outfits = ITEM_DEFS.filter((d) => d.slot === "outfit");
+    expect(outfits.map((d) => d.id)).toEqual(["banana-suit"]);
+    expect(Object.keys(RIDES).sort()).toEqual([...rides, ...outfits].map((d) => d.id).sort());
+    expect(Object.keys(RIDE_CELLS).sort()).toEqual([...rides, ...outfits].map((d) => d.id).sort());
+    for (const def of [...rides, ...outfits]) {
       const d = RIDES[def.id]!;
-      expect([def.name, def.description, def.tier, def.colors]).toEqual([d.name, d.description, "mythic", d.colors]);
+      expect([def.name, def.description, def.tier, def.colors]).toEqual([d.name, d.description, def.slot === "ride" ? "mythic" : d.tier, d.colors]);
       // A view measured for each view drawn (Moon's Ride: its side only, as Eric left it).
       for (const v of ["back", "front"] as const) expect(!!RIDE_CELLS[def.id]![v], `${def.id} ${v}`).toBe(!!d.views?.[v]);
       expect(TOWN_FEEL.rides[def.id], def.id).toBeDefined();
     }
     expect(RIDES["moon-ride"]!.views).toBeUndefined();
     expect(RIDES["moon-ride"]!.trail).toBeUndefined();
-    // Every other ride has both views and a trail mark, inside the art's limits (40 x 30 units).
-    for (const d of Object.values(RIDES).filter((x) => x.id !== "moon-ride")) {
+    // Every other ride has both views and a trail mark, inside the art's limits (40 x 30 units); an outfit both views, the droplets.
+    expect([!!RIDES["banana-suit"]!.views?.back, !!RIDES["banana-suit"]!.views?.front, RIDES["banana-suit"]!.trail]).toEqual([true, true, undefined]);
+    for (const d of Object.values(RIDES).filter((x) => x.id !== "moon-ride" && x.id !== "banana-suit")) {
       expect([!!d.views?.back, !!d.views?.front, !!d.trail], d.id).toEqual([true, true, true]);
       expect(d.trail!.w, d.id).toBeLessThanOrEqual(40);
       expect(d.trail!.h, d.id).toBeLessThanOrEqual(30);
@@ -99,7 +103,8 @@ describe("the rides", () => {
 
   it("every ride is 0.75 its drawn size (Nov 1, Eric: \"0.75 is good\"), one default, and Cheetah Shoes walk twice as fast", () => {
     expect(RIDE_SETTINGS.defaultScale).toBe(0.75);
-    expect(RIDE_SETTINGS.scale).toEqual({});
+    // (But an outfit, Nov 10: drawn round the pawn's own head, at its size as drawn.)
+    expect(RIDE_SETTINGS.scale).toEqual({ "banana-suit": 1 });
     expect(RIDE_SETTINGS.speed).toEqual({ "cheetah-shoes": 2 });
     expect(rideSpeed("cheetah-shoes")).toBe(2);
     expect(rideSpeed("riding-chirp")).toBe(1);
