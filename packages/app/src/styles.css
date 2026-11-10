@@ -21014,6 +21014,12 @@ button.sq-tiny {
 .ac-board .board-wrap {
   width: 100%;
 }
+/* Classic's dark squares a touch darker on this board (Eric, Nov 10: "the colors fuse"), so they still part from the light ones
+   under their half's dim layer (.ac-theirs): color distance 16 → 22, 14 → 18 dimmed. Other boards and schemes are as they were. */
+:root:not([data-board-colors]) .ac-board,
+[data-board-colors="classic"] .ac-board {
+  --sq-dark: #b39c7c;
+}
 /* What is drawn over the squares: exactly the board (eighths of --board-size), the taps and drags of the buy and adjust steps. */
 .ac-layer {
   position: absolute;
