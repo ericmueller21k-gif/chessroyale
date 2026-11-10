@@ -79,8 +79,9 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     tests 26 and a minute of setup, plus any wait for runners), one run at a time (a newer push
     waiting replaces an older one; the next run covers both). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
     area) adds its paths and spec to `e2e/areas.json`, or its PRs keep running everything. CI retries a failed test
-    once until the flaky-test batch lands (the goal is no retries); its `result` job lists flaky tests (passed only on
-    the retry) first, then failed ones, each with its shard, `file:line`, project and error. Not a required check yet
+    once, for its trace; on main a test that passed only on the retry turns the run red (Nov 10), so a flake is fixed
+    at its cause, never hidden. The `result` job lists flaky tests first, then failed ones, each with its shard,
+    `file:line`, project and error. Not a required check yet
     (the director decides when). Flakes only: "Re-run failed jobs" once; a test that fails again is real. Locally, run
     just the specs you're working on, and the `@perf` specs (frame budgets, which CI leaves out:
     `npx playwright test --grep @perf --project phone`), under the shared e2e lock.

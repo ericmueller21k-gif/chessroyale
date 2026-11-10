@@ -88,10 +88,11 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths, changed and
     removed specs, every spec reachable, shard counts; traced: a settings key, a helper, a shared module and the hub,
     comments and types only, changes it can't place; core traced by default; new files no entry places).
-  - **Retries and traces:** `--retries 1` in CI (PR and main) until the flaky-test batch lands; the goal is 0, as
-    `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
-    it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
-    Flakes only: "Re-run failed jobs" once; a test that fails again is real.
+  - **Retries and traces:** `--retries 1` in CI (PR and main), kept for the trace it records: traces only on that
+    retry (`on-first-retry`; recording every test measured about 8% slower). A test that passes only on its retry is
+    "flaky": the summary lists it first, and **on main it turns the run red** (the `result` job's "No flaky test on
+    main", Nov 10, audit F1): fix it at its cause from its trace, never with a longer wait or a retry. A PR isn't held
+    up by one. A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
   - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
     Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
     1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).
