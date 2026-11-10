@@ -30,7 +30,8 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   batch began is forgotten (`SEATING_KEEP_MS`, a backstop no seating reaches today).
 - **Lobbies.** One Durable Object per lobby, under a 5-character code with no look-alikes (`codes.ts`; a code is never
   reused while its lobby exists). "Play with friends" makes a private lobby (invite link `/lobby/CODE`); a private raid
-  stays people-only. Seats survive reloads (a seat token on the device). The host (a connected computer before a
+  stays people-only. Seats survive reloads (a seat token on the device). One seat per account (a guest's too): a second
+  tab or device takes over that seat, as a reconnect does; a token from another account is refused. The host (a connected computer before a
   phone) or the many judges score each round (see [engine.md](engine.md)).
 - **A lobby's life** (`LOBBY_LIFE`): results stay up `lobbyResultsKeepMinutes` (15), then it closes; a lobby that
   never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes` (now only a safety net).

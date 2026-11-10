@@ -118,25 +118,67 @@ export function judgeWeight(nps: number, load: number, cfg: Pick<JudgeConfig, "s
   return Math.pow(Math.max(1, nps) / 100_000, cfg.speedWeight) / (1 + load);
 }
 
-/** Draws `count` different judges at random by weight, leaving out `exclude`. */
+/**
+ * A device that can judge: its seat, its speed, whose it is (`owner`: the account; none: the seat's own) and its class
+ * (`kind`: a computer or a phone; none: one class for all).
+ */
+export interface JudgeCandidate {
+  id: string;
+  nps: number;
+  owner?: string;
+  kind?: "computer" | "phone";
+}
+
+const ownerOf = (d: JudgeCandidate) => d.owner ?? d.id;
+
+/** What `drawJudges` reads: the weight, and (each optional, none: no limit) the caps and the class threshold. */
+export type DrawConfig = Pick<JudgeConfig, "speedWeight"> & Partial<Pick<JudgeConfig, "maxNps" | "medianCap" | "pairClassMin" | "pairClassShare">>;
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+
+/**
+ * Draws `count` different judges at random by weight, leaving out `exclude`. Never two of one owner, nor one whose owner
+ * is excluded: two judges that agree are accepted unchecked, so they must be two people (2026-11-10-device-trust.md).
+ * A speed counts at most `maxNps` and `medianCap` times the median of `devices` (a claimed speed buys little in a
+ * lobby of phones). Each judge after the first, and the first when `kind` is given (a refill beside a remaining judge),
+ * comes from that class (computer with computer) only while the class has `pairClassMin` other owners left, and at least
+ * `pairClassShare` of the lobby's owners; else from everyone, so a pair finishes together but a class an attacker fills
+ * can't pick the second (2026-11-10-judge-pairing.md).
+ */
 export function drawJudges(
   rng: () => number,
-  devices: readonly { id: string; nps: number }[],
+  devices: readonly JudgeCandidate[],
   count: number,
-  cfg: Pick<JudgeConfig, "speedWeight">,
+  cfg: DrawConfig,
   load: Map<string, number> = new Map(),
   exclude: ReadonlySet<string> = new Set(),
+  kind?: JudgeCandidate["kind"],
 ): string[] {
-  const pool = devices.filter((d) => !exclude.has(d.id));
+  const cap = Math.min(cfg.maxNps ?? Infinity, cfg.medianCap && devices.length ? cfg.medianCap * median(devices.map((d) => d.nps)) : Infinity);
+  const owners = new Set(devices.filter((d) => exclude.has(d.id)).map(ownerOf));
+  let pool = devices.filter((d) => !exclude.has(d.id) && !owners.has(ownerOf(d)));
   const out: string[] = [];
+  const minOwners = Math.max(cfg.pairClassMin ?? 1, Math.ceil((cfg.pairClassShare ?? 0) * new Set(devices.map(ownerOf)).size));
+  let paired = kind !== undefined;
   while (out.length < count && pool.length) {
-    const weights = pool.map((d) => judgeWeight(d.nps, load.get(d.id) ?? 0, cfg));
+    const same = paired ? pool.filter((d) => d.kind === kind) : pool;
+    const from = same.length && new Set(same.map(ownerOf)).size >= minOwners ? same : pool;
+    const weights = from.map((d) => judgeWeight(Math.min(d.nps, cap), load.get(d.id) ?? 0, cfg));
     const total = weights.reduce((a, b) => a + b, 0);
     let x = rng() * total;
     let i = 0;
-    while (i < pool.length - 1 && x >= weights[i]!) x -= weights[i++]!;
-    out.push(pool[i]!.id);
-    pool.splice(i, 1);
+    while (i < from.length - 1 && x >= weights[i]!) x -= weights[i++]!;
+    const chosen = from[i]!;
+    out.push(chosen.id);
+    if (!paired) {
+      paired = true;
+      kind = chosen.kind;
+    }
+    pool = pool.filter((d) => ownerOf(d) !== ownerOf(chosen));
   }
   return out;
 }
@@ -148,9 +190,9 @@ export function drawJudges(
 export function assignJudges(
   rng: () => number,
   boards: readonly { boardId: number; cost: number }[],
-  devices: readonly { id: string; nps: number }[],
+  devices: readonly JudgeCandidate[],
   perJob: number,
-  cfg: Pick<JudgeConfig, "speedWeight">,
+  cfg: DrawConfig,
 ): Map<number, string[]> {
   const load = new Map<string, number>();
   const out = new Map<number, string[]>();

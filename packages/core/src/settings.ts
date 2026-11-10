@@ -2352,6 +2352,10 @@ export interface JudgeConfig {
   graceMs: number;
   graceFactor: number;
   speedWeight: number;
+  maxNps: number;
+  medianCap: number;
+  pairClassMin: number;
+  pairClassShare: number;
   benchNodes: number;
   defaultNps: number;
   deepOnDevices: boolean;
@@ -2399,8 +2403,28 @@ export const JUDGES: JudgeConfig = {
    */
   graceMs: 150,
   graceFactor: 0.25,
-  /** Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. */
-  speedWeight: 3,
+  /**
+   * Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. 2 (was 3,
+   * then 1): the speed is the device's own word until it's measured, so the cap below keeps what a claim buys small,
+   * while computers still mostly judge with computers (2026-11-10-judge-pairing.md).
+   */
+  speedWeight: 2,
+  /** The fastest a device's claimed speed counts (nodes/s; a fast desktop's real engine is about 2 to 3 million). */
+  maxNps: 3_000_000,
+  /**
+   * When judges are drawn, a speed counts at most this many times the lobby's median (so in a lobby of phones, a device
+   * that claims a desktop's speed weighs as a fast phone, not as a hundred). 3, not 4: two accounts claiming a computer
+   * in a 62-phone lobby get both judges 2.9% of the time at 3, 7% at 4 (2026-11-10-judge-pairing.md).
+   */
+  medianCap: 3,
+  /**
+   * The second judge comes from the first's class (computer or phone, the device's own word) only when that class has
+   * at least this many other accounts left, and at least `pairClassShare` of the lobby's accounts; else from everyone.
+   * A fixed count alone let an attacker supply it (four accounts claiming "computer" in a lobby of phones: both judges
+   * 29%; with the share, 7%, as if classes were ignored). Delta review 2, 2026-11-10-judge-pairing.md.
+   */
+  pairClassMin: 3,
+  pairClassShare: 0.1,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
@@ -2415,6 +2439,8 @@ export const JUDGES: JudgeConfig = {
    * decide, and a device could copy that to dodge blame. Revisit before turning this on:
    * docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
    */
+  // (Before turning this on: two accounts claiming "computer" at a fast speed would make deepMode() true and the judging
+  // pool only the capable devices, the two of them, in a lobby of phones. Delta review 2 of PR #601, Nov 10.)
   deepOnDevices: false,
   /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */
   deepNodes: 2_000_000,

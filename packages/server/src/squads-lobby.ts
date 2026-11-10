@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, FRONT_DOOR, LEAVING, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, voteResultMs, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FRONT_DOOR, JUDGES, LEAVING, LOBBY_LIFE, SQUADS, SQUADS_LOBBY, botVotes, castPregameVote, cleanLook, closePregameVote, shuffle, voteResultMs, type ItemLook, type MercItem, type SquadsClock, type SquadsSettings } from "@chessroyale/core";
 import { botRoster, type LobbyCloseReason, type MoveScore, type Opening } from "@chessroyale/chess";
 import { Chess } from "chess.js";
 import {
@@ -511,12 +511,12 @@ export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: num
   };
 }
 
-/** The engine's top moves for positions the devices (or the server) have settled, shared by the lobbies here. */
+/**
+ * Top moves shared by the lobbies here. Empty for now: devices' answers are used for their own job only, and the engine
+ * server's verdict only scores the moves devices sent, so it isn't the server's own choice either. It fills again once
+ * the server picks its own top moves (ROADMAP; 2026-11-10-device-trust.md, review fixes).
+ */
 const TOP_CACHE = new Map<string, MoveScore[]>();
-const cacheTop = (fen: string, top: MoveScore[]) => {
-  TOP_CACHE.set(fen, top);
-  if (TOP_CACHE.size > 2000) TOP_CACHE.delete(TOP_CACHE.keys().next().value!);
-};
 /** For tests: forget the shared cache. */
 export const clearTopCache = () => TOP_CACHE.clear();
 
@@ -525,6 +525,7 @@ const mineIn = (m: SquadsMatch, id: string) => m.sides.some((x) => x.seats.inclu
 export const SQUADS_FULL = "This lobby is full.";
 export const SQUADS_STARTED = "This match has already started.";
 export const SQUADS_ENDED = "That match has ended.";
+export const SQUADS_OTHER_ACCOUNT = "That seat belongs to another account.";
 export const SQUADS_UPDATE = "Update the app to play Squads (reload the page).";
 
 const showMs = (lm: LiveMatch, s: SquadsSettings) =>
@@ -654,14 +655,17 @@ export class SquadsCore {
     const now = this.io.now();
     this.r.activeAt = now;
     if (opts.v !== SQUADS_PROTOCOL) return { ok: false, message: SQUADS_UPDATE };
-    const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    const byToken = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    // A seat keeps the account it was taken on (its result and reward go there): back on another one, refused, as in
+    // the main lobby. One seat per account: a second tab or device of an account seated here takes over that seat.
+    if (byToken && opts.userId && opts.userId !== this.r.accounts[byToken.id]) return { ok: false, message: SQUADS_OTHER_ACCOUNT };
+    const existing = byToken ?? (opts.userId ? this.r.humans.find((h) => this.r.accounts[h.id] === opts.userId) : undefined);
     if (existing) {
       if (existing.left) return { ok: false, message: SQUADS_ENDED, ended: true, left: existing.leftAs ?? { how: "out", result: null } };
       existing.connected = true;
       delete existing.goneAt;
       if (opts.look !== undefined) existing.look = cleanLook(opts.look);
       if (opts.badge) existing.badge = opts.badge;
-      if (opts.userId) this.r.accounts[existing.id] = opts.userId;
       if (opts.test) existing.test = true;
       this.resendTo(existing.id);
       this.sendAll((id) => (id === existing.id ? null : { t: "lobby", lobby: this.lobbyView(null) }));
@@ -2089,7 +2093,7 @@ export class SquadsCore {
   private speed(id: string, nps: unknown) {
     if (typeof nps !== "number" || !Number.isFinite(nps) || nps <= 0) return;
     const d = (this.r.devices[id] ??= { nps: 0, strikes: 0, jobs: 0 });
-    d.nps = Math.round(Math.max(10_000, Math.min(50_000_000, nps)));
+    d.nps = Math.round(Math.max(10_000, Math.min(JUDGES.maxNps, nps)));
   }
 
   private deviceUp(id: string): boolean {
@@ -2111,13 +2115,17 @@ export class SquadsCore {
   /**
    * Devices for a job, best first: outside this match before those in it (nobody's engine decides the bots they play
    * against or beside, while anyone else's can), and `last` (a token's own squad, judging its refund) after those;
-   * computers before phones, the least loaded, the fastest. None holding its most unanswered jobs already.
+   * computers before phones, the least loaded, the fastest. None holding its most unanswered jobs already. Never two of
+   * one party (nor one beside a device in `exclude`): two devices that agree must be two people who answer apart. With
+   * no outside device free (and no `exclude`: not a referee), a second device of the first's party is asked as a
+   * checker: its disagreement still goes to the server, its agreement counts as one answer (`settle`).
    */
   private pickDevices(lm: LiveMatch, n: number, exclude: readonly string[] = [], last: ReadonlySet<string> = new Set()): string[] {
     const inMatch = new Set(lm.m.sides.flatMap((x) => x.seats));
     const busy = this.inFlight();
     const cap = SQUADS_LOBBY.botWork.maxInFlight;
-    return Object.keys(this.r.devices)
+    const parties = new Set(exclude.flatMap((id) => this.human(id)?.partyId ?? []));
+    const ranked = Object.keys(this.r.devices)
       .filter((id) => this.deviceUp(id) && !exclude.includes(id) && (busy.get(id) ?? 0) < cap[this.human(id)!.device])
       .sort((a, b) => {
         const da = this.r.devices[a]!;
@@ -2127,8 +2135,22 @@ export class SquadsCore {
         const kb = key(b, db);
         for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! - kb[i]!;
         return a < b ? -1 : 1;
+      });
+    const out = ranked
+      .filter((id) => {
+        const party = this.human(id)!.partyId;
+        if (parties.has(party)) return false;
+        parties.add(party);
+        return true;
       })
       .slice(0, n);
+    const checker = out.length === 1 && n >= 2 && !exclude.length && ranked.find((id) => id !== out[0] && this.sameParty(id, out[0]!));
+    return checker ? [...out, checker] : out;
+  }
+
+  private sameParty(a: string, b: string): boolean {
+    const pa = this.human(a)?.partyId;
+    return !!pa && pa === this.human(b)?.partyId;
   }
 
   private requestWork(lm: LiveMatch, half: HalfRecord, board: number, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {
@@ -2247,16 +2269,14 @@ export class SquadsCore {
     const pending = job.devices.filter((d) => !(d in job.answers) && this.deviceUp(d));
     const done = (top: MoveScore[] | undefined, how: NonNullable<WorkJob["how"]>) => {
       job.how = how;
-      if (top) {
-        job.top = top;
-        if (how !== "one") cacheTop(job.fen, top);
-      }
+      if (top) job.top = top;
       this.touch(lm);
       return true;
     };
     if (valid.length >= 2) {
       const [a, b] = valid as [{ d: string; top: MoveScore[] }, { d: string; top: MoveScore[] }];
-      if (topsAgree(a.top, b.top)) return done(a.top, "agreed");
+      // (Two of one party, the second a checker: their agreement is one answer, not two people's.)
+      if (topsAgree(a.top, b.top)) return done(a.top, this.sameParty(a.d, b.d) ? "one" : "agreed");
       // A referee's answer: the one it agrees with stands; the other device gets a strike.
       if (job.referee) {
         const ref = job.answers[job.referee];
@@ -2310,7 +2330,6 @@ export class SquadsCore {
       }
       job.how = "server";
       job.top = verdict;
-      cacheTop(job.fen, verdict);
     }
     this.touch(lm);
     this.pump();

@@ -349,6 +349,8 @@ export class SquadsLobby extends DurableObject<Env> {
         ...(attached.badge ? { badge: attached.badge } : {}),
       });
       if (!result.ok) {
+        // (Not that seat's socket: closing this one mustn't mark its player gone.)
+        if (known) ws.serializeAttachment(attached);
         await this.persist(core);
         return refuse(result.message, { ...(result.ended ? { ended: true } : {}), ...(result.left ? { left: result.left } : {}) });
       }
