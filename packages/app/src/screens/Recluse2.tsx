@@ -120,7 +120,8 @@ function useCue(on: boolean, key: string, fn: () => void) {
 
 type Xy = { x: number; y: number };
 /** His raised hand in the frame he holds it up in while the power streams in (`seizeLoop`), on either drawing. */
-const SEIZE_PALM = { [RECLUSE.id]: palmOf(RECLUSE.anims.seizeLoop!.frames[0]!)!, [RECLUSE_BUST.id]: palmOf(RECLUSE_BUST.anims.seizeLoop!.frames[0]!)! };
+let seizePalm: Record<string, readonly [number, number]> | undefined;
+const SEIZE_PALM = () => (seizePalm ??= { [RECLUSE.id]: palmOf(RECLUSE.anims.seizeLoop!.frames[0]!)!, [RECLUSE_BUST.id]: palmOf(RECLUSE_BUST.anims.seizeLoop!.frames[0]!)! });
 /** Golden motes in the stream, and how long one takes from the God King to the boss (ms). */
 const MOTES = 16;
 const MOTE_MS = 650;
@@ -150,7 +151,7 @@ function AbsorbStream({ t }: { t: number }) {
       const cv = box?.querySelector(".boss-char-sprite")?.getBoundingClientRect();
       if (!him || !box || !cv?.width) return setGeo(null);
       const ch = box.classList.contains(`ch-${RECLUSE_BUST.id}`) ? RECLUSE_BUST : RECLUSE;
-      const palm = SEIZE_PALM[ch.id]!;
+      const palm = SEIZE_PALM()[ch.id]!;
       const b = { x: cv.left + (palm[0] / ch.w) * cv.width, y: cv.top + (palm[1] / ch.h) * cv.height };
       const g = { x: him.left + him.width * 0.5, y: him.top + him.height * 0.55 };
       // (Out of him sideways, low, then up into the hand from below: clear of both their words above them.)

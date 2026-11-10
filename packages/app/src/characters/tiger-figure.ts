@@ -11,7 +11,7 @@ import { lazyAnim } from "./sprite.ts";
 export const HOP_AIR_MS = 300;
 
 /** When the airborne frame starts in `hop` (ms): he leaves the ground there. */
-export const HOP_AIR_AT = TIGER.anims.hop!.frames.slice(0, TIGER_HOP_AIR).reduce((t, f) => t + f.ms, 0);
+export const HOP_AIR_AT = () => TIGER.anims.hop!.frames.slice(0, TIGER_HOP_AIR).reduce((t, f) => t + f.ms, 0);
 
 const hop = TIGER.anims.hop!;
 const hopTrip: Anim = lazyAnim(() => ({ loop: false, frames: hop.frames.map((f, i) => (i === TIGER_HOP_AIR ? { ...f, ms: HOP_AIR_MS } : f)) }));

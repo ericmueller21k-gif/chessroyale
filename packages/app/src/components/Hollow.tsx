@@ -33,7 +33,7 @@ export function hollowCastFrom(kit: BossKit | null): { x: number; y: number } {
   const h = kit?.ch.h ?? 102;
   return { x: HOLLOW_CASTER.left + (HOLLOW_CAST_FROM[0] / w) * HOLLOW_CASTER.width, y: HOLLOW_CASTER.top + (HOLLOW_CAST_FROM[1] / h) * HOLLOW_CASTER.width * (h / w) };
 }
-const CLEAR_MS = animLength(EFFECTS.darkSquare.ch.anims.clear!);
+const CLEAR_MS = () => animLength(EFFECTS.darkSquare.ch.anims.clear!);
 
 /** The square a side's king stands on. */
 function kingOn(fen: string, side: "w" | "b"): string | null {
@@ -257,7 +257,7 @@ export const HOLLOW_UI = {
       }),
       ...(p.cleared ?? []).flatMap((sq) => {
         const since = stageSince(`clear:${boss.id}:${sq}:${p.turn}`, now);
-        return now < since + CLEAR_MS ? [{ square: sq, state: "clear" as const, since }] : [];
+        return now < since + CLEAR_MS() ? [{ square: sq, state: "clear" as const, since }] : [];
       }),
     ];
     const checked = darkNow.length && inCheck(board) ? kingOn(board, sideToMove(board)) : null;
