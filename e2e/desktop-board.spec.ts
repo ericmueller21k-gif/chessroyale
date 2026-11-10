@@ -295,9 +295,11 @@ for (const screen of Object.keys(ROOM) as Screen[]) {
       }
       await expect(page.locator(".dv-status")).toHaveText("Your move", { timeout: 30_000 });
     } else if (screen === "crowd") {
-      // A turn's end: the scoring, the reveal and the next turn's play.
+      // A turn's end: the scoring, the reveal and what follows it: the next turn (yours to play or the other team's to watch) or,
+      // after a stage's last turn, its break. (Not "play" itself: you never pick here, so a stage's end can knock you out and
+      // the rest is "simulating", with no next turn of yours. Main run 42768777492, Nov 10.)
       await expect.poll(() => phase(page), { timeout: 60_000, intervals: [100] }).toBe("reveal");
-      await expect.poll(() => phase(page), { timeout: 30_000, intervals: [100] }).toBe("play");
+      await expect.poll(() => phase(page), { timeout: 30_000, intervals: [100] }).toMatch(/^(play|watching|stageBreak)$/);
     } else if (screen === "vote") {
       // A vote's end (its result) and the next one's start.
       await expect.poll(() => page.evaluate(() => (window as any).match?.phase.vote?.index ?? 0), { timeout: 60_000 }).toBeGreaterThanOrEqual(1);

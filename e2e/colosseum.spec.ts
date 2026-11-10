@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { test } from "./helpers.ts";
+import { test, townReady } from "./helpers.ts";
 
 /**
  * Inside the Colosseum, the first look (Oct 30; docs/areas/colosseum.md): the town's Colosseum card links in, the arena draws
@@ -45,7 +45,7 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
 
   // The way in: the town's Colosseum card keeps what it had, plus the link.
   await page.goto("/town");
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   const gate = (await page.evaluate(() => (window as unknown as { __townAt: (k: string) => { x: number; y: number } | null }).__townAt("coliseum")))!;
   expect(gate, "the Colosseum is drawn at the start").not.toBeNull();
   const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
@@ -155,7 +155,7 @@ test("the Colosseum's first look: the card's link in, the arena drawn, Change se
   // Exit: back to the town.
   await page.getByRole("button", { name: "Exit" }).click();
   await expect(page).toHaveURL(/\/town$/);
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(errors.filter((e) => !/WebGL|GPU stall|willReadFrequently/i.test(e))).toEqual([]);
 });
 

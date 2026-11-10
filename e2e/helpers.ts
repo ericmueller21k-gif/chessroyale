@@ -1,11 +1,8 @@
-import { execFileSync } from "node:child_process";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { test as base, expect, type Page } from "@playwright/test";
 
 /** The local server's state folder (playwright.config.ts: a fresh temp folder each run, unless E2E_KEEP_STATE=1). */
 export const E2E_STATE = resolve(process.env.E2E_STATE_DIR || ".wrangler/state");
-/** Its local D1 databases (sqlite files), for the specs that read them. */
-export const D1_DIR = join(E2E_STATE, "v3/d1/miniflare-D1DatabaseObject");
 
 /**
  * Playwright's `test`, plus: every browser context a test opens itself (`browser.newContext()`, e.g. a second
@@ -455,10 +452,8 @@ export async function asAdmin(page: Page) {
  * One a file: putting an address on this account takes it off any other (withEmail), so two files running side by side
  * with one address left the first a guest halfway through ("Sign in to chat with other players." on a Report, Oct 30).
  * A new spec file that makes an admin needs its line in ADMINS. Reloads nothing: the server reads it at once.
- * The local database is one SQLite file that the running server writes to as well (presence, live lobbies), and this
- * second process gets "database is locked: SQLITE_BUSY" while a write of the server's is under way: then it waits a
- * moment and asks again, as SQLite's own busy wait would (wrangler's command has none). Any other error fails the test,
- * with its message (docs/decisions/2026-10-15-flaky-e2e-batch.md). Answers the account's id.
+ * The write goes through the server's own database (localSql), so it never locks the server out; an error fails the test, with its
+ * message. Answers the account's id.
  */
 export async function asServerAdmin(page: Page, who: "ops" | "chat" = "ops") {
   const file = test.info().file.split(/[\\/]/).pop()!.replace(/\.spec\.ts$/, "");
@@ -495,18 +490,22 @@ async function withEmail(page: Page, email: string) {
   return id;
 }
 
-/** Runs `sql` on the local database (waiting out the server's own writes: SQLITE_BUSY, as `asServerAdmin` says). */
-async function localSql(page: Page, sql: string) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
-      return;
-    } catch (e) {
-      const why = String((e as { stderr?: unknown }).stderr ?? e);
-      if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
-      await page.waitForTimeout(300);
-    }
-  }
+/**
+ * The town's first frame drawn (its canvas's `data-ready`), within 20 s: as town.spec.ts and town-street.spec.ts wait. That first frame
+ * paints every house and boss sprite on the page's own thread (Town.tsx, startTown): about 1 s on a phone, 2 to 3 s on a busy CI
+ * runner, and past 5 s (the default wait) on a cold one (main run 42768777492, town-afk; colosseum, shop). Nov 10.
+ */
+export const townReady = (page: Page) => expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+
+/**
+ * Runs `sql` on the local database, through the server's own D1 (`POST /api/e2e/sql`, server/src/e2e-sql.ts; the e2e's local server
+ * only). Answers the last statement's rows. (Not `wrangler d1 execute --local` beside the server any more: while that second process
+ * held the file's lock, a request on the server failed with SQLITE_BUSY, a 500 in whatever test was open. Nov 10.)
+ */
+export async function localSql<T = Record<string, unknown>>(page: Page, sql: string, ...params: (string | number)[]): Promise<T[]> {
+  const res = await page.request.post("/api/e2e/sql", { data: { sql, ...(params.length ? { params } : {}) }, headers: { "x-e2e-sql": process.env.E2E_SQL_KEY ?? "" } });
+  if (!res.ok()) throw new Error(`local sql failed (${res.status()}): ${(await res.text()).slice(0, 500)}\n${sql}`);
+  return ((await res.json()) as { rows: T[] }).rows;
 }
 
 /**
