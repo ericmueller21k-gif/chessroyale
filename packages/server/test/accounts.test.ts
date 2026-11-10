@@ -455,6 +455,24 @@ describe("account API", () => {
     expect(pub?.look.head?.def).toBe("party-hat");
   });
 
+  it("an outfit (Nov 10): worn in its own slot over the rest, which stay equipped underneath and come back when it's off", async () => {
+    const sql = memorySql();
+    await ensureSchema(sql);
+    const { user } = await createGuest(sql, 1000, "Guest");
+    const add = (id: string, def: string) => sql.run("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, created_at) VALUES (?, ?, ?, 'yellow', 20, 7, 'beta-001', 900)", id, user.id, def);
+    await add("hat", "top-hat");
+    await add("banana", "banana-suit");
+    await equipLocker(sql, user.id, "head", "hat");
+    expect((await equipLocker(sql, user.id, "head", "banana")).ok).toBe(false);
+    const on = await equipLocker(sql, user.id, "outfit", "banana");
+    if (!on.ok) throw new Error(on.message);
+    expect(on.locker.equipped).toEqual({ head: "hat", outfit: "banana" });
+    expect([on.locker.look.outfit?.def, on.locker.look.head?.def]).toEqual(["banana-suit", "top-hat"]);
+    expect((await looksOf(sql, [user.id])).get(user.id)?.outfit?.def).toBe("banana-suit");
+    const off = await equipLocker(sql, user.id, "outfit", null);
+    expect(off.ok && off.locker.equipped).toEqual({ head: "hat" });
+  });
+
   it("deleting crate items: your own only, for good, taken off first if worn", async () => {
     const sql = memorySql();
     await ensureSchema(sql);

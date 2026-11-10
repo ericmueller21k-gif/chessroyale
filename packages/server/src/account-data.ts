@@ -139,6 +139,13 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u) => [stmt("DELETE FROM solo_games WHERE user_id = ?", u.id)],
   },
   {
+    // The engine server's per-account cap (engine-calls.ts, Nov 10): how many times today the account called its open routes.
+    name: "engineCalls",
+    tables: ["engine_calls"],
+    export: async (sql, u) => ({ today: await all(sql, "SELECT day, n FROM engine_calls WHERE user_id = ? ORDER BY day", u.id) }),
+    erase: (u) => [stmt("DELETE FROM engine_calls WHERE user_id = ?", u.id)],
+  },
+  {
     // Quests (quests.ts, Nov 9, phase 3): your dailies and weekly (which, when dealt and finished, the target), each game that moved
     // one (its key and when), and the day and week last dealt and the day a reroll dealt each one. What they paid is in the ledger, below.
     name: "quests",

@@ -13,7 +13,8 @@ import { applyOp, cond, keyFor, leg, ledgerAccount, opKeys, opStatements, type L
  *   - **Level rewards** (op `level:<level>:<ledger id>`, reason "level"): each level reached, XP.levelCrates crates and XP.levelKeys
  *     keys, every XP.bossCrateEvery-th also a boss crate to pick (the wallet's `boss_picks`). Paid at a counted game for every level
  *     up to your level now that isn't paid yet (at most XP.levelsPerGame a game), so a level reached before phase 2, through a guest's
- *     merge or a test switch, or while rewards were paused, is paid at the next counted game; never twice (one op per level).
+ *     merge or a test switch, or while rewards were paused, is paid at the next counted game; never twice (one op per level), and never
+ *     a level a guest merged into the account was paid already (Nov 10).
  *   - **The boss crate pick** (op `pick:<ledger id>:<request>`): one pick spent, the chosen live boss's crate into your boss crates
  *     (unopened, opened as any boss crate: no tokens, no key).
  *   - **Old crates** (the wallet's `crates`, Squads' placements' before Nov 9): turned into crates of XP.rewardCrate as the locker is
@@ -52,20 +53,23 @@ export function levelOp(me: LedgerAccount, level: number, game: string, now: num
 }
 
 /**
- * The levels owed: every level from 2 to `level` whose reward op isn't in the ledger yet, lowest first, at most XP.levelsPerGame.
- * One count first (the usual answer: none owed), then which, by their keys.
+ * The level rewards an account has had, in SQL (`?1`: its ledger id): its own level ops, and those of every guest that signed in to it
+ * (its merge's legs name the guest's ledger id: `merge:<ledger id>:…`, ledger.ts mergeMoves). The guest's XP joins the account, so
+ * the levels that XP reached were paid already: the outside review of Nov 10 (a merge had them paid again).
+ */
+const PAID_LEVELS = `SELECT op_id FROM ledger WHERE reason = 'level' AND leg = 0 AND account IN (
+  SELECT ?1 UNION SELECT substr(op_id, 7, instr(substr(op_id, 7), ':') - 1) FROM ledger WHERE account = ?1 AND reason = 'merge')`;
+
+/**
+ * The levels owed: every level from 2 to `level` whose reward isn't paid yet (by this account, or a guest merged into it: PAID_LEVELS),
+ * lowest first, at most XP.levelsPerGame. One read.
  */
 export async function owedLevels(sql: Sql, me: LedgerAccount, level: number): Promise<number[]> {
   if (level < 2) return [];
-  const paid = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ledger WHERE account = ? AND reason = 'level' AND leg = 0", me.account))?.n ?? 0;
-  if (paid >= level - 1) return [];
-  const all = Array.from({ length: level - 1 }, (_, i) => i + 2);
-  const have = new Set(
-    (await sql.all<{ op_id: string }>("SELECT op_id FROM ledger WHERE op_id IN (SELECT value FROM json_each(?)) AND leg = 0", JSON.stringify(all.map((l) => levelOpId(l, me.account))))).map(
-      (r) => r.op_id,
-    ),
-  );
-  return all.filter((l) => !have.has(levelOpId(l, me.account))).slice(0, XP.levelsPerGame);
+  const paid = new Set((await sql.all<{ op_id: string }>(PAID_LEVELS, me.account)).map((r) => Number(r.op_id.split(":")[1])));
+  return Array.from({ length: level - 1 }, (_, i) => i + 2)
+    .filter((l) => !paid.has(l))
+    .slice(0, XP.levelsPerGame);
 }
 
 /** Pays every level owed at your XP now (one batch, each level once: a race or a retry pays nothing more). */

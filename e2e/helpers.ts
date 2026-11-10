@@ -182,6 +182,15 @@ export async function soundOff(page: Page) {
 }
 
 /**
+ * Out of a 50 v 50 or Squads lobby for good (Nov 10: its Exit, with "Keep me in the queue" unchecked; checked, Exit keeps you
+ * queued while you browse: search-home.spec.ts). The unchecked box is remembered on the device, as a player's is.
+ */
+export async function leaveQueue(page: Page) {
+  await page.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
+  await page.getByRole("button", { name: "Exit", exact: true }).click();
+}
+
+/**
  * Home's RANKED row: tap `mode` ("50 v 50", "1 v 1", "Squads", "Classic"), or with none, 50 v 50 unless a mode is
  * picked already (by ?mode= or an earlier tap). Home opens with nothing picked and PLAY dimmed (Eric, Oct 18).
  */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { HUNCHESS_RIDES, ITEM_DEFS, NOT_TRADEABLE, WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, WELCOME_TEXT, hunchessBase, isHunchess, itemDef, showsPurity, tradeable } from "@chessroyale/core";
-import { createGuest, ensureSchema, profile, recordResult, signInWithIdentity, type MatchResult, type Sql } from "../src/accounts.ts";
+import { HUNCHESS_RIDES, ITEM_DEFS, NOT_TRADEABLE, WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, WELCOME_TEXT, XP, hunchessBase, isHunchess, itemDef, showsPurity, tradeable } from "@chessroyale/core";
+import { createGuest, createSession, ensureSchema, profile, recordResult, signInWithIdentity, type MatchResult, type Sql } from "../src/accounts.ts";
+import { handleAccountApi } from "../src/api.ts";
 import { lockerMoves, lockerState } from "../src/locker.ts";
 import { finishedGames, grantWelcomeCrate, openWelcomeCrate, seenWelcomeNotice, welcomeState } from "../src/welcome.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -16,11 +17,11 @@ const GAME: MatchResult = { mode: "classic", online: true, placement: 3, players
 
 /** A fresh database with one account (signed in unless `guest`). */
 async function account(guest = false) {
-  const { sql, db } = memoryDb();
+  const { sql, db, d1 } = memoryDb();
   await ensureSchema(sql);
   const g = await createGuest(sql, T0, "Player");
   const id = guest ? g.user.id : (await signInWithIdentity(sql, g.user, "email", "tester@example.com", {}, T0)).id;
-  return { sql, db, id };
+  return { sql, db, d1, id };
 }
 
 /** `n` finished games for `id`, each saved as a match room or the app saves one, then the grant check that follows it. */
@@ -50,12 +51,12 @@ describe("earning it", () => {
     expect(rows(db, id)).toBe(1);
   });
 
-  it("any mode counts: online matches, Squads, solo results, boss battles, ranked 1 v 1 games, mixed", async () => {
+  it("any mode counts: online matches, Squads, solo games the server timed, boss battles, ranked 1 v 1 games, mixed", async () => {
     const { sql, id } = await account();
     await recordResult(sql, id, { mode: "crowd", online: true, placement: 1, players: 100, lobby: "AAAAA" }, T0);
     await recordResult(sql, id, { mode: "squads", online: true, placement: 2, players: 16, lobby: "AAAAB" }, T0);
-    await recordResult(sql, id, { mode: "boss", online: false, placement: 1, players: 1 }, T0);
-    await recordResult(sql, id, { mode: "classic", online: false, placement: 5, players: 8 }, T0);
+    await recordResult(sql, id, { mode: "boss", online: false, placement: 1, players: 1, playMs: WELCOME_GIFT.soloMinSeconds * 1000, moves: XP.minMoves }, T0);
+    await recordResult(sql, id, { mode: "classic", online: false, placement: 5, players: 8, playMs: 12 * 60_000, moves: 40 }, T0);
     expect(await finishedGames(sql, id)).toBe(4);
     expect(await grantWelcomeCrate(sql, id, T0)).toEqual([]);
     // One ranked 1 v 1 game (its record's count: aborted games are never recorded).
@@ -70,11 +71,38 @@ describe("earning it", () => {
     expect(await finishedGames(sql, id)).toBe(0);
     expect((await welcomeState(sql, id)).status).toBe("locked");
     // The app can't say a solo game was or wasn't abandoned: only a match room marks one.
-    await recordResult(sql, id, { mode: "classic", online: false, placement: 8, players: 8, abandoned: true }, T0);
+    await recordResult(sql, id, { mode: "classic", online: false, placement: 8, players: 8, abandoned: true, playMs: 5 * 60_000, moves: 20 }, T0);
     expect(await finishedGames(sql, id)).toBe(1);
     await play(sql, id, 3);
     expect(await grantWelcomeCrate(sql, id, T0)).toEqual([]);
     await play(sql, id, 1);
+    expect((await welcomeState(sql, id)).status).toBe("ready");
+  });
+
+  it("a solo game counts only with XP.minMoves moves and WELCOME_GIFT.soloMinSeconds of the server's time: empty posts earn nothing (Nov 10, finding 10)", async () => {
+    const { sql, d1, id } = await account();
+    const cookie = `hc_session=${await createSession(sql, id, Date.now())}`;
+    const post = async (path: string, body: unknown) =>
+      (await handleAccountApi(new Request(`https://hunchess.com${path}`, { method: "POST", body: JSON.stringify(body), headers: { cookie } }), { DB: d1 } as never))!;
+    // The review's attack: 25 results posted with no game the server timed. All recorded (the profile's stats), none counted.
+    for (let i = 0; i < 25; i++) expect((await post("/api/results", { mode: "classic", placement: 1, players: 8 })).status).toBe(200);
+    expect((await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM results WHERE user_id = ?", id))?.n).toBe(25);
+    expect(await finishedGames(sql, id)).toBe(0);
+    expect(await welcomeState(sql, id)).toMatchObject({ status: "locked", games: 0 });
+    // A game the server timed, but shorter than the minimum, or with too few moves: not counted either.
+    const started = async (secondsAgo: number) => {
+      const { game } = (await (await post("/api/xp/solo/start", {})).json()) as { game: string };
+      await sql.run("UPDATE solo_games SET started_at = started_at - ? WHERE user_id = ?", secondsAgo * 1000, id);
+      return game;
+    };
+    await post("/api/results", { mode: "classic", placement: 1, players: 8, moves: 30, game: await started(WELCOME_GIFT.soloMinSeconds - 5) });
+    await post("/api/results", { mode: "classic", placement: 1, players: 8, moves: XP.minMoves - 1, game: await started(10 * 60) });
+    await post("/api/results", { mode: "boss", placement: 1, players: 1, game: await started(10 * 60) });
+    expect(await finishedGames(sql, id)).toBe(0);
+    // Long enough by the server's clock, with enough moves: each counts (a quick boss loss too: the review of #610, m6).
+    await post("/api/results", { mode: "boss", placement: 2, players: 2, moves: XP.minMoves, game: await started(WELCOME_GIFT.soloMinSeconds) });
+    for (let i = 0; i < 4; i++) await post("/api/results", { mode: "classic", placement: 2, players: 8, moves: 25, game: await started(4 * 60) });
+    expect(await finishedGames(sql, id)).toBe(5);
     expect((await welcomeState(sql, id)).status).toBe("ready");
   });
 
@@ -342,7 +370,8 @@ describe("stored data", () => {
   it("old lockers load: an account with items from before (no welcome row, no `abandoned` on its results) reads as not earned yet", async () => {
     const { sql, db, id } = await account();
     db.prepare("INSERT INTO items (id, user_id, def, color, blemish, seed, crate, fischer, created_at) VALUES ('old1', ?, 'pirate-hat', 'red', 12, 3, 'beta-001', 0, 1)").run(id);
-    db.prepare("INSERT INTO results (user_id, mode, online, placement, players, played_at) VALUES (?, 'classic', 0, 1, 8, 1)").run(id);
+    // (An online result from before `abandoned`: it counts. A solo one from before the server timed games wouldn't, since Nov 10.)
+    db.prepare("INSERT INTO results (user_id, mode, online, placement, players, played_at) VALUES (?, 'classic', 1, 1, 8, 1)").run(id);
     const locker = await lockerState(sql, id);
     expect(locker.items.map((i) => i.def)).toEqual(["pirate-hat"]);
     expect(locker.welcome).toEqual({ games: 1, next: 5, unopened: 0, status: "locked", notice: false });

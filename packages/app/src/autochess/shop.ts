@@ -146,8 +146,8 @@ export function replaceTaken(shop: Shop, seed: number, army: Army, cfg: AutoChes
 export type RerollBlock = "gold";
 
 /**
- * What the next reroll costs (v7.1, Eric Oct 22: "5+1 per roll up to 10 max per round"): `shop.reroll.first` for the first of a round, `step`
- * more for each one after it, up to `max` (5, 6, 7, 8, 9, 10, 10, ...). `done`: how many rerolls this round's shop has had (`shop.rerolls`);
+ * What the next reroll costs (Eric Nov 10: one free, then 1, then 2, capped at 2): `shop.reroll.first` for the first of a round, `step`
+ * more for each one after it, up to `max` (0, 1, 2, 2, ...). `done`: how many rerolls this round's shop has had (`shop.rerolls`);
  * the next round's shop starts at 0 again.
  */
 export const rerollPrice = (done: number, cfg: AutoChessSettings = AUTOCHESS) => Math.min(cfg.shop.reroll.max, cfg.shop.reroll.first + cfg.shop.reroll.step * Math.max(0, done));

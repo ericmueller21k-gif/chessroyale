@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { createLobbyFromHome, joinFromInvite, named, test, pickMode, startBotLevel } from "./helpers.ts";
+import { asServerAdmin, createLobbyFromHome, joinFromInvite, named, test, pickMode, startBotLevel } from "./helpers.ts";
 
 /** The automated reviewer's token in the local Worker (playwright.config.ts). */
 const REVIEW = { authorization: "Bearer e2e-review-token-0123456789" };
@@ -14,10 +14,20 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const id = await myId(page);
 
-  // The reviewer's API: a decision needs a written reason; then the ban, logged as the reviewer's.
+  // The reviewer's API: a decision needs a written reason.
   expect((await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban" } })).status()).toBe(400);
-  const ban = await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban", reason: "e2e: a banned account" } });
-  expect(await ban.json()).toEqual({ ok: true, status: "banned", by: "reviewer" });
+  // The reviewer's token never bans (the outside review's finding 6; its review's M1): a person does.
+  const refused = await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban", reason: "e2e: a banned account" } });
+  expect(refused.status()).toBe(409);
+  expect(((await refused.json()) as { message: string }).message).toMatch(/^a ban is for a person/);
+  const adminCtx = await browser.newContext();
+  const adminPage = await adminCtx.newPage();
+  await adminPage.goto("/?debug");
+  const adminEmail = `ops-admin-fairplay-${test.info().project.name}@e2e.test`;
+  await asServerAdmin(adminPage);
+  const ban = await adminPage.request.post(`/api/admin/fairplay/cases/${id}/decision`, { data: { decision: "ban", reason: "e2e: a banned account" } });
+  expect(await ban.json()).toEqual({ ok: true, status: "banned", by: `admin:${adminEmail}` });
+  await adminCtx.close();
   // Without the token, the API and the review page aren't there.
   expect((await page.request.get(`/api/admin/fairplay/cases/${id}`)).status()).toBe(404);
   const admin = await page.request.get("/admin/fairplay");

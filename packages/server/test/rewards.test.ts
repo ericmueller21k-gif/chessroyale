@@ -253,6 +253,33 @@ describe("PAUSE_REWARDS (Nov 9): nothing granted while it's on; owed levels and 
   });
 });
 
+describe("level rewards through a guest's merge (the outside review of Nov 10)", () => {
+  it("a guest's merge doesn't pay its levels again: the account is owed only levels neither was paid", async () => {
+    const { sql } = await world();
+    const owner = await signedIn(sql, "owner@example.com");
+    const guest = (await createGuest(sql, T0, "Guest")).user;
+    // (A guest earns where sign-in isn't set up: the local and e2e servers.) The guest reaches level 3: levels 2 and 3 paid to it.
+    await setTestXp(sql, guest.id, 2_000, T0);
+    expect((await grantXp(sql, guest.id, { ...game("lobby:AAAAA:1"), signedInOnly: false }))?.rewards?.levels).toEqual([2, 3]);
+    // The account reaches level 2: level 2 paid to it.
+    await setTestXp(sql, owner.id, 1_500, T0);
+    expect((await grantXp(sql, owner.id, game("lobby:BBBBB:1")))?.rewards?.levels).toEqual([2]);
+    const before = await holdings(sql, guest.id);
+    const mine = await holdings(sql, owner.id);
+    await signInWithIdentity(sql, guest, "email", "owner@example.com", {}, T0 + 1);
+    // Together: 1,820 + 2,320 XP, level 5. Its next game pays levels 4 and 5 only (before: 3, 4 and 5; level 3 the guest's again).
+    expect(await xpOf(sql, owner.id)).toBe(4_140);
+    const next = await grantXp(sql, owner.id, game("lobby:CCCCC:1", 20, { now: T0 + 60 * MIN }));
+    expect(next?.rewards?.levels).toEqual([4, 5]);
+    const after = await holdings(sql, owner.id);
+    expect(after.keys).toBe(mine.keys + before.keys + 2 * XP.levelKeys);
+    expect(after.crates["winter-1"]).toBe((mine.crates["winter-1"] ?? 0) + (before.crates["winter-1"] ?? 0) + 2 * XP.levelCrates);
+    // Nothing more at the game after.
+    expect((await grantXp(sql, owner.id, game("lobby:DDDDD:1", 20, { now: T0 + 90 * MIN })))?.rewards?.levels ?? []).toEqual([]);
+    expect(await ledgerMismatches(sql, owner.id)).toEqual([]);
+  });
+});
+
 describe("the account's data: the new rows through a merge, the download and deleting", () => {
   it("a guest's series crates and boss picks join the account it signs in to; the download has them; deleting closes them", async () => {
     const { sql } = await world();

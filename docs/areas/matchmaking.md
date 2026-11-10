@@ -33,6 +33,10 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
   stays people-only. Seats survive reloads (a seat token on the device). One seat per account (a guest's too): a second
   tab or device takes over that seat, as a reconnect does; a token from another account is refused. The host (a connected computer before a
   phone) or the many judges score each round (see [engine.md](engine.md)).
+- **Stepping out of a lobby** (Nov 10, [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md)): 50 v 50's and Squads'
+  queue lobbies have Exit and "Keep me in the queue" (checked unless unchecked on the device) where Cancel was. Checked, you browse
+  with the seat held by the app's connection (home's rows, the bar elsewhere; a reload keeps it: `hunchess.awaySearch`); the lobby
+  filling takes you in, with the found alert. Unchecked, Exit leaves as Cancel did. Raid, party and Solo queues keep Cancel.
 - **A lobby's life** (`LOBBY_LIFE`): results stay up `lobbyResultsKeepMinutes` (15), then it closes; a lobby that
   never starts closes after `lobbyIdleMinutes`, an abandoned one after `lobbyAbandonedMinutes` (now only a safety net).
   Closing tells anyone still connected, records results on profiles, drops it from the live line and deletes its

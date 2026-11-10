@@ -76,6 +76,10 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
 - **The drawing** (`town/render.ts`): one canvas, one `requestAnimationFrame` loop (in `Town.tsx`), stopped when the screen
   closes or the tab is hidden; device pixel ratio capped at 2; nothing allocated per frame on the hot path (square colors,
   fonts, gradients, clouds, pawns and every boss and home frame are made once, the frames the first time they show).
+  Since Nov 10 (phone load 3) a picture's pixels are painted the first time it's drawn too (`houses/kit.ts` `paint`: so a paint
+  function must not lean on anything that changes after the call; `test/town-paint-lazy.test.ts` checks every picture), and each
+  statue's world-scale picture is made when first drawn: opening took 5.8 s to its first frame on a slowed phone, now 2.1 s
+  (`e2e/perf.spec.ts`, "Chess Town on a slow phone").
   It draws through a **drawing layer** (`town/paint.ts`, Oct 30) with two backends: Canvas 2D (today's town, everyone's) and
   WebGL 2 (the street town's only drawing since Nov 6, `town/paint-gl.ts`; below, "WebGL").
 - **WebGL (Oct 30; docs/decisions/2026-10-30-town-webgl.md; the street town's only drawing since Nov 6,

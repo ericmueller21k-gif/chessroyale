@@ -2251,6 +2251,11 @@ export const FRONT_DOOR = {
   heroHopFirstSec: 4,
   /** …then one every this many seconds (never under reduced motion). */
   heroHopEverySec: 30,
+  /**
+   * Searching while you browse (Eric, Nov 10): home's "Stop search?" or "Play bots?" (asked in place, in the action row) goes
+   * back to the three actions after this long without a tap.
+   */
+  searchAskMs: 6_000,
 } as const;
 
 /**
@@ -2480,6 +2485,22 @@ export const LOBBY_LIFE = {
 } as const;
 
 /**
+ * A match's end on players' profiles (server/lobby-do.ts; the outside review of Nov 10, finding 9): each signed-in player's result,
+ * fair play, XP and rewards wait in the lobby's record (`saveQueue`) until written, each write keyed so a retry or a restart writes
+ * nothing twice. At most `perWake` players are written per wake (about 20 D1 calls each: far under D1's 1,000 queries per
+ * invocation), the next ones a second later. A failed write is tried again every `retrySeconds`, and the lobby waits to close for it
+ * up to `retryHours` past its closing time (then it closes, and says so on the ops page). Fair play, XP, the Welcome Crate and boss
+ * tokens stop holding a result up `strictMinutes` after its first failed try (logged): a lasting bug in one never blocks the result,
+ * and a short D1 outage never drops them (by time, not tries: the review of #610, m3).
+ */
+export const MATCH_SAVE = {
+  perWake: 20,
+  retrySeconds: 60,
+  retryHours: 24,
+  strictMinutes: 30,
+} as const;
+
+/**
  * Resigning and leaving a match (Eric, Oct 13: "we need a surrender button... for every game mode"; DECISIONS.md,
  * "Resign: leaving a match in every mode"). Resigning in a solo game ends it at once, a loss. Online you can't end the
  * game for everyone: you leave it, out in the last place still open (a loss on your record), and a bot plays your seat
@@ -2551,6 +2572,13 @@ export const RANKED_1V1 = {
   drawOfferEveryMoves: 3,
   /** A finished game's results stay up this long, then the game's object deletes everything it stored. */
   resultsKeepMinutes: 10,
+  /**
+   * Recording a finished game (server/duel-room.ts): tried at once, then 15 s after each try for the first four, then every
+   * `recordRetrySeconds`, up to `recordRetryHours` after the game ended (as Squads' rewards: the outside review of Nov 10, finding 7);
+   * the room waits to close for it that long (then it closes, and says so on the ops page).
+   */
+  recordRetrySeconds: 60,
+  recordRetryHours: 24,
   /** In the queue: after this long, "Few players online right now" offers Keep waiting and Play a bot (unranked). */
   fewPlayersSeconds: 45,
   /**
@@ -3073,6 +3101,20 @@ export const AGE_GATE = {
 } as const;
 
 /**
+ * The engine server's two open routes (server/index.ts; the outside review of Nov 10, finding 4): POST /api/engine/score (a solo
+ * game's close calls) and GET /api/engine/ping (waking it as a solo game starts). Only for an account (signed in, where sign-in is
+ * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts; not yet measured against a
+ * keen solo player), and solo's searches at most `soloDailySearches` a day, never more than `soloShare` of the day's
+ * ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device re-checks itself for the rest of the game,
+ * as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
+ */
+export const ENGINE_SERVER = {
+  perAccountDaily: 200,
+  soloDailySearches: 1000,
+  soloShare: 1 / 3,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */
@@ -3215,10 +3257,19 @@ export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
  */
 export const RIDES = {
   defaultScale: 0.75,
-  scale: {} as Readonly<Record<string, number>>,
+  // (An outfit is drawn round the pawn's own head, so at its size as drawn.)
+  scale: { "banana-suit": 1 } as Readonly<Record<string, number>>,
   speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
   tryScale: [0.5, 1.25] as const,
 };
+
+/**
+ * Outfits (Eric, Nov 10; docs/decisions/2026-11-10-outfit-slot.md): an outfit hides every other worn item. `eyewear`: face items
+ * tagged eyewear (goggles, shades) still show, over its face hole ("the only exception"); false hides them too.
+ */
+export const OUTFIT = {
+  eyewear: true,
+} as const;
 
 /**
  * The Welcome Crates (Eric, Nov 6: "you get it for completing 5 games in any mode or any boss … Limit one per account"; then "the
@@ -3228,6 +3279,13 @@ export const RIDES = {
  */
 export const WELCOME_GIFT = {
   milestones: [5, 25],
+  /**
+   * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
+   * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
+   * review of Nov 10, finding 10). By moves, not 3 minutes, so a quick boss loss or a first-stage knockout still counts (the review of
+   * #610, m6). Online games count as their rooms recorded them.
+   */
+  soloMinSeconds: 60,
 } as const;
 
 /**
@@ -3396,10 +3454,12 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
-   * automated reviewer act whatever this says.
+   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
+   * whatever this says; the automated reviewer never bans. "review" since Nov 10 (the outside review, finding 3: its
+   * evidence is the judges' numbers, which devices send): automatic bans stay off until Eric turns them back on, after the
+   * deep re-check's own facts land (ROADMAP.md, fair play; docs/decisions/2026-11-10-rewards-and-records.md).
    */
-  enforcement: "ban" as "watch" | "review" | "ban",
+  enforcement: "review" as "watch" | "review" | "ban",
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -3424,8 +3484,8 @@ export const FAIRPLAY = {
   holdBackDays: 7,
   /**
    * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
-   * (native Stockfish, the full network), restricted to the judges' top moves and the pick. "Deep match": the pick is
-   * the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * (native Stockfish, the full network), over every legal move (in groups of at most 8, one search each: the engine's
+   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
    * budget of its own (its own container instance, so matches never wait behind it).
    */
   deep: {
@@ -3437,7 +3497,7 @@ export const FAIRPLAY = {
     perRun: 40,
     /** Off-peak hours (UTC, from-to): watch cases are checked only then; reviews any time. */
     offPeakUtc: [3, 10] as readonly [number, number],
-    /** The candidate moves searched: the judges' best this many, plus the pick. */
+    /** The judges' best moves kept with each pick as evidence (FairMove.top): this many. (The re-check searches every legal move.) */
     candidates: 8,
   },
   /**
@@ -4059,8 +4119,8 @@ export interface AutoChessSettings {
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
-   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (the TFT-style economy, Eric Oct 25:
-   * 2, 3, 4, 5, 5, ...; v7.1's was 5, 6, ... 10 on the old ×10 scale), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (Eric Nov 10: "1 free reroll every round,
+   * and then it costs 1 for the next one, and then 2, and it's capped at 2": 0, 1, 2, 2, ...; Oct 25's was 2, 3, 4, 5, 5), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -4266,7 +4326,10 @@ export interface AutoChessSettings {
     readonly holdChance: number;
     /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
     readonly placeBy: number;
-    /** It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    /**
+     * It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room).
+     * Nov 10: `xpChanceFull` 0.8 → 0.7 with the free first reroll, so the bot, keeping the gold it spent on rerolls, levels at about the same pace (214 → 210 of 300 test rounds).
+     */
     readonly maxXpBuys: number;
     readonly xpGold: number;
     /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
@@ -4304,7 +4367,7 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    reroll: { first: 2, step: 1, max: 5 },
+    reroll: { first: 0, step: 1, max: 2 },
   },
   sellBack: 0.75,
   benchSlots: 4,
@@ -4365,5 +4428,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

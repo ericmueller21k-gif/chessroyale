@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, type ItemLook, type ItemSlot } from "@chessroyale/core";
+import { PAWN_OUTLINE_ON_BLACK, aboveHat, behindPiece, isShiny, secondColor, showsPurity, shownLook, type ItemLook, type ItemSlot } from "@chessroyale/core";
 import { LINE, Region, darken, isLight, lighten, lw, mirror, usePaint as paintIn, type Finish, type Paint } from "./item-paint.tsx";
 
 import type { RiderDraft } from "./rides/kit.ts";
@@ -1338,7 +1338,9 @@ function RidingAvatar({ id, c, mount, side, rider }: { id: string; c: RideCells;
  * the votes, the cut screen, the queue and profiles. `ride` (the locker and the profiles, Oct 31): on their ride, if they
  * have one on, in its idle; everywhere else a ride isn't drawn (a match's screens, the crowd, home's pawn).
  */
-export function Avatar({ look, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
+export function Avatar({ look: equipped, side = "w", ride = false, outlined = false }: { look?: ItemLook; side?: "w" | "b"; ride?: boolean; outlined?: boolean }) {
+  // (An outfit, Nov 10: only it and any eyewear show; it's drawn round the pawn everywhere, with or without `ride`: core's shownLook.)
+  const look = shownLook(equipped);
   const at = (slot: ItemSlot) => look?.[slot];
   const skin = at("skin");
   // Worn items in drawing order (face, head, then a weapon; a face item tagged "above" goes over a hat: goggles, shades;
@@ -1366,7 +1368,7 @@ export function Avatar({ look, side = "w", ride = false, outlined = false }: { l
         ))}
     </g>
   );
-  const mount = ride ? at("ride") : undefined;
+  const mount = at("outfit") ?? (ride ? at("ride") : undefined);
   const c = rideCells(mount?.def);
   if (mount && c)
     return (

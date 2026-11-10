@@ -17,10 +17,13 @@ const PAD = 0.15;
 /** A key for a look (null: nothing on), to tell when it changed. */
 export const lookKey = (look: ItemLook | null | undefined): string | null => (look && Object.keys(look).length ? JSON.stringify(look) : null);
 
-/** What the pawn itself wears: a look without its ride (Oct 31: the town draws the ride under the dressed pawn, rides.ts). */
+/**
+ * What the pawn itself wears: a look without its ride (Oct 31: the town draws the ride under the dressed pawn, rides.ts) or its
+ * outfit (Nov 10: drawn the same way, round the pawn).
+ */
 export function offRide(look: ItemLook | null | undefined): ItemLook | null {
-  if (!look?.ride) return look ?? null;
-  const { ride: _, ...rest } = look;
+  if (!look?.ride && !look?.outfit) return look ?? null;
+  const { ride: _, outfit: _o, ...rest } = look;
   return rest;
 }
 

@@ -22,7 +22,9 @@ async function player(browser: Browser, name: string, room: string, o: { off?: b
   }
   const page = await ctx.newPage();
   await named(page, name);
-  await page.goto(`/?chatroom=${room}`);
+  // (A queue of its own, `?pool=`: the three right-column tests press 1 v 1's PLAY at once on parallel workers, and in the
+  // shared queue they met each other, so the search was gone before its Cancel: the CI flake of Nov 10.)
+  await page.goto(`/?chatroom=${room}&pool=${room}`);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await asSignedIn(page);
   await page.reload();

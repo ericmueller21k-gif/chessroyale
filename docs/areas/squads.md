@@ -474,7 +474,8 @@ door's look; every class is `sq-`.
   after the lobby "Back to your party" reconnects (the leader queues again). Escape closes the sheet as ✕ does, from
   its first frame (leaving a party made while it was open; `2026-10-16-flaky-e2e-batch-4.md`).
 - **The waiting room** is the home screen's queue (as Crowd's), 32 seats: people as they join (your party's dashed),
-  then the eight squads of four once bots fill. **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
+  then the eight squads of four once bots fill. Its Exit with "Keep me in the queue" (Nov 10, [matchmaking.md](matchmaking.md)) lets you
+  browse still queued: home's rows say "Searching · Squads", "Solo queue · 5 of 32" (or Party); Start with bots greys ("Soon"). **The votes** use Crowd's vote board (`VoteScreen`, given Squads' own
   votes, no eval bar, no chimes or ticks): everyone's pawn on one side, three zones, three cards.
 - **Standings everywhere.** Every squad's name (display only, by id: Rooks, Knights, Bishops, Queens, Kings, Pawns,
   Towers, Crowns, each with a color), members, where it stands in the bracket, and its team clock counting down

@@ -1,4 +1,4 @@
-import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, secondColor, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
+import { CROWD_SETTINGS, DEFAULT_SETTINGS, SLOT_NAMES, bossDef, bossInfo, itemColor, itemDef, secondColor, shownLook, tierInfo, type ItemLook, type ItemSlot, type RankedRecentGame, type RankView } from "@chessroyale/core";
 import type { PublicProfile } from "./account.ts";
 
 /**
@@ -198,7 +198,7 @@ export function recentRows(ranked: RankedRecentGame[], recent: PublicProfile["re
  * The order worn items are listed in (FrontDoor's WORN_ORDER: this file stays free of components). Not a ride (Oct 31): the
  * card's one row holds four tiles at most; its "View all" lists the ride.
  */
-const WORN: readonly ItemSlot[] = ["skin", "head", "face", "weapon"];
+const WORN: readonly ItemSlot[] = ["outfit", "skin", "head", "face", "weapon"];
 
 export interface WornTile {
   slot: ItemSlot;
@@ -213,8 +213,10 @@ export interface WornTile {
 }
 
 export function wornTiles(look: ItemLook): WornTile[] {
+  // (An outfit on, Nov 10: only it and eyewear show, so only they are listed.)
+  const shown = shownLook(look);
   return WORN.flatMap((slot) => {
-    const it = look[slot];
+    const it = shown[slot];
     const d = it && itemDef(it.def);
     if (!it || !d) return [];
     const first = itemColor(it.color).name;

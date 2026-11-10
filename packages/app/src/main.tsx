@@ -5,7 +5,7 @@ import { watchShell } from "./shell.ts";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
-import { DuelQueueBar } from "./components/DuelQueueBar.tsx";
+import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
@@ -13,7 +13,7 @@ import { watchStaleChunks } from "./stale.ts";
 import { prepareAudio, wakeAudio } from "./sound.ts";
 import { watchTheme } from "./theme.ts";
 import { applyBoardColors } from "./prefs.ts";
-import { setBannerPlusSource } from "@chessroyale/core";
+import { mountOf, setBannerPlusSource, shownLook } from "@chessroyale/core";
 import { bannerPlusAsked } from "./test-switches.ts";
 import { account, onAccountChange } from "./account.ts";
 import { loadRide } from "./components/rides/load.ts";
@@ -65,7 +65,7 @@ render(
     <BanNotice />
     <ReportSheet />
     <MaintenanceBanner />
-    <DuelQueueBar />
+    <SearchBar />
   </ErrorBoundary>,
   document.getElementById("app")!,
 );
@@ -74,7 +74,7 @@ render(
 // changes (once a ride: it's kept), so your pawn on home, in your ring and in the town rarely waits for it (Nov 1, rides lazy).
 requestAnimationFrame(() =>
   setTimeout(() => {
-    const wornRide = () => void loadRide(account().profile?.locker?.look?.ride?.def);
+    const wornRide = () => void loadRide(mountOf(shownLook(account().profile?.locker?.look))?.def);
     onAccountChange(wornRide);
     wornRide();
   }),

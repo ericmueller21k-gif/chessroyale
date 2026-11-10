@@ -280,8 +280,8 @@ export function LevelRing({ xp }: { xp: number }) {
   );
 }
 
-/** The order worn items are listed in (a ride last, Oct 31). */
-export const WORN_ORDER: readonly ItemSlot[] = ["skin", "head", "face", "weapon", "ride"];
+/** The order worn items are listed in (a ride last, Oct 31; an outfit first, Nov 10: with one on, only it and eyewear show). */
+export const WORN_ORDER: readonly ItemSlot[] = ["outfit", "skin", "head", "face", "weapon", "ride"];
 
 /** The 44 px back button at the top left of a front-door page. */
 export function BackButton({ onClick, label = "Back" }: { onClick: () => void; label?: string }) {

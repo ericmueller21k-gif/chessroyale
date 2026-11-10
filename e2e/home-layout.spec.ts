@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { named, test, pickMode } from "./helpers.ts";
+import { named, test, pickMode, leaveQueue } from "./helpers.ts";
 
 /**
  * Light or dark, and the computer's home with its queue in place (DECISIONS.md, "Light and dark, a switch", "A cleaner
@@ -241,12 +241,12 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     const seats = (await page.locator(".fd-seats").boundingBox())!;
     expect(seats.x).toBeGreaterThanOrEqual(m.x + m.width);
     expect(seats.x + seats.width).toBeLessThanOrEqual(pn.x);
-    // The whole lobby fits the window, Cancel included.
-    const cancel = (await page.getByRole("button", { name: "Cancel" }).boundingBox())!;
+    // The whole lobby fits the window, its way out included ("Keep me in the queue" and Exit where Cancel was, Nov 10).
+    const cancel = (await page.locator(".fd-exit-row").boundingBox())!;
     expect(cancel.y + cancel.height).toBeLessThanOrEqual(h);
-    expect(cancel.height).toBeGreaterThanOrEqual(44);
-    // (Cancel is right there: no back arrow in the lobby.)
-    await expect(page.getByRole("button", { name: "Leave the queue" })).toBeHidden();
+    expect((await page.getByRole("button", { name: "Exit", exact: true }).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    // (Exit is right there: no back arrow in the lobby.)
+    await expect(page.getByRole("button", { name: /^Exit, / })).toBeHidden();
     // From 1280 px your card shrinks to the top of the left column, the lobby's chat under it, the lobby beside them.
     const card = page.locator(".fd-wait-side .fd-hero");
     const chat = page.locator(".fd-wait-chat .qchat-lobby");
@@ -273,7 +273,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     }
     expect(await sideways(page), `queue ${w}`).toBe(0);
 
-    await page.getByRole("button", { name: "Cancel" }).click();
+    await leaveQueue(page);
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     await expect(menu).toBeVisible();
     await expect(panel).toBeVisible();
@@ -297,7 +297,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
   await expect(panel).toHaveCount(0);
 });
 
-test("computer: in the queue, your profile opens over it; another menu item leaves the queue and goes there", async ({ page }) => {
+test("computer: in the queue, your profile opens over it; another menu item goes there still queued (Keep me in the queue, Nov 10) or, unchecked, leaves the queue first", async ({ page }) => {
   test.skip(!desktop(), "the computer's menu");
   await named(page, "Wanderer");
   const menu = page.getByRole("navigation", { name: "Menu" });
@@ -311,15 +311,24 @@ test("computer: in the queue, your profile opens over it; another menu item leav
   await page.locator(".fd-overlay").getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.locator(".fd-seats")).toBeVisible();
   expect(await page.evaluate(() => (window as any).match?.phase.kind)).toMatch(/loading|lobby/);
-  // Settings: out of the queue, then Settings.
+  // Settings, "Keep me in the queue" checked: Settings, still queued (the bar), as 1 v 1's search; Play: home's rows say it.
+  await menu.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page.locator(".dq-bar .dq-text")).toHaveText("Searching 50 v 50");
+  await menu.getByRole("button", { name: "Play", exact: true }).click();
+  await expect(page.locator(".fd-search")).toBeVisible();
+  // Back in the lobby (Lobby), unchecked: Settings leaves the queue first, then Settings.
+  await page.locator(".fd-search-acts").getByRole("button", { name: /^Lobby/ }).click();
+  await page.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
   await menu.getByRole("button", { name: "Settings" }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   expect(await page.evaluate(() => (window as any).match?.closed)).toBe(true);
+  await expect(page.locator(".dq-bar")).toHaveCount(0);
   await menu.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeEnabled();
 });
 
-test("phone: the queue takes the whole screen; the count, the grid and Cancel are in view on common phones, the chat under them; back and Cancel leave", async ({ page }) => {
+test("phone: the queue takes the whole screen; the count, the grid and its way out (Keep me in the queue, Exit) are in view on common phones, the chat under them; back and Exit, unchecked, leave", async ({ page }) => {
   test.skip(desktop(), "the phone's layout");
   await named(page, "Pocket");
   for (const [w, h] of [
@@ -337,10 +346,10 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
       const b = (await page.locator(sel).first().boundingBox())!;
       return b.y >= 0 && b.y + b.height <= h;
     };
-    for (const sel of [".fd-queue-count", ".fd-seats", ".fd-cancel"]) expect(await inView(sel), `${sel} at ${w} x ${h}`).toBe(true);
+    for (const sel of [".fd-queue-count", ".fd-seats", ".fd-exit-row"]) expect(await inView(sel), `${sel} at ${w} x ${h}`).toBe(true);
     await expect(page.getByText("You're in · seat 1")).toBeVisible();
-    // The chat: under Cancel, its header on screen, the rest a scroll away at most.
-    const cancel = (await page.locator(".fd-cancel").boundingBox())!;
+    // The chat: under Exit's row, its header on screen, the rest a scroll away at most.
+    const cancel = (await page.locator(".fd-exit-row").boundingBox())!;
     const c = (await chat.boundingBox())!;
     expect(c.y).toBeGreaterThanOrEqual(cancel.y + cancel.height);
     expect(c.y + 26).toBeLessThanOrEqual(h);
@@ -349,8 +358,9 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
     await chat.locator(".qchip", { hasText: "Good luck!" }).click();
     await expect(chat.locator(".qline.you", { hasText: "Good luck!" })).toBeVisible();
     expect(await sideways(page)).toBe(0);
-    // The back arrow leaves the queue too.
-    await page.getByRole("button", { name: "Leave the queue" }).click();
+    // The back arrow leaves the queue too, "Keep me in the queue" unchecked (checked, it keeps you queued: search-home.spec.ts).
+    await page.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
+    await page.getByRole("button", { name: "Exit, leave the queue" }).click();
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
     expect(await page.evaluate(() => (window as any).match?.closed)).toBe(true);
   }
@@ -366,7 +376,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(q.width).toBe(vw);
   expect(q.y).toBe(0);
   // Its own header (the back arrow, the mode, the sound), nothing of home around it, and no menu or panel.
-  await expect(page.getByRole("button", { name: "Leave the queue" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Exit, leave the queue" })).toBeVisible();
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50");
   await expect(page.locator(".fd-top")).toHaveCount(0);
   await expect(page.locator(".fd-hero")).toBeHidden();
@@ -377,7 +387,7 @@ test("phone: the queue takes the whole screen; the count, the grid and Cancel ar
   expect(seat.width).toBeGreaterThan(26);
   expect(seat.width).toBeLessThan(40);
   expect(await sideways(page)).toBe(0);
-  await page.getByRole("button", { name: "Cancel" }).click();
+  await leaveQueue(page);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
   expect(await sideways(page)).toBe(0);
@@ -454,6 +464,9 @@ test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits fro
     const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
     const profile = await bar.getByRole("button", { name: "Your profile", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, ring: getComputedStyle(el).borderTopWidth, animations: el.getAnimations({ subtree: true }).length }));
     expect(profile, `profile at ${width}`).toEqual({ ...shop, ring: "0px", animations: 0 });
+    // Quests, the shop and Friends are outlines like the gear (Eric, Nov 10: "just black and empty on the inside"): no fill, the gear's color.
+    const looks = await bar.locator(".fd-top-quests svg, .fd-top-shop svg, .fd-top-friends svg, .fd-top-gear svg").evaluateAll((els) => els.map((el) => ({ fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke })));
+    expect(looks, `icons at ${width}`).toEqual(Array(4).fill({ fill: "none", stroke: looks[3]!.stroke }));
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });

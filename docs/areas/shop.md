@@ -50,13 +50,19 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
   Crate as the locker was read. The Crates tab shows each series crate's count and a padlock while it can't open; its Open is greyed
   without both. `?fischer=1` / `?shiny=1` only where `TEST_SWITCHES` is "1". Every 10th level's boss crate is picked in the Crates tab's
   "Boss crate choice" (`POST /api/locker/pick`; [2026-11-09-xp-phase2-boss-pick.md](../decisions/2026-11-09-xp-phase2-boss-pick.md)).
-- **Items** have a slot (head, face, skin, weapon, ride: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
+- **Items** have a slot (head, face, skin, weapon, ride, outfit: `ITEM_SLOTS`, the server's check too), are drawn on the pawn's 100 × 100 square, and fit by anchors
   (head, face, eyes, neck, mouth: each piece's own lines; a mustache sits at the mouth, under a snowman's carrot).
   Every face item is tagged above or below a hat (`faceLayer` in crates.ts; Eric, Oct 30): goggles and shades are drawn
   over a hat, every other face item under it (a smiley under a pirate hat's brim). A new face item must say which.
   Weapons don't move with the piece: they're drawn where every piece's side (or shoulder) is. Your
   pawn wears your equipped items on the vote board, the cut screen and your profile; other players' looks come with
   them into a lobby; bots wear simple seeded outfits (`BOT_LOOKS`).
+- **Outfits** (Nov 10; [2026-11-10-outfit-slot.md](../decisions/2026-11-10-outfit-slot.md)): the `outfit` slot. One on, every other worn item is
+  hidden (core's `shownLook`: only the outfit, and eyewear, `eyewear: true` (goggles, shades) while `OUTFIT.eyewear`), everywhere a look is
+  drawn (`Avatar`, the town, the profiles' rows); the rest stay equipped underneath. **Secret** (Eric's exception to "nothing hidden"): the
+  locker's Outfit tab shows only once you own an outfit (`ownsOutfit`); with one on, other items greyed with "Hidden by your outfit"
+  (`hiddenByOutfit`). Drawn with the rides' kit (`components/rides/banana-suit.tsx`, the pawn's head in its face hole), in every view, even
+  where rides aren't. **Banana Suit**: Mythic, the Mythic Crate's secret item (`MYTHIC_CRATE_ITEMS`; the crate is still look-only: no roll yet).
 - **Rides** (Oct 31: [2026-10-31-rides.md](../decisions/2026-10-31-rides.md); Nov 1, every boss's:
   [2026-11-01-rides-v2.md](../decisions/2026-11-01-rides-v2.md)): items in the `ride` slot, one at a time, that your pawn sits on,
   all Mythic, with a color, a purity and shine like every item: **Riding Chirp**, **Moon's Ride**, and (Nov 1) **Hollow's Bulb** (two
@@ -99,10 +105,10 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     many guests could fill one account past the cap); locally and in e2e (no sign-in) guests do.
   - **Decided by the server only.** An online battle by its match room: `LobbyCore` counts each person's picks that went in (`picked`,
     at each turn's lock) and knows when the match began; `bossBattleSpan` gives their moves and time (to the end, or to when they left),
-    and the Durable Object's `saveResults` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
+    and the Durable Object's `writeResult` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
     the device, so the server can't see its moves: it counts by **the server's clock alone**: `POST /api/boss/solo/start` as the battle
     begins (App.tsx's `startSolo`, `noteSoloBattle`: the server notes the time in `solo_battles`, one open per account, a new start
-    replacing it), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
+    replacing it; each of the two asked once more a second later when it fails on the way or on the server: `askTwice`, account.ts), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
     counts when 5 minutes or more passed between the two. Its 10-moves path isn't there (the device's word). The drop itself is one
     transaction: the drop row goes in only while the window (counted in the same statement) has room, and the token with it.
   - **The result screen** (`components/TokenBox.tsx`, on `ResultsScreen` for any boss battle): when the server says the battle dropped
@@ -152,8 +158,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
   - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
-    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (a `results` row not marked `abandoned`, or a
-    ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
+    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (an online `results` row not marked `abandoned`,
+    a solo one only with `XP.minMoves` (10) moves and `WELCOME_GIFT.soloMinSeconds` (60) of the server's own time (`play_ms`; Nov 10:
+    empty posts had earned crates; idle open timers still count, accepted while items aren't traded), or a ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
     milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
     `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or

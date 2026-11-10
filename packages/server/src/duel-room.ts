@@ -128,7 +128,11 @@ export function newDuelRecord(code: string, now: number, players: Record<Color, 
   };
 }
 
-/** A recording with no outcome yet is tried again this long after its last try started, at most this many tries. */
+/**
+ * A recording with no outcome yet is tried again this long after its last try started, for the first RECORD_TRIES tries; then every
+ * RANKED_1V1.recordRetrySeconds, up to RANKED_1V1.recordRetryHours after the game ended (Nov 10: four tries in a minute lost every
+ * rating change of a short D1 outage).
+ */
 export const RECORD_RETRY_MS = 15_000;
 export const RECORD_TRIES = 4;
 
@@ -263,8 +267,10 @@ export class DuelCore {
       if (d !== null) times.push(d);
       // (The vote opens after the versus moment: no event of its own.)
     }
-    if (this.toRecord() && r.recordAt !== null) times.push(r.recordAt);
-    if (r.closeAt !== null) times.push(r.closeAt);
+    const recordAt = this.toRecord() ? r.recordAt : null;
+    if (recordAt !== null) times.push(recordAt);
+    // (A recording still to come: the closing waits for its try, so a closing that's due never spins the alarm.)
+    if (r.closeAt !== null) times.push(recordAt !== null ? Math.max(r.closeAt, recordAt) : r.closeAt);
     return times.length ? Math.min(...times) : null;
   }
 
@@ -311,11 +317,24 @@ export class DuelCore {
 
   // ---------------- Recording ----------------
 
-  /** A finished game (not aborted, or aborted by a dodge: ranked's leave rules) whose outcome hasn't come back, with tries left. */
-  private toRecord(): boolean {
-    const r = this.r;
+  /**
+   * A finished game (not aborted, or aborted by a dodge: ranked's leave rules) whose outcome hasn't come back, within
+   * RANKED_1V1.recordRetryHours of its end. The room stays open while this holds (DuelGame.closeIfDue).
+   */
+  toRecord(): boolean {
     const end = this.end;
-    return !!end && (end.result !== "aborted" || this.dodged()) && r.outcomes === null && r.recordTries < RECORD_TRIES;
+    return this.recordable() && this.r.outcomes === null && !!end && this.io.now() < end.at + RANKED_1V1.recordRetryHours * 3_600_000;
+  }
+
+  /** A game to record whose outcome never came back in RANKED_1V1.recordRetryHours: given up on (the room closes and says so). */
+  recordGivenUp(): boolean {
+    return this.recordable() && this.r.outcomes === null && !this.toRecord();
+  }
+
+  /** A finished game that's recorded: not aborted, or aborted by a dodge (ranked's leave rules). */
+  private recordable(): boolean {
+    const end = this.end;
+    return !!end && (end.result !== "aborted" || this.dodged());
   }
 
   /** Whether a recording try is due now (takeFinished would hand the game over). */
@@ -326,8 +345,9 @@ export class DuelCore {
 
   /**
    * The finished game, to be recorded (ranks, coins, the kept game), when a try is due: at once when it ends, then
-   * again RECORD_RETRY_MS after each try while no outcome has come back (recordDuel's nonce makes a repeat harmless),
-   * at most RECORD_TRIES tries. The caller starts it only when none of its own is running. Null when nothing is due.
+   * again RECORD_RETRY_MS after each of the first RECORD_TRIES tries while no outcome has come back (recordDuel's nonce makes a
+   * repeat harmless), then every RANKED_1V1.recordRetrySeconds, for RANKED_1V1.recordRetryHours. The caller starts it only when
+   * none of its own is running. Null when nothing is due.
    */
   takeFinished(): FinishedDuel | null {
     const r = this.r;
@@ -336,7 +356,7 @@ export class DuelCore {
     if (!this.takeFinishedDue() || !end) return null;
     const now = this.io.now();
     r.recordTries++;
-    r.recordAt = now + RECORD_RETRY_MS;
+    r.recordAt = now + (r.recordTries < RECORD_TRIES ? RECORD_RETRY_MS : RANKED_1V1.recordRetrySeconds * 1000);
     return {
       id: r.id,
       players: { w: r.players.w.uid, b: r.players.b.uid },

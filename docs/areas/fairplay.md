@@ -32,7 +32,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   while the other team chooses, is). The review page shows "(premove)" by its time. 1 v 1 has no timing signal, so
   nothing there is marked.
 - **Someone who resigns mid-match** (or is gone too long) has their match's signals recorded with their result as
-  they leave (`takeLeftResults`, the Durable Object's `saveResults`), as everyone's are at the end.
+  they leave (`takeLeftResults`, queued by the Durable Object's `queueResults`, once per lobby: `since`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
   reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **banned**
@@ -64,7 +64,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   Lifting a ban, or deciding a review any way but a ban, forgets that account's identities (not another's). An account fair play hasn't acted on leaves nothing in fair play's tables.
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
-  off-peak). The judges' quick numbers can open a review, never a ban. A move in a position Stockfish refuses is
+  off-peak), over every legal move in groups of at most 8 (`moveGroups`, as 1 v 1's check), never the judges' list, which a device
+  sent (Nov 10); a position's whole budget taken before its first search, and outside a review a match only as far as
+  `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection only flags since Nov 10**
+  (`FAIRPLAY.enforcement: "review"`, the outside review's finding 3): no automatic bans until Eric turns them back on. A move in a position Stockfish refuses is
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
@@ -78,7 +81,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   only while their case is open (watch or review) or an appeal of a ban is waiting (purgeEvidence's rule).
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
-  reviewer never decides appeals nor changes a ban. A player's page also has chat moderation's section (warn, chat
+  reviewer never bans (409: a ban is a person's), decides appeals nor changes a ban, and
+  reads no email: admins are "admin", typed addresses "[email]" (`forReviewer`; Nov 10). A player's page also has chat moderation's section (warn, chat
   ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
   player's page by id or profile link.
 - **Emails:** a ban notice and a clearing go to the player's sign-in address through Resend.

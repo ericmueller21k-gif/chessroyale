@@ -422,7 +422,21 @@ export async function grantTestItems(body: { keys?: number; boss?: string; token
  */
 export async function startSoloBossBattle(town?: string): Promise<string | null> {
   if (!state.profile) return null;
-  return (await api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: JSON.stringify(town ? { town } : {}) })).battle;
+  // (Asked again as a finish is: a start lost on the way earned no token and, from the town, said nothing in its chat. A second
+  // start replaces the first on the server, one open battle an account, and the chat's line goes out once: the CI flake of Nov 10.)
+  return (await askTwice(() => api<{ battle: string | null }>("/api/boss/solo/start", { method: "POST", body: JSON.stringify(town ? { town } : {}) }))).battle;
+}
+
+/** Asks, and once more after a moment when the first try fails on the way or on the server (a refusal, a 4xx, isn't asked again). */
+async function askTwice<T>(ask: () => Promise<T>): Promise<T> {
+  try {
+    return await ask();
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    if (status !== undefined && status < 500) throw e;
+    await new Promise((r) => setTimeout(r, 1000));
+    return ask();
+  }
 }
 
 /**
@@ -432,15 +446,7 @@ export async function startSoloBossBattle(town?: string): Promise<string | null>
  */
 export async function finishSoloBossBattle(battle: string, end: { outcome: "won" | "lost" | "drew" | "surrendered"; moves: number } | null = null): Promise<{ counted: boolean; token: string | null }> {
   // (`end`: how it ended and your moves, for the town's chat when it was a challenge from the town: "Ann beat Alfil in 34 moves!".)
-  const ask = () => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify(end ? { battle, ...end } : { battle }) });
-  try {
-    return await ask();
-  } catch (e) {
-    const status = (e as { status?: number }).status;
-    if (status !== undefined && status < 500) throw e;
-    await new Promise((r) => setTimeout(r, 1000));
-    return ask();
-  }
+  return askTwice(() => api<{ counted: boolean; token: string | null }>("/api/boss/solo/finish", { method: "POST", body: JSON.stringify(end ? { battle, ...end } : { battle }) }));
 }
 
 /** The token an online boss battle (its lobby code) dropped you, if the server has counted it yet. */

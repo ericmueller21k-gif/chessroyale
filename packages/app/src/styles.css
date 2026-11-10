@@ -8226,6 +8226,25 @@ button.history-label {
   font-size: 12px;
   line-height: 1.15;
 }
+/* An item an outfit hides (Nov 10): greyed, still there and still wearable underneath; its line over the art. */
+.locker-item.covered > :not(.locker-covered):not(.locker-worn) {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.locker-covered {
+  position: absolute;
+  top: 46px;
+  left: 4px;
+  right: 4px;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.15;
+  pointer-events: none;
+}
 .locker-item.worn {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
@@ -8278,6 +8297,17 @@ button.history-label {
 }
 .locker-tabs {
   flex-wrap: wrap;
+}
+/* With the secret Outfit tab (only once you own an outfit, Nov 10): seven tabs, two even rows of four on a phone, one row on a
+   wider screen; never a lone stretched tab. Without it, the layout above, as before. */
+.locker-tabs.with-outfit {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (min-width: 600px) {
+  .locker-tabs.with-outfit {
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 .locker-item.default {
   --tier: var(--line);
@@ -8982,7 +9012,6 @@ button.history-label {
   --fd-gold-text: #f2c14e;
   --fd-gold-ink: #1a1406;
   --fd-gold-soft: #3a2f12;
-  --fd-blue: #7fb2f0;
   --fd-green: #4ade80;
   --fd-seat: #262a33;
   --fd-line: #2d313b;
@@ -9001,7 +9030,6 @@ button.history-label {
   --fd-off: #3a3f48;
   --fd-gold-text: #9a6a06;
   --fd-gold-soft: #fbefcc;
-  --fd-blue: #2d64a8;
   --fd-green: #16a34a;
   --fd-seat: #e4e1da;
   --fd-line: #dcd8d0;
@@ -9433,30 +9461,14 @@ button.fd-logo {
   transform: none;
 }
 /*
- * The phone's top bar in colour (Eric, Nov 9: "the 5 we have should all have some color"): the icons a size bigger (29 px in
- * the same 44 px squares, 40 px below 360 px where the squares shrink), the Quests clipboard and the shop's bag gold, Friends
- * blue, Settings a plain dark outline. Flat fills, the same outline weight. The profile is the shop's square too: no gold
- * ring, your pawn's face only (cropped, still: no ride, no animation). A computer's top right keeps its ring.
+ * The phone's top bar (Eric, Nov 10, undoing Nov 9's colors: "just make them all black, like the settings, just black and empty on
+ * the inside, except for your guy"): Quests, the shop, Friends and the gear are plain outlines in the text color (black in light
+ * mode, light in dark), no fill; the icons a size bigger (29 px in the same 44 px squares, 40 px below 360 px). The profile is the
+ * shop's square too: no gold ring, your pawn's face only (cropped, still: no ride, no animation), the one in color.
  */
 .fd-top .fd-icon-btn svg {
   width: 29px;
   height: 29px;
-}
-.fd-top .fd-top-shop svg {
-  fill: var(--fd-gold);
-  stroke: var(--fd-gold-text);
-}
-.fd-top .fd-top-quests .fd-qbar-body,
-.fd-top .fd-top-quests .fd-qbar-clip {
-  fill: var(--fd-gold);
-  stroke: var(--fd-gold-text);
-}
-.fd-top .fd-top-quests .fd-qbar-check {
-  stroke: var(--fd-gold-ink);
-}
-.fd-top .fd-top-friends svg {
-  fill: var(--fd-blue);
-  stroke: var(--fd-blue);
 }
 /*
  * The profile square's face (Eric, Nov 9: "a zoom in of your guy's head, but there should still be padding around all the sides,
@@ -10063,6 +10075,147 @@ button.fd-logo {
 .fd-ranked .fd-label {
   font-size: 12px;
   text-align: center;
+}
+/*
+ * Searching while you browse (Eric, Nov 10; the approved mockup, notes/assets/search-rows2-*.png; Home.tsx, search.ts): the
+ * modes row's own box shows the search, at the row's own height (52 px buttons and 5 px round them), so nothing moves. The row
+ * under it holds the three actions (and, in place, a question with Yes and No). Everything under them greys in place, not
+ * tappable (`fd-off` and `inert`); the top bar and your card stay lit.
+ */
+.fd-off {
+  opacity: 0.38;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+.fd-modes.fd-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 62px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: var(--fd-text);
+}
+.fd-search-ring {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px solid color-mix(in srgb, var(--fd-green) 25%, transparent);
+  border-top-color: var(--fd-green);
+  animation: fd-search-spin 1s linear infinite;
+}
+@keyframes fd-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-search-ring {
+    animation: none;
+  }
+}
+.fd-search-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+.fd-search-title,
+.fd-search-detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-title {
+  font: 800 17px Archivo, system-ui, sans-serif;
+}
+.fd-search-detail {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-search-time {
+  flex: none;
+  font: 800 22px Archivo, system-ui, sans-serif;
+  color: var(--fd-green);
+  font-variant-numeric: tabular-nums;
+}
+/* (The actions: the options row's buttons, lit, with no lines between them; Cancel and a red Yes in the danger color.) */
+.fd-modes.fd-search-acts > * {
+  color: var(--fd-text);
+}
+.fd-modes.fd-search-acts button span,
+.fd-search-ask span {
+  color: var(--fd-sub);
+}
+.fd-modes.fd-search-acts button.red,
+.fd-modes.fd-search-acts .fd-search-yes.red {
+  color: var(--fd-danger);
+}
+.fd-modes.fd-search-acts .fd-search-yes.go {
+  color: var(--fd-green);
+}
+.fd-modes.fd-search-acts .fd-search-yes,
+.fd-search-ask {
+  font-weight: 800;
+}
+/* (The question: where the first action was, the same box, not a button.) */
+.fd-search-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-ask br {
+  display: none;
+}
+.fd-search-ask span {
+  font-size: 11px;
+  font-weight: 400;
+}
+/*
+ * Narrow rows (a phone under 375 px, a 1280 px computer's 320 px column): a little smaller, and the detail's ending ("in the
+ * lobby") goes, so nothing is cut (measured at 320 px with the widest words: e2e/search-home.spec.ts). The rows are
+ * containers only while searching, so home's own layout is untouched.
+ */
+.fd-searching {
+  container-type: inline-size;
+}
+@container (max-width: 339px) {
+  .fd-modes.fd-search {
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .fd-search-ring {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+  }
+  .fd-search-title {
+    font-size: 15px;
+  }
+  .fd-search-detail {
+    font-size: 12px;
+  }
+  .fd-search-more {
+    display: none;
+  }
+  .fd-search-time {
+    font-size: 19px;
+  }
+  .fd-modes.fd-search-acts button,
+  .fd-search-ask {
+    font-size: 12.5px;
+  }
 }
 
 /* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
@@ -11798,6 +11951,46 @@ a.fd-row-link {
   font-weight: 800;
 }
 /*
+ * A lobby's way out (Nov 10, Queue.tsx's useQueueExit): "Keep me in the queue" and Exit in Cancel's place and height, so the
+ * chat under it doesn't move.
+ */
+.fd-exit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 56px;
+}
+.fd-keep {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--fd-panel);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.fd-keep input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--fd-gold);
+}
+.fd-keep span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-exit-row .fd-exit {
+  flex: none;
+  min-width: 110px;
+}
+/*
  * A phone's queue fits a common phone (390 x 664, 375 x 667) with the count, the grid and Cancel in view: your seat is
  * one line under the grid (your pawn is the gold-ringed one), and the lobby's chat goes under Cancel, filling the rest
  * of the screen (on a short phone, a scroll away; its header shows). A computer keeps the card (below).
@@ -12506,6 +12699,31 @@ button.fd-seat {
     align-self: stretch;
     min-width: 150px;
     padding: 0 28px;
+  }
+  /* (Keep me in the queue over Exit, in Cancel's cell beside your seat, about Cancel's width, so your seat's card keeps its room.) */
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row {
+    grid-area: cancel;
+    flex-direction: column;
+    gap: 6px;
+    width: 168px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep {
+    flex: none;
+    min-height: 32px;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep input {
+    width: 16px;
+    height: 16px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-cancel {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0;
   }
 }
 @media (min-width: 1024px) {
@@ -21013,6 +21231,12 @@ button.sq-tiny {
 }
 .ac-board .board-wrap {
   width: 100%;
+}
+/* Classic's dark squares a touch darker on this board (Eric, Nov 10: "the colors fuse"), so they still part from the light ones
+   under their half's dim layer (.ac-theirs): color distance 16 → 22, 14 → 18 dimmed. Other boards and schemes are as they were. */
+:root:not([data-board-colors]) .ac-board,
+[data-board-colors="classic"] .ac-board {
+  --sq-dark: #b39c7c;
 }
 /* What is drawn over the squares: exactly the board (eighths of --board-size), the taps and drags of the buy and adjust steps. */
 .ac-layer {

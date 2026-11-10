@@ -23,7 +23,8 @@ agree. Background: DECISIONS.md, "Fair play"; the numbers behind the thresholds:
 
 `GET /api/admin/fairplay/cases/<userId>`
 
-- `player`: name, joined, signed in or not, online matches (no email for the reviewer).
+- `player`: name, joined, signed in or not, online matches. No email anywhere in what the reviewer reads: an admin is named
+  "admin" in the log and decisions, and an address typed in a reason, an appeal or a reply reads "[email]".
 - `case`: status, reason, when it opened, who decided last.
 - `reports`: when, why (Cheating, Offensive name or icon, Something else, Offensive chat), which match, who (and whether
   they were signed in). A report of a town square chat line ("Offensive chat") comes without the line's words: those are
@@ -36,17 +37,20 @@ agree. Background: DECISIONS.md, "Fair play"; the numbers behind the thresholds:
     null with fewer than 8);
   - `near` (moves within 2 points of the best), `gap` (what the second-best loses);
   - `thinkS`, `away` (times the page was hidden or lost focus during the move's clock);
-  - `deepBest`, `deepRank`: the engine server's deep re-check (its best of the judges' top moves and the pick, and
+  - `deepBest`, `deepRank`: the engine server's deep re-check (its best of every legal move, and
     where the pick ranked: 1 = its best), when it has run.
   - `moves` is null once the evidence was deleted (30 days for flagged or reported players).
 - `log`: every change to the case, who made it and why. `appeals`. `sameDevice`: other accounts that played online
   from the same device marker, with their case status.
 
-`POST /api/admin/fairplay/cases/<userId>/decision` with JSON `{ "decision": "ban" | "clear" | "watch" | "review",
+`POST /api/admin/fairplay/cases/<userId>/decision` with JSON `{ "decision": "clear" | "watch" | "review",
 "reason": "…", "notice": "…" }`
 
 - `reason` is required (5 characters or more): it goes in the case's log, with `by: "reviewer"`.
-- `notice` (optional) replaces the standard sentence in the player's email (a ban, or a clearing after a review).
+- `notice` (optional) replaces the standard sentence in the player's email (a clearing after a review).
+- `ban` is always refused (`409`, the case stays as it was): a ban is a person's (Nov 10). The ban bar's evidence still rests on the
+  judges' numbers, which devices send, so a leaked token or a steered reviewer could ban an honest player. Detection itself only
+  opens reviews (`policy.enforcement` "review").
 - Answers `{ ok: true, status, by }`, or `400` (no reason, a bad decision), `404` (no such player), `409` (a banned
   case, one with an open appeal, or the case of a deleted account: those are for a person).
 
@@ -65,8 +69,8 @@ matches.
   with an "Offensive chat" report since its last decision);
 - anything where the evidence was deleted (`moves: null` for every match) and the summaries alone don't settle it.
 
-**Ban** only on overwhelming evidence, the same bar as automatic bans (`policy.levels`), from matches the deep re-check
-has gone through:
+**Review, for a person to ban** (you never ban): keep the case in review, the numbers in the reason, on overwhelming evidence,
+the same bar as automatic bans (`policy.levels`), from matches the deep re-check has gone through:
 - at least `banMatches` deep-checked matches whose `summary.evidence` adds up to `banEvidence` or more, with
   `banDeepChecked` or more moves checked among them, the engine's best (`deepRank` 1) on `banDeep` or more of them, and
   a best match strength of `banPerf` or more; or one match past every `banOne*` bar;
@@ -75,6 +79,8 @@ has gone through:
 - Supporting signs (never enough alone): think times that don't follow difficulty (`summary.timeCorr` near 0 or below,
   hard finds in under 5 s), look-aways on the moves that matched the engine, a strength far above the player's own
   history (`summary.parts.jump`), several independent cheating reports.
+- Check the "hard" finds yourself: a forced reply, an only move or a recapture the judges' `gap` and `crowdFound` call hard may be
+  obvious (those numbers come from players' devices).
 - Reason: the numbers, in one or two sentences, e.g. "2 deep-checked matches: evidence 11.4, 84% of 19 counted moves
   the engine's best, hard finds 4/5 in 3-5 s each."
 
