@@ -500,8 +500,6 @@ export class NetMatch implements GameView {
       }
       // (`seeded`: this app plays a boss request's seed, so it may check the boss's moves: BOSS_CHECK.)
       this.send({ t: "hello", token, name: this.playerName, device: deviceKind(), practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn(), seeded: true, ...(this.partyPass && !token ? { party: this.partyPass, seat: this.partySeat } : {}) });
-      // (Back after a dropped connection with Maia still loaded: the lobby forgot it on the reconnect.)
-      if (this.maia?.ready()) this.send({ t: "maiaReady" });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -570,6 +568,8 @@ export class NetMatch implements GameView {
         this.chat.onWelcome();
         // This device's engine speed, so the lobby can share out the judging (once per page; sent again on reconnect).
         void this.reportSpeed();
+        // (Back after a dropped connection with Maia still loaded: the lobby forgot it as it took the seat back.)
+        if (this.maia?.ready()) this.send({ t: "maiaReady" });
         return;
       case "error":
         // (You left this match: resigned, or gone too long. Home, with a note of its own.)
