@@ -265,17 +265,17 @@ function modes(src: FaqSources): FaqSection {
 - **A tie at the cut line goes through:** everyone tied exactly with the last player through stays in, and the cuts still to come take the extra, a little at each. So does anyone within ${n(src.crowdScoring.cutGrace, "point")} of that player ([the bubble](#crowd-scoring)). Only the last cut before the ending breaks a tie, so the ending has its size: fewer points given away before the [opening allowance](#opening-allowance) go through, then less thinking time.
 - **You vote on the ending** before move 1: a team final (the top ${left(src.crowdKnockouts.team)} play on: ${teamSizes.slice(0, -1).join(", ")}, then ${teamSizes.at(-1)} to the end), a boss final (the top ${left(src.crowdKnockouts.boss)} team up against ${finalFoe}) or a duel (the best of each side, 1v1). Then on how it starts, then on the clock.
 - **How it starts**, voted on before move 1: ${startLabel("normal")}, the usual starting position; ${startLabel("random")}, a real, balanced opening already ${n(randomMoves, "move")} in for each side, so the game picks up at move ${randomMoves + 1}; or ${startLabel("freestyle")}: the pieces on the back row start shuffled, the same for both sides and different every game. To castle in Freestyle, move your king onto its rook: the king lands on the g- or c-file with the rook beside it, as usual. Nobody voting means ${SV.options[SV.defaultOption]?.label}. Both teams play from that start; a boss final is played from the usual starting position.
-- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A boss raid is ${namedClock(R)}.
+- **The clock is a chess time control**, voted on before move 1: ${timeControls.slice(0, -1).join(", ")} or ${timeControls.at(-1)}. Nobody voting means ${V.options[V.defaultOption]?.label}. Your minutes last the whole game, and each of your moves adds its seconds as it starts; the time you take comes out of your bank, so what a quick move doesn't use is saved for later, as on a chess clock. No move can go past its cap, because your whole team picks together; with an empty bank you still get the added seconds. Your bank is beside the board's clock and in the scoreboard's Bank column. A group Boss Battle is ${namedClock(R)}.
 - **${n(C.powerUpsAtStart, "power-up")}** each: a power-up shows the engine's top 3 moves for that turn.
 - How you play, under the modes on the home screen: **Solo queue** puts you in a lobby, with bots filling empty seats after a short wait; **Party** (coming soon) will queue you with up to ${CROWD_PARTY_MAX - 1} friends into the same matchmaking (sides drawn at random); **Bots** is you and ${C.lobbySize - 1} bots, at once, at the level you pick: ${BOT_LEVELS.filter((l) => l.mean !== null).map((l) => `${l.label} (about ${l.mean})`).join(", ")}, My level (about your rating) or Random (every bot's rating random). A level is the bots' average: each bot is a few hundred points either side of it.
 - **Bots are a lobby of players.** Each bot has its own rating, the same every match (most between 800 and 1500, a few above or below), and picks from the engine's moves about as loosely as a player of that rating would.
 
-### Boss raid and Boss alone {#mode-boss}
+### Boss Battle {#mode-boss}
 
-- **Boss raid:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
-- **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (tap one to invite them), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Raids with people (**Join a raid**, **People only**, **Raid with bots** and **Play with friends**) are moving to Chess Town's Colosseum and aren't on the home screen for now.
+- **A group Boss Battle:** up to ${R.lobbySize} players pick the crowd's moves together against a [boss](#boss-brain); the most popular pick is played. Every boss starts from the starting position.
+- **Where:** **Boss Battle** on the home screen. The bosses are at the top: tap one to see it on the stage below, with you and, behind you, two spots for friends (tap one to invite them), or **?** for a random one. Under the boss's name, the arrows pick its difficulty (${src.difficulty.length} levels, shown by the dots), and **START** meets the boss you picked. Group Boss Battles (**Join a Boss Battle**, **People only**, **Play with bots** and **Play with friends**) are moving to Chess Town's Colosseum and aren't on the home screen for now.
 - **Scoring:** the [50 v 50 way](#raid-scoring), its limit widening with the crowd's moves (Boss alone scores as before).
-- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} in a raid it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the raid is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
+- **The boss strikes:** every ${n(S.bossKillEvery, "crowd move")} in a group battle it knocks out the player who gave away the most points since its last strike (as the judge counts them, before the [scoring's limit](#raid-scoring), after the [opening allowance](#opening-allowance); a missed move counts as ${n(S.finalMissLoss, "point")}, and a tie goes against the weaker player over the match), until half the group is left${finalBoss ? "" : ` (in the Crowd's boss final, until ${S.bossMinSurvivors} are left)`}. If two are still tied for the worst, nobody is struck: it strikes after the next crowd move instead.
 - **The God King** fights on your side, with ${n(S.kingChargesMax, "charge")} ([more on him](#god-king)).
 - The battle ends in checkmate or a draw, or after ${n(S.bossMaxMoves, "crowd move")}, when the engine judges the position.
 - **With friends** (up to ${BOSS_PARTY.max} of you): invite them from the spots behind you. The leader (with the crown) picks the boss and the difficulty; everyone else taps **READY**, and the leader's **START** works once everyone is ready. In the battle everyone picks every move and sees the others' picks as they come. Two or more on one move: it's played. Otherwise the engine's best pick is played, or, if two are within ${BOSS_PARTY.closeCp} centipawns, one of those at random. The team shares one ${BOSS_CLOCK.bankSeconds / 60} + ${BOSS_CLOCK.incrementSeconds} clock, and the turn waits for everyone: ${BOSS_PARTY.afkKickSec} seconds after the turn's first pick, the leader can remove someone who hasn't picked. The boss never strikes anyone down.
@@ -397,7 +397,7 @@ function leaving(src: FaqSources): string {
 - **To resign:** tap the **gear** at the top right of the match (on a computer, click it), then **Resign**. It asks once more, so a stray tap never resigns. (There's no undo; only [1 v 1](#mode-1v1) has draw offers.)
 - **1 v 1:** resigning ends the game, a loss. Before both first moves are made it's **Leave** instead: the game is called off, with no result, but leaving a ranked game before it starts, or resigning very early, costs rank points ([1 v 1](#mode-1v1), leaving early).
 - **Solo games and Boss alone:** the game ends there, and it counts as a loss.
-- **Online (Crowd, boss raids, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.
+- **Online (Crowd, Boss Battles, Squads):** you can't end the game for everyone else, so resigning means you leave it. You're out in the last place still open, it counts as a loss (in a match that counts for ranking, for your ranking too), and a bot plays your seat so your team isn't a player short (with Bots off, only when your side would otherwise have nobody left). In Squads your squad plays on with a bot in your seat, and your record has the worst place your squad could still finish.
 - **Before the first move** (the votes, a boss's entrance), it's just **Leave**: you go home, a bot takes your seat, and nothing goes on your record.
 - **Already out** (cut, or struck down by the boss)? **Leave the match** takes you home, and your place stands.
 - **Closed the app or lost your connection?** Back within ${gone}, you're still in your seat (a reload is fine). Gone longer, it counts as resigning. When everyone has left a match, it ends there, and its lobby code stops working.`;
@@ -463,11 +463,11 @@ ${
  * by crowd move (CrowdScoring.capFromMove), no bubble; the strike as before; Boss alone as before. Numbers from RAID_SCORING.
  */
 export function raidScoringWords(cs: CrowdScoring | undefined, missed: number): string {
-  if (!cs) return `A boss raid scores like Classic: no limit and no streaks. A missed move scores ${num(missed)}.`;
+  if (!cs) return `A group Boss Battle scores like Classic: no limit and no streaks. A missed move scores ${num(missed)}.`;
   const from = cs.capFromMove ?? [];
   const caps = cs.cap.map((c, i) => `${c === null ? "no limit" : `about ±${num(c)}`} from the ${ordinal(from[i] ?? 1)} crowd move`);
   const firstCap = cs.cap[0] ?? null;
-  return `A boss raid scores the [50 v 50 way](#crowd-scoring), the whole crowd counting as your team (the limit, a piece hung, everyone falling for it, streaks and the fire, rare brilliant finds), but a raid has no cuts, so the limit widens with the crowd's moves instead: ${caps.slice(0, -1).join(", ")} and ${caps.at(-1)}. A missed move scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} at first)`}.${cs.streakMinAverage ? ` A move that plays itself (the crowd giving away less than ${n(cs.streakMinAverage, "point")} on average, as in a game already decided) neither adds to a streak nor ends it.` : ""} Nobody is cut, so there's no bubble.
+  return `A group Boss Battle scores the [50 v 50 way](#crowd-scoring), the whole crowd counting as your team (the limit, a piece hung, everyone falling for it, streaks and the fire, rare brilliant finds), but a Boss Battle has no cuts, so the limit widens with the crowd's moves instead: ${caps.slice(0, -1).join(", ")} and ${caps.at(-1)}. A missed move scores ${cs.missCaps} times the limit below zero${firstCap === null ? "" : ` (${num(-cs.missCaps * firstCap)} at first)`}.${cs.streakMinAverage ? ` A move that plays itself (the crowd giving away less than ${n(cs.streakMinAverage, "point")} on average, as in a game already decided) neither adds to a streak nor ends it.` : ""} Nobody is cut, so there's no bubble.
 
 - **The boss's strike** still goes by the points you gave away since its last strike, before the limit and the streaks: the [player who played worst](#mode-boss) is struck, never a tie on a coin flip.
 - **Boss alone** scores as before (no limit, no streaks, 1 decimal): with nobody to compare with, a move scores 0 and a missed one ${num(missed)}.`;
@@ -520,7 +520,7 @@ A loss is never below zero: if picks score above the engine's own choice, the hi
 
 $ round score = the group's average loss − your loss
 
-Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} (in 50 v 50 and a boss raid, [less](#crowd-scoring)) and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
+Positive means you beat your group (early in a game, every loss here is after the [opening allowance](#opening-allowance)). A missed move scores ${num(S.missedMoveScore)} (in 50 v 50 and a group Boss Battle, [less](#crowd-scoring)) and is left out of the average. In Crowd your round scores add up all game, and every cut goes by the total.
 
 ### The opening allowance {#opening-allowance}
 
@@ -530,7 +530,7 @@ ${openingAllowanceWords(src.allowance)}
 
 ${crowdScoringWords(src.crowdScoring, src.crowd.crowdMisses)}
 
-### Scoring in a boss raid {#raid-scoring}
+### Scoring in a group Boss Battle {#raid-scoring}
 
 ${raidScoringWords(src.raid.crowdScoring, S.missedMoveScore)}
 
@@ -562,7 +562,7 @@ A move is **brilliant** when it separated the field: among at least ${B.minPicke
 
 ### Your rating {#rating}
 
-Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a raid). Solo games never change it.
+Your rating comes from your moves, not from wins: from the average number of points your moves give away, matched against how many Stockfish gives away at each of its own strength settings (so it's on Stockfish's rating scale). It shows after ${n(src.ratingMinMoves, "move")}, starts near ${src.priorRating} and firms up as your moves come in. A match counts toward your ranking only when at least ${pct(src.rankedShare, 0)} of its seats are real players; solo games and practice mode never count. Your ranking changes only in a match with at least ${rankedMinHumans(src.crowd.lobbySize, src.rankedShare)} real players (${rankedMinHumans(src.raid.lobbySize, src.rankedShare)} in a group Boss Battle). Solo games never change it.
 `,
   };
 }
@@ -657,8 +657,8 @@ A boss is a chess engine with a character. Two things decide how it plays: **how
 
 A boss's strength is a rating on Stockfish's scale, set as the battle starts:
 
-- **A boss raid** is matched to the people in it (bots never count): the boss comes in at the weakest of its tiers that's stronger than their average rating. The tiers: ${tiers.join(", ")}.
-- **A Solo raid and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
+- **A group Boss Battle** is matched to the people in it (bots never count): the boss comes in at the weakest of its tiers that's stronger than their average rating. The tiers: ${tiers.join(", ")}.
+- **Play with bots and Boss alone** work the same way from your own rating (unrated, ${src.priorRating}).
 ${
   fixed
     ? `- **The Crowd's boss final** is always ${bossInText(fixed.name, false, src.roster)}, whose strength is fixed at ${fixedLevel(M)}, whatever anyone's rating: no tier, offset or difficulty ([his block](#boss-${fixed.id})).`
@@ -676,7 +676,7 @@ ${offsets}
 
 **Worked example.** You're rated ${you}. The weakest tier above ${you} is ${tier}. ${ginger.name} at ${src.difficulty.find((d) => d.elo === 0)?.label ?? "Medium"}: ${tier} ${term(ginger.offset)} = **${gingerElo}**. ${bigBoy.name} at ${hard.label}: ${tier} ${term(bigBoy.offset)} ${term(hard.elo)} = **${bigBoyElo}**.
 
-The Boss Battle screen shows the boss you picked by its name, with your difficulty's name and its five dots under it. A Solo raid (Raid with bots) has no difficulty on top.
+The Boss Battle screen shows the boss you picked by its name, with your difficulty's name and its five dots under it. Play with bots has no difficulty on top.
 
 ### Brain 1: Stockfish at a set strength {#stockfish-brain}
 
@@ -728,7 +728,7 @@ Maia runs in your browser as its own program. Its license and source code are in
 
 ### The handover: from Maia to Stockfish {#handover}
 
-A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a raid${fixed ? "" : " or the Crowd's boss final"}: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
+A boss's strength is on Stockfish's scale, the one your rating is on; Maia's ratings are on a human scale, and the two don't line up one to one. So a Maia boss plays at a Maia rating that rises with its **level**, along straight lines. The level is the boss's strength${margin ? `, plus ${num(margin)} when a crowd plays it (a group Boss Battle${fixed ? "" : " or the Crowd's boss final"}: a crowd voting together plays above its average member); in Boss alone it's the strength itself` : ""}.
 
 $ level = strength${margin ? ` + ${num(margin)} (a crowd)` : ""}
 ${lines.join("\n")}
@@ -747,7 +747,7 @@ $ Stockfish's share = ${pct(M.bridgeStockfishShare, 0)} × (strength − ${M.bri
 |---|---|---|---|
 ${handover}
 
-**Worked example.** A raid's boss at ${exStrength}: its level is ${exStrength}${margin ? ` + ${num(margin)} = ${exLevel}` : ""}, so it plays Maia at ${exHeld ? `its ceiling, **${exMaia}**` : `${ey0} + ${num(exSlope, 3)} × (${exLevel} − ${ex0}) = ${ey0} + ${num(exSlope * (exLevel - ex0))} = **${exMaia}**`}${plan(exStrength, true).brain === M.brain ? "" : `, with ${guardName[plan(exStrength, true).brain]}`}. A raid's boss at ${midBridge} plays Maia at ${midPlan.rating}${shortGuard[midPlan.brain]}, and ${pct(midPlan.stockfishShare, 0)} of its moves are Stockfish's.
+**Worked example.** A group Boss Battle's boss at ${exStrength}: its level is ${exStrength}${margin ? ` + ${num(margin)} = ${exLevel}` : ""}, so it plays Maia at ${exHeld ? `its ceiling, **${exMaia}**` : `${ey0} + ${num(exSlope, 3)} × (${exLevel} − ${ex0}) = ${ey0} + ${num(exSlope * (exLevel - ex0))} = **${exMaia}**`}${plan(exStrength, true).brain === M.brain ? "" : `, with ${guardName[plan(exStrength, true).brain]}`}. A group Boss Battle's boss at ${midBridge} plays Maia at ${midPlan.rating}${shortGuard[midPlan.brain]}, and ${pct(midPlan.stockfishShare, 0)} of its moves are Stockfish's.
 
 These numbers come from simulated battles against crowds of bots, and may be tuned as real battles come in.
 
@@ -807,7 +807,7 @@ Plays from the game so far.
 Always plays Black, from the starting position: if you'd have been Black, he claims the dark side before move 1.
 
 - **The Dark** (passive): after his first move he covers the square of the piece he moved; then another square on every ${ordinal(p.darkEvery)} move of his (his ${[1, 2, 3].map((k) => ordinal(1 + k * p.darkEvery)).join(", ")}…), a random occupied square, never a king's. Each stays dark for ${n(p.darkTurns, "turn")}, and pieces there are hidden. A move that touches the dark goes through unchecked: if it turns out illegal, it costs ${n(p.darkTryCost, "point")} and you pick again, and your ${ordinal(p.darkTries)} wrong try in a turn ends your turn as a missed move (a turn never costs more than a missed move). Each wrong move gets a dry word from him.
-- **Your ${p.darkBulbs} bulbs** (Boss alone): no points when you play him alone. You get a string of ${p.darkBulbs} of his bulbs instead, by his bar, and each wrong move into the dark puts one out (no limit a turn). When the ${p.darkBulbForced.map(ordinal).join(" and the ")} go out, the dark plays that turn's move for you: a bad one (giving away ${range(p.darkForcedLoss)} points against the best move; never one that lets him force mate, nor one that mates or stalemates on the spot). When the last one goes out, the screen goes black and you lose. Crowds, raids and parties keep the points.
+- **Your ${p.darkBulbs} bulbs** (Boss alone): no points when you play him alone. You get a string of ${p.darkBulbs} of his bulbs instead, by his bar, and each wrong move into the dark puts one out (no limit a turn). When the ${p.darkBulbForced.map(ordinal).join(" and the ")} go out, the dark plays that turn's move for you: a bad one (giving away ${range(p.darkForcedLoss)} points against the best move; never one that lets him force mate, nor one that mates or stalemates on the spot). When the last one goes out, the screen goes black and you lose. Crowds, group Boss Battles and parties keep the points.
 - **Deeper Dark** (passive): after his ${p.darkBlockAt.map(ordinal).join(", ")} moves a 2×2 block of squares goes dark for ${n(p.darkBlockTurns, "turn")}, and once a game, after his ${ordinal(p.darkBigAt)}, a 3×3 block for ${n(p.darkBigTurns, "turn")}. Whatever is in a block is hidden, and so is anything that moves inside it. A block never covers a king (so a king always keeps a square of escape in the light) and holds some pieces when it can. A square that was already dark stays dark until the later of its two ends.
 - **Lights Out** (ultimate): at the start of his turn, a memory test in ${n(p.lightsOutRounds.length, "round")}: find ${p.lightsOutRounds.map((r) => r.pieces).join(", then ")} of his pieces (${p.lightsOutRounds.map((r) => `${num(r.ms / 1000)} s`).join(", ")}; each tap adds ${num(p.lightsOutTapMs / 1000)} s). Each piece you miss costs ${n(p.lightsOutMiss, "point")}. If the crowd finds under ${pct(p.lightsOutHold, 0)} of them, he plays an extra quiet move straight after his own (no capture, check or promotion, worth at most ${n(p.lightsOutExtraGain, "point")} to him).`,
   bigboy: (p, b) => `
@@ -894,11 +894,11 @@ Plays from the game so far. A beaver builder in an orange hard hat, planks on hi
   dash: (p, b) => `
 Plays from the game so far. A lanky, cocky cheetah in a backwards orange cap and a teal and orange track jacket, a chess clock under his arm, his tortoise Tick asleep on the clock in his bar. He never stops to think: his moves come at once. ${b.offset < 0 ? `His powers are why he plays ${Math.abs(b.offset)} under the usual strength.` : b.offset > 0 ? `He plays ${b.offset} over the usual strength.` : "He plays at the usual strength."}
 
-Your time is the clock at the right of the box under the board: alone or in a party it's your time bank for the battle (the team's one bank in a party); in a raid it's each move's timer.
-- **Clock Slap** (passive): every time he takes one of your pieces he slaps his clock and steals your time: ${n(p.slapBankSeconds, "second")} off your bank, or in a raid your next move's timer ${n(p.slapMoveSeconds, "second")} shorter (never under ${n(p.slapMoveMin, "second")}). Tick, in his bar, keeps count of what he's stolen.
+Your time is the clock at the right of the box under the board: alone or in a party it's your time bank for the battle (the team's one bank in a party); in a group Boss Battle it's each move's timer.
+- **Clock Slap** (passive): every time he takes one of your pieces he slaps his clock and steals your time: ${n(p.slapBankSeconds, "second")} off your bank, or in a group Boss Battle your next move's timer ${n(p.slapMoveSeconds, "second")} shorter (never under ${n(p.slapMoveMin, "second")}). Tick, in his bar, keeps count of what he's stolen.
 - **Time Scramble** (ultimate, at most ${n(p.maxUltimates["dash"] ?? 0, "time")} a battle): after the warning, your next ${n(p.scrambleMoves, "move")} get ${n(p.scrambleSeconds, "second")} each, counted down over the board. They still come out of your bank, which still gets its extra seconds.
 - **Scramble Rush** (once a battle, never before move ${num(p.dashScramble.from)}, warned a turn ahead: "Next turn: Scramble Rush"): "1.00" counts down to "0.00" over ${n(p.dashScramble.countdownMs / 1000, "second")} while his copies race across the board, moving ${n(p.dashScramble.pieces, "piece")} of yours and ${num(p.dashScramble.pieces)} of his (never a king). Then you have ${n(p.dashScramble.placeMs / 1000, "second")} to drag or tap them back, each piece at most ${n(p.dashScramble.movesPerPiece, "time")}: a green edge where one is right, a red edge where it isn't. Fewer than ${num(p.dashScramble.needCorrect)} of the ${num(p.dashScramble.pieces * 2)} back (solo, yours alone; online with a crowd, on average) and he plays an extra move at once: the move list shows both of his moves. Either way the board goes back exactly as it was: only the screen showed them moved.
-- **Out of time** against him is never a loss: a move is played for you instead, picked at random from the ${n(p.flagTop, "best move")} (in a raid, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
+- **Out of time** against him is never a loss: a move is played for you instead, picked at random from the ${n(p.flagTop, "best move")} (in a group Boss Battle, only if nobody picked in time). Your bank can run down to nothing; each move then has just its extra seconds.`,
 };
 
 /**
@@ -1008,11 +1008,11 @@ function godKing(src: FaqSources): FaqSection {
     body: `
 ### Who he is {#king-who}
 
-The crowd's champion in every boss battle: raids, the Crowd's boss final and Boss alone. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}), the Crowd's boss: calling him there only spends a charge.` : ""}
+The crowd's champion in every Boss Battle (alone, in a party or in a group) and the Crowd's boss final. He stands by the board in your side's colors, talks now and then, and acts when the crowd calls him. He's there for the big moments, not to play the game for you.${finalBoss ? ` His help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}), the Crowd's boss: calling him there only spends a charge.` : ""}
 
 ### Strike or play: his charges {#king-charges}
 
-He has up to ${n(S.kingChargesMax, "charge")}. In a raid or Boss alone he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` There a call only spends one: his help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}).` : ""} Tap him to open his menu:
+He has up to ${n(S.kingChargesMax, "charge")}. In a Boss Battle he starts with ${S.kingChargesMax}. In the Crowd's boss final, the finalists' leftover power-ups become his charges: one for every ${S.kingPowerUpsPerCharge}, rounded, at least ${kingCharges(0, S)} and at most ${S.kingChargesMax}.${finalBoss ? ` There a call only spends one: his help doesn't work against [${bossInText(finalBoss.name, false, src.roster)}](#boss-${finalBoss.id}).` : ""} Tap him to open his menu:
 
 - **Play this move:** he plays the judge's best move for the crowd (stronger than the boss).
 - **Strike the boss:** three bolts on the boss's king, and the boss's next move is one that gives away ${range(S.kingStrikeLoss)} points (never a piece for nothing). One strike a move. It enrages the boss too: ${src.powers.rageStrike} on its [rage meter](#rage-meter) (unless an ultimate is under way; Wrangler's meter is his own, and a strike adds nothing to it).
@@ -1159,7 +1159,7 @@ export function xpAndLevels(src: FaqSources): FaqSection {
 
 **Quests:** you get **${n(Q.dailyPerDay, "daily quest")}** each day and **${n(1, "weekly quest")}** each week, in the Quests window (it opens by itself the first time you come to the home screen each day when you're signed in, and from the **Quests** button any time). Each shows what to do ("${Q.daily[0]?.goal ?? ""}", "${Q.weekly[0]?.goal ?? ""}"), how far you are and what it pays.
 - **Rewards:** ${dailyPays}; the weekly quest ${weeklyPays}. They're paid the moment a game finishes the quest, and its XP joins that game's XP ("Quest +${Q.daily[0]?.xp ?? 0}"); the result says which quest ("Quest done: …").
-- **What counts:** only games that earn XP (the same rules as above), each game once per quest. Quests ask for modes you can always play: Squads, 50 v 50, boss raids (bots fill them), and any game. A win counts when it earns its win XP. Games on your device count only toward "finish games" quests, and only once they've lasted a little while (our server times them).
+- **What counts:** only games that earn XP (the same rules as above), each game once per quest. Quests ask for modes you can always play: Squads, 50 v 50, Boss Battles (alone counts too), and any game. A win counts when it earns its win XP. Games on your device count toward "finish games" quests, and a Boss Battle on your device toward the Boss Battle quests too, but only once they've lasted a little while (our server times them).
 - **New dailies** come each day at ${String(X.dayStartUtcHour).padStart(2, "0")}:00 UTC; the weekly resets on Mondays at the same time. **Unfinished dailies stay**, up to ${Q.maxDailies} waiting, so missing a day doesn't waste them. A new weekly replaces the old one, finished or not.
 - **One free reroll a day for each daily:** the arrows on a daily you haven't finished swap it for another quest (only that one). The new quest's arrows come back the next day.
 

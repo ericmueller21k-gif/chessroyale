@@ -77,7 +77,7 @@ async function into(page: Page, raid: boolean) {
   await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=gingerbread");
   if (raid) {
     await openBossRaid(page);
-    await page.getByRole("button", { name: /^Raid with bots/ }).click();
+    await page.getByRole("button", { name: /^Play with bots/ }).click();
   } else await bossAloneFromHome(page);
   await yourMove(page);
 }

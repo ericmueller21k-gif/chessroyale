@@ -3464,8 +3464,8 @@ export const QUESTS = {
   weekStartDay: 1,
   soloMinMinutes: 3,
   daily: [
-    { id: "boss-hunter", name: "Boss Hunter", goal: "Beat a boss in a raid", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
-    { id: "raid-party", name: "Raid Party", goal: "Play 2 boss raids", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
+    { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
+    { id: "raid-party", name: "Boss Fighter", goal: "Play 2 Boss Battles", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
     { id: "squad-up", name: "Squad Up", goal: "Play 2 Squads games", target: 2, counts: "squads", weight: 2, xp: 300, icon: { kind: "squad" } },
     { id: "fifty-fifty", name: "Fifty-Fifty", goal: "Play a 50 v 50 game", target: 1, counts: "crowd", weight: 2, xp: 300, icon: { kind: "board", piece: "queen" } },
     { id: "warm-up", name: "Warm Up", goal: "Finish 3 games", target: 3, counts: "any", weight: 2, xp: 300, icon: { kind: "board", piece: "pawn" } },
@@ -4384,9 +4384,17 @@ export interface AutoChessSettings {
     readonly xpRichGold: number;
     readonly xpChance: number;
     readonly xpChanceFull: number;
+    /** With no read of you (round 1, or a test that passes none): the chance it banks for interest. */
     readonly saveChance: number;
     /** When it banks for interest it still spends at least this much (a few pieces' worth). */
     readonly saveKeep: number;
+    /**
+     * It saves when you save (Eric, Nov 10: "if you're saving a bunch of your gold, … it shouldn't spend a ton of its own"). From round 2 it reads your gold
+     * at the round's start and what you banked from the last round (never this round's buys): you saving (`banked` or more carried over, or `gold` or more
+     * to start) it banks too, `chance` of the time, to your interest steps (the tens you kept beyond this round's income), still spending `saveKeep`, with no
+     * rerolls or XP; you spending down, it spends to keep up (no bank). From round `lateRound`, or with either side at `lowHp` HP or less, it never banks.
+     */
+    readonly follow: { readonly banked: number; readonly gold: number; readonly chance: number; readonly lateRound: number; readonly lowHp: number };
     /** It buys a queen only with this much more left after her (it buys one when rich, not with its last coins). */
     readonly queenChange: number;
     /** Whenever one of its offers is a star-up it can pay for, it buys it this often (Eric: "buys star-ups as a player would", nearly always). */
@@ -4476,5 +4484,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, follow: { banked: 10, gold: 30, chance: 0.85, lateRound: 7, lowHp: 8 }, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

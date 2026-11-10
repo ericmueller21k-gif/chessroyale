@@ -220,7 +220,7 @@ async function run(stage) {
 async function tile() {
   const p = await browser.newPage({ ...context, colorScheme: scheme });
   await p.goto(`${url}?mode=raid&nolanding`);
-  await p.getByRole("heading", { name: "Boss raid", exact: true }).waitFor();
+  await p.getByRole("heading", { name: "Boss Battle", exact: true }).waitFor();
   await p.getByRole("radio", { name: "Smudgy" }).click();
   await p.waitForTimeout(1500);
   await p.screenshot({ path: join(outDir, `${device}${widthArg ? widthArg : ""}-${scheme}-select.png`) });

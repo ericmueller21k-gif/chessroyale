@@ -215,11 +215,11 @@ describe("progress: only counted games, by mode, decided by the server", () => {
     await grantXp(sql, ann.id, game("lobby:CCCCC:1", "boss"));
     await grantXp(sql, ann.id, game("lobby:DDDDD:1", "classic"));
     await grantXp(sql, ann.id, game("duel:EEEEE", "duel"));
-    expect(await progress(sql, ann.id)).toEqual({ "Squad Up": "1/2", "Fifty-Fifty": "1/1", "Raid Party": "1/2", "Boss Hunter": "0/1", Winner: "0/2", Regular: "5/10" });
-    // A won raid: Raid Party, Boss Hunter and Winner; a won ranked game: Winner.
+    expect(await progress(sql, ann.id)).toEqual({ "Squad Up": "1/2", "Fifty-Fifty": "1/1", "Boss Fighter": "1/2", "Boss Hunter": "0/1", Winner: "0/2", Regular: "5/10" });
+    // A won raid: Boss Fighter, Boss Hunter and Winner; a won ranked game: Winner.
     await grantXp(sql, ann.id, game("lobby:FFFFF:1", "boss", { won: true }));
     await grantXp(sql, ann.id, game("duel:GGGGG", "duel", { won: true }));
-    expect(await progress(sql, ann.id)).toEqual({ "Squad Up": "1/2", "Fifty-Fifty": "1/1", "Raid Party": "2/2", "Boss Hunter": "1/1", Winner: "2/2", Regular: "7/10" });
+    expect(await progress(sql, ann.id)).toEqual({ "Squad Up": "1/2", "Fifty-Fifty": "1/1", "Boss Fighter": "2/2", "Boss Hunter": "1/1", Winner: "2/2", Regular: "7/10" });
   });
 
   it("no XP, no progress: too short, left, a test game, a guest where sign-in is set up, a banned account, rewards paused", async () => {
@@ -250,6 +250,18 @@ describe("progress: only counted games, by mode, decided by the server", () => {
     expect(await progress(sql, ann.id)).toEqual({ "Warm Up": "0/3", Winner: "0/2", "Boss Hunter": "0/1", Regular: "0/10" });
     await grantXp(sql, ann.id, game("solo:bbbbbbbbbbbbbbbbbb", "solo", { ms: 12 * MIN, won: true }, { cap: "solo" }));
     expect(await progress(sql, ann.id)).toEqual({ "Warm Up": "1/3", Winner: "0/2", "Boss Hunter": "0/1", Regular: "1/10" });
+  });
+
+  it("a solo Boss Battle (Nov 10) moves the boss quests under the same solo rules: enough time, and a win only with its win XP", async () => {
+    const { sql } = await world();
+    const ann = await signedIn(sql, "ann@example.com");
+    await set(sql, ann.id, [["boss-hunter"], ["raid-party"], ["winner"]]);
+    await grantXp(sql, ann.id, game("solo:aaaaaaaaaaaaaaaaaa", "soloBoss", { ms: QUESTS.soloMinMinutes * MIN - 1_000, won: true }, { cap: "solo" }));
+    expect(await progress(sql, ann.id)).toEqual({ "Boss Hunter": "0/1", "Boss Fighter": "0/2", Winner: "0/2" });
+    await grantXp(sql, ann.id, game("solo:bbbbbbbbbbbbbbbbbb", "soloBoss", { ms: 12 * MIN, won: false }, { cap: "solo" }));
+    expect(await progress(sql, ann.id)).toEqual({ "Boss Hunter": "0/1", "Boss Fighter": "1/2", Winner: "0/2" });
+    await grantXp(sql, ann.id, game("solo:cccccccccccccccccc", "soloBoss", { ms: 12 * MIN, won: true }, { cap: "solo" }));
+    expect(await progress(sql, ann.id)).toEqual({ "Boss Hunter": "1/1", "Boss Fighter": "2/2", Winner: "0/2" });
   });
 
   it("a solo game past the day's solo minutes (no XP) moves no quest: no XP, no progress (review of #575, m2)", async () => {

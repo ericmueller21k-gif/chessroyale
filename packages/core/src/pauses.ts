@@ -31,7 +31,7 @@ export const pauseVariable = (what: Pausable): string =>
 const NAMES: Record<(typeof PAUSABLE)[number], string> = {
   classic: "Classic is",
   crowd: "Crowd is",
-  raid: "Boss raids are",
+  raid: "Online Boss Battles are",
   squads: "Squads is",
   ranked1v1: "1 v 1 is",
   solo: "Solo and Boss alone are",

@@ -108,7 +108,7 @@ function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
           [dash(p.crowd.brilliant), "brilliant"],
         ]
       : [
-          [String(p.boss.raids), "raids"],
+          [String(p.boss.raids), "battles"],
           [String(p.boss.bossesBeaten), "tiers beaten"],
           [dash(p.boss.strikesSurvived), "strikes survived"],
           [dash(p.boss.lastStands), "Last Stands"],
@@ -121,7 +121,7 @@ function Stats({ p, own }: { p: PublicProfile; own: boolean }) {
         {(
           [
             ["crowd", "Crowd"],
-            ["boss", "Boss raid"],
+            ["boss", "Boss Battle"],
           ] as const
         ).map(([id, label]) => (
           <button type="button" role="tab" key={id} aria-selected={tab === id} class={tab === id ? "on" : ""} onClick={() => setTab(id)}>

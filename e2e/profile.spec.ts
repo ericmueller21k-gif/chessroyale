@@ -66,8 +66,8 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   await expect(tiles.filter({ hasText: "games" })).toContainText("1");
   await expect(tiles.filter({ hasText: "best finish" })).toContainText("3rd");
   await expect(tiles.filter({ hasText: "cuts survived" })).toContainText("100%");
-  await page.getByRole("tab", { name: "Boss raid" }).click();
-  await expect(tiles.filter({ hasText: "raids" })).toContainText("0");
+  await page.getByRole("tab", { name: "Boss Battle" }).click();
+  await expect(tiles.filter({ hasText: "battles" })).toContainText("0");
   await expect(page.getByText("BOSS TIERS BEATEN · 0 / 10")).toBeVisible();
   await expect(page.locator(".fd-match")).toContainText("Best move Nxe5");
   // Rename.
@@ -152,7 +152,7 @@ test("home → queue → match, then tap a name for that player's profile (phone
   // Both join back to back: here bots fill the raid 8 s after its first join (MATCH_FILL_SECONDS), and a page load in
   // between can outlast that.
   for (const p of [desk, phone]) {
-    await p.getByRole("button", { name: /^Join a raid/ }).click();
+    await p.getByRole("button", { name: /^Join a Boss Battle/ }).click();
     await expect(p.locator(".fd-seats")).toBeVisible();
   }
   await expect(desk.locator(".fd-seats .fd-seat")).toHaveCount(50);

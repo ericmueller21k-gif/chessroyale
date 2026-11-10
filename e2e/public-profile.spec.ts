@@ -448,7 +448,7 @@ test("View all: the full list of matches and each worn item's details open in sh
   const matches = page.getByRole("dialog", { name: "Recent matches" });
   // (Today's profile's list: the profile's own games, with their details.)
   await expect(matches.locator(".fd-match")).toHaveCount(3);
-  await expect(matches).toContainText("Boss raid · Ginger 1500");
+  await expect(matches).toContainText("Boss Battle · Ginger 1500");
   await expect(matches).toContainText("Crowd · 50 v 50");
   await page.keyboard.press("Escape");
   await expect(matches).toHaveCount(0);

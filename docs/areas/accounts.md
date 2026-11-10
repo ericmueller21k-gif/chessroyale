@@ -72,7 +72,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   resets on Mondays (08:00 UTC). One free reroll a day per daily (POST /api/quests/reroll; Nov 10): the replacement keeps the slot and is marked `quests.rerolled_day`, so it can't be rerolled again that day; two tabs reroll a quest once. Progress (`quest_progress`, one row per quest per game, only from the attempt that first counted the game:
   `quest_games`) and
   completion (op `quest:<kind>:<quest id>:<ledger id>`: 300 XP a daily, some a Winter Crate; the weekly 1,500 XP, a crate and a key) go in the
-  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests, with 3 of the server's minutes and only while its time XP is paid (not past the day's solo minutes); a
+  game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests and, for a solo Boss Battle (the result's `mode: "boss"`, quest mode `soloBoss`, Nov 10), the boss quests, with 3 of the server's minutes and only while its time XP is paid (not past the day's solo minutes); a
   win only when its win XP went in), so each quest pays once. Its XP is a part of the box ("Quest +300") and can level you up; the quests are in
   the result's rewards (`XpRewards.quests`). Nothing while `PAUSE_REWARDS` is on. A guest's merge drops the guest's quests; deleting removes
   them; the download has them (store `quests`). The screens: [hub.md](hub.md).
