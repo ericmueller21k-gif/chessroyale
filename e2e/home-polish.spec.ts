@@ -160,7 +160,8 @@ test("home: your pawn hops on a phone and a computer alike, 4 s after home shows
     w.__hopLog = [];
     let on = false;
     new MutationObserver(() => {
-      const pawn = document.querySelector(".fd-hero .fd-pawn");
+      // (Home's own pawn, not the shell's copy in index.html: #shell is drawn before the app, Nov 10.)
+      const pawn = [...document.querySelectorAll(".fd-hero .fd-pawn")].find((p) => !p.closest("#shell"));
       if (pawn && w.__heroAt === undefined) w.__heroAt = Date.now();
       const now = !!pawn && pawn.classList.contains("hop");
       if (now !== on) {
