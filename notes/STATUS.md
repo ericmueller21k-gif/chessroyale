@@ -711,3 +711,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 10 06:30 UTC: #601 review in (review/fable-b1): no blocker; majors = linear speedWeight makes ~48% mixed pairs → lone answers; Squads cache still takes device-chosen lists via server verdict. Fix round session_01JuCWRsTtCpTFq1NuvipJTM (xhigh) on claude/fable-b1 → .review-fixes.md; then delta review, then merge. #602 boss-party test fix open (CI). #599 CI on 6d6a311 running.
 
 - Nov 10 06:50 UTC: #599 phone load 2 MERGED (d6f6461). #601 delta review: BLOCKER (claimed device class lets 2 accounts take both judges in a phone lobby, 67%); fix round 2 session_01JuCWRsRjUeESNVi1t7AbKC (xhigh) running; then delta review 2. Main f80f5e0 red on 3 flaky (chat:280, desktop-board:300, town-afk:54): brief-flaky-nov10c.md ready, START IT when fix round 2 finishes (one xhigh Opus at a time).
+
+- Nov 10 07:00 UTC (1:00 am Central): Eric's bug: rerolling one daily "refreshed both"; wants each daily rerollable once a day. Brief brief-quest-reroll.md (xhigh, full lane if D1 changes) START when delta review 2 (session_01JuCWRrM7PfxqjsJeZsbKgM) finishes; flaky batch 5 after it.
