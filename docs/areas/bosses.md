@@ -800,6 +800,11 @@ for his character and moments, and `e2e/<boss>.spec.ts` for what his powers show
   (`KNOWN_STEPS` and `runBattle` in `boss-kit-lib.ts`, the parity test's `solo` and its host): the kit fails until it does;
 - his passive's event in `PASSIVE_EVENTS` (`e2e/boss-smoke.spec.ts`): the smoke test fails with what to add.
 
+**His art is made on first use** (Nov 10; [2026-11-10-lazy-boss-art.md](../decisions/2026-11-10-lazy-boss-art.md)): wrap each animation in
+`lazyAnim(() => ...)` and paint parts through `lazyParts` (`sprite.ts`); read timings from his animations inside functions or a `lazyTable`,
+never at import (`test/lazy-boss-art.test.ts` fails otherwise). Frames sharing a rounded-pose cache or a counter: `lazyAnimsTogether()`.
+The battle warms his moves and effects in slices (`prewarmAnims`, `BossEffect.tsx`) before his own prewarm; home warms the tiles' portraits.
+
 **Admins first** (Nov 1, Timber): a new boss can go in for admins before players. His id in `BOSS_ADMIN_FIRST` (settings.ts)
 keeps him out of `isPlayable` (no random pick, no player's select or menu, no raid lobby's pick) while `adminFirst`/`menuBosses`
 put him on an admin's select and Boss alone; the kit and the smoke test still check him. Taking the id out puts him live.
