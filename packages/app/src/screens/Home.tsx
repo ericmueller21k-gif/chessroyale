@@ -352,7 +352,7 @@ function FriendsSheet({
     return () => removeEventListener("keydown", key);
   }, []);
   // (A friend code: a lobby made for you and your friends, its link copied to share: Eric, Oct 18.)
-  const label = mode === "raid" ? "Create a raid" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
+  const label = mode === "raid" ? "Create a Boss Battle" : mode === "classic" ? "Get a Classic friend code" : "Get friend code";
   return (
     <div class="fd-sheet-scrim" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div class="fd-sheet" role="dialog" aria-modal="true" aria-labelledby="friends-title">
@@ -923,6 +923,7 @@ export function HomeScreen({
           dailyResetIn={questCountdowns(quests.answer, quests.receivedAt).daily}
           weeklyResetIn={questCountdowns(quests.answer, quests.receivedAt).weekly}
           paused={!!quests.answer.paused}
+          from={quests.from}
           onReroll={quests.reroll}
           onClose={quests.close}
         />
@@ -977,7 +978,7 @@ export function HomeScreen({
       <div class="fd-page rd-page">
         <header class="fd-page-head">
           <BackButton onClick={() => onRaid(false)} />
-          <h1>{full ? "Boss raid" : "Boss Battle"}</h1>
+          <h1>Boss Battle</h1>
           <span class="fd-head-spacer" />
         </header>
         {/* (Why you're here: a match that closed while this screen was where you'd come back to, as on home.) */}
@@ -988,7 +989,7 @@ export function HomeScreen({
           {/* (The public queues share their lobby: always a random boss.) */}
           {full && (
             <RaidOption
-              label="Join a raid"
+              label="Join a Boss Battle"
               sub={online(`Random boss · up to ${RAID_SIZE} players · bots after ${fill} s`)}
               disabled={loading || !!raidResting}
               locked={locked}
@@ -1004,7 +1005,7 @@ export function HomeScreen({
               onClick={() => (onlineLocked ? onSignIn() : onPlay("raid", "botsoff"))}
             />
           )}
-          {full && <RaidOption label="Raid with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
+          {full && <RaidOption label="Play with bots" sub={`You and ${RAID_SIZE - 1} bots · starts at once`} disabled={loading || !!soloResting} locked={locked} onClick={() => onSolo("raid", { fill: true })} />}
           {full ? (
             <RaidOption label="Boss alone" sub={pick === RANDOM ? "Just you vs a random boss" : "Just you vs this boss"} disabled={loading || !!soloResting} locked={locked} onClick={bossAlone} />
           ) : (
@@ -1027,7 +1028,7 @@ export function HomeScreen({
               </p>
             </>
           )}
-          {full && <RaidOption label="Play with friends" sub="Make a raid and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
+          {full && <RaidOption label="Play with friends" sub="Make a Boss Battle and share its code, or join one" locked={locked} onClick={() => setFriends(true)} />}
         </div>
         {full && <p class="fd-sub rd-about">{`Up to ${RAID_SIZE} of you pick the crowd's moves together against a boss. The most popular pick is played.`}</p>}
         {raidResting && <p class="fd-rest">{raidResting}</p>}

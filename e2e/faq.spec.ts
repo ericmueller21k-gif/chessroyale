@@ -69,7 +69,7 @@ test("a link to a heading in the FAQ opens at that heading", async ({ page }) =>
 
 test("the FAQ's Your rating says when your ranking changes (the sentence home's ⓘ used to carry, Eric, Oct 28)", async ({ page }) => {
   await page.goto("/faq#faq-rating");
-  const line = page.getByText("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
+  const line = page.getByText("Your ranking changes only in a match with at least 30 real players (15 in a group Boss Battle). Solo games never change it.");
   await expect(line).toBeVisible();
   // Under the Your rating heading, not another entry's.
   const under = await line.evaluate((el) => {

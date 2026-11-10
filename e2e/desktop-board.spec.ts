@@ -61,7 +61,7 @@ async function into(page: Page, screen: Screen) {
     await page.goto("/?debug&pace=quick&clock=60&laststand=0&boss=gardener");
     if (screen === "raid") {
       await openBossRaid(page);
-      await page.getByRole("button", { name: /^Raid with bots/ }).click();
+      await page.getByRole("button", { name: /^Play with bots/ }).click();
     } else await bossAloneFromHome(page);
     await expect.poll(() => phase(page), { timeout: 120_000 }).toBe("play");
   } else if (screen === "crowd" || screen === "vote") {

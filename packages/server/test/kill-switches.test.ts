@@ -54,7 +54,7 @@ describe("reading the switches", () => {
 
   it("the friendly lines, and the server's refusal: 503 with the line and which part", async () => {
     expect(pausedLine("squads")).toBe("Squads is resting for a bit. Back soon.");
-    expect(pausedLine("raid")).toBe("Boss raids are resting for a bit. Back soon.");
+    expect(pausedLine("raid")).toBe("Online Boss Battles are resting for a bit. Back soon.");
     expect(pausedLine("solo")).toBe("Solo and Boss alone are resting for a bit. Back soon.");
     expect(pausedLine("shop")).toBe("The shop is resting for a bit. Back soon.");
     expect(pausedLine("ranked1v1")).toBe("1 v 1 is resting for a bit. Back soon.");

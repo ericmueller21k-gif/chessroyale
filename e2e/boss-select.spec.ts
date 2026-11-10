@@ -33,7 +33,7 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await named(page, "Selector");
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/?mode=raid");
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   const tiles = page.getByRole("radiogroup", { name: "Bosses" }).getByRole("radio");
   // Fourteen bosses you can meet (Folio the last), the Hidden Boss's tile, then "?".
   await expect(tiles).toHaveCount(16);
@@ -54,7 +54,7 @@ test("the tiles and the stage: a tap drops the boss on, plays its sound once and
   await expect(page.locator(".bs-level")).not.toContainText(/Rating|💀|\d/u);
   await expect(bubble(page)).toBeVisible();
   // (Nothing shifts, Eric's rule: the "Join a raid" button keeps its box whichever boss is picked, checked below.)
-  const joinBox = async (): Promise<Box> => (await page.getByRole("main").getByRole("button", { name: /^Join a raid/ }).boundingBox())!;
+  const joinBox = async (): Promise<Box> => (await page.getByRole("main").getByRole("button", { name: /^Join a Boss Battle/ }).boundingBox())!;
   const boingoJoin = await joinBox();
   expect(BOINGO).toContain(await bubble(page).getAttribute("aria-label"));
   await expect.poll(async () => (await sounds(page)).filter((s) => s.startsWith("clownSplat")).length).toBe(1);
@@ -198,14 +198,14 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   await page.goto("/?debug&pace=quick&clock=20&bossMoves=3");
   await openBossRaid(page);
   const main = page.getByRole("main");
-  await expect(main.getByRole("button", { name: /^Join a raid/ })).toHaveText(/^Join a raidRandom boss · up to 50 players · bots after \d+ s$/);
+  await expect(main.getByRole("button", { name: /^Join a Boss Battle/ })).toHaveText(/^Join a Boss BattleRandom boss · up to 50 players · bots after \d+ s$/);
   await expect(main.getByRole("button", { name: /^People only/ })).toHaveText(/^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/);
 
   // Play with friends: the raid is made for the boss picked (the lobby's bossPicked).
   await tile(page, "Jefferson").click();
   await main.getByRole("button", { name: /^Play with friends/ }).click();
   const made = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/lobby?"));
-  await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Create a raid" }).click();
+  await page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Create a Boss Battle" }).click();
   const url = new URL((await made).url());
   expect(url.searchParams.get("mode")).toBe("raid");
   expect(url.searchParams.get("boss")).toBe("grex");
@@ -218,7 +218,7 @@ test("the pick reaches Boss alone, a Solo raid and a raid you make; the public q
   // (The stage shows no number (Eric, Oct 25), and the difficulty's name under the boss (Medium). A Solo raid's strength is the usual one, a
   // step above your rating plus Sawyer's offset: 1350 unrated, as it was; its brain plays it with the bots as a crowd.)
   await expect(page.locator(".bs-level")).toHaveText("Medium");
-  await main.getByRole("button", { name: /^Raid with bots/ }).click();
+  await main.getByRole("button", { name: /^Play with bots/ }).click();
   await expect.poll(() => page.evaluate(() => (window as any).match?.boss?.id ?? null), { timeout: 60_000 }).toBe("sawyer");
   expect(await page.evaluate(() => (window as any).match.runner.state.boss.elo)).toBe(1350);
 
@@ -308,7 +308,7 @@ for (const scheme of ["light", "dark"] as const) {
       const at = `${scheme} ${w}x${h}`;
       await page.setViewportSize({ width: w!, height: h! });
       await page.goto("/?mode=raid");
-      await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
       await expect(page.locator(".bs-tile")).toHaveCount(16);
       await page.evaluate(() => document.fonts.ready);
       const g = await page.evaluate(measureGrid);

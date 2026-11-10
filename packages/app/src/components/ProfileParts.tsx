@@ -96,7 +96,7 @@ export function Recent({ p, mark, bare }: { p: PublicProfile; mark?: number; /**
           r.mode === "crowd"
             ? `Crowd · ${r.team ? "50 v 50" : "everyone moves"}`
             : boss
-              ? `Boss raid · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
+              ? `Boss Battle · ${r.bossElo ? `${bossInfo(r.bossElo, r.bossId).name} ${r.bossElo}` : "a boss"}`
               : `Classic · ${r.players} players`;
         return (
           <div

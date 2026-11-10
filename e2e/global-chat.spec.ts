@@ -152,15 +152,15 @@ test("a device the age gate marked too young keeps the quick chips (typed text r
   // The chips, not the field.
   await expect(chat.getByRole("tab", { name: "Lobby" })).toHaveAttribute("aria-selected", "true");
   await expect(chat.getByRole("textbox")).toHaveCount(0);
-  await chat.getByRole("button", { name: "Anyone up for a raid?" }).click();
-  await expect(chat.locator(".gline.you").filter({ hasText: "Anyone up for a raid?" })).toBeVisible();
+  await chat.getByRole("button", { name: "Anyone up for a Boss Battle?" }).click();
+  await expect(chat.locator(".gline.you").filter({ hasText: "Anyone up for a Boss Battle?" })).toBeVisible();
   // Ann's typed line never reaches this device; the server refuses its typing whatever the app shows.
   await expect(chat.locator(".gline").filter({ hasText: "typed hello" })).toHaveCount(0);
   const typed = await kid.request.post("/api/chat", { data: { text: "hi", chatroom: room } });
   expect(typed.status()).toBe(403);
   expect(((await typed.json()) as { message: string }).message).toMatch(/13 and older/);
   // Ann sees the chip's line.
-  await expect(ann.locator(".gline").filter({ hasText: "Anyone up for a raid?" })).toBeVisible({ timeout: 15_000 });
+  await expect(ann.locator(".gline").filter({ hasText: "Anyone up for a Boss Battle?" })).toBeVisible({ timeout: 15_000 });
 
   // A guest: reads (once chat is on, on this device), can't post.
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });

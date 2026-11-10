@@ -24,7 +24,7 @@ export const inviteLink = (kind: InviteKind, code: string) => (kind === "squads"
 /** "invited you to a Crowd lobby". */
 export function inviteWhat(kind: InviteKind): string {
   if (kind === "squads") return "their Squads party";
-  if (kind === "raid") return "a boss raid";
+  if (kind === "raid") return "a Boss Battle";
   if (kind === "classic") return "a Classic lobby";
   return "a Crowd lobby";
 }

@@ -501,8 +501,8 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("Bullet 3+2 (3 minutes, +2 s a move, at most 10 s on a move), Blitz 5+3 (5 minutes, +3 s a move, at most 15 s on a move) or Rapid 10+5 (10 minutes, +5 s a move, at most 20 s on a move)");
     expect(t).toContain("Nobody voting means Blitz 5+3.");
     expect(t).toContain("as on a chess clock");
-    // (A boss raid's clock by its name, as the vote names it.)
-    expect(t).toContain("A boss raid is Rapid 10+5.");
+    // (A group Boss Battle's clock by its name, as the vote names it.)
+    expect(t).toContain("A group Boss Battle is Rapid 10+5.");
     expect(t).not.toMatch(/Variable|Normal \(/);
     // Changed time controls (and a changed default) change the words.
     const V = FAQ_DEFAULTS.clockVote;
@@ -539,7 +539,7 @@ describe("the FAQ on the Crowd's boss final (Eric, Oct 14: always the Hidden Bos
     expect(t).toContain(`a boss final (the top ${crowdFinalists("boss")} team up against the ${him.name})`);
     expect(t).toContain(`The Crowd's boss final is always the ${him.name}, for the last ${crowdFinalists("boss")} of a 50 v 50.`);
     // No strikes in the Crowd's final: the strike line is the raid's only.
-    expect(t).toContain("until half the raid is left.");
+    expect(t).toContain("until half the group is left.");
     // Other knockouts, another name: the words follow.
     const renamed = BOSS_ROSTER.map(({ the: _, ...b }) => (b.id === him.id ? { ...b, name: "A Powerful Foe" } : b));
     const moved = section("modes", { ...FAQ_DEFAULTS, roster: renamed, crowdKnockouts: { ...CROWD_KNOCKOUTS, boss: CROWD_KNOCKOUTS.team } });
@@ -763,8 +763,8 @@ describe("the FAQ's chat entry (the town square's typed chat, Oct 28; the global
 
 describe("the FAQ's rating entry (Eric, Oct 28)", () => {
   it("Your rating says when your ranking changes, from the settings: 30 real players (15 in a raid), or the share's own counts (the sentence home's ⓘ carried until Oct 28)", () => {
-    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a raid). Solo games never change it.");
-    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a raid).");
+    expect(text()).toContain("Your ranking changes only in a match with at least 30 real players (15 in a group Boss Battle). Solo games never change it.");
+    expect(text({ ...FAQ_DEFAULTS, rankedShare: 0.2 })).toContain("Your ranking changes only in a match with at least 20 real players (10 in a group Boss Battle).");
   });
 });
 

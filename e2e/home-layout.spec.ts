@@ -579,7 +579,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
   // ?mode=raid (the test link): the full Boss raid screen, all five choices.
   await page.goto("/?mode=raid");
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await expect(main.locator(".rd-option")).toHaveCount(5);
   // A computer's side menu: Boss Battle opens its screen (highlighted there), Chess Town the town square.
   if (desktop()) {

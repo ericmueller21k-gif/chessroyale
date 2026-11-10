@@ -1075,7 +1075,10 @@ export type SoundName =
   | "clawCoin"
   | "clawWhir"
   | "clawGrab"
-  | "clawThud";
+  | "clawThud"
+  // Quest progress on home (Nov 10; questSound below).
+  | "questTick"
+  | "questDone";
 
 const SOUNDS: Record<SoundName, (t: number) => void> = {
   move: (t) => pieceSample("move", t),
@@ -1134,6 +1137,9 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   // The queue: a pawn pops into its seat (a short soft "pop"), and a bot's, quieter.
   pop: (t) => bubblePop(t, 1),
   popSoft: (t) => bubblePop(t, 0.45),
+  // (Placeholders until Eric's pack: a small bell note per count, and the auto chess level-up's arpeggio and chord. QUEST_SOUND_FILES.)
+  questTick: (t) => (QUEST_SOUND_FILES.tick ? fileSample(QUEST_SOUND_FILES.tick, t) : strike(t, 1568, [[1, 1, 0.09], [2, 0.3, 0.05]], 0.1)),
+  questDone: (t) => (QUEST_SOUND_FILES.done ? fileSample(QUEST_SOUND_FILES.done, t) : autochess("level")(t)),
   sell: autochess("sell"),
   acReroll: autochess("reroll"),
   acPlace: autochess("place"),
@@ -1440,6 +1446,7 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   acPlace: [["autochess", "place"]],
   acHold: [["autochess", "hold"]],
   acXp: [["autochess", "xp"]],
+  questDone: [["autochess", "level"]],
   acLevel: [["autochess", "level"]],
   acLock: [["autochess", "lock"]],
   acReveal: [["autochess", "reveal"]],
@@ -1801,6 +1808,17 @@ export function playOnTap(name: SoundName) {
     .catch(() => undefined)
     .then(() => ctx === c && play(name));
 }
+
+/**
+ * Quest progress's sounds (Eric, Nov 10: "some sort of satisfying animation or sound. I've actually got a sound pack that I'm working
+ * on"): "tick" as a moved quest's count goes up on home, "done" as one finishes. Everything plays them through here, by name: the
+ * pack drops in by setting its files below (e.g. "/sounds/quests/done.mp3"); null plays the placeholder made in code.
+ */
+export type QuestSound = "tick" | "done";
+const QUEST_SOUND_FILES: Record<QuestSound, string | null> = { tick: null, done: null };
+export const questSound = (s: QuestSound) => play(s === "tick" ? "questTick" : "questDone");
+/** Made ahead (the done sound's placeholder, in the sound worker), as the overlay opens to show progress. */
+export const warmQuestSounds = () => warmSounds(["questDone"]);
 
 /** Plays a sound; `voice` previews a roulette voice without choosing it (Settings → Sound, "Reveal sound"). */
 export function play(name: SoundName, voice?: ReelVoice) {

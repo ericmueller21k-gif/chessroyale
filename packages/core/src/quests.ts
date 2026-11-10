@@ -43,9 +43,12 @@ export interface QuestsAnswer {
   paused?: boolean;
 }
 
-/** What the server knows of a counted game, for quests: its mode (a solo game is "solo"), and a win whose XP was paid. */
+/**
+ * What the server knows of a counted game, for quests: its mode (a solo game is "solo", a solo Boss Battle "soloBoss": the device's
+ * word, as its moves and its win are), and a win whose XP was paid.
+ */
 export interface QuestGame {
-  mode: "classic" | "crowd" | "boss" | "squads" | "duel" | "solo";
+  mode: "classic" | "crowd" | "boss" | "squads" | "duel" | "solo" | "soloBoss";
   /** Won, and its win XP paid (the server checks the ledger: a friends' lobby's win pays once a day per opponent). */
   won: boolean;
   /** Your time in it by the server's clock, ms (a solo game needs QUESTS.soloMinMinutes of it). */
@@ -57,9 +60,15 @@ export function questDef(id: string): QuestDef | null {
   return QUESTS.daily.find((q) => q.id === id) ?? QUESTS.weekly.find((q) => q.id === id) ?? null;
 }
 
-/** Whether a counted game moves a quest of this kind (online games by their room's facts; solo only "any", with enough time). */
+/**
+ * Whether a counted game moves a quest of this kind (online games by their room's facts). A solo game needs QUESTS.soloMinMinutes of
+ * the server's time and moves "any"; a solo Boss Battle also "boss" and, won, "bossWin" (Eric, Nov 10: "they just follow our normal rules").
+ */
 export function questCounts(counts: QuestCounts, g: QuestGame): boolean {
-  if (g.mode === "solo") return counts === "any" && g.ms >= QUESTS.soloMinMinutes * 60_000;
+  if (g.mode === "solo" || g.mode === "soloBoss") {
+    if (g.ms < QUESTS.soloMinMinutes * 60_000) return false;
+    return counts === "any" || (g.mode === "soloBoss" && (counts === "boss" || (counts === "bossWin" && g.won)));
+  }
   switch (counts) {
     case "any":
       return true;

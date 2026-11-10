@@ -16,7 +16,7 @@ import {
   youColor,
   type MatchState,
 } from "../src/autochess/economy.ts";
-import { botAdjust, botAt, botBenchAt, botBuys, botPlan } from "../src/autochess/bot.ts";
+import { botAdjust, botAt, botBank, botBenchAt, botBuys, botPlan, type BotRead } from "../src/autochess/bot.ts";
 import { addXp } from "../src/autochess/level.ts";
 import { newShop, rerollPrice } from "../src/autochess/shop.ts";
 import { buyBlock, carryBench, emptyArmy, extras, halfSquares, kingSquares, legalCounts, owned, placeBlock } from "../src/autochess/army.ts";
@@ -275,6 +275,52 @@ describe("auto chess: the bot", () => {
     }
     expect(kept).toBeGreaterThan(30);
     expect(kept).toBeLessThan(100);
+  });
+
+  it("saves when you save (Eric, Nov 10): from what you banked and your gold at the round's start, it banks to your interest steps and buys only what it needs; you spending down, it spends to keep up", () => {
+    const you = (gold: number, banked: number, hp = 24, ownHp = 24): BotRead => ({ gold, banked, hp, ownHp });
+    const saver = you(46, 30);
+    const spender = you(17, 1);
+    const spent = (read: BotRead, seed: number, round = 4) => botBuys(emptyArmy("b", "e8"), 40, round, mulberry32(seed), AUTOCHESS, { level: 5, xp: 0 }, read).buys;
+    let followed = 0;
+    let savedSpent = 0;
+    let spentSpent = 0;
+    for (let seed = 0; seed < 200; seed++) {
+      // You banked 30 (3 tens): it banks 30 of its 40 most of the time (`follow.chance`), never more, with no reroll, XP or hold; the rest it spends.
+      const { bank, lean } = botBank(40, 4, mulberry32(seed), AUTOCHESS, saver);
+      expect([0, 30]).toContain(bank);
+      expect(lean).toBe(bank > 0);
+      const buys = spent(saver, seed);
+      const cost = buys.reduce((sum, b) => sum + b.price, 0);
+      if (bank) {
+        followed++;
+        expect(cost).toBeLessThanOrEqual(10);
+        expect(buys.filter((b) => b.type === "reroll" || b.type === "xp" || b.type === "hold")).toEqual([]);
+      }
+      savedSpent += cost;
+      // You spent down (1 carried over, 17 to start): it banks nothing and spends to keep up.
+      expect(botBank(40, 4, mulberry32(seed), AUTOCHESS, spender).bank).toBe(0);
+      spentSpent += spent(spender, seed).reduce((sum, b) => sum + b.price, 0);
+      // Your steps, not more: 20 banked, it banks 20; your 30 to start with nothing banked is the 14 beyond round 4's income (16): one ten.
+      expect([0, 20]).toContain(botBank(40, 4, mulberry32(seed), AUTOCHESS, you(36, 20)).bank);
+      expect([0, 10]).toContain(botBank(40, 4, mulberry32(seed), AUTOCHESS, you(30, 0)).bank);
+      // Late in the match, or with either side low, it never banks, whatever you do.
+      expect(botBank(40, AUTOCHESS.bot.follow.lateRound, mulberry32(seed), AUTOCHESS, saver).bank).toBe(0);
+      expect(botBank(40, 4, mulberry32(seed), AUTOCHESS, you(46, 30, AUTOCHESS.bot.follow.lowHp)).bank).toBe(0);
+      expect(botBank(40, 4, mulberry32(seed), AUTOCHESS, you(46, 30, 24, AUTOCHESS.bot.follow.lowHp)).bank).toBe(0);
+      // Its plan reads you too, and its lock-in time doesn't move with what it reads.
+      const plan = (read?: BotRead) => botPlan("b", "e8", 40, 4, mulberry32(seed), { ...AUTOCHESS, lockIn: true }, [], { level: 5, xp: 0 }, read);
+      expect(plan(saver).lockAt).toBe(plan(spender).lockAt);
+      // (The plan draws its lock-in time first, then the bank.)
+      const rng = mulberry32(seed);
+      rng();
+      if (botBank(40, 4, rng, AUTOCHESS, saver).bank) expect(plan(saver).spent).toBeLessThanOrEqual(10);
+    }
+    // "Leans to save": most rounds, not every one.
+    expect(followed).toBeGreaterThan(150);
+    expect(followed).toBeLessThan(200);
+    // (Measured: about 22 a round against a spender, 10 against a saver; its level-5 board caps what it can use.)
+    expect(spentSpent / 200).toBeGreaterThan(savedSpent / 200 + 8);
   });
 
   it("rerolls its shop now and then when it has gold to spare: at most 3 a round, never when it is poor, and every reroll costs the climbing price (0, 1, 2)", () => {
