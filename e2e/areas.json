@@ -488,6 +488,7 @@
       ],
       "specs": [
         "e2e/crowd.spec.ts",
+        "e2e/crowd-play.spec.ts",
         "e2e/crowd-hidden.spec.ts",
         "e2e/crowd-scoring.spec.ts",
         "e2e/match-screen.spec.ts",
@@ -517,7 +518,7 @@
         "packages/app/src/match-exit.ts",
         "packages/app/src/components/MatchMenu.tsx"
       ],
-      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
+      "specs": ["e2e/crowd.spec.ts", "e2e/crowd-play.spec.ts", "e2e/crowd-hidden.spec.ts", "e2e/formats.spec.ts", "e2e/match-menu.spec.ts", "e2e/problems.spec.ts", "e2e/resign.spec.ts", "e2e/boss-review.spec.ts", "e2e/boss-result.spec.ts", "e2e/xp.spec.ts"]
     },
     "home and the front door": {
       "paths": [
@@ -617,12 +618,13 @@
     "Auto chess, the demo": {
       "paths": [
         "packages/app/src/autochess/**",
+        "e2e/autochess-helpers.ts",
         "packages/app/src/screens/AutoChess.tsx",
         "packages/app/src/components/AcStarArt.tsx",
         "packages/app/src/components/FloatGold.tsx",
         "packages/chess/src/hunchess/**"
       ],
-      "specs": ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"]
+      "specs": ["e2e/autochess.spec.ts", "e2e/autochess-board.spec.ts", "e2e/home-layout.spec.ts"]
     },
     "Settings, light and dark, install": {
       "paths": [

@@ -174,7 +174,7 @@ test.describe("a deploy landed", () => {
   // never came and the page never loaded again: the flaky "the page loaded again: 1" (Nov 2). The service worker installs on the
   // page's "load" and takes over at once, so on a quick run it was in charge before the town's chunk asked for its styles.)
   test.use({ serviceWorkers: "block" });
-test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", async ({ page }) => {
+test("a deploy landed while the page was open: the town square's files are gone, so the page loads again, once, and the town opens", { tag: "@phone-only" }, async ({ page }) => {
   // (After a deploy the old version's files are gone: the first ask for the town's styles fails as it would then.)
   let asked = 0;
   await page.route(/\/assets\/Town-[^/]*\.css$/, (route) => (asked++ === 0 ? route.fulfill({ status: 404, body: "" }) : route.continue()));
@@ -192,7 +192,7 @@ test("a deploy landed while the page was open: the town square's files are gone,
 });
 });
 
-test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", async ({ page }) => {
+test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (a day's top is light blue, a night's deep navy)", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -207,7 +207,7 @@ test("the sky by the time of day: ?sky=day and ?sky=night draw different skies (
   expect(errors).toEqual([]);
 });
 
-test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed, Eric, Oct 30), and ?crowd=50 brings the crowd; without ?fps there is no pill", async ({ page }) => {
+test("/town?fps: anyone sees the frame-rate pill with a number (no admin needed, Eric, Oct 30), and ?crowd=50 brings the crowd; without ?fps there is no pill", { tag: "@phone-only" }, async ({ page }) => {
   const pill = page.locator(".town-fps");
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -280,7 +280,7 @@ const glowAt = (p: Page, kind: "lamp" | "light", id: number | string) =>
     [kind, id] as const,
   );
 
-test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at ?sky=day", async ({ page }) => {
+test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur's Circus's lit doorway are clearly warmer and brighter than at ?sky=day", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   const lum = ([r, g, b]: number[]) => 0.3 * r! + 0.59 * g! + 0.11 * b!;
   const warm = ([r, , b]: number[]) => r! - b!;
@@ -314,7 +314,7 @@ test("the lights at dusk and night: at ?sky=night a park lamp's glass and Babur'
 
 // (Sawyer's: a boss whose home has no inside, so no challenge in it: Babur's, Puddles' and Alfil's are e2e/boss-challenge.spec.ts's.
 // Folio's was this test's boss until its home got an inside, Nov 5.)
-test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", async ({ page }) => {
+test("a boss's card: 'Challenge alone', then 'Leave the town square?'; Stay keeps you, Leave opens the Boss raid screen with that boss's tile picked", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => ((window as any).__soundLog = []));
   await page.goto("/town");
@@ -382,7 +382,7 @@ test("a home you can go into (Babur's): its card is its name, then 'Go in' under
   expect(errors).toEqual([]);
 });
 
-test("the Colosseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", async ({ page }) => {
+test("the Colosseum: a tap on its gate walks you to the apron in front of it and opens its card ('Raids with people' greyed, 'Coming soon'); a tap elsewhere closes it", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -482,7 +482,7 @@ for (const st of [
   });
 }
 
-test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", async ({ page }) => {
+test("a chess table in the park: a tap on one walks you to a free stool and you sit; its card (no title: Eric, Oct 27) shows 'Casual' and 'Ranked' greyed and 'Coming soon'; a tap elsewhere closes it and you stand", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -513,7 +513,7 @@ test("a chess table in the park: a tap on one walks you to a free stool and you 
   expect(errors).toEqual([]);
 });
 
-test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", async ({ page }) => {
+test("Folio's Folded House: a tap walks you there and opens its card with its name; at ?sky=night its doorway's lamplight keeps its brightness, warm, as the town darkens", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   const name = "Folio's Folded House";
   const at = async () => {
@@ -587,7 +587,7 @@ test("Folio's Folded House: a tap walks you there and opens its card with its na
 const tables = (p: Page) => p.evaluate(() => (window as unknown as { __townTables: () => string[] }).__townTables());
 const seat = (p: Page, i: number, n: 1 | 2) => p.evaluate(([i, n]) => (window as unknown as { __townSeat: (i: number, n: number) => void }).__townSeat(i, n), [i, n] as const);
 
-test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring under the free stool); two play (the pieces move, a clock over the board); a tap on a game offers 'Spectate', greyed, 'Coming soon', and you don't sit", async ({ page }) => {
+test("the tables' boards (Eric, Oct 27): one bot sitting waits (a green ring under the free stool); two play (the pieces move, a clock over the board); a tap on a game offers 'Spectate', greyed, 'Coming soon', and you don't sit", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -715,7 +715,7 @@ test("a town bot: a tap opens its card ('<name> (bot)', its rating, Play); Play 
   expect(errors).toEqual([]);
 });
 
-test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", async ({ page }) => {
+test("a bot sitting at a table: a tap on the table walks you to the free stool; its card's first button plays it ('Play <name> (bot) · <rating>', Casual and Ranked greyed under it); a reload or the back button from the game lands you back at the table", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto("/town?debug");
@@ -762,7 +762,7 @@ test("a bot sitting at a table: a tap on the table walks you to the free stool; 
 
 // ---------------- The bosses' sidekicks (Oct 28, Eric; docs/decisions/2026-10-28-sidekicks-in-town.md) ----------------
 
-test("a sidekick: a tap and it waves, then stands while its card is open ('Glim (bot)', 'Hollow's sidekick', its rating, Play); Play: both seated, the game against it with its face on its strip; resign, back at the table", async ({ page }) => {
+test("a sidekick: a tap and it waves, then stands while its card is open ('Glim (bot)', 'Hollow's sidekick', its rating, Play); Play: both seated, the game against it with its face on its strip; resign, back at the table", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
   await page.goto("/town?debug");
@@ -808,7 +808,7 @@ test("a sidekick: a tap and it waves, then stands while its card is open ('Glim 
   expect(errors).toEqual([]);
 });
 
-test("Hollow's card: one of his three lines (Eric's words), the next one each time it opens", async ({ page }) => {
+test("Hollow's card: one of his three lines (Eric's words), the next one each time it opens", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/town");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -862,7 +862,7 @@ test("Hollow's card: one of his three lines (Eric's words), the next one each ti
  * they walk and fade into their respective house and then the new one walks out from their home"). A test hook speeds the
  * minute (`__townTurns(ms)`: the next turn now, then every `ms`); `__townBots()` says who's going home, where to, fading.
  */
-test("the bots' turns: ten out; one walks home and fades out at its door, gone; the one home longest fades in at its own door and walks to the square", async ({ page }) => {
+test("the bots' turns: ten out; one walks home and fades out at its door, gone; the one home longest fades in at its own door and walks to the square", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto("/town?sky=day");
@@ -1366,7 +1366,7 @@ async function squareSettled(page: Page, c: number, r: number): Promise<{ x: num
   throw new Error(`square ${c},${r}: the camera never settled`);
 }
 
-test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", async ({ page }) => {
+test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride's idle standing and its move walking, its side, back or front the way it goes; its trail instead of the droplets; its tag over its top; nothing fetched for it; another rider as others see them", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors = watchErrors(page);
   await page.goto("/");
@@ -1525,7 +1525,7 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
 test.describe("rides lazy", () => {
   // (No service worker: it would serve the ride's chunk from its cache, past the hold.)
   test.use({ serviceWorkers: "block" });
-  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", async ({ page }) => {
+  test("rides lazy (Nov 1): while your ride's drawing loads (its own chunk), your pawn is on foot in the box and under the tag it will have on its ride; when it comes, the ride appears there and nothing moves", { tag: "@phone-only" }, async ({ page }) => {
     const errors = watchErrors(page);
     await page.goto("/");
     // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)

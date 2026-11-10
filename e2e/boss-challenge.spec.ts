@@ -272,7 +272,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   expect(errors).toEqual([]);
 });
 
-test("challenging Babur in the town: the default intro (his line, the table pops in, his attack swung in place, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Babur in the town: the default intro (his line, the table pops in, his attack swung in place, the flash and the wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -333,7 +333,7 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   expect(errors).toEqual([]);
 });
 
-test("challenging Hollow in the town: his own intro (in to your seats, his line, the table pops in still lit, his channel line as the ball charges, the lanterns out one by one, the string, the tree, his strand, your pawn, the blackout, the dim light, the iris to the board), the battle out of the dark; Leave back where you stood", async ({ page }) => {
+test("challenging Hollow in the town: his own intro (in to your seats, his line, the table pops in still lit, his channel line as the ball charges, the lanterns out one by one, the string, the tree, his strand, your pawn, the blackout, the dim light, the iris to the board), the battle out of the dark; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -694,16 +694,16 @@ test("challenging Smudgy in the town: his own intro (to the marks by the covered
   test.setTimeout(240_000);
   await smudgyChallenge(page, { gif: true });
 });
-test("challenging Folio in the town: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood", async ({ page }) => {
+test("challenging Folio in the town: its own intro (to the clean page's marks, its line, the step back, the stools and the table folding up, the plane bringing the board, the board unfolding, its bow and quiet line), the crumple into the match; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await folioChallenge(page, { noGl: false, gif: true });
 });
-test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", async ({ page }) => {
+test("challenging Folio with WebGL off: the crumple falls back to a fade through black, and the match starts", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   await folioChallenge(page, { noGl: true, gif: false });
 });
 
-test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Wrangler in the town: his own intro (in to where you stand, his line, the lasso thrown to the board on its hay bale, the bale dragged to the middle, the two ropes thrown out, the buckets yanked in as the stools, his brag, his attack, his wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -781,7 +781,7 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   expect(errors).toEqual([]);
 });
 
-test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Jefferson in the town: his own intro (in to your marks, one of his calls, he hollers, the crew stop and come round the table to watch, your lift raises you level with the board, his brag, his attack, his wipe of sparklers and fireworks), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -868,7 +868,7 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   expect(errors).toEqual([]);
 });
 
-test("challenging Ginger in the town: his own intro (in to your marks in his igloo, his line, he charges his staff and blasts the air, the icicle falls point first and stabs the floor, its round top the table; two elves bring the board out of the stockroom and toss it up onto it; he casts and the pieces appear; his brag, his attack, his blizzard), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Ginger in the town: his own intro (in to your marks in his igloo, his line, he charges his staff and blasts the air, the icicle falls point first and stabs the floor, its round top the table; two elves bring the board out of the stockroom and toss it up onto it; he casts and the pieces appear; his brag, his attack, his blizzard), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -966,7 +966,7 @@ test("challenging Ginger in the town: his own intro (in to your marks in his igl
   expect(errors).toEqual([]);
 });
 
-test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Big Boy in the town: his own intro (his line, his toy blocks build the table, the board plops on, the stools drop in, his attack, the lollipop swirl), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1056,7 +1056,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   expect(errors).toEqual([]);
 });
 
-test("challenging Dash in an admin's town: his own intro in his store (you both walk to where you stand; his line; four dashes: the shoe-box table, the board, the pieces with a pop, both stools; his brag; he stands through the attack's beat; the clock rush), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Dash in an admin's town: his own intro in his store (you both walk to where you stand; his line; four dashes: the shoe-box table, the board, the pieces with a pop, both stools; his brag; he stands through the attack's beat; the clock rush), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1166,7 +1166,7 @@ test("challenging Dash in an admin's town: his own intro in his store (you both 
   expect(errors).toEqual([]);
 });
 
-test("challenging Timber in an admin's town: his own intro (his line, the log carried to the middle and gnawed, the shavings' fog, his table and stumps, his attack, the sawdust sweep), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Timber in an admin's town: his own intro (his line, the log carried to the middle and gnawed, the shavings' fog, his table and stumps, his attack, the sawdust sweep), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1279,7 +1279,7 @@ test("challenging Timber in an admin's town: his own intro (his line, the log ca
   expect(errors).toEqual([]);
 });
 
-test("challenging Boingo in the town (Nov 6): into his Funhouse, the default intro on his carnival mat (his line, the table pops in, his attack, the flash and the wipe), the battle; Leave back where you stood", async ({ page }) => {
+test("challenging Boingo in the town (Nov 6): into his Funhouse, the default intro on his carnival mat (his line, the table pops in, his attack, the flash and the wipe), the battle; Leave back where you stood", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
