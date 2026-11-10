@@ -1,7 +1,8 @@
-import { BOSS_BRAIN, BOSS_ROSTER, bossBrainFor, isPlayable, maiaRatingFor, mulberry32 } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_ROSTER, bossBrainFor, isPlayable, lossForRating, maiaRatingFor, mulberry32 } from "@chessroyale/core";
 import { describe, expect, it } from "vitest";
 import {
   bossMoveFrom,
+  eloDrawT,
   brainGuard,
   brainLine,
   HumanUciEngine,
@@ -248,6 +249,16 @@ describe("the boss's move with a Maia brain (bossMoveFrom)", () => {
     expect(counts.get("e2e4")).toBeGreaterThan(counts.get("c2c4")!);
     // (No seed: Stockfish at a strength, as before.)
     expect(await bossMoveFrom(scripted("d2d4"), START_FEN, 1400, 1000, "elo", Math.random, [5, 15])).toBe("d2d4");
+  });
+
+  it("the seeded draw's temperature follows BOSS_CHECK.eloDrawScale (straight between its points, held past its ends; reports/elo-draw.md, D5)", () => {
+    const pts = BOSS_CHECK.eloDrawScale;
+    for (const [elo, k] of pts) expect(eloDrawT(elo)).toBeCloseTo(lossForRating(elo) * k, 6);
+    const [a, b] = [pts[0]!, pts[1]!];
+    const mid = (a[0] + b[0]) / 2;
+    expect(eloDrawT(mid)).toBeCloseTo((lossForRating(mid) * (a[1] + b[1])) / 2, 6);
+    expect(eloDrawT(1200)).toBeCloseTo(lossForRating(1200) * a[1], 6);
+    expect(eloDrawT(3100)).toBeCloseTo(lossForRating(3100) * pts[pts.length - 1]![1], 6);
   });
 
   it("the full guard turns Maia's blunder down for its next likely move", async () => {

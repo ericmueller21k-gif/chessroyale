@@ -2210,8 +2210,23 @@ export type BossBrainSettings = typeof BOSS_BRAIN;
  *   - `missStrikes`: a checker that misses its window is replaced next move; this many misses in a battle are a strike.
  *   - `loaders`: on the Maia brain, how many devices are told to load Maia to check his moves as the battle begins (drawn at random:
  *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
+ *   - `eloDrawScale`: Stockfish at a strength with a seed (eloDraw) draws with T = the mean loss a move at that Elo (RATING_CURVE)
+ *     times this factor, by Elo (straight between the points, held past the ends), so it gives away what UCI_LimitStrength does
+ *     through the same guard: reports/elo-draw.md (200 positions; the delta review's D5).
  */
-export const BOSS_CHECK = { waitMs: 4_000, maiaGap: 0.25, throwLoss: 0.8, missStrikes: 2, loaders: 2 } as const;
+export const BOSS_CHECK = {
+  waitMs: 4_000,
+  maiaGap: 0.25,
+  throwLoss: 0.8,
+  missStrikes: 2,
+  loaders: 2,
+  eloDrawScale: [
+    [1600, 0.8],
+    [2200, 1.25],
+    [2500, 1.25],
+    [2800, 1.25],
+  ] as readonly (readonly [number, number])[],
+} as const;
 
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);

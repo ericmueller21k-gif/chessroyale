@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, BOSS_POWERS, lossForRating, openingPlies, type BossBrain, type BossPowerSettings, type Rng } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_CHECK, BOSS_POWERS, lossForRating, openingPlies, type BossBrain, type BossPowerSettings, type Rng } from "@chessroyale/core";
 import type { BoardSlot, NetBoard } from "./protocol.ts";
 import { recentMoves, type BoardState } from "./boards.ts";
 import { applyMove, gameEnd, legalMoves, sideToMove } from "./rules.ts";
@@ -554,13 +554,13 @@ async function pickBossMove(
 
 /**
  * Stockfish at a strength, drawn from its top moves with a given random source (an online boss move two devices play with one seed:
- * BOSS_CHECK; UCI_LimitStrength draws with the clock): each move weighed exp(−loss ÷ T), T the mean loss per move Stockfish gives
- * away at that UCI_Elo (RATING_CURVE), so the best is the likeliest and a move T points worse about a third as likely. The guard
- * and the head-to-head check after it are the same as for UCI_LimitStrength's move.
+ * BOSS_CHECK; UCI_LimitStrength draws with the clock): each move weighed exp(−loss ÷ T) (eloDrawT), so the best is the likeliest
+ * and a move T points worse about a third as likely. The guard and the head-to-head check after it are the same as for
+ * UCI_LimitStrength's move.
  */
 export function eloDraw(top: readonly MoveScore[], elo: number, rng: Rng): string {
   const best = top[0]!.expected;
-  const t = Math.max(0.5, lossForRating(elo));
+  const t = eloDrawT(elo);
   const weights = top.map((m) => Math.exp(-moveLoss(best, m.expected).points / t));
   let r = rng() * weights.reduce((a, b) => a + b, 0);
   for (let i = 0; i < top.length; i++) {
@@ -568,6 +568,25 @@ export function eloDraw(top: readonly MoveScore[], elo: number, rng: Rng): strin
     if (r < 0) return top[i]!.move;
   }
   return top[0]!.move;
+}
+
+/**
+ * eloDraw's temperature at a strength: the mean loss a move at that UCI_Elo (RATING_CURVE), times BOSS_CHECK.eloDrawScale's factor
+ * (straight between its points, held past its ends), so the seeded draw gives away what UCI_LimitStrength does through the same
+ * guard (reports/elo-draw.md).
+ */
+export function eloDrawT(elo: number): number {
+  const pts = BOSS_CHECK.eloDrawScale;
+  let k = elo <= pts[0]![0] ? pts[0]![1] : pts[pts.length - 1]![1];
+  for (let i = 1; i < pts.length && elo > pts[0]![0]; i++) {
+    const [xa, ya] = pts[i - 1]!;
+    const [xb, yb] = pts[i]!;
+    if (elo <= xb) {
+      k = ya + ((elo - xa) * (yb - ya)) / (xb - xa);
+      break;
+    }
+  }
+  return Math.max(0.1, lossForRating(elo) * k);
 }
 
 /**
