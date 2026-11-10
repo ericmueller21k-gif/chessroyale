@@ -5,15 +5,16 @@
  * Four test accounts (server/src/test-accounts.ts: dummy emails at test.hunchess, marked test, off public rankings) play real
  * Crowd 50 v 50 matches through PLAY, as four people on four computers would: the real queue, the lobby's WebSocket, bots in the
  * other seats.
- *   - Engine Eddie: Stockfish's top move every pick (the full-network build, up to the deep re-check's 2M nodes): the cheater.
+ *   - Engine Eddie: Stockfish's top move every pick (Node's full-network Stockfish 19, the browsers' engine, up to 2M nodes): the
+ *                   cheater. (The live deep re-check is native Stockfish 17.1 at 2M nodes: a different engine, as a real cheater's would be.)
  *   - Strong Sam:   Maia-3 at its strongest (2500, its likeliest move): a strong human-like player who shouldn't be pooled.
  *   - Judge Jo, Judge Jay: everyday players (Maia at 1500, drawn as people play), so each match has devices of four accounts.
  * Every one of them answers the lobby's judge work as an honest device does (the app's own code, net.ts: judge, planBots,
  * hostScore, on Node's Stockfish), so the match is vouched (two devices of two accounts on every job). Afterwards it prints each
  * account's fair-play numbers and case (GET /api/admin/test-accounts), as the review page (/admin/fairplay) shows them.
  *
- *   npx tsx scripts/cheater-demo.ts [--url https://hunchess.com] [--matches 6] [--until-pooled] [--wait-pool 60] [--out FILE]
- *   npx tsx scripts/cheater-demo.ts --report          # the accounts' numbers and cases only
+ *   npx tsx scripts/cheater-demo.ts [--url https://hunchess.com] [--matches 4] [--until-pooled] [--wait-pool M] [--out FILE]
+ *   npx tsx scripts/cheater-demo.ts --report          # the accounts' numbers and cases only (run it again later: see below)
  *   npx tsx scripts/cheater-demo.ts --delete          # deletes every test account and its data (fair play's file too)
  *
  * Options:
@@ -22,8 +23,14 @@
  *                    under Playwright's webServer) takes the e2e's key instead (E2E_SQL_KEY, set by playwright.config.ts).
  *   --matches N      matches to play, one after another (default 1)
  *   --until-pooled   stop once Engine Eddie is in the engine pool (checked after each match)
- *   --wait-pool M    after the last match, keep reading the report each minute for up to M minutes until Eddie is pooled (the deep
- *                    re-check runs on the Worker's 15-minute schedule; default 0)
+ *   --wait-pool M    after the last match, keep reading the report each minute for up to M minutes until Eddie is pooled (default 0:
+ *                    run --report again later instead)
+ *
+ * The result comes later than the matches. Live, the deep re-check (native Stockfish 17.1 at 2M nodes, on the Worker's 15-minute
+ * schedule) makes 40 searches a run: about 45 minutes per match (about 120 searches), 500 a day (about 4 matches), and a player not
+ * in review only off-peak (03-10 UTC). Whether Eddie is pooled, and after how many matches, is what the run finds out: nothing here
+ * promises it. So the run plays its matches; read the result later with --report (or press "Check the counted moves with the engine
+ * server now" on his case at /admin/fairplay: 60 searches, any hour).
  *   --who LIST       which accounts play (default eddie,sam,jo,jay)
  *   --pool NAME      a queue of its own (a test switch: local servers only)
  *   --out FILE       also write the report there (Markdown)
@@ -182,7 +189,7 @@ async function startMaia(): Promise<HumanUciEngine | null> {
   return null;
 }
 
-/** Eddie's engine: the full-network Stockfish (the deep re-check's kind), sized to the move's clock. */
+/** Eddie's engine: Node's full-network Stockfish 19 (not the live deep re-check's 17.1), sized to the move's clock. */
 let eddieEngine: UciEngine | null = null;
 let eddieNps = 300_000;
 
@@ -403,7 +410,7 @@ class Seat {
 
   private async choose(fen: string, clockMs: number): Promise<string | null> {
     if (this.persona.style === "engine" && eddieEngine) {
-      // Stockfish's top move: as deep as about half the move's clock allows, up to the deep re-check's own node count (a search that
+      // Stockfish's top move: as deep as about half the move's clock allows, up to the deep re-check's node count (a search that
       // runs near the deadline gives way to the prefetched top move: pick).
       const nodes = Math.round(Math.max(300_000, Math.min(FAIRPLAY.deep.nodes, eddieNps * (clockMs / 1000) * 0.5)));
       const [best] = await eddieEngine.topMovesAt(fen, 1, nodes);
@@ -594,12 +601,29 @@ function reportText(accounts: ReportAccount[]): string {
 
 const eddiePooled = (accounts: ReportAccount[]) => accounts.find((a) => a.name === "Engine Eddie")?.case?.status === "pool";
 
+/** Where Eddie stands if he isn't pooled yet, and when to look again (the deep re-check's pace: FAIRPLAY.deep). */
+function notYet(accounts: ReportAccount[]): string | null {
+  const eddie = accounts.find((a) => a.name === "Engine Eddie");
+  if (!eddie || eddie.case?.status === "pool") return null;
+  const d = FAIRPLAY.deep;
+  const queued = eddie.matches.filter((m) => m.deepQueued).length;
+  // (About 120 searches a match: its counted moves, each one's legal moves in groups. The review of PR #622.)
+  const perMatchMin = Math.round((120 / d.perRun) * 15);
+  const [from, to] = d.offPeakUtc.map((h) => String(h).padStart(2, "0"));
+  return [
+    `Engine Eddie isn't in the engine pool yet (case: ${eddie.case?.status ?? "none"}; ${queued} of his ${eddie.matches.length} match(es) still queued for the deep re-check).`,
+    `Live, the re-check is native Stockfish 17.1 at ${d.nodes / 1e6}M nodes (a different engine from Eddie's Stockfish 19), ${d.perRun} searches per 15-minute run:`,
+    `about ${perMatchMin} min per match and ${d.dailySearches} searches a day (about ${Math.floor(d.dailySearches / 120)} matches); a player not in review only off-peak (${from}-${to} UTC).`,
+    `Run --report again later to read the result, or press "Check the counted moves with the engine server now" on his case at /admin/fairplay.`,
+  ].join("\n");
+}
+
 // ---------------- Main ----------------
 
 if (arg("delete")) {
   const r = await http("DELETE", "/api/admin/test-accounts", { admin: true });
   if (r.status !== 200) fail(`deleting answered ${r.status}.`);
-  console.log(`Deleted ${r.body.deleted} test account(s) and everything kept about them.`);
+  console.log(`Deleted ${r.body.deleted} test account(s) and fair play's files on them (their results stay in the game's numbers under the deleted id, as any deleted account's).`);
   process.exit(0);
 }
 
@@ -652,7 +676,8 @@ for (let waited = 0; waitPoolMin > 0 && !eddiePooled(final) && waited < waitPool
   await sleep(60_000);
   final = await report();
 }
-const text = reportText(final);
+const later = notYet(final);
+const text = reportText(final) + (later ? `\n\n${later}` : "");
 console.log(text);
 if (out) writeFileSync(out, text + "\n");
 process.exit(0);

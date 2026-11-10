@@ -83,9 +83,11 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   page (chat moderation included), the boss battle's "Trigger ultimate (testing)" button, and the test switches in the
   address (`?debug`, `?rounds=`, …; [ops.md](ops.md), "Test switches").
 - **Test accounts** (Nov 10; `test-accounts.ts`, [the decision](../decisions/2026-11-10-cheater-demo.md)): `/api/admin/test-accounts` (an admin,
-  a script through Access with a service token, or the e2e's key): POST `{name}` makes or signs in to `<name>@test.hunchess` (`users.test` = 1;
-  a real account's address: 409), GET lists their fair play, DELETE removes them all, fair play's file too. They play as anyone (nothing
-  granted) and are left out of the "Top N%" and 1 v 1's top places. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
+  a script through Access with the one service token `TEST_ACCOUNTS_CLIENT_ID` names in `wrangler.jsonc`'s `vars` (empty: no token gets in;
+  emptied before launch, ROADMAP.md), or the e2e's key): POST `{name}` makes `<name>@test.hunchess` (`users.test` = 1; a real account's
+  address: 409) and signs a script in as it (not an admin's own browser), GET lists their fair play, DELETE removes them all as any deleted
+  account (results re-keyed, ledger kept), fair play's file too. They play as anyone (nothing granted), are left out of the "Top N%" and 1 v
+  1's top places, and their reports never count toward a review. `scripts/cheater-demo.ts` plays with them ([fairplay.md](fairplay.md)).
 - **Bans** (from [fairplay.md](fairplay.md)) stop online play; solo stays open.
 - **The default pawn color** (Nov 7; `users.pawn_color`, NULL: white): PATCH `/api/me` `{pawn}` (only "white" or "black"); shown on the profile and
   in the town's presence (`town-here.ts`). A guest keeps it on the device (`brc.pawnColor`, `prefs.ts`). See `core/src/pawn-color.ts`.

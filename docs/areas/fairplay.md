@@ -63,7 +63,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **Reports** never ban anyone: they raise a player's review priority and record their moves. A report of a line in
   the town square's chat ("Offensive chat", Oct 28: [chat.md](chat.md)) carries the line's text and time, read from the
   server's room, and the case page shows it under Reports. The automated reviewer's API gets that report without the
-  words and refuses to let it clear such a case: a moderator reads the line first.
+  words and refuses to let it clear such a case: a moderator reads the line first. A test account's reports
+  (`users.test`, [accounts.md](accounts.md)) never count toward the reporters that put a player in review.
 - **Deleting an account never gets around fair play** (`account-data.ts`; [accounts.md](accounts.md)). A banned or
   in-review account's case, log, hashed identities and device markers stay under its old id; its judged moves, match
   summaries and appeals go. A new account with one of its identities is banned again, or goes to review (`banCheck`).
@@ -106,7 +107,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | The review page and API | `packages/server/src/admin.ts` |
 | The report sheet, ban notice and appeal form, look-away counter | `packages/app/src/screens/PlayerProfile.tsx`, `components/FairPlay.tsx`, `lookaway.ts`, `net.ts` |
 | Simulations | `packages/sim/scripts/fairplay-bank.ts` (the position bank in `packages/sim/data/`), `fairplay-sim.ts` → `reports/fairplay.md` |
-| The cheater demo on a real server (test accounts: Engine Eddie, Strong Sam, two judges) | `scripts/cheater-demo.ts`; accounts `test-accounts.ts` ([accounts.md](accounts.md)) |
+| The cheater demo on a real server (test accounts: Engine Eddie, Strong Sam, two judges; its result comes from the deep re-check later: `--report`) | `scripts/cheater-demo.ts`; accounts `test-accounts.ts` ([accounts.md](accounts.md)) |
 
 ## Settings
 
