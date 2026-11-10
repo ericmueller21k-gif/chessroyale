@@ -33,6 +33,7 @@
  */
 import { PIG, PIG_PALETTE, pigLayers, type PigPose } from "./pig.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 type Pt = readonly [number, number];
 /** His drawing space sits at (OX, OY) on his frame (pig.ts), the ground at y 70 there. */
@@ -87,38 +88,38 @@ function anim(name: string, loop: boolean, frames: { ms: number; p: PigPose; ext
 
 // ---- spin: the lasso up and whirling, wider and faster than his idle's (a turn every 8 frames).
 
-const spin = anim(
+const spin = lazyAnim(() => anim(
   "spin",
   true,
   Array.from({ length: 8 }, (_, i) => ({ ms: 60, p: { mood: i % 4 === 3 ? "grit" : "fierce", spin: i, grow: 2, lean: -1, bob: i % 4 === 3 ? 1 : 0 } as PigPose, extra: i === 0 ? { cue: "whirl" } : {} })),
-);
+));
 
 // ---- throw: swung back over his head, flung out to our upper left; his arm out after it.
 
 const OUT_ARM = { fistL: [6, 30] as Pt, elbowL: [14, 37] as Pt };
-const throwA = anim("throw", false, [
+const throwA = lazyAnim(() => anim("throw", false, [
   { ms: 90, p: { mood: "fierce", lean: 2, fistL: [26, 25], elbowL: [22, 35], loop: { c: [46, 9], rx: 13, ry: 4, tilt: 8 }, bow: [38, 14] } },
   { ms: 70, p: { mood: "wild", lean: -2, fistL: [10, 28], elbowL: [16, 37], loop: { c: [12, 6], rx: 9, ry: 3, tilt: -12 }, front: true, bow: [9, 18] }, extra: { cue: "throw" } },
   { ms: 120, p: { mood: "wild", lean: -2, ...OUT_ARM, loop: null }, h1: true },
   { ms: 200, p: { mood: "smug", lean: -1, ...OUT_ARM, loop: null }, h1: true },
-]);
+]));
 
 // ---- yank: heels dug in, leaning back to our right, both fists on the rope on our left; a heave every other frame.
 
 const YANK_HEAVE: PigPose = { mood: "grit", lean: 3, bob: 2, fistL: [13, 47], elbowL: [21, 49], fistR: [22, 49], elbowR: [36, 51], loop: null, coil: null, feet: { l: [-3, 0], r: [1, 0] } };
 const YANK_GRIP: PigPose = { mood: "fierce", lean: 1, bob: 1, fistL: [11, 45], elbowL: [19, 47], fistR: [20, 47], elbowR: [34, 49], loop: null, coil: null, feet: { l: [-3, 0], r: [1, 0] } };
-const yank = anim("yank", true, [
+const yank = lazyAnim(() => anim("yank", true, [
   { ms: 120, p: YANK_HEAVE, extra: { cue: "yank", shake: [1, 0], specks: [...dust([6, 70], 0), ...dust([60, 70], 0)] }, h1: true },
   { ms: 120, p: YANK_HEAVE, extra: { specks: [...dust([6, 70], 1), ...dust([60, 70], 1)] }, h1: true },
   { ms: 120, p: YANK_GRIP, extra: { cue: "yank", shake: [1, 0], specks: dust([6, 70], 2) }, h1: true },
   { ms: 120, p: { ...YANK_GRIP, mood: "grit" }, h1: true },
-]);
+]));
 
 // ---- crossThrow: the coil shaken out into a second loop, both spun up, arms crossed, both thrown at once, one each way.
 
 /** Arms crossed in front of his chest: his lasso arm's fist (on our left) across to our right, the other's across to our left. */
 const CROSSED = { fistL: [46, 45] as Pt, elbowL: [35, 50] as Pt, fistR: [32, 46] as Pt, elbowR: [44, 51] as Pt };
-const crossThrow = anim("crossThrow", false, [
+const crossThrow = lazyAnim(() => anim("crossThrow", false, [
   { ms: 100, p: { mood: "wild", spin: 0, coil: 2 }, extra: { cue: "windup" } },
   { ms: 90, p: { mood: "wild", spin: 1, fistR: [63, 34], elbowR: [59, 41], loop2: { c: [70, 22], rx: 8, ry: 5, tilt: 25 } } },
   { ms: 70, p: { mood: "wild", spin: 2, loop2: "spin", grow: 1 } },
@@ -131,24 +132,24 @@ const crossThrow = anim("crossThrow", false, [
   { ms: 70, p: { mood: "wild", lean: 0, ...CROSSED, front: true, loop: { c: [92, 22], rx: 9, ry: 3.5, tilt: 8 }, loop2: { c: [9, 22], rx: 7, ry: 3, tilt: -8 }, bow: [68, 26], bow2: [20, 28] }, extra: { cue: "throw" } },
   { ms: 160, p: { mood: "wild", ...CROSSED, front: true, loop: null, loop2: null, coil: null }, h1: true, h2: true },
   { ms: 220, p: { mood: "fierce", ...CROSSED, front: true, loop: null, loop2: null, coil: null }, h1: true, h2: true },
-]);
+]));
 
 // ---- doubleYank: braced, arms crossed; then flung wide apart (the ropes cross in front of him), a second heave, slack.
 
 const WIDE = { fistL: [12, 46] as Pt, elbowL: [19, 46] as Pt, fistR: [66, 46] as Pt, elbowR: [60, 47] as Pt };
-const doubleYank = anim("doubleYank", false, [
+const doubleYank = lazyAnim(() => anim("doubleYank", false, [
   { ms: 140, p: { mood: "grit", bob: 1, ...CROSSED, front: true, loop: null, loop2: null, coil: null, feet: { l: [-2, 0], r: [2, 0] } }, h1: true, h2: true },
   { ms: 130, p: { mood: "grit", bob: 2, lean: 1, ...WIDE, loop: null, loop2: null, coil: null, feet: { l: [-3, 0], r: [3, 0] } }, extra: { cue: "yank", shake: [0, 1], specks: [...dust([6, 70], 0), ...dust([62, 70], 0)] }, h1: true, h2: true },
   { ms: 120, p: { mood: "wild", bob: 2, lean: 1, ...WIDE, loop: null, loop2: null, coil: null, feet: { l: [-3, 0], r: [3, 0] } }, extra: { specks: [...dust([6, 70], 1), ...dust([62, 70], 1)] }, h1: true, h2: true },
   { ms: 120, p: { mood: "grit", bob: 1, ...WIDE, fistL: [14, 44], fistR: [64, 44], loop: null, loop2: null, coil: null, feet: { l: [-3, 0], r: [3, 0] } }, extra: { cue: "yank", shake: [0, 1], specks: dust([34, 70], 0) }, h1: true, h2: true },
   { ms: 150, p: { mood: "smug", bob: 1, ...WIDE, loop: null, loop2: null, coil: null, feet: { l: [-3, 0], r: [3, 0] } }, h1: true, h2: true },
   { ms: 200, p: { mood: "smug", fistL: [16, 50], elbowL: [21, 49], fistR: [61, 50], elbowR: [57, 48], loop: null, loop2: null, coil: null }, h1: true, h2: true },
-]);
+]));
 
 // ---- brag: the lasso spun back up, a hat tip, a snorting laugh, a spur stomp with a glint; ends on his idle's first frame.
 
 const SPUR_L: Pt = [26, 67];
-const brag = anim("brag", false, [
+const brag = lazyAnim(() => anim("brag", false, [
   { ms: 85, p: { mood: "smug", spin: 4 }, extra: { cue: "whirl" } },
   { ms: 85, p: { mood: "smug", spin: 5 } },
   { ms: 140, p: { mood: "blink", spin: 6, headDy: 1, bob: 1, hat: { tilt: 8, dy: 2 } }, extra: { cue: "tip" } },
@@ -161,9 +162,9 @@ const brag = anim("brag", false, [
   { ms: 90, p: { mood: "fierce", spin: 5, feet: { l: [-1, -4] }, bob: -1 } },
   { ms: 110, p: { mood: "sneer", spin: 6, bob: 1 }, extra: { cue: "stomp", shake: [0, 1], specks: [...dust([4, 70], 0), ...dust([29, 70], 0), ...glint(SPUR_L, true)] } },
   { ms: 160, p: { mood: "sneer", spin: 7 }, extra: { specks: [...dust([4, 70], 1), ...glint(SPUR_L, false)] } },
-]);
+]));
 /** (His idle's first frame: brag's last frame leads into it.) */
-const idle: Anim = { loop: true, frames: [PIG.anims.idle!.frames[0]!] };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames: [PIG.anims.idle!.frames[0]!] }));
 
 export const BOSS_PIG_INTRO: Character = {
   ...PIG,

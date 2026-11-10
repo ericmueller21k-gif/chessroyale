@@ -8,6 +8,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { GARDENER_PALETTE } from "../../characters/gardener.ts";
 import { flower, grain, groundShadow, paint, signBoard, signFace, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const G_ = GARDENER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -227,7 +228,7 @@ const layers: Layer[] = order.map((part) => ({ part, x: at[part]![0], y: at[part
 const RUN: readonly Record<string, string>[] = [{}, { "3": G_["4"]!, "4": G_["3"]! }, { "2": G_["3"]!, "3": G_["2"]! }];
 const frames: Frame[] = RUN.map((pal) => ({ ms: 200, layers, pal }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_GARDENER: Character = {
   id: "house-gardener",

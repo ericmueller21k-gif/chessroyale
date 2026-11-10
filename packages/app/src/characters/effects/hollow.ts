@@ -1,7 +1,7 @@
 /** Hollow's effects: the dark, his pour and a miss, his strand of bulbs, Lights out's night. See ../effects.ts. */
 import { DEFAULT_LIGHTS, bulbColour, lightsSwap } from "../lights.ts";
 import { canvas, ellipse, toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { SQUARE, sparkle, type Pt } from "./common.ts";
 
 // ---- Hollow's dark: a square covered in smoke (the passive), the darkness he pours onto it, a miss, his strand of
@@ -110,7 +110,7 @@ export const DARK_SQUARE: Character = {
   parts: DARK_PARTS,
   anims: {
     /** The darkness pours in: billows grow from the middle, swirling, and close over the square. */
-    gather: {
+    gather: lazyAnim(() => ({
       loop: false,
       frames: [0.25, 0.45, 0.65, 0.85, 1].map((g, i): Frame => ({
         ms: i === 4 ? 140 : 90,
@@ -118,19 +118,19 @@ export const DARK_SQUARE: Character = {
         layers: [{ part: cloudPart(`grow${g}`, () => cloud(i / 8, g)), x: 0, y: 0 }],
         specks: darkGlints(i, 2 + i),
       })),
-    },
+    })),
     /** Dark, while it lasts: the cloud turning slowly, violet glints twinkling in it. */
-    dark: {
+    dark: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`dark${i}`, () => cloud(i / 8)), x: 0, y: 0 }], specks: darkGlints(i) })),
-    },
+    })),
     /** Its last turn: paler and grayer, wisps peeling off its top, fewer glints; the piece still hidden. */
-    thin: {
+    thin: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: [{ part: cloudPart(`thin${i}`, () => cloud(i / 8, 1, true)), x: 0, y: 0 }], specks: [...peel(i), ...darkGlints(i, 1)] })),
-    },
+    })),
     /** It clears: the billows drift apart, thin out and are gone. Ends empty. */
-    clear: {
+    clear: lazyAnim(() => ({
       loop: false,
       frames: [
         ...[0.3, 0.7, 1.1].map((sp, i): Frame => ({
@@ -142,7 +142,7 @@ export const DARK_SQUARE: Character = {
         { ms: 90, layers: [{ part: cloudPart("clear3", () => cloud(0.4, 0.3, true, 1.6)), x: 0, y: 0 }], pal: { A: "#16121f66", B: "#211b2e66", C: "#2f273f55", D: "#43395644" } },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -175,10 +175,10 @@ export const DARK_POUR: Character = {
     return parts;
   })(),
   anims: {
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: [0, 1, 2, 3].map((i): Frame => ({ ms: 70, layers: [{ part: `pour${i}`, x: 0, y: 0 }], specks: [...darkGlints(i, 2).map(([x, y, k]): Speck => [x + 4, y, k]), [3 + ((i * 5) % 7), 12 + ((i * 3) % 8), "u"]] })),
-    },
+    })),
   },
 };
 
@@ -200,7 +200,7 @@ export const DARK_MISS: Character = {
   palette: DARK_PALETTE,
   parts: {},
   anims: {
-    miss: {
+    miss: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 60, layers: [], cue: "miss", specks: missX(4, "s", 2) },
@@ -210,7 +210,7 @@ export const DARK_MISS: Character = {
         { ms: 90, layers: [], specks: missX(7, "R", 1), pal: { R: "#b0204a55" } },
         { ms: 40, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -312,11 +312,11 @@ export const BULB_STRAND: Character = {
   parts: STRIP_PARTS,
   anims: {
     ...Object.fromEntries([3, 2, 1, 0].map((n) => [`lit${n}`, { loop: true, frames: n ? [0, 1, 2, 3].map((i) => strip(n, i === 0 ? 400 : 260, { g: i })) : [strip(0, 600)] } satisfies Anim])),
-    out3: goOut(3),
-    out2: goOut(2),
-    out1: goOut(1),
+    out3: lazyAnim(() => goOut(3)),
+    out2: lazyAnim(() => goOut(2)),
+    out1: lazyAnim(() => goOut(1)),
     /** The strand lighting again after the last bulb went out: one by one, each flickering on. Ends with all three lit. */
-    relight: {
+    relight: lazyAnim(() => ({
       loop: false,
       frames: [
         strip(0, 120, { cue: "relight" }),
@@ -330,7 +330,7 @@ export const BULB_STRAND: Character = {
         strip(2, 50),
         strip(3, 200, { g: 2 }),
       ],
-    },
+    })),
   },
 };
 
@@ -502,8 +502,8 @@ const nightGlint = (x: number, y: number, big = false): Speck[] => [[x, y, "x"],
 
 const nightAnims: Record<string, Anim> = {
   /** Each bulb smashed: the lights flicker, then settle a step darker (the pieces still show at 1 and 2). */
-  dim1: { loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2")] }, { ms: 60, layers: [] }, { ms: 70, layers: [tileLayer("dim1")] }, { ms: 50, layers: [] }, { ms: 300, layers: [tileLayer("dim1")] }] },
-  dim2: { loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2s")] }, { ms: 60, layers: [tileLayer("dim1")] }, { ms: 70, layers: [tileLayer("dim2s")] }, { ms: 50, layers: [tileLayer("dim1")] }, { ms: 300, layers: [tileLayer("dim2")] }] },
+  dim1: lazyAnim(() => ({ loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2")] }, { ms: 60, layers: [] }, { ms: 70, layers: [tileLayer("dim1")] }, { ms: 50, layers: [] }, { ms: 300, layers: [tileLayer("dim1")] }] })),
+  dim2: lazyAnim(() => ({ loop: false, frames: [{ ms: 60, layers: [tileLayer("dim2s")] }, { ms: 60, layers: [tileLayer("dim1")] }, { ms: 70, layers: [tileLayer("dim2s")] }, { ms: 50, layers: [tileLayer("dim1")] }, { ms: 300, layers: [tileLayer("dim2")] }] })),
 };
 for (let tile = 0; tile < NIGHT_TILES; tile++)
   for (const light of [false, true]) {

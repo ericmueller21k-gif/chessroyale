@@ -2,6 +2,7 @@
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 // ---- The pie (Boingo's passive): flying, splatting on a square, staying, fading.
 
@@ -78,7 +79,7 @@ export const PIE_SPLAT: Character = {
   parts: { top10: pieTop(10), top16: pieTop(16), splatBig: splatPart(true), splat: splatPart(false) },
   anims: {
     /** The pie lands: it comes down (seen from above, growing), then SPLAT, cream flying, and it settles. */
-    splat: {
+    splat: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 60, layers: [{ part: "top10", x: 11, y: 11 }] },
@@ -87,14 +88,14 @@ export const PIE_SPLAT: Character = {
         { ms: 90, layers: [{ part: "splatBig", x: 1, y: 1 }], specks: spatter(1) },
         { ms: 140, layers: [{ part: "splat", x: 1, y: 1 }] },
       ],
-    },
+    })),
     /** Pied, while it lasts: the cherry glints now and then. */
-    pied: {
+    pied: lazyAnim(() => ({
       loop: true,
       frames: Array.from({ length: 8 }, (_, i) => ({ ms: 220, layers: [{ part: "splat", x: 1, y: 1 }], pal: i === 5 ? { E: "#ffffff", r: "#ff5a5f" } : undefined })),
-    },
+    })),
     /** It clears: the pie fades away. The last frame is empty. */
-    fade: {
+    fade: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 110, layers: [{ part: "splat", x: 1, y: 1 }], pal: fadePie("c0") },
@@ -102,7 +103,7 @@ export const PIE_SPLAT: Character = {
         { ms: 110, layers: [{ part: "splat", x: 1, y: 1 }], pal: fadePie("40") },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -116,13 +117,13 @@ export const PIE_FLY: Character = {
   parts: { pie: pieFlyPart },
   anims: {
     /** In flight, tumbling (a quarter turn a frame). Loops while it flies. */
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: ([0, 1, 2, 3] as const).map((rot): Frame => {
         const across = rot % 2 ? [13, 11] : [11, 13];
         return { ms: 70, layers: [{ part: "pie", x: across[0]!, y: across[1]!, rot }] };
       }),
-    },
+    })),
   },
 };
 

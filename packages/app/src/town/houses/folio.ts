@@ -15,6 +15,7 @@ import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprit
 import { inPoly } from "../../characters/paint.ts";
 import { FOLIO_PALETTE } from "../../characters/folio.ts";
 import { grain, groundShadow, paint, signBoard, signFace, signPost, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 /** Folio's own colors (characters/folio.ts), imported: the house is folded from its paper. Its faded ink is the house's own (below). */
 const F_: Record<string, string> = FOLIO_PALETTE;
@@ -446,7 +447,7 @@ const frames: Frame[] = SWAY.map((_, f) => ({
   pal: f === 3 ? DIM : undefined,
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_FOLIO: Character = {
   id: "house-folio",

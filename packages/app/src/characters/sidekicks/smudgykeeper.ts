@@ -6,7 +6,7 @@
  * Dabble's rig, as drawn (its parts, its poses: idle, walk, sit, wave), recolored, with the smock over its body and the glasses over
  * its snout on every frame (where Dabble's head is that frame). Nothing here changes Dabble.
  */
-import { type Character, type Frame, type Layer, type Part } from "../sprite.ts";
+import { lazyAnim, type Character, type Frame, type Layer, type Part } from "../sprite.ts";
 import { DABBLE_GROUND, DABBLE_PARTS, SIDEKICK_PALETTE, dabblePartAt, sidekickSmudgy } from "./smudgy.ts";
 
 const PALETTE: Record<string, string> = {
@@ -85,5 +85,5 @@ export const sidekickSmudgyKeeper: Character = {
   palette: PALETTE,
   halo: "#26301f",
   parts,
-  anims: { idle: anim("idle"), walk: anim("walk"), sit: anim("sit"), wave: anim("wave") },
+  anims: { idle: lazyAnim(() => anim("idle")), walk: lazyAnim(() => anim("walk")), sit: lazyAnim(() => anim("sit")), wave: lazyAnim(() => anim("wave")) },
 };

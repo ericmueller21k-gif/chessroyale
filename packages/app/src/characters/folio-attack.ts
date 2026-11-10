@@ -11,6 +11,7 @@
 import { KING_ATTACK } from "@chessroyale/chess";
 import { FOLIO, folioLayers, type FolioPose } from "./folio.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 /** The art's own offset (its frames are drawn OX pixels further right than its poses: folio.ts `shifted`). */
 const OX = 6;
@@ -58,7 +59,7 @@ function inkStroke(i: number): Speck[] {
 const AIM: FolioPose = { neck: [-2, -10], head: "rest", wingN: POINT, wingF: [3, -2], dy: -1 };
 const GATHER: FolioPose = { neck: [-1, -8], head: "rest", wingN: [-48, 24], wingF: [2, -2], dy: -1 };
 
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [] },
@@ -76,7 +77,7 @@ const kingAttack: Anim = (() => {
   frames.push(F(done, { neck: [3, 6], head: "dip", eye: "happy", wingN: [0, 1], wingF: [0, 1] }, { cue: "glint" }));
   frames.push(F(150, { dy: -2 }), F(110, { dy: -14, wingN: [0, -4], wingF: [0, -4], shadow: 10 }, { cue: "flap" }), F(A.ms - A.leaveAt - 310, { dy: -32, wingN: [0, -6], wingF: [0, -6], shadow: 7 }), { ms: 50, layers: [] });
   return { loop: false, frames };
-})();
+})());
 
 /**
  * The crane for its attack on a king: the same drawing, parts and palette, facing our left as always, in a frame `REACH` wider on
@@ -89,7 +90,7 @@ export const FOLIO_ATTACK: Character = {
   w: FOLIO.w + REACH,
   h: FOLIO.h + TOP,
   foot: [FOLIO.foot[0] + REACH, FOLIO.foot[1] + TOP],
-  anims: { idle: { loop: true, frames: [F(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [F(1000, {})] })), kingAttack },
 };
 
 /** The part of it a portrait shows (its head and beak, the top of its neck and its near wing's root), in frame pixels. */

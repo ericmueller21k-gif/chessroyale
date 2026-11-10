@@ -19,7 +19,14 @@ export const FREEZE = { boltAt: 1500, iceAt: 1760 } as const;
  * The blizzard's beats: the banner (gone as the storm comes), then the storm bursts from his cane and sweeps the board,
  * then the God King's line; then (once the last piece has iced over) the pieces due to thaw next turn crack (`crackAt`).
  */
-export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSweep.ch.anims.sweep!), lineAt: 2800, crackAt: 3050 } as const;
+export const BLIZZARD = {
+  sweepAt: 1300,
+  get sweepMs() {
+    return animLength(EFFECTS.blizzardSweep.ch.anims.sweep!);
+  },
+  lineAt: 2800,
+  crackAt: 3050,
+} as const;
 /**
  * A thaw's beats (each later turn of the blizzard): its banner naming the pieces freed, gone as (`meltAt`) their ice
  * melts away and he has his say; the God King's line (`lineAt`); then the pieces due to thaw next turn crack
@@ -27,7 +34,7 @@ export const BLIZZARD = { sweepAt: 1300, sweepMs: animLength(EFFECTS.blizzardSwe
  */
 export const THAW = { meltAt: 1300, lineAt: 1700, crackAt: 1750 } as const;
 /** How long the ice takes to melt away (iceOverlay's thaw; it ends empty). */
-export const MELT_MS = animLength(EFFECTS.iceOverlay.ch.anims.thaw!);
+export const MELT_MS = () => animLength(EFFECTS.iceOverlay.ch.anims.thaw!);
 
 function freezeMoment({ boss, moment, t, orientation, banner, cast }: MomentProps) {
   const piece = moment.square ? pieceAt(boss.board.fen, moment.square) : null;
@@ -122,7 +129,7 @@ export const GINGER_UI = {
     // When the pieces due to thaw next turn crack on this screen (0: they're simply cracked), and when the freed melt.
     const crackAt = blizzard ? blizzard.at + BLIZZARD.crackAt : thaw ? thaw.at + THAW.crackAt : 0;
     const meltAt = thaw ? thaw.at + THAW.meltAt : 0;
-    const melting = (thaw?.squares ?? []).filter((sq) => crowd(sq) && !iced.includes(sq) && now < meltAt + MELT_MS);
+    const melting = (thaw?.squares ?? []).filter((sq) => crowd(sq) && !iced.includes(sq) && now < meltAt + MELT_MS());
     // (Several crack or melt at once: one crackle for them all, the first's.)
     const firstCrack = iced.find((sq) => due.has(sq));
     const fx = EFFECTS.iceOverlay;

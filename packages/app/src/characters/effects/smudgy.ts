@@ -22,6 +22,7 @@
 import { canvas, edge, ellipse, inEllipse, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims, type Pt } from "./common.ts";
+import { lazyParts, lazyAnim } from "../sprite.ts";
 
 export const PAINT_PALETTE: Record<string, string> = {
   k: "#2a1c06", // outline: a dark brown that reads on every square
@@ -98,10 +99,10 @@ const droplets = (t: number): Speck[] =>
     return x < 1 || y < 1 || x > SQUARE - 2 || y > SQUARE - 2 ? [] : [[x, y, i % 2 ? "R" : "K"]];
   }).flat();
 
-const splashParts: Record<string, Part> = {};
+const { parts: splashParts, add: addSplashParts } = lazyParts();
 const splashAnims: Record<string, Anim> = {};
 for (const [v, name] of ["A", "B", "C"].entries()) {
-  for (const [s, id] of [[0.4, "s0"], [0.75, "s1"], [1.12, "s2"], [1, "hold"], [1, "hold2"]] as const) splashParts[`${name}${id}`] = splashPart(v, s, id === "hold2" ? 3 : 0);
+  for (const [s, id] of [[0.4, "s0"], [0.75, "s1"], [1.12, "s2"], [1, "hold"], [1, "hold2"]] as const) addSplashParts(`${name}${id}`, () => splashPart(v, s, id === "hold2" ? 3 : 0));
   splashAnims[`land${name}`] = {
     loop: false,
     frames: [
@@ -171,7 +172,7 @@ export const PAINT_DRIP: Character = {
   palette: PAINT_PALETTE,
   parts: { d1: dripPart(0.2), d2: dripPart(0.45), d3: dripPart(0.7), d4: dripPart(1), d5: dripPart(1, true) },
   anims: {
-    drip: {
+    drip: lazyAnim(() => ({
       loop: false,
       frames: [
         frame(70, [L("d1")], { cue: "drip" }),
@@ -182,7 +183,7 @@ export const PAINT_DRIP: Character = {
         frame(40, [], { specks: drops(2) }),
         frame(20),
       ],
-    },
+    })),
   },
 };
 
@@ -231,10 +232,10 @@ const flecks = (t: number, ramp: string): Speck[] =>
     return [Math.round(x! + side! * (5 + t * 3 + i)), Math.round(y! - (3 + t * 2)), ramp[1 + (i % 2)]!];
   }).filter(([x, y]) => x > 0 && y > 0 && x < SQUARE - 1 && y < SQUARE - 1);
 
-const strokeParts: Record<string, Part> = {};
+const { parts: strokeParts, add: addStrokeParts } = lazyParts();
 const strokeAnims: Record<string, Anim> = {};
 for (const [tint, ramp] of [["C", "cCx"], ["N", "nNM"]] as const) {
-  for (const [reach, id] of [[0.4, "a"], [0.78, "b"], [1, "c"]] as const) strokeParts[`${tint}${id}`] = strokePart(reach, ramp);
+  for (const [reach, id] of [[0.4, "a"], [0.78, "b"], [1, "c"]] as const) addStrokeParts(`${tint}${id}`, () => strokePart(reach, ramp));
   strokeAnims[`stroke${tint}`] = {
     loop: false,
     frames: [
@@ -290,7 +291,7 @@ export const PAINT_FLY: Character = {
       cv[12]![15] = "w";
     }),
   },
-  anims: { fly: { loop: true, frames: [frame(70, [L("a")]), frame(70, [L("b")])] } },
+  anims: { fly: lazyAnim(() => ({ loop: true, frames: [frame(70, [L("a")]), frame(70, [L("b")])] })) },
 };
 
 // ---- A blob splatting on a king (his attack on a king).

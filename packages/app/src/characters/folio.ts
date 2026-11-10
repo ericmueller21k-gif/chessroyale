@@ -12,7 +12,7 @@
  * the page's own drawings (a loose sheet, a creased square, the bird base) on the way in and out of the crane.
  */
 import { canvas, inPoly, line, toGrid } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 const PAPER_B = "#f3e7cc";
 
@@ -857,17 +857,17 @@ const shifted = (frames: readonly Frame[]): Frame[] =>
   }));
 
 const anims: Record<string, Anim> = {
-  idle: { loop: true, frames: shifted(IDLE) },
-  entrance: { loop: false, frames: shifted(ENTRANCE) },
-  thinking: { loop: true, frames: shifted(THINKING) },
-  move: { loop: false, frames: shifted(MOVE) },
-  capture: { loop: false, frames: shifted(CAPTURE) },
-  hurt: { loop: false, frames: shifted(HURT) },
-  check: { loop: false, frames: shifted(CHECK) },
-  smug: { loop: false, frames: shifted(SMUG) },
-  rattled: { loop: false, frames: shifted(RATTLED) },
-  defeat: { loop: false, frames: shifted(DEFEAT) },
-  victory: { loop: false, frames: shifted(VICTORY) },
+  idle: lazyAnim(() => ({ loop: true, frames: shifted(IDLE) })),
+  entrance: lazyAnim(() => ({ loop: false, frames: shifted(ENTRANCE) })),
+  thinking: lazyAnim(() => ({ loop: true, frames: shifted(THINKING) })),
+  move: lazyAnim(() => ({ loop: false, frames: shifted(MOVE) })),
+  capture: lazyAnim(() => ({ loop: false, frames: shifted(CAPTURE) })),
+  hurt: lazyAnim(() => ({ loop: false, frames: shifted(HURT) })),
+  check: lazyAnim(() => ({ loop: false, frames: shifted(CHECK) })),
+  smug: lazyAnim(() => ({ loop: false, frames: shifted(SMUG) })),
+  rattled: lazyAnim(() => ({ loop: false, frames: shifted(RATTLED) })),
+  defeat: lazyAnim(() => ({ loop: false, frames: shifted(DEFEAT) })),
+  victory: lazyAnim(() => ({ loop: false, frames: shifted(VICTORY) })),
 };
 
 export const FOLIO: Character = {

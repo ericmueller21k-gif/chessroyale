@@ -13,6 +13,7 @@
  */
 import { canvas, ellipse, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const SIDEKICK_PALETTE = {
   k: "#1d1019", // outline
@@ -658,7 +659,7 @@ function f(ms: number, p: Pose, extra: Extras = {}): Frame {
 // ---- Animations.
 
 /** Idle (3 s): sways, breathes, blinks, wiggles an ear; now and then the can drips a drop or two. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 30 }, (_, i) => {
     const bob = i % 15 >= 8 ? 1 : 0;
@@ -670,10 +671,10 @@ const idle: Anim = {
     const dripI = i >= 14 && i <= 18 ? i - 14 : i >= 23 && i <= 27 ? i - 23 : -1;
     return f(100, { bob, mood: blink ? "blink" : "calm", ear, sx: sway, hx: sway > 0 ? 1 : 0, sprout, tail, tilt: -22 }, dripI >= 0 ? { pour: "drip", d: dripI } : {});
   }),
-};
+}));
 
 /** Walk (0.6 s): a heavy, waddly little step, head bobbing, the can held close. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) => {
     const th = (i / 6) * Math.PI * 2;
@@ -684,11 +685,11 @@ const walk: Anim = {
     const bob = i % 3 === 0 ? 1 : 0;
     return f(100, { bob, sx, hy: bob ? 0 : -1, hx: sx, near, far, mood: "calm", ear: bob ? "down" : "mid", sprout: sx > 0 ? "l" : sx < 0 ? "r" : "mid", tail: sx, arm: "hold", tilt: -22 - (bob ? 4 : 0) }, i % 3 === 0 ? { cue: "step" } : {});
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the chess table, facing the board, legs dangling, the can low in its lap; thinks about a move. */
 const SIT: Pose = { sit: true, arm: "lap" };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
@@ -696,11 +697,11 @@ const sit: Anim = {
     const swing = i % 8 < 4 ? 0 : 1;
     return f(200, { ...SIT, mood: blink ? (lean ? "thinkBlink" : "blink") : lean ? "think" : "calm", bob: i % 8 >= 4 ? 1 : 0, hx: lean ? 2 : 0, hy: lean ? 1 : 0, ear: i === 9 ? "down" : "mid", sprout: i % 8 < 4 ? "mid" : "r", far: { lift: swing }, near: { lift: 1 - swing }, tail: swing }, i === 10 ? { pour: "trickle", t: i } : {});
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): lifts the can and sprinkles a little arc of drops (a happy hello), then settles back to idle. */
 const WAVES: readonly ArmName[] = ["waveL", "waveM", "waveR", "waveM", "waveL", "waveM"];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "happy", arm: "hold" }),
@@ -710,10 +711,10 @@ const wave: Anim = {
     f(100, { mood: "calm", arm: "hold", tilt: -22 }),
     f(200, { mood: "calm", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** Entrance: drops in from above on its shadow, lands with a squash and a puff of dust, then lifts the can: ta-da. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: dropShadow(4).map(([x, y, k]): Speck => [x + SHIFT, y, k]) },
@@ -728,18 +729,18 @@ const entrance: Anim = {
     f(120, { mood: "happy", arm: "hold", tilt: -22 }),
     f(300, { mood: "calm", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** Thinking (loops): head tipped up, eyes up, a foot tapping, the can low, thought bubbles popping up. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", arm: "side", hx: 1, hy: -1, bob: i % 6 >= 3 ? 1 : 0, far: { lift: i % 4 === 1 ? 2 : 0 }, tail: i % 6 < 3 ? 1 : 0, ear: i === 5 ? "down" : "mid", sprout: i % 6 < 3 ? "l" : "mid" }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a hop toward the board and a little splash of the can at it. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, mood: "bold", arm: "hold" }),
@@ -750,10 +751,10 @@ const move: Anim = {
     f(110, { dx: 1, mood: "happy", arm: "hold" }),
     f(150, { mood: "calm", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** A capture: two excited hops, the can waving high, a shower of drops and twinkles. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "bold", arm: "hold" }),
@@ -768,10 +769,10 @@ const capture: Anim = {
     f(120, { bob: 1, mood: "happy", arm: "up" }, { pour: "arc", t: 9, reach: 8, height: 3 }),
     f(160, { mood: "smug", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, eyes screwed shut, the can spilling; then it shakes it off with a brave little grin. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, mood: "hurt", arm: "low", ear: "down", sprout: "wilt" }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -782,11 +783,11 @@ const hurt: Anim = {
     f(120, { mood: "bold", arm: "up", sprout: "l" }),
     f(160, { mood: "calm", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** Check: two sharp jabs of the can at the board, spraying, eyes bright. */
 const JAB: Pose = { bob: 2, dx: 1, mood: "bold", arm: "point", ear: "up" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "bold", arm: "up" }),
@@ -797,24 +798,24 @@ const check: Anim = {
     f(150, { dx: 1, mood: "happy", arm: "point" }, { pour: "trickle", t: 1 }),
     f(160, { mood: "smug", arm: "hold", tilt: -22 }),
   ],
-};
+}));
 
 /** Smug: chin up, eyes half shut, a little smirk, a slow nod, the can held just so. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: "smug", arm: "hold", tilt: -26, hy: i < 3 || i > 5 ? -1 : 0, hx: i < 4 ? 0 : 1, bob: i % 4 === 2 ? 1 : 0, ear: i === 5 ? "up" : "mid", sprout: i < 4 ? "mid" : "l" })),
-};
+}));
 
 /** Rattled: wide eyes, worried brows, sweat flying, trembling where it stands, the can slopping water. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", arm: "side", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, ear: "down", tail: i % 2 ? 1 : -1, sprout: i % 2 ? "l" : "r", tilt: i % 2 ? -26 : -36 }, { specks: sweat(i), pour: i % 2 ? "trickle" : "none", t: i })),
-};
+}));
 
 /** Defeat: hit, dizzy eyes, the can slips and spills a puddle, and it plops down on its bottom, dazed (the last frame holds). */
 /** The dropped can, standing a little crooked on the ground beside the feet (the water already spilled out of it). */
 const CAN_DOWN: readonly [number, number, number] = [44, 51, -22];
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "hurt", arm: "low", ear: "down", sprout: "wilt" }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -824,17 +825,17 @@ const defeat: Anim = {
     f(120, { plop: true, dx: -3, mood: "out", arm: "limp", ear: "down", sprout: "wilt", hy: 2, hx: 1, lone: CAN_DOWN }, { specks: [...puddle(2), ...dizzy(0, 7)] }),
     f(1000, { plop: true, dx: -3, mood: "out", arm: "limp", ear: "down", sprout: "wilt", hy: 2, hx: 1, lone: CAN_DOWN, tail: 1 }, { specks: [...puddle(3), ...dizzy(1, 7)] }),
   ],
-};
+}));
 
 /** Victory: jumping for joy, the can high and showering, the sprout bursting into flower. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 3, 5, 5, 5, 3, 0, 0, 3, 5, 3, 0][i]!;
     const arms: ArmName[] = ["high", "waveL", "waveM", "waveR", "waveM", "waveL", "high", "high", "waveR", "waveM", "waveL", "high"];
     return f(110, { bob: i === 0 || i === 6 || i === 7 ? 2 : 0, air, mood: air > 2 ? "happy" : "cheer", arm: arms[i]!, near: air > 2 ? { lift: 3 } : {}, far: air > 2 ? { lift: 3 } : {}, hy: i % 2 ? -1 : 0, ear: air > 3 ? "up" : "mid", tail: i % 2 ? 2 : -1, sprout: "bloom" }, { pour: "shower", t: i, cue: i === 2 ? "sprinkle" : undefined, specks: [...petals(i, 4), ...twinkles(i, 1)] });
   }),
-};
+}));
 
 export const sidekickPuddles: Character = {
   id: "sidekick-puddles",

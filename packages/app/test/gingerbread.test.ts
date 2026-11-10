@@ -185,7 +185,7 @@ describe("the blizzard's thaw (Eric, Oct 12: the ice thawing as pieces get close
     expect(ice.anims.thaw!.frames[0]!.cue).toBe("crackle");
     // Each within its moment: the thaw's melt and its cracks, the blizzard's cracks.
     expect(THAW.crackAt + animLength(ice.anims.crack!)).toBeLessThanOrEqual(GINGER_FX.thaw);
-    expect(THAW.meltAt + MELT_MS).toBeLessThanOrEqual(GINGER_FX.thaw);
+    expect(THAW.meltAt + MELT_MS()).toBeLessThanOrEqual(GINGER_FX.thaw);
     expect(BLIZZARD.crackAt + animLength(ice.anims.crack!)).toBeLessThanOrEqual(GINGER_FX.blizzard);
     // The blizzard's last piece has iced over before the cracks show.
     expect(BLIZZARD.crackAt).toBeGreaterThanOrEqual(BLIZZARD.sweepAt + BLIZZARD.sweepMs + animLength(ice.anims.freeze!) - 100);

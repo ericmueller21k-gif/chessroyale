@@ -1,6 +1,7 @@
 import { BOSS_BANNER, RECLUSE_PHASE2, bannerPlusMs, bossBannerMs } from "@chessroyale/core";
 import { RECLUSE, RECLUSE_JUMP } from "./characters/recluse.ts";
 import { animLength, cueAt } from "./characters/power-art.ts";
+import { lazyTable } from "./characters/sprite.ts";
 import { RECLUSE_LINES } from "./characters/recluse-lines.ts";
 import { holdMs, typeMs } from "./speech.tsx";
 import {
@@ -49,7 +50,7 @@ import {
  * One book on screen throughout: his own, in his frames. Every added duration is a setting (RECLUSE_PHASE2.change).
  * (Until Oct 17 it was about 15 s after the fall, and the clocks ran as "PHASE 2" ended.)
  */
-export const PHASE_CHANGE = (() => {
+export const PHASE_CHANGE = lazyTable(() => {
   const a = RECLUSE.anims;
   const len = (n: string) => animLength(a[n]!);
   const fallMs = 1800;
@@ -148,7 +149,7 @@ export const PHASE_CHANGE = (() => {
     },
     countdownMs,
   };
-})();
+});
 
 /**
  * His figure where he stands through the phase change (BossCharacter's figure run, from `at`, the change's start): slumped
@@ -190,7 +191,7 @@ export interface ArcStrike {
 /** How long an arc shows (ms), and how often its shape is drawn again while it does. */
 export const ARC_LIFE = 260;
 export const ARC_REDRAW = 70;
-export const ARC_STRIKES: readonly ArcStrike[] = (() => {
+export const ARC_STRIKES: readonly ArcStrike[] = lazyTable(() => {
   const C = PHASE_CHANGE;
   let s = 0x2f6b9e1;
   const rnd = () => ((s = (Math.imul(s ^ (s >>> 15), 2246822507) + 0x6d2b79f5) >>> 0) / 2 ** 32);
@@ -210,7 +211,7 @@ export const ARC_STRIKES: readonly ArcStrike[] = (() => {
   for (const at of [C.crackAt, C.partAt])
     for (const hand of [0, 1] as const) out.push({ at, hand, to: hand === 0 ? [4, 50] : [96, 50], seed: 1 + Math.floor(rnd() * 1e6), big: true });
   return out.sort((x, y) => x.at - y.at);
-})();
+});
 
 type Pt = readonly [number, number];
 /**

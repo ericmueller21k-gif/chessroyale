@@ -20,11 +20,12 @@
  */
 import type { Anim, Character } from "../sprite.ts";
 import { ARMS, CREW_PALETTE, FOOT, frame, H, PARTS, W, WALK, type Look, type Pose } from "../../town/shops/giraffe-rig.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const DEALER: Look = { id: "dealer", hat: "none", top: "trench", shades: true, toothpick: true, seed: 7 };
 const POCKETS: Pose = { armF: ARMS.pocket, armN: ARMS.pocket, mouth: "smirk" };
 
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     frame(DEALER, i === 6 || i === 7 ? 120 : 190, {
@@ -35,18 +36,18 @@ const idle: Anim = {
       pick: i === 6 ? 1 : i === 7 ? 0.5 : 0,
     }, i === 6 ? { cue: "flick" } : {}),
   ),
-};
-const walk: Anim = {
+}));
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: WALK.map((w, i) => frame(DEALER, 110, { ...POCKETS, feet: w.feet, bob: w.bob, hx: 1 }, i === 0 || i === 3 ? { cue: "step" } : {})),
-};
-const sit: Anim = {
+}));
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     frame(DEALER, 220, { ...POCKETS, sit: 11, feet: [[0, 0], [3, 0]], bob: i % 5 === 2 ? 1 : 0, pick: i === 6 ? 1 : 0, hx: i >= 3 && i <= 4 ? -1 : 0 }, i === 6 ? { cue: "flick" } : {}),
   ),
-};
-const wave: Anim = {
+}));
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     frame(DEALER, 160, { ...POCKETS, hx: -2 }),
@@ -58,7 +59,7 @@ const wave: Anim = {
     frame(DEALER, 130, { ...POCKETS }),
     frame(DEALER, 160, { ...POCKETS, hy: 1 }),
   ],
-};
+}));
 
 export const sidekickGrexDealer: Character = {
   id: "sidekick-grex-dealer",

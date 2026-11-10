@@ -9,6 +9,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { HOLLOW_PALETTE } from "../../characters/hollow.ts";
 import { grain, groundShadow, paint, signBoard, signFace, signPost, WARM, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const P_ = HOLLOW_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -229,7 +230,7 @@ const GLOW: readonly Record<string, string>[] = [
 ];
 const frames: Frame[] = GLOW.map((pal) => ({ ms: 520, layers, pal }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_HOLLOW: Character = {
   id: "house-hollow",

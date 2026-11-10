@@ -9,7 +9,7 @@
  * ring), `flip` (lying open, its pages flipping fast), `close` (snapping shut), and `idle` (lying closed).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Part, type Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
 
 export const BOOK_PALETTE: Record<string, string> = {
@@ -202,14 +202,14 @@ const dust = (t: number, n = 12, cx = 16): Speck[] =>
 
 const fx: Record<string, Anim> = {
   /** Lying closed on its square. */
-  idle: { loop: true, frames: [{ ms: 400, layers: [mid("spin:0", 15, 21)] }] },
+  idle: lazyAnim(() => ({ loop: true, frames: [{ ms: 400, layers: [mid("spin:0", 15, 21)] }] })),
   /** In flight: spinning a turn every 8 frames, its shadow under it. Loops (the board moves it along). */
-  fly: {
+  fly: lazyAnim(() => ({
     loop: true,
     frames: TURNS.map((d) => ({ ms: 50, layers: [mid("shadow:6", 12, 5, 0, 12), mid(`spin:${d}`, d ? 25 : 15, d ? 25 : 21, 0, -2)] })),
-  },
+  })),
   /** Slamming down flat: dropping from above, its shadow growing, hitting the square (cue `slam`), dust and a ring. */
-  slam: {
+  slam: lazyAnim(() => ({
     loop: false,
     frames: [
       { ms: 70, layers: [mid("shadow:6", 12, 5, 0, 8), mid("spin:0", 15, 21, 0, -4)] },
@@ -219,14 +219,14 @@ const fx: Record<string, Anim> = {
       { ms: 80, layers: [mid("ring:15", 32, 15, 0, 6), mid("spin:0", 15, 21)], specks: dust(2) },
       { ms: 300, layers: [mid("spin:0", 15, 21)], specks: dust(3) },
     ],
-  },
+  })),
   /** Lying open, its pages flipping fast (loop). */
-  flip: {
+  flip: lazyAnim(() => ({
     loop: true,
     frames: (["flutter1", "flutter2", "flutter3", "open"] as const).map((p) => ({ ms: 55, layers: [mid(p, 25, 17)] })),
-  },
+  })),
   /** Open, then snapping shut (cue `snap`): the front cover swings over from the left, a puff of page dust. */
-  close: {
+  close: lazyAnim(() => ({
     loop: false,
     frames: [
       { ms: 120, layers: [mid("open", 25, 17)] },
@@ -237,7 +237,7 @@ const fx: Record<string, Anim> = {
       { ms: 90, layers: [mid("spin:0", 15, 21, 6)], specks: dust(1, 8, 22) },
       { ms: 300, layers: [mid("spin:0", 15, 21, 6)] },
     ],
-  },
+  })),
 };
 
 export const RECLUSE_BOOK: Character = {

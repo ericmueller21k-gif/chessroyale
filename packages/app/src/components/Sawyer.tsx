@@ -345,7 +345,7 @@ export function cutSides(cut: Pick<SawCut, "a" | "b">, o: Orientation): [CutSide
 }
 
 const TAPE_MS = Math.max(...(["tape1N", "tape2N"] as const).map((a) => animLength(EFFECTS.sawCut.ch.anims[a]!)));
-const HEAL_MS = animLength(EFFECTS.sawCut.ch.anims.healN!);
+const HEAL_MS = () => animLength(EFFECTS.sawCut.ch.anims.healN!);
 /** The last cut each battle showed (so one that has just gone heals away), and when this device saw it go. */
 const cutLast = new Map<string, SawCut>();
 const cutGone = new Map<string, number>();
@@ -383,7 +383,7 @@ export function cutItems(boss: BossView, orientation: Orientation, now: number, 
         cutGone.set(tag, (at = now));
         if (cutGone.size > 50) cutGone.delete(cutGone.keys().next().value!);
       }
-      if (now < at + HEAL_MS) both(last, (S) => ({ anim: `heal${S}`, since: at! }));
+      if (now < at + HEAL_MS()) both(last, (S) => ({ anim: `heal${S}`, since: at! }));
     }
   }
   return out;
@@ -404,7 +404,7 @@ function cutMoment({ moment, banner, cast }: MomentProps) {
 /** The last board saw each battle showed (so one that has just ended closes up), and when this device saw it end. */
 const gapLast = new Map<string, { at: number; until: number }>();
 const gapGone = new Map<string, number>();
-const CLOSE_MS = animLength(EFFECTS.boardGap.ch.anims.close!);
+const CLOSE_MS = () => animLength(EFFECTS.boardGap.ch.anims.close!);
 
 /** The gap down the middle now: its animation and since when (sawn open in its moment; there; closing as it ends); null: none. */
 export function gapState(boss: BossView, moments: readonly Moment[], now: number): { anim: string; then?: string; since: number } | null {
@@ -430,7 +430,7 @@ export function gapState(boss: BossView, moments: readonly Moment[], now: number
       gapGone.set(tag, (at = now));
       if (gapGone.size > 50) gapGone.delete(gapGone.keys().next().value!);
     }
-    if (now < at + CLOSE_MS) return { anim: "close", since: at };
+    if (now < at + CLOSE_MS()) return { anim: "close", since: at };
   }
   return null;
 }

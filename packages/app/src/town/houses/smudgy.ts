@@ -9,6 +9,7 @@
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { SMUDGY_PALETTE } from "../../characters/smudgy.ts";
 import { flower, grain, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const S_ = SMUDGY_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -307,7 +308,7 @@ const frames: Frame[] = [0, 1, 2, 3, 4].map((f) => {
   return { ms: f === 4 ? 500 : 220, layers, specks };
 });
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_SMUDGY: Character = {
   id: "house-smudgy",

@@ -9,7 +9,7 @@
  * handful of numbers. The cane hand (his right, on our left) always grips the cane; the other arm is free.
  */
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
-import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
 
@@ -526,7 +526,7 @@ const BREATH = [0, 0, 0, 1, 1, 1, 0, 0] as const;
  * Idle: he breathes, glowering, and a frost glint runs round his icing; every 6 s or so he thumps his cane on the
  * ground in a puff of frost. Silent.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     ...Array.from({ length: 5 }, (_, n) => BREATH.map((bob, i) => f(130, { bob }, { specks: i === 3 || i === 4 ? sparkle(...GLINTS[(n * 2 + (i - 3)) % GLINTS.length]!, i === 3) : undefined }))).flat(),
@@ -537,22 +537,22 @@ const idle: Anim = {
     f(130, { cane: "rest" }, { specks: frostBurst([OX + 10, OY + GROUND - 2], 5).filter((_, i) => i % 2 === 0) }),
     f(200, {}),
   ],
-};
+}));
 
 /** Snowflake thought dots popping up beside his head, one by one. */
 const thoughtFlakes = (n: number): Speck[] =>
   [[OX + 43, OY + 8], [OX + 48, OY + 3], [OX + 54, OY - 2]].slice(0, n).flatMap(([x, y], i) => (i === 2 ? sparkle(x!, y!, true) : sparkle(x!, y!)));
 /** Thinking: a hand on his chin, eyes rolled up, tapping a foot, snowflakes for thoughts. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) => [0, 1, 2, 3].map((i) => f(130, { mood: "think", free: "chin", feet: i % 2 ? "tap" : "stand", bob: i === 2 ? 1 : 0 }, { specks: thoughtFlakes(n) }))),
-};
+}));
 
 /** Smug: leaning on his cane, a brow up, a slow foot tap. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => f(150, { mood: "smug", feet: i % 4 < 2 ? "tap" : "stand", bob: i % 4 === 1 ? 1 : 0, headDx: i < 4 ? 0 : 1 })),
-};
+}));
 
 /** His icing "sweating": drops running off his head. */
 const drips = (i: number): Speck[] => {
@@ -565,13 +565,13 @@ const drips = (i: number): Speck[] => {
   ];
 };
 /** Rattled: worried brows, wide eyes, his icing sweating, shaking where he stands. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, free: "hip" }, { specks: drips(i) })),
-};
+}));
 
 /** His move: a stamp forward and a jab of the cane at the board. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { crouch: 1, cane: "lift" }),
@@ -582,10 +582,10 @@ const move: Anim = {
     f(110, { crouch: 1, cane: "lift" }),
     f(160, {}),
   ],
-};
+}));
 
 /** A capture: he cackles, shaking a fist in the air, bells jingling. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { crouch: 1 }),
@@ -594,10 +594,10 @@ const capture: Anim = {
     ),
     f(140, { mood: "smug" }),
   ],
-};
+}));
 
 /** Hurt: hit, crumbs fly off his head and a crack appears; he flinches, then glares. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { crouch: 3, mood: "hurt", cracks: 1, free: "out" }, { cue: "crunch", pal: FLASH, shake: [1, 0], specks: crumbs(0) }),
@@ -609,13 +609,13 @@ const hurt: Anim = {
     f(120, { mood: "angry", cracks: 1, free: "up", bob: 1 }),
     f(160, { mood: "angry" }),
   ],
-};
+}));
 
 /** Check: he lunges with the cane like a sword, twice, frost sparking off its tip. */
 const tipSpark = (p: GingerPose, big = true) => sparkle(...(caneTip(p).map((v, i) => v + (i === 0 ? 2 : 0)) as [number, number]), big);
 const THRUST: GingerPose = { crouch: 2, feet: "wide", cane: "thrust", free: "up", mood: "shout", glow: true };
 const AIM: GingerPose = { crouch: 1, feet: "wide", cane: "aim", free: "hip", mood: "angry" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, AIM),
@@ -627,7 +627,7 @@ const check: Anim = {
     f(150, { ...AIM, mood: "laugh" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Defeat: hit, cracked, he totters and topples over backwards; crumbs, then still (the last frame holds). */
 function fallen(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Layer[] } {
@@ -655,7 +655,7 @@ function fallen(mood: Mood, extra: Speck[] = []): Partial<Frame> & { layers: Lay
 }
 /** Where his head lands when he falls, in frame pixels (for the crumbs). */
 const FALLEN_HEAD: Pt = [OX + 46, OY + GROUND - 16];
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { crouch: 3, mood: "hurt", cracks: 1, free: "out" }, { cue: "crunch", pal: FLASH, shake: [1, 0], specks: crumbs(0) }),
@@ -667,19 +667,19 @@ const defeat: Anim = {
     { ms: 160, ...fallen("out", crumbs(3, FALLEN_HEAD)) },
     { ms: 1000, ...fallen("out") },
   ],
-};
+}));
 
 /** Victory: the cane raised high, a fist up, jumping for joy in the snow; bells. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
     return f(110, { mood: "laugh", cane: "overhead", free: "up", air, crouch: i === 0 || i === 6 ? 2 : 0, feet: air > 3 ? "wide" : "stand", headDy: i % 2 ? -1 : 0 }, { specks: snow(i), cue: i === 2 ? "jingle" : undefined, pal: air > 4 ? GLOW_HALF : undefined });
   }),
-};
+}));
 
 /** Entrance: a whirl of snow, he drops into it, slams his cane down in a burst of frost and glares. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: swirl(0, 8, 8), cue: "jingle" },
@@ -695,7 +695,7 @@ const entrance: Anim = {
     f(140, {}, { specks: sparkle(...GLINTS[0]!, true) }),
     f(320, {}),
   ],
-};
+}));
 
 /**
  * His passive power, freezing a piece: he raises the cane, it glows ice-blue, his eyes go icy, he points it two-handed
@@ -714,7 +714,7 @@ const gather = (n: number): Speck[] => {
     return [Math.round(hx + Math.cos(a) * r), Math.round(hy + Math.sin(a) * r), i % 2 ? "F" : "I"];
   });
 };
-const freezeCast: Anim = {
+const freezeCast: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, cane: "lift" }),
@@ -729,7 +729,7 @@ const freezeCast: Anim = {
     f(140, { crouch: 1, cane: "lift", mood: "smug" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /**
  * His ultimate, the blizzard: the cane raised high and glowing, a fist up, he calls the storm; snow whirls round him,
@@ -737,7 +737,7 @@ const freezeCast: Anim = {
  * there). Then he cackles.
  */
 const STORM: GingerPose = { cane: "overhead", free: "up", glow: true, mood: "shout", feet: "wide" };
-const blizzard: Anim = {
+const blizzard: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 2, cane: "lift", feet: "wide", mood: "shout" }, { cue: "jingle" }),
@@ -752,7 +752,7 @@ const blizzard: Anim = {
     f(140, { crouch: 1, cane: "lift", mood: "smug" }, { specks: snow(12, 8) }),
     f(200, { mood: "smug" }),
   ],
-};
+}));
 
 export const GINGERBREAD: Character = {
   id: "gingerbread",

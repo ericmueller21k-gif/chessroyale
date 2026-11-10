@@ -12,7 +12,7 @@
  * mouth and the eyes per look, so a pose is a handful of numbers (see Pose / build()).
  */
 import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Speck } from "../sprite.ts";
 
 export const SIDEKICK_FOLIO_PALETTE: Record<string, string> = {
   k: "#2b2330", // outline
@@ -649,7 +649,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 // ---- Animations.
 
 /** Idle (3 s): breathes (the body flexes a pixel, the throat flutters), blinks twice, glances ahead, a paper crinkle. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 20 }, (_, i) => {
     const ph = i % 10;
@@ -658,10 +658,10 @@ const idle: Anim = {
     const glance = i >= 11 && i <= 14;
     return f(150, { sq: inhale ? -1 : 0, ay: inhale ? -1 : 0, mood: blink ? "blink" : glance ? "glance" : "calm", sac: ph === 7 || ph === 8 ? 1 : 0, hx: glance ? 1 : 0 }, { specks: i === 13 ? crinkle(0) : i === 14 ? crinkle(1) : [] });
   }),
-};
+}));
 
 /** Walk (0.6 s): a hop: a crouch, a push off, a stretch in the air, a drop, a squashed landing with a flutter of paper. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(100, { sq: 3, leg: "coil", ay: 1, mood: "calm" }),
@@ -671,10 +671,10 @@ const walk: Anim = {
     f(100, { sq: 3, leg: "land", ay: 1, mood: "blink" }, { cue: "step", specks: flutter(0) }),
     f(90, { sq: 1, leg: "crouch", mood: "calm" }, { specks: flutter(1) }),
   ],
-};
+}));
 
 /** Sit (loops): on the stool facing the board, legs dangling, the pawn low in its lap; a slow blink, leaning to think a move. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
@@ -682,11 +682,11 @@ const sit: Anim = {
     const swing = i % 8 < 4;
     return f(200, { sit: true, leg: swing ? "sit" : "swing", sq: i % 8 >= 4 ? -1 : 0, mood: blink ? (lean ? "thinkBlink" : "blink") : lean ? "think" : "calm", hx: lean ? 1 : 0, hy: lean ? 1 : 0 });
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): a little hop, then the pawn held high and waved hello, then it settles. */
 const WAVES = ["waveL", "waveR", "waveL", "waveR"] as const;
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { sq: 3, leg: "coil", mood: "happy" }),
@@ -697,7 +697,7 @@ const wave: Anim = {
     f(110, { arm: "hold", mood: "happy", ay: 0 }),
     f(150, { mood: "calm" }),
   ],
-};
+}));
 
 // ---- The page on its own (the entrance and the defeat): a loose sheet, and the sheet creased into a square corner-up.
 
@@ -737,7 +737,7 @@ function pageFrame(ms: number, d: { name: string; at: Pt }, cx: number, cy: numb
 
 /** Entrance: a loose page drifts down, rocking (cue rustle), lands flat, folds into a square (cue fold), and pops open into the frog (cue pop) with a puff of paper: a hop, a hello. */
 const HELLO = ["waveL", "waveR", "waveL", "waveR"] as const;
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 140, layers: [{ part: shadowPart(3), x: MIDX - 4, y: GROUND - 2 }] },
@@ -755,18 +755,18 @@ const entrance: Anim = {
     f(120, { arm: "hold", mood: "happy" }),
     f(300, { mood: "calm" }),
   ],
-};
+}));
 
 /** Thinking (loops): head tipped up, eyes rolled up, a foot on its chin, the pawn set down beside it, a toe tapping, thought dots popping up. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", arm: "chin", pawn: [51, 53], hx: 1, hy: -1, sq: i % 6 >= 3 ? 0 : -1, leg: i % 4 === 1 ? "tap" : "rest", farArm: "stand" }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a crouch, a hop toward the board, the pawn pressed down onto it (a spark of ink), then picked up again. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { sq: 3, leg: "coil", mood: "bold" }),
@@ -778,13 +778,13 @@ const move: Anim = {
     f(110, { dx: 1, arm: "hold", mood: "happy" }),
     f(150, { mood: "calm" }),
   ],
-};
+}));
 
 /** Capture: it flicks its tongue out at a paper piece (cue flick), reels it in, gulps (the throat puffs), and hops for joy. */
 const PIECE = ["..ABB..", ".ABBBC.", ".BBBCC.", "..BBC..", "...BC..", "..ABCD.", ".ABBCCD", "ABBCCDD"];
 add("piece", () => ({ grid: PIECE }));
 const piece = (x: number, y: number): Layer[] => [{ part: "piece", x, y }];
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { sq: 2, leg: "crouch", mood: "bold", hx: -1 }),
@@ -800,10 +800,10 @@ const capture: Anim = {
     f(100, { sq: 3, leg: "land", arm: "up", mood: "happy" }, { cue: "step", specks: flutter(0) }),
     f(160, { sq: 0, arm: "hold", mood: "smug" }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, eyes screwed shut, paper creasing, the pawn flung out of its foot; it catches it and shakes it off. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { sq: 3, leg: "coil", mood: "hurt", arm: "down", pawn: [53, 36] }, { cue: "crumple", pal: FLASH, shake: [1, 0] }),
@@ -815,11 +815,11 @@ const hurt: Anim = {
     f(120, { arm: "hold", mood: "bold" }, { specks: sparkle(57, 30, false) }),
     f(160, { mood: "calm" }),
   ],
-};
+}));
 
 /** Check: two sharp jabs of the pawn at the board, a croak (the throat puffs), an ink exclamation mark. */
 const bang = (x: number, y: number): Speck[] => [0, 1, 2, 3, 4].flatMap((j): Speck[] => [[x, y + j, "U"], [x + 1, y + j, "U"]]).concat([[x, y + 6, "U"], [x + 1, y + 6, "U"], [x, y + 7, "U"], [x + 1, y + 7, "U"]]);
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { sq: 1, arm: "up", mood: "bold" }),
@@ -830,23 +830,23 @@ const check: Anim = {
     f(150, { dx: 1, arm: "point", mood: "happy" }),
     f(160, { arm: "hold", mood: "smug" }),
   ],
-};
+}));
 
 /** Smug (loops): chin up, eyes half shut, a little smirk, a slow nod, the pawn held just so. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: "smug", hy: i < 3 || i > 5 ? -1 : 0, hx: i < 4 ? 0 : 1, sq: i % 4 === 2 ? 0 : -1, sac: i === 5 ? 1 : 0 }, { specks: i === 4 ? sparkle(55, 20) : i === 5 ? sparkle(55, 20, false) : [] })),
-};
+}));
 
 /** Rattled (loops): wide eyes with pinpoint pupils, a wavy mouth, sweat flying, trembling where it sits, the pawn shaking. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", dx: i % 2 ? 1 : -1, sq: i % 4 === 2 ? 2 : 1, leg: "crouch", ay: i % 2, hy: i % 2 }, { specks: sweat(i) })),
-};
+}));
 
 /** Defeat: hit, dizzy eyes, the pawn flung away; it deflates, unfolds into its flat page and the pawn stands beside it (the last frame holds). */
 const SETTLE = { i: "#adafbf", s: "#d6d0c6", j: "#928f97", l: "#8a8590" };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { sq: 3, leg: "coil", mood: "hurt", arm: "down", pawn: [55, 33] }, { cue: "crumple", pal: FLASH, shake: [1, 0] }),
@@ -862,10 +862,10 @@ const defeat: Anim = {
     pageFrame(220, page(5, 6, 32), 28, 58, 19, { pal: { i: "#adafbf", s: "#d6d0c6", j: "#928f97" } }, [52, 53]),
     pageFrame(1200, page(5, 6, 32), 28, 58, 19, { pal: SETTLE }, [52, 53]),
   ],
-};
+}));
 
 /** Victory (loops): jumping for joy with the pawn waved high, a croak, bits of paper tossed in the air. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 3, 6, 7, 5, 2, 0, 0, 4, 7, 4, 0][i]!;
@@ -873,7 +873,7 @@ const victory: Anim = {
     const grounded = air === 0;
     return f(110, { sq: grounded ? 3 : -1, dy: -air, leg: grounded ? "land" : air > 4 ? "air" : "tuck", arm: arms[i]!, mood: i % 3 === 2 ? "cheer" : "happy", sac: i === 3 || i === 9 ? 2 : 0, hx: i % 2 }, { cue: i === 3 ? "croak" : undefined, specks: [...bits(32, 26, i, 7, 22), ...(i % 4 === 2 ? sparkle(48 + (i % 3) * 4, 8) : [])] });
   }),
-};
+}));
 
 export const sidekickFolio: Character = {
   id: "sidekick-folio",

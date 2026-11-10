@@ -9,6 +9,7 @@
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { GREX_PALETTE } from "../../characters/grex.ts";
 import { grain, groundShadow, paint, signBoard, signFace, tone, WARM, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const X_ = GREX_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -259,7 +260,7 @@ const frames: Frame[] = SPARKS.map((sp) => ({
   specks: sp.map(([dx, dy, k]): Speck => [FUSE_TIP[0] + dx, FUSE_TIP[1] + dy, k]),
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_GREX: Character = {
   id: "house-grex",

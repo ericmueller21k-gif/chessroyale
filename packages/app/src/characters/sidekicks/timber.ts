@@ -14,6 +14,7 @@
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#140d0b", // outline
@@ -206,8 +207,6 @@ function headPart(mood: Mood): Painted {
   if (f.blush) dots(cv, [[31, 31], [32, 31]], "q");
   return crop(cv);
 }
-const MOODS: readonly Mood[] = ["calm", "blink", "half", "happy", "cheer", "focus", "think", "thinkBlink", "smug", "rattled", "hurt", "out", "bold"];
-for (const m of MOODS) painted(`head:${m}`, () => headPart(m));
 
 /** The red crest at the back of the head, poking out from under the hat. */
 type Crest = "rest" | "flare" | "flat";
@@ -216,13 +215,13 @@ const CREST_PTS: Record<Crest, readonly Pt[]> = {
   flare: [[27, 20], [24, 11], [21.5, 17.5], [16.5, 11.5], [19.5, 20], [13, 16.5], [18.5, 23], [14, 24.5], [22, 26.5], [26.5, 26]],
   flat: [[27, 20], [20, 20], [13.5, 22.5], [19, 23], [14.5, 26.5], [20, 26], [17.5, 29], [23, 27.5], [26.5, 26]],
 };
-for (const c of ["rest", "flare", "flat"] as const)
-  painted(`crest:${c}`, () => {
-    const cv = canvas(W, H);
-    const L = roundL(22, 20, 7, 7);
-    paint(cv, inPoly(CREST_PTS[c]), (x, y) => redT(L(x, y)));
-    return crop(cv);
-  });
+// (Painted the first time a pose shows it, like the heads.)
+function crestPart(c: Crest): Painted {
+  const cv = canvas(W, H);
+  const L = roundL(22, 20, 7, 7);
+  paint(cv, inPoly(CREST_PTS[c]), (x, y) => redT(L(x, y)));
+  return crop(cv);
+}
 
 /** The tiny hard hat, painted per tilt (degrees, clockwise) about the middle of its brim. */
 function hatPart(tilt: number): Painted & { name: string } {
@@ -482,7 +481,7 @@ function build(p: Pose): Layer[] {
   // Crest, head, hat.
   const hx = (p.hx ?? 0) + dx;
   const hy = (p.hy ?? 0) + by;
-  add(painted(`crest:${p.crest ?? "rest"}`, () => ({ part: { grid: ["."] }, at: [0, 0] })), hx, hy);
+  add(painted(`crest:${p.crest ?? "rest"}`, () => crestPart(p.crest ?? "rest")), hx, hy);
   add(painted(`head:${p.mood ?? "calm"}`, () => headPart(p.mood ?? "calm")), hx, hy);
   const ht = p.hat ?? {};
   add(hatPart(ht.tilt ?? 0), hx + (ht.dx ?? 0), hy + (ht.dy ?? 0));
@@ -551,7 +550,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 
 /** Idle (~3 s): breathes and blinks, leans in and taps rat-a-tat on its plank (chips fly, the hat jiggles askew),
  * nods, satisfied, and pushes the hat straight with a wing tip. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     ...[0, 0, 1, 1, 0, 0].map((bob, i) => f(110, { bob, mood: i === 4 ? "blink" : "calm" })),
@@ -569,10 +568,10 @@ const idle: Anim = {
     f(140, { mood: "calm", wing: "fold" }),
     ...[0, 0, 1, 1, 0, 0, 1, 1, 0, 0].map((bob, i) => f(120, { bob, mood: i === 6 ? "blink" : "calm", tail: i === 2 ? 1 : i === 3 ? -1 : 0 })),
   ],
-};
+}));
 
 /** Walk (0.6 s): quick little hop-steps, the head bobbing forward, the tail flicking. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(100, { plank: false, air: 1, hx: 2, feet: { n: { x: 3, lift: 3 }, f: { x: -2 } }, tail: 1, wing: "tuck" }),
@@ -582,10 +581,10 @@ const walk: Anim = {
     f(100, { plank: false, bob: 1, hx: 1, feet: { f: { x: 2 }, n: { x: -1 } }, tail: -1 }, { cue: "step" }),
     f(100, { plank: false, bob: 0, hx: 0, tail: 0 }),
   ],
-};
+}));
 
 /** Sit (loops): perched on a stool facing the board, feet dangling and swinging, a slow blink, a thoughtful peck at the air. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const mood: Mood = i === 4 || i === 6 ? "half" : i === 5 ? "blink" : i >= 10 && i <= 12 ? "focus" : "calm";
@@ -593,10 +592,10 @@ const sit: Anim = {
     const hx = i === 11 ? 2 : i === 10 || i === 12 ? 1 : 0;
     return f(i === 11 ? 120 : 200, { sit: true, wing: "tuck", mood, hx, bob: i % 8 >= 4 ? 1 : 0, feet: { n: { x: swing ? 1 : -1 }, f: { x: swing ? -1 : 1 } } }, i === 11 ? { cue: "tap" } : {});
   }),
-};
+}));
 
 /** Wave (1.2 s): a happy wing wave with the hat wobbling, a rat-a-tat hello peck at the air, back to idle. */
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "happy", wing: "waveA" }),
@@ -611,10 +610,10 @@ const wave: Anim = {
     f(140, { mood: "happy", wing: "hat" }),
     f(160, { mood: "calm", wing: "fold" }),
   ],
-};
+}));
 
 /** Entrance: drops in on its shadow, lands with a squash and dust, the hat lands a beat later, a salute. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: dropShadow(4) },
@@ -628,18 +627,18 @@ const entrance: Anim = {
     f(160, { mood: "cheer", wing: "hat", hat: { dy: -1 } }, { specks: twinkles(1, 2) }),
     f(300, { mood: "calm" }),
   ],
-};
+}));
 
 /** Thinking (loops): eyes up, a wing tip on its chin, a foot tapping, thought dots. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", wing: "chin", hy: -1, bob: i % 6 >= 3 ? 1 : 0, feet: { n: i % 4 === 1 ? { lift: 2, x: 1 } : {} }, tail: i % 6 < 3 ? 1 : 0, hat: { tilt: -4 } }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a wing points at the board (orders!), a hop toward it, a nod. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, mood: "focus" }),
@@ -650,10 +649,10 @@ const move: Anim = {
     f(110, { hy: 1, mood: "happy" }),
     f(150, { mood: "calm" }),
   ],
-};
+}));
 
 /** A capture: a furious rat-a-tat on the plank, chips everywhere, then a proud little hop. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { hx: 1, mood: "focus", crest: "flare" }),
@@ -664,10 +663,10 @@ const capture: Anim = {
     f(100, { bob: 2, mood: "happy" }, { specks: dust(0) }),
     f(160, { mood: "smug", crest: "flare" }),
   ],
-};
+}));
 
 /** Hurt: a flash, eyes screwed shut, the hat pops up and lands askew; it shakes it off and puts the hat straight. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, hx: -1, mood: "hurt", wing: "flail", crest: "flare", hat: { dy: -4 } }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -678,10 +677,10 @@ const hurt: Anim = {
     f(120, { mood: "focus", wing: "hat" }),
     f(160, { mood: "calm" }),
   ],
-};
+}));
 
 /** Check: points at the board twice like giving orders, beak open, shout lines. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 1, mood: "focus", wing: "pointUp" }),
@@ -691,22 +690,22 @@ const check: Anim = {
     f(150, { hx: 1, mood: "bold", wing: "point", crest: "flare" }),
     f(170, { mood: "smug", wing: "hip", crest: "flare" }),
   ],
-};
+}));
 
 /** Smug: crest flared, chin up, eyes half shut, a wing on its hip, a slow nod. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: i === 6 ? "blink" : "smug", wing: "hip", crest: "flare", hy: i < 3 || i > 5 ? -1 : 0, hx: -1, bob: i % 4 === 2 ? 1 : 0, hat: { tilt: -5 } })),
-};
+}));
 
 /** Rattled: wide eyes, crest flat, sweat flying, trembling, the hat rattling on its head. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", wing: i % 2 ? "flail" : "hip", crest: "flat", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, hat: { tilt: i % 2 ? 6 : -6, dy: i % 4 === 0 ? -1 : 0 } }, { specks: sweat(i) })),
-};
+}));
 
 /** Defeat: a flash, the hat slides down over its eyes, it wobbles and plops down, stars circling (the last frame holds). */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "hurt", wing: "flail", crest: "flare", hat: { dy: -4 } }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -718,17 +717,17 @@ const defeat: Anim = {
     f(180, { plop: true, mood: "out", wing: "droop", crest: "flat", hat: { dy: 5 } }, { specks: dizzy(4, 30, 18) }),
     f(1000, { plop: true, mood: "out", wing: "droop", crest: "flat", hat: { dy: 5, tilt: 4 } }, { specks: dizzy(5, 30, 18) }),
   ],
-};
+}));
 
 /** Victory: hopping with joy, both wings up, the hat bouncing, sawdust confetti. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 3, 5, 6, 5, 3, 0, 0, 3, 5, 3, 0][i]!;
     const wings: WingName[] = ["up", "waveA", "waveB", "up", "waveB", "waveA", "up", "up", "waveA", "waveB", "waveA", "up"];
     return f(100, { bob: air === 0 ? 2 : 0, air, mood: air > 2 ? "happy" : "cheer", wing: wings[i]!, far: wings[i]!, crest: "flare", feet: air > 2 ? { n: { lift: 1 }, f: { lift: 1 } } : {}, hat: { dy: air >= 5 ? -2 : air > 0 ? -1 : 0, tilt: i % 4 < 2 ? 5 : -5 }, tail: air > 3 ? 1 : 0 }, { specks: sawdust(i), cue: i === 1 || i === 8 ? "tap" : undefined });
   }),
-};
+}));
 
 export const sidekickBeaver: Character = {
   id: "sidekick-beaver",

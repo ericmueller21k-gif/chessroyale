@@ -17,10 +17,11 @@
  */
 import type { Anim, Character } from "../sprite.ts";
 import { elfPalette, FOOT, frame, H, OUTFITS, PARTS, W, WALK, WALK_ARMS, type Look } from "../../town/shops/elf-rig.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const KEEPER: Look = { id: "keeper", hat: "santa", beard: true };
 
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     frame(KEEPER, 220, { mouth: "smile" }),
@@ -36,16 +37,16 @@ const idle: Anim = {
     frame(KEEPER, 220, { mouth: "smile" }),
     frame(KEEPER, 220, { bob: 1, mouth: "smile" }),
   ],
-};
-const walk: Anim = {
+}));
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: WALK.map((w, i) => frame(KEEPER, 110, { feet: w.feet, bob: w.bob, far: WALK_ARMS[i]![0], near: WALK_ARMS[i]![1], mouth: "grin", flop: w.bob }, i === 0 || i === 3 ? { cue: "step" } : {})),
-};
-const sit: Anim = {
+}));
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) => frame(KEEPER, 220, { sit: 11, bob: i % 5 === 2 ? 1 : 0, eyes: i === 6 ? "blink" : "open", mouth: i >= 3 && i <= 5 ? "grin" : "smile", near: [2, 4], far: [1, 4] })),
-};
-const wave: Anim = {
+}));
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     frame(KEEPER, 120, { mouth: "grin", near: [2, -3] }),
@@ -57,7 +58,7 @@ const wave: Anim = {
     frame(KEEPER, 130, { mouth: "grin", near: [2, -3] }),
     frame(KEEPER, 160, { mouth: "smile" }),
   ],
-};
+}));
 
 export const sidekickGingerElf: Character = {
   id: "sidekick-ginger-elf",

@@ -24,6 +24,7 @@
  */
 import { GREX, grexBuild, sparkSpray, type GrexPose } from "./grex.ts";
 import type { Anim, Character, Frame } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 type Pt = readonly [number, number];
 const OX = 20; // his drawing space on his frame (grex.ts)
@@ -52,7 +53,7 @@ const holler = (t: number, dy = 0): Frame["specks"] => {
 const CUP: Pt = [45, 1];
 const CALL: GrexPose = { headDy: 6, headDx: 2, mood: "shout", a: "high", feet: "wide" };
 
-const call: Anim = {
+const call: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(140, { ...CALL, mood: "grin", headDy: 2, a: "pump", flick: 0 }, 1, {}, [42, 9]),
@@ -64,8 +65,8 @@ const call: Anim = {
     fr(130, { ...CALL, big: true, flick: 6, a: "pump" }, 7, { specks: holler(1) }, CUP),
     fr(160, { mood: "grin", flick: 7 }, 8),
   ],
-};
-const waveOver: Anim = {
+}));
+const waveOver: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     fr(130, { b: "point", a: "high", mood: "grin", flick: 0 }, 11, { cue: "whoosh" }),
@@ -73,8 +74,8 @@ const waveOver: Anim = {
     fr(130, { b: "point", a: "pump", mood: "grin", flick: 2 }, 13),
     fr(130, { b: "wind", a: "high", mood: "laugh", flick: 3, bob: 1 }, 14),
   ],
-};
-const brag: Anim = {
+}));
+const brag: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(120, { a: "high", b: "high", mood: "grin", flick: 0 }, 21),
@@ -88,11 +89,11 @@ const brag: Anim = {
     fr(160, { a: "cross", b: "out", mood: "grin", flick: 8, crouch: 1 }, 29, { cue: "stomp" }),
     fr(180, { flick: 9 }, 30),
   ],
-};
+}));
 
 export const BOSS_GREX_INTRO: Character = {
   ...GREX,
   id: "grex-intro",
   name: "Jefferson (his intro)",
-  anims: { call, waveOver, brag, idle: { loop: true, frames: [GREX.anims.idle!.frames[0]!] } },
+  anims: { call, waveOver, brag, idle: lazyAnim(() => ({ loop: true, frames: [GREX.anims.idle!.frames[0]!] })) },
 };

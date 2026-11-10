@@ -32,7 +32,7 @@ const B = MOO_BEATS;
 type Orientation = "white" | "black";
 
 /** How long the held beams and the burned crescents take to fade once the crowd's move lands (ms): the longer of the two fades. */
-export const FADE_MS = Math.max(animLength(EFFECTS.moonbeam.ch.anims.fade!), animLength(EFFECTS.moonScorch.ch.anims.fade!)) + 20;
+export const FADE_MS = () => Math.max(animLength(EFFECTS.moonbeam.ch.anims.fade!), animLength(EFFECTS.moonScorch.ch.anims.fade!)) + 20;
 
 // ---------------- The beams on the board ----------------
 
@@ -66,7 +66,7 @@ export function heldMarks(boss: Pick<BossView, "id" | "startMove">, stunned: rea
   if (stunned.length) Object.assign(held, { squares: [...stunned], fadeAt: 0 });
   else if (held.squares.length) {
     if (!held.fadeAt) held.fadeAt = now;
-    if (now >= held.fadeAt + FADE_MS) Object.assign(held, { squares: [], fadeAt: 0 });
+    if (now >= held.fadeAt + FADE_MS()) Object.assign(held, { squares: [], fadeAt: 0 });
   }
   return { squares: held.squares, fadeAt: held.fadeAt };
 }

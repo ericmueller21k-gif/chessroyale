@@ -14,6 +14,7 @@
  */
 import { canvas, ellipse, inEllipse, roundLight, shade, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const SIDEKICK_PALETTE = {
   k: "#150c11", // outline (Boingo's)
@@ -625,7 +626,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 // ---- Animations.
 
 /** Idle (3 s): breathes, blinks, glances ahead, its pompom bobbing; now and then the flower gives a tiny squirt. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 30 }, (_, i) => {
     const bob = i % 15 >= 8 ? 1 : 0;
@@ -645,10 +646,10 @@ const idle: Anim = {
       armA: squirt && i >= 19 && i <= 21 ? "squeeze" : "hold",
     }, i === 19 ? { cue: "squirt" } : {});
   }),
-};
+}));
 
 /** Walk (0.6 s): a bouncy waddle in its big shoes, the head bobbing, the body swaying. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) => {
     const th = (i / 6) * Math.PI * 2;
@@ -671,10 +672,10 @@ const walk: Anim = {
       hairDx: i < 3 ? -1 : 0,
     }, contact ? { cue: "step" } : {});
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the chess table facing the board, shoes swinging, slow blinks, thinking about a move. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
@@ -695,11 +696,11 @@ const sit: Anim = {
       hairDx: lean ? 1 : 0,
     });
   }),
-};
+}));
 
 /** Wave (once, about 1.2 s): waves hello with its free hand and the flower squirts a little arc, then settles back to idle. */
 const WAVES: readonly ArmB[] = ["wave1", "wave2", "wave3", "wave2", "wave1", "wave2", "wave3"];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "happy", armB: "hip", flowerDy: 1 }),
@@ -722,10 +723,10 @@ const wave: Anim = {
     f(100, { mood: "happy" }),
     f(100, { mood: "calm" }),
   ],
-};
+}));
 
 /** Entrance: drops in from above on its shadow, lands with a squash and a puff of dust, then ta-da: arms up, a big squirt. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: dropShadow(4) },
@@ -740,10 +741,10 @@ const entrance: Anim = {
     f(120, { mood: "happy", armB: "hip", jet: stream(6, 8, 20) }),
     f(300, { mood: "calm" }),
   ],
-};
+}));
 
 /** Thinking (loops): head tipped up, eyes rolled up, a hand on the chin, a foot tapping, thought dots popping up. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, {
@@ -759,10 +760,10 @@ const thinking: Anim = {
       hatDx: 1,
     }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a hop toward the board and a squirt at it. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, mood: "bold", armA: "hip", flowerDy: 1, hatDy: 1 }),
@@ -773,10 +774,10 @@ const move: Anim = {
     f(110, { dx: 1, mood: "happy", armA: "hip" }),
     f(150, { mood: "calm" }),
   ],
-};
+}));
 
 /** A capture: two excited hops, both arms up, a big squirt, twinkles and confetti. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "bold", armA: "hip", armB: "hip", hatDy: 1 }),
@@ -791,10 +792,10 @@ const capture: Anim = {
     f(120, { bob: 1, mood: "happy", armA: "hip" }),
     f(160, { mood: "smug", armA: "hip", armB: "hip" }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, the flower squeezed so it dribbles, its hat knocked off; then a brave little grin. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, mood: "hurt", armA: "down", armB: "down", hatDy: -4, pomDy: -2, jet: { head: 9, a: 0.5, b: 0.09 } }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -805,11 +806,11 @@ const hurt: Anim = {
     f(120, { mood: "bold", armA: "hip", armB: "hip", hatDx: 1 }),
     f(160, { mood: "calm" }),
   ],
-};
+}));
 
 /** Check: two sharp jabs of squirt at the board, eyes bright. */
 const JAB: Pose = { bob: 1, dx: 1, mood: "bold", armA: "point" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "bold", armA: "up", armB: "hip" }),
@@ -821,27 +822,27 @@ const check: Anim = {
     f(110, { dx: 1, mood: "happy", armA: "point", jet: stream(4, 5, 21) }),
     f(160, { mood: "smug", armA: "hip", armB: "hip" }),
   ],
-};
+}));
 
 /** Smug: chin up, eyes half shut, a little smirk, a slow nod, hands on hips. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(150, { mood: "smug", armA: "hip", armB: "hip", hy: i < 3 || i > 5 ? -1 : 0, hx: i < 4 ? 0 : 1, bob: i % 4 === 2 ? 1 : 0, pomDy: i % 4 === 2 ? 1 : 0, hatDx: i >= 4 ? 1 : 0, hairDx: i >= 4 ? 1 : 0 }, i === 5 ? { specks: star(TX + 8, G - 17, "H") } : {}),
   ),
-};
+}));
 
 /** Rattled: wide eyes, worried brows, sweat flying, trembling, the flower dribbling in fright. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(80, { mood: "rattled", armA: "side", armB: "hip", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, hatDy: i % 2 ? 1 : 0, pomDy: i % 2 ? -1 : 1, hairDx: i % 2 ? 1 : -1, flowerDy: i % 2 }, { specks: [...sweat(i), [TX + 7 + (i % 2), G - 10 + ((i * 2) % 5), "b"]] }),
   ),
-};
+}));
 
 /** Defeat: hit, dizzy eyes, the hat flies off, it plonks down on the ground, legs out, the flower wilting (the last frame holds). */
 const SLUMP: Pose = { slump: true, bob: 8, mood: "out", armA: "floor", armB: "ground", hatOff: "ground", flower: "wilt" };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "hurt", armA: "down", armB: "down", hatDy: -5, jet: { head: 9, a: 0.5, b: 0.09 } }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -853,10 +854,10 @@ const defeat: Anim = {
     f(160, { ...SLUMP, hy: 2 }, { specks: dizzy(4, 21, 22) }),
     f(1000, { ...SLUMP, hy: 2, hx: 1 }, { specks: dizzy(5, 21, 22) }),
   ],
-};
+}));
 
 /** Victory: jumping for joy, both arms up, the flower squirting arcs, confetti. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 3, 5, 6, 5, 3, 0, 0, 3, 5, 3, 0][i]!;
@@ -874,7 +875,7 @@ const victory: Anim = {
       jet: stream(i, 12, 21),
     }, { specks: [...confetti(i), ...twinkles(i, 1)], cue: i === 2 ? "squirt" : undefined });
   }),
-};
+}));
 
 export const sidekickBoingo: Character = {
   id: "sidekick-boingo",

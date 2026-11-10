@@ -14,7 +14,7 @@
 import { LAST_STAND, lastStandAttackHits } from "@chessroyale/chess";
 import { bannerPlusMs } from "@chessroyale/core";
 import { canvas, edge, ellipse, inEllipse, line, poly, roundLight, shade, tint, toGrid } from "./paint.ts";
-import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GOD_KING_PALETTE = {
   k: "#16121b", // outline
@@ -598,42 +598,42 @@ const breath = (i: number) => (i >= 6 && i < 18 ? 1 : 0);
 const wave = (i: number, n = FRAMES) => (i / n) * Math.PI * 2;
 
 /** Idle: he breathes, his cape ripples, the flame flickers and sheds embers, his eyes glint now and then. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: FRAMES }, (_, i) =>
     f(100, { bob: breath(i), flick: i, wave: wave(i), flap: i >= 8 && i < 16, eyes: i === 10 || i === 11 ? "hot" : "glow" }, { specks: embers("hold", i) }),
   ),
-};
+}));
 
 /** Appearing on the board out of the beam: landed low, he rises. */
-const appear: Anim = {
+const appear: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { crouch: 3, arm: "plant", eyes: "hot", flick: 0 }, { cue: "appear" }),
     f(80, { crouch: 1, arm: "hold", flick: 1 }),
     f(90, { arm: "hold", flick: 2 }),
   ],
-};
+}));
 
 const RAISED: KingPose = { arm: "raise", flame: "flare", eyes: "hot" };
 /** Raising his sword: up over his head, the flame flares, his eyes blaze. */
-const raise: Anim = {
+const raise: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { arm: "mid", eyes: "hot", flick: 0 }),
     f(70, { ...RAISED, bob: -1, flick: 1 }, { cue: "raise", specks: [...burst("raise", 3), ...eyeFlare(RAISED, true)] }),
     f(110, { ...RAISED, flick: 2 }, { specks: [...burst("raise", 5), ...eyeFlare(RAISED)] }),
   ],
-};
+}));
 /** Sword raised: the flame roars, his cape stirs. */
-const raised: Anim = {
+const raised: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) =>
     f(100, { ...RAISED, flick: i, wave: wave(i, 6), flap: i % 3 === 0, bob: i >= 3 ? 1 : 0, eyes: i % 3 === 1 ? "glow" : "hot" }, { specks: embers("raise", i, 3, "flare") }),
   ),
-};
+}));
 /** His bolt: a sweep forward, the sword pointed and blazing as the bolt leaves its tip, then up again. */
-const point: Anim = {
+const point: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { ...RAISED, arm: "back", flick: 0 }),
@@ -642,9 +642,9 @@ const point: Anim = {
     f(100, { ...RAISED, arm: "point", flick: 0, eyes: "glow" }),
     f(90, { ...RAISED, arm: "mid", flick: 1 }),
   ],
-};
+}));
 /** One slash: back over his head, then a cut down across his front, a crescent of light behind the blade. */
-const slash: Anim = {
+const slash: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(60, { ...RAISED, arm: "back", flick: 0 }),
@@ -653,23 +653,23 @@ const slash: Anim = {
     f(90, { ...RAISED, arm: "down", flick: 0, eyes: "glow" }),
     f(90, { ...RAISED, arm: "mid", flick: 1 }),
   ],
-};
+}));
 
 /** Lowering his sword after commanding it from his spot, back to how he stands by. */
-const lower: Anim = {
+const lower: Anim = lazyAnim(() => ({
   loop: false,
   frames: [f(90, { ...RAISED, arm: "mid", flame: "lit", eyes: "glow", flick: 0 }, { cue: "lower" }), f(90, { arm: "hold", flick: 1 })],
-};
+}));
 
 /** His leap out of the dock (his Last Stand): a crouch, then up, sword raised. */
-const leap: Anim = {
+const leap: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { crouch: 4, arm: "hold", eyes: "hot" }, { cue: "leap" }),
     f(120, { bob: -2, arm: "raise", flame: "flare", eyes: "hot", flick: 1 }),
     f(230, { bob: -2, arm: "raise", flame: "flare", eyes: "hot", flick: 2 }),
   ],
-};
+}));
 
 /** Fallen: on his side, cracked, eyes dark, the flame down to embers, his crown rolled off beside him. */
 function fallenFrame(ms: number, i: number, extra: Partial<Frame> = {}): Frame {
@@ -701,10 +701,10 @@ function fallenFrame(ms: number, i: number, extra: Partial<Frame> = {}): Frame {
     ...(extra.cue ? { cue: extra.cue } : {}),
   };
 }
-const fallen: Anim = { loop: true, frames: [0, 1, 2, 3, 4, 5].map((i) => fallenFrame(160, i)) };
+const fallen: Anim = lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3, 4, 5].map((i) => fallenFrame(160, i)) }));
 
 /** Rising again (the result screen, if the crowd won): from the ground to one knee, up, and his sword raised. */
-const rise: Anim = {
+const rise: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fallenFrame(200, 0, { cue: "rise" }),
@@ -713,7 +713,7 @@ const rise: Anim = {
     f(140, { crouch: 1, arm: "mid", eyes: "hot" }),
     f(200, { ...RAISED, flick: 1 }, { specks: [...burst("raise", 5), ...eyeFlare(RAISED, true)] }),
   ],
-};
+}));
 
 /**
  * His Last Stand, from the moment he starts to fall onto the piece's square (LAST_STAND.fallAt): the dive, the
@@ -786,15 +786,15 @@ function lastStandsNow(): { lastStand: Anim; lastStandAttacked: Anim } {
 }
 
 /** His portraits for the banners: sword raised, eyes blazing; and battle-worn (cracked, eyes dim, a few red drops). */
-const portrait: Anim = { loop: true, frames: [f(1000, { ...RAISED, flick: 1, wave: 0 }, { specks: eyeFlare(RAISED) })] };
-const portraitHurt: Anim = {
+const portrait: Anim = lazyAnim(() => ({ loop: true, frames: [f(1000, { ...RAISED, flick: 1, wave: 0 }, { specks: eyeFlare(RAISED) })] }));
+const portraitHurt: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(1000, { arm: "hold", flame: "dim", cracks: 3, eyes: "dim", bob: 1, wave: 0 }, {
       specks: [[OX + 34, OY + 12, "r"], [OX + 34, OY + 13, "R"], [OX + 25, OY + 27, "r"], [OX + 26, OY + 28, "R"], [OX + 13, OY + 24, "r"]],
     }),
   ],
-};
+}));
 
 const ANIMS = {
   idle,

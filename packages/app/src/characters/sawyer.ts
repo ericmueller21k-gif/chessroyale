@@ -14,7 +14,7 @@
  * SAWYER_LINES, his sounds characters/sawyer-sounds.ts.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
 
@@ -534,14 +534,14 @@ const SWISH = [0, 0, 1, 1, 1, 1, 0, 0, -1, -1, -2, -2, -2, -2, -1, -1, 0, 0] as 
  * Idle: the blade buzzes in and out the whole time, his tail swishes slowly side to side, he bobs on his knees; he
  * blinks, and halfway through he smirks (one brow up, the grin pulled to one side). Silent.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 54 }, (_, i) => {
     const mood: Mood = i === 9 || i === 40 ? "blink" : i >= 22 && i < 32 ? "smirk" : "grin";
     const bob = Math.floor(i / 6) % 3 === 2 ? 1 : 0;
     return f(90, { mood, bob, swish: SWISH[Math.floor(i / 3) % SWISH.length]!, saw: { stroke: STROKES[i % 4]! } });
   }),
-};
+}));
 
 /** Sawdust spraying off the blade's teeth, down and forward, `t` frames on (frame pixels). */
 function spray(p: SawyerPose, t: number, n = 12): Speck[] {
@@ -572,7 +572,7 @@ const tipOf = (p: SawyerPose): Pt => {
 };
 
 /** Rev: he squeezes the trigger, the saw shakes in his hands and screams, sawdust flies; a wild grin. */
-const rev: Anim = (() => {
+const rev: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [f(120, { mood: "smirk", bob: 1, saw: { tilt: 12 } })];
   for (let i = 0; i < 12; i++) {
     const p: SawyerPose = { mood: "glee", saw: { tilt: 17 + (i % 2), stroke: i % 2 ? 2 : 0 }, hatDrop: i % 2, swish: i % 4 < 2 ? 0 : -1 };
@@ -581,7 +581,7 @@ const rev: Anim = (() => {
   frames.push(f(120, { mood: "glee", saw: { tilt: 15, stroke: 1 } }, { specks: spray({ saw: { tilt: 15, stroke: 1 } }, 13, 5) }));
   frames.push(f(200, { mood: "smirk" }));
   return { loop: false, frames };
-})();
+})());
 
 /**
  * Saw down: he lifts the saw, leans in and drives it straight down in front of him (`swing`), the blade biting at the
@@ -590,7 +590,7 @@ const rev: Anim = (() => {
 const DOWN: SawyerPose = { mood: "squint", bob: 2, lean: -2, headDx: -1, saw: { at: [31, 44], tilt: -36 } };
 /** Where the blade's tip bites, driven down (drawing space). */
 export const CUT: Pt = tipOf({ ...DOWN, saw: { ...DOWN.saw, stroke: 2 } });
-const sawDown: Anim = {
+const sawDown: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { mood: "fierce", bob: 1, saw: { at: [26.5, 35], tilt: 20 } }),
@@ -602,14 +602,14 @@ const sawDown: Anim = {
     f(150, { mood: "smirk", bob: 1, saw: { tilt: 10 } }),
     f(200, { mood: "smirk" }),
   ],
-};
+}));
 
 /**
  * A leap (onto the board, and back to his corner: the board moves him along his arc): a crouch, off the ground at
  * `upAt` with his feet tucked up, down again at `landAt` (cue `hop`: a soft thump), and up straight.
  */
 export const LEAP = { upAt: 100, landAt: 600 } as const;
-const leap: Anim = {
+const leap: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { mood: "fierce", bob: 2, saw: { at: [27.5, 38], tilt: 16 } }),
@@ -618,21 +618,21 @@ const leap: Anim = {
     f(90, { mood: "grin", bob: 2, saw: { tilt: 10 } }, { cue: "hop", shake: [0, 1] }),
     f(110, { mood: "grin", bob: 1 }),
   ],
-};
+}));
 
 /**
  * The board saw: he saws his way up the board, the blade down and biting (where `CUT` is) the whole way, stepping as
  * he goes, sawdust bursting off it; the big saw's sound from its first frame (cue `bigsaw`). About BOARD_SAW.runMs long
  * (the board moves him up the middle).
  */
-const boardSaw: Anim = {
+const boardSaw: Anim = lazyAnim(() => ({
   loop: false,
   frames: Array.from({ length: 19 }, (_, i) => {
     const step = i % 4;
     const feet: SawyerPose["feet"] = step === 0 ? { l: [-2, -2] } : step === 2 ? { r: [2, -2] } : {};
     return f(90, { ...DOWN, bob: step % 2 ? 2 : 1, feet, saw: { ...DOWN.saw, stroke: i % 2 ? 0 : 2 } }, { ...(i === 0 ? { cue: "bigsaw" } : {}), shake: [i % 2 ? 1 : 0, 0], specks: burst(CUT, i % 5, 12) });
   }),
-};
+}));
 
 /**
  * What he says (his text box: speech.tsx): short, a builder's patter. Reactions are rare (each moment's chance in
@@ -716,7 +716,7 @@ const sawAt = (i: number, bite: boolean): SawyerPose =>
  * then saws at the king nonstop: ten bites, one on each hit (cues `cut` and `swing` in turn, so the repeats don't pile
  * up), sawdust bursting out of the cut each time; a gleeful rev of the arms, and he leaps off. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const tuck = { l: [2, -5] as Pt, r: [-2, -5] as Pt };
   const frames: Frame[] = [
@@ -746,7 +746,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})());
 
 /**
  * Sawyer for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, facing our left as
@@ -760,5 +760,5 @@ export const SAWYER_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [SAWYER.foot[0] + ATTACK_REACH, SAWYER.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(1000, {})] })), kingAttack },
 };

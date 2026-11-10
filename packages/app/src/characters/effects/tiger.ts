@@ -15,7 +15,7 @@
  *                away, leaving the real piece. Drawn over the square's piece.
  */
 import { canvas, inEllipse, toGrid } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 import { BALLOON_COLORS, BALLOON_PIECES, balloonDrawing, balloonLooks, balloonPartOf, knotX, stringPart, type BalloonLook, type BalloonPiece } from "../tiger-bar.ts";
 import { SQUARE, hitAnims, sparkle } from "./common.ts";
 
@@ -285,7 +285,7 @@ export const HOOP_RING: Character = {
   palette: HOOP_PAL,
   parts: ringParts.parts,
   anims: {
-    land: {
+    land: lazyAnim(() => ({
       loop: false,
       frames: [
         fr(70, [ring({ flame: 4, heat: 2, seed: 1, s: 0.3, lift: 22 })], { cue: "whoosh" }),
@@ -293,10 +293,10 @@ export const HOOP_RING: Character = {
         fr(80, [ring({ flame: 2, heat: 2, seed: 3 })], { cue: "thump" }),
         fr(110, [ring({ flame: 10, heat: 2, seed: 4 })], { cue: "flame", specks: sparks(1, 14, 8) }),
       ],
-    },
-    burn: { loop: true, frames: [5, 6, 7, 8].map((seed, i) => fr(110, [ring({ flame: [9, 7, 10, 8][i]!, heat: 2, seed })])) },
-    dying: { loop: true, frames: [9, 10, 11, 12].map((seed, i) => fr(150, [ring({ flame: [4, 3, 4, 3][i]!, heat: 1, seed })], { specks: sparks(seed, 6, 4) })) },
-    out: {
+    })),
+    burn: lazyAnim(() => ({ loop: true, frames: [5, 6, 7, 8].map((seed, i) => fr(110, [ring({ flame: [9, 7, 10, 8][i]!, heat: 2, seed })])) })),
+    dying: lazyAnim(() => ({ loop: true, frames: [9, 10, 11, 12].map((seed, i) => fr(150, [ring({ flame: [4, 3, 4, 3][i]!, heat: 1, seed })], { specks: sparks(seed, 6, 4) })) })),
+    out: lazyAnim(() => ({
       loop: false,
       frames: [
         fr(90, [ring({ flame: 1, heat: 0, seed: 13, charred: true })]),
@@ -305,7 +305,7 @@ export const HOOP_RING: Character = {
         fr(90, [smoke(3, 4, true)]),
         fr(20, []),
       ],
-    },
+    })),
   },
 };
 
@@ -330,7 +330,7 @@ export const HOOP_FLY: Character = {
   foot: [SQUARE / 2, SQUARE],
   palette: HOOP_PAL,
   parts: flyParts.parts,
-  anims: { fly: { loop: true, frames: [0, 1, 2, 3].map((t) => fr(70, [(flyParts.add(`fly:${t}`, () => flyingHoop(t)), { part: `fly:${t}`, x: 0, y: 0 })])) } },
+  anims: { fly: lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((t) => fr(70, [(flyParts.add(`fly:${t}`, () => flyingHoop(t)), { part: `fly:${t}`, x: 0, y: 0 })])) })) },
 };
 
 /** His attack's hit on a king's square (`hit<H|L><L|R>`, about 200 ms): a balloon bonks on him and pops, scraps flying. */
