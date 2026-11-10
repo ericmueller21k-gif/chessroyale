@@ -2,7 +2,7 @@ import { useLayoutEffect, useRef } from "preact/hooks";
 import { bossKit } from "../characters/kits.ts";
 import { SQUARE } from "../characters/effects.ts";
 import { EFFECTS, animLength, type EffectName } from "../characters/power-art.ts";
-import { renderFrame, type Character, type Frame } from "../characters/sprite.ts";
+import { renderFrame, type Anim, type Character, type Frame } from "../characters/sprite.ts";
 import { play, type SoundName } from "../sound.ts";
 import { cueHaptic } from "../haptics.ts";
 
@@ -113,6 +113,25 @@ export function prewarm(name: EffectName, frames: readonly (readonly [string, nu
     if (i >= frames.length) stop();
   });
   return () => stop();
+}
+
+/**
+ * Characters' animations made ahead (their frames' poses, made the first time they're read: sprite.ts lazyAnim): about 4 ms
+ * of work at a time with a pause between (one big move can take longer: frames still draw between them), then `done`. So a
+ * boss's battle builds his moves while it loads, not in one stall the first time one shows. Returns a cancel.
+ */
+export function prewarmAnims(anims: readonly Anim[], done?: () => void): () => void {
+  let i = 0;
+  let timer = 0;
+  const slice = () => {
+    const t0 = performance.now();
+    do void anims[i++]?.frames;
+    while (i < anims.length && performance.now() - t0 < 4);
+    if (i < anims.length) timer = window.setTimeout(slice, 50);
+    else done?.();
+  };
+  timer = window.setTimeout(slice, 50);
+  return () => clearTimeout(timer);
 }
 
 /**
