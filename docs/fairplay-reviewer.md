@@ -50,7 +50,8 @@ agree. Background: DECISIONS.md, "Fair play"; the numbers behind the thresholds:
 - `notice` (optional) replaces the standard sentence in the player's email (a clearing after a review).
 - `ban` is always refused (`409`, the case stays as it was): a ban is a person's (Nov 10). The ban bar's evidence still rests on the
   judges' numbers, which devices send, so a leaked token or a steered reviewer could ban an honest player. Detection never bans:
-  at the ban bar it puts the player in the engine pool (`policy.enforcement` "pool"; status `pool`).
+  at the ban bar on two matches it puts the player in the engine pool (`policy.enforcement` "pool"; status `pool`); on one match it
+  opens a review ("level ban on one match"), yours to weigh like any other: one lobby's judges may have forged it.
 - Answers `{ ok: true, status, by }`, or `400` (no reason, a bad decision), `404` (no such player), `409` (a banned
   case, a pooled one, one with an open appeal, or the case of a deleted account: those are for a person).
 
