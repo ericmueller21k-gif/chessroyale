@@ -174,7 +174,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
   // POST /api/e2e/sql: the e2e tests' writes to the local database, on its one writer (e2e-sql.ts; the e2e's local server only).
-  if (rawEnv.E2E_SQL === "1") {
+  if (rawEnv.E2E_SQL) {
     const res = await e2eSql(request, url, rawEnv);
     if (res) return res;
   }

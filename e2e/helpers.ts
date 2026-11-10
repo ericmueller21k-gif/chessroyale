@@ -494,7 +494,7 @@ export const townReady = (page: Page) => expect(page.locator("canvas.town-canvas
  * held the file's lock, a request on the server failed with SQLITE_BUSY, a 500 in whatever test was open. Nov 10.)
  */
 export async function localSql<T = Record<string, unknown>>(page: Page, sql: string, ...params: (string | number)[]): Promise<T[]> {
-  const res = await page.request.post("/api/e2e/sql", { data: { sql, ...(params.length ? { params } : {}) } });
+  const res = await page.request.post("/api/e2e/sql", { data: { sql, ...(params.length ? { params } : {}) }, headers: { "x-e2e-sql": process.env.E2E_SQL_KEY ?? "" } });
   if (!res.ok()) throw new Error(`local sql failed (${res.status()}): ${(await res.text()).slice(0, 500)}\n${sql}`);
   return ((await res.json()) as { rows: T[] }).rows;
 }
