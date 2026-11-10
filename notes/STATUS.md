@@ -1,3 +1,4 @@
+- Nov 10 14:35 UTC: #611 fix round done (c87ce56; head 2af2bd0). Delta review started; CI running.
 - Nov 10 13:56 UTC: #611 review: B1 blocker (honest devices differ -> strikes + stronger boss), M1-M4, E1 Maia 40 MB (chose c: phone only if Maia already cached), m1-m7. Fix helper on claude/fable-b3. ASK ERIC: Squads party alone with bots earns no coins/crates by design?
 - Nov 10 13:36 UTC: Fable b3 PR #611 open (full-e2e). 2nd device loads Maia 40 MB in raids (flag to Eric). Review on review/fable-b3.
 - Nov 10 12:56 UTC: #610 LIVE 6dea498. Main run 42817948595: shards green; flaky search-home.spec.ts:61 [phone] (toEqual) -> flaky batch 7 = tiger:305, recluse:824, search-home:61 (after Fable b3; one xhigh at a time).
