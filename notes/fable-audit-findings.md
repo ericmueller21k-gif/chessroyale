@@ -225,10 +225,9 @@ moves checked or made by the server; fair play set to "review", not "ban", until
 
 ## Still to come
 
-Three reviewers had not reported when this was written: phone performance (a real build, bundle contents, load
-and idle cost on an emulated phone), the rules engine and every boss (scoring math, broken positions, state lost
-on save and restore), and tests and dead code (unused code, duplication, tests that can't fail, docs the code
-contradicts). If their results follow, they are in `fable-audit-findings-2.md` beside this file.
+The last three reviews (phone performance; the rules engine and bosses; tests and dead weight) are in
+`fable-audit-findings-2.md` beside this file, with two corrections to this one (the stylesheet is not worth
+splitting; the lobbies share a shape, not copied lines).
 
 ## Not covered
 
