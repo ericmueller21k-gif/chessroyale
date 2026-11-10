@@ -1,3 +1,4 @@
+- Nov 10 23:00 UTC: #622 review: no blocker; M1 token path must close by a dedicated TEST_ACCOUNTS_CLIENT_ID (I fill it in wrangler vars = CF_ACCESS_CLIENT_ID2 client id), M2 test accounts as reporters, M3 demo claim unproven vs SF 17.1 -> live run decides. Fix round started.
 - Nov 10 22:45 UTC: #624 loading bar (I resolved a merge conflict with #620) CI; #625 schema-fast (full-e2e) CI + review. #622 cheater demo review pending. #623 desktop quests CI.
 - Nov 10 22:30 UTC: #620 load fix + #621 town rider MERGED. #623 desktop Daily Quests CI. #622 cheater demo CI + review. Loading bar + schema-fast helpers running.
 - Nov 10 22:15 UTC: cheater demo PR #622 (full-e2e; users.test column; admin test-accounts route). Local: Eddie pooled, Sam clean. Review (one round). Live run after deploy.
