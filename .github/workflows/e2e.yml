@@ -196,9 +196,18 @@ jobs:
       - name: Summary
         if: ${{ needs.plan.result == 'success' }}
         run: node e2e/ci-summary-merge.mjs "$SHARDS" e2e-summary "$NOTE" >> "$GITHUB_STEP_SUMMARY"
+      # (A run red with no failed test, Nov 9 audit F2: GitHub dropped the shards or this job. Said plainly, so the director
+      # re-runs it once instead of hunting for a test.)
       - name: The plan and every shard green
         if: ${{ needs.plan.result != 'success' || needs.shard.result != 'success' }}
-        run: exit 1
+        env:
+          PLAN: ${{ needs.plan.result }}
+          SHARD: ${{ needs.shard.result }}
+        run: |
+          if [ "$PLAN" = "success" ] && [ "$SHARD" != "failure" ]; then
+            echo "### No test failed: the shards were $SHARD (GitHub didn't run them). Re-run this run once." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit 1
 
   perf:
     if: ${{ inputs.perf }}
