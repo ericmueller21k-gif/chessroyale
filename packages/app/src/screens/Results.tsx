@@ -16,6 +16,9 @@ import { exitFor } from "../match-exit.ts";
 import { TokenBox } from "../components/TokenBox.tsx";
 import { XpResult, useGameXp } from "../components/XpResult.tsx";
 
+/** An online match where one device's word stood alone (LobbyRecord.unvouched: nobody could check a host's scores or the boss's move). */
+export const UNVOUCHED_LINE = "Only one device checked this match: it pays as a solo game.";
+
 export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeText = "Home" }: { match: GameView; placement: number; winner: string; onAgain: () => void; onHome: () => void; /** Its leaving button's words: "Back to town" after a boss challenged in the town. */ homeText?: string }) {
   const played = match.moves.filter((m) => m.move !== null);
   const [review, setReview] = useState(false);
@@ -150,7 +153,9 @@ export function ResultsScreen({ match, placement, winner, onAgain, onHome, homeT
         )}
         {/* Whether it counted for your ranking, in words (the rule: RANKING in settings.ts). */}
         {/* (A boss battle's solo note: it says nothing of ranking, Eric, Nov 8; a lobby's line stays.) */}
-        {match.ranked === false && (match.serverPaced || !bossResult) && (
+        {/* (One device's word stood alone somewhere in it: why it pays as a solo game, in place of the unranked line.) */}
+        {match.unvouched && <p class="results-unranked">{UNVOUCHED_LINE}</p>}
+        {match.ranked === false && !match.unvouched && (match.serverPaced || !bossResult) && (
           <p class="results-unranked">
             {match.serverPaced
               ? `Unranked: fewer than ${rankedMinHumans(match.settings.lobbySize)} real players, so your ranking didn't change.`

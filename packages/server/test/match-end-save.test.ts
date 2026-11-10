@@ -152,6 +152,8 @@ async function lobbyOn(db: D1Database, rec: LobbyRecord) {
 
 async function world(n: number) {
   const { core, rec, ids } = raidToTheEnd(n);
+  // (One device scored and played the boss in this raid (unvouched): taken as a checked match's, so fair play's rows are written.)
+  delete rec.unvouched;
   const { sql, d1, db } = memoryDb();
   await ensureSchema(sql);
   rec.accounts = {};
@@ -187,6 +189,14 @@ describe("a match's end: saved once, a few players a wake, a failure kept and re
     for (let i = 0; i < 20 && w.rec.saveQueue?.length; i++) expect(await w.lobby.writeResults()).toBe(true);
     expect({ results: w.count("results"), fair: w.count("fairplay_matches"), ledger: w.count("ledger") }).toEqual(rows);
   }, 60_000);
+
+  it("a match that rested on one device's word (unvouched) writes its results but no fair-play rows (the review of #611, m4)", async () => {
+    const w = await world(3);
+    w.rec.unvouched = "the host scored a round alone";
+    w.lobby.queueResults(w.core, w.rec);
+    for (let i = 0; i < 20 && w.rec.saveQueue?.length; i++) expect(await w.lobby.writeResults()).toBe(true);
+    expect({ results: w.count("results"), fair: w.count("fairplay_matches") }).toEqual({ results: 3, fair: 0 });
+  });
 
   it("at most MATCH_SAVE.perWake players a wake, so a wake's D1 calls stay far under D1's 1,000 a invocation", async () => {
     (MATCH_SAVE as Record<string, number>).perWake = 4;

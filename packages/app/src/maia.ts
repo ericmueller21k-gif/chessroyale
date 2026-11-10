@@ -122,6 +122,9 @@ async function allSaved(): Promise<boolean> {
   }
 }
 
+/** Maia's files are all saved on this device already (loading it downloads nothing): a phone may check the boss's moves (BOSS_CHECK). */
+export const maiaSaved = allSaved;
+
 /** Reads one file to its end, counting its bytes as they come; none are kept (the service worker keeps the file). */
 async function readCounting(url: string, slot: FileProgress): Promise<void> {
   const res = await fetch(url);

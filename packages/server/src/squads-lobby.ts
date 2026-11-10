@@ -220,6 +220,8 @@ export interface WorkJob {
   queued?: true;
   /** Another job is already working on this position (e.g. every board from the same start): this one takes its answer. */
   follows?: string;
+  /** Settled on one answer while these devices were still searching: their answers are compared when they come (lateTop). */
+  late?: string[];
 }
 
 /**
@@ -286,6 +288,8 @@ export interface SquadsReward {
   coins: number;
   crates: number;
   recorded: boolean;
+  /** Why a placement that pays had nothing: "daily" (the daily cap). */
+  why?: "daily";
   /** XP (Nov 9; squads-do.ts): their own moves and their time in the lobby's games (`xpSpan`), and how they left, if they did. */
   moves?: number;
   playMs?: number;
@@ -342,6 +346,19 @@ export interface SquadsRecord {
   botShop?: Record<number, number>;
   /** A test control was used here: nothing more is recorded or rewarded. */
   testUsed?: boolean;
+  /**
+   * The outside review of Nov 10 (finding 5) and its review (M4), by squad id: a squad whose own match's bot work its own party's devices
+   * answered with no other party's device up to ask (one person alone, or one party with only bots), and why, the first time. Noted
+   * for the logs only: its placement pays as any, under the daily cap (Eric, Nov 10). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  unvouched?: Record<number, string>;
+  /**
+   * A late answer that disagreed with the one used (lateTop): its position and the two answers, by device, until the server's verdict
+   * (or, with no engine server, the `referee` device's answer).
+   */
+  lateChecks?: Record<string, { fen: string; tops: Record<string, MoveScore[]>; referee?: string }>;
+  /** People whose placement reward the daily cap took (SQUADS_LOBBY.rewardsPerDay: its write found today's spent), told so. */
+  capped?: Record<string, true>;
   /** XP (Nov 9): when the bracket began, and each person's own moves (halves they acted in) and when their last one went in. */
   bracketAt?: number;
   played?: Record<string, { moves: number; at: number }>;
@@ -519,6 +536,9 @@ export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: num
 const TOP_CACHE = new Map<string, MoveScore[]>();
 /** For tests: forget the shared cache. */
 export const clearTopCache = () => TOP_CACHE.clear();
+
+/** When a job's second answer is out of time: graceMs after the first, or graceFactor of the first's own time if longer (as JUDGES). */
+const graceUntil = (job: WorkJob) => job.firstAt! + Math.max(SQUADS_LOBBY.botWork.graceMs, SQUADS_LOBBY.botWork.graceFactor * (job.firstAt! - job.sentAt));
 
 const mineIn = (m: SquadsMatch, id: string) => m.sides.some((x) => x.seats.includes(id));
 
@@ -1042,6 +1062,10 @@ export class SquadsCore {
     }
     this.r.bracket = bracket;
     this.r.bracketAt = this.io.now();
+    // (One party in the whole lobby (one person, or friends with only bots): every bot move is that party's word, or the server's
+    // quick look when its devices don't answer. Noted for the logs; its squads are paid as any (Eric, Nov 10).)
+    const parties = new Set(this.r.squads.flatMap((sq) => sq.players.filter((p) => !p.isBot).map((p) => this.human(p.id)?.partyId || p.id)));
+    if (parties.size < 2) for (const sq of this.r.squads) if (sq.players.some((p) => !p.isBot)) this.unvouchSquad(sq.id, "one party in the lobby");
     this.placeNew();
     // Mercenary: every squad's wallet. A test lobby that starts after round 1 gives the squads still in a wallet to shop
     // with, and its intro is long enough to shop in (their shops are open until their first match starts).
@@ -1237,7 +1261,7 @@ export class SquadsCore {
     for (const job of Object.values(half.work)) {
       // (A queued job waits for a device to answer something; one following a twin, for the twin.)
       if (job.how || job.queued || job.follows) continue;
-      if (job.firstAt !== undefined) out.push(job.firstAt + SQUADS_LOBBY.botWork.graceMs);
+      if (job.firstAt !== undefined) out.push(graceUntil(job));
       out.push(job.sentAt + SQUADS_LOBBY.botWork.answerMs);
       if (job.refereeAt !== undefined) out.push(job.refereeAt + SQUADS_LOBBY.botWork.answerMs);
     }
@@ -1723,7 +1747,7 @@ export class SquadsCore {
         continue;
       }
       if (job.queued) continue;
-      if (job.firstAt !== undefined) out.push(job.firstAt + SQUADS_LOBBY.botWork.graceMs);
+      if (job.firstAt !== undefined) out.push(graceUntil(job));
       out.push(job.sentAt + SQUADS_LOBBY.botWork.answerMs);
       if (job.refereeAt !== undefined) out.push(job.refereeAt + SQUADS_LOBBY.botWork.answerMs);
     }
@@ -1860,13 +1884,25 @@ export class SquadsCore {
    * A person's reward for their squad's placement: coins and crates if they're still playing their seat (not left,
    * not handed to a bot), and recorded on their profile if signed in; nothing in a lobby a test control touched.
    */
-  private rewardFor(id: string, placement: SquadsPlacement): { coins: number; crates: number; recorded: boolean } {
+  private rewardFor(id: string, placement: SquadsPlacement): { coins: number; crates: number; recorded: boolean; why?: "daily" } {
     const testing = !!this.r.test || !!this.r.testUsed;
     const h = this.human(id);
     const p = this.player(id);
     const playing = !!h && !h.left && !!p && !p.replacedByBot;
     const r = SQUADS_LOBBY.rewards[placement];
-    return { coins: playing && !testing ? r.coins : 0, crates: playing && !testing ? r.crates : 0, recorded: !testing && !!this.r.accounts[id] };
+    // (Nothing past the daily cap: the outside review of Nov 10. A party alone with bots is paid as any (Eric, Nov 10: "If you play with just
+    // all bots, you still get rewards from that"): the daily cap bounds what its own devices could farm.)
+    const why = this.r.capped?.[id] ? ("daily" as const) : null;
+    const pays = playing && !testing && !why;
+    return { coins: pays ? r.coins : 0, crates: pays ? r.crates : 0, recorded: !testing && !!this.r.accounts[id], ...(playing && !testing && why && (r.coins || r.crates) ? { why } : {}) };
+  }
+
+  /** The daily cap took this person's placement reward (its write found SQUADS_LOBBY.rewardsPerDay spent today): they're told. */
+  rewardCapped(id: string) {
+    (this.r.capped ??= {})[id] = true;
+    const sq = this.squadOf(id);
+    const placement = sq ? this.r.placed[sq.id] : undefined;
+    if (sq && placement) this.send(id, { t: "placed", squadId: sq.id, placement, ...this.rewardFor(id, placement) });
   }
 
   /**
@@ -2148,6 +2184,28 @@ export class SquadsCore {
     return checker ? [...out, checker] : out;
   }
 
+  /**
+   * A job settled on one party's answer (`one`): if no other party's device was up to ask, the squads of its match that party plays in
+   * rest on its word (`unvouched`, the outside review of Nov 10, finding 5, per squad since its review's M4): noted for the logs only
+   * (Eric, Nov 10: a party alone with bots is paid, under the daily cap). One answering first while another party's device was up (it was slower) isn't that:
+   * their answers are compared as they come (lateTop).
+   */
+  private noteAlone(lm: LiveMatch, job: WorkJob) {
+    const party = (id: string) => this.human(id)?.partyId ?? id;
+    const by = new Set(job.devices.filter((d) => job.answers[d]).map(party));
+    const others = Object.keys(this.r.devices).filter((id) => this.deviceUp(id) && !by.has(party(id)));
+    if (others.length) return;
+    for (const side of lm.m.sides) if (side.seats.some((id) => by.has(party(id)))) this.unvouchSquad(side.squadId, "only its own party's devices moved its match's bots");
+  }
+
+  /** A squad rests on its own party's word (`unvouched`): noted once, with the first reason. */
+  private unvouchSquad(squadId: number, why: string) {
+    const u = (this.r.unvouched ??= {});
+    if (u[squadId]) return;
+    u[squadId] = why;
+    console.log(`squads ${this.r.code}: squad ${squadId}: ${why}`);
+  }
+
   private sameParty(a: string, b: string): boolean {
     const pa = this.human(a)?.partyId;
     return !!pa && pa === this.human(b)?.partyId;
@@ -2230,9 +2288,12 @@ export class SquadsCore {
   }
 
   private botTop(id: string, jobId: string, top: unknown) {
+    if (String(jobId).endsWith("~late")) return this.lateRefereed(id, String(jobId), top);
     const found = this.jobById(jobId);
     if (!found) return;
     const { lm, job } = found;
+    // (Settled on another's answer while this device still searched: compared now.)
+    if (job.how && job.late?.includes(id)) return this.lateTop(lm, job, id, top);
     if (job.how || (!job.devices.includes(id) && job.referee !== id) || id in job.answers) return;
     const clean = cleanTop(job.fen, top, this.s.bots.candidates);
     job.answers[id] = clean;
@@ -2261,6 +2322,8 @@ export class SquadsCore {
       if (!cached && twin && !twin.how) return false;
       job.how = cached ? "cached" : twin?.top ? twin.how! : "fallback";
       if (cached ?? twin?.top) job.top = cached ?? twin!.top;
+      // (The twin's answer stood on one party's word: this match's bots rest on it too.)
+      if (job.how === "one" && twin) this.noteAlone(lm, twin);
       this.touch(lm);
       return true;
     }
@@ -2270,6 +2333,7 @@ export class SquadsCore {
     const done = (top: MoveScore[] | undefined, how: NonNullable<WorkJob["how"]>) => {
       job.how = how;
       if (top) job.top = top;
+      if (how === "one") this.noteAlone(lm, job);
       this.touch(lm);
       return true;
     };
@@ -2306,15 +2370,76 @@ export class SquadsCore {
       return false;
     }
     if (valid.length === 1) {
-      if (!pending.length || now >= job.firstAt! + cfg.graceMs) return done(valid[0]!.top, "one");
+      if (!pending.length || now >= graceUntil(job)) {
+        // (Those still searching: their answers are compared as they come, lateTop.)
+        if (pending.length) job.late = pending;
+        return done(valid[0]!.top, "one");
+      }
       return false;
     }
     if (!pending.length || now >= job.sentAt + cfg.answerMs) return done(undefined, "fallback");
     return false;
   }
 
+  /**
+   * An answer that came after its job was settled on another's (the review of #611, M3; as the match room's late judges): compared now.
+   * Agreeing: nothing more. One that doesn't hold together: a strike. Disagreeing: the engine server's verdict (lateVerdict), and the
+   * device further from it gets a strike (the bots' moves already made stand; a liar is benched after botWork.strikes). No engine
+   * server: a referee device of another party, as in time (settle; lateRefereed).
+   */
+  private lateTop(lm: LiveMatch, job: WorkJob, id: string, top: unknown) {
+    job.late = job.late!.filter((d) => d !== id);
+    const clean = cleanTop(job.fen, top, this.s.bots.candidates);
+    job.answers[id] = clean;
+    if (!clean) return this.strike(id, `${job.id}: a late answer that doesn't hold together`);
+    const first = job.devices.find((d) => d !== id && job.answers[d]);
+    if (!first || !job.top || topsAgree(job.top, clean)) return;
+    console.log(`squads ${this.r.code}: ${job.id}: ${id}'s late answer disagrees with ${first}'s, used`);
+    const lid = `${job.id}~late`;
+    const check: { fen: string; tops: Record<string, MoveScore[]>; referee?: string } = { fen: job.fen, tops: { [first]: job.top, [id]: clean } };
+    if (this.io.serverEngine && this.io.serverTop) {
+      (this.r.lateChecks ??= {})[lid] = check;
+      return this.io.serverTop({ id: lid, fen: job.fen, moves: verdictMovesOf([job.top, clean]), nodes: SQUADS_LOBBY.botWork.serverNodes });
+    }
+    const referee = this.pickDevices(lm, 1, job.devices)[0];
+    if (!referee) return;
+    (this.r.lateChecks ??= {})[lid] = { ...check, referee };
+    this.r.devices[referee]!.jobs++;
+    this.send(referee, { t: "botWork", jobs: [{ id: lid, fen: job.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }] });
+  }
+
+  /** The referee's answer to a late answer's dispute (no engine server): as in time, the one it agrees with stands, the other is struck. */
+  private lateRefereed(id: string, lid: string, top: unknown) {
+    const check = this.r.lateChecks?.[lid];
+    if (!check || check.referee !== id) return;
+    delete this.r.lateChecks![lid];
+    const ref = cleanTop(check.fen, top, this.s.bots.candidates);
+    if (!ref) return this.strike(id, `${lid}: an answer that doesn't hold together`);
+    const [a, b] = Object.keys(check.tops) as [string, string];
+    const right = topsAgree(ref, check.tops[a]!) ? a : topsAgree(ref, check.tops[b]!) ? b : null;
+    if (right) this.strike(right === a ? b : a, `${lid}: outvoted (a late answer's dispute)`);
+  }
+
+  /** The engine server's verdict on a late answer's disagreement: the device further from it gets a strike (none: nothing). */
+  private lateVerdict(id: string, moves: MoveScore[] | null) {
+    const check = this.r.lateChecks?.[id];
+    if (!check) return;
+    delete this.r.lateChecks![id];
+    const verdict = moves ? (cleanTop(check.fen, [...moves].sort((a, b) => b.expected - a.expected), 8) ?? null) : null;
+    if (!verdict) return;
+    const answers = Object.entries(check.tops).map(([d, top]) => ({ d, dist: distanceFromVerdict(top, verdict) }));
+    if (answers.length === 2 && Math.abs(answers[0]!.dist - answers[1]!.dist) > 0.01) {
+      const far = answers[0]!.dist > answers[1]!.dist ? answers[0]! : answers[1]!;
+      this.strike(far.d, `${id}: further from the engine server (a late answer's dispute)`);
+    }
+  }
+
   /** The engine server's verdict on a job two devices disagreed about (null: it couldn't answer). */
   serverAnswered(id: string, moves: MoveScore[] | null) {
+    if (id.endsWith("~late")) {
+      this.lateVerdict(id, moves);
+      return this.pump();
+    }
     const found = this.jobById(id);
     if (!found || found.job.how) return this.pump();
     const { lm, job } = found;

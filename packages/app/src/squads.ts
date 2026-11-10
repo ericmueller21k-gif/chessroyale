@@ -224,7 +224,7 @@ export class SquadsClient {
   vote: NetSquadsVote | null = null;
   readonly matches = new Map<string, LocalMatch>();
   clocks: NetTeamClock[] = [];
-  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean } | null = null;
+  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean; why?: "daily" } | null = null;
   results: Record<number, SquadsPlacement> | null = null;
   /** What each person wears (sent once per player: the last one seen is kept). */
   readonly looks = new Map<string, ItemLook>();
@@ -795,7 +795,7 @@ export class SquadsClient {
         break;
       }
       case "placed":
-        this.placed = { squadId: msg.squadId, placement: msg.placement, coins: msg.coins, crates: msg.crates, recorded: msg.recorded };
+        this.placed = { squadId: msg.squadId, placement: msg.placement, coins: msg.coins, crates: msg.crates, recorded: msg.recorded, ...(msg.why ? { why: msg.why } : {}) };
         break;
       case "results":
         this.results = msg.placements;

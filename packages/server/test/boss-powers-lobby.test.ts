@@ -1506,6 +1506,8 @@ describe("the boss's brain online (BOSS_BRAIN: Maia while it's off for players o
   function raidOf(patch: Partial<Settings>, admins: boolean[], rating = 1500) {
     const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, ...patch });
     admins.forEach((a, i) => L.core.connect(undefined, `P${i + 1}`, i ? "phone" : "computer", false, rating, undefined, undefined, null, null, a));
+    // (The host's Maia loaded: his moves ask for it, BOSS_CHECK's N1.)
+    L.core.message("p1", { t: "maiaReady" });
     L.core.message("p1", { t: "start" });
     L.advance(1000);
     return L;
@@ -1763,6 +1765,8 @@ describe("Wrangler online", () => {
     // A lobby of admins (his brain: Maia), slips on (every move of his a stumble).
     const L = setup({ ...RAID_SETTINGS, raidOpening: true, lastStandFrom: 999, bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99, bossStumbleBelow: 9999, bossStumbleMax: 1 });
     for (const [i, name] of ["P1", "P2"].entries()) L.core.connect(undefined, name, i ? "phone" : "computer", false, 1500, undefined, undefined, null, null, true);
+    // (The host's Maia loaded: his moves ask for it, BOSS_CHECK's N1.)
+    L.core.message("p1", { t: "maiaReady" });
     L.core.message("p1", { t: "start" });
     L.advance(1000);
     L.advance(60_000);

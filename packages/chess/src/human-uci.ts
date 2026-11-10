@@ -24,6 +24,8 @@ export class HumanUciEngine implements HumanEngineLike {
   error: string | null = null;
   /** Waiting for the load to end (loaded()). */
   private waiting: ((ok: boolean) => void)[] = [];
+  /** Called when it fails, before or after loading (the lobby is told it's no longer loaded: BOSS_CHECK). */
+  onFail: (() => void) | null = null;
 
   constructor(
     private readonly transport: UciTransport,
@@ -71,6 +73,7 @@ export class HumanUciEngine implements HumanEngineLike {
     this.state = s;
     if (s === "loading") return;
     for (const w of this.waiting.splice(0)) w(s === "ready");
+    if (s === "failed") this.onFail?.();
   }
 
   /** Once the load has ended: true ready, false failed or closed (never before it ends; at once if it has). */
@@ -120,8 +123,11 @@ export class HumanUciEngine implements HumanEngineLike {
     });
   }
 
-  /** Maia's likeliest moves at a rating (among `allowed`, if given) and its own draw; null if it isn't ready. */
-  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number }): Promise<HumanAnswer | null> {
+  /**
+   * Maia's likeliest moves at a rating (among `allowed`, if given) and its own draw (from `seed`, the same on every device: the
+   * box's Seed option, set for this draw alone; none, a random one); null if it isn't ready.
+   */
+  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number; seed?: number }): Promise<HumanAnswer | null> {
     if (!this.ready()) return Promise.resolve(null);
     return this.serial(async () => {
       if (!this.ready()) return null;
@@ -130,6 +136,8 @@ export class HumanUciEngine implements HumanEngineLike {
       this.transport.send(`setoption name Temperature value ${opts.temperature}`);
       this.transport.send(`setoption name TopP value ${opts.topP}`);
       this.transport.send(`setoption name MultiPV value ${opts.multipv}`);
+      // (0: the box's random source again. An older box ignores the option: its own draw, as before.)
+      this.transport.send(`setoption name Seed value ${opts.seed && opts.seed > 0 ? Math.min(2_147_483_647, Math.floor(opts.seed)) : 0}`);
       this.transport.send(`position fen ${fen}`);
       const done = this.until((l) => l.startsWith("bestmove"));
       this.transport.send("go" + (allowed ? ` searchmoves ${allowed.join(" ")}` : ""));

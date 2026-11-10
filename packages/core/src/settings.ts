@@ -2190,6 +2190,44 @@ export const BOSS_BRAIN = {
 };
 export type BossBrainSettings = typeof BOSS_BRAIN;
 
+/**
+ * Who plays the boss online (the outside review of Nov 10, finding 2, and its review; docs/decisions/2026-11-10-boss-and-lone-devices.md
+ * and docs/areas/bosses.md, "Who plays the boss online"): his own move (the brain's, a slip, the King's stagger, a power's best) and
+ * Boingo's funhouse move are asked of the host and a checker (an up-to-date app outside the host's account and party, drawn at random;
+ * for Maia's moves one whose Maia is loaded) with one seed, so two honest devices give the same move (Stockfish at a node count; Maia
+ * and limited-strength Stockfish draw with the seed; the bridge band's share is drawn by the server). The same move plays. Two differ:
+ * the engine server scores both and the better for him plays, but for Maia's move against a device's fallback to Stockfish (its Maia
+ * late or not ready), which plays if it's within `maiaGap` of the other. Nobody to ask, or no verdict: the host's plays, and the
+ * match pays as a solo game.
+ *   - `waitMs`: once the host has answered, how long the checker has (both search at once; the checker skips his powers' extras
+ *     on a turn that has none).
+ *   - `maiaGap`: Maia's move against a fallback plays if the engine server finds it at most this much worse (points of expected
+ *     score, 0 to 1), else the better: four honest Maia moves in five (reports/maia-sim, maia-raw: one in five gave away 0.25 or more).
+ *     A device that lies "Maia played it" gains at most this, and only on moves where the other device really fell back.
+ *   - `throwLoss`: a move the engine server finds this much worse than the other device's is a throw: its device gets a judge's
+ *     strike (benched at JUDGES.strikes). Above Maia's honest worst: its unguarded moves in reports/maia-sim (317 moves) gave away at
+ *     most 0.76.
+ *   - `missStrikes`: a checker that misses its window is replaced next move; this many misses in a battle are a strike.
+ *   - `loaders`: on the Maia brain, how many devices are told to load Maia to check his moves as the battle begins (drawn at random:
+ *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
+ *   - `eloDrawScale`: Stockfish at a strength with a seed (eloDraw) draws with T = the mean loss a move at that Elo (RATING_CURVE)
+ *     times this factor, by Elo (straight between the points, held past the ends), so it gives away what UCI_LimitStrength does
+ *     through the same guard: reports/elo-draw.md (two 200-position runs pooled; the delta reviews' D5 and N4).
+ */
+export const BOSS_CHECK = {
+  waitMs: 4_000,
+  maiaGap: 0.25,
+  throwLoss: 0.8,
+  missStrikes: 2,
+  loaders: 2,
+  eloDrawScale: [
+    [1600, 1.25],
+    [2200, 1.25],
+    [2500, 1.25],
+    [2800, 1.05],
+  ] as readonly (readonly [number, number])[],
+} as const;
+
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 
@@ -2740,11 +2778,19 @@ export const SQUADS_LOBBY = {
   rewardRetrySeconds: 60,
   rewardRetryHours: 24,
   /**
+   * The daily cap (the outside review of Nov 10, finding 5; like ranked's, RANKED_1V1.coins.perDay): at most this many lobbies a UTC
+   * day pay an account their placement's coins and crates; the next that day pay none (XP as usual), and the placement says so.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
+   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  rewardsPerDay: 5,
+  /**
    * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
    * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
-   * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that
-   * disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a third device, and
-   * the device that was wrong gets a strike (`strikes` and it gets no more work). A bot whose candidates aren't in
+   * answers compared. The lobby waits `graceMs` after the first answer for the second (or `graceFactor` of the first's time),
+   * `answerMs` for any; two that disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a
+   * third device, and the device that was wrong gets a strike (`strikes` and it gets no more work). A second answer after the
+   * grace is compared when it comes: disagreeing, the engine server's verdict strikes the one further from it. A bot whose candidates aren't in
    * `fallbackMarginMs` before its deadline (no devices, none answering) plays from the server's own quick look
    * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score. A
    * device holds at most `maxInFlight` unanswered jobs at once (a phone fewer: its battery), so a slow one is never
@@ -2756,6 +2802,8 @@ export const SQUADS_LOBBY = {
     perJob: 2,
     maxInFlight: { computer: 4, phone: 2 },
     graceMs: 400,
+    /** The second answer's grace is at least graceMs, or this share of the first's own time (as JUDGES.graceFactor). */
+    graceFactor: 0.5,
     answerMs: 4_000,
     serverNodes: 400_000,
     strikes: 2,

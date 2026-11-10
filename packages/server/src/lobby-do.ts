@@ -564,7 +564,7 @@ export class Lobby extends DurableObject<Env> {
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat });
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -652,8 +652,8 @@ export class Lobby extends DurableObject<Env> {
  * One player's XP game for a match room's match (server/xp.ts): their moves and time as the room counted them (`span`: xpSpan); a
  * win is 1st in Classic, their team's (or the crowd's against the boss) otherwise; nothing for leaving (abandoned), practice or a
  * lobby a test switch made (except ?xpgame=MINUTES: that long, with enough moves). A friends' lobby (not matchmade) pays the win
- * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). Keyed by the match
- * (its code and start).
+ * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). A match where one
+ * device's word stood alone (`unvouched`) pays as a solo game. Keyed by the match (its code and start).
  */
 export function lobbyXpGame(
   rec: LobbyRecord,
@@ -680,7 +680,9 @@ export function lobbyXpGame(
       abandoned: !!r.abandoned,
       test: forced === null && (!!o.tested || practice),
     },
-    cap: vs,
+    // (One device's word stood alone somewhere in the match (LobbyRecord.unvouched): it pays as a solo game does, under solo's
+    // daily caps on wins and minutes; the outside review of Nov 10, finding 5.)
+    cap: rec.unvouched ? "solo" : vs,
     signedInOnly,
     now,
     // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)
@@ -717,7 +719,8 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
       countCall(`lobby.${what}Failed`);
       return fallback;
     });
-  const moves = rec.fair?.[p.playerId] ?? [];
+  // (A match that rested on one device's word (unvouched) builds no fair-play case: its numbers are that device's alone.)
+  const moves = rec.unvouched ? [] : (rec.fair?.[p.playerId] ?? []);
   if (moves.length) await soft("fairPlay", recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail), null);
   // (A player in review, or banned, has their results held off ranking until they're cleared.)
   const held = !(await eligibleForRanked(c.sql, p.userId));

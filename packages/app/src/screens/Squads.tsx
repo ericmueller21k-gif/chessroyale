@@ -1,5 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
-import { SQUADS } from "@chessroyale/core";
+import { SQUADS, SQUADS_LOBBY } from "@chessroyale/core";
 import { squadsVotes, type NetSquadsLobby } from "@chessroyale/chess/squads";
 import { BackButton, DressedPawn } from "../components/FrontDoor.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
@@ -191,6 +191,11 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
   );
 }
 
+/** Why a placement that pays had no coins or crates (the outside review of Nov 10): the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay). */
+export const NO_REWARD: Record<"daily", string> = {
+  daily: `No coins or crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
+};
+
 /**
  * Your squad is out: where it placed, your reward, and what next: watch the rest of the bracket, or queue again.
  */
@@ -202,7 +207,7 @@ function OutCard({ client, actions, onSpectate }: { client: SquadsClient; action
       <div class="sq-card-title">Knocked out · {placementText(p.placement)}</div>
       <p class="muted small">
         {squadName(p.squadId)} placed {placementText(p.placement)} of 8 squads.{" "}
-        {p.coins || p.crates ? `+${p.coins} coins${p.crates ? ` · ${p.crates} crate` : ""}` : client.lobby?.test ? "Test lobby: no rewards." : ""}
+        {p.coins || p.crates ? `+${p.coins} coins${p.crates ? ` · ${p.crates} crate` : ""}` : client.lobby?.test ? "Test lobby: no rewards." : p.why ? NO_REWARD[p.why] : ""}
       </p>
       <SquadsXp client={client} />
       <div class="sq-card-actions">
@@ -298,7 +303,7 @@ function SquadsResults({ client, actions }: { client: SquadsClient; actions: Squ
       {placed && (
         <p class="muted">
           {won ? `${squadName(placed.squadId)} won the Squads final.` : `${squadName(placed.squadId)} placed ${placementText(placed.placement)}.`}{" "}
-          {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : ""}
+          {placed.coins || placed.crates ? `+${placed.coins} coins${placed.crates ? ` and ${placed.crates} crate` : ""}.` : lobby.test ? "Test lobby: no rewards." : placed.why ? NO_REWARD[placed.why] : ""}
         </p>
       )}
       {placed && <SquadsXp client={client} />}
