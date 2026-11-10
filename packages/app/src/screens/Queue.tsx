@@ -11,6 +11,7 @@ import { pawnLook } from "../looks.ts";
 import { LobbyChat } from "../components/LobbyChat.tsx";
 import type { MatchChat } from "../chat.ts";
 import { clockShown } from "../clock-text.ts";
+import { keepInQueue, rememberKeepInQueue } from "../search.ts";
 
 /**
  * What the queue screen shows: an online queue (NetMatch: Default or Bots off) or Solo filling with its bots
@@ -142,11 +143,14 @@ export function QueueScreen({
   match,
   onCancel,
   onLetBotsFill,
+  onAway,
   chat = true,
 }: {
   match: QueueView & { readonly chat?: MatchChat };
   onCancel: () => void;
   onLetBotsFill?: () => void;
+  /** 50 v 50's public queue: Exit with "Keep me in the queue" (checked) steps out to browse, still queued (search.ts). */
+  onAway?: () => void;
   /** The lobby's chat here, under Cancel (a phone). A computer shows it beside the lobby instead (HomeScreen's `chat`). */
   chat?: boolean;
 }) {
@@ -191,10 +195,11 @@ export function QueueScreen({
         ? `Unranked: fewer than ${rankedMinHumans(size)} real players`
         : null;
   const modeName = raid ? "Boss raid · up to 50" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
+  const exit = useQueueExit(onCancel, onAway, filled);
   return (
     <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
       <header class="fd-page-head">
-        <BackButton onClick={onCancel} label="Leave the queue" />
+        <BackButton onClick={exit.go} label={exit.label} />
         <h1 class="fd-queue-mode">
           {modeName}
           {type === "solo" ? " · Solo" : type === "botsoff" ? " · Bots off" : ""}
@@ -230,9 +235,11 @@ export function QueueScreen({
           </div>
         </div>
       </div>
-      <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
-        Cancel
-      </button>
+      {exit.row ?? (
+        <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
+          Cancel
+        </button>
+      )}
       {/* (A phone: the lobby's chat under Cancel, so the count, the grid and Cancel are all in view; it fills the rest.) */}
       {chat && (
         <div class="fd-queue-chat">
@@ -241,6 +248,40 @@ export function QueueScreen({
       )}
     </div>
   );
+}
+
+/**
+ * A lobby's way out (Eric, Nov 10: "an exit ... but stay in the queue"): where Cancel was, in the same box, "Keep me in the
+ * queue" (checked unless this device unchecked it) and Exit. Checked, Exit steps out to browse with the search going (home's
+ * rows, the bar on other pages: search.ts); unchecked, it leaves the queue, as Cancel did. The header's back does the same.
+ * Once the lobby has filled (the match is about to begin) a checked Exit greys: there's nothing left to wait for.
+ * Without `onAway` (Solo filling, a raid's or a party's queue): Cancel, as before.
+ */
+export function useQueueExit(onCancel: () => void, onAway: (() => void) | undefined, filled: boolean) {
+  const [keep, setKeep] = useState(keepInQueue);
+  if (!onAway) return { go: onCancel, label: "Leave the queue", row: null };
+  const stays = keep && filled;
+  const go = () => (keep ? !stays && onAway() : onCancel());
+  const row = (
+    <div class="fd-exit-row">
+      <label class="fd-keep">
+        <input
+          type="checkbox"
+          checked={keep}
+          onChange={(e) => {
+            const v = (e.target as HTMLInputElement).checked;
+            setKeep(v);
+            rememberKeepInQueue(v);
+          }}
+        />
+        <span>Keep me in the queue</span>
+      </label>
+      <button type="button" class="fd-btn fd-cancel fd-exit" disabled={stays} onClick={go}>
+        Exit
+      </button>
+    </div>
+  );
+  return { go, label: keep ? "Exit, keep searching" : "Exit, leave the queue", row };
 }
 
 /**

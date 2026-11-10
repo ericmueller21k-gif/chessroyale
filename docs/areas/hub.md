@@ -72,6 +72,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     last 20: +2 min queue") leaves PLAY on. Home's note slot (the `fd-notice` at its top, dismissable for the tab) says "You left
     before the game started: −5 RP" after a dodge, or "Finish ranked games to clear your leaves." from 5 marks; another notice (a match
     that ended) goes first.
+  - **Searching while you browse** (Eric, Nov 10; [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md); `search.ts`, Home's `SearchRow`):
+    a search on (1 v 1's, a 50 v 50 or Squads lobby stepped out of), the modes row keeps its box: a green ring, "Searching · 50 v 50", "Solo queue · 37 of
+    100 in the lobby" (no "in the lobby" under 340 px), the time; the panel Cancel, Lobby, Start with bots (`searchSlots`), Cancel and bots asking in the
+    same slots (the question not a button; Yes, No; back after `FRONT_DOOR.searchAskMs`). The rest greys (`fd-off`, `inert`); the top bar and card stay lit.
   - **Chess Town's button** (Eric, Oct 31 and Nov 1; it was the full-width Boss Arena card, Oct 26, "Party up and take on the bosses";
     [docs/decisions/2026-11-01-home-chess-town.md](../decisions/2026-11-01-home-chess-town.md)): right under PLAY, **exactly PLAY's size at
     every width** (`.fd-town` is in each of PLAY's size rules in `styles.css`: 97 px on a phone, 76 px on a computer, 60 px in a short
@@ -352,6 +356,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 | What | Where |
 | --- | --- |
+| Searching while you browse (every queue): the state, the bar | `packages/app/src/search.ts`, `components/SearchBar.tsx`; home's rows in `screens/Home.tsx`; the lobbies' Exit in `screens/Queue.tsx` (`useQueueExit`) |
 | Screens | `packages/app/src/screens/Home.tsx` (home, the RANKED row, Chess Town's button, the Other modes cards (Boss Battle, Auto chess), the Boss raid screen and its Solo Boss Mode form), `Landing.tsx`, `Queue.tsx`, `Profile.tsx`, `PlayerProfile.tsx` (yours), `PublicProfile.tsx` (everyone's), `Settings.tsx`, `Lobby.tsx`, `Legal.tsx`, `Friends.tsx` |
 | Friends' pieces (rows, the live panel's section, the toast, Invite friends, the settings, a profile's buttons) | `packages/app/src/components/Friends.tsx`; the list and actions `friends.ts` |
 | The computer's frame and menus | `components/FrontDoor.tsx`, `FrontMenu.tsx`, `LiveWindow.tsx`, `LiveNumber.tsx`, `MiniBoard.tsx`, `TinyBoard.tsx`, `LeaderboardSheet.tsx` |

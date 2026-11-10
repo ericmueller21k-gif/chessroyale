@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { named, test, watchFor, openBossRaid, pickMode } from "./helpers.ts";
+import { named, test, watchFor, openBossRaid, pickMode, leaveQueue } from "./helpers.ts";
 
 /**
  * Matchmaking types (DECISIONS.md, "Matchmaking types"): Default (bots after the fill time; 8 s locally), Bots off
@@ -201,14 +201,14 @@ test("opening the app from scratch during a live match puts you back in it; leav
   await expect.poll(() => phase(again), { timeout: 20_000 }).toMatch(/^(vote|play|watching|scoring|reveal|opening)$/);
   expect(path(again)).toBe(`/lobby/${live}`);
 
-  // Leaving on purpose: Cancel in a queue, then the app opened again: home. (Another device, seated nowhere else.)
+  // Leaving on purpose: out of a queue (Exit, not kept in it: Nov 10), then the app opened again: home. (Another device, seated nowhere else.)
   const ctx2 = await browser.newContext(test.info().project.name === "phone" ? ({ ...devices["iPhone 13"], browserName: undefined } as any) : {});
   const third = await ctx2.newPage();
   await third.goto(`/?debug&pool=${q}-2`);
   await pickMode(third);
   await third.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(third.locator(".fd-seats")).toBeVisible();
-  await third.getByRole("button", { name: "Cancel" }).click();
+  await leaveQueue(third);
   await expect(third.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await third.close();
   const fourth = await ctx2.newPage();

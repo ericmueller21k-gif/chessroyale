@@ -1,5 +1,5 @@
 import { expect } from "@playwright/test";
-import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, pickMode } from "./helpers.ts";
+import { asAdmin, named, openBossRaid, switchesOff, test, openPlayWithFriends, pickMode, leaveQueue } from "./helpers.ts";
 
 const live = (p: import("@playwright/test").Page) => p.evaluate(() => fetch("/api/live").then((r) => r.json()));
 
@@ -132,8 +132,8 @@ test("the queue: your pawn first and ringed, others pop in, Cancel frees the sea
   const before: string[] = await ann.evaluate(() => (window as any).__soundLog);
   expect(before.some((l) => l.startsWith("pop:") && !l.endsWith(":muted"))).toBe(true);
   await ann.getByRole("button", { name: "Turn sound off" }).click();
-  // Bo cancels: home again, and Ann's count drops.
-  await bo.getByRole("button", { name: "Cancel" }).click();
+  // Bo leaves the queue (Exit, "Keep me in the queue" unchecked: Nov 10): home again, and Ann's count drops.
+  await leaveQueue(bo);
   await expect(bo.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(ann.locator(".fd-count-n")).toHaveText("1");
   // Time's up (8 s locally): bots pop into the empty seats, then the match begins.

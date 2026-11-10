@@ -2251,6 +2251,11 @@ export const FRONT_DOOR = {
   heroHopFirstSec: 4,
   /** …then one every this many seconds (never under reduced motion). */
   heroHopEverySec: 30,
+  /**
+   * Searching while you browse (Eric, Nov 10): home's "Stop search?" or "Play bots?" (asked in place, in the action row) goes
+   * back to the three actions after this long without a tap.
+   */
+  searchAskMs: 6_000,
 } as const;
 
 /**
