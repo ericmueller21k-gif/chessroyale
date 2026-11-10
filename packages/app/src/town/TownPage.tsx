@@ -80,7 +80,8 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
         if (!live || !m) return;
         const you = m.readyYou();
         release = you.done;
-        void you.ready.then(() => live && setTown(() => m.TownScreen));
+        // (In a task of its own: the town's start isn't added to the long task that composed your ride, Nov 10.)
+        void you.ready.then(() => setTimeout(() => live && setTown(() => m.TownScreen)));
       });
     // Your account first (a moment, on a page opened at /town; at once from home): an admin's town has the homes of the bosses in
     // the game for admins first (admin-town.ts), read as the town's code loads. Not waiting past ACCOUNT_WAIT_MS: a town without them.

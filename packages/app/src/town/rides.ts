@@ -260,7 +260,8 @@ export class Rider {
   private fast = false;
   /**
    * The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between).
-   * Hurried (`hurry`): every job's pictures made and decoded together, then all put down in one go (about 0.1 to 0.3 s of work at once).
+   * Hurried (`hurry`): every job's pictures made and decoded together, then all put down in one go (Nov 10, headless: about 0.25 s for a
+   * ride's 78 jobs on a computer, 1 s on a phone slowed four times; one an animation frame they took 1.5 to 2 s).
    */
   private async compose(jobs: Job[]): Promise<void> {
     if (this.fast) {
