@@ -86,11 +86,13 @@ export interface ChatNotice {
 
 /** What a player's own app shows about their chat (their profile): a ban in force, and a notice not yet seen. */
 export async function chatStanding(sql: Sql, userId: string, now: number): Promise<{ block?: ChatBlock; notice?: ChatNotice } | null> {
-  const block = await chatBlock(sql, userId, now);
-  const row = await sql.first<{ id: number; action: "warn" | "ban"; at: number; until: number | null; note: string | null; ended_at: number | null }>(
-    "SELECT id, action, at, until, note, ended_at FROM chat_mod_log WHERE user_id = ? AND seen = 0 AND action IN ('warn', 'ban') ORDER BY id DESC LIMIT 1",
-    userId,
-  );
+  const [block, row] = await Promise.all([
+    chatBlock(sql, userId, now),
+    sql.first<{ id: number; action: "warn" | "ban"; at: number; until: number | null; note: string | null; ended_at: number | null }>(
+      "SELECT id, action, at, until, note, ended_at FROM chat_mod_log WHERE user_id = ? AND seen = 0 AND action IN ('warn', 'ban') ORDER BY id DESC LIMIT 1",
+      userId,
+    ),
+  ]);
   const live = row && (row.action === "warn" || (row.ended_at === null && (row.until === null || row.until > now)));
   const notice = live ? { id: row.id, kind: row.action, at: row.at, until: row.until, note: row.note } : null;
   return block || notice ? { ...(block ? { block } : {}), ...(notice ? { notice } : {}) } : null;
