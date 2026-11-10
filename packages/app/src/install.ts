@@ -21,18 +21,9 @@ export function setUpInstall() {
   });
   if (import.meta.env.PROD && "serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").then(
-        (reg) => {
-          // A new version installing (found by this page, or later) waits for this page to load before fetching its files
-          // (sw-template.js, precache): it's loaded now.
-          const loaded = () => (reg.installing ?? reg.waiting)?.postMessage("loaded");
-          loaded();
-          reg.addEventListener("updatefound", loaded);
-        },
-        () => {
-          // Not fatal: the app works without it, just not offline.
-        },
-      );
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        // Not fatal: the app works without it, just not offline.
+      });
     });
   }
 }

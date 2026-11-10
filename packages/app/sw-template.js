@@ -13,35 +13,13 @@ const STREAMED = ["/sounds/colosseum/ambient.mp3"];
 // shown, then answered from it. The landing page's demo video (/media/) streams from the network like the ambience.
 const LAZY = /\.(png|jpe?g|webp|gif|avif)$/;
 
-// The precache waits for the page (Nov 10, a slow first load after a deploy): a new version installs while the page that found it is
-// still loading, and all of its files at once (addAll) took most of the line from the page's own (a 12 Mbps line: home ready in 3.0 s
-// instead of 1.7). So it starts once the page says it has loaded (install.ts), or after PAGE_WAIT_MS at most, two files at a time and
-// at low priority, so a screen opened meanwhile still gets the line. A file already in this version's cache (an install tried before)
-// isn't fetched again.
-const PAGE_WAIT_MS = 8000;
-let pageLoaded;
-const loaded = new Promise((resolve) => (pageLoaded = resolve));
-self.addEventListener("message", (event) => {
-  if (event.data === "loaded") pageLoaded();
-});
-
-async function precache() {
-  await Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, PAGE_WAIT_MS))]);
-  const cache = await caches.open(VERSION);
-  const queue = [...FILES];
-  const next = async () => {
-    for (let file = queue.shift(); file; file = queue.shift()) {
-      if (await cache.match(file)) continue;
-      const res = await fetch(file, { priority: "low" });
-      if (!res.ok) throw new Error(`precache: ${file} ${res.status}`);
-      await cache.put(file, res);
-    }
-  };
-  await Promise.all([next(), next()]);
-}
-
 self.addEventListener("install", (event) => {
-  event.waitUntil(precache().then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches
+      .open(VERSION)
+      .then((cache) => cache.addAll(FILES))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
