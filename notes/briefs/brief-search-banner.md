@@ -40,6 +40,9 @@ What the mockup shows:
    - Unchecked: you leave the queue, as today.
    - When the match is found while you browse: the existing found alert (sound and buzz), and you're taken in, as 1 v 1 does today.
 5. Tapping the banner (not Cancel) takes you back to the lobby or search screen.
+6. **An optional second action on the banner** (Eric, Nov 10): a queue can add one more button beside Cancel. The first user is
+   auto chess against people (its own job, next): "Play vs bot" starts a bot match at once and leaves the queue. Build the banner
+   with that slot (one prop: a label and what it does). No queue uses it yet, but a test shows it renders and fits on a 320 px phone.
 
 **Lane:** targeted, but this touches online sync and the lobbies' seats and connections, so effort xhigh.
 
