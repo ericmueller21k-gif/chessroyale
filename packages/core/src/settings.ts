@@ -3278,6 +3278,38 @@ export const OPS = {
 } as const;
 
 /**
+ * Alerts to Discord (Nov 10; docs/ideas/live-ops.md, sections 1 and 5; server/alerts.ts): the 15-minute cron compares the server's
+ * stored error counts with normal and posts to the Worker secret ALERT_WEBHOOK. A PAGE (players can't play) pings at once; the rest
+ * waits for the morning digest. A PAGE needs a real count, well above that hour's normal, two checks in a row.
+ */
+export const ALERTS = {
+  /** The cron's period (wrangler.jsonc): a 15-minute window's normal is this share of the hour's. */
+  checkMinutes: 15,
+  page: {
+    /** Errors in one 15-minute window, at least (a real count, never one event). */
+    minErrors: 20,
+    /** And at least this many times normal: the median of the same clock hour on each of the `normalDays` days before. */
+    timesNormal: 3,
+    normalDays: 7,
+    /** Checks in a row over the line before a PAGE (and under it before "recovered"). */
+    inARow: 2,
+    /** While it lasts, a problem pages again ("still happening") at most this often. */
+    repeatMs: 3_600_000,
+  },
+  /**
+   * The match, lobby and queue routes: the Worker's own errors on these (the route as routeOf names it, "POST /api/play"), with
+   * the Durable Objects' errors apart. A request into a lobby that fails is counted once in each (the room's, then the Worker's).
+   */
+  playRoutes: ["/api/play", "/api/lobby", "/api/squads/", "/api/boss/party", "/api/1v1/"],
+  /** D1 not answering: read again this much later; both failing (two checks in a row) pages. */
+  d1RetryMs: 30_000,
+  /** The morning digest: the first check at or after this hour in this time zone, once a day. */
+  digest: { hour: 8, timeZone: "America/Chicago" },
+  /** The ops page linked from every post. */
+  opsPage: "https://hunchess.com/admin/ops",
+} as const;
+
+/**
  * The town's WebGL fallbacks (Oct 30; docs/areas/ops.md, "Health"): a page whose town asked for WebGL and drew with Canvas 2D
  * instead says so once, through the error reporting (the app's problems.ts, `reportTownFallback`), as this kind with its
  * reason as the message. The health view counts them by reason, apart from the errors. The reasons: no WebGL 2 in the

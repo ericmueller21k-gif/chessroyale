@@ -802,7 +802,8 @@
         "packages/server/src/limits.ts",
         "packages/server/src/health.ts",
         "packages/server/src/ops.ts",
-        "packages/server/src/ops-admin.ts"
+        "packages/server/src/ops-admin.ts",
+        "packages/server/src/alerts.ts"
       ],
       "specs": ["e2e/busy.spec.ts", "e2e/kill-switches.spec.ts", "e2e/problems.spec.ts"]
     },

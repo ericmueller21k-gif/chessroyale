@@ -183,3 +183,9 @@ What to watch in the Cloudflare dashboard (the names move around; search the das
    Add → Workers) plus the uptime check below cover it.
 4. **Uptime:** a free external monitor (e.g. UptimeRobot) on `https://hunchess.com/api/live` every 5 minutes, emailed
    when it fails twice. (Cloudflare Health Checks need a Pro zone plan, $20/month; not needed.)
+5. **Discord (the game's own alerts, alerts.ts; docs/areas/ops.md, "Alerts"):** in Discord, a private channel (e.g.
+   `#hunchess-alerts`) → **Edit Channel → Integrations → Webhooks → New Webhook → Copy Webhook URL**. Then in Cloudflare,
+   Workers & Pages → chessroyale → Settings → Variables and Secrets → **Add**: name `ALERT_WEBHOOK`, type **Secret**, value the
+   URL; Save and deploy. Optional: `ALERT_PING` (Text), your Discord user id (Discord → Settings → Advanced → Developer Mode,
+   then right-click your name → Copy User ID), so a page pings you rather than `@everyone`. `PAUSE_ALERTS` = `1` turns them off.
+   The ops page's Health says "Alerts: on" once it's set.
