@@ -112,7 +112,7 @@ describe("auto chess: survivors", () => {
 
   it("the settings hold the design's numbers (v4, v5, v6, v7, the TFT-style economy): tune them here, nowhere else", () => {
     expect(AUTOCHESS).toMatchObject({
-      shop: { slots: 4, reroll: { first: 2, step: 1, max: 5 } },
+      shop: { slots: 4, reroll: { first: 0, step: 1, max: 2 } },
       sellBack: 0.75,
       benchSlots: 4,
       lockIn: false,
