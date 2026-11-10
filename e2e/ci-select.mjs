@@ -1,8 +1,8 @@
 // CI's e2e plan (.github/workflows/e2e.yml, the `plan` job): which spec files a run tests, and on how many shards.
 // A pull request runs the specs of the areas it changes (e2e/areas.json says which paths belong to which specs) plus
 // the smoke set; a shared foundation, or any path the table doesn't know, runs every spec. A push to main, a manual run
-// and a pull request with the `full-e2e` label run every spec too. A `traced` module (settings.ts,
-// e2e/helpers.ts, the app's shared modules) is followed through the code instead: what its diff changes, then the files
+// and a pull request with the `full-e2e` label run every spec too. A `traced` module (every core module
+// but index.ts, e2e/helpers.ts, the app's shared modules) is followed through the code instead: what its diff changes, then the files
 // that use that, each counted as changed (traceChanges, below). Docs: docs/areas/ops.md, "CI e2e".
 //
 // Usage:
