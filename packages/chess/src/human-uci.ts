@@ -24,6 +24,8 @@ export class HumanUciEngine implements HumanEngineLike {
   error: string | null = null;
   /** Waiting for the load to end (loaded()). */
   private waiting: ((ok: boolean) => void)[] = [];
+  /** Called when it fails, before or after loading (the lobby is told it's no longer loaded: BOSS_CHECK). */
+  onFail: (() => void) | null = null;
 
   constructor(
     private readonly transport: UciTransport,
@@ -71,6 +73,7 @@ export class HumanUciEngine implements HumanEngineLike {
     this.state = s;
     if (s === "loading") return;
     for (const w of this.waiting.splice(0)) w(s === "ready");
+    if (s === "failed") this.onFail?.();
   }
 
   /** Once the load has ended: true ready, false failed or closed (never before it ends; at once if it has). */

@@ -2,8 +2,9 @@
  * eloDraw's calibration (BOSS_CHECK.eloDrawScale; PR #611's delta review, D5): Stockfish at a strength drawn with a seed
  * (eloDraw: two devices play the same move) against UCI_LimitStrength's own draw, both through the boss's guard, on the
  * same positions at each strength. The loss of a move is in points of expected score (0-100) against the best, by the
- * boss engine's own top-8 search. Per Elo it prints UCI's mean loss a move, the seeded draw's at scale 1 (a real seeded
- * move per position, and the draw's exact expectation over seeds), and the scale on T that brings that expectation to UCI's.
+ * boss engine's own top-8 search. Per Elo it prints UCI's mean loss a move, the seeded draw's at the table's T (eloDrawT: a real
+ * seeded move per position, and the draw's exact expectation over seeds), and the scale on RATING_CURVE's loss that brings that
+ * expectation to UCI's (the table's factor, measured).
  *
  *   npx tsx packages/sim/scripts/elo-draw.ts [positions=200] [uciSamples=3]
  *
@@ -11,7 +12,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { DEFAULT_SETTINGS, RAID_SETTINGS, lossForRating, mulberry32, shuffle } from "@chessroyale/core";
-import { applyMove, bossGuardFrom, bossMoveFrom, fenAfter, gameEnd, legalMoves, moveLoss, withinGuard, type BossGuard, type MoveScore, type Opening } from "@chessroyale/chess";
+import { applyMove, bossGuardFrom, bossMoveFrom, eloDrawT, fenAfter, gameEnd, legalMoves, moveLoss, withinGuard, type BossGuard, type MoveScore, type Opening } from "@chessroyale/chess";
 import { createNodeEngine } from "@chessroyale/chess/node";
 
 const N = Number(process.argv[2] ?? 200);
@@ -102,8 +103,8 @@ const lines = [
   "",
   `\`npx tsx packages/sim/scripts/elo-draw.ts ${N} ${SAMPLES}\`: ${positions.length} positions, Stockfish lite at ${nodes} nodes, the raid's guard, mean loss a move (points).`,
   "",
-  "| Elo | T | UCI (± se) | seeded, scale 1: a move / exact | scale | seeded at scale (exact) |",
-  "|---|---|---|---|---|---|",
+  "| Elo | T (table) | UCI (± se) | seeded at T: a move / exact | scale (table) | scale fitted | seeded at it (exact) |",
+  "|---|---|---|---|---|---|---|",
 ];
 for (const r of results) {
   const target = mean(r.uci);
@@ -114,7 +115,8 @@ for (const r of results) {
     else lo = mid;
   }
   const scale = (lo + hi) / 2;
-  lines.push(`| ${r.elo} | ${lossForRating(r.elo).toFixed(2)} | ${target.toFixed(2)} ± ${se(r.uci).toFixed(2)} (${r.uci.length}) | ${mean(r.seeded).toFixed(2)} / ${expected(r, 1).toFixed(2)} | ${scale.toFixed(2)} | ${expected(r, scale).toFixed(2)} |`);
+  const table = eloDrawT(r.elo) / lossForRating(r.elo);
+  lines.push(`| ${r.elo} | ${eloDrawT(r.elo).toFixed(2)} | ${target.toFixed(2)} ± ${se(r.uci).toFixed(2)} (${r.uci.length}) | ${mean(r.seeded).toFixed(2)} / ${expected(r, table).toFixed(2)} | ${table.toFixed(2)} | ${scale.toFixed(2)} | ${expected(r, scale).toFixed(2)} |`);
 }
 writeFileSync("reports/elo-draw.md", lines.join("\n") + "\n");
 console.log(lines.join("\n"));

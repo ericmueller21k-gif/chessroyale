@@ -414,9 +414,13 @@ describe("speaking to the Maia box (HumanUciEngine)", () => {
     expect(maia.error).toBe("load failed: HTTP 404");
     const ok = new HumanUciEngine(maiaBox());
     await ok.init();
+    // (Its hook: the app tells the lobby its Maia is no longer loaded, BOSS_CHECK's N1.)
+    let told = 0;
+    ok.onFail = () => told++;
     ok.fail("worker error");
     expect(ok.ready()).toBe(false);
     expect(ok.failed()).toBe(true);
+    expect(told).toBe(1);
   });
 
   it("a load that never ends gives up after its time", async () => {

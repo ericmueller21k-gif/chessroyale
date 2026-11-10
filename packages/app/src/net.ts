@@ -977,10 +977,14 @@ export class NetMatch implements GameView {
     this.loadMaia();
   }
 
-  /** Starts Maia; once it's loaded the lobby is told (`maiaReady`: this device may check the boss's Maia moves). */
+  /**
+   * Starts Maia; once it's loaded the lobby is told (`maiaReady`: this device may check the boss's Maia moves, and as the host play
+   * them), and again if it fails (`off`: the boss's moves are then the seeded Stockfish ones, N1).
+   */
   private loadMaia() {
     const maia = (this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs));
     void maia?.loaded().then((ok) => ok && this.maia === maia && this.send({ t: "maiaReady" }));
+    if (maia) maia.onFail = () => void (this.maia === maia && this.send({ t: "maiaReady", off: true }));
   }
 
   /** Frees Maia (its model holds a few hundred MB). */

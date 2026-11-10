@@ -350,6 +350,8 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     join(L, "Saved", "phone");
     ready(L, ["p1", "p2", "p3", "p4"], true);
     L.core.message("p4", { t: "speed", nps: 300_000, maiaSaved: true });
+    // (The host's Maia is loaded: his moves are Maia's, delta review 2's N1.)
+    L.core.message("p1", { t: "maiaReady" });
     L.core.message("p1", { t: "start" });
     L.advance(1000);
     const { key, reqs } = nextBossTurn(L, ["p1", "p2", "p3", "p4"]);
@@ -358,7 +360,7 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     // Told to load Maia to check (BOSS_CHECK.loaders: two drawn of p3 and p4, as the battle began); the phone without it, never.
     expect(L.take("p2", "bossBrain")).toEqual([]);
     for (const id of ["p3", "p4"]) expect(L.take(id, "bossBrain")).toEqual([expect.objectContaining({ check: true })]);
-    // Nobody's Maia ready yet: the host alone.
+    // Nobody else's Maia ready yet: the host alone.
     expect(reqs.map((x) => x.id)).toEqual(["p1"]);
     L.core.record.unvouched = undefined;
     const r = reqs[0]!.r;

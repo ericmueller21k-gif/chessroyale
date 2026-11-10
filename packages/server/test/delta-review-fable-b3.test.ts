@@ -288,6 +288,8 @@ describe("delta review of PR #611's fixes, turned around", () => {
     join(L, "Liar", "phone");
     ready(L, ["p1", "p2", "p3", "p4"], true);
     L.core.message("p4", { t: "maiaReady" });
+    // (The host's Maia is loaded, as its "Maia played it" says: his moves are Maia's, delta review 2's N1.)
+    L.core.message("p1", { t: "maiaReady" });
     L.core.message("p1", { t: "start" });
     L.advance(1000);
     let checked = 0;
@@ -327,7 +329,7 @@ describe("delta review of PR #611's fixes, turned around", () => {
     expect(host.check).toBeUndefined();
   });
 
-  it("D2 (M2): on a turn with his powers' extras (Wrangler's showdown) the checker gets the whole request and their time, and when its move plays its own extras come with it", () => {
+  it("D2 (M2): on a turn with his powers' extras (Wrangler's showdown) the checker gets the whole request and their time; when its move plays, the host is asked for that move's extras, and only with no answer in its time do the checker's come with it (N2)", () => {
     const L = raid({ server: true, settings: { bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 } });
     people(L);
     const runner = (L.core as unknown as { runner: { applyBossMove: (...a: unknown[]) => unknown } }).runner;
@@ -358,6 +360,9 @@ describe("delta review of PR #611's fixes, turned around", () => {
       expect(L.core.record.timer!.at).toBe(L.now() + BOSS_CHECK.waitMs + 15_000);
       L.core.message("p2", { t: "bossMove", key, move: better.m, showdown: better.l!.spec });
       for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === better.m ? 0.6 : 0.5 })));
+      // (The host asked for the better move's extras (delta review 2, N2); it doesn't answer in its time.)
+      expect(L.take("p1", "bossRequest").at(-1)?.allowed).toEqual([better.m]);
+      L.advance(BOSS_CHECK.waitMs + 15_000);
       expect(played(L)).toBe(better.m);
       const extras = spy.mock.calls.at(-1)![2] as Record<string, unknown>;
       expect(extras.showdown).toBe(better.l!.spec);

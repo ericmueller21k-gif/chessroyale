@@ -610,8 +610,11 @@ export type ClientMessage =
    * guard's swap). Two devices' different Maia moves are settled by it (BOSS_CHECK). Missing: "stockfish".
    */
   | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; by?: "maia" | "stockfish" }
-  /** This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves (BOSS_CHECK). */
-  | { t: "maiaReady" }
+  /**
+   * This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves, and as the host play them (BOSS_CHECK).
+   * `off`: it failed after all (its worker broke): no longer loaded.
+   */
+  | { t: "maiaReady"; off?: true }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
