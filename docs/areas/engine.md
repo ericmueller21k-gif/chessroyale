@@ -120,11 +120,10 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     them), and the admins' debug line says "pick replaced (not allowed)"; the runner's `applyBossMove` (solo and the
     server) plays the first allowed move for anything else a host sends, and logs it. Every power × brain path is tested
     (`packages/chess/test/boss-power-legal.test.ts`).
-  - **Two devices play each online boss move** (Nov 10, `BOSS_CHECK`; docs/decisions/2026-11-10-boss-and-lone-devices.md): his own
-    move and the funhouse's go to the host and a checker (a judging device, computers first) with one seed (`bossRequest.draw`: the
-    random source and Maia's draw, the box's Seed option). The same move plays; two differ: the engine server scores both (one
-    search), the better for him plays, and a device 40 points or more worse gets a strike; nobody to ask, or no verdict: the
-    host's, and the match is unvouched (pays as a solo game). `packages/server/test/boss-check.test.ts`.
+  - **Two devices play each online boss move** (Nov 10, `BOSS_CHECK`; 2026-11-10-boss-and-lone-devices.md): his move and the funhouse's go
+    to the host and a checker (a judging device) with one seed (`bossRequest.draw`: the rng and Maia's Seed). Same move: it plays; two
+    differ: the engine server's better for him (40 points worse, or unplayable: a strike); none to ask or no verdict: the host's,
+    unvouched. `packages/server/test/boss-check.test.ts`.
   - **The landing guard** (Oct 17; docs/decisions/2026-10-17-alfil-sees-the-landing.md; Eric: "can we make the engine
     think, the turn before the pieces land, that they're there?"): on Alfil's move just before his Mammoth Slam's pieces
     land (`landsAfterHisMove`), his moves still come from the board as it is, but `bossMoveFrom`'s `ahead` judges them
