@@ -5,7 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, FRONT_DOOR, JUDGES, RAID_SETTINGS, SQUADS, SQUADS_LOBBY, modeSettings, mulberry32, voteResultMs, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type ScoreJob, type ServerMessage } from "@chessroyale/chess";
-import { SQUADS_PROTOCOL, squadsVotes } from "@chessroyale/chess/squads";
+import { SQUADS_PROTOCOL, squadsLegalMoves, squadsVotes } from "@chessroyale/chess/squads";
 import { LobbyCore, OTHER_ACCOUNT, hostBoardOk, newLobbyRecord } from "../src/lobby.ts";
 import { drawJudges, judgeWeight } from "../src/judges.ts";
 import { SQUADS_OTHER_ACCOUNT, clearTopCache } from "../src/squads-lobby.ts";
@@ -268,7 +268,7 @@ describe("Squads: seats and the shared answers", () => {
     return { L, ids, lead };
   }
 
-  it("an answer two devices agreed on is used for its job, never handed to another lobby; the engine server's is", () => {
+  it("an answer two devices agreed on is used for its job, never handed to another lobby", () => {
     const A = firstTurn();
     expect(A.lead).toBeDefined();
     const top = fallbackTop(A.lead.fen, SQUADS.bots.candidates);
@@ -279,17 +279,50 @@ describe("Squads: seats and the shared answers", () => {
     const same = B.L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.fen === A.lead.fen);
     expect(same.length).toBeGreaterThan(0);
     expect(same.some((j) => j.how === "cached")).toBe(false);
-    // The engine server's verdict (two devices disagreed): that one is shared.
+  });
+
+  it("the review's junk-verdict proof, turned around: two parties that disagree on purpose get a verdict for their job only, never shared", () => {
     const C = firstTurn({ server: true });
-    const bad = [...top].reverse().map((m, i) => ({ ...m, expected: i === 0 ? 0.99 : m.expected }));
-    C.L.core.message(C.ids[0]!, { t: "botTop", id: C.lead.id, top });
-    C.L.core.message(C.ids[1]!, { t: "botTop", id: C.lead.id, top: bad });
+    const real = fallbackTop(C.lead.fen, SQUADS.bots.candidates).map((m) => m.move);
+    const junk = squadsLegalMoves(C.lead.fen).filter((m) => !real.includes(m));
+    const a = junk.slice(0, 4).map((move, i) => ({ move, expected: 0.6 - i * 0.01 }));
+    const b = junk.slice(4, 8).map((move, i) => ({ move, expected: 0.55 - i * 0.01 }));
+    C.L.core.message(C.ids[0]!, { t: "botTop", id: C.lead.id, top: a });
+    C.L.core.message(C.ids[1]!, { t: "botTop", id: C.lead.id, top: b });
     const req = C.L.server.find((r) => r.id === C.lead.id)!;
-    C.L.core.serverAnswered(C.lead.id, top.filter((m) => req.moves.includes(m.move)));
+    // The server only scores the devices' moves (the ROADMAP's next step: its own top moves) ...
+    expect(req.moves.some((m) => real.includes(m))).toBe(false);
+    C.L.core.serverAnswered(C.lead.id, req.moves.map((move, i) => ({ move, expected: 0.3 - i * 0.01 })));
     expect(C.lead.how).toBe("server");
+    // ... so its verdict settles this job and goes no further: another lobby asks its own devices.
     const D = firstTurn();
-    const cached = D.L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.fen === C.lead.fen);
-    expect(cached.some((j) => j.how === "cached")).toBe(true);
+    const same = D.L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.fen === C.lead.fen);
+    expect(same.length).toBeGreaterThan(0);
+    expect(same.some((j) => j.how === "cached")).toBe(false);
+  });
+
+  it("a party alone (no outside device): a second party device checks each job; agreement is one answer, disagreement goes to the server", () => {
+    const partyAlone = () => {
+      const L = squadsLobby({ test: { start: 0 }, fillInMs: 5_000, serverEngine: true });
+      L.core.reserve([{ size: 4, pass: "PASS" }], 60_000);
+      const party = [0, 1, 2, 3].map((i) => L.join(`M${i}`, { party: "PASS", device: "computer" }));
+      for (const id of party) L.core.message(id, { t: "speed", nps: 1_000_000 });
+      L.advance(5_000 + VOTES_MS + SQUADS_LOBBY.bracketIntroSeconds * 1000);
+      const jobs = L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.devices.length && !j.how);
+      expect(jobs.length).toBeGreaterThan(0);
+      // (Before: one device per job, alone. The review's party-of-four proof.)
+      expect(jobs.every((j) => j.devices.length === 2)).toBe(true);
+      return { L, job: jobs[0]! };
+    };
+    const A = partyAlone();
+    const top = fallbackTop(A.job.fen, SQUADS.bots.candidates);
+    for (const d of A.job.devices) A.L.core.message(d, { t: "botTop", id: A.job.id, top });
+    expect(A.job.how).toBe("one");
+    const B = partyAlone();
+    B.L.core.message(B.job.devices[0]!, { t: "botTop", id: B.job.id, top });
+    B.L.core.message(B.job.devices[1]!, { t: "botTop", id: B.job.id, top: [...top].reverse().map((m, i) => ({ ...m, expected: i === 0 ? 0.99 : m.expected })) });
+    expect(B.job.how).toBeUndefined();
+    expect(B.L.server.some((r) => r.id === B.job.id)).toBe(true);
   });
 
   it("two devices of one party are never both asked for one job", () => {

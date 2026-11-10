@@ -512,14 +512,11 @@ export function testLobbyOptions(q: URLSearchParams, now: number): { fillAt: num
 }
 
 /**
- * The engine server's top moves for positions it settled, shared by the lobbies here. Only the server's: an answer
- * devices agreed on is used for its own job, never handed to another lobby (2026-11-10-device-trust.md).
+ * Top moves shared by the lobbies here. Empty for now: devices' answers are used for their own job only, and the engine
+ * server's verdict only scores the moves devices sent, so it isn't the server's own choice either. It fills again once
+ * the server picks its own top moves (ROADMAP; 2026-11-10-device-trust.md, review fixes).
  */
 const TOP_CACHE = new Map<string, MoveScore[]>();
-const cacheTop = (fen: string, top: MoveScore[]) => {
-  TOP_CACHE.set(fen, top);
-  if (TOP_CACHE.size > 2000) TOP_CACHE.delete(TOP_CACHE.keys().next().value!);
-};
 /** For tests: forget the shared cache. */
 export const clearTopCache = () => TOP_CACHE.clear();
 
@@ -2119,14 +2116,16 @@ export class SquadsCore {
    * Devices for a job, best first: outside this match before those in it (nobody's engine decides the bots they play
    * against or beside, while anyone else's can), and `last` (a token's own squad, judging its refund) after those;
    * computers before phones, the least loaded, the fastest. None holding its most unanswered jobs already. Never two of
-   * one party (nor one beside a device in `exclude`): two devices that agree must be two people who answer apart.
+   * one party (nor one beside a device in `exclude`): two devices that agree must be two people who answer apart. With
+   * no outside device free (and no `exclude`: not a referee), a second device of the first's party is asked as a
+   * checker: its disagreement still goes to the server, its agreement counts as one answer (`settle`).
    */
   private pickDevices(lm: LiveMatch, n: number, exclude: readonly string[] = [], last: ReadonlySet<string> = new Set()): string[] {
     const inMatch = new Set(lm.m.sides.flatMap((x) => x.seats));
     const busy = this.inFlight();
     const cap = SQUADS_LOBBY.botWork.maxInFlight;
     const parties = new Set(exclude.flatMap((id) => this.human(id)?.partyId ?? []));
-    return Object.keys(this.r.devices)
+    const ranked = Object.keys(this.r.devices)
       .filter((id) => this.deviceUp(id) && !exclude.includes(id) && (busy.get(id) ?? 0) < cap[this.human(id)!.device])
       .sort((a, b) => {
         const da = this.r.devices[a]!;
@@ -2136,7 +2135,8 @@ export class SquadsCore {
         const kb = key(b, db);
         for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return ka[i]! - kb[i]!;
         return a < b ? -1 : 1;
-      })
+      });
+    const out = ranked
       .filter((id) => {
         const party = this.human(id)!.partyId;
         if (parties.has(party)) return false;
@@ -2144,6 +2144,12 @@ export class SquadsCore {
         return true;
       })
       .slice(0, n);
+    const checker = out.length === 1 && n >= 2 && !exclude.length && ranked.find((id) => id !== out[0] && this.sameParty(id, out[0]!));
+    return checker ? [...out, checker] : out;
+  }
+
+  private sameParty(a: string, b: string): boolean {
+    return this.human(a)?.partyId === this.human(b)?.partyId;
   }
 
   private requestWork(lm: LiveMatch, half: HalfRecord, board: number, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {
@@ -2268,7 +2274,8 @@ export class SquadsCore {
     };
     if (valid.length >= 2) {
       const [a, b] = valid as [{ d: string; top: MoveScore[] }, { d: string; top: MoveScore[] }];
-      if (topsAgree(a.top, b.top)) return done(a.top, "agreed");
+      // (Two of one party, the second a checker: their agreement is one answer, not two people's.)
+      if (topsAgree(a.top, b.top)) return done(a.top, this.sameParty(a.d, b.d) ? "one" : "agreed");
       // A referee's answer: the one it agrees with stands; the other device gets a strike.
       if (job.referee) {
         const ref = job.answers[job.referee];
@@ -2322,7 +2329,6 @@ export class SquadsCore {
       }
       job.how = "server";
       job.top = verdict;
-      cacheTop(job.fen, verdict);
     }
     this.touch(lm);
     this.pump();
