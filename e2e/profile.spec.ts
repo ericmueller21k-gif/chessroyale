@@ -117,6 +117,18 @@ test("an admin's locker has one of every item, each tagged Admin, worn like any 
   await page.waitForTimeout(500);
   await expect(page.locator(".locker-dialog")).toHaveCount(0);
   await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  // An outfit (Nov 10): the Banana Suit over the rest; the crown stays worn underneath, greyed (shown, not hidden), goggles not;
+  // the preview is the suit; off again, the crown is back.
+  const banana = crate.getByRole("button", { name: /^Banana Suit, / });
+  await banana.click();
+  await expect(banana.locator(".locker-worn")).toHaveText("Worn");
+  await expect(page.locator(".locker-avatar .avatar.riding")).toHaveAttribute("data-ride", "banana-suit");
+  await expect(crown.locator(".locker-covered")).toHaveText("Hidden by your outfit");
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
+  await expect(crate.getByRole("button", { name: /^Ski Goggles, / }).locator(".locker-covered")).toHaveCount(0);
+  await banana.click();
+  await expect(page.locator(".locker-covered")).toHaveCount(0);
+  await expect(crown.locator(".locker-worn")).toHaveText("Worn");
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 });
 
