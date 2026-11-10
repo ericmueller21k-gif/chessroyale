@@ -1,249 +1,236 @@
-# HunChess: outside review, findings (Nov 10, 2026)
+# HunChess: outside review, findings (Nov 10, 2026; second, deeper pass)
 
-Answer to `notes/fable-audit.md`. Read-only: nothing in the game was changed. Code read at `main` a706681.
+Answer to `notes/fable-audit.md`. Nothing in the game was changed. Code read at `main` a706681.
 
-**How to read the confidence labels.** "Read the code" means I opened the lines cited. "From the docs" means I
-trust the area page and did not check the code. "Guess" means neither.
+**How it was done.** A first pass by reading, then a second pass with tests run locally and six read-only
+reviewers, one per area. Three had reported when this was written (Squads and 1 v 1; rewards and auto chess;
+accounts, admin, fair play and chat). Three had not (phone performance with a real build; the rules engine and
+bosses; tests and dead code): see "Still to come" at the end. I spot-checked each reviewer's top claims in the code.
 
-**What I did not read**, so say nothing about: Squads' server, the town's and auto chess's code, the admin pages'
-internals, `fairplay.ts`'s scoring math, and nearly all of the app's screens. I ran nothing: no tests, no build, no
-load. Sign-in, sessions and cookies I only skimmed; what I saw looked careful.
+**Confidence labels.** "Ran it": a test showed it. "Read": the lines cited were read. "Docs": from an area page.
+"Guess": neither.
+
+**Proof tests** (beside this file; copy into `packages/server/test/` and run with `npx vitest run <file>`):
+- `fable-lying-host.test.ts`: the boss thrown, and a junk move shown as best.
+- `fable-many-seats.test.ts`: one account, three seats.
+- `fable-match-end-save.test.ts`: database calls per player at a match's end, and results written twice.
 
 ## The short version
 
-The server is in charge of the chess rules, the clock, crates and the wallet. It is **not** in charge of two things
-that decide who wins: the boss's moves and, in a match with few people, the scores. Both come from one player's
-device. Fix those two, close one open door on the engine server, and the integrity story is good.
+The wallet, crates, sign-in and ranked 1 v 1's rules are well built: no way found to pay twice, roll a crate
+unfairly, or decide a 1 v 1 result from the app. The weak spot is one idea used in three places: **work sent to
+players' devices is trusted when too few devices, or the wrong devices, check it.** Scores, the boss's moves and
+Squads' bot moves can each be decided by one player. Because fair play bans on its own from those same numbers,
+the same hole can be used to get an honest player banned.
 
-The larger risk is not in the code. About 60% of the app is the town and character art, there are six modes, and no
-match has yet been played by real strangers. A launch crowd spread over six queues will mostly meet bots.
+Four fixes close most of it: one seat per account per lobby; never trust a device's claimed speed; the boss's
+moves checked or made by the server; fair play set to "review", not "ban", until its evidence is the server's own.
 
-## Top 10, by impact
+## Top findings, by impact
 
-### 1. In a boss raid, one of the raiders plays the boss
-- **What.** The boss's move comes from the host's device, and the host is a player on the crowd's side. The server
-  takes whatever the host sends as long as it is a move the rules allow.
-- **Evidence.** `packages/server/src/lobby.ts:1324-1326` (`bossMove`: only checks the sender is the host, the phase
-  and the key). `docs/areas/engine.md`: "the host's device plays Maia's move and the server sends that one move to
-  everyone"; `applyBossMove` "plays the first allowed move for anything else a host sends".
-- **Why it matters.** A changed app that is host makes the boss play its worst allowed move every turn. The whole
-  raid wins. Wins pay XP and finish win quests, which pay crates. `pickHost` prefers a computer, so a cheater on a
-  computer is the likely host. The power fields on the same message (`drag`, `showdown`, `beam`, `balloon`) are the
-  host's word too.
-- **What I'd do.** Cheapest: the round's two judges already search the boss's position; have the server refuse a
-  boss move that loses more than the blunder guard allows by their agreed numbers, and play their best instead.
-  Better: run the boss's brain on the engine server for any raid that pays rewards (Maia is about 80 ms a move).
-  This is the computing rule's own third case: "a check that must be beyond any player's reach".
-- **Confidence.** High (read the code). I did not check what each power field can do when forged.
+### 1. One account can sit in many seats of one lobby, and be both judges
+- **What.** A `hello` with no seat token always makes a new seat; nothing checks the account already has one.
+  Judges are drawn by weight = (claimed speed)³, and the speed is the device's own word, up to 50 million.
+- **Evidence.** `lobby.ts:829-866` (no account check), `:2602-2605` (speed), `judges.ts:116-119`,
+  `settings.ts:2403` (`speedWeight: 3`). Squads: `squads-lobby.ts:673-714`, `squads-do.ts:334-361`.
+- **Ran it.** Three connects on one account gave seats p1, p2, p3. In Squads, 32 connects gave 32 seats, one in
+  every squad. With the cube, two tabs claiming 50M outweigh 95 honest computers at 2M by about 300 to 1.
+- **Why it matters.** Two tabs of one person are both judges of nearly every round, agree with each other, and
+  are accepted with no check: full control of scoring, in a ranked 100-player match too. Each extra seat is also
+  an extra vote in Crowd. In Squads, ghost seats can fill a lobby, keep an empty match alive, and inflate the
+  online count that feeds the overload cap.
+- **Do.** One seat per account per lobby (a second socket takes over the first seat). Ignore claimed speed: time
+  the first job. Never draw two judges from one account, party, address or device marker. Lower the cube.
+- **Confidence.** High. The seat part is run; "both judges nearly always" is arithmetic on read code.
 
-### 2. Anyone can switch off the engine server for the day
-- **What.** `POST /api/engine/score` needs no sign-in, and every call takes one search from the same daily budget
-  (3,000) that every lobby's re-checks and dispute verdicts use. The budget is taken before the search runs.
-- **Evidence.** `packages/server/src/index.ts:197-205`; `engine.ts:129-132` and `:47` (`takeBudget`, instance
-  `engine-1`); the per-address limit is 10,000 a minute per Worker instance (`settings.ts:3098`).
-- **Why it matters.** One loop of 3,000 requests, a few seconds from one address, and for the rest of the UTC day
-  no close call is re-checked and no judges' dispute gets a verdict, site-wide. Disputes then fall to "the faster
-  device stands" (`lobby.ts:3003-3011`), which a cheater can be (finding 3). `/api/engine/ping` is open too and
-  wakes a paid container.
-- **What I'd do.** Require a signed-in session, give each account a small daily count, and keep solo's budget apart
-  from the lobbies' so one can never starve the other.
-- **Confidence.** High (read the code).
+### 2. In a raid, one of the raiders plays the boss
+- **Evidence.** `lobby.ts:1324-1326`: the host's `bossMove` is played if the rules allow it.
+- **Ran it.** A host that sent the boss's worst move each turn won the raid in 8 moves; all raiders got the win.
+- **Do.** Refuse a boss move that loses more than the blunder guard by the round's judged numbers, or run the
+  boss's brain on the engine server for raids that pay rewards.
+- **Confidence.** High.
 
-### 3. With few people in a match, the host scores its own moves
-- **What.** Two judges are used only when two devices can judge. Otherwise the host scores every round. A pick the
-  host leaves out "counts as the best (no loss)".
-- **Evidence.** `lobby.ts:2372-2374` (`scores`: host only), `:2398` (unscored pick = best), `:2565-2569`
-  (`judging()`). Also: judges are drawn weighted by a speed each device reports itself, up to 50 million
-  (`:2602-2605`), and when one judge is late the other's answer is used alone (`:2833-2846`), spot-checked on the
-  engine server 25% of the time, and only while that server has budget (finding 2).
-- **Why it matters.** At launch nearly every match is a few people and bots, so the host path is the normal one.
-  The rating is protected (a match counts only with 30 real players of 100, `settings.ts:2316`). Placement,
-  profile stats, "brilliant" counts and fair play's signals are not: fair-play.md says signals are "never numbers a
-  browser makes up", but on this path they are one browser's numbers. Two friends who both claim a huge speed are
-  likely drawn as both judges and can agree on anything.
-- **What I'd do.** Cap the claimed speed to what the device then proves (time its first job). Never draw two judges
-  from one party, one address or one device marker. On the host path, send a sample of rounds to the engine server
-  and treat a host caught wrong as a fair-play signal. Write a "lying host" unit test for `lobby.ts` (it is pure, so
-  this is cheap) and keep it as a guard.
-- **Confidence.** High on the code. Medium on how much it matters before real stakes exist.
+### 3. Fair play can ban an honest player on numbers a cheater supplied
+- **What.** `FAIRPLAY.enforcement` is `"ban"` (`settings.ts:3375`). The signals are the judges' numbers. The "deep
+  re-check" on the engine server searches only the candidate moves those judges supplied plus the pick
+  (`fairplay-deep.ts:96`), so it confirms a forged list.
+- **Why it matters.** With finding 1, two tabs can report a victim's picks as best among poor candidates, match
+  after match, until the victim is banned and emailed. On the host path (finding 5) one device can do it.
+- **Do.** Set enforcement to `"review"` now. Make the deep re-check choose its own candidates (the engine's own
+  top moves). Then turn bans back on.
+- **Confidence.** Medium to high. Every link was read; the whole chain was not run end to end.
 
-### 4. Ranked 1 v 1, the mode with the visible rank, has no automatic cheat detection
-- **What.** 1 v 1 has "no judged picks, so no signals and no part in the suspicion score". Its games are checked
-  only after a report opens a case and an admin presses the button.
-- **Evidence.** `docs/areas/fairplay.md:69-77`. Stockfish is already loaded in every player's page.
-- **Why it matters.** This is the mode where an engine helps most and where rank and coins are paid. A cheater
-  needs no second device: a short script can ask the engine the page already has. Two accounts on two devices can
-  also trade wins for rank and coins; the device marker only stops the same device.
-- **What I'd do.** Sample finished ranked games on the fair-play engine instance off-peak (winners with a fast
-  climb first), and add the cheap signals that need no engine: move-time flatness, and the same pair meeting again
-  and again. Until that exists, treat the ladder as unverified.
-- **Confidence.** High from the docs; I did not read `fairplay-duel.ts`.
-- **A related point.** The repo is public, so every fair-play threshold and the reports that tuned them are public.
-  Before launch, move the numbers to Worker secrets or make the repo private.
+### 4. Anyone can switch off the engine server for the day
+- **Evidence.** `index.ts:197-209`: `POST /api/engine/score` needs no sign-in and spends the shared daily budget
+  (3,000; `engine.ts:129-132`). The per-address limit is 10,000 a minute.
+- **Why it matters.** One loop ends all verdicts, spot checks and re-checks until midnight UTC: the only check on
+  findings 1 and 5. `/api/engine/ping` keeps a paid container awake.
+- **Do.** Require sign-in, a small durable per-account cap, and a budget for matches apart from solo's.
+- **Confidence.** High (read by two reviewers independently).
 
-### 5. Saving a 100-player match's results is one long chain of database calls
-- **What.** At the end of a match the lobby saves each person in turn: fair play, the ranked hold, XP and quests,
-  the result, the welcome crate, the boss token. That is roughly 10 to 20 D1 queries a person, one after another,
-  inside one handler.
-- **Evidence.** `packages/server/src/lobby-do.ts:161-204`. `docs/areas/ops.md:121-123` already counts 300 to 500
-  queries for quests alone and calls it "fine for now".
-- **Why it matters.** Three ways it can hurt.
-  1. Cloudflare's D1 page lists 1,000 queries per invocation on the paid plan; its Workers page now lists 10,000
-     subrequests. I can't tell which applies here. If it is 1,000, the players saved last get nothing, silently:
-     every call's error is swallowed (`.catch(() => undefined)` on `recordResult`, line 190).
-  2. It may take tens of seconds. `resultsSaved` is set in memory first and stored after. A deploy in that window
-     (main deploys on every merge) restarts the object and runs the loop again. XP and tokens are keyed, so they are
-     safe; `recordResult` is called without its `once` guard, so results can be written twice.
-  3. D1 runs one query at a time. Several big matches ending together queue behind each other.
-- **What I'd do.** One batch per player (D1's `batch`), pass `once` to `recordResult`, and log a failed save
-  instead of swallowing it. Staging lets guests play, and guests have no account, so the load tests may never have
-  run this path: check that first.
-- **Confidence.** Medium. The code is read; the limit and the timing need a run (see "To run").
+### 5. With few people, one device scores the match or moves the bots
+- **Main lobby.** Under two judging devices, the host scores every round, and a pick it leaves out "counts as the
+  best" (`lobby.ts:2372-2374`, `:2398`). **Ran it:** `a2a3` came back as the best move, loss 0. The host also
+  sends the bots' picks (`:2390-2392`), so it chooses the crowd's move when bots are the majority.
+- **Squads.** With one human, their device alone answers for every bot's moves and the answer stands
+  (`squads-lobby.ts:2116-2131`, `:2288-2290`). **Ran it:** 20 of 30 opposing bot moves were the dictated blunder.
+  First place pays 100 coins and a crate, with no daily cap.
+- **Squads' shared cache.** Two agreeing devices write their answer into a cache every Squads lobby on that
+  server instance reads (`squads-lobby.ts:515-519`). **Ran it:** a fresh lobby used the planted answer and asked
+  no one.
+- **Why it matters.** At launch most matches are a few people and bots, so these are the normal paths.
+- **Do.** A lone device's answer never stands alone where a reward depends on it: sample it on the engine
+  server, or pay nothing extra for results only one device vouched for. Cache only server-checked answers. Give
+  Squads' rewards a daily cap like ranked's.
+- **Confidence.** High.
 
-### 6. Most of the code is not the game
-- **What.** App source by folder: town 63k lines, character art 52k, shared components 34k, all game screens 14k,
-  the board 1.6k. The town and the art are about 60% of the app. There are six modes plus the town and a shop, and
-  no match has been played by strangers.
-- **Evidence.** Line counts at a706681 (`packages/app/src/town`, `characters`, `screens`, `board`).
-- **Why it matters.** Three costs. Every helper pays to read and test around it. First load carries it (finding
-  8). And a launch crowd is small: 200 people online, over six queues and regions, is bots everywhere, and Crowd's
-  rating never counts because no match reaches 30 real players.
-- **What I'd do.** Pick the one mode that is the reason to come (I'd guess boss raids: they work with 1 to 50 people
-  and bots feel natural there) and launch with it and 1 v 1. Open Crowd at set hours so people land together. Keep
-  Squads, auto chess and the town behind "coming soon" until a few hundred people play daily. Take Classic out of
-  the build and CI until its redesign (it is on hold and still the default mode of `/api/lobby`,
-  `index.ts:252`; commit bd726b5 keeps it).
-- **Confidence.** High on the numbers. The advice is judgment, and Eric knows his players; I don't.
+### 6. The automated reviewer's token can ban any account
+- **Evidence.** `fairplay.ts:247-260`. **Ran it:** a ban with the token succeeded for a player with no case, no
+  reports and no matches. The same API returns admins' emails in the case log.
+- **Why it matters.** A leaked token, or a reviewer bot steered by text in a name or an appeal, can ban everyone.
+- **Do.** For the reviewer, let the server allow a ban only when the case already meets the ban bar (or allow it
+  only review, watch and clear). Strip emails from its answers.
+- **Confidence.** High.
 
-### 7. Money: paid keys for random crates is a loot box, and the "50% off" is a risk of its own
-- **What.** Crates are earned free, but opening one needs a key, and keys are to be sold. Legally that is a paid
-  random reward. The shop page also shows a struck-through "full price" beside a 50% beta price.
-- **Evidence.** `docs/areas/shop.md` ("Crates need keys", "The Shop tab's page", `SHOP.discount`).
-- **Why it matters.** I am not a lawyer; confirm each point.
-  - **The strike-through.** A "was" price nobody was ever charged is a deceptive-pricing problem in the US (FTC's
-    former-price guides, California) and in the EU and UK (the reference must be a real recent price). This one is
-    easy to walk into and easy to avoid.
-  - **Regions.** Belgium treats paid loot boxes as gambling. Brazil bans them for under-18s as of 2026. Others
-    (Netherlands, Spain, Australia's age ratings) are tightening. The age gate today only knows "under 13".
-  - **Stores.** Apple and Google require odds shown before purchase, and Apple requires its own payment for
-    digital goods inside an app. As a website with Stripe this doesn't bite; a store app changes it.
-  - **The bundle.** "A chance at a Mythic Crate" is a random reward inside a random reward. Its odds need showing
-    too.
-  - **Refunds and tax.** EU buyers have 14 days to withdraw unless they agree to waive it at purchase. Digital
-    sales owe VAT or sales tax in the buyer's place from the first sale.
-- **What I'd do.** Launch money with things sold directly: a named item, a pack whose contents are shown, coins.
-  Keep random crates as free rewards only. That removes nearly all of the above. Add paid keys later, with an 18+
-  check and region blocks, once there's revenue to pay for the legal review. Whatever is sold: no trading and no
-  cash-out, ever. Show "50% off" only against a price that was really charged.
-- **Confidence.** Medium. The laws named are from memory, not looked up today.
+### 7. Ranked 1 v 1 has no automatic cheat detection, and loses results after a minute of trouble
+- **Detection.** No signals at all for 1 v 1; games are checked only after a report (`docs/areas/fairplay.md:69`),
+  and Stockfish is already in every page. Two accounts on two devices can trade wins; the same-device guard is a
+  cookie, and nothing limits meeting the same opponent again and again.
+- **Lost results.** A finished game tries to record 4 times, 15 s apart, then gives up for good
+  (`duel-room.ts:132-133, 315-319`). A 60-second D1 outage loses every rating change in it. Squads retries for
+  24 hours.
+- **Do.** Sample finished ranked games on the fair-play engine off-peak; add move-time and repeat-pairing
+  signals; retry recording for hours, not a minute.
+- **Confidence.** Docs for detection; read for the rest. The game's own rules are solid (see "What's solid").
 
-### 8. The first load is heavy for a phone-first game
-- **What.** The main chunk is 2.4 MB (836 kB compressed) and the one CSS file 438 kB (89 kB compressed):
-  `styles.css` is 26,186 lines.
-- **Evidence.** Your own Nov 9 audit's table; `packages/app/src/styles.css`.
-- **Why it matters.** On a mid-range phone, parsing 2.4 MB of script is about a second or more before anything
-  runs, on top of the 1.4 s of boss art you found. A new player's first ten seconds decide whether they stay.
-- **What I'd do.** Give the home screen a size budget and a CI check that fails over it. Load each mode's screen,
-  its boss and its CSS on entry. Split `styles.css` by screen, which also ends it as a merge-conflict magnet.
-- **Confidence.** Medium (your numbers; I didn't build).
+### 8. Sign-in by email code is weak for the accounts that matter most
+- **Evidence.** `accounts.ts:629-687`. The code is 6 digits; the attempt count resets on each resend; 5 sends an
+  hour. **Ran it:** 25 counted guesses in one hour window, about 600 a day per address, no lockout across codes.
+  A stranger's request also replaces the owner's code and uses up their sends.
+- **Why it matters.** Admin is decided by email address alone (`admin.ts:43`). An attacker who knows an admin's
+  address has roughly a 1 in 5 chance a year of the admin pages. Anyone can block a known address from signing in.
+- **Do.** Tie the code to the browser that asked (a nonce cookie), count failures per address per day, 8 digits,
+  and put Cloudflare Access (or a second factor) in front of `/admin/*` for good, not only until launch.
+- **Confidence.** High.
 
-### 9. The docs have become a history log, and helpers pay to read it
-- **What.** "One short page per area" is now 8,000 lines: town-square 1,268, bosses 1,066, squads 745. Single
-  bullets run 300 words with dates, quotes and what it used to be. Code comments carry the same history. 76
-  decision notes were written in 3.5 days.
-- **Evidence.** `docs/areas/*.md`; `docs/areas/engine.md`'s "The boss's brain" bullet; your Nov 9 audit, F5.
-- **Why it matters.** Your own measurement says a helper's cost is steps times history. These pages are read at
-  the start of every job. A new reader (I was one) can't find the present state inside the story of how it got
-  there.
-- **What I'd do.** Area pages say only what is true today, in under 150 lines, with links. Dates, quotes and
-  "before Oct 13" go to the decision notes, which already exist for that. One Haiku job per page.
-- **Confidence.** Medium. It is a judgment about cost, not a bug.
+### 9. A match's end is about 2,200 database calls in a row, and can write results twice
+- **Evidence.** `lobby-do.ts:161-204`. **Ran it:** 14 to 22 D1 calls per signed-in player (22 at 10 players), so
+  about 2,200 for 100, one after another. Saving again, as after a restart before `resultsSaved` was stored,
+  doubled the rows (10 became 20): `recordResult` is called without its `once` guard (line 190).
+- **Why it matters.** Cloudflare's D1 page lists 1,000 queries per invocation on the paid plan; its Workers page
+  lists 10,000 subrequests. If the first applies, the last players saved get nothing, silently (errors are
+  swallowed). Either way it is tens of seconds in which a deploy doubles results. Main deploys on every merge.
+- **Do.** One batch per player; pass `once`; count failed saves on the ops page. Then run a 100-account match on
+  staging and count the rows.
+- **Correction to my first pass.** I said staging may never have run this path. Guests get guest accounts, so it
+  has run; what hasn't been checked is the count at 100 signed-in players.
+- **Confidence.** High on the numbers; medium on which limit bites.
 
-### 10. Adding a boss still touches the shared engine
-- **What.** Boss names appear inside the shared files: "hollow" 31 times in `runner.ts` and 16 in `lobby.ts`;
-  "alfil" 22 and 15. Each boss also shows up in the protocol, `net.ts` and `solo.ts`.
-- **Evidence.** grep counts at a706681; `packages/chess/src/bosses/` has 22 files, so a hook layer exists but leaks.
-- **Why it matters.** This is why "add a boss in an hour" is hard: a boss edits the files every mode depends on,
-  which then runs the whole e2e suite. It is also where one boss's fix breaks another.
-- **What I'd do.** Before boss 21, move what's left into `BossRules` hooks until a grep for a boss's name in
-  `runner.ts` and `lobby.ts` finds nothing. Make that grep a test. Then a boss is one folder and its own spec.
-- **Confidence.** Medium. Counts are exact; I didn't read each mention, and some may be comments.
+### 10. Free rewards from requests alone
+- **Welcome Crates.** Any posted solo result counts as a finished game (`welcome.ts:48`; `api.ts:627-661`).
+  **Ran it:** 25 empty posts earned two Welcome Crates, which opened to two Mythic rides.
+- **Idle farming.** Solo XP trusts the browser for moves and wins; only time is the server's. **Ran it:** one day
+  of open timers gave 1,950 XP, 3 crates, a key and 2 boss tokens. The daily caps hold per account; accounts are
+  free.
+- **The shop route.** `/api/shop/buy` gives every item free by direct call while `SHOP_FREE` is on
+  (`core/shop.ts:70`), though the tabs are hidden. When it's turned off the server charges full price and ignores
+  the 50% the page shows.
+- **Do.** Count a solo game for the Welcome Crate only when the server timed it. Decide now whether items will
+  ever be traded or gifted: if not, idle farming is tolerable; if so, it must be closed first. Close the route.
+- **Confidence.** High.
 
-## By section
+### 11. Most of the code is not the game, and the launch crowd will be thin
+- App source: town 63k lines, character art 52k, components 34k, all game screens 14k, the board 1.6k. Six modes
+  plus the town and a shop, and no match yet played by strangers. 200 people online over six queues is bots
+  everywhere, which is exactly where findings 2 and 5 live.
+- **Do.** Launch with one headline mode and 1 v 1; open Crowd at set hours; hold Squads, auto chess and the town
+  until a few hundred play daily. Take Classic (on hold) out of the build and CI.
+- **Confidence.** High on the numbers; the advice is judgment.
 
-**1. Integrity.** Findings 1 to 4. Also:
-- The good news, read in code: ratings come from the account, never the app (`lobby-do.ts:501-503`); practice mode
-  is admin-only; a solo result never counts for rank; crates open on the server; purchases are one transaction.
-- Solo XP is the browser's word, capped per day. Fine while items can't be traded. If trading or gifting is ever
-  added, every free account becomes a farm.
+### 12. Money: paid keys for random crates is a loot box; the "50% off" is its own risk
+- A struck-through "full price" nobody was charged is a deceptive-pricing risk (US, EU, UK). Paid random rewards
+  are banned or restricted in Belgium and, for under-18s, Brazil; stores require odds shown; the bundle's "chance
+  at a Mythic Crate" is a random reward inside one. EU buyers have a 14-day withdrawal right unless waived at
+  purchase. The age gate only knows "under 13" and is an unsigned cookie.
+- **Do.** Start by selling things directly (a named item, a pack whose contents are shown, coins); keep random
+  crates as free rewards; add paid keys later with an 18+ check and region blocks. No trading, no cash-out.
+- **Confidence.** Medium. I'm not a lawyer and these are from memory.
 
-**2. Launch risk.** Finding 5. Also:
-- Every merge to main deploys, and a deploy restarts every match object. State is stored on each message, so
-  matches should survive, but an engine-server answer in flight is lost. I found no test for "deploy in the middle
-  of a match". Your gradual-deploy proposal is the right fix; add that test.
-- The engine server is one single-thread container at about one search a second. 3,000 searches a day is perhaps a
-  few dozen full matches. Past that, fairness quietly drops to the devices. Decide the real budget before launch
-  and show "budget spent" on the ops page as an alert, not a number.
-- Each message rewrites the whole lobby record (about 80 kB at 100 players). Likely fine; watch storage cost.
-- Rate limits live in each Worker instance's memory, so they bound a script, not a determined person.
+## Other findings
 
-**3. Security.** Finding 2. Also:
-- Client test switches can't be enforced on the client, and don't need to be, as long as the server ignores them.
-  The server side I read does check (`testSwitches`, `squadsTestAllowed`).
-- Public repo: account id, database id and the Access tag are not secrets. The fair-play numbers are the exposure.
-- Typed chat is open to signed-in 13 to 17 year olds. CLAUDE.md lists muting as "later". A way to block or mute a
-  person should ship before strangers can type to each other.
+**Abuse and safety**
+- One guest session sent 200 sign-in emails to 200 addresses (ran it): the cap is per address only. Risks email
+  cost and the sender's reputation. Every cookie-less `GET /api/me` makes a user and session row never cleaned up.
+- Two "cheating" reports from `name+1@` and `name+2@` accounts put a newer player into review, out of ranked
+  until a person clears it (ran it; `fairplay.ts:330-379`).
+- The name and chat filter drops emoji-style letters: a slur in squared letters passed as a name and in chat;
+  "snap: kid_2012" passed as a name (ran it; `text-filter.ts:87-89, 127-133`). Typed lines outside the town can't
+  be reported with their words. No block or mute yet, with 13-year-olds able to type.
+- A ban is evaded with a new email and cleared cookies. Sessions last 365 days with no "sign out everywhere".
+- The repo is public, so every fair-play threshold is too.
 
-**4. Money and law.** Finding 7.
+**Squads and matchmaking**
+- A seat token moves the seat, its result and its reward to whichever account connects with it
+  (`squads-lobby.ts:664`; ran it). The main lobby refuses this. It allows selling or boosting wins.
+- Party seat reservations never expire (`squads-lobby.ts:638-643`; ran it): after 8 re-queues a filling lobby
+  takes no more real players.
+- The matchmaker's queue is memory only (`matchmaker.ts:64-70`): a deploy forgets everyone in line.
 
-**5. Phones.** Finding 8. Battery: the town draws all the time; I didn't measure it. Worth one check that it stops
-drawing when the tab is hidden or a sheet covers it.
+**Reliability**
+- When a deploy drops every socket, every app reconnects at the same instants (500 ms, 1 s, 2 s…) with no random
+  spread (`net.ts:505`). Each reconnect is several D1 reads and a full record write. Add jitter.
+- Seat tokens are made with `Math.random` (`lobby.ts:839`). The account check limits the harm; use
+  `crypto.getRandomValues` anyway.
+- A guest merging into an account gets level rewards paid again (`rewards.ts:58-69`; ran it). A second solo start
+  cancels the first game's XP (`xp.ts:50-61`). A solo boss turn that throws has no fallback and would hang on
+  "boss thinking" (`solo.ts:911`; not reproduced).
 
-**6. Code health.** Finding 10. Also:
-- 234 references to test hooks across the app's game code (`testSwitchesAllowed`, `__town*`, `testParams`). They
-  are there because e2e drives canvases. A single test bridge module would get them out of the render paths.
-- Three lobby implementations (`lobby.ts` 3,713 lines, `squads-lobby.ts` 2,462, `duel-room.ts`) plus parties.
-  Guess: they repeat connect, reconnect, leave and timers. Worth one read to see what can be shared.
-- `settings.ts` is 4,342 lines. Keep "one place" as one folder with one index.
+**Code health** (measured parts are in "Still to come")
+- The Durable Object shell is written four times (`lobby-do.ts`, `squads-do.ts` twice, `duel-do.ts`), and
+  "device work checked across devices" twice with drifting rules: that drift is why Squads lacks guards the main
+  lobby has. One shared module for seats, sockets and device checks would have prevented findings 1 and 5 in
+  Squads.
+- Boss names inside shared files ("hollow" 31 times in `runner.ts`, 16 in `lobby.ts`): a boss still edits the
+  engine, which is why a boss PR runs everything.
+- First load: 836 kB of compressed script and a 26,186-line stylesheet (your Nov 9 numbers).
+- Area pages total 8,000 lines and read as history; every helper reads them first.
 
-**7. Scope.** Finding 6. What a new player would find confusing, as a guess from the docs: six modes at the door;
-"the most popular move is played" versus being scored on your own pick; why a boss exists in a chess game. One
-30-second first match that teaches by playing would do more than any text.
+## What's solid
 
-**8. How you build.** Finding 9. Also:
-- What's missing is people. Tests check what the builders thought of. Ten strangers for an hour will find what
-  122 specs can't, and tell you which mode is the game.
-- What's missing in tests: a cheating client. Every test plays an honest app. A small set of "the app lies" unit
-  tests (host scores, boss moves, judge reports, made-up tickets) would guard findings 1 and 3 for good.
-- Monitoring and alerts: already proposed on Nov 9. I agree it comes before launch.
-- 62 PRs merged in 3 days is fast, and much of it is process fixing process. That is normal at this size, and the
-  cure is less surface (finding 6), not more pipeline.
-
-**9. Anything else.**
-- Results that fail to save are swallowed in several places (`.catch(() => undefined)`). Count them on the ops
-  page so a silent loss is visible.
-- Before real players' data exists, rehearse one D1 restore.
+- **Ranked 1 v 1's rules:** seats by account, moves checked with chess.js, the server's clocks, one guarded
+  transaction per result. Nothing the app sends reaches a result.
+- **The ledger:** every grant one batch, keyed, replay-safe; no double pay or negative balance found; it
+  reconciled after an abuse run.
+- **Rolls:** secure randomness on the server; 400,000 simulated rolls matched the odds (39.9/26.1/18.0/14.0/2.0).
+- **Test switches:** refused in production, admins included.
+- **Admin pages:** every user string escaped; no GET changes state; the Access token check is complete.
+- **Sign-in with Google, sessions, privacy:** tokens stored hashed, emails never shown to players, deletion covers
+  every table, no secrets in the repo or its history, CI gives forks nothing.
+- **Auto chess:** grants nothing and calls no server route; no rule bugs found in what was read.
 
 ## Quick wins (under an hour each)
 
-1. Require sign-in on `/api/engine/score` and `/api/engine/ping`; give solo its own budget counter.
-2. Pass `once` to `recordResult` in `lobby-do.ts:190`, and log its failure.
-3. Clamp a device's claimed speed to what its first job measured (`lobby.ts:2602`).
-4. Don't draw two judges with the same party or device marker.
-5. Take the struck-through price off the shop page until a full price has really been charged.
-6. Add the bundle's Mythic odds to the odds shown.
-7. Alert when the engine budget passes 80%.
-8. A grep test: no boss id inside `runner.ts` or `lobby.ts` beyond today's count, so it only goes down.
+1. `FAIRPLAY.enforcement` to `"review"`.
+2. One seat per account per lobby, main lobby and Squads.
+3. Clamp claimed speed to a sane top (say 5M) and drop `speedWeight` to 1, until speed is measured.
+4. Sign-in required on `/api/engine/score` and `/api/engine/ping`.
+5. Pass `once` to `recordResult` (`lobby-do.ts:190`).
+6. Reviewer token: no bans without an open case at the ban bar.
+7. Welcome Crate: count only server-timed solo games.
+8. Stop Squads' cache taking device answers.
+9. Refuse a seat token from another account in Squads (`squads-lobby.ts:664`), as the main lobby does.
+10. Jitter on reconnect (`net.ts:505`).
+11. Record a ranked game for hours, not four tries.
+12. Take the struck-through price off the shop until a full price has been charged.
 
-## To run (I couldn't)
+## Still to come
 
-- **Match-end save at size.** On staging with sign-in on, finish a Crowd match with 100 signed-in accounts. Count
-  result rows (expect 100), time `saveResults`, and look for "Too many API requests" or subrequest errors in the
-  logs.
-- **Deploy mid-match.** Start a raid on staging, deploy during a scoring phase, and check the round finishes and
-  results are written once.
-- **The lying host.** In `packages/server/test`, drive `LobbyCore` as a host that (a) sends `bossMove` with the
-  boss's worst allowed move each turn, and (b) sends `scores` that leave out its own pick. Today both should be
-  accepted; that is the bug to pin.
-- **Budget drain.** Against staging with an engine server, send 3,000 `POST /api/engine/score` and confirm lobbies
-  then get no verdicts.
+Three reviewers had not reported when this was written: phone performance (a real build, bundle contents, load
+and idle cost on an emulated phone), the rules engine and every boss (scoring math, broken positions, state lost
+on save and restore), and tests and dead code (unused code, duplication, tests that can't fail, docs the code
+contradicts). If their results follow, they are in `fable-audit-findings-2.md` beside this file.
+
+## Not covered
+
+The town's and auto chess's screens beyond what a reviewer read; `search.ts` and `eval.ts` of the auto chess
+engine; most app screens; anything on a real phone; real load.
