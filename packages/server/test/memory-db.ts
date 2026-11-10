@@ -34,14 +34,15 @@ export function memoryDb() {
   }
   const stmt = (q: string, params: unknown[] = []) => ({
     bind: (...p: unknown[]) => stmt(q, p),
-    // (The statement runs at once, so a batch's transaction holds it.)
     run: async () => (db.prepare(q).run(...(params as never[])), { success: true }),
     first: async () => db.prepare(q).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(q).all(...(params as never[])) }),
+    // (For a batch: run at once, so its transaction holds it, and a statement that fails undoes them all, as D1's.)
+    runNow: () => db.prepare(q).run(...(params as never[])),
   });
   const d1 = {
     prepare: (q: string) => stmt(q),
-    batch: async (stmts: { run(): unknown }[]) => (transaction(stmts.map((s) => () => s.run())), stmts.map(() => ({ success: true }))),
+    batch: async (stmts: { runNow(): unknown }[]) => (transaction(stmts.map((s) => () => s.runNow())), stmts.map(() => ({ success: true }))),
   } as unknown as D1Database;
   return { db, sql, d1 };
 }

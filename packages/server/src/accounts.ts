@@ -35,7 +35,7 @@ import {
   XP,
   type XpGrant,
 } from "@chessroyale/core";
-import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
+import { LOCKER_COLUMNS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, type AdminCheck, type LockerState } from "./locker.ts";
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
 import { CLAW_SCHEMA } from "./claw.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
@@ -223,6 +223,8 @@ const SCHEMA = [
  * read first); `then` runs right after a column is added, to fill it in from what's already stored.
  */
 const COLUMNS: { table: string; column: string; type: string; then?: string[] }[] = [
+  // The locker's (locker.ts): a present's second color.
+  ...LOCKER_COLUMNS,
   // The profile's stats (Oct 6, 2026): recorded from then on; older results leave them empty.
   { table: "results", column: "brilliant", type: "INTEGER" },
   { table: "results", column: "best_move", type: "TEXT" },
@@ -327,56 +329,124 @@ export async function refreshRating(sql: Sql, userId: string): Promise<void> {
 }
 
 const ready = new WeakSet<object>();
+/** The schema run on its way for each database, and when it started (ensureSchema). */
+const running = new WeakMap<object, { run: Promise<void>; at: number }>();
+/**
+ * How long a request waits for a schema run another request started before running its own: a run whose request was
+ * cut short (its player gone) may never finish, and a normal one takes a few round trips.
+ */
+const SCHEMA_WAIT_MS = 5_000;
 /** Every schema statement, as one fingerprint: a database that has it recorded needs none of them run again. */
 const SCHEMA_VERSION = (() => {
-  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, LOCKER_MIGRATIONS, COLUMNS, AFTER_COLUMNS]);
+  const text = JSON.stringify([SCHEMA, LEDGER_TRIGGERS, COLUMNS, AFTER_COLUMNS]);
   let h = 2166136261;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return `${text.length}-${(h >>> 0).toString(36)}`;
 })();
+/** The schema's parts, for the tests (schema-fast.test.ts runs them one statement at a time, as before, to compare). */
+export const schemaParts = { SCHEMA, LEDGER_TRIGGERS, COLUMNS, AFTER_COLUMNS, version: SCHEMA_VERSION };
 
 /**
- * Creates the tables if they don't exist yet (once per Worker instance, cheap and idempotent). A database already
- * at this schema answers one read (`meta.schema`) instead of the ~35 statements: in a surge, every new Worker
- * instance runs this once, so it mustn't be a burst of statements into the one database (DECISIONS.md, "Capacity").
+ * Makes sure the database has every table, column, index and trigger, once per Worker instance: a later request costs
+ * nothing, and the requests that come while it runs wait for that one run (its failure is theirs too, and the next
+ * request tries again). A database already at this schema answers one read (`meta.schema`): in a surge every new
+ * instance makes it, so it mustn't be a burst of statements into the one database (DECISIONS.md, "Capacity"). Otherwise
+ * a few round trips (schemaRun; docs/decisions/2026-11-10-schema-fast.md).
  */
 export async function ensureSchema(sql: Sql, key: object = sql): Promise<void> {
+  let waited: Promise<void> | undefined;
+  for (let flight = running.get(key); !ready.has(key) && flight && flight.run !== waited; flight = running.get(key)) {
+    waited = flight.run;
+    if (await settlesWithin(flight.run, flight.at + SCHEMA_WAIT_MS - Date.now())) return;
+  }
   if (ready.has(key)) return;
-  const at = await sql.first<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
-  if (at?.value === SCHEMA_VERSION) {
-    ready.add(key);
-    return;
-  }
-  for (const s of SCHEMA) await sql.run(s);
-  // (The ledger's append-only triggers: a second lock beside ledger.ts's own. A database that refused them would still load.)
-  for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
-  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
-  const ownerColumn = (await sql.all<{ name: string; pk: number }>("PRAGMA table_info(fairplay_identities)")).find((c) => c.name === "user_id");
-  if (ownerColumn && !ownerColumn.pk) await sql.batch(IDENTITIES_REKEY);
-  for (const s of LOCKER_MIGRATIONS)
-    await sql.run(s).catch((e: unknown) => {
-      if (!/duplicate column/i.test(String(e))) throw e;
+  const run: Promise<void> = schemaRun(sql)
+    .then(() => void ready.add(key))
+    .finally(() => {
+      if (running.get(key)?.run === run) running.delete(key);
     });
-  const have = new Map<string, Set<string> | null>();
-  for (const c of COLUMNS) {
-    if (!have.has(c.table)) {
-      const cols = await sql.all<{ name: string }>(`PRAGMA table_info(${c.table})`).catch(() => null);
-      have.set(c.table, cols ? new Set(cols.map((r) => r.name)) : null);
-    }
-    if (have.get(c.table)?.has(c.column)) continue;
-    const added = await sql.run(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`).then(
-      () => true,
-      (e: unknown) => {
-        if (!/duplicate column/i.test(String(e))) throw e;
-        return false;
-      },
-    );
-    if (added) for (const t of c.then ?? []) await sql.run(t);
+  running.set(key, { run, at: Date.now() });
+  await run;
+}
+
+/** True once `run` is done, false if `ms` pass first; its failure is thrown. */
+async function settlesWithin(run: Promise<void>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([run.then(() => true), new Promise<boolean>((done) => (timer = setTimeout(() => done(false), Math.max(0, ms))))]);
+  } finally {
+    clearTimeout(timer);
   }
-  for (const s of AFTER_COLUMNS) await sql.run(s);
-  await sql.run("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-  await sql.run("INSERT INTO meta (key, value) VALUES ('schema', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", SCHEMA_VERSION);
-  ready.add(key);
+}
+
+/** The tables whose columns the schema run reads: fairplay_identities (for its key) and every table COLUMNS adds to. */
+const COLUMN_TABLES = [...new Set(["fairplay_identities", ...COLUMNS.map((c) => c.table)])];
+
+/**
+ * Every schema statement, in order, in a few round trips (a fresh database or an upgrade by a column: 4; before Nov 10,
+ * one per statement, 134 and 97): the version read; the tables, indexes and triggers (all IF NOT EXISTS) as one batch; the
+ * columns of every table that gains some, in one read; then the missing columns, the statements after them and this
+ * schema's version last, as one batch. A batch is one transaction (all or none); one that's refused falls back to the
+ * statements one at a time, as before.
+ */
+async function schemaRun(sql: Sql): Promise<void> {
+  const at = await sql.first<{ value: string }>("SELECT value FROM meta WHERE key = 'schema'").catch(() => null);
+  if (at?.value === SCHEMA_VERSION) return;
+  await sql.batch([...SCHEMA, ...LEDGER_TRIGGERS].map((s) => stmt(s))).catch(async () => {
+    // (The ledger's append-only triggers are a second lock beside ledger.ts's own: a database that refused them would still load.)
+    await sql.batch(SCHEMA.map((s) => stmt(s)));
+    for (const s of LEDGER_TRIGGERS) await sql.run(s).catch((e: unknown) => console.error(`ledger trigger not made: ${String(e)}`));
+  });
+  let columns = await columnsOf(sql);
+  // fairplay_identities' key gained the owner (Oct 16, 2026): a table from before is rebuilt once (fairplay-schema.ts).
+  const ownerKey = columns.get("fairplay_identities")?.get("user_id");
+  if (ownerKey === 0) {
+    await sql.batch(IDENTITIES_REKEY);
+    columns = await columnsOf(sql);
+  }
+  const missing = COLUMNS.filter((c) => !columns.get(c.table)?.has(c.column));
+  const last = [
+    ...AFTER_COLUMNS.map((s) => stmt(s)),
+    stmt("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)"),
+    stmt("INSERT INTO meta (key, value) VALUES ('schema', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value", SCHEMA_VERSION),
+  ];
+  const adds = missing.flatMap((c) => [stmt(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`), ...(c.then ?? []).map((t) => stmt(t))]);
+  await sql.batch([...adds, ...last]).catch(async (refused: unknown) => {
+    if (!missing.length) throw refused;
+    // (Another instance may have added a column first: one at a time, as before, where "duplicate column" is fine.)
+    for (const c of missing) {
+      const added = await sql.run(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`).then(
+        () => true,
+        (e: unknown) => {
+          if (!/duplicate column/i.test(String(e))) throw e;
+          return false;
+        },
+      );
+      if (added) for (const t of c.then ?? []) await sql.run(t);
+    }
+    await sql.batch(last);
+  });
+}
+
+/**
+ * Each of COLUMN_TABLES' columns and its place in the table's primary key (0: not in it), in one read. A database that
+ * refuses that read gets each table's `PRAGMA table_info`, one at a time, as before.
+ */
+async function columnsOf(sql: Sql): Promise<Map<string, Map<string, number>>> {
+  type Column = { tbl: string; name: string; pk: number };
+  const read = COLUMN_TABLES.map((t) => `SELECT '${t}' AS tbl, name, pk FROM pragma_table_info('${t}')`).join(" UNION ALL ");
+  const rows = await sql.all<Column>(read).catch(async (e: unknown) => {
+    console.error(`schema: columns read a table at a time (${String(e)})`);
+    const each: Column[] = [];
+    for (const tbl of COLUMN_TABLES) for (const c of await sql.all<Column>(`PRAGMA table_info(${tbl})`)) each.push({ tbl, name: c.name, pk: c.pk });
+    return each;
+  });
+  const out = new Map<string, Map<string, number>>();
+  for (const r of rows) {
+    if (!out.has(r.tbl)) out.set(r.tbl, new Map());
+    out.get(r.tbl)!.set(r.name, Number(r.pk));
+  }
+  return out;
 }
 
 // ---------------- Helpers ----------------

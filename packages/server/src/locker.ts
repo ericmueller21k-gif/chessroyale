@@ -30,8 +30,8 @@ export const LOCKER_SCHEMA = [
   )`,
 ];
 
-/** Columns added after the tables first shipped (each run once; "duplicate column" afterwards is fine). */
-export const LOCKER_MIGRATIONS = [`ALTER TABLE items ADD COLUMN color2 TEXT`];
+/** Columns added after the tables first shipped (accounts.ts COLUMNS: each added once, if the table lacks it). */
+export const LOCKER_COLUMNS = [{ table: "items", column: "color2", type: "TEXT" }];
 
 /**
  * Who's an admin (admin.ts, isAdmin, with the Worker's ADMIN_EMAILS). An admin's locker has one of every item: admin
