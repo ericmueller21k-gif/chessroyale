@@ -2149,7 +2149,8 @@ export class SquadsCore {
   }
 
   private sameParty(a: string, b: string): boolean {
-    return this.human(a)?.partyId === this.human(b)?.partyId;
+    const pa = this.human(a)?.partyId;
+    return !!pa && pa === this.human(b)?.partyId;
   }
 
   private requestWork(lm: LiveMatch, half: HalfRecord, board: number, out: Map<string, { id: string; fen: string; n: number; nodes: number }[]>) {

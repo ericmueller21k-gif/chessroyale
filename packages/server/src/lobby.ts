@@ -2620,6 +2620,11 @@ export class LobbyCore {
       .map((h) => ({ id: h.id, nps: devices[h.id]!.nps, owner: this.r.accounts?.[h.id] ?? h.id, kind: h.device }));
   }
 
+  /** A device's class (computer or phone, its own word at hello), for drawing a judge beside it; none for no device. */
+  private kindOf(id: string | undefined): JudgeCandidate["kind"] {
+    return id === undefined ? undefined : this.human(id)?.device;
+  }
+
   /** Two judges per job when two devices can judge (else the host, as before). */
   private judging(): boolean {
     const cfg = this.jcfg;
@@ -2754,7 +2759,8 @@ export class LobbyCore {
         ...(sj.priority ? { priority: sj.priority } : {}),
       };
       const judges = (planned[String(sj.boardId)] ?? []).filter((id) => devices.some((d) => d.id === id)).slice(0, perJob);
-      if (judges.length < perJob) judges.push(...drawJudges(() => this.jrng(), devices, perJob - judges.length, cfg, load, new Set(judges)));
+      // (A refill beside a remaining judge comes from its class, as a planned pair does.)
+      if (judges.length < perJob) judges.push(...drawJudges(() => this.jrng(), devices, perJob - judges.length, cfg, load, new Set(judges), this.kindOf(judges[0])));
       for (const j of judges) load.set(j, (load.get(j) ?? 0) + 1);
       tasks[job.id] = { boardId: sj.boardId, job, botIds: sj.bots.map((b) => b.id), judges, tried: [...judges], want: perJob, sentAt: now, sent: {}, reports: {}, boards: {} };
       this.jr.stats.jobs++;
@@ -2819,7 +2825,8 @@ export class LobbyCore {
     // (A job with a deep re-check goes to another capable device, if there is one.)
     const capable = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : [];
     const pool = capable.some((d) => !t.tried.includes(d.id)) ? capable : this.judgeDevices();
-    const [next] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
+    // (From the remaining judge's class, if one is still on it, so the two finish together.)
+    const [next] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried), this.kindOf(t.judges[0]));
     if (!next) return false;
     t.judges.push(next);
     t.tried.push(next);
@@ -3033,7 +3040,9 @@ export class LobbyCore {
     t.judges = [a, b];
     t.waitUntil = undefined;
     const pool = t.deep ? this.judgeDevices().filter((d) => this.capable(d.id)) : this.judgeDevices();
-    const [ref] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried));
+    // (From the two's class when they share one: the referee races the server's verdict.)
+    const kind = this.kindOf(a) === this.kindOf(b) ? this.kindOf(a) : undefined;
+    const [ref] = drawJudges(() => this.jrng(), pool, 1, this.jcfg, new Map(), new Set(t.tried), kind);
     if (ref) {
       t.refereed = true;
       t.refereeBy = ref;

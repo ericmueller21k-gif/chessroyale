@@ -2353,6 +2353,8 @@ export interface JudgeConfig {
   graceFactor: number;
   speedWeight: number;
   maxNps: number;
+  medianCap: number;
+  pairClassMin: number;
   benchNodes: number;
   defaultNps: number;
   deepOnDevices: boolean;
@@ -2408,6 +2410,17 @@ export const JUDGES: JudgeConfig = {
   speedWeight: 2,
   /** The fastest a device's claimed speed counts (nodes/s; a fast desktop's real engine is about 2 to 3 million). */
   maxNps: 3_000_000,
+  /**
+   * When judges are drawn, a speed counts at most this many times the lobby's median (so in a lobby of phones, a device
+   * that claims a desktop's speed weighs as a fast phone, not as a hundred). 3, not 4: two accounts claiming a computer
+   * in a 62-phone lobby get both judges 2.9% of the time at 3, 7% at 4 (2026-11-10-judge-pairing.md).
+   */
+  medianCap: 3,
+  /**
+   * The second judge comes from the first's class (computer or phone, the device's own word) only when that class has
+   * at least this many other accounts left; else from everyone, so a claimed class never decides who the second is.
+   */
+  pairClassMin: 3,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */

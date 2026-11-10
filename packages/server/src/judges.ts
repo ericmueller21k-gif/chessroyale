@@ -131,35 +131,51 @@ export interface JudgeCandidate {
 
 const ownerOf = (d: JudgeCandidate) => d.owner ?? d.id;
 
+/** What `drawJudges` reads: the weight, and (each optional, none: no limit) the caps and the class threshold. */
+export type DrawConfig = Pick<JudgeConfig, "speedWeight"> & Partial<Pick<JudgeConfig, "maxNps" | "medianCap" | "pairClassMin">>;
+
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m]! : (s[m - 1]! + s[m]!) / 2;
+};
+
 /**
  * Draws `count` different judges at random by weight, leaving out `exclude`. Never two of one owner, nor one whose owner
  * is excluded: two judges that agree are accepted unchecked, so they must be two people (2026-11-10-device-trust.md).
- * After the first, the rest come from the first's class (computer with computer) while that class has any left, so a
- * pair finishes together instead of the faster's answer being used alone (2026-11-10-judge-pairing.md).
+ * A speed counts at most `maxNps` and `medianCap` times the median of `devices` (a claimed speed buys little in a
+ * lobby of phones). Each judge after the first, and the first when `kind` is given (a refill beside a remaining judge),
+ * comes from that class (computer with computer) only while the class has `pairClassMin` other owners left; else from
+ * everyone, so a pair finishes together but a class nobody else claims can't pick the second (2026-11-10-judge-pairing.md).
  */
 export function drawJudges(
   rng: () => number,
   devices: readonly JudgeCandidate[],
   count: number,
-  cfg: Pick<JudgeConfig, "speedWeight">,
+  cfg: DrawConfig,
   load: Map<string, number> = new Map(),
   exclude: ReadonlySet<string> = new Set(),
+  kind?: JudgeCandidate["kind"],
 ): string[] {
+  const cap = Math.min(cfg.maxNps ?? Infinity, cfg.medianCap && devices.length ? cfg.medianCap * median(devices.map((d) => d.nps)) : Infinity);
   const owners = new Set(devices.filter((d) => exclude.has(d.id)).map(ownerOf));
   let pool = devices.filter((d) => !exclude.has(d.id) && !owners.has(ownerOf(d)));
   const out: string[] = [];
-  let kind: JudgeCandidate["kind"];
+  let paired = kind !== undefined;
   while (out.length < count && pool.length) {
-    const same = out.length ? pool.filter((d) => d.kind === kind) : pool;
-    if (same.length) pool = same;
-    const weights = pool.map((d) => judgeWeight(d.nps, load.get(d.id) ?? 0, cfg));
+    const same = paired ? pool.filter((d) => d.kind === kind) : pool;
+    const from = same.length && new Set(same.map(ownerOf)).size >= (cfg.pairClassMin ?? 1) ? same : pool;
+    const weights = from.map((d) => judgeWeight(Math.min(d.nps, cap), load.get(d.id) ?? 0, cfg));
     const total = weights.reduce((a, b) => a + b, 0);
     let x = rng() * total;
     let i = 0;
-    while (i < pool.length - 1 && x >= weights[i]!) x -= weights[i++]!;
-    const chosen = pool[i]!;
+    while (i < from.length - 1 && x >= weights[i]!) x -= weights[i++]!;
+    const chosen = from[i]!;
     out.push(chosen.id);
-    kind = chosen.kind;
+    if (!paired) {
+      paired = true;
+      kind = chosen.kind;
+    }
     pool = pool.filter((d) => ownerOf(d) !== ownerOf(chosen));
   }
   return out;
@@ -174,7 +190,7 @@ export function assignJudges(
   boards: readonly { boardId: number; cost: number }[],
   devices: readonly JudgeCandidate[],
   perJob: number,
-  cfg: Pick<JudgeConfig, "speedWeight">,
+  cfg: DrawConfig,
 ): Map<number, string[]> {
   const load = new Map<string, number>();
   const out = new Map<number, string[]>();
