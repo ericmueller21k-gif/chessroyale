@@ -686,12 +686,16 @@ export function HomeScreen({
     } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
   }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
   // The bosses' art is made the first time it's shown (sprite.ts lazyAnim): their tiles' and faces' made here in quiet slices,
-  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves.
+  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves. Not
+  // while a game is starting (the Bot level box, the queue: home fills in place): one face can take a slow phone most of a
+  // second, and the queue waited on it (Nov 10 flakes, docs/decisions/2026-11-10-flaky-batch-7.md).
+  const starting = botBox || (queue !== undefined && queue !== null);
   useEffect(() => {
+    if (starting) return;
     let stop = () => {};
     const t = setTimeout(() => (stop = prewarmAnims(portraitAnims())), 1500);
     return () => (clearTimeout(t), stop());
-  }, []);
+  }, [starting]);
   useEffect(() => (raid ? prewarmAnims(bossAnims(bossDef(pick)?.name)) : undefined), [raid, pick]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
