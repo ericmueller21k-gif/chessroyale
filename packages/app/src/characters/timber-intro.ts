@@ -8,6 +8,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
 import { BOSS_BEAVER, OY, PALETTE, PARTS, W, f, feetDust, puff, px, type Arm, type Pose, type Pt } from "./timber.ts";
+import { joinParts, lazyAnim } from "./sprite.ts";
 
 // ---- His battle intro (BOSS_BEAVER_INTRO, id `timber-intro`): he works on the left of the board, so he FACES OUR RIGHT
 // (his own frames mirrored). He walks to the giant log, heaves it up, carries it to the middle, stands it on end in
@@ -210,7 +211,7 @@ const STEP_FAR: Pt[] = [[-3, 0], [0, 0], [3, 0], [3, -1], [0, -4], [-3, -1]];
 const SWAY = [2, 1, 0, -2, -1, 0];
 const BOB = [0, 1, 0, 0, 1, 0];
 const WAG = [-6, -10, -12, -10, -6, -4];
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5].map((t) =>
     intro(110, {
@@ -223,7 +224,7 @@ const walk: Anim = {
       armR: { h: [47 - STEP_FAR[t]![0], 46 - (t === 4 ? 1 : 0)] },
     }, { feet: [STEP_NEAR[t]!, STEP_FAR[t]!] }),
   ),
-};
+}));
 
 // ---- lift (600 ms): he bends and hugs the log at his feet, squeezes, and heaves it up (`hup`) across his chest.
 
@@ -232,7 +233,7 @@ const logUp = (up: number, dx = 0): LogAt => ({ kind: "lying", foot: [LOG_DOWN[0
 const CARRY_UP = 16;
 const STRAIN: Pose = { mood: "squint", brows: "worry", mouth: "frown", puff: 2 };
 const carryPose = (p: Pose, bob = 0): Pose => paws(p, [69, 52 - bob], [37, 52 - bob]);
-const lift: Anim = {
+const lift: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     intro(100, paws({ sink: 5, lean: -1, mood: "squint", brows: "angry", tail: -10 }, [70, 63], [36, 63]), { log: { kind: "lying", foot: LOG_DOWN, shadow: true } }),
@@ -242,13 +243,13 @@ const lift: Anim = {
     intro(110, paws({ breath: 1, headDy: -1, mood: "wide", brows: "up", mouth: "open", jaw: 2, tail: -16 }, [69, 47], [37, 47]), { log: logUp(18) }),
     intro(110, carryPose({ ...STRAIN, tail: -10 }), { log: logUp(CARRY_UP) }),
   ],
-};
+}));
 
 // ---- carry (loop, 6 x 110 ms): the same waddle under the log, strained (cheeks puffed, eyes squeezed, a drop of
 // sweat), the log bobbing a beat behind his steps.
 
 const LOG_BOB = [0, 1, 2, 0, 1, 2];
-const carry: Anim = {
+const carry: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5].map((t) =>
     intro(
@@ -257,7 +258,7 @@ const carry: Anim = {
       { feet: [STEP_NEAR[t]!, STEP_FAR[t]!], log: logUp(CARRY_UP + LOG_BOB[t]!), dspecks: t % 3 === 1 ? [px(57, 19, "~"), px(57, 20, "~")] : t % 3 === 2 ? [px(59, 22, "~"), px(59, 23, "~")] : [] },
     ),
   ),
-};
+}));
 
 // ---- setDown (500 ms): a heave up and over to our right, the log swings down, stands on end (`thump`), a pat, let go.
 
@@ -268,7 +269,7 @@ const logFootPuffs = (t: number): Speck[] => {
   return [...puff(d(LOG_STOOD[0] - 18), y, t), ...puff(d(LOG_STOOD[0] + 18), y, t)];
 };
 const STOOD: LogAt = { kind: "standing", foot: LOG_STOOD, shadow: true };
-const setDown: Anim = {
+const setDown: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     intro(110, paws({ ...STRAIN, mood: "squint", brows: "angry", lean: -1, breath: 1, tail: -14 }, [76, 46], [45, 46]), { log: logUp(22, 6) }),
@@ -277,7 +278,7 @@ const setDown: Anim = {
     intro(90, paws({ mood: "proud", mouth: "grin", lean: -2, sink: 2, breath: 1, tail: -4 }, [73, 56], [48, 53]), { log: STOOD, dspecks: logFootPuffs(1) }),
     intro(90, paws({ mood: "proud", mouth: "grin", lean: -1, sink: 1, tail: -8 }, [69, 58], [47, 54]), { dspecks: logFootPuffs(2) }),
   ],
-};
+}));
 
 // ---- gnaw (loop, 8 x 90 ms): crouched at the log, a paw on it, he chatters at it: jaw open, teeth shut (`gnaw`,
 // `chomp` in turn), his head bobbing in, chips and sawdust spraying from his teeth.
@@ -302,7 +303,7 @@ const biteChips = (j: number, t: number): Speck[] => {
   }
   return out;
 };
-const gnawAnim: Anim = {
+const gnawAnim: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
     const open = i % 2 === 0;
@@ -326,12 +327,12 @@ const gnawAnim: Anim = {
       behind: REVIEW,
     });
   }),
-};
+}));
 
 // ---- done (800 ms): a step back from his work, he dusts off his paws (puffs of sawdust), and grins with a chitter.
 
 const dustOff = (t: number, a: Pt): Speck[] => puff(a[0], a[1], t);
-const done: Anim = {
+const done: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     intro(100, { dx: 2, sink: 1, mood: "smile", mouth: "grin", tail: -12 }, { feet: [[3, -3], [0, 0]] }),
@@ -341,7 +342,7 @@ const done: Anim = {
     intro(130, { dx: 3, mood: "proud", mouth: "grin", breath: 1, armL: { h: [29, 52] }, armR: { h: [47, 52] }, tail: -18 }),
     intro(200, { dx: 3, mood: "wink", mouth: "grin", head: [0, -1], armL: { h: [29, 52] }, armR: { h: [47, 52] }, tail: -8 }),
   ],
-};
+}));
 
 /**
  * Timber for his battle intro: his own parts and palette (plus the log's pale sapwood `p` and its see-through shadow),
@@ -356,6 +357,6 @@ export const BOSS_BEAVER_INTRO: Character = {
   h: IH,
   foot: IFOOT,
   palette: { ...PALETTE, p: "#fff0c8", "-": "#0d0e1280", "+": "#0d0e1244" },
-  parts: { ...PARTS, ...LOG_PARTS },
+  parts: joinParts(LOG_PARTS, PARTS),
   anims: { idle: { loop: true, frames: [intro(1000, {})] }, walk, lift, carry, setDown, gnaw: gnawAnim, done },
 };

@@ -22,6 +22,7 @@
  */
 import { caneTip, GINGERBREAD, gingerLayers, type GingerPose } from "./gingerbread.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 type Pt = readonly [number, number];
 const OX = 14; // his drawing space on his frame (gingerbread.ts)
@@ -81,7 +82,7 @@ const frostBurst = ([x, y]: Pt, r: number): Speck[] =>
     return i % 2 ? [[px, py, "I"]] : sparkle(px, py);
   }).flat();
 
-const charge: Anim = {
+const charge: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, cane: "lift", mood: "angry" }),
@@ -94,8 +95,8 @@ const charge: Anim = {
     f(110, { ...RAISE, crouch: 2 }, { pal: { ...GLOW_PULSE, ...ICY_EYES }, specks: [...ring(HOOK_RAISE, 4, 0.8, 8), ...sparkle(...HOOK_RAISE, true)], shake: [-1, 0] }),
     f(120, { ...RAISE, crouch: 1 }, { pal: { ...GLOW_BRIGHT, ...ICY_EYES }, specks: [...sparkle(...HOOK_RAISE, true), ...sparkle(HOOK_RAISE[0] - 5, HOOK_RAISE[1] + 4), ...sparkle(HOOK_RAISE[0] + 5, HOOK_RAISE[1] - 3)] }),
   ],
-};
-const blast: Anim = {
+}));
+const blast: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { ...OVER, crouch: 1 }, { pal: { ...GLOW_BRIGHT, ...ICY_EYES }, specks: sparkle(...HOOK_OVER, true) }),
@@ -106,7 +107,7 @@ const blast: Anim = {
     f(120, { ...OVER, crouch: 1, mood: "laugh", glow: false }),
     f(150, { crouch: 1, cane: "lift", mood: "smug" }),
   ],
-};
+}));
 const CAST: GingerPose = { crouch: 2, feet: "wide", cane: "thrust", free: "up", glow: true, mood: "shout" };
 const castTip = caneTip(CAST);
 /** The cast's white light leaving the cane's tip toward the board (to our right): a white mote and its sparkle trail. */
@@ -115,7 +116,7 @@ const mote = (t: number): Speck[] => {
   const y = castTip[1] - t;
   return [...sparkle(x, y, t < 2), [x - 3, y + 1, "F"], [x - 6, y + 1, "i"], [x - 9, y + 2, "I"]];
 };
-const cast: Anim = {
+const cast: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, cane: "lift", mood: "angry" }),
@@ -127,8 +128,8 @@ const cast: Anim = {
     f(130, { ...CAST, glow: false, mood: "laugh", crouch: 1 }),
     f(150, { crouch: 1, cane: "lift", mood: "smug" }),
   ],
-};
-const brag: Anim = {
+}));
+const brag: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { mood: "smug", free: "hip" }),
@@ -141,7 +142,7 @@ const brag: Anim = {
     f(140, { mood: "smug", cane: "rest", free: "hip" }, { specks: frostBurst([OX + 10, OY + GROUND - 2], 5).filter((_, i) => i % 2 === 0) }),
     f(200, {}),
   ],
-};
+}));
 
 export const BOSS_GINGER_INTRO: Character = {
   ...GINGERBREAD,

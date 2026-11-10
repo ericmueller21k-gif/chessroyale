@@ -19,7 +19,7 @@ import { canvas, ellipse, flame as flameGrid, inEllipse, inPoly, roundLight, sha
 import type { Beat } from "./boss-beats.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GREX_PALETTE = {
   k: "#1e0e05", // outline
@@ -841,7 +841,7 @@ const GROOVE = [0, 0, 1, 1, 0, 0, 1, 1] as const;
  * Idle: he crackles. The flames flicker (three shapes, never in step), both sparklers spit sparks, and he bobs his
  * head to a beat only he can hear; every 6 s or so he twirls the outer sparkler over his head and laughs. Silent.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     ...Array.from({ length: 6 }, (_, n) => GROOVE.map((bob, i) => f(110, { bob, flick: n * 8 + i }, {}, n * 8 + i))).flat(),
@@ -850,10 +850,10 @@ const idle: Anim = {
     f(100, { b: "high", flick: 2, mood: "laugh", bob: 1 }, {}, 52),
     f(140, { flick: 0, mood: "grin" }, {}, 53),
   ],
-};
+}));
 
 /** Entrance: a fireball streaks down, bursts on the ground, and there he is, crouched in the flames; the sparklers fizz alight, he twirls one and strikes a pose. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: fireball(OX + 28, OY - 6), cue: "whoosh" },
@@ -867,7 +867,7 @@ const entrance: Anim = {
     f(110, { a: "high", b: "high", big: true, flick: 6, mood: "laugh" }, {}, 5),
     f(320, { flick: 7 }, {}, 6),
   ],
-};
+}));
 
 /** Smoke-ring thoughts: little flames popping up beside his head, one by one. */
 const thoughtFlames = (n: number, i: number): Speck[] =>
@@ -876,28 +876,28 @@ const thoughtFlames = (n: number, i: number): Speck[] =>
     return [[x, y, "Y"], [x, y - 1, (i + k) % 2 ? "f" : "y"], ...(big ? ([[x - 1, y, "f"], [x + 1, y, "f"], [x, y + 1, "F"], [x, y - 2, "F"]] as Speck[]) : [[x, y + 1, "F"] as Speck])];
   });
 /** Thinking: a hoof scratching his long neck, eyes rolled up, tapping a foot, little flames for thoughts. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) => [0, 1, 2, 3].map((i) => f(130, { mood: "think", a: "chin", b: "down", feet: i % 2 ? "stepR" : "stand", bob: i === 2 ? 1 : 0, flick: n * 4 + i }, { specks: thoughtFlames(n, i) }, n * 4 + i))),
-};
+}));
 
 /** Smug: a fist on his hip, a brow up, eyes half shut, a slow nod. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7].map((i) => f(150, { mood: "smug", b: "hip", bob: i % 4 === 1 ? 1 : 0, headDx: i < 4 ? 0 : 1, flick: i }, {}, i)),
-};
+}));
 
 /** Rattled: wide eyes and worried brows, sweat flying, shaking where he stands, the sparklers sputtering. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const b = grexBuild({ mood: "rattled", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, flick: i, a: "down", b: "down" });
     return { ms: 80, layers: b.layers, specks: [...b.tips.flatMap((t, k) => sparkSpray(t, i * 5 + k, 0.4)), ...sweat(i)] };
   }),
-};
+}));
 
 /** His move: a step toward the board and a flourish of the sparkler at it. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { crouch: 1, flick: 0 }, {}, 1),
@@ -908,10 +908,10 @@ const move: Anim = {
     f(110, { crouch: 1, flick: 5 }, {}, 6),
     f(160, { flick: 6 }, {}, 7),
   ],
-};
+}));
 
 /** A capture: he laughs, bouncing, both sparklers up, his flames roaring. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { crouch: 1, flick: 0 }, {}, 1),
@@ -920,7 +920,7 @@ const capture: Anim = {
     ),
     f(140, { mood: "smug", flick: 13 }, {}, 20),
   ],
-};
+}));
 
 /** Hurt: hit, he screws his eyes shut, embers knocked off, a flinch; then he shakes it off with a fist up and grins. */
 const embersOff = (t: number): Speck[] =>
@@ -929,7 +929,7 @@ const embersOff = (t: number): Speck[] =>
     const y = Math.round(OY - 12 + vy! * t * 2.4 + 0.5 * t * t);
     return [[x, y, i % 2 ? "Y" : "f"], [x + 1, y, "F"]];
   });
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { crouch: 3, mood: "hurt", a: "down", b: "down", flick: 0 }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: embersOff(0) }, 1),
@@ -940,11 +940,11 @@ const hurt: Anim = {
     f(120, { mood: "grin", a: "pump", flick: 5 }, {}, 6),
     f(160, { mood: "grin", flick: 6 }, {}, 7),
   ],
-};
+}));
 
 /** Check: two jabs of both sparklers at the board, his flames flaring and his eyes glowing. */
 const JAB: GrexPose = { crouch: 2, feet: "stepR", a: "flick", b: "flick", mood: "shout", big: true };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { crouch: 1, feet: "stepR", b: "high", flick: 0 }, {}, 1),
@@ -956,7 +956,7 @@ const check: Anim = {
     f(150, { feet: "stepR", b: "point", mood: "laugh", flick: 6 }, {}, 7),
     f(160, { mood: "smug", flick: 7 }, {}, 8),
   ],
-};
+}));
 
 /** Defeat: hit, his eyes cross, his flames go out in puffs of smoke, he totters and keels over (the last frame holds). */
 function fallen(mood: Mood, t: number): Partial<Frame> & { layers: Layer[] } {
@@ -974,7 +974,7 @@ function fallen(mood: Mood, t: number): Partial<Frame> & { layers: Layer[] } {
   const sy = OY + GROUND - 1 - y1;
   return { layers: [{ part: "shadow", x: OX + 5, y: OY + GROUND - 2 }, ...lying.map((l) => ({ ...l, x: l.x + sx, y: l.y + sy }))] };
 }
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { crouch: 3, mood: "hurt", a: "down", b: "down", flick: 0 }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: embersOff(0) }, 1),
@@ -986,16 +986,16 @@ const defeat: Anim = {
     { ms: 200, ...fallen("out", 2), specks: wisps([OX + 60, OY + 40], 2, 4) },
     { ms: 1000, ...fallen("out", 0), specks: wisps([OX + 60, OY + 40], 3, 2) },
   ],
-};
+}));
 
 /** Victory: jumping for joy, both sparklers high and roaring, embers everywhere. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) => {
     const air = [0, 3, 6, 7, 6, 3, 0, 0, 0, 0, 0, 0][i]!;
     return f(110, { mood: "laugh", a: "high", b: "high", big: true, air, crouch: i === 0 || i === 6 ? 2 : 0, feet: air > 3 ? "wide" : "stand", headDy: i % 2 ? -1 : 0, flick: i }, { specks: embers(OX + 28, OY + 50, i, 10, 26, 50), cue: i === 2 ? "fizz" : undefined, pal: air > 5 ? EYES_HOT : undefined }, i);
   }),
-};
+}));
 
 /**
  * His passive power, igniting a tile: he winds up the outer sparkler behind his head, it flares, and he throws it at
@@ -1003,7 +1003,7 @@ const victory: Anim = {
  * and a fresh sparkler fizzes alight in his hand.
  */
 const THROW_FROM: Pt = [OX + 52, OY + 33];
-const ignite: Anim = {
+const ignite: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, b: "wind", flick: 0 }, {}, 1),
@@ -1016,7 +1016,7 @@ const ignite: Anim = {
     f(110, { b: "out", mood: "grin", flick: 7 }, { cue: "fizz" }, 8),
     f(160, { mood: "grin", flick: 8 }, {}, 9),
   ],
-};
+}));
 
 /** The candle's muzzle in a pose, in frame pixels (where its shots leave). */
 const muzzle = (p: GrexPose): Pt => {
@@ -1031,7 +1031,7 @@ const muzzle = (p: GrexPose): Pt => {
 
 /** The ultimate's warning: he pulls out the Roman candle, shows it off, taps it, and its fuse fizzes. */
 const SHOW: GrexPose = { candle: "show", mood: "smug" };
-const candleWarn: Anim = {
+const candleWarn: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { crouch: 1, b: "down", flick: 0 }, {}, 1),
@@ -1042,7 +1042,7 @@ const candleWarn: Anim = {
     f(100, { ...SHOW, mood: "laugh", flick: 5 }, { specks: sparkSpray(muzzle(SHOW), 6, 0.4) }, 6),
     f(260, { ...SHOW, flick: 6 }, {}, 7),
   ],
-};
+}));
 
 /** Where the candle's foot is slammed down and stays while he fires (his drawing space: on the board, in front of him). */
 const PLANT: Pt = [50, 59];
@@ -1093,7 +1093,7 @@ function streak([x, y]: Pt, deg: number): Speck[] {
  * shot a "shot" cue), his other hoof pumping his sparkler; then laughs. The last frame holds until he's taken off.
  */
 const AIM = (deg: number): GrexPose => ({ candle: { base: PLANT, deg }, mood: "grin", big: true, feet: "wide" });
-const romanCandle: Anim = {
+const romanCandle: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: dropShadow(4), cue: "whoosh" },
@@ -1124,7 +1124,7 @@ const romanCandle: Anim = {
     f(140, { ...AIM(0), mood: "laugh", headDy: -1, flick: 61 }, { specks: wisps(muzzle(AIM(0)), 2) }, 71),
     f(400, { ...AIM(0), mood: "grin", flick: 62 }, { specks: wisps(muzzle(AIM(0)), 3, 2) }, 72),
   ],
-};
+}));
 
 export const GREX: Character = {
   id: "grex",

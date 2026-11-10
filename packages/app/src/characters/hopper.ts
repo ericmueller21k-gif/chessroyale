@@ -19,7 +19,7 @@
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const HOPPER_PALETTE: Record<string, string> = {
   k: "#1b150e", // outline
@@ -857,7 +857,7 @@ const BREATH = [0, 0, 0, 0, 1, 1, 1, 1] as const;
  * the rabbit's near ear twitches and he blinks; the grasshopper rubs a hind leg (his chirp, silent here). Frame 1 is
  * the approved still.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const sway = [0, 0, 0, 1, 1, 1, 0, 0, 0, 0, -1, -1, -1, 0, 0, 0][i]!;
@@ -874,13 +874,13 @@ const idle: Anim = {
     };
     return f(125, p);
   }),
-};
+}));
 
 /**
  * Entrance: his shadow spreads, they drop in from above in one long hop and land (a thump, dust), the rabbit bounced on
  * the saddle; then the rabbit tips a wave and the grasshopper chirps.
  */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "chirp" },
@@ -894,20 +894,20 @@ const entrance: Anim = {
     f(160, { pawN: [24, 8.5], elbowN: [31, 15], ...EARS_UP, mood: "joy", bugEye: "joy", antN: [-5, 11], antF: [0, 8] }, { cue: "chirp" }),
     f(300, {}),
   ],
-};
+}));
 
 /** Thinking: the rabbit's paw to his chin, his eye rolled up, an ear bent; the grasshopper's antennae tapping; gold dots. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) =>
     [0, 1, 2, 3].map((i) =>
       f(130, { ...AT_CHIN, ...EARS_BENT, mood: "up", antN: i % 2 ? [-3, 15] : [-4, 13], antF: i % 2 ? [1, 9.5] : [2, 11], bob: i === 2 ? 1 : 0 }, { specks: thoughts(n) }),
     ),
   ),
-};
+}));
 
 /** His move: a small hop, the grasshopper crouching and springing, the rabbit bounced, then they settle. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 2, ride: 1 }),
@@ -917,10 +917,10 @@ const move: Anim = {
     f(120, { bob: 1 }, { specks: dust(1, 2) }),
     f(160, {}),
   ],
-};
+}));
 
 /** A capture: the rabbit pumps his fist and cheers, the grasshopper bouncing and chirping. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 1, ride: 1 }),
@@ -930,10 +930,10 @@ const capture: Anim = {
     }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Hurt: a flash, fur flies, both knocked back a step, eyes squeezed shut, ears flung back; then the rabbit glares. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, dx: 1, ...EARS_BACK, mood: "shut", bugEye: "shut" }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -944,11 +944,11 @@ const hurt: Anim = {
     f(120, { mood: "aim", ...EARS_UP, antN: [-5, 11], antF: [0, 8] }),
     f(160, {}),
   ],
-};
+}));
 
 /** Check: the grasshopper rears up, the rabbit points ahead (at the king), ears up, his look set; twice. */
 const LOOM: HopperPose = { ...REAR, ...POINTING, ...EARS_UP, mood: "aim", antN: [-6, 10], antF: [-1, 7] };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 2, ride: 1 }),
@@ -960,10 +960,10 @@ const check: Anim = {
     f(150, { mood: "smug" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Smug: the rabbit leaning back, heavy-lidded, ears laid back; the grasshopper rubbing a hind leg (a lazy chirp). */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const rub = i % 4 === 1 || i % 4 === 2;
@@ -977,23 +977,23 @@ const smug: Anim = {
       antN: [-4 + (i < 4 ? 0 : 1), 13],
     });
   }),
-};
+}));
 
 /** Rattled: shaking, the rabbit's eye wide and ears stiff, sweat flying; the grasshopper's antennae quivering. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p: HopperPose = { mood: "wide", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, earN: [37 + (i % 2), -2], earF: [42 - (i % 2), -1.5], antN: [-4 + (i % 2 ? 1 : -1), 13], antF: [1 + (i % 2 ? -1 : 1), 9.5] };
     return f(80, p, { specks: sweat(i, p) });
   }),
-};
+}));
 
 /**
  * Defeat: a flash; the grasshopper's legs give way and he sinks flat, antennae drooping; the rabbit slumps over the
  * saddle, ears hanging, the scarf limp.
  */
 const SLUMP: HopperPose = { bob: 6, ...SPLAY, ...EARS_DROOP, ...LIMP, mood: "out", bugEye: "shut", nod: 2, lean: -1, ride: 1, antN: [-6, 26], antF: [-2, 24], pawN: [26, 28], pawF: [24.5, 27], sag: 3 };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, dx: 1, ...EARS_BACK, mood: "shut", bugEye: "shut" }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -1003,10 +1003,10 @@ const defeat: Anim = {
     f(140, SLUMP, { specks: dust(1) }),
     f(1000, SLUMP),
   ],
-};
+}));
 
 /** Victory: the grasshopper hops in place, the rabbit waving a carrot over his head, ears flapping, the scarf streaming. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
@@ -1025,7 +1025,7 @@ const victory: Anim = {
     };
     return f(110, p, { cue: i === 2 ? "chirp" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 3 === 0 ? sparkle(riderOnFrame([p.pawN![0] + 1, p.pawN![1] - 7.5], p)) : [])] });
   }),
-};
+}));
 
 /**
  * Leapfrog, his passive (the pawn hopping over yours on the board is the board's): the grasshopper crouches back on his
@@ -1033,7 +1033,7 @@ const victory: Anim = {
  * ears flopped back and the scarf streaming, and lands (`land`: the pawn comes down beyond yours), dust; then they
  * step back to their place.
  */
-const leapfrog: Anim = {
+const leapfrog: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { bob: 3, dx: 2, ride: 1, mood: "aim", sag: 0.5 }),
@@ -1048,7 +1048,7 @@ const leapfrog: Anim = {
     f(140, { dx: -1, mood: "smug" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /**
  * Carrot Patch, his ultimate (the carrots flying to their squares and landing are the board's): the grasshopper bounds
@@ -1070,7 +1070,7 @@ const bound = (n: number): Frame[] => {
     { ...f(90, top, { cue: `toss${n}`, specks: [[Math.round(hx + 5), Math.round(hy + 2), "P"], [Math.round(hx + 7), Math.round(hy + 3), "J"], [Math.round(hx + 9), Math.round(hy + 3), "R"]] }), layers: [...hopperLayers(top), carrotAt([hx, hy], 120)] },
   ];
 };
-const carrotPatch: Anim = {
+const carrotPatch: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, ride: 1, ...IN_SATCHEL, mood: "aim" }),
@@ -1079,10 +1079,10 @@ const carrotPatch: Anim = {
     f(110, { bob: 1, mood: "joy", ...EARS_UP }, { specks: dust(1, 3) }),
     f(130, { mood: "smug" }, { cue: "plant5" }),
   ],
-};
+}));
 
 /** He wins the carrot race (before the spin): the rabbit holds a carrot high, cheering, the grasshopper bouncing. */
-const raceWon: Anim = {
+const raceWon: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, ride: 1, ...IN_SATCHEL, mood: "joy" }),
@@ -1093,10 +1093,10 @@ const raceWon: Anim = {
     }),
     f(160, { ...HELD_UP, mood: "joy" }),
   ],
-};
+}));
 
 /** He loses the race: the rabbit's ears droop, a sigh, the scarf going limp; the grasshopper's antennae sag. */
-const raceLost: Anim = {
+const raceLost: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { mood: "wide", ...EARS_UP }, { cue: "sigh" }),
@@ -1105,7 +1105,7 @@ const raceLost: Anim = {
     f(180, { mood: "sad", nod: 1, bob: 1, ...EARS_DROOP, ...LIMP, antN: [-6, 22], antF: [-1, 20] }),
     f(400, { mood: "out", nod: 1, bob: 1, ...EARS_DROOP, ...LIMP, antN: [-6, 22], antF: [-1, 20] }),
   ],
-};
+}));
 
 export const HOPPER: Character = {
   id: "hopper",
@@ -1223,7 +1223,7 @@ const reload = (i: number): Frame => fa(f(80, { ...IN_SATCHEL, mood: "aim", nod:
  * (cues `toss` and `bonk` in turn, so the repeats don't pile up), each landing on the king's head (the board's carrot
  * bonk), his eye on the king throughout; he cheers, a carrot held up, and they hop off. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1245,7 +1245,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * Chub & Chirp for their attack on a king: the same drawing, parts and palette, facing our left as always (as Sawyer),

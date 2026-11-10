@@ -15,7 +15,7 @@
 import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Canvas } from "./paint.ts";
 import { BOUNCE, KING_ATTACK, SNACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import type { Sprite } from "./sprite-kit.ts";
 
 export const BIGBOY_PALETTE: Record<string, string> = {
@@ -618,7 +618,7 @@ const WOBBLE: readonly BigBoyPose[] = [
  * Idle: he wobbles on his feet, blinks, licks his lollipop (twice, then smacks his lips), and waves it, its swirl
  * spinning. Silent.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     ...WOBBLE.map((p) => f(140, p)),
@@ -641,14 +641,14 @@ const idle: Anim = {
     f(90, { lolly: "shakeUp", mood: "grin", spin: 11 }),
     f(160, { mood: "blank" }),
   ],
-};
+}));
 
 /**
  * Lollipop swing: he raises it, pulls it back behind his head and chops it down at his side, BONK (a rainbow trail
  * behind it), then holds it up, pleased. It never goes higher than his wave, so on a phone it stays under the bar's
  * heading.
  */
-const swing: Anim = {
+const swing: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { mood: "fierce", bob: 1 }),
@@ -662,13 +662,13 @@ const swing: Anim = {
     f(150, { mood: "grin", lolly: "up", spin: 4, bob: 1 }),
     f(200, { mood: "grin" }),
   ],
-};
+}));
 
 /** Where his feet land, in frame pixels (for the dust). */
 const FOOT_L: Pt = [OX + 26, OY + GROUND - 1];
 const FOOT_R: Pt = [OX + 42, OY + GROUND - 1];
 /** Tantrum: his lip wobbles, then he goes red and stomps, left, right, left, right, shaking the lollipop, wailing. */
-const tantrum: Anim = {
+const tantrum: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(140, { mood: "pout" }),
@@ -684,7 +684,7 @@ const tantrum: Anim = {
     f(200, { mood: "pout", bob: 1 }),
     f(200, { mood: "blank" }),
   ],
-};
+}));
 
 // ---- His powers' moments and his reactions (everything above stays as approved).
 
@@ -721,10 +721,10 @@ const snackFrames = (): Frame[] => {
   const back = Math.max(4, Math.round((SNACK.ms - used) / 150));
   return [...frames, ...Array.from({ length: back }, (_, i) => f((SNACK.ms - used) / back, { ...WADDLE[i % 4]!, mood: "yum" }))];
 };
-const snack: Anim = { loop: false, frames: snackFrames() };
+const snack: Anim = lazyAnim(() => ({ loop: false, frames: snackFrames() }));
 
 /** Toy block toss (his passive): he pulls out a block, winds up behind his head and throws it (`toss`: it leaves his hand). */
-const toss: Anim = {
+const toss: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(140, { free: "hold", holding: "block", mood: "grin" }),
@@ -734,10 +734,10 @@ const toss: Anim = {
     f(160, { free: "out", mood: "grin" }),
     f(200, { mood: "grin" }),
   ],
-};
+}));
 
 /** A slurp of his lollipop (his move). */
-const lick: Anim = {
+const lick: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { lolly: "toward" }),
@@ -747,10 +747,10 @@ const lick: Anim = {
     f(180, { lolly: "toward", mood: "yum" }),
     f(160, { mood: "yum" }),
   ],
-};
+}));
 
 /** A giggle behind his hand, shoulders bobbing. */
-const giggle: Anim = {
+const giggle: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { free: "mouth", mood: "giggle" }, { cue: "giggle" }),
@@ -758,10 +758,10 @@ const giggle: Anim = {
     f(160, { mood: "grin" }),
     f(160, { mood: "grin", bob: 1 }),
   ],
-};
+}));
 
 /** The tantrum as approved, with its wail as he goes red. */
-const wail: Anim = { loop: false, frames: tantrum.frames.map((fr, i) => (i === 2 ? { ...fr, cue: "wail" } : fr)) };
+const wail: Anim = lazyAnim(() => ({ loop: false, frames: tantrum.frames.map((fr, i) => (i === 2 ? { ...fr, cue: "wail" } : fr)) }));
 
 /** Dazed stars circling his head, `t` steps round. */
 const stars = (t: number, bob: number): Speck[] =>
@@ -828,7 +828,7 @@ function bounceFrames(): Frame[] {
   to(end, AIR);
   return out;
 }
-const bigBounce: Anim = { loop: false, frames: bounceFrames() };
+const bigBounce: Anim = lazyAnim(() => ({ loop: false, frames: bounceFrames() }));
 
 export const BIGBOY: Character = {
   id: "bigboy",
@@ -967,7 +967,7 @@ const windUp = (i: number): Frame => {
  * overhead and sideways in turn (cues `bonk` and `swing`), glaring at it, winding up between; then a giggle behind his
  * hand (`giggle`), a crouch and a spring off (`boing`). The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(5) },
@@ -989,7 +989,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * Big Boy for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame

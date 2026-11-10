@@ -33,6 +33,7 @@
  */
 import { PIG, PIG_PALETTE, pigLayers, type PigPose } from "./pig.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 type Pt = readonly [number, number];
 /** His drawing space sits at (OX, OY) on his frame (pig.ts), the ground at y 70 there. */
@@ -163,7 +164,7 @@ const brag = anim("brag", false, [
   { ms: 160, p: { mood: "sneer", spin: 7 }, extra: { specks: [...dust([4, 70], 1), ...glint(SPUR_L, false)] } },
 ]);
 /** (His idle's first frame: brag's last frame leads into it.) */
-const idle: Anim = { loop: true, frames: [PIG.anims.idle!.frames[0]!] };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames: [PIG.anims.idle!.frames[0]!] }));
 
 export const BOSS_PIG_INTRO: Character = {
   ...PIG,

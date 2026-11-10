@@ -14,6 +14,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../sprite.ts";
 import { PAPER_PALETTE, cv, face, get, inPoly, line, paragraph, put, stamp, type Cv, type Pt } from "../../town/shops/paper-kit.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const W = 64;
 const H = 64;
@@ -220,7 +221,7 @@ const frame = (ms: number, p: Partial<Pose>, more: Partial<Frame> = {}): Frame =
 // ---- The animations.
 
 /** Idle (loop, 12 x 200 ms): slow breaths (the shell rises a pixel and settles), the head nods once, a slow blink, the spectacles glint, the top page's corner lifts in a draught. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     frame(200, {
@@ -232,7 +233,7 @@ const idle: Anim = {
       page: i === 5 ? 1 : i === 6 ? 2 : i === 7 ? 1 : 0,
     }),
   ),
-};
+}));
 
 /** Walk (loop, 8 x 150 ms, slow): legs in diagonal pairs (near front with far back), each lifting and reaching; the body sways a pixel; the head bobs forward with each step. */
 const WALK: readonly Partial<Pose>[] = [
@@ -245,11 +246,11 @@ const WALK: readonly Partial<Pose>[] = [
   { nf: [48, GROUND], fb: [20, GROUND - 1], nb: [15, GROUND - 2], ff: [49, GROUND - 3], by: -1, hx: 0 },
   { nf: [49, GROUND], fb: [21, GROUND - 1], nb: [14, GROUND], ff: [48, GROUND - 1], by: 0, hx: 0 },
 ];
-const walk: Anim = { loop: true, frames: WALK.map((p, i) => frame(150, p, i === 0 || i === 4 ? { cue: "step" } : {})) };
+const walk: Anim = lazyAnim(() => ({ loop: true, frames: WALK.map((p, i) => frame(150, p, i === 0 || i === 4 ? { cue: "step" } : {})) }));
 
 /** Sit (loop, 10 x 240 ms; at a table): settled down on its plastron, legs tucked as stubs, head raised to the board; it breathes, peers over its spectacles (a glint), nods, blinks. */
 const SIT: Partial<Pose> = { sit: true, nf: [49, GROUND], nb: [13, GROUND], ff: [52, GROUND - 1], fb: [18, GROUND - 1] };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     frame(240, {
@@ -261,18 +262,18 @@ const sit: Anim = {
       glint: i === 5 ? 0 : i === 6 ? 1 : -1,
     }),
   ),
-};
+}));
 
 /** Wave (once, 10 frames, about 1.9 s): it lifts its near front leg, slowly, and waves it twice, smiling, then sets it down. */
 const WAVES: readonly Pt[] = [[50, 56], [52, 50], [53, 44], [50, 42], [55, 44], [50, 42], [55, 44], [52, 51]];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ...WAVES.map((w, i) => frame(i === 0 ? 220 : 170, { wave: w, eye: i === 0 ? "open" : "smile", hy: -1, hx: 1, glint: i === 2 ? 1 : -1, by: i % 2 ? -1 : 0 })),
     frame(200, { eye: "smile", hy: -1 }),
     frame(300, { eye: "open" }),
   ],
-};
+}));
 
 export const sidekickFolioTurtle: Character = {
   id: "sidekick-folio-turtle",

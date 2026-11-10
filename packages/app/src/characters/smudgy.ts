@@ -28,7 +28,7 @@
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import type { Sprite } from "./sprite-kit.ts";
 
 export const SMUDGY_PALETTE: Record<string, string> = {
@@ -916,7 +916,7 @@ const TAU = Math.PI * 2;
  * still as he stands in the first frame, the approved still); his eyes swivel on their own, each looking its own way
  * now and then, and he blinks; a drop of paint runs off his brush. Frame 1 is the approved still.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const e = Math.sin((Math.PI * i) / 16) ** 2;
@@ -934,13 +934,13 @@ const idle: Anim = {
     const drop = i >= 6 && i <= 10 ? blob(5, 14 + (i - 6) * 3, 1) : [];
     return F(125, p, { specks: drop });
   }),
-};
+}));
 
 /**
  * Entrance: his shadow spreads, he drops in from above, beret flying, and lands (a thump, dust, the beret bounced); then
  * a flourish of the brush, a flick of paint and a grin, and he settles with a sly look.
  */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "drop" },
@@ -954,20 +954,20 @@ const entrance: Anim = {
     F(160, { ...HOLD_UP, mouth: "grin", lidF: "half", gazeN: [0.6, 0.3], curl: 1, beretTilt: -18 }, { specks: flecks(tipOf(HOLD_OVER), 110, 3, 5) }),
     F(300, {}),
   ],
-};
+}));
 
 /** Thinking: the brush's handle tapped on his chin, his eyes rolled up, gold dots rising off his beret; the tail curling slowly. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) =>
     [0, 1, 2, 3].map((i) =>
       F(130, { ...holding([24.5, i % 2 ? 37 : 37.8], 6), gazeN: [-0.5, -1.3], gazeF: i === 2 ? [0.4, -1.2] : [-1.4, -1.1], lidN: "half", lidF: "open", curl: [1, 0.92, 0.84, 0.92][i]!, sway: 0.08 * (i % 2 ? 1 : -1), swayPhase: i, beretTilt: i === 2 ? -9 : -16, bob: i === 2 ? 1 : 0 }, { specks: thoughts(n) }),
     ),
   ),
-};
+}));
 
 /** His move: a crouch, a hop with the tail whipping out behind and the beret lifting, a landing (dust), and a settle. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, beret: [0, 1] }),
@@ -977,10 +977,10 @@ const move: Anim = {
     F(120, { bob: 1, beret: [0, -1], beretTilt: -9 }, { specks: dust(1, 2) }),
     F(160, {}),
   ],
-};
+}));
 
 /** A capture: he cheers, pumping the brush over his head, flicking paint, the tail corkscrewing, the beret bouncing. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 1, ...HOLD_BACK, lean: 1 }, { cue: "splat" }),
@@ -992,10 +992,10 @@ const capture: Anim = {
     }),
     F(160, { mouth: "smirk", lidF: "half" }),
   ],
-};
+}));
 
 /** Hurt: a flash, flecks fly off the brush, the beret pops off to the side, he's knocked back with his eyes shut; then he glares. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { bob: 2, dx: 1, lidN: "shut", lidF: "shut", mouth: "open", curl: 0.6, sway: 0.5, beret: [2, -4], beretTilt: -34 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: flecks(REST.brushTip, 60, 1, 5) }),
@@ -1006,10 +1006,10 @@ const hurt: Anim = {
     F(120, { lidN: "half", lidF: "open", gazeN: [0.5, 0.3], mouth: "smirk", ...HOLD_UP }),
     F(160, {}),
   ],
-};
+}));
 
 /** Check: he points the brush ahead (at the king) with a flourish of sparkle, grinning, his eye on it; twice. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, ...HOLD_BACK, lean: 1 }),
@@ -1021,11 +1021,11 @@ const check: Anim = {
     F(150, { lidN: "half", lidF: "half" }),
     F(160, { lidN: "half", lidF: "half", mouth: "grin" }),
   ],
-};
+}));
 
 const SMUG_GAZE: readonly Pt[] = [[-1.1, 0.5], [-0.4, 0.4], [0.6, 0.3], [0.6, 0.3], [0.2, 0.4], [-0.6, 0.5], [-1.1, 0.5], [-1.1, 0.5]];
 /** Smug: leaning back, heavy-lidded, a grin, the beret tipped, the tail lazily swaying, one eye wandering. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(150, {
@@ -1043,10 +1043,10 @@ const smug: Anim = {
       beret: [0, i % 4 === 2 ? -1 : 0],
     }),
   ),
-};
+}));
 
 /** Rattled: shaking, eyes wide, mouth working, sweat flying, the tail wound tight and trembling, the beret jiggling. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p: SmudgyPose = {
@@ -1064,7 +1064,7 @@ const rattled: Anim = {
     };
     return F(80, p, { specks: sweat(i) });
   }),
-};
+}));
 
 /** The beret over his eyes, the sag of the end. */
 const SLUMP: SmudgyPose = { bob: 6, curl: 0.12, sway: 0, lidN: "shut", lidF: "shut", mouth: "frown", beret: [-1, 9], beretTilt: -7, ...STROKE, paint: "side", handN: [27.5, 58], nod: 1 };
@@ -1072,7 +1072,7 @@ const SLUMP: SmudgyPose = { bob: 6, curl: 0.12, sway: 0, lidN: "shut", lidF: "sh
  * Defeat: a flash; the beret pops off his head, he reels; his tail uncurls and goes limp, the brush drops, and he slumps
  * with the beret fallen over his eyes.
  */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { bob: 2, dx: 1, lidN: "shut", lidF: "shut", mouth: "open", beret: [2, -5], beretTilt: -36, curl: 0.6, sway: 0.5 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: flecks(REST.brushTip, 60, 1, 5) }),
@@ -1082,10 +1082,10 @@ const defeat: Anim = {
     F(140, SLUMP, { specks: dust(1) }),
     F(1000, SLUMP),
   ],
-};
+}));
 
 /** Victory: he hops in place, the brush waving over his head and flicking yellow, the tail corkscrewing, the beret bouncing. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
@@ -1106,14 +1106,14 @@ const victory: Anim = {
     };
     return F(110, p, { cue: i === 2 ? "giggle" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 3 === 0 ? flecks(tipOf(wave), 90, 2, 3) : []), ...(i % 4 === 1 ? sparkle(34, -2) : [])] });
   }),
-};
+}));
 
 /**
  * Camouflage's splash (his passive, at the start): he dips the brush in the palette, raises it loaded, winds back and
  * flings a big splash at the board (`splash`: it leaves the brush; the board flies it to his pawns), flecks flying; then
  * a sly look, one eye on you, the other wandering, and the brush loaded again.
  */
-const camouflage: Anim = {
+const camouflage: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 1, ...DIP, paint: "smear", lidN: "half", lidF: "half", gazeN: [-1.4, 1], gazeF: [-1.2, 1] }),
@@ -1128,14 +1128,14 @@ const camouflage: Anim = {
     F(90, { paint: "smear", mouth: "grin", gazeN: [0.3, 0.4], lidN: "half" }, { specks: sparkle(11, 11) }),
     F(80, {}),
   ],
-};
+}));
 
 /**
  * The strike, the reveal (his passive's second half: the disguised piece makes its rook move and the paint drips off
  * it, `drip`): he crouches with his tail wound tight, then the tail snaps open, the beret leaps off his head, and he
  * laughs with the brush up; the tail curls back, the beret lands.
  */
-const strike: Anim = {
+const strike: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(110, { bob: 2, curl: 1, lidN: "wide", lidF: "wide", mouth: "grin", beret: [0, 1] }),
@@ -1148,14 +1148,14 @@ const strike: Anim = {
     F(140, { mouth: "smirk", lidN: "half", lidF: "half", beretTilt: -16 }),
     F(160, {}),
   ],
-};
+}));
 
 /**
  * Repaint, his ultimate: two quick brush strokes. The paint on his brush goes your color (a cream), he winds back and
  * strokes (`stroke1`: his pawn goes your color); it goes his color (a charcoal) with a sparkle, he winds back again and
  * strokes (`stroke2`: your knight or bishop goes his); a flourish and a grin.
  */
-const repaint: Anim = {
+const repaint: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(120, { ...HOLD_UP, lidN: "half", lidF: "half", mouth: "grin", curl: 0.95 }, { pal: PAINT_CREAM, specks: sparkle(14, 4) }),
@@ -1170,7 +1170,7 @@ const repaint: Anim = {
     F(140, { mouth: "smirk", lidN: "half", lidF: "half" }),
     F(160, {}),
   ],
-};
+}));
 
 // ---- His attack on a king (for his kit's `kingAttack` once he's wired in: perSquare 36, stand 1.8, facesLeft).
 
@@ -1228,7 +1228,7 @@ const windUp = (i: number): Frame =>
  * `splat` in turn (the cue frame is where the blob reaches the king's head: the board splats it there), his eyes and
  * his face on the king throughout; he laughs, the brush up, and they bound off. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1250,7 +1250,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 export const SMUDGY: Character = {
   id: "smudgy",

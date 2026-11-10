@@ -18,6 +18,7 @@
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1d1210", // outline
@@ -337,7 +338,7 @@ const frame = (ms: number, p: Partial<Pose>, more: Partial<Frame> = {}): Frame =
 // ---- The animations.
 
 /** Idle: chest out, he breathes, his head jerks round to look (as a rooster's does), his tail sways, a blink, a ruffle. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     frame(i === 4 || i === 9 ? 260 : 170, {
@@ -349,7 +350,7 @@ const idle: Anim = {
       wing: i === 10 ? 1 : 0,
     }),
   ),
-};
+}));
 
 /** Walk: a proud strut, the head pumping forward and back with each step, the tail bobbing. */
 const WALK: readonly Partial<Pose>[] = [
@@ -360,10 +361,10 @@ const WALK: readonly Partial<Pose>[] = [
   { by: -1, hx: 1, near: 30, far: 31, nearUp: 3, farUp: 0, tail: 0 },
   { by: 0, hx: -1, near: 33, far: 28, nearUp: 2, farUp: 0, tail: 0.04 },
 ];
-const walk: Anim = { loop: true, frames: WALK.map((p, i) => frame(110, p, i === 0 || i === 3 ? { cue: "step" } : {})) };
+const walk: Anim = lazyAnim(() => ({ loop: true, frames: WALK.map((p, i) => frame(110, p, i === 0 || i === 3 ? { cue: "step" } : {})) }));
 
 /** Sit (at a table): settled down on his belly, his toes tucked under; he breathes, looks round, blinks, flicks his tail. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     frame(220, {
@@ -375,10 +376,10 @@ const sit: Anim = {
       tail: i === 8 ? 0.08 : 0,
     }),
   ),
-};
+}));
 
 /** Wave: he throws up a wing and flaps it, beak open in a crow, then folds it away. */
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     frame(120, { wing: 1, hy: -1 }),
@@ -390,7 +391,7 @@ const wave: Anim = {
     frame(140, { wing: 1, hy: -1 }),
     frame(260, {}),
   ],
-};
+}));
 
 export const sidekickPigRooster: Character = {
   id: "sidekick-pig-rooster",

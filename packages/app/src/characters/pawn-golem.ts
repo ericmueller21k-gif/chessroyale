@@ -4,6 +4,7 @@
  */
 import { canvas, ellipse, inEllipse, inPoly, line, roundLight, shade, toGrid } from "./paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 const PALETTE = {
   k: "#0e0e12", // outline
@@ -173,7 +174,7 @@ const motes = (i: number, fl: readonly [number, number], fr: readonly [number, n
   ];
 };
 
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i): Frame => {
     const t = (TAU * i) / 8;
@@ -197,7 +198,7 @@ const idle: Anim = {
       specks: motes(i, fistL, fistR),
     };
   }),
-};
+}));
 
 const HOT = { h: PALETTE.g, g: PALETTE.G, j: PALETTE.G };
 /** Puffs of dust rolling out along the ground from both fists: `t` is 1, 2, 3 as they spread, swell and thin. */
@@ -231,7 +232,7 @@ const chips = (t: number): Speck[] =>
 /** Vertical speed lines over a falling fist. */
 const fall = (x: number, y: number): Speck[] => [3, 9].flatMap((dx): Speck[] => Array.from({ length: 9 }, (_, i): Speck => [OX + x + dx, OY + y - 12 + i, "q"]));
 
-const attack: Anim = {
+const attack: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 120, layers: pose({ fistL: [1, 34], fistR: [50, 34] }) },
@@ -246,7 +247,7 @@ const attack: Anim = {
     { ms: 150, layers: pose({ fistL: [-1, 38], fistR: [53, 38], shoulderL: [7, 24], shoulderR: [47, 24] }) },
     { ms: 150, layers: pose({ fistL: [1, 34], fistR: [50, 34] }) },
   ],
-};
+}));
 
 export const PAWN_GOLEM: Character = {
   id: "pawn-golem",

@@ -29,7 +29,7 @@ import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
 import { sparkle } from "./effects/common.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { BALLOON_COLORS, BALLOON_COLOR_NAMES, BALLOON_PIECES, BALLOON_SHAPES, balloonPartOf, knotX, type BalloonColor, type BalloonPiece, type Stage } from "./tiger-bar.ts";
 
 export const TIGER_PALETTE: Record<string, string> = {
@@ -860,7 +860,7 @@ const STAND: TigerPose = { rear: 65, paw: [24, 30], bunch: [16, -18] };
 const HOOP_STAND: TigerPose = { rear: 65, pawF: [33, 30], holdF: true, bunch: [18, -17], eyes: "half", hatTilt: 6 };
 
 /** Idle: frame 1 is the still. He breathes slowly, his balloons bob out of step, his tail swishes, an ear flicks, he blinks. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) =>
     F(125, {
@@ -873,10 +873,10 @@ const idle: Anim = {
       head: [0, i >= 6 && i <= 9 ? 1 : 0],
     }),
   ),
-};
+}));
 
 /** Entrance: his shadow spreads, he drops in, lands in a crouch with dust, straightens, and gives the crowd a big bored yawn. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: shadowOnly(8), cue: "drop" },
@@ -890,11 +890,11 @@ const entrance: Anim = {
     F(160, { head: [1, -1], jaw: 30, eyes: "shut", earN: 3, earF: 3, tail: 3 }),
     F(300, { eyes: "half" }),
   ],
-};
+}));
 
 /** Thinking: bored, eyes half shut on the board, his tail tip tapping, an ear turning; a slow yawn in the third round. */
 const THINK_JAW = [0, 0, 0, 0, 0, 0, 0, 0, 8, 18, 24, 10, 0, 0, 0, 0] as const;
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) =>
     F(130, {
@@ -908,10 +908,10 @@ const thinking: Anim = {
       bob: i >= 8 && i <= 11 ? 1 : 0,
     }),
   ),
-};
+}));
 
 /** His move: a crouch, a step with the front foot and one with the hind, each with a thump of dust, and a settle. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, earN: 1, earF: 1, eyes: "half" }),
@@ -921,10 +921,10 @@ const move: Anim = {
     F(120, { bob: 2, eyes: "half" }, { cue: "thump", shake: [0, 1], specks: dust(1, 2) }),
     F(160, { eyes: "half" }),
   ],
-};
+}));
 
 /** A capture: a lazy swat at the board with his raised paw (the balloons jerk on their strings), then a pleased little grin. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 2, earN: 2, earF: 2, eyes: "half" }),
@@ -935,10 +935,10 @@ const capture: Anim = {
     ...Array.from({ length: 6 }, (_, i) => F(85, { eyes: i < 4 ? "joy" : "half", jaw: i < 4 ? 6 : 0, tail: [2, 4, 2, 4, 2, 0][i]!, earN: -1, earF: -1, head: [0, -1], balloons: bobbing(i * 2) })),
     F(160, { eyes: "half" }),
   ],
-};
+}));
 
 /** Hurt: every color pale, knocked back with his eyes shut and ears flat, the hat jolted up, the balloons yanked; a glare. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { dx: 2, head: [2, -1], eyes: "shut", earN: 3, earF: 3, hat: [1, -3], hatTilt: 20, tail: 4, balloons: { queen: [2, -2], knight: [2, -1], rook: [1, -2], pawn: [2, -1] } }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
@@ -949,10 +949,10 @@ const hurt: Anim = {
     F(120, { head: [-1, 0], eyes: "half", earN: 2, earF: 2, tail: -1 }),
     F(160, { eyes: "half" }),
   ],
-};
+}));
 
 /** Check: a growl he can't be bothered to make a roar (a crouch, the jaw open, ears back), then he shakes his bunch at the board. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, head: [-1, 1], earN: 2, earF: 2, eyes: "half" }),
@@ -964,26 +964,26 @@ const check: Anim = {
     F(150, { paw: [7, 50], eyes: "half", balloons: { queen: [-1, 0], rook: [-1, 0] } }),
     F(160, { eyes: "half" }),
   ],
-};
+}));
 
 /** Smug: head back, eyes half shut, a thin grin, the hat tipped further, his tail swishing slowly, the balloons bobbing. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(150, { head: [1, -1], eyes: i === 5 ? "shut" : "half", jaw: i % 4 === 1 ? 4 : 0, hatTilt: 16, tail: [0, 2, 3, 2, 0, -1, -2, -1][i]!, earN: i === 2 ? -1 : 0, balloons: bobbing(i * 2) }),
   ),
-};
+}));
 
 /** Rattled: shaking a pixel either way, eyes wide, ears back, tail up and bristling, the balloons jittering on their strings. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(80, { dx: i % 2 ? 1 : -1, bob: i % 4 === 0 ? 1 : 0, eyes: "wide", earN: 3, earF: 3, tail: 5, hat: [0, i % 2 ? -1 : 0], balloons: { queen: [i % 2 ? 1 : 0, 0], knight: [0, i % 2 ? 0 : -1], rook: [i % 2 ? 0 : -1, 0], pawn: [0, i % 2 ? 1 : 0] } }),
   ),
-};
+}));
 
 /** Defeat: a flash and a reel; he lets go of his balloons (they float up and away) and slumps down, ears limp, the hat tipped over his eyes. */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { dx: 2, head: [2, -1], eyes: "shut", earN: 3, earF: 3, hat: [1, -2], tail: 3 }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
@@ -993,10 +993,10 @@ const defeat: Anim = {
     F(140, { bob: 4, head: [0, 3], eyes: "shut", earN: 3, earF: 3, paw: [12, 60], loose: true, bunch: [3, -27], hat: [-2, 2], hatTilt: -10, tail: -3 }),
     F(1000, { bob: 4, head: [0, 3], eyes: "shut", earN: 3, earF: 3, paw: [12, 60], gone: ALL_GONE, hat: [-2, 2], hatTilt: -10, tail: -3 }),
   ],
-};
+}));
 
 /** Victory: up on his hind legs (the old act's bow, without the enthusiasm), the bunch held high, a smug look, a foot tap. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     F(110, {
@@ -1011,12 +1011,12 @@ const victory: Anim = {
       stepHN: i === 8 ? 2 : 0,
     }, i === 2 ? { cue: "huff" } : i === 8 ? { cue: "thump" } : {}),
   ),
-};
+}));
 
 // ---- His own moments.
 
 /** The hop to the pump and back (one animation; mirror it for the way back): a crouch, a spring, in the air (`air`: hold it while the hop moves him), down, a landing with dust, a settle. */
-const hop: Anim = {
+const hop: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(110, { bob: 3, earN: 2, earF: 2, eyes: "half", tail: -2 }),
@@ -1026,12 +1026,12 @@ const hop: Anim = {
     F(100, { bob: 3, earN: 2, earF: 2, eyes: "shut", balloons: { queen: [0, -1], knight: [0, -1], rook: [0, -1] } }, { cue: "thump", specks: dust(0, 2) }),
     F(150, { bob: 1, eyes: "half" }, { specks: dust(1, 2) }),
   ],
-};
+}));
 /** The frame of `hop` that holds while he is moved through the air. */
 export const TIGER_HOP_AIR = 2;
 
 /** Place: he pulls a limp balloon from his vest pocket and sets it on the nozzle in front of him (`touch`: it is on the nozzle). */
-const place: Anim = {
+const place: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(110, { paw: [30, 48], head: [1, 1], eyes: "half" }),
@@ -1042,20 +1042,20 @@ const place: Anim = {
     F(120, { bob: 1, paw: [7, 55], head: [-1, 1], eyes: "half" }),
     F(140, { eyes: "half" }),
   ],
-};
+}));
 
 /** Cheer (a balloon landed on the board): a small pleased grin, the tail up, the balloons bobbing. */
-const cheer: Anim = {
+const cheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { eyes: "open", earN: -1, earF: -1 }, { cue: "cheer" }),
     ...Array.from({ length: 6 }, (_, i) => F(90, { eyes: "joy", jaw: i % 2 ? 4 : 7, tail: [3, 5, 4, 5, 3, 2][i]!, head: [0, -1], earN: -2, earF: -2, bob: i % 2, balloons: bobbing(i * 2 + 1) })),
     F(90, { eyes: "half", jaw: 0 }),
   ],
-};
+}));
 
 /** Big cheer (a real queen landed): he half rears up, a wide grin, the balloons swinging, sparkles; then down again, still pleased. */
-const bigCheer: Anim = {
+const bigCheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 2, eyes: "wide", earN: -2, earF: -2 }, { cue: "cheer" }),
@@ -1069,10 +1069,10 @@ const bigCheer: Anim = {
     F(110, { rear: 16, paw: [11, 46], bunch: [2, -3], eyes: "joy", jaw: 6 }),
     F(100, { bob: 1, eyes: "joy", jaw: 4 }),
   ],
-};
+}));
 
 /** Wince (a balloon popped): ears flat, eyes shut, a flinch, then an annoyed look and a lash of his tail. */
-const wince: Anim = {
+const wince: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { dx: 1, bob: 1, head: [1, 0], eyes: "shut", earN: 3, earF: 3, tail: 3, hat: [0, -1] }, { cue: "wince", shake: [1, 0] }),
@@ -1083,13 +1083,13 @@ const wince: Anim = {
     F(120, { head: [-1, 0], eyes: "half", earN: 1, earF: 1, tail: -1 }),
     F(110, { eyes: "half" }),
   ],
-};
+}));
 
 /** The hoops (his ultimate's cast, Alfil's Slam's length): up on his hind legs with a burning hoop, the old act and a sour look; three throws. */
 const HOOP_HOLD: Pt = [25, 34];
 const HOOP_BACK: Pt = [38, 18];
 const HOOP_THROW: Pt = [22, 42];
-const hoops: Anim = {
+const hoops: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { rear: 30, paw: [14, 46], eyes: "half", bunch: [6, -6] }),
@@ -1106,7 +1106,7 @@ const hoops: Anim = {
     F(90, { rear: 30, paw: [14, 46], eyes: "half", bunch: [6, -6] }),
     F(170, { bob: 2, eyes: "half" }, { cue: "thump", specks: dust(0, 2) }),
   ],
-};
+}));
 
 export const TIGER_ANIMS = ["idle", "entrance", "thinking", "move", "capture", "hurt", "check", "smug", "rattled", "defeat", "victory", "hop", "place", "cheer", "bigCheer", "wince", "hoops"] as const;
 
@@ -1179,7 +1179,7 @@ const popBeat = (i: number): Frame => {
  * ten times: each lands on a hit's own time (`bonk`: the cue frame is where the board marks the king's square) and pops there (`pop`)
  * as the next one comes up in his paw; a bored huff (`huff`), and he hops out of the frame. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1201,7 +1201,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * The tiger for his attack on a king: the same drawing, parts and palette, facing our left as always, in a frame `ATTACK_REACH`

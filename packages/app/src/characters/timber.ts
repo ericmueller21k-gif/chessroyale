@@ -27,6 +27,7 @@
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
+import { lazyAnim } from "./sprite.ts";
 
 export const PALETTE: Record<string, string> = {
   k: "#1e130d", // outline
@@ -712,7 +713,7 @@ export const f = (ms: number, p: Pose, extra: Partial<Frame> = {}): Frame => {
  */
 const BREATH = [0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0];
 const TAIL = [-8, -8, -8, -8, -8, -8, -8, -8, -8, -8, -12, -18, -22, -22, 0, -4, -7, -8, -8, -8, -8, -8, -8, -8];
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: BREATH.map((br, i) => {
     const mood: Mood = i === 5 ? "blink" : i >= 15 && i <= 19 ? "proud" : "smile";
@@ -724,7 +725,7 @@ const idle: Anim = {
       dust: i >= 14 && i <= 16 ? i - 14 : undefined,
     });
   }),
-};
+}));
 
 // ---- Things on his frames: chips, sawdust, sweat, the ground's dust. Drawing pixels (the frame adds OY).
 
@@ -836,7 +837,7 @@ const BRIM = (y: number): Pose => ({ armR: { h: [57, y], e: [65, 30] }, frontR: 
 // ---- His animations.
 
 /** Entrance: his shadow spreads, he drops in and lands with a stomp, sets his hard hat with a pat, twirls the hammer and taps it. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: shadowOnly(8), cue: "drop" },
@@ -859,11 +860,11 @@ const entrance: Anim = {
     f(90, { ...DRAWN }),
     f(240, {}),
   ],
-};
+}));
 
 /** Thinking (loop): sizing up the board like a job: a paw on his chin, eyes narrowed, one shut to sight along it; the tail taps. */
 const CHIN: Pose = { armL: { h: [23, 40] }, front: true };
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((i) =>
     f(i === 7 ? 120 : 190, {
@@ -877,10 +878,10 @@ const thinking: Anim = {
       dust: i === 7 ? 0 : i === 8 ? 1 : undefined,
     }, { cue: i === 7 ? "tap" : undefined }),
   ),
-};
+}));
 
 /** His move: a quick point of the hammer at the board, a tap in the air, and back on the belt. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { ...AT_HIP, lean: -1 }),
@@ -890,10 +891,10 @@ const move: Anim = {
     f(90, { ...DRAWN }),
     f(150, {}),
   ],
-};
+}));
 
 /** A capture: a big satisfied swing of the hammer, a whack, wood chips flying, and a proud rest with it on his shoulder. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { ...AT_HIP, sink: 1 }),
@@ -907,10 +908,10 @@ const capture: Anim = {
     f(100, { ...DRAWN }),
     f(150, {}),
   ],
-};
+}));
 
 /** Hurt: a flash and a shake, his hat knocked askew; a gruff glare, and he straightens it with a paw. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { dx: 1, sink: 1, mood: "shut", brows: "worry", mouth: "frown", hat: [3, -4], hatTilt: 18, tail: -16 }, { cue: "oof", pal: FLASH, shake: [2, 0], specks: sweat(0) }),
@@ -922,10 +923,10 @@ const hurt: Anim = {
     f(130, { mood: "smile", brows: "angry", hat: [0, 0], ...BRIM(16) }, { cue: "pat" }),
     f(160, {}),
   ],
-};
+}));
 
 /** Check: a firm point of the hammer at the board, brows down, leaning in; a jab for emphasis. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { ...AT_HIP }),
@@ -937,11 +938,11 @@ const check: Anim = {
     f(100, { ...DRAWN, dust: 1 }),
     f(160, {}),
   ],
-};
+}));
 
 /** Smug (loop): the hammer on his shoulder, chin up, a toothy grin, a wink; the tail pats slowly. */
 const SHOULDERED: Pose = { armR: { h: [51, 43] }, hammerR: -42 };
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     f(i === 6 ? 120 : 180, {
@@ -954,10 +955,10 @@ const smug: Anim = {
       dust: i === 6 ? 0 : i === 7 ? 1 : undefined,
     }),
   ),
-};
+}));
 
 /** Rattled (loop): worried, eyes wide, sweat flying, the tail twitching, his hat slipping down over his brow. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(90, {
@@ -972,11 +973,11 @@ const rattled: Anim = {
       armR: { h: [44, 44 + ((i + 1) % 2)] },
     }, { specks: sweat(i) }),
   ),
-};
+}));
 
 /** Defeat: a flash, his hat flies off, he sits down hard, his tools spill, the hat lands upside down; dazed, held. */
 const SAT: Pose = { sink: 5, spread: 3, armL: { h: [27, 57] }, armR: { h: [51, 57] }, tail: 0, spill: 2 };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { dx: 1, mood: "shut", brows: "worry", mouth: "frown", hat: [2, -8], hatTilt: -16, tail: -18 }, { cue: "oof", pal: FLASH, shake: [2, 0] }),
@@ -987,10 +988,10 @@ const defeat: Anim = {
     f(150, { ...SAT, mood: "shut", brows: "worry", mouth: "frown", head: [0, 2], hatOff: { at: [27, 52], tilt: 24, behind: true } }, { specks: stars(1) }),
     f(900, { ...SAT, mood: "shut", brows: "worry", mouth: "frown", head: [0, 2], hatOff: { at: [27, 52], tilt: 21, behind: true } }, { specks: stars(2) }),
   ],
-};
+}));
 
 /** Victory (loop): he cheers, hammer high, the other fist up, hopping, his tail slapping the ground, chips falling like confetti. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) => {
     const up = i % 2 === 0;
@@ -1007,7 +1008,7 @@ const victory: Anim = {
       dust: up ? undefined : (i % 4 === 1 ? 0 : 1),
     }, { cue: i === 1 || i === 5 ? "slap" : i === 0 ? "cheer" : undefined, specks: confetti(i) });
   }),
-};
+}));
 
 // ---- His own moments.
 
@@ -1019,7 +1020,7 @@ const SCRAP_AT: Pt = [8, 29];
 const TAP_UP: Pose = { armL: { h: [15, 23] }, hammer: -105 };
 const TAP_DOWN: Pose = { armL: { h: [19, 21] }, hammer: 178 };
 const TAPPED: Pt = [8, 27];
-const scrapAnim: Anim = {
+const scrapAnim: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { head: [-1, -1], brows: "up", armL: { h: [13, 28] }, scrap: [6, 4] }),
@@ -1034,13 +1035,13 @@ const scrapAnim: Anim = {
     f(100, { ...DRAWN, mood: "proud", mouth: "grin" }, { specks: puff(TAPPED[0], TAPPED[1], 2) }),
     f(150, {}),
   ],
-};
+}));
 
 /**
  * Build (the Workshop, a piece dropped): he reaches back and slides a plank up out of its strap, shows it off overhead, and
  * swings it down toward the board as if setting the piece there (cue `set` where it lands), then slides it back in.
  */
-const build: Anim = {
+const build: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { head: [1, 0], armR: { h: [63, 20] }, mood: "smile" }),
@@ -1057,11 +1058,11 @@ const build: Anim = {
     f(110, { armR: { h: [63, 20] }, plankOut: 0, mood: "proud" }, { cue: "pat" }),
     f(160, { mood: "proud" }),
   ],
-};
+}));
 
 /** The warning before his ultimate (loop): he bares his buck teeth, licks his lips, clacks his teeth, eyes narrowed and gleeful. */
 const HUNGRY: Pose = { mood: "squint", brows: "angry", mouth: "open", lean: -1, head: [-1, 0] };
-const gnawWarn: Anim = {
+const gnawWarn: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(150, { ...HUNGRY, jaw: 3 }),
@@ -1075,7 +1076,7 @@ const gnawWarn: Anim = {
     f(160, { ...HUNGRY, jaw: 3, tail: -14 }),
     f(180, { ...HUNGRY, jaw: 3, tail: -4 }),
   ],
-};
+}));
 
 /**
  * Gnaw (his ultimate): he leans in and chomps, jaw open and shut, quick bites (cue `chomp` each), chips and splinters flying
@@ -1086,7 +1087,7 @@ const OPEN: Pose = { ...BITE, mouth: "open", jaw: 5, head: [-4, 2] };
 const SHUT: Pose = { ...BITE, mouth: "grin", mood: "shut" };
 const MOUTH: Pt = [12, 41];
 const sp2 = (t: number, s: number) => splinters(MOUTH[0], MOUTH[1], t, s);
-const gnaw: Anim = {
+const gnaw: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { ...HUNGRY, jaw: 3, tail: -10 }),
@@ -1106,10 +1107,10 @@ const gnaw: Anim = {
     f(150, { mood: "proud", mouth: "grin" }, { specks: puff(13, 37, 1) }),
     f(150, { mood: "proud" }, { specks: puff(13, 37, 2) }),
   ],
-};
+}));
 
 /** A quick proud nod (a piece he built lands). */
-const cheer: Anim = {
+const cheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { head: [0, 2], mood: "proud", sink: 1 }),
@@ -1119,10 +1120,10 @@ const cheer: Anim = {
     f(130, { headDy: -1, mood: "proud", mouth: "grin", dust: 2 }),
     f(250, { mood: "smile" }),
   ],
-};
+}));
 
 /** A big cheer (his queen finished): hammer up, a hop, a tail slap, chips flying. */
-const bigCheer: Anim = {
+const bigCheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { ...AT_HIP, sink: 2, mood: "wide", brows: "up", mouth: "open", jaw: 2 }),
@@ -1136,7 +1137,7 @@ const bigCheer: Anim = {
     f(110, { ...DRAWN, mood: "proud", mouth: "grin", dust: 2 }, { specks: confetti(7, 5) }),
     f(200, { mood: "proud" }),
   ],
-};
+}));
 
 export const BOSS_BEAVER: Character = {
   id: "timber",
@@ -1234,7 +1235,7 @@ const RESTED: Pose = { noPlank: true, held: { top: [84, 28], bot: [34, 47] }, ar
  * His attack on a king, on the shared beats (KING_ATTACK, boss-timing.ts), every frame's time worked out from them so
  * they add up exactly; the king to our left (his hammer paw's side; the board mirrors him when it's to his right).
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [];
   let t = 0;
@@ -1311,7 +1312,7 @@ const kingAttack: Anim = (() => {
   to(A.ms - 20, empty(10));
   to(A.ms, empty(0));
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * Timber for his attack on a king (his kit's `kingAttack`): his own parts and palette, in a frame `A_REACH` wider on the

@@ -10,6 +10,7 @@ import { canvas, ellipse, inEllipse, inPoly, roundLight, shade, toGrid, type Can
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
+import { lazyAnim } from "./sprite.ts";
 
 export const CLOWN_PALETTE = {
   k: "#150c11", // outline, seams
@@ -403,7 +404,7 @@ const bigJump = (extra: (i: number) => ClownPose = () => ({}), height = 1): Fram
  * Idle: six bounces, then a big jump (about every 6 s), lower than his victory leaps so on a phone he stays clear
  * of the bar above. Quiet: only the big jump makes a sound.
  */
-const idle: Anim = { loop: true, frames: [...Array.from({ length: 6 }, () => bounce(90)).flat(), ...bigJump(() => ({}), 0.6)] };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames: [...Array.from({ length: 6 }, () => bounce(90)).flat(), ...bigJump(() => ({}), 0.6)] }));
 
 /** Three thought dots popping up beside his head, one by one. */
 const thoughtDots = (n: number): Speck[] =>
@@ -413,12 +414,12 @@ const thoughtDots = (n: number): Speck[] =>
     for (let dy = 0; dy <= r; dy++) for (let dx = 0; dx <= r; dx++) out.push([OX + x! + dx, OY + y! + dy, "w"]);
     return out;
   });
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) => bounce(110, () => ({ mood: "think", right: "chin", specks: thoughtDots(n) }), 0.5)),
-};
+}));
 
-const smug: Anim = { loop: true, frames: [...bounce(130, () => ({ mood: "smug", hatDx: 1 }), 0.6), ...bounce(130, () => ({ mood: "smug", hatDx: 1, headDx: 1 }), 0.6)] };
+const smug: Anim = lazyAnim(() => ({ loop: true, frames: [...bounce(130, () => ({ mood: "smug", hatDx: 1 }), 0.6), ...bounce(130, () => ({ mood: "smug", hatDx: 1, headDx: 1 }), 0.6)] }));
 
 /** Sweat drops flying off his head. */
 const sweat = (i: number): Speck[] => {
@@ -430,10 +431,10 @@ const sweat = (i: number): Speck[] => {
     [OX + 35 + t, OY + 8 + t * 2, "B"],
   ];
 };
-const rattled: Anim = { loop: true, frames: [...bounce(70, (i) => ({ mood: "rattled", dx: i % 2 ? 1 : -1, specks: sweat(i) }), 0.4), ...bounce(70, (i) => ({ mood: "rattled", dx: i % 2 ? -1 : 1, specks: sweat(i + 4) }), 0.4)] };
+const rattled: Anim = lazyAnim(() => ({ loop: true, frames: [...bounce(70, (i) => ({ mood: "rattled", dx: i % 2 ? 1 : -1, specks: sweat(i) }), 0.4), ...bounce(70, (i) => ({ mood: "rattled", dx: i % 2 ? -1 : 1, specks: sweat(i + 4) }), 0.4)] }));
 
 /** His move: a hop, pointing at the board. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { squeeze: 3, crouch: 2 }),
@@ -447,22 +448,22 @@ const move: Anim = {
     f(90, { squeeze: 1, right: "point" }),
     f(160, { right: "point" }),
   ],
-};
+}));
 
 /** A capture: he throws his head back and laughs, shaking on his pogo. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { squeeze: 2, crouch: 1 }),
     ...Array.from({ length: 12 }, (_, i) => f(80, { mood: "laugh", headDy: -1, dx: i % 2 ? 1 : -1, air: [0, 2, 3, 2][i % 4], squeeze: i % 4 === 0 ? 2 : 0 }, i === 0 ? { cue: "laugh" } : {})),
     f(120, { mood: "grin" }),
   ],
-};
+}));
 
 /** A white flash for the frame he's hit. */
 const FLASH: Record<string, string> = { r: "#ffffff", R: "#ffe0e0", p: "#ffffff", P: "#f0e0ff", o: "#ffffff", O: "#ffe8d0", q: "#ffd0d0" };
 /** Hurt: hit, squashed, eyes crossed, his hat knocked up off his head; it lands crooked. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { squeeze: 4, crouch: 4, mood: "hurt", hatDy: -4 }, { cue: "squeak", pal: FLASH, shake: [1, 0] }),
@@ -475,7 +476,7 @@ const hurt: Anim = {
     f(110, { mood: "rattled", hatDx: 2, dx: -1, air: 1 }),
     f(160, { mood: "rattled", hatDx: 1 }),
   ],
-};
+}));
 
 /** A golden "honk!" burst off his nose. */
 const honkBurst = (big: boolean): Speck[] => {
@@ -487,7 +488,7 @@ const honkBurst = (big: boolean): Speck[] => {
   return rays;
 };
 /** Check: he squeezes his nose and honks twice. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { squeeze: 2, crouch: 1, right: "nose" }),
@@ -498,10 +499,10 @@ const check: Anim = {
     f(90, { right: "nose", mood: "honk", air: 1 }, { specks: honkBurst(false) }),
     ...bounce(90, () => ({ mood: "laugh" }), 0.6),
   ],
-};
+}));
 
 /** Defeat: hit, a last wobbly bounce or two, then off the pogo onto the ground (the last frame holds). */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { squeeze: 4, crouch: 4, mood: "hurt", hatDy: -5 }, { cue: "squeak", pal: FLASH, shake: [1, 0] }),
@@ -515,7 +516,7 @@ const defeat: Anim = {
     f(140, { fallen: true, mood: "out" }),
     f(1000, { fallen: true, mood: "out" }),
   ],
-};
+}));
 
 /** Confetti drifting down, seeded by frame. */
 const CONFETTI = "ygurpw";
@@ -526,13 +527,13 @@ const confetti = (i: number): Speck[] =>
     return [x + 1, y, CONFETTI[n % CONFETTI.length]!];
   });
 /** Victory: a big spinning jump, arms up, confetti, a laugh and a honk; then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     ...bigJump((i) => ({ mood: i < 2 ? "grin" : "laugh", left: i >= 2 && i < 10 ? "up" : "bar", right: i >= 2 && i < 10 ? "up" : "bar", flip: i >= 5 && i <= 6 })).map((fr, i) => ({ ...fr, specks: confetti(i), cue: i === 2 ? "laugh" : i === 10 ? "honk" : fr.cue })),
     ...bounce(90, (i) => ({ mood: "laugh", specks: confetti(i + 15) })),
   ],
-};
+}));
 
 /** A puff of smoke where he pops up from. */
 const puff = (r: number): Speck[] => {
@@ -545,7 +546,7 @@ const puff = (r: number): Speck[] => {
   return out;
 };
 /** Entrance: a puff of smoke, he springs up out of it, lands, bounces and honks his nose. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: puff(2), cue: "slideUp" },
@@ -566,7 +567,7 @@ const entrance: Anim = {
     f(100, { right: "nose", mood: "honk" }, { specks: honkBurst(false) }),
     f(300, { mood: "grin" }),
   ],
-};
+}));
 
 /** His pose with a pie held up at (x, y) (his drawing space). */
 const withPie = (ms: number, p: ClownPose, x: number, y: number, extra: Partial<Frame> = {}): Frame => ({ ms, layers: [...pose(p), at("pie", x, y)], ...extra });
@@ -577,7 +578,7 @@ const whoosh: Speck[] = [0, 2, 4].flatMap((dy) => [0, 1, 2, 3].map((i): Speck =>
  * His passive power, the pie: he pulls a pie up behind his head, winds up and throws it (the frame with the "throw"
  * cue: the pie leaves his glove there, and the board's flying pie takes over), then laughs.
  */
-const pieThrow: Anim = {
+const pieThrow: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { squeeze: 2, crouch: 1 }),
@@ -590,7 +591,7 @@ const pieThrow: Anim = {
     ...Array.from({ length: 6 }, (_, i) => f(80, { mood: "laugh", headDy: -1, dx: i % 2 ? 1 : -1, air: [0, 2, 3, 2][i % 4], squeeze: i % 4 === 0 ? 2 : 0 }, i === 0 ? { cue: "laugh" } : {})),
     f(140, { mood: "grin" }),
   ],
-};
+}));
 
 /** A shadow on the ground, growing as he drops onto it from above. */
 const dropShadow = (r: number): Speck[] => {
@@ -611,7 +612,7 @@ const dust = (r: number): Speck[] =>
  * with a boing, springs up into a spin (the frame with the "flip" cue: the board flips there) and lands laughing,
  * pointing at the crowd's side. The last frame holds.
  */
-const funhouse: Anim = {
+const funhouse: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: dropShadow(2) },
@@ -630,7 +631,7 @@ const funhouse: Anim = {
     ...bounce(90, () => ({ mood: "laugh" }), 0.6),
     f(400, { right: "point", mood: "grin" }),
   ],
-};
+}));
 
 export const CLOWN: Character = {
   id: "clown",
@@ -745,7 +746,7 @@ const reload = (i: number): Frame => {
  * a pie already in his hand, then pies the king nonstop: ten pies, one on each hit (cues `splat` and `squeak` in turn,
  * so the repeats don't pile up), bouncing between; he laughs, arms up, and bounces off. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(4) },
@@ -767,7 +768,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * Boingo for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame

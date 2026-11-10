@@ -18,7 +18,7 @@
  * few numbers. Fur is shaggy: its locks hang a pixel or two below every lower edge and stick out along the sides.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 
 export const ALFIL_PALETTE: Record<string, string> = {
@@ -688,20 +688,20 @@ const SWAY = [0, 0, 0, 1, 1, 1, 0, 0, 0, -1, -1, -1, 0, 0, 0, 0] as const;
  * Idle: he breathes, glowering, his trunk swaying; his ears flap once, his tail swishes, he blinks, and a glint runs
  * up the ankus to its spike. Silent. (Frame 1 is the approved still.)
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const p: AlfilPose = { bob: BREATH[i % 8]!, trunkTip: [23 + SWAY[i]!, 42], ears: i === 8 || i === 9 ? 1 : 0, tail: [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0][i]!, mood: i === 13 ? "blink" : "glare" };
     const glint = i >= 3 && i <= 5 ? sparkle(onFrame([9.6 - (i - 3) * 0.6, 26 - (i - 3) * 12], p)) : [];
     return f(125, p, { specks: glint });
   }),
-};
+}));
 
 /**
  * Entrance: the ground rumbles and his shadow spreads, he drops in from above and lands with a thud, squashed, dust
  * flying; he rears up and trumpets, ears out, and settles into his glare.
  */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "rumble" },
@@ -715,36 +715,36 @@ const entrance: Anim = {
     f(160, { bob: -1, nod: -1, trunk: "up", ears: 2 }, { specks: blast({ bob: -1, nod: -1 }, 1) }),
     f(300, {}),
   ],
-};
+}));
 
 /** Thinking: his near foot up to his chin, his eyes rolled up, his trunk curled and tapping, gold dots for thoughts. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) =>
     [0, 1, 2, 3].map((i) => f(130, { mood: "up", foreN: [27, 26], trunk: i % 2 ? "lift" : "hang", trunkTip: [22, 41], bob: i === 2 ? 1 : 0, tail: i === 1 ? 1 : 0 }, { specks: thoughts(n) })),
   ),
-};
+}));
 
 /** Smug: heavy-lidded, a brow cocked, his near foot on his hip, tapping the ankus's butt on the ground, trunk swinging. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const tap = i % 4 === 1 ? 2 : 0;
     return f(150, { mood: "smug", foreN: [37, 37], ankusButt: [11.4, 66.6 - tap], ankusTip: [7.6, -tap], trunkTip: [23 + [0, 1, 2, 1, 0, -1, -2, -1][i]!, 42], tail: [0, 1, 1, 1, 0, -1, -2, -1][i]!, nod: i % 4 === 2 ? 1 : 0 }, { cue: undefined });
   }),
-};
+}));
 
 /** Rattled: wide eyes, shaking, ears out, his trunk twitching, sweating. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p: AlfilPose = { mood: "wide", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, ears: 2, trunkTip: [23 + (i % 2 ? 1 : -1), 41], tail: i % 2 ? 1 : -1 };
     return f(80, p, { specks: sweat(i, p) });
   }),
-};
+}));
 
 /** His move: he lifts his near foot and stamps it down, planting the ankus with it (dust), then settles. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1 }),
@@ -754,10 +754,10 @@ const move: Anim = {
     f(120, { bob: 1 }, { specks: dust(1, 2, OX + 30, 12) }),
     f(160, {}),
   ],
-};
+}));
 
 /** A capture: he throws his trunk up and trumpets, ears flapping, bobbing with glee. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 1, trunk: "lift" }),
@@ -767,10 +767,10 @@ const capture: Anim = {
     }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Hurt: a flash, tufts of fur fly, he's knocked back a step, eyes squeezed shut, then glares and snorts. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 3, nod: 1, mood: "shut", ears: 2, dx: 1 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -781,11 +781,11 @@ const hurt: Anim = {
     f(120, { mood: "glare", trunk: "lift", ears: 1 }, { pal: EYES_HOT }),
     f(160, {}),
   ],
-};
+}));
 
 /** Check: he rears up, ankus raised and trunk high, eyes flaring, twice. */
 const LOOM: AlfilPose = { ...RAISED, bob: -2, ears: 2, trunk: "up", mood: "glare" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1 }),
@@ -797,11 +797,11 @@ const check: Anim = {
     f(150, { mood: "smug", trunk: "lift" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Defeat: a flash; he staggers, the ankus slips from his fist and clatters down, and he sinks onto his haunches, head hung. */
 const SLUMP: AlfilPose = { bob: 6, nod: 4, mood: "out", ears: -1, trunkTip: [23, 47], foreF: [6, 50], foreN: [31, 50], ankusButt: [1, 66], ankusTip: [67, 66.5] };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 3, nod: 1, mood: "shut", ears: 2, dx: 1 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -811,17 +811,17 @@ const defeat: Anim = {
     f(140, SLUMP, { specks: dust(1, 3) }),
     f(1000, SLUMP),
   ],
-};
+}));
 
 /** Victory: he hops on his hind legs, ankus raised high, trunk up trumpeting, ears flapping. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 5, 6, 5, 2, 0, 0, 0, 0, 0, 0][i]!;
     const p: AlfilPose = { ...RAISED, mood: "joy", trunk: "up", air, bob: i === 0 || i === 6 ? 2 : 0, ears: i % 2 ? 1 : 2, nod: i % 2 ? 0 : -1, tail: i % 2 ? 1 : -1 };
     return f(110, p, { cue: i === 2 ? "trumpet" : i === 6 ? "stomp" : undefined, specks: [...(i >= 2 && i <= 4 ? blast(p, i % 2) : []), ...(i === 6 ? dust(0, 3) : i === 7 ? dust(1, 3) : []), ...(i % 3 === 0 ? sparkle(tipOf(p)) : [])] });
   }),
-};
+}));
 
 /**
  * The ankus held out by his trunk's coil at `g` (drawing space), its spike pointing `deg` round from straight up
@@ -880,7 +880,7 @@ const RETAKE: AlfilPose = { trunk: "grip", trunkGrip: 51 };
 const POINTED = sw(4, { ears: 2 });
 /** Where his trunk's curled tip is, levelled: the snort comes out there. */
 const SNOUT = onFrame([SWING[4]![0][0] - 1, SWING[4]![0][1] + 3]);
-const tusksCast: Anim = {
+const tusksCast: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, nod: 1, trunk: "grip", trunkGrip: 52, ears: 1 }),
@@ -895,7 +895,7 @@ const tusksCast: Anim = {
     f(90, { ...RETAKE, mood: "smug" }),
     f(140, { mood: "smug" }),
   ],
-};
+}));
 
 /**
  * Tusks, the fusion: a short beat to go with the board's white flash. He crouches (the `rise` cue: the two pawns start
@@ -903,7 +903,7 @@ const tusksCast: Anim = {
  * `flash` cue: the board's white flash, the elephant appearing; the crunch of the fusion), a short trumpet, then he
  * lowers it.
  */
-const tusksFuse: Anim = {
+const tusksFuse: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 2, foreF: [2, 30], ankusButt: [10, 66.6], ankusTip: [6, 1] }, { cue: "rise" }),
@@ -916,7 +916,7 @@ const tusksFuse: Anim = {
     f(120, { ...RAISED, mood: "smug" }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /**
  * Mammoth Slam, his ultimate: he crouches, squashes and launches (the `leap` cue: his big trumpet), rises off the
@@ -925,7 +925,7 @@ const tusksFuse: Anim = {
  * shadows appear on their squares); he rises, smug.
  */
 const SQUASH: AlfilPose = { bob: 5, nod: 2, ears: 2, mood: "shut", trunkTip: [24, 44] };
-const mammothSlam: Anim = {
+const mammothSlam: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { bob: 2, trunk: "lift", mood: "glare" }),
@@ -941,7 +941,7 @@ const mammothSlam: Anim = {
     f(120, { bob: 1, mood: "smug" }, { cue: "shadows", specks: dust(3, 4) }),
     f(300, { mood: "smug" }),
   ],
-};
+}));
 
 export const ALFIL: Character = {
   id: "alfil",
@@ -986,7 +986,7 @@ const jab = (low: boolean, out: boolean): AlfilPose => {
  * high and low (a `jab` cue each: the board's hit on the king's square), drawing it back between; he trumpets and
  * leaps off; the last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "rumble" },
@@ -1015,7 +1015,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames: frames.map((fr) => (fr.layers.length ? facingRight(fr) : { ...fr, specks: (fr.specks ?? []).map(([x, y, k]): Speck => [AW - 1 - (x + ATTACK_REACH), y, k]) })) };
-})();
+})()));
 
 /**
  * Alfil for his attack on a king (his kit's `kingAttack`, once he's wired in): the same drawing, parts and palette,

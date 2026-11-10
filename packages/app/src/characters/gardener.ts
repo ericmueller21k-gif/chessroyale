@@ -30,7 +30,7 @@
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GARDENER_PALETTE: Record<string, string> = {
   k: "#1d1019", // outline
@@ -782,7 +782,7 @@ const DOWN: GardenerPose = { fist: [16.5, 35], nozzle: -4, spray: 0 };
  * Frame 1 is the approved still (the spray at its length 16, drops seed 3).
  */
 const IDLE_SPRAY = [16, 16, 16, 16, 16, 12, 8, 4, 0, 0, 0, 0, 4, 8, 12, 15] as const;
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) =>
     F(125, {
@@ -797,10 +797,10 @@ const idle: Anim = {
       sag: 9 + (i >= 5 && i <= 12 ? 0.5 : 0),
     }, { specks: i >= 8 && i <= 11 ? drip(i - 8, { nozzle: 8 }) : [] }),
   ),
-};
+}));
 
 /** Entrance: his shadow spreads, he drops in with the hose swinging and lands with a heavy thump, shakes it off, and booms a happy yawn. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: shadowOnly(8), cue: "drop" },
@@ -814,10 +814,10 @@ const entrance: Anim = {
     F(160, { head: [-1, 1], eyes: "shut", jaw: 4, ...jet(14, 8) }),
     F(290, {}),
   ],
-};
+}));
 
 /** Thinking: he lowers the nozzle, chews, looks at the board; now and then scratches his chin with his free hand; bubbles rise (one, two, three). */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].flatMap((n) =>
     [0, 1, 2, 3].map((i) =>
@@ -834,10 +834,10 @@ const thinking: Anim = {
       }, { specks: bubbles(Math.min(3, n + 1)) }),
     ),
   ),
-};
+}));
 
 /** His move: a crouch, a heavy step (the near foot, then the far one), each with a thump and a puff of dust, and a settle. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, earN: 3, earF: 3, ...jet(8, 4) }),
@@ -847,10 +847,10 @@ const move: Anim = {
     F(120, { stepF: 0, bob: 2, ...jet(8, 8) }, { cue: "thump", shake: [0, 1], specks: dust(1, 2) }),
     F(160, {}),
   ],
-};
+}));
 
 /** A capture: he cheers, the nozzle up and the water fountaining, his jaw wide, his ears flapping, drops falling, a hop. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 1, earN: 3, earF: 3, ...jet(10, 3) }),
@@ -872,10 +872,10 @@ const capture: Anim = {
     }),
     F(160, { eyes: "half" }),
   ],
-};
+}));
 
 /** Hurt: a flash, knocked back with his eyes shut and the nozzle flung up, the water sputtering out; then he glares. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { bob: 2, dx: 1, eyes: "shut", jaw: 18, brows: "worry", earN: -3, earF: -3, tail: 4, ...UP, spray: 0, sag: 12, loop: 1.2 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: sweat(0) }),
@@ -886,11 +886,11 @@ const hurt: Anim = {
     F(120, { eyes: "half", brows: "angry", ...jet(12, 8) }),
     F(160, {}),
   ],
-};
+}));
 
 /** Check: he points the nozzle at the king and sends a hard jet toward the board, grunting, brows down; twice. */
 const AIM: GardenerPose = { fist: [17.5, 31], nozzle: 18, brows: "angry", head: [-1, 0] };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, head: [1, 1], earN: 3, earF: 3, spray: 0 }),
@@ -902,10 +902,10 @@ const check: Anim = {
     F(100, { ...AIM, ...jet(6, 7), jaw: 0 }),
     F(210, {}),
   ],
-};
+}));
 
 /** Smug (loop): head back, heavy-lidded, a lazy trickle from the nozzle, his free hand on his belly, an ear flicking now and then. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(150, {
@@ -923,10 +923,10 @@ const smug: Anim = {
       sag: 11,
     }, { specks: i === 2 ? drip(0, DOWN) : i === 3 ? drip(1, DOWN) : [] }),
   ),
-};
+}));
 
 /** Rattled (loop): shaking, eyes wide, sweat flying, the water wobbling, the hose jiggling. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(80, {
@@ -943,10 +943,10 @@ const rattled: Anim = {
       loop: i % 2 ? 1.15 : 0.9,
     }, { specks: sweat(i) }),
   ),
-};
+}));
 
 /** Defeat: flashes and reels back, the hose goes slack, the nozzle drops to the ground, he sinks onto his haunches, head down, ears limp; held. */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 2, dx: 1, eyes: "shut", jaw: 16, brows: "worry", earN: -3, earF: -3, ...UP, spray: 0, sag: 12, loop: 1.2 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: sweat(0) }),
@@ -956,10 +956,10 @@ const defeat: Anim = {
     F(100, { bob: 5, head: [1, 3], eyes: "shut", fist: [18, 48], nozzle: -55, spray: 0, free: true, hand: [47.5, 55], sag: 15, loop: 0.4, earN: 4, earF: 4 }, { specks: drip(0, { fist: [18, 48], nozzle: -55 }) }),
     F(730, { bob: 5, head: [1, 3], eyes: "shut", brows: "worry", fist: [18, 48], nozzle: -55, spray: 0, free: true, hand: [47.5, 55], sag: 15, loop: 0.4, earN: 4, earF: 4 }, { specks: drip(1, { fist: [18, 48], nozzle: -55 }) }),
   ],
-};
+}));
 
 /** Victory (loop): both arms up, the nozzle fountaining, his free hand open over his head, hopping, his jaw wide. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const up = i % 2 === 0;
@@ -980,7 +980,7 @@ const victory: Anim = {
       sag: up ? 8 : 12,
     }, { cue: i === 2 ? "grunt" : i === 8 ? "thump" : undefined, specks: [...splashes(i, 5), ...(i % 4 === 1 ? sparkle(44, 4 + (i % 3) * 3) : [])] });
   }),
-};
+}));
 
 // ---- His own moments.
 
@@ -1018,7 +1018,7 @@ const plantMany = planting(5, [110, 100, 120, 110, 100, 120, 140]);
  * frames), the water stops (cue `stop`), and he breathes out as the hose goes slack and the spare hose returns behind him.
  * The hose stays in his hand through the pull: the hose runs from the nozzle through his hand to his hip.
  */
-const water: Anim = {
+const water: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { ...DOWN, hand: [50.5, 49.5], head: [-1, 0], brows: "angry", sag: 11 }),
@@ -1032,10 +1032,10 @@ const water: Anim = {
     F(150, { fist: [17, 31], nozzle: 20, ...jet(6, 7), hand: [47.5, 48.5], head: [0, 0], loop: 0.3, sag: 8, bob: 1, jaw: 10 }, { cue: "stop", specks: drip(0, { nozzle: 20, fist: [17, 31] }) }),
     F(180, { spray: 0, loop: 1, eyes: "half", jaw: 14, bob: 0, head: [0, 1], earN: 2, earF: 2 }, { specks: sweat(1) }),
   ],
-};
+}));
 
 /** A small cheer (the watering grew him a piece): the nozzle up and a quick fountain, his jaw wide, eyes happy, a hop. */
-const cheer: Anim = {
+const cheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { ...UP, ...fount(14, 3), jaw: 10, eyes: "joy", bob: 1, earN: 2, earF: 2 }),
@@ -1044,10 +1044,10 @@ const cheer: Anim = {
     ),
     F(160, { jaw: 6, eyes: "joy", ...jet(12, 12) }),
   ],
-};
+}));
 
 /** A big cheer (the watering grew him a queen): both hands up, the nozzle fountaining high, bigger hops, gold sparkles all round. */
-const bigCheer: Anim = {
+const bigCheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { ...UP, ...fount(14, 3), jaw: 12, eyes: "wide", bob: 2, earN: -2, earF: -2, ...HAND([46, 24]) }),
@@ -1059,14 +1059,14 @@ const bigCheer: Anim = {
     F(100, { eyes: "joy", jaw: 8, ...jet(14, 14) }, { specks: sparkle(40, 8) }),
     F(200, { eyes: "joy", jaw: 4 }),
   ],
-};
+}));
 
 /**
  * A shrug (the watering grew nothing): he looks at the wet board, then both shoulders go up, his head sinks and his free hand turns out
  * palm up at his side, the nozzle drooping to a drip; he lets it go.
  */
 const SHRUG: GardenerPose = { ...DOWN, lift: 2, head: [0, 2], eyes: "half", brows: "worry", earN: 3, earF: 3, ...HAND([62, 35]), elbowF: [55, 39], fist: [16.5, 34], nozzle: 12, sag: 11 };
-const shrug: Anim = {
+const shrug: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { ...DOWN, head: [-1, 0], eyes: "wide", brows: "up", sag: 11 }),
@@ -1077,7 +1077,7 @@ const shrug: Anim = {
     F(100, { ...DOWN, head: [0, 1], eyes: "half", sag: 11 }, { specks: drip(1, DOWN) }),
     F(130, { eyes: "half", jaw: 0 }),
   ],
-};
+}));
 
 export const GARDENER: Character = {
   id: "gardener",
@@ -1163,7 +1163,7 @@ const easeBeat = (i: number): Frame => {
  * ten of them, cues `jet` and `spurt` in turn (the cue frame is where the board splashes the king's square), staring at him, relentless; he
  * grunts once, satisfied (`grunt`), and drops out of the frame. The last frame is empty.
  */
-const kingAttack: Anim = (() => {
+const kingAttack: Anim = lazyAnim(() => ((() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1185,7 +1185,7 @@ const kingAttack: Anim = (() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})();
+})()));
 
 /**
  * The hippo for his attack on a king: the same drawing, parts and palette, facing our left as always (as Moo), in a frame

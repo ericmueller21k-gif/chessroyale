@@ -337,6 +337,38 @@ export function lieDown(
 }
 
 /**
+ * An animation made the first time it's read (its `frames` or `loop`), not when the app loads: a page then builds only
+ * the bosses it shows (Nov 10: every boss's poses cost about 1.4 s of a fast core on every load). Every boss wraps its
+ * top-level animations in it; the art comes out the same, pixel for pixel.
+ */
+export function lazyAnim(make: () => Anim): Anim {
+  let made: Anim | undefined;
+  const get = () => (made ??= make());
+  return {
+    get loop() {
+      return get().loop;
+    },
+    get frames() {
+      return get().frames;
+    },
+  };
+}
+
+/**
+ * Two parts records read as one, live: a part added to either later (one made the first time a lazy animation draws it)
+ * is there too, where a copy (`{ ...a, ...b }`) would miss it. `a` wins a clash, as the later spread did.
+ */
+export function joinParts(a: Readonly<Record<string, Part>>, b: Readonly<Record<string, Part>>): Record<string, Part> {
+  const has = (k: string | symbol) => k in a || k in b;
+  return new Proxy({} as Record<string, Part>, {
+    get: (_, k) => (typeof k === "string" ? (a[k] ?? b[k]) : undefined),
+    has: (_, k) => has(k),
+    ownKeys: () => [...new Set([...Object.keys(b), ...Object.keys(a)])],
+    getOwnPropertyDescriptor: (_, k) => (typeof k === "string" && has(k) ? { enumerable: true, configurable: true, value: a[k] ?? b[k] } : undefined),
+  });
+}
+
+/**
  * Parts made the first time they're drawn: a boss's dozens of poses (each limb painted from its points), or a hundred
  * night tiles, cost nothing when the app loads, only when a frame that uses them first shows. `add` registers a part's
  * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all).

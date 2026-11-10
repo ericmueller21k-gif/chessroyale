@@ -16,6 +16,7 @@
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1a1210", // outline
@@ -484,7 +485,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 // ---- Animations.
 
 /** Idle (3.6 s): slow breaths, a very slow blink, nods off (head droops, lids fall), jerks awake; the flag twitches once. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 24 }, (_, i) => {
     const by = i % 8 >= 4 ? 1 : 0;
@@ -493,11 +494,11 @@ const idle: Anim = {
     const flag = i === 19 ? 1 : i === 20 ? -1 : 0;
     return f(150, { by, mood, hy: Math.max(-1, nod), hx: nod >= 2 ? -1 : 0, flag, cy: i === 16 ? -1 : 0 }, { specks: nod >= 3 ? bubbles(i - 12) : [] });
   }),
-};
+}));
 
 /** Walk (1.2 s): a ponderous plod, one foot at a time, the head bobbing, the clock wobbling. */
 const STEPS: readonly Leg[] = ["nf", "fh", "ff", "nh"];
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const leg = STEPS[Math.floor(i / 2)]!;
@@ -505,11 +506,11 @@ const walk: Anim = {
     const feet: Pose["feet"] = { [leg]: { lift: up ? 3 : 1, x: up ? 1 : 2 } };
     return f(150, { mood: "sleepy", feet, by: up ? 0 : 1, hy: up ? 0 : 1, hx: up ? 0 : 1, cx: i % 4 === 1 ? 1 : i % 4 === 3 ? -1 : 0, cy: up ? 0 : 0, flag: i % 4 === 1 ? 1 : 0, tail: i % 4 < 2 ? 0 : -1 }, up ? {} : { cue: "step" });
   }),
-};
+}));
 
 /** Sit (loops): at the table on its belly, the clock set down before it, half asleep over the board; a slow blink, now and then a slow press of the clock. */
 const SIT: Pose = { sit: true, by: 4, dx: -4, hx: 2, hy: -3, mood: "sleepy" };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 20 }, (_, i) => {
     const blink = i === 3 || i === 4 || i === 5;
@@ -518,10 +519,10 @@ const sit: Anim = {
     const breathe = i % 10 >= 5 ? 1 : 0;
     return f(220, { ...SIT, by: 4 + breathe, hy: -3 + (i >= 6 && i <= 9 ? 1 : 0) - breathe, mood: blink ? "blink" : i >= 6 && i <= 9 ? "droop" : "sleepy", paw: reach ? paws[reach]! : null, press: reach === 3 ? 1 : 0 }, reach === 3 && i === 13 ? { cue: "ding", specks: ding(51, 35, true) } : {});
   }),
-};
+}));
 
 /** Wave (once, 1.5 s): slowly lifts a stubby foot, a sleepy wave and a tiny deadpan smile, the clock dings, back to idle. */
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(150, { mood: "sleepy" }),
@@ -535,10 +536,10 @@ const wave: Anim = {
     f(150, { mood: "smile", paw: [39, 33], hy: -1, flag: 0 }, { specks: ding(31, 10) }),
     f(200, { mood: "sleepy" }),
   ],
-};
+}));
 
 /** Entrance: a shell with a clock on it sits there; feet come out, then, very slowly, the head; a sleepy look, the flag pops up. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(300, { hide: true, hx: -16, hy: 5, by: 3, tuck: 6, mood: "doze", flag: -1 }),
@@ -551,18 +552,18 @@ const entrance: Anim = {
     f(160, { mood: "awake", flag: 1, cy: -1 }, { cue: "ding", specks: ding(23, 7) }),
     f(400, { mood: "sleepy", flag: 0 }),
   ],
-};
+}));
 
 /** Thinking (loops): chin up, eyes rolled up under heavy lids, thought dots rising, very slowly. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(200, { mood: i === 9 ? "blink" : "up", hy: -2, hx: -1, by: i % 6 >= 3 ? 1 : 0, feet: { nf: i % 6 === 1 ? { lift: 1 } : {} } }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: stretches its neck out toward the board, nudges, and draws it slowly back. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(150, { mood: "awake", hy: -1 }),
@@ -573,10 +574,10 @@ const move: Anim = {
     f(150, { mood: "sleepy", hx: 1 }),
     f(250, { mood: "sleepy" }),
   ],
-};
+}));
 
 /** A capture: a slow chomp at the board, a satisfied chew, a little smile. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(150, { mood: "awake", hy: -1 }),
@@ -589,10 +590,10 @@ const capture: Anim = {
     f(220, { mood: "smile", press: 1 }, { cue: "ding", specks: ding(20, 10) }),
     f(300, { mood: "smile" }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, it ducks halfway into its shell, the clock jolts; then pokes back out, unbothered. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { mood: "hurt", hide: true, hx: -3, hy: 1, by: 1, cy: -2, flag: 1 }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -602,10 +603,10 @@ const hurt: Anim = {
     f(160, { mood: "sleepy", hx: -1, flag: 0 }),
     f(250, { mood: "sleepy" }),
   ],
-};
+}));
 
 /** Check: its eyes actually open, the neck stretches at the board, and it slaps... slowly... the clock: ding. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(150, { mood: "awake", hy: -1 }),
@@ -617,24 +618,24 @@ const check: Anim = {
     f(200, { mood: "smug", hx: 1, paw: [39, 33] }),
     f(250, { mood: "sleepy" }),
   ],
-};
+}));
 
 /** Smug: lids at half mast, a tiny smile, chin up, a slow nod; the flag gives a little flick. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(200, { mood: i === 6 ? "blink" : "smug", hy: i < 3 ? -2 : i < 5 ? -1 : -2, hx: -1, by: i % 4 === 2 ? 1 : 0, flag: i === 3 ? 1 : 0 })),
-};
+}));
 
 /** Rattled: wide awake for once, sweat flying, trembling, the clock rattling on its back, the flag flapping. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(90, { mood: "wide", dx: i % 2 ? 1 : 0, hx: -2, by: i % 4 === 2 ? 1 : 0, cx: i % 2 ? -1 : 1, cy: i % 3 === 0 ? -1 : 0, flag: i % 2 ? 1 : -1, feet: { nf: { lift: i % 4 === 1 ? 1 : 0 }, nh: { lift: i % 4 === 3 ? 1 : 0 } } }, { specks: sweat(i) }),
   ),
-};
+}));
 
 /** Defeat: a jolt, then it pulls everything into its shell and goes to sleep; the flag falls (the last frame holds). */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { mood: "hurt", hx: -2, cy: -2, flag: 1 }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -646,17 +647,17 @@ const defeat: Anim = {
     f(400, { mood: "doze", hide: true, hx: -16, hy: 5, by: 3, tuck: 6, flag: -1 }, { specks: bubbles(2, 47, 31) }),
     f(1000, { mood: "doze", hide: true, hx: -16, hy: 5, by: 3, tuck: 6, flag: -1 }, { specks: bubbles(3, 47, 31) }),
   ],
-};
+}));
 
 /** Victory: a slow happy stomp-stomp, a big content smile, the clock dinging away, sparkles. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const up = i % 4 < 2;
     const near = i < 4;
     return f(180, { mood: i % 4 === 1 ? "smile" : "happy", hy: up ? -2 : -1, by: up ? 0 : 1, feet: up ? { [near ? "nf" : "ff"]: { lift: 2 } } : {}, press: i % 4 === 2 ? (near ? 1 : 2) : 0, flag: i % 2 ? 1 : 0, cy: up ? -1 : 0 }, { specks: [...sparkle(i), ...(i % 4 === 2 ? ding(near ? 20 : 31, 9) : [])], cue: i % 4 === 2 ? "ding" : undefined });
   }),
-};
+}));
 
 export const sidekickBlitz: Character = {
   id: "sidekick-blitz",

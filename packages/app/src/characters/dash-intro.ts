@@ -6,7 +6,7 @@
  * names in its parts record, so his town frames draw exactly as before. The ids keep `blitz`. A file of its own so the town doesn't
  * build these frames: it loads only when you challenge him (shops/intro.ts, through shops/blitz-intro-art.ts).
  */
-import { partSize, type Anim, type Character, type Frame, type Layer, type Speck } from "./sprite.ts";
+import { lazyAnim, partSize, type Anim, type Character, type Frame, type Layer, type Speck } from "./sprite.ts";
 import { BOSS_BLITZ, GROUND, PALETTE, PARTS, POINT, W, add, elbowOf, layers, leg, placed, pointLines, shoe, star, type Pose, type Pt } from "./boss-blitz.ts";
 
 // ================================================================================================================
@@ -207,7 +207,7 @@ function trail(face: Face, dx: number, len: number, phase = 0): Speck[] {
 // dust, is all but gone, then only his dust cloud and speed lines are left.
 const SPOT = IFOOT[0];
 const FLOOR = IFOOT[1];
-const bolt: Anim = {
+const bolt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ix(90, { sink: 2, eyes2: "sly", mouth: "grin", brow: 1, hand: "up", tail: 3 }),
@@ -230,7 +230,7 @@ const bolt: Anim = {
       specks: RUN_YS.flatMap((y, i) => istreak(4 + (i % 3) * 9, y, 30 + (i % 2) * 24, 1).map(([x, yy, k]): Speck => [x, yy, k === "O" ? "M" : k === "N" ? "M" : "J"])),
     }),
   ],
-};
+}));
 
 // ---- arrive (7 frames, 730 ms): a blur in from our left (whoosh), a skid past his spot in a spray of dust (skid), a
 // wind-up, the toss toward the table (drop: code shows the dropped thing from here), a held "there", and he stands.
@@ -248,7 +248,7 @@ const tossLines = (t: number): Speck[] => [
   ...star(TOSS_PAW[0] + 22 + t * 3, TOSS_PAW[1] - 6, t === 0),
   ...(t === 0 ? star(TOSS_PAW[0] + 16, TOSS_PAW[1] + 9) : []),
 ];
-const arrive: Anim = {
+const arrive: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ix(50, ...((): [Pose, IX] => {
@@ -282,11 +282,11 @@ const arrive: Anim = {
     ix(200, { at: [19, 53], gesture: "open", head: [-1, 0], mouth: "grin", eyes2: "sly", brow: 1, tail: 1 }, { over: skidDust(3), specks: tossLines(1) }),
     ix(150, { mouth: "grin", tail: 0 }),
   ],
-};
+}));
 
 // ---- dashBy (loop, 4 x 60 ms): the run at full speed, two afterimages, speed lines and a kick of dust off each step.
 // Drawn facing our right; mirror it to run left. Code slides it across (about 10 to 14 px a frame looks right).
-const dashBy: Anim = {
+const dashBy: Anim = lazyAnim(() => ({
   loop: true,
   frames: [0, 1, 2, 3].map((t) => {
     const [p, g] = run(t);
@@ -298,13 +298,13 @@ const dashBy: Anim = {
       ...(t === 0 ? { cue: "whoosh" } : {}),
     });
   }),
-};
+}));
 
 // ---- brag (6 frames, 1030 ms): he dusts off his jacket (puffs off his chest), winds up, and finger-guns you with a wink
 // and a glint (ding).
 const chestPuff = (x: number, y: number, t: number): Speck[] =>
   [[0, 0], [1, -1], [-1, -1], [2, 0], [0, -2], [-2, 1]].slice(0, 6 - t * 2).map(([a, b], i): Speck => [x + a! - t * 2, y + b! - t, i % 2 ? "j" : "i"]);
-const brag: Anim = {
+const brag: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ix(110, { at: [38, 57], gesture: "open", eyes: "half", mouth: "smirk", head: [0, 1], tail: 1 }, { cue: "brush", dspecks: chestPuff(33, 58, 0) }),
@@ -314,7 +314,7 @@ const brag: Anim = {
     ix(120, { at: POINT, gesture: "point", head: [-1, 0], mouth: "grin", eyes2: "wink", brow: 2, lift: 1, tail: 3 }, { cue: "ding", dspecks: [...pointLines(-1), ...star(POINT[0] - 10, POINT[1] - 1, true)] }),
     ix(500, { at: POINT, gesture: "point", head: [-1, 0], mouth: "wide", eyes2: "sly", brow: 2, tail: 2 }, { dspecks: [...pointLines(0, 0.5), ...star(POINT[0] - 10, POINT[1] - 1)] }),
   ],
-};
+}));
 
 /**
  * Dash for his battle intro: his own parts and palette (plus dust and afterimage colors), FACING OUR RIGHT, in a

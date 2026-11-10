@@ -24,6 +24,7 @@ import { TOWN_FEEL } from "../feel.ts";
 import { COLISEUM } from "../world.ts";
 import { grain, groundShadow, paint, signBoard, signFace, TORCH, type LightPool, type LightSpot, type Pt } from "./kit.ts";
 import { PED_W, STATUE_W, statueH, type StatueId } from "./statues.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#2a1c14", // outline
@@ -524,7 +525,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((f) => {
   };
 });
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_COLISEUM: Character = {
   id: "house-coliseum",
