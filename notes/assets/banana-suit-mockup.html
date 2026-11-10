@@ -9,7 +9,7 @@
   p { margin: 4px 22px 0; font-weight: 500; color: #444; }
 </style></head><body>
 <h1>Banana Suit: crate-exclusive rider (mockup)</h1>
-<p>Takes the ride slot (no ride with it). Head and face items still go on. Arms swing as you run in town.</p>
+<p>Takes the ride slot (no ride with it). Head and face items still go on. Arms and legs swing as you run in town: a silly run.</p>
 <svg width="0" height="0" style="position:absolute">
   <defs>
     <!-- One glove: a big white cartoon mitt, 3 fingers and a thumb. -->
@@ -18,6 +18,13 @@
         fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
       <path d="M-4 -16 L-3 -6 M6 -16 L5 -6 M14 -11 L11 -3" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round"/>
       <path d="M-11 4 C-6 7 4 8 10 4" fill="none" stroke="#c9ced6" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <!-- One shoe: a big white cartoon shoe (the gloves' style), its toe to the right. -->
+    <g id="shoe">
+      <path d="M-14 -7 C-14 -14 -4 -15 2 -11 C10 -10 20 -7 21 1 C22 7 16 9 8 9 L-12 9 C-18 9 -19 2 -14 -7 Z"
+        fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-15 4 L20 4" stroke="#c9ced6" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M2 -9 C4 -4 7 -3 10 -4" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round"/>
     </g>
     <!-- The suit: a banana, its face hole, the pawn's head in it. -->
     <g id="suit">
@@ -41,33 +48,49 @@
 </svg>
 <div class="sheet">
   <!-- Standing: arms down at its sides. -->
-  <div class="cell"><svg width="210" height="240" viewBox="0 0 210 240">
+  <div class="cell"><svg width="210" height="290" viewBox="0 0 210 290">
     <path d="M70 128 C58 150 52 168 50 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
     <path d="M140 128 C152 150 158 168 160 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M96 214 C94 236 92 252 90 268" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M118 214 C120 236 122 252 124 268" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(84 272) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(130 272) scale(1.05)"/>
     <use href="#suit"/>
     <use href="#glove" transform="translate(48 192) rotate(15) scale(1.05)"/>
     <use href="#glove" transform="translate(162 192) rotate(-15) scale(-1.05 1.05)"/>
-  </svg>Standing<small>arms at its sides</small></div>
+  </svg>Standing<small>arms and legs at rest</small></div>
   <!-- Running, step 1: left arm forward, right arm back. -->
-  <div class="cell"><svg width="210" height="240" viewBox="0 0 210 240">
+  <div class="cell"><svg width="210" height="290" viewBox="0 0 210 290">
     <path d="M140 128 C160 140 172 150 180 156" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M96 212 C88 232 78 246 64 256" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M118 212 C132 226 146 232 160 230" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(58 262) rotate(30) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(168 228) rotate(-25) scale(1.05)"/>
     <g transform="rotate(-4 105 120)"><use href="#suit"/></g>
     <path d="M70 128 C54 120 42 108 34 96" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
     <use href="#glove" transform="translate(30 86) rotate(150) scale(1.05)"/>
     <use href="#glove" transform="translate(188 160) rotate(-70) scale(-1.05 1.05)"/>
-  </svg>Running, step 1<small>arms swing, the suit leans</small></div>
+  </svg>Running, step 1<small>arms and legs swing, the suit leans</small></div>
   <!-- Running, step 2: the other way. -->
-  <div class="cell"><svg width="210" height="240" viewBox="0 0 210 240">
+  <div class="cell"><svg width="210" height="290" viewBox="0 0 210 290">
     <path d="M70 128 C50 140 38 150 30 156" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M96 212 C82 226 68 232 54 230" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M118 212 C126 232 136 246 150 256" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(46 228) rotate(25) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(156 262) rotate(-30) scale(1.05)"/>
     <g transform="rotate(4 105 120)"><use href="#suit"/></g>
     <path d="M140 128 C156 120 168 108 176 96" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
     <use href="#glove" transform="translate(22 160) rotate(70) scale(1.05)"/>
     <use href="#glove" transform="translate(180 86) rotate(-150) scale(-1.05 1.05)"/>
   </svg>Running, step 2<small>and back</small></div>
   <!-- With a head item: a party hat on the pawn's head (head and face slots still work). -->
-  <div class="cell"><svg width="210" height="240" viewBox="0 0 210 240">
+  <div class="cell"><svg width="210" height="290" viewBox="0 0 210 290">
     <path d="M70 128 C58 150 52 168 50 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
     <path d="M140 128 C152 150 158 168 160 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M96 214 C94 236 92 252 90 268" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M118 214 C120 236 122 252 124 268" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(84 272) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(130 272) scale(1.05)"/>
     <use href="#suit"/>
     <path d="M92 72 L106 38 L120 72 Z" fill="#7c5cff" stroke="#1d1d1f" stroke-width="3.5" stroke-linejoin="round"/>
     <path d="M97 62 L115 62 M101 52 L111 52" stroke="#ffd93b" stroke-width="3" stroke-linecap="round"/>
@@ -76,9 +99,13 @@
     <use href="#glove" transform="translate(162 192) rotate(-15) scale(-1.05 1.05)"/>
   </svg>With a head item<small>head and face still fit</small></div>
   <!-- Town size: small, on the grass. -->
-  <div class="cell town"><svg width="90" height="110" viewBox="0 0 210 240">
-    <ellipse cx="106" cy="226" rx="46" ry="9" fill="#000" opacity=".18"/>
+  <div class="cell town"><svg width="90" height="124" viewBox="0 0 210 290">
+    <ellipse cx="106" cy="276" rx="60" ry="9" fill="#000" opacity=".18"/>
     <path d="M140 128 C160 140 172 150 180 156" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round"/>
+    <path d="M96 212 C88 232 78 246 64 256" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round"/>
+    <path d="M118 212 C132 226 146 232 160 230" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(58 262) rotate(30) scale(-1.15 1.15)"/>
+    <use href="#shoe" transform="translate(168 228) rotate(-25) scale(1.15)"/>
     <g transform="rotate(-4 105 120)"><use href="#suit"/></g>
     <path d="M70 128 C54 120 42 108 34 96" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round"/>
     <use href="#glove" transform="translate(30 86) rotate(150) scale(1.15)"/>
