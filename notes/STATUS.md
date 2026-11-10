@@ -1,3 +1,4 @@
+- Nov 10 22:30 UTC: #620 load fix + #621 town rider MERGED. #623 desktop Daily Quests CI. #622 cheater demo CI + review. Loading bar + schema-fast helpers running.
 - Nov 10 22:15 UTC: cheater demo PR #622 (full-e2e; users.test column; admin test-accounts route). Local: Eddie pooled, Sam clean. Review (one round). Live run after deploy.
 - Nov 10 22:05 UTC: Eric: loading bar after ~2 s (plain steps, real progress) -> claude/loading-bar; desktop: Quests pill off the card, "Daily Quests" in the left menu -> claude/desktop-quests. He may suggest desktop polish later (empty space).
 - Nov 10 21:55 UTC: Eric: after the white page, "HunChess" splash 8 s = ensureSchema after #618 (96 sequential stmts per request in flight) + splash waits for /api/me unbounded. Helper claude/schema-fast (full lane, one review).
