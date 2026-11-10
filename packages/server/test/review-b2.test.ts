@@ -63,7 +63,7 @@ describe("the review of #610: its findings, fixed", () => {
   });
 
   it("M1: an honest player's obvious moves, reported by lying judges, reach the ban bar: the reviewer's token can't ban them; a person can", async () => {
-    expect(FAIRPLAY.enforcement).toBe("review");
+    expect(FAIRPLAY.enforcement).toBe("pool");
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const p = await player(sql, "Honest");
@@ -73,9 +73,9 @@ describe("the review of #610: its findings, fixed", () => {
     for (let i = 0; i < 5; i++) await deepCheckRun(sql, onlyMoveSearch, QUIET, { all: true, perRun: 200 });
     const r = await decide(sql, p.id, "ban", "reviewer", "deep re-check confirms engine moves", QUIET + 1000);
     expect(r).toEqual({ ok: false, status: 409, message: expect.stringMatching(/^a ban is for a person/) });
-    expect((await caseOf(sql, p.id))?.status).toBe("review");
-    // Review, watch and clear stay the reviewer's.
-    expect(await decide(sql, p.id, "watch", "reviewer", "obvious moves the crowd missed", QUIET + 2000)).toEqual({ ok: true, status: "watch" });
+    // (At the ban bar since Nov 10: the engine pool, a person's to judge; its Release too.)
+    expect((await caseOf(sql, p.id))?.status).toBe("pool");
+    expect(await decide(sql, p.id, "watch", "reviewer", "obvious moves the crowd missed", QUIET + 2000)).toEqual({ ok: false, status: 409, message: "engine pool cases are for a person" });
     expect((await decide(sql, p.id, "ban", "admin:eric@example.com", "a person read the games", QUIET + 3000)).ok).toBe(true);
     expect((await caseOf(sql, p.id))?.status).toBe("banned");
   });

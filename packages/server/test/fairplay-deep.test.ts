@@ -95,8 +95,8 @@ describe("the deep re-check", () => {
     }
   });
 
-  it("as shipped (Nov 10, finding 3), detection only flags: the same overwhelming evidence opens a review, never a ban, and emails nobody", async () => {
-    expect(FAIRPLAY.enforcement).toBe("review");
+  it("as shipped (Nov 10, the engine pool), detection never bans: the same overwhelming evidence pools them, and emails nobody", async () => {
+    expect(FAIRPLAY.enforcement).toBe("pool");
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const p = await player(sql, "Cheat");
@@ -106,7 +106,7 @@ describe("the deep re-check", () => {
     await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: engineMatch() }, QUIET - HOUR, mail);
     await deepCheckRun(sql, fakeSearch().search, QUIET, { mail, perRun: 100 });
     expect(JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches ORDER BY id LIMIT 1"))!.summary)).toMatchObject({ deepChecked: 20, deepMatch: 20 });
-    expect((await caseOf(sql, p.id))?.status).toBe("review");
+    expect((await caseOf(sql, p.id))?.status).toBe("pool");
     expect(sent).toEqual([]);
   });
 
