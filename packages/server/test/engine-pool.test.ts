@@ -5,6 +5,7 @@ import { createGuest, createSession, ensureSchema, publicProfile, recordResult, 
 import { caseOf, decide, eligibleForRanked, purgeEvidence, recordFairPlay, reportPlayer, setCase, type CaseMailer } from "../src/fairplay.ts";
 import { handleAdmin, poolExport, poolPlayers } from "../src/admin.ts";
 import { purgeDuelGames } from "../src/ranked.ts";
+import { forgetTopPlaces, topPlace } from "../src/ranked-schema.ts";
 import { deleteAccount } from "../src/account-data.ts";
 import { memoryDb } from "./memory-db.ts";
 
@@ -152,6 +153,13 @@ describe("into the pool", () => {
     await setCase(sql, top.id, "pool", "detection", "level ban: test", T0);
     expect((await publicProfile(sql, ids[9]!, T0))!.topPercent).toBeLessThan(before!);
     expect((await publicProfile(sql, top.id, T0))!.topPercent).toBe(topBefore);
+    // 1 v 1's top places (its top tiers): the pooled ladder above takes nobody's place; the pooled player's own counts the same way.
+    for (const [id, ladder] of [[top.id, 3100], [ids[9]!, 3000], [ids[8]!, 2900]] as const)
+      await sql.run("INSERT INTO ranked_1v1 (user_id, rating, rd, games, wins, losses, draws, ladder, last_at) VALUES (?, 2400, 60, 40, 20, 20, 0, ?, ?)", id, ladder, T0);
+    forgetTopPlaces();
+    expect(await topPlace(sql, 3000, T0)).toBe(1);
+    expect(await topPlace(sql, 2900, T0)).toBe(2);
+    expect(await topPlace(sql, 3100, T0)).toBe(1);
   });
 });
 

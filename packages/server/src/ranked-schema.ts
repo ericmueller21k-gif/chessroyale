@@ -102,13 +102,22 @@ const topPlaces = new Map<number, { place: number; at: number }>();
  * are higher. Equal ladders share a place (the same ladder is always the same tier). Asked only at
  * RANKED_1V1.topFloor or above (null below: no top tier there), as one count on the ladder's index (ranked_1v1_ladder:
  * the entries above it, never the table), and kept a minute per ladder in this Worker instance (`TOP_PLACE_MS`), so a
- * busy profile or queue costs one count a minute per ladder.
+ * busy profile or queue costs one count a minute per ladder. Fair play's engine pool is left out of the count (its ladders above,
+ * taken away: the pool's few cases, never a scan of the table): a pooled player never takes an honest player's place, and theirs is
+ * counted the same way, so it looks as ever.
  */
 export async function topPlace(sql: Sql, ladder: number | null | undefined, now = Date.now()): Promise<number | null> {
   if (!mayBeTop(ladder)) return null;
   const kept = topPlaces.get(ladder);
   if (kept && now - kept.at < TOP_PLACE_MS) return kept.place;
-  const above = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM ranked_1v1 WHERE ladder > ?", ladder))?.n ?? 0;
+  const above =
+    (
+      await sql.first<{ n: number }>(
+        `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder > ?1)
+           - (SELECT COUNT(*) FROM fairplay_cases c JOIN ranked_1v1 r ON r.user_id = c.user_id WHERE c.status = 'pool' AND r.ladder > ?1) AS n`,
+        ladder,
+      )
+    )?.n ?? 0;
   const place = above + 1;
   topPlaces.delete(ladder);
   if (topPlaces.size >= TOP_PLACES_KEPT) topPlaces.delete(topPlaces.keys().next().value!);
