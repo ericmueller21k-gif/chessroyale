@@ -39,7 +39,7 @@ import { LOCKER_MIGRATIONS, LOCKER_SCHEMA, NO_ADMINS, lockerMoves, lockerState, 
 import { BOSS_TOKENS_SCHEMA, tokenMoves } from "./boss-tokens.ts";
 import { CLAW_SCHEMA } from "./claw.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
-import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type OpKey, type Outcome } from "./ledger.ts";
+import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type Cond, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
 import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
@@ -1200,9 +1200,10 @@ export async function equipItem(sql: Sql, userId: string, itemId: unknown, admin
  * A placement reward (Squads): coins into the wallet, and crates of the newest series (XP.rewardCrate, since Nov 9: each opens with a
  * crate key). One ledger
  * op, keyed by `op` (Squads': opKeys.squadsReward, so its lobby can write it again after a failure or a restart and it pays once;
- * none: a fresh key). Answers what became of it; null: nothing to give, or no such account (deleted mid-match). A failed write throws.
+ * none: a fresh key). `cap`: a guard on the account's ledger id (Squads' daily cap): "refused" past it. Answers what became of it; null:
+ * nothing to give, or no such account (deleted mid-match). A failed write throws.
  */
-export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now()): Promise<Outcome | null> {
+export async function grantReward(sql: Sql, userId: string, coins: number, crates: number, op?: OpKey, now = Date.now(), cap?: (account: string) => Cond): Promise<Outcome | null> {
   const c = Math.max(0, Math.round(coins));
   const k = Math.max(0, Math.round(crates));
   if (!c && !k) return null;
@@ -1212,6 +1213,8 @@ export async function grantReward(sql: Sql, userId: string, coins: number, crate
     id: op === undefined ? `reward:${crypto.randomUUID()}` : keyFor(op, me),
     reason: "reward",
     now,
+    // (A daily cap, checked in the same statement as the reward goes in: refused past it.)
+    ...(cap ? { when: cap(me.account) } : {}),
     legs: [...(c ? [leg.coins(userId, c)] : []), ...(k ? [leg.seriesCrates(userId, XP.rewardCrate, k)] : [])],
   });
 }

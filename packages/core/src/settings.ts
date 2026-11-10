@@ -2754,6 +2754,13 @@ export const SQUADS_LOBBY = {
   rewardRetrySeconds: 60,
   rewardRetryHours: 24,
   /**
+   * The daily cap (the outside review of Nov 10, finding 5; like ranked's, RANKED_1V1.coins.perDay): at most this many lobbies a UTC
+   * day pay an account their placement's coins and crates; the next that day pay none (XP as usual), and the placement says so.
+   * Checked as the reward is written (squads-do.ts writeReward), in the same statement. A lobby of only one party and bots pays
+   * none at all (SquadsRecord.unvouched). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  rewardsPerDay: 5,
+  /**
    * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
    * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
    * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that

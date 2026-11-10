@@ -9,7 +9,7 @@ import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { d1Sql, ensureSchema, grantReward, recordResult, type Sql } from "./accounts.ts";
-import { opKeys } from "./ledger.ts";
+import { cond, opKeys, type Cond, type Outcome } from "./ledger.ts";
 import { grantXp } from "./xp.ts";
 import { rankOf } from "./ranked-schema.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
@@ -204,10 +204,12 @@ export class SquadsLobby extends DurableObject<Env> {
       await ensureSchema(sql, this.env.DB);
       const signedInOnly = signInRequired(await withSecrets(this.env));
       for (const r of [...rec.rewardQueue]) {
-        await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly, isPaused(this.env, "rewards"));
+        const out = await writeReward(sql, rec.code, rec.createdAt, r, Date.now(), signedInOnly, isPaused(this.env, "rewards"));
         const i = rec.rewardQueue.indexOf(r);
         if (i >= 0) rec.rewardQueue.splice(i, 1);
         written++;
+        // (The daily cap took it: they're told, in place of the coins they were shown.)
+        if (out === "refused" && this.record === rec) this.core().rewardCapped(r.playerId);
       }
     } catch (e) {
       ok = false;
@@ -632,14 +634,16 @@ export class SquadsParty extends DurableObject<Env> {
  * (code and creation), the Welcome Crate (once ever), and the coins and crates as a ledger op keyed `squads:<code>:<created>:<ledger
  * id>`. Throws if D1 fails, so the lobby keeps it to try again.
  */
-export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<void> {
-  if (!r.userId) return;
+export async function writeReward(sql: Sql, code: string, created: number, r: SquadsReward, now: number, signedInOnly: boolean, paused = false): Promise<Outcome | null> {
+  if (!r.userId) return null;
   if (r.recorded) {
     // XP (Nov 9): your moves and time as this lobby counted them; a win is your squad winning the lobby (1st). Once: keyed by this
     // lobby (code and creation). Never in the way of the result.
     const xp = await grantXp(sql, r.userId, {
       key: `squads:${code}:${created}`,
       facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
+      // (A lobby of one party's devices alone (the bots' moves their word): XP as a solo game's, under its daily caps.)
+      ...(r.solo ? { cap: "solo" as const } : {}),
       signedInOnly,
       now,
       paused,
@@ -653,5 +657,19 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
     // (A finished game: maybe the Welcome Crate, once ever: welcome.ts.)
     await grantWelcomeCrate(sql, r.userId, now).catch(() => false);
   }
-  await grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now);
+  return grantReward(sql, r.userId, r.coins, r.crates, opKeys.squadsReward(code, created), now, squadsDailyCap(now));
 }
+
+/**
+ * Squads' daily cap (SQUADS_LOBBY.rewardsPerDay, like ranked's): fewer than that many Squads placement rewards in the account's ledger
+ * since the UTC day began, checked in the same statement as this one goes in (two lobbies ending at once can't both pass it).
+ */
+export const squadsDailyCap =
+  (now: number) =>
+  (account: string): Cond =>
+    cond(
+      "(SELECT COUNT(*) FROM ledger WHERE account = ? AND reason = 'reward' AND leg = 0 AND op_id LIKE 'squads:%' AND created_at >= ?) < ?",
+      account,
+      Math.floor(now / 86_400_000) * 86_400_000,
+      SQUADS_LOBBY.rewardsPerDay,
+    );

@@ -286,6 +286,10 @@ export interface SquadsReward {
   coins: number;
   crates: number;
   recorded: boolean;
+  /** Why a placement that pays had nothing: "alone" (one party's devices moved every bot: `unvouched`), "daily" (the daily cap). */
+  why?: "alone" | "daily";
+  /** The lobby rested on one party's devices (`unvouched`): XP pays as a solo game's. */
+  solo?: true;
   /** XP (Nov 9; squads-do.ts): their own moves and their time in the lobby's games (`xpSpan`), and how they left, if they did. */
   moves?: number;
   playMs?: number;
@@ -342,6 +346,14 @@ export interface SquadsRecord {
   botShop?: Record<number, number>;
   /** A test control was used here: nothing more is recorded or rewarded. */
   testUsed?: boolean;
+  /**
+   * The outside review of Nov 10 (finding 5): bot work that one party's devices answered with no other party's device up to ask (one
+   * person alone, or one party with only bots), the first time it happened. Set: no placement pays coins or crates, and XP pays as
+   * a solo game's (the bots' moves were that party's word alone). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   */
+  unvouched?: string;
+  /** People whose placement reward the daily cap took (SQUADS_LOBBY.rewardsPerDay: its write found today's spent), told so. */
+  capped?: Record<string, true>;
   /** XP (Nov 9): when the bracket began, and each person's own moves (halves they acted in) and when their last one went in. */
   bracketAt?: number;
   played?: Record<string, { moves: number; at: number }>;
@@ -1042,6 +1054,10 @@ export class SquadsCore {
     }
     this.r.bracket = bracket;
     this.r.bracketAt = this.io.now();
+    // (One party in the whole lobby (one person, or friends with only bots): every bot move is that party's word, or the server's
+    // quick look when its devices don't answer. Its placements pay no coins or crates: the outside review of Nov 10, finding 5.)
+    const parties = new Set(this.r.squads.flatMap((sq) => sq.players.filter((p) => !p.isBot).map((p) => this.human(p.id)?.partyId || p.id)));
+    if (parties.size < 2) this.r.unvouched ??= "one party in the lobby";
     this.placeNew();
     // Mercenary: every squad's wallet. A test lobby that starts after round 1 gives the squads still in a wallet to shop
     // with, and its intro is long enough to shop in (their shops are open until their first match starts).
@@ -1850,7 +1866,7 @@ export class SquadsCore {
         // (Someone who left before their squad's place was decided has their own row already: a loss as they left.)
         if (p.isBot || this.human(p.id)?.left) continue;
         const reward = this.rewardFor(p.id, placement);
-        this.r.rewardQueue.push({ playerId: p.id, userId: this.r.accounts[p.id] ?? null, squadId: sq, placement, ...reward, ...this.xpSpan(p.id), ...(p.replacedByBot ? { abandoned: true as const } : {}) });
+        this.r.rewardQueue.push({ playerId: p.id, userId: this.r.accounts[p.id] ?? null, squadId: sq, placement, ...reward, ...this.xpSpan(p.id), ...(p.replacedByBot ? { abandoned: true as const } : {}), ...(this.r.unvouched ? { solo: true as const } : {}) });
         this.send(p.id, { t: "placed", squadId: sq, placement, ...reward });
       }
     }
@@ -1860,13 +1876,24 @@ export class SquadsCore {
    * A person's reward for their squad's placement: coins and crates if they're still playing their seat (not left,
    * not handed to a bot), and recorded on their profile if signed in; nothing in a lobby a test control touched.
    */
-  private rewardFor(id: string, placement: SquadsPlacement): { coins: number; crates: number; recorded: boolean } {
+  private rewardFor(id: string, placement: SquadsPlacement): { coins: number; crates: number; recorded: boolean; why?: "alone" | "daily" } {
     const testing = !!this.r.test || !!this.r.testUsed;
     const h = this.human(id);
     const p = this.player(id);
     const playing = !!h && !h.left && !!p && !p.replacedByBot;
     const r = SQUADS_LOBBY.rewards[placement];
-    return { coins: playing && !testing ? r.coins : 0, crates: playing && !testing ? r.crates : 0, recorded: !testing && !!this.r.accounts[id] };
+    // (Nothing when one party's devices moved the bots (unvouched), nor past the daily cap: the outside review of Nov 10.)
+    const why = this.r.unvouched ? ("alone" as const) : this.r.capped?.[id] ? ("daily" as const) : null;
+    const pays = playing && !testing && !why;
+    return { coins: pays ? r.coins : 0, crates: pays ? r.crates : 0, recorded: !testing && !!this.r.accounts[id], ...(playing && !testing && why && (r.coins || r.crates) ? { why } : {}) };
+  }
+
+  /** The daily cap took this person's placement reward (its write found SQUADS_LOBBY.rewardsPerDay spent today): they're told. */
+  rewardCapped(id: string) {
+    (this.r.capped ??= {})[id] = true;
+    const sq = this.squadOf(id);
+    const placement = sq ? this.r.placed[sq.id] : undefined;
+    if (sq && placement) this.send(id, { t: "placed", squadId: sq.id, placement, ...this.rewardFor(id, placement) });
   }
 
   /**
@@ -1996,7 +2023,7 @@ export class SquadsCore {
       const placement = worstPlacement(this.r.bracket, sq.id);
       leftAs = { how: "resigned", result: { placement, players: this.s.squadCount } };
       const testing = !!this.r.test || !!this.r.testUsed;
-      if (!testing && this.r.accounts[id]) this.r.rewardQueue.push({ playerId: id, userId: this.r.accounts[id]!, squadId: sq.id, placement, coins: 0, crates: 0, recorded: true, ...this.xpSpan(id), resigned: true });
+      if (!testing && this.r.accounts[id]) this.r.rewardQueue.push({ playerId: id, userId: this.r.accounts[id]!, squadId: sq.id, placement, coins: 0, crates: 0, recorded: true, ...this.xpSpan(id), resigned: true, ...(this.r.unvouched ? { solo: true as const } : {}) });
     }
     h.left = true;
     h.leftAs = leftAs;
@@ -2148,6 +2175,20 @@ export class SquadsCore {
     return checker ? [...out, checker] : out;
   }
 
+  /**
+   * A job settled on one party's answer (`one`): if no other party's device was up to ask, the lobby rests on that party's word
+   * (`unvouched`, the outside review of Nov 10, finding 5): its placements pay no coins or crates, its XP as a solo game's. One
+   * answering first while another party's device was up (it was slower) isn't that: their answers are compared as they come.
+   */
+  private noteAlone(job: WorkJob) {
+    if (this.r.unvouched) return;
+    const by = new Set(job.devices.filter((d) => job.answers[d]).map((d) => this.human(d)?.partyId ?? d));
+    const others = Object.keys(this.r.devices).filter((id) => this.deviceUp(id) && !by.has(this.human(id)?.partyId ?? id));
+    if (others.length) return;
+    this.r.unvouched = "one party's devices alone moved the bots";
+    console.log(`squads ${this.r.code}: ${this.r.unvouched}: no coins or crates, XP as a solo game's`);
+  }
+
   private sameParty(a: string, b: string): boolean {
     const pa = this.human(a)?.partyId;
     return !!pa && pa === this.human(b)?.partyId;
@@ -2270,6 +2311,7 @@ export class SquadsCore {
     const done = (top: MoveScore[] | undefined, how: NonNullable<WorkJob["how"]>) => {
       job.how = how;
       if (top) job.top = top;
+      if (how === "one") this.noteAlone(job);
       this.touch(lm);
       return true;
     };
