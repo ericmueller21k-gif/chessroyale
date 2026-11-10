@@ -160,7 +160,8 @@ describe("the Crowd's boss final online: always the Hidden Boss (Eric, Oct 14)",
     // His brain, decided as the battle begins: Maia at its top rating, raw (his fixed brain), told to the host only.
     expect(L.core.record.bossBrain).toEqual({ brain: "maia-raw", rating: maiaTopRating() });
     expect(L.last(L.core.record.hostId!, "bossBrain")!.brain).toEqual({ brain: "maia-raw", rating: maiaTopRating() });
-    // His moves: asked at his fixed strength (Stockfish's while Maia loads), on his brain.
+    // His moves: asked at his fixed strength (Stockfish's while Maia loads), on his brain once the host's Maia is loaded (N1).
+    L.core.message(L.core.record.hostId!, { t: "maiaReady" });
     for (let i = 0; i < 400 && !L.bossRequests.length; i++) L.step();
     expect(L.bossRequests[0]).toMatchObject({ elo: fixedLevel(), brain: { brain: "maia-raw", rating: maiaTopRating() } });
     expect(L.bossRequests[0]!.stumble).toBeUndefined();
