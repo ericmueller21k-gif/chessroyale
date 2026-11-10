@@ -463,9 +463,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     bot's pawn from its idle's top to its feet (`sidekickSquares`, 0.87), its feet where a pawn's base stands; its name
     tag over its head, as a pawn's. **Its frames are baked** (`scripts/bake-sidekicks.ts`, run after changing a sidekick's
     art): one PNG a sidekick (`town/sidekicks/<boss>.png`: rows idle, walk, sit, wave) and their times, feet and heads in
-    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts every frame into a canvas once
-    (`SpriteFrames` in `render.ts`), never per frame; a sidekick isn't drawn (or tapped) until its picture has loaded (a
-    moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
+    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts a sheet's frames into canvases once,
+    when its sidekick is first drawn (`SpriteFrames.cut` in `render.ts`; Nov 10, phone load), never per frame; a sidekick isn't
+    drawn (or tapped) until its picture has loaded (a moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
     town's first frame back (measured: the decision).
   - **A person's card** (a tap on a bot, or on a real player once they walk in the town: `Card` kind `"person"`; placed over its
     name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 210 × 53 px on a phone and

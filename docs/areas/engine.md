@@ -12,7 +12,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `engineNodes` (250k) per position, top lines first; the score a pick gets is its loss against the best move.
   `packages/chess/src/uci.ts` (`UciEngine`) speaks UCI; the same code runs in Node (tests, sims: `src/node.ts`) and in
   the browser (a Web Worker pool, Stockfish 19 lite WASM: `packages/app/src/engine.ts`). The browser engine is
-  deterministic (`reports/judge-determinism.md`).
+  deterministic (`reports/judge-determinism.md`). Home warms one worker (`warmEngine`); the rest of the pool starts when
+  play is near: a match, the queue, the boss menu, Squads, 1 v 1 (`App.tsx`, `playNear`; Nov 10, phone load).
 - **The best move is the highest-scored pick** (`docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md`):
   the judge's best (the top-8 search's first line, or what the re-check made best), unless a pick scored above it
   (`bestOf` in `packages/core/src/scoring.ts`; a tie keeps the judge's best). `resolveBoard` names it on every path, so
