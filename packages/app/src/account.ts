@@ -1,5 +1,6 @@
 import { ASK_AGE_LINE, CHAT_MOD, oldEnough, pawnColorOf, type ChatPicks, type PawnColor, type ShopState } from "@chessroyale/core";
 import { devicePawnColor, setDevicePawnColor } from "./prefs.ts";
+import { loadStep } from "./loadbar.ts";
 import type { CrateRoll, ItemInstance, ItemLook, ItemSlot, QuestsAnswer, RankedLeaves, RankedSummary, XpGrant } from "@chessroyale/core";
 import type { ChatBlock } from "@chessroyale/chess";
 
@@ -193,14 +194,17 @@ export async function loadAccount(name?: string): Promise<void> {
     const young = storedYoung || config.age === "under";
     set({ config, age: young ? "under" : (config.age ?? null) });
     if (young) rememberTooYoung();
-    if (!config.accounts) return;
+    if (!config.accounts) return loadStep("last");
+    loadStep("account");
     set({ profile: await me });
+    loadStep("last");
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {
     // No server (local dev) or offline: play on without an account. A server that did answer keeps its test switch when
     // only your profile failed (Oct 25: a CI run lost its ?boss= link that way, the switch going with the profile).
     set({ config: { accounts: false, google: false, email: false, ...(config?.testSwitches ? { testSwitches: true } : {}) } });
+    loadStep("last");
   }
 }
 

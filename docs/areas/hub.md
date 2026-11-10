@@ -8,6 +8,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
   the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
   preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+  Past `FRONT_DOOR.loadBarAfterMs` (2 s) the shell shows a thin bar and what's loading (under the splash's logo, centered; the shell is always the splash since Eric's Nov 10 call, never home's outline),
+  moved by the app's steps (`loadbar.ts`); a script that won't load, or no step for 20 s: "Try again" (a reload).
+  [Decision](../decisions/2026-11-10-loading-bar.md); guard: `e2e/home-layout.spec.ts`, "the loading bar".
   Your profile (`/api/me`) is asked for beside the sign-in options, not after them (`account.ts` `loadAccount`, Nov 10). The service
   worker precaches one file at a time at low priority and, after a deploy, copies what's unchanged from the old version's cache
   (same name under `/assets/`, else the same hash in `sw.js`'s `HASHES`) instead of downloading it again.

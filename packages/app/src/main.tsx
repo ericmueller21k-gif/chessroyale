@@ -2,6 +2,7 @@ import { render } from "preact";
 import "./board/pieces.css";
 import { App } from "./App.tsx";
 import { watchShell } from "./shell.ts";
+import { loadStep } from "./loadbar.ts";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
@@ -30,6 +31,9 @@ document.addEventListener("gesturestart", (e) => e.preventDefault());
 document.addEventListener("touchmove", (e) => {
   if (e.touches.length > 1) e.preventDefault();
 }, { passive: false });
+
+// The app's script has run: the loading bar (index.html's shell, if it's showing) moves on to signing in (loadbar.ts).
+loadStep("signIn");
 
 // Errors on this device are reported (problems.ts), from the start.
 watchErrors();
