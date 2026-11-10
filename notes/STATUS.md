@@ -694,3 +694,8 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
 - Nov 10 ~03:55 UTC (Nov 9 9:55 pm Central): #597 MERGED. Main 0ba688d RED: boss-challenge:1059 [phone] Dash intro failed twice (waitForFunction 20 s for bolt frame 3) + shop:1094 [desktop] flaky (goIn home not drawn in 20 s). Both pass locally; both town-load timing under CI load. Forwarded to the lazy-boss-art helper (session_01JuCWRtKc9gWgrjMG5P3dgp) to verify against. The session can't re-run jobs either (403). Deploys unaffected. Fable 5.2 outside-review brief: notes/fable-audit.md (Eric will link it).
 
 - Nov 10 ~04:15 UTC (Nov 9 10:15 pm Central): Fable 5.2 outside review IN (notes/fable-audit-findings*.md + 3 proof tests). Plan: notes/fable-plan.md (9 batches; 1-5 xhigh, one at a time; batch 1 starts when the lazy-art helper finishes). Asked Eric: TEST_SWITCHES in CF dashboard; struck-through prices; paid crates approach; launch scope; Access on /admin.
+
+- Nov 10 ~04:40 UTC: Eric on the Fable plan: **phone load (6) first, then tests (7)**; keep his paid-crates plan (#3 pushback);
+  keep 50v50 at launch, add a "beta / quiet hours: expect more bots" notice (todo, small, hub lane); Access on /admin: go.
+  TEST_SWITCHES checked by me: off in production (/api/auth/config has no testSwitches). Starting phone-load-2 helper beside
+  lazy-art (both high: Eric's 2-at-once rule). Batches 1-5 (xhigh) after.
