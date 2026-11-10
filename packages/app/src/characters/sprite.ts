@@ -341,9 +341,12 @@ export function lieDown(
  * the bosses it shows (Nov 10: every boss's poses cost about 1.4 s of a fast core on every load). Every boss wraps its
  * top-level animations in it; the art comes out the same, pixel for pixel.
  */
+let animsMadeSoFar = 0;
+/** How many lazy animations have been made so far (a unit test checks the app's load makes none). */
+export const animsMade = (): number => animsMadeSoFar;
 export function lazyAnim(make: () => Anim): Anim {
   let made: Anim | undefined;
-  const get = () => (made ??= make());
+  const get = () => (made ??= (animsMadeSoFar++, make()));
   return {
     get loop() {
       return get().loop;
@@ -352,6 +355,24 @@ export function lazyAnim(make: () => Anim): Anim {
       return get().frames;
     },
   };
+}
+
+/**
+ * A table made the first time one of its fields is read (timings read from a boss's animations, which reading would
+ * make): `lazyTable(() => ({ ... }))` in place of `(() => ({ ... }))()`, its uses unchanged.
+ */
+export function lazyTable<T extends object>(make: () => T): T {
+  let t: T | undefined;
+  const of = () => (t ??= make());
+  return new Proxy({} as T, {
+    get: (_, k) => Reflect.get(of(), k),
+    has: (_, k) => Reflect.has(of(), k),
+    ownKeys: () => Reflect.ownKeys(of()),
+    getOwnPropertyDescriptor: (_, k) => {
+      const d = Reflect.getOwnPropertyDescriptor(of(), k);
+      return d && { ...d, configurable: true };
+    },
+  });
 }
 
 /**
@@ -368,7 +389,7 @@ export function lazyAnimsTogether(): ((make: () => Anim) => Anim) & { first: () 
   const upTo = (i: number): Anim => {
     making++;
     try {
-      while (made.length <= i) made.push(makers[made.length]!());
+      while (made.length <= i) made.push((animsMadeSoFar++, makers[made.length]!()));
     } finally {
       making--;
     }

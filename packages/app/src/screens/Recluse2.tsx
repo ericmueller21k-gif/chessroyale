@@ -3,7 +3,7 @@ import { createPortal, memo } from "preact/compat";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
 import { moveLeft } from "@chessroyale/chess";
 import { RECLUSE, RECLUSE_BUST, RECLUSE_JUMP, palmOf } from "../characters/recluse.ts";
-import type { Frame } from "../characters/sprite.ts";
+import { lazyTable, type Frame } from "../characters/sprite.ts";
 import { EngineOverlay, placeEngine } from "../components/Recluse.tsx";
 import { kingSay } from "../godKing.ts";
 import { play } from "../sound.ts";
@@ -83,7 +83,7 @@ const FIG_H = (FIG_W * RECLUSE.h) / RECLUSE.w;
 /** Where his feet land, in the middle of the board (% of it); the book lies open just in front of them. */
 const MIDDLE: Pt = { x: 50, y: 60 };
 /** His raised hands as he chants in the middle of the board (% of it, our left first): where the arcs strike from. */
-const CHANT_HANDS = (() => {
+const CHANT_HANDS = lazyTable(() => {
   const f = RECLUSE.anims.chant!.frames[0]!;
   const left = MIDDLE.x - (FIG_W * RECLUSE.foot[0]) / RECLUSE.w;
   const top = MIDDLE.y - (FIG_H * RECLUSE.foot[1]) / RECLUSE.h;
@@ -91,7 +91,7 @@ const CHANT_HANDS = (() => {
     .filter((l) => l.part === "hand:palm")
     .map((l) => [left + ((l.x + 3.5) / RECLUSE.w) * FIG_W, top + ((l.y + 2) / RECLUSE.h) * FIG_H] as const)
     .sort((a, b) => a[0] - b[0]);
-})();
+});
 /** Where he leaps from and back to (his feet), by his place: a phone's boss bar above the board's top left; a computer's figure by its bottom left. */
 const PLACE = { phone: { x: 10, y: 38 }, computer: { x: -12, y: 100 } } as const;
 const FLIGHT = RECLUSE_JUMP.landAt - RECLUSE_JUMP.upAt;
