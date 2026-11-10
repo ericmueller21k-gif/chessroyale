@@ -8295,8 +8295,15 @@ button.history-label {
 .locker-subhead {
   margin-top: 10px;
 }
+/* Seven tabs (Outfit, Nov 10): two even rows of four on a phone, one row on a wider screen; never a lone stretched tab. */
 .locker-tabs {
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (min-width: 600px) {
+  .locker-tabs {
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 .locker-item.default {
   --tier: var(--line);
