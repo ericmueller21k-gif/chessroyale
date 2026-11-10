@@ -57,6 +57,9 @@ const BOX_STYLE = {
   "--gk-s": GOD_KING_BOX.size,
 } as Record<string, number>;
 
+/** A screen frame (ms): how finely the God King's sprite looks ahead for its next frame. */
+const STEP_MS = 16;
+
 /**
  * The God King: a holy knight in white plate (dark steel for Black) with gold trim, a winged crown-helmet, a flaming
  * gold sword, a blue tabard and a torn white cape, drawn as pixel art from parts (characters/god-king.ts). `anim`
@@ -66,24 +69,37 @@ const BOX_STYLE = {
 export function GodKingSprite({ side, anim = "idle", since = 0, then, class: cls = "" }: { side: "w" | "b"; anim?: GodKingAnim; since?: number; then?: GodKingAnim; class?: string }) {
   const box = useRef<HTMLSpanElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
-  // Drawn before the paint (no empty first frame), then whenever the picture changes.
+  // Drawn before the paint (no empty first frame), then whenever the picture changes: it sleeps until its next frame is
+  // due (found ahead in steps of a screen frame, up to a second), not woken 60 times a second (Nov 10, phone load).
   useLayoutEffect(() => {
     const g = cv.current?.getContext("2d");
     if (!g) return;
     let raf = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let last = "";
+    const idAt = (t: number) => {
+      const s = kingFrameAt(anim, t, since, then);
+      return `${s.anim}:${s.frame}`;
+    };
     const draw = () => {
-      const s = kingFrameAt(anim, Date.now(), since, then);
+      const now = Date.now();
+      const s = kingFrameAt(anim, now, since, then);
       const id = `${s.anim}:${s.frame}`;
       if (id !== last) {
         last = id;
         g.putImageData(frameImage(side, GOD_KING.anims[s.anim]!.frames[s.frame]!), 0, 0);
         box.current?.setAttribute("data-anim", s.anim);
       }
-      raf = requestAnimationFrame(draw);
+      let wait = STEP_MS;
+      while (wait < 1000 && idAt(now + wait) === id) wait += STEP_MS;
+      // (Woken a screen frame early, then on the frame itself, so the change lands on its paint.)
+      timer = setTimeout(() => (raf = requestAnimationFrame(draw)), Math.max(0, wait - STEP_MS));
     };
     draw();
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      clearTimeout(timer);
+      cancelAnimationFrame(raf);
+    };
   }, [side, anim, since, then]);
   return (
     <span ref={box} class={`god-king ${cls}`} data-anim={anim} style={BOX_STYLE} aria-hidden="true">

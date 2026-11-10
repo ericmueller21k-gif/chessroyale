@@ -291,10 +291,11 @@ const SHEET_URL: Record<string, string> = Object.fromEntries(
   Object.entries(import.meta.glob<string>("./sidekicks/*.png", { eager: true, query: "?url", import: "default" })).map(([path, url]) => [path.replace(/^.*\/|\.png$/g, ""), url]),
 );
 /**
- * A sidekick's four animations (Oct 28), every frame cut once from its baked sheet into a canvas of its own as the town
- * opens (as soon as the picture has loaded, a moment after; until then it isn't drawn), never per frame (Eric's
- * frame-rate rule); when each frame ends; how tall it stands (its frame's height in squares, so it's a pawn's height from
- * its idle's top to its feet); and where its head is in each animation (its name tag sits there).
+ * A sidekick's four animations (Oct 28), every frame cut once from its baked sheet into a canvas of its own, never per
+ * frame (Eric's frame-rate rule). The sheet is fetched as the town opens and cut when its sidekick first appears (`cut`;
+ * Nov 10, phone load: not all 14 sheets into some 875 canvases on entry); until then it isn't drawn. When each frame
+ * ends; how tall it stands (its frame's height in squares, so it's a pawn's height from its idle's top to its feet); and
+ * where its head is in each animation (its name tag sits there).
  */
 class SpriteFrames {
   readonly frames: Record<SpriteAnim, HTMLCanvasElement[]> = { idle: [], walk: [], sit: [], wave: [] };
@@ -302,6 +303,7 @@ class SpriteFrames {
   readonly top: Record<SpriteAnim, number>;
   readonly squares: number;
   ready = false;
+  private img: HTMLImageElement | null = null;
   constructor(readonly sheet: SidekickSheet) {
     for (const a of SPRITE_ANIMS) {
       let t = 0;
@@ -312,19 +314,25 @@ class SpriteFrames {
     this.top = { idle, walk: idle, wave: idle, sit: sheet.top.sit / sheet.h };
     this.squares = TOWN_FEEL.sidekickSquares / (sheet.foot[1] / sheet.h - idle);
     const img = new Image();
-    img.onload = () => {
-      SPRITE_ANIMS.forEach((a, row) => {
-        this.frames[a] = sheet.ms[a].map((_, col) => {
-          const c = document.createElement("canvas");
-          c.width = sheet.w;
-          c.height = sheet.h;
-          c.getContext("2d")!.drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
-          return c;
-        });
-      });
-      this.ready = true;
-    };
+    img.onload = () => void (this.img = img);
     img.src = SHEET_URL[sheet.id.replace(/^sidekick-/, "")]!;
+  }
+  /** Its frames cut from its sheet, once, the first time it's drawn (or its face asked for) after the sheet has loaded. */
+  cut(): void {
+    const img = this.img;
+    if (this.ready || !img) return;
+    const sheet = this.sheet;
+    SPRITE_ANIMS.forEach((a, row) => {
+      this.frames[a] = sheet.ms[a].map((_, col) => {
+        const c = document.createElement("canvas");
+        c.width = sheet.w;
+        c.height = sheet.h;
+        c.getContext("2d")!.drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
+        return c;
+      });
+    });
+    this.ready = true;
+    this.img = null;
   }
   /** Its frame `t` ms into `anim` (looping; the wave holds its last frame). */
   at(anim: SpriteAnim, t: number): HTMLCanvasElement {
@@ -337,6 +345,7 @@ class SpriteFrames {
   }
   /** Its idle's first frame cut to what's drawn, as an image's address (the game's strip shows it): made when asked. */
   face(): string | null {
+    this.cut();
     const c = this.frames.idle[0];
     if (!c) return null;
     const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
@@ -1634,9 +1643,10 @@ export class Renderer {
         } else {
           const lk = person.look;
           if (isSprite(lk)) {
-            // A sidekick (Oct 28): its own frames, cut from its sheet as the town opened. It walks, stands, sits (its sit has its own
+            // A sidekick (Oct 28): its own frames, cut from its sheet the first time it's drawn. It walks, stands, sits (its sit has its own
             // stool, drawn over the table's: not lowered, no shadow) and waves once when tapped. No hop: its walk steps.
             const sp = this.spriteArt.get(lk.sprite)!;
+            sp.cut();
             this.sitting = false;
             if (sp.ready) {
               const anim = spriteAnim(person, now);
