@@ -1,3 +1,4 @@
+- Nov 10 15:50 UTC: #604 MERGED 8f42757 (Eric OK); #612 squads-replay MERGED 688ed8b. search-home:61 flaky again (batch 7).
 - Nov 10 15:35 UTC: Eric OKed #604 (guard edits). Merged main into it (a87b214), CI running; merge when green.
 - Nov 10 15:25 UTC: Eric: rename raid->Boss Battle (player-visible) + solo Boss Battles count for boss quests (normal solo rules); quest progress animation Hearthstone-style (popup on return home, bars slide, big completion + sound slot for his pack; mockup first); Squads lone party PAID (told b3 fix helper); squads-replay guard fix OKed -> PR open. #604 explained, awaiting his yes. Queue after b3: bot saves-with-player, rename+quests, quest animation.
 - Nov 10 15:05 UTC: #611 delta review: D1 BLOCKER (a liar claiming by:maia gets moves played unstruck <0.8), D2 major (extras lost), D3-D7 minor. CI green on 08e5f52. Fix round 2 (fix2-fable-b3.md), .done marker last.
