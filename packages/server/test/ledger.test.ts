@@ -157,8 +157,8 @@ describe("each path, keyed by its event: replayed or raced, it changes a balance
   it("Welcome Crates (welcome:… and welcome-open:…), a boss crate's buy and open (open:<its row>), deleting an item (delete:<item>)", async () => {
     const { sql, db } = await world();
     const a = await signedIn(sql, "a@example.com", T0);
-    // (Solo games the server timed: only those count toward a Welcome Crate since Nov 10.)
-    for (let i = 0; i < 5; i++) await recordResult(sql, a.id, { mode: "classic", online: false, placement: 1, players: 8, playMs: 5 * 60_000 }, T0 + i);
+    // (Solo games the server timed, with enough moves: only those count toward a Welcome Crate since Nov 10.)
+    for (let i = 0; i < 5; i++) await recordResult(sql, a.id, { mode: "classic", online: false, placement: 1, players: 8, playMs: 5 * 60_000, moves: 20 }, T0 + i);
     expect((await Promise.all([1, 2, 3].map(() => grantWelcomeCrate(sql, a.id, T0 + 9)))).flat()).toEqual([5]);
     const opens = await Promise.all([1, 2, 3].map(() => openWelcomeCrate(sql, a.id, T0 + 10)));
     expect(opens.filter((r) => r.ok && !r.again)).toHaveLength(1);

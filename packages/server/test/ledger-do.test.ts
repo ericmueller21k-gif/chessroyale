@@ -146,6 +146,8 @@ describe("an online boss battle's token drop (lobby-do.ts: drop:<code>:<match st
           for (let i = 0; i < 5_000 && !until() && rt.alarm !== null; i++) {
             vi.setSystemTime(Math.max(Date.now(), rt.alarm));
             await lobby.alarm().catch(() => undefined);
+            // (Results are written in the background since the review of #610, m2.)
+            await rt.settle();
           }
         },
       };
