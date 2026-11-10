@@ -870,6 +870,12 @@ export type ServerMessage = { now: number } & (
       /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
       brain?: NetBossBrain;
       /**
+       * His own move and the funhouse's (BOSS_CHECK): the seed to play it with, for the random source and Maia's draw (1 to
+       * 2147483647). The same request goes to a second device, and the two moves are compared: the same seed, the same move.
+       * Missing from older servers (and for his powers' picks): play as before.
+       */
+      draw?: number;
+      /**
        * Wrangler's turn (BossAsks): his long pulls to choose from (his first move: answer one of them as `move`, or an
        * ordinary move), his showdown's line-up after his move (`showdown`: "try", one that qualifies, else ""; "test",
        * the admins' trigger: the best found even outside the band, answered with `outside`, or a stand-in drag), a lasso

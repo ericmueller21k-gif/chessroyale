@@ -120,8 +120,11 @@ export class HumanUciEngine implements HumanEngineLike {
     });
   }
 
-  /** Maia's likeliest moves at a rating (among `allowed`, if given) and its own draw; null if it isn't ready. */
-  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number }): Promise<HumanAnswer | null> {
+  /**
+   * Maia's likeliest moves at a rating (among `allowed`, if given) and its own draw (from `seed`, the same on every device: the
+   * box's Seed option, set for this draw alone; none, a random one); null if it isn't ready.
+   */
+  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number; seed?: number }): Promise<HumanAnswer | null> {
     if (!this.ready()) return Promise.resolve(null);
     return this.serial(async () => {
       if (!this.ready()) return null;
@@ -130,6 +133,8 @@ export class HumanUciEngine implements HumanEngineLike {
       this.transport.send(`setoption name Temperature value ${opts.temperature}`);
       this.transport.send(`setoption name TopP value ${opts.topP}`);
       this.transport.send(`setoption name MultiPV value ${opts.multipv}`);
+      // (0: the box's random source again. An older box ignores the option: its own draw, as before.)
+      this.transport.send(`setoption name Seed value ${opts.seed && opts.seed > 0 ? Math.min(2_147_483_647, Math.floor(opts.seed)) : 0}`);
       this.transport.send(`position fen ${fen}`);
       const done = this.until((l) => l.startsWith("bestmove"));
       this.transport.send("go" + (allowed ? ` searchmoves ${allowed.join(" ")}` : ""));

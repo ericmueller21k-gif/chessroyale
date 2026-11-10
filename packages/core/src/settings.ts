@@ -2190,6 +2190,20 @@ export const BOSS_BRAIN = {
 };
 export type BossBrainSettings = typeof BOSS_BRAIN;
 
+/**
+ * Who plays the boss online (the outside review of Nov 10, finding 2; docs/decisions/2026-11-10-boss-and-lone-devices.md): his own
+ * move (the brain's, a slip, the King's stagger, a power's best) and Boingo's funhouse move are asked of the host and a second device
+ * with one seed, so two honest devices give the same move (Stockfish's searches are exact at a node count, Maia draws with the seed).
+ * The same move plays; two different ones go to the engine server, and the better for him plays; the host's alone (nobody to ask,
+ * or the other gone) plays and the match pays as a solo game. A loss guard can't do it: Maia's own moves (no guard, Eric's) give
+ * away 25 points or more about one move in five at a raid's levels (reports/maia-boss.md).
+ *   - `waitMs`: once one answer is in, how long the other device has (both search at once).
+ *   - `strikeLoss`: a device whose move the engine server finds this much worse than the other's (points of expected score, 0 to
+ *     1) gets a judge's strike (benched at JUDGES.strikes: no more hosting or judging this match). Two honest devices differ only
+ *     when one's Maia wasn't ready or answered late, never by a thrown piece.
+ */
+export const BOSS_CHECK = { waitMs: 4_000, strikeLoss: 0.4 } as const;
+
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
 

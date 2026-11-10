@@ -2,7 +2,7 @@ import { LookAways } from "./lookaway.ts";
 import { engineSpeed, ownEngine } from "./engine.ts";
 import { lastBoss } from "./boss-history.ts";
 import { showBanNotice } from "./components/FairPlay.tsx";
-import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, DEFAULT_SETTINGS, LEAVING, PREGAME_VOTES, mulberry32, type MatchmakingType, botChoose, botLeanFor, botThinkMs as thinkMs, castPregameVote, type Augment, type ItemLook, type Settings, type SlamPiece } from "@chessroyale/core";
 import {
   legalMoves,
   toSan,
@@ -796,7 +796,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
         return void this.useBrain(m.brain);
@@ -892,18 +892,21 @@ export class NetMatch implements GameView {
    * the hoops), the same whether it will pop or not. `crease` (Folio's Crease is wanted with this move): its line on the
    * position after the move goes with it (creaseAnswer).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
       if (brain) this.useBrain(brain);
-      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
+      // (The server's seed for this move (BOSS_CHECK): the random source and Maia's draw, so the second device asked plays the
+      // same move. This request may come to this device as that second device: it plays it the same way.)
+      const rng = draw ? mulberry32(draw) : Math.random;
+      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
       if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;
       // (Chub & Chirp's Carrot Patch: his race brain on this device's engine, with the race the server sent.)
       const look = race && !funhouse ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
-      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, Math.random, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look);
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
         // on this device's engines (the scout's line-ups first). The server checks them against his rules.

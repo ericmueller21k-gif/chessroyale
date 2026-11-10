@@ -652,8 +652,8 @@ export class Lobby extends DurableObject<Env> {
  * One player's XP game for a match room's match (server/xp.ts): their moves and time as the room counted them (`span`: xpSpan); a
  * win is 1st in Classic, their team's (or the crowd's against the boss) otherwise; nothing for leaving (abandoned), practice or a
  * lobby a test switch made (except ?xpgame=MINUTES: that long, with enough moves). A friends' lobby (not matchmade) pays the win
- * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). Keyed by the match
- * (its code and start).
+ * once an XP day per set of opponents (`opponents`: player ids, xpOpponents; only those with accounts count). A match where one
+ * device's word stood alone (`unvouched`) pays as a solo game. Keyed by the match (its code and start).
  */
 export function lobbyXpGame(
   rec: LobbyRecord,
@@ -680,7 +680,9 @@ export function lobbyXpGame(
       abandoned: !!r.abandoned,
       test: forced === null && (!!o.tested || practice),
     },
-    cap: vs,
+    // (One device's word stood alone somewhere in the match (LobbyRecord.unvouched): it pays as a solo game does, under solo's
+    // daily caps on wins and minutes; the outside review of Nov 10, finding 5.)
+    cap: rec.unvouched ? "solo" : vs,
     signedInOnly,
     now,
     // (Quests, phase 3: a raid is "boss", Crowd "crowd" (50 v 50), the rest "classic".)

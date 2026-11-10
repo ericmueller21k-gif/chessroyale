@@ -27,7 +27,8 @@ export interface HumanEngineLike {
   ready(): boolean;
   /** It won't be ready: its load failed, or its worker broke. */
   failed?(): boolean;
-  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number }): Promise<HumanAnswer | null>;
+  /** `seed`: its draw from that seed (the same move on any device: BOSS_CHECK); none, a random one. */
+  candidates(fen: string, rating: number, allowed: readonly string[] | null, opts: { temperature: number; topP: number; multipv: number; seed?: number }): Promise<HumanAnswer | null>;
 }
 
 /** What the brain did with the boss's last move (the admins' debug line). */

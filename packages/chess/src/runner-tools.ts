@@ -170,6 +170,8 @@ export interface BossBrainCall {
   stockfishShare?: number;
   /** BOSS_BRAIN, unless a test or sim passes its own. */
   settings?: typeof BOSS_BRAIN;
+  /** Maia draws with this seed (an online boss move two devices play: BOSS_CHECK); none, at random. */
+  seed?: number;
   onNote?(note: BrainNote): void;
 }
 
@@ -489,7 +491,7 @@ async function pickBossMove(
   const human = brain && brain.brain !== "stockfish" ? brain : null;
   const share = human && k !== "stagger" && (human.stockfishShare ?? 0) > 0 ? rng() < human.stockfishShare! : false;
   const asked = performance.now();
-  const ask = human && k !== "stagger" && !share && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv }) : null;
+  const ask = human && k !== "stagger" && !share && human.engine.ready() ? human.engine.candidates(fen, human.rating, allowed, { temperature: human.settings?.temperature ?? BOSS_BRAIN.temperature, topP: human.settings?.topP ?? BOSS_BRAIN.topP, multipv: human.settings?.multipv ?? BOSS_BRAIN.multipv, ...(human.seed ? { seed: human.seed } : {}) }) : null;
   // A boss power can stop the boss too (nobody moves onto a pie): it plays the best of what's allowed.
   const all = await engine.topMoves(fen, 8);
   const ok = allowed ? new Set(allowed) : null;
