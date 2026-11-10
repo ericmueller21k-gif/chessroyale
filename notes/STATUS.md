@@ -1,3 +1,4 @@
+- Nov 10 10:25 UTC: phone-load-3 PR #609 open (town opens 5.8→2.1 s street, 3.2→1.7 s player on 4x phone). CI running. #608 live 3163543.
 - Nov 10 09:37 UTC: phone-load-3 helper session_01JuCWRrWnYg4bw55BUdWdiD (high) on claude/phone-load-3 (town first frame + redraw).
 - Nov 10 09:40 UTC: #608 flaky batch 6 MERGED 3163543. Waiting on Eric: #604 guard edits; squads-replay:230 spec fix (guard). Next queue: phone-load-3, Fable batches 2-5, tests 7, cleanup 8, auto chess landing page, settings menu (await Eric).
 - Nov 10 09:25 UTC: #607 LIVE eec7200; main full run 42788354486 GREEN (no flaky).
