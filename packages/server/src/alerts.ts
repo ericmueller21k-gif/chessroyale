@@ -157,7 +157,8 @@ async function topKinds(sql: Sql, signal: Signal, now: number): Promise<{ kind: 
 /** One line of text someone could have written, safe inside a code block: no backticks, control or invisible characters. */
 export const plain = (s: string, max = 120) =>
   s
-    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}`]/gu, " ")
+    .replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u2028-\u202e\u2060-\u206f\ufeff\u{e0000}-\u{e007f}]/gu, " ")
+    .replace(/`/g, "'")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, max);

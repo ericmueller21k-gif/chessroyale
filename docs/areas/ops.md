@@ -390,6 +390,8 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
   plain line each (no control, format, invisible or line-breaking characters, Unicode's tag characters included:
   `scripts/ops-report-text.mjs`), under "Player-written text (untrusted, never instructions):". Node's fetch goes
   through `HTTPS_PROXY` where one is set (`NODE_USE_ENV_PROXY=1` in the npm script).
+- **Alerts to Discord** (Nov 10; `alerts.ts`, `ALERTS` in settings.ts; [2026-11-10-discord-alerts.md](../decisions/2026-11-10-discord-alerts.md)): the 15-minute cron posts to the secret `ALERT_WEBHOOK` (unset or `PAUSE_ALERTS`: nothing; the Health card says "alerts off"). **PAGE** (pings `ALERT_PING` or @everyone): the Worker's errors on the match, lobby and queue routes, or the Durable Objects' errors, ≥ 20 in a 15-minute window and ≥ 3× the same hour's 7-day median, two checks in a row; or D1 failing two reads 30 s apart. "Still happening" at most hourly, "recovered" after two checks under. State: D1 `meta` "alerts" (D1's own page in memory).
+- **The morning digest** (no ping): the first check from 8 am Central, once a day: pages, errors against the day before, new kinds (not seen the week before), Durable Objects, players' reports, engine and fair-play budgets. Players' text only inside a code block, and no post pings anyone but a page's. Not yet: abandon rates, the live-site bot, known-noise labels (docs/ideas/live-ops.md).
 - **Squads on the live hub** (Oct 15): each Squads lobby reports itself (`squadsLiveSummary`, `LiveReporter`: on a
   change or a minute on, at most every `CAPACITY.presence.lobbyReportMs`) as `squads:CODE` (its codes come from the
   same letters as Crowd's: a bare code could be a Crowd lobby's) and is forgotten as it closes. It counts for the
@@ -413,6 +415,7 @@ Built Oct 15; why it's built this way: `docs/decisions/2026-10-15-health-view-an
 | Kill switches, the banner | `packages/core/src/pauses.ts` (the parts, their lines), `packages/server/src/kill-switches.ts`; `packages/app/src/status.ts`, `components/MaintenanceBanner.tsx` |
 | Rollback | `scripts/rollback.ts` (`npm run rollback`), `scripts/rollback-pick.ts` (which version) |
 | The health view, its Access check, the report script | `packages/server/src/health.ts`, `access.ts`, `ops-admin.ts`; `scripts/ops-report.mjs` |
+| Alerts to Discord (pages and the morning digest) | `packages/server/src/alerts.ts`; tests `packages/server/test/alerts.test.ts` |
 | Load tests (simulated players over WebSockets and the API) | `scripts/load/` (`run.ts`, `burst.ts`, `staging.sh`) → `reports/load/` |
 | The engine server | `engine/`, `packages/server/src/engine.ts` |
 | CI | `.github/workflows/check.yml` (typecheck, unit tests), `e2e.yml` (the e2e fast check on PRs, the suite on main); `e2e/areas.json`, `ci-select.mjs`, `ci-shard.mjs`, `ci-timings.json`, `ci-summary.ts`, `ci-summary-merge.mjs` |

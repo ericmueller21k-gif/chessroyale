@@ -379,5 +379,8 @@ describe("the health view", () => {
     expect(page).toContain("<h2>Health</h2>");
     expect(page).toContain("Fair play's deep re-checks:");
     expect(page).toContain("<b>Town WebGL fallbacks</b>");
+    // Alerts to Discord (alerts.ts): off with no ALERT_WEBHOOK, said on the page and in the JSON.
+    expect(page).toContain("<b>Alerts:</b> alerts off: no ALERT_WEBHOOK");
+    expect(((await (await get({ cookie: `hc_session=${adminToken}` }))!.json()) as { alerts: unknown }).alerts).toEqual({ on: false, why: "no ALERT_WEBHOOK", paging: [] });
   });
 });
