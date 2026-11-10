@@ -188,7 +188,7 @@ describe("the schema run's statements: the same schema and rows as one at a time
     });
   });
 
-  it("another instance adding a column first: the batch is refused and the columns go one at a time, as before", async () => {
+  it("another instance adding a column first: the batch is refused and each column goes with its fill as its own batch", async () => {
     const want = await current();
     const db = await lessOneColumn();
     let raced = false;
@@ -201,10 +201,24 @@ describe("the schema run's statements: the same schema and rows as one at a time
     });
     await ensureSchema(sql, {});
     expect(raced).toBe(true);
-    // (The refused batch, the column on its own ("duplicate column" is fine), then the statements after the columns.)
+    // (The refused batch, the column and its fill as one batch ("duplicate column" is fine), then the statements after the columns.)
     expect(counts.trips).toBe(6);
     expect(schemaOf(db)).toEqual(schemaOf(want));
     expect(versionOf(db)).toBe(schemaParts.version);
+  });
+
+  it("a column's fill refused (not a duplicate column): nothing of the batch stays, the run fails, and the next run adds the column with its fill", async () => {
+    // (Review, Nov 10: a column must never be left without its `then`, or nothing fills it later.)
+    const want = await older();
+    await oneByOne(want.sql);
+    const db = await older();
+    let refusals = 0;
+    const once = { refuse: (q: string) => q.startsWith("UPDATE users SET rating") && refusals++ === 0 };
+    await expect(ensureSchema(counted(db, once).sql, {})).rejects.toThrow(/refused/);
+    expect(versionOf(db)).not.toBe(schemaParts.version);
+    await ensureSchema(counted(db, once).sql, {});
+    expect(schemaOf(db)).toEqual(schemaOf(want));
+    expect(rowsOf(db)).toEqual(rowsOf(want));
   });
 
   it("a database that refuses the ledger's triggers still loads (each one logged), with every table", async () => {

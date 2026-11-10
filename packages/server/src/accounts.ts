@@ -413,17 +413,14 @@ async function schemaRun(sql: Sql): Promise<void> {
   const adds = missing.flatMap((c) => [stmt(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`), ...(c.then ?? []).map((t) => stmt(t))]);
   await sql.batch([...adds, ...last]).catch(async (refused: unknown) => {
     if (!missing.length) throw refused;
-    // (Another instance may have added a column first: one at a time, as before, where "duplicate column" is fine.)
-    for (const c of missing) {
-      const added = await sql.run(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`).then(
-        () => true,
-        (e: unknown) => {
-          if (!/duplicate column/i.test(String(e))) throw e;
-          return false;
-        },
-      );
-      if (added) for (const t of c.then ?? []) await sql.run(t);
-    }
+    // (Another instance may have added a column first: each column with its follow-ups as its own batch, all or nothing, so a
+    // column is never left without its fill (review, Nov 10); "duplicate column" is fine. Any other refusal: the whole batch
+    // rolled back, so throw and the next request retries it.)
+    if (!/duplicate column/i.test(String(refused))) throw refused;
+    for (const c of missing)
+      await sql.batch([stmt(`ALTER TABLE ${c.table} ADD COLUMN ${c.column} ${c.type}`), ...(c.then ?? []).map((t) => stmt(t))]).catch((e: unknown) => {
+        if (!/duplicate column/i.test(String(e))) throw e;
+      });
     await sql.batch(last);
   });
 }
