@@ -24,7 +24,13 @@ import {
   secondColor,
   rollCrate,
   stackItems,
+  shownLook,
+  mountOf,
+  hiddenByOutfit,
+  BOSS_CRATE_POOL,
+  OUTFIT,
   type CrateDef,
+  type ItemLook,
 } from "../src/index.ts";
 
 /** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
@@ -45,7 +51,9 @@ describe("crates", () => {
       expect(new Set(c.items).size).toBe(c.items.length);
     }
     // (A HunChess colorway, Nov 6: in none of these, only the Welcome Crate: welcome.test.ts.)
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess ? 0 : 1);
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess ? 0 : d.slot === "outfit" ? 2 : 1);
+    // (An outfit, Nov 10: in both regular crates, Epic: ROADMAP "Riders in regular crates".)
+    expect(CRATES.filter((c) => c.items.includes("banana-suit")).map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
@@ -81,20 +89,20 @@ describe("crates", () => {
     expect(itemChance(beta, "antlers")).toBe(0);
   });
 
-  it("Beta, complete (28 items): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
+  it("Beta, complete (28 items, and the Banana Suit since Nov 10): each box's items and every item's chance, each tier's items rarer than the one below's", () => {
     const boxes = Object.fromEntries((["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const).map((t) => [t, beta.items.filter((id) => itemDef(id)?.tier === t)]));
     expect(boxes).toEqual({
       common: ["party-hat", "wizard-hat", "top-hat", "fake-mustache", "fedora", "bandana", "ninja-headband", "shuriken"],
       uncommon: ["viking-helm", "little-crown", "briefcase", "eyepatch", "hook", "ninja-mask", "nunchucks"],
       rare: ["dark-shades", "wire-earpiece", "cutlass", "spyglass", "katana"],
-      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi"],
+      epic: ["suit-and-tie", "captains-coat", "ninja-hood", "ninja-gi", "banana-suit"],
       legendary: ["pirate-hat", "smiley-face"],
       mythic: ["tommy-gun", "parrot"],
     });
-    expect(beta.items).toHaveLength(28);
+    expect(beta.items).toHaveLength(29);
     // Boxes 40/26/18/14 shared evenly (5, 3.71, 3.6 and 3.5% each); Fischer Random 2%: Legendary 80 (0.8% each),
     // Mythic 20 (0.2% each).
-    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.035, legendary: 0.008, mythic: 0.002 };
+    const chance: Record<string, number> = { common: 0.05, uncommon: 0.26 / 7, rare: 0.036, epic: 0.028, legendary: 0.008, mythic: 0.002 };
     for (const [tier, ids] of Object.entries(boxes)) for (const id of ids) expect(itemChance(beta, id), id).toBeCloseTo(chance[tier]!, 6);
     // The ladder holds item by item: any one item is rarer than any one item of the tier below.
     const each = TIERS.map((t) => chance[t.id]!);
@@ -186,8 +194,8 @@ describe("crates", () => {
       expect(count[d]! / n).toBeGreaterThan(0.125);
       expect(count[d]! / n).toBeLessThan(0.135);
     }
-    // Epic (four items) about 14% in all, 3.5% each.
-    const epic = ["snowman", "present", "gingerbread", "chimney"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
+    // Epic (five items since the Banana Suit, Nov 10) about 14% in all, 2.8% each.
+    const epic = ["snowman", "present", "gingerbread", "chimney", "banana-suit"].reduce((s, d) => s + (count[d] ?? 0), 0) / n;
     expect(epic).toBeGreaterThan(0.13);
     expect(epic).toBeLessThan(0.15);
     expect(fischer / n).toBeGreaterThan(0.015);
@@ -363,7 +371,7 @@ describe("face items over or under a hat", () => {
 
 describe("rides (Oct 31)", () => {
   it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
-    expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride"]);
+    expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride", "outfit"]);
     expect(SLOT_NAMES.ride).toBe("Ride");
     // (Nov 6: each ride's HunChess colorway is a ride too, made from it: welcome.test.ts. These are the rides themselves.)
     const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
@@ -402,5 +410,38 @@ describe("rides (Oct 31)", () => {
     expect(cleanLook({ ride: { def: "beanie", color: "red", blemish: 1, seed: 2 } })).toEqual({});
     expect(cleanLook({ head: ride })).toEqual({});
     expect(cleanLook({ ride: { def: "riding-chirp", color: "nope", blemish: 500, seed: -3 } }).ride).toEqual({ def: "riding-chirp", color: "red", blemish: 100, seed: 3 });
+  });
+});
+
+describe("outfits (Eric, Nov 10)", () => {
+  const it_ = (def: string) => ({ def, color: "red", blemish: 10, seed: 3 });
+  const look: ItemLook = { head: it_("top-hat"), face: it_("ski-goggles"), skin: it_("snowman"), weapon: it_("katana"), ride: it_("moon-ride"), outfit: it_("banana-suit") };
+
+  it("a slot of its own; the Banana Suit is Epic, in both regular crates, never a boss crate's", () => {
+    expect(SLOT_NAMES.outfit).toBe("Outfit");
+    expect(ITEM_DEFS.filter((d) => d.slot === "outfit").map((d) => [d.id, d.name, d.tier])).toEqual([["banana-suit", "Banana Suit", "epic"]]);
+    expect(BOSS_CRATE_POOL).not.toContain("banana-suit");
+    expect(itemChance(beta, "banana-suit")).toBeCloseTo(0.028, 6);
+    expect(itemChance(crate, "banana-suit")).toBeCloseTo(0.028, 6);
+    expect(cleanLook({ outfit: it_("banana-suit") }).outfit?.def).toBe("banana-suit");
+    expect(cleanLook({ outfit: it_("top-hat") }).outfit).toBeUndefined();
+  });
+
+  it("an outfit hides every other worn item but eyewear (goggles, shades), which still shows", () => {
+    expect(OUTFIT.eyewear).toBe(true);
+    expect(ITEM_DEFS.filter((d) => d.eyewear).map((d) => d.id).sort()).toEqual(["dark-shades", "ski-goggles"]);
+    expect(shownLook(look)).toEqual({ outfit: look.outfit, face: look.face });
+    expect(shownLook({ ...look, face: it_("santa-beard") })).toEqual({ outfit: look.outfit });
+    expect(mountOf(shownLook(look))?.def).toBe("banana-suit");
+    for (const d of ["top-hat", "snowman", "katana", "moon-ride", "santa-beard"]) expect(hiddenByOutfit(look, d), d).toBe(true);
+    for (const d of ["ski-goggles", "dark-shades", "banana-suit"]) expect(hiddenByOutfit(look, d), d).toBe(false);
+  });
+
+  it("taking it off brings everything back: nothing else is unequipped (the look keeps every slot)", () => {
+    const { outfit: _, ...rest } = look;
+    expect(shownLook(rest)).toBe(rest);
+    expect(mountOf(rest)?.def).toBe("moon-ride");
+    expect(hiddenByOutfit(rest, "top-hat")).toBe(false);
+    expect(shownLook(undefined)).toBeUndefined();
   });
 });

@@ -550,6 +550,13 @@ export function shownLook<L extends ItemLook | null | undefined>(look: L): L {
   return { outfit: look.outfit, ...(face ? { face } : {}) } as L;
 }
 
+/** Whether an outfit worn in `look` hides an item (`def`) of another slot (the locker greys it: "Hidden by your outfit"). */
+export function hiddenByOutfit(look: ItemLook | null | undefined, def: string): boolean {
+  const d = itemDef(def);
+  if (!look?.outfit || !d || d.slot === "outfit") return false;
+  return !(d.slot === "face" && OUTFIT.eyewear && d.eyewear);
+}
+
 /** What a pawn is drawn on or in (Nov 10): its outfit if one is on, else its ride (both drawn by the rides' machinery). */
 export const mountOf = (look: ItemLook | null | undefined) => look?.outfit ?? look?.ride;
 

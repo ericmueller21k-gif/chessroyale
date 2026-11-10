@@ -11,7 +11,7 @@ const INK = "#1d1d1f";
 const STEM = "#7a5524";
 const TIP = "#6b4a1f";
 const RIM = "#6b4a1f";
-const HOLE = "#2e1f0c";
+const HOLE = "#8a6a3c";
 const SOLE = "#c9ced6";
 
 /** The peel (front and side alike), on the pawn's square: its top near y 3, its tip at y 76, the face hole round (50, 28). */
@@ -51,8 +51,8 @@ function Suit({ p, hole }: { p: Paint; hole: "front" | "side" | null }) {
       <path d={TIP_D} fill={TIP} {...LINE} {...lw(1.6)} />
       {hole && (
         <>
-          <ellipse cx={hx} cy={hy} rx={hole === "front" ? 13.5 : 11.5} ry={15} fill={RIM} {...LINE} {...lw(2.2)} />
-          <circle cx={hx} cy={hy} r={10.4} fill={HOLE} />
+          <ellipse cx={hx} cy={hy} rx={hole === "front" ? 12.8 : 11.2} ry={14} fill={RIM} {...LINE} {...lw(2.2)} />
+          <circle cx={hx} cy={hy} r={9.8} fill={HOLE} />
         </>
       )}
       {!hole && <path d="M 50 8 C 49 30 49 54 50.5 74" fill="none" stroke={darken(p.hex, 0.3)} stroke-width="1.4" stroke-linecap="round" opacity="0.7" />}
@@ -141,7 +141,7 @@ function StandBack({ p, f, hole }: { p: Paint; f: number; hole: "front" | null }
 const StandFront = ({ f }: { f: number }) => standingArms(IDLE[f % 2]!.dip, IDLE[f % 2]!.hand);
 
 /** The pawn's head in the face hole (front), or hidden whole (back: cut 0). */
-const facePose = (dip: number, hidden: boolean): RiderPose => ({ dx: 0, dy: 0, pawnX: HOLE_AT.front[0] - 50, pawnY: HOLE_AT.front[1] - 29 + dip, cut: hidden ? 0 : 38.5 });
+const facePose = (dip: number, hidden: boolean): RiderPose => ({ dx: 0, dy: 0, pawnX: HOLE_AT.front[0] - 50, pawnY: HOLE_AT.front[1] - 29 + dip, cut: hidden ? 0 : 36.5 });
 
 // ---------------- Running side-on (facing right): a real sprint, four frames ----------------
 
@@ -274,7 +274,7 @@ export const bananaSuit: RiderDraft = {
   pose(anim, f) {
     if (anim === "idle") return facePose(IDLE[f % 2]!.dip, false);
     const bob = SPRINT[f % 4]!.bob;
-    return { dx: (f % 4) * 25, dy: 0, pawnX: r2(HOLE_SIDE[0] - 50), pawnY: r2(HOLE_SIDE[1] - 29 + bob), cut: 38.5 };
+    return { dx: (f % 4) * 25, dy: 0, pawnX: r2(HOLE_SIDE[0] - 50), pawnY: r2(HOLE_SIDE[1] - 29 + bob), cut: 36.5 };
   },
   Back({ p, f, anim }: RiderProps) {
     if (anim === "idle") return <StandBack p={p} f={f} hole="front" />;
