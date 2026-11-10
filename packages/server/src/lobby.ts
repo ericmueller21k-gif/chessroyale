@@ -1824,7 +1824,7 @@ export class LobbyCore {
     this.r.bossChecker = next;
     this.sendBossRequest(next, true);
     // (Answers in already: the fresh one has the checker's window from now.)
-    if (Object.keys(c.answers).length && this.r.timer?.kind === "bossTimeout") this.setTimer("bossTimeout", Math.max(this.r.timer.at, this.io.now() + BOSS_CHECK.waitMs));
+    if (Object.keys(c.answers).length && this.r.timer?.kind === "bossTimeout") this.setTimer("bossTimeout", Math.max(this.r.timer.at, this.io.now() + this.checkMs()));
   }
 
   /** The position the boss's turn is played in. */
@@ -1861,7 +1861,7 @@ export class LobbyCore {
     c.answers[playerId] = { move, extras, ...(maia ? { by: "maia" as const } : {}) };
     // (The host's in: the checker has a little longer, both searching at once, its request lighter. The checker's in first: the host
     // keeps its own time, for his powers' extras.)
-    const by = this.io.now() + BOSS_CHECK.waitMs;
+    const by = this.io.now() + this.checkMs();
     if (playerId === this.r.hostId && this.r.timer?.kind === "bossTimeout" && this.r.timer.at > by) this.setTimer("bossTimeout", by);
     this.settleBoss(false);
   }
@@ -1884,8 +1884,9 @@ export class LobbyCore {
     }
     if (ids.length >= 2) {
       const [a, b] = [c.answers[ids[0]!]!, c.answers[ids[1]!]!];
-      // (His powers' extras from the one that worked them out: the host's whole request, not the checker's.)
-      if (a.move === b.move) return this.playBoss(a.move, Object.keys(b.extras).length > Object.keys(a.extras).length ? b.extras : a.extras);
+      // (His powers' extras: the host's (its word, checked by their rules, as before the check), else the fuller of the two.)
+      const host = ids.indexOf(this.r.hostId ?? "") === 0 ? a : ids.indexOf(this.r.hostId ?? "") === 1 ? b : null;
+      if (a.move === b.move) return this.playBoss(a.move, host?.extras ?? (Object.keys(b.extras).length > Object.keys(a.extras).length ? b.extras : a.extras));
       console.log(`boss move in ${this.r.code}: ${ids[0]} played ${a.move}${a.by ? " (Maia)" : ""}, ${ids[1]} ${b.move}${b.by ? " (Maia)" : ""}`);
       if (this.serverOn) {
         c.server = `boss:${this.r.bossKey}`;
@@ -1906,11 +1907,19 @@ export class LobbyCore {
       c.asked.push(next);
       this.r.bossChecker = next;
       this.sendBossRequest(next, true);
-      return this.setTimer("bossTimeout", this.io.now() + BOSS_CHECK.waitMs);
+      return this.setTimer("bossTimeout", this.io.now() + this.checkMs());
     }
     this.unvouch("the boss's move with no second device to check it");
     const one = c.answers[ids[0]!]!;
     this.playBoss(one.move, one.extras);
+  }
+
+  /**
+   * How long a checker has once another device's answer is in: BOSS_CHECK.waitMs, plus the time the host is given for his powers'
+   * extras on a turn that has them (the checker's request is whole then, D2: so it isn't routinely late on a heavy turn, M2).
+   */
+  private checkMs(): number {
+    return BOSS_CHECK.waitMs + bossTimeoutMs(this.bossAsks()) - BOSS_TIMEOUT_MS + hoopsMs(this.runner);
   }
 
   /** Each device asked that didn't answer missed it (once a move), but not one asked less than BOSS_CHECK.waitMs ago (D3). */

@@ -327,7 +327,7 @@ describe("delta review of PR #611's fixes, turned around", () => {
     expect(host.check).toBeUndefined();
   });
 
-  it("D2 (M2): on a turn with his powers' extras (Wrangler's showdown) the checker gets the whole request, and when its move plays its own extras come with it", () => {
+  it("D2 (M2): on a turn with his powers' extras (Wrangler's showdown) the checker gets the whole request and their time, and when its move plays its own extras come with it", () => {
     const L = raid({ server: true, settings: { bossId: "pig", bossPowerTest: "showdown", bossKillEvery: 99 } });
     people(L);
     const runner = (L.core as unknown as { runner: { applyBossMove: (...a: unknown[]) => unknown } }).runner;
@@ -354,6 +354,8 @@ describe("delta review of PR #611's fixes, turned around", () => {
       const better = allowed.map((m) => ({ m, l: [...lineups(applyMove(host.fen, m), 1, 3, 3000)].find(Boolean) })).find((x) => x.l)!;
       const other = allowed.find((m) => m !== better.m)!;
       L.core.message("p1", { t: "bossMove", key, move: other, showdown: "" });
+      // (The checker's time after the host's answer has the showdown's own allowance too, as the host's window has: M2's heavy turn.)
+      expect(L.core.record.timer!.at).toBe(L.now() + BOSS_CHECK.waitMs + 15_000);
       L.core.message("p2", { t: "bossMove", key, move: better.m, showdown: better.l!.spec });
       for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === better.m ? 0.6 : 0.5 })));
       expect(played(L)).toBe(better.m);
