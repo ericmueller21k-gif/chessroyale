@@ -12,7 +12,7 @@
  * hostScore, on Node's Stockfish), so the match is vouched (two devices of two accounts on every job). Afterwards it prints each
  * account's fair-play numbers and case (GET /api/admin/test-accounts), as the review page (/admin/fairplay) shows them.
  *
- *   npx tsx scripts/cheater-demo.ts [--url https://hunchess.com] [--matches 3] [--until-pooled] [--wait-pool 45] [--out FILE]
+ *   npx tsx scripts/cheater-demo.ts [--url https://hunchess.com] [--matches 6] [--until-pooled] [--wait-pool 60] [--out FILE]
  *   npx tsx scripts/cheater-demo.ts --report          # the accounts' numbers and cases only
  *   npx tsx scripts/cheater-demo.ts --delete          # deletes every test account and its data (fair play's file too)
  *
@@ -403,8 +403,9 @@ class Seat {
 
   private async choose(fen: string, clockMs: number): Promise<string | null> {
     if (this.persona.style === "engine" && eddieEngine) {
-      // Stockfish's top move: as deep as about a third of the move's clock allows, up to the deep re-check's own node count.
-      const nodes = Math.round(Math.max(300_000, Math.min(FAIRPLAY.deep.nodes, eddieNps * (clockMs / 1000) * 0.35)));
+      // Stockfish's top move: as deep as about half the move's clock allows, up to the deep re-check's own node count (a search that
+      // runs near the deadline gives way to the prefetched top move: pick).
+      const nodes = Math.round(Math.max(300_000, Math.min(FAIRPLAY.deep.nodes, eddieNps * (clockMs / 1000) * 0.5)));
       const [best] = await eddieEngine.topMovesAt(fen, 1, nodes);
       return best?.move ?? null;
     }
