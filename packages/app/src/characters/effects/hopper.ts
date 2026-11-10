@@ -18,6 +18,7 @@
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
+import { lazyParts, lazyAnim } from "../sprite.ts";
 
 const CARROT_PALETTE: Record<string, string> = {
   k: "#21160c", // outline
@@ -124,10 +125,9 @@ const CARROT_LEN = 12;
 const CARROT_W = 7;
 const LEAF = 10.5;
 
-const PARTS: Record<string, Part> = {
-  mound: part(SQUARE, SQUARE, (cv) => soil(cv)),
-  // Once pulled: the hole it left, a ring of loose soil round it (no outline: crumbs on the square).
-  hole: part(
+const { parts: PARTS, add: addPart } = lazyParts();
+addPart("mound", () => part(SQUARE, SQUARE, (cv) => soil(cv)));
+addPart("hole", () => part(
     SQUARE,
     SQUARE,
     (cv) => {
@@ -136,17 +136,16 @@ const PARTS: Record<string, Part> = {
       for (let y = 0; y < SQUARE; y++) for (let x = 0; x < SQUARE; x++) if (ring(x, y)) cv[y]![x] = hole(x, y) ? "f" : y < 26 ? "i" : "h";
     },
     false,
-  ),
-  loose: part(
+  ));
+addPart("loose", () => part(
     SQUARE,
     SQUARE,
     (cv) => {
       for (const [x, y, k] of [[10, 25, "h"], [11, 26, "g"], [12, 24, "i"], [13, 27, "h"], [20, 24, "h"], [21, 25, "i"], [21, 26, "g"], [19, 27, "h"], [22, 27, "g"], [15, 28, "h"], [17, 28, "g"], [9, 27, "g"]] as const) cv[y]![x] = k;
     },
     false,
-  ),
-};
-for (const sway of [-6, 0, 6]) PARTS[`planted:${sway}`] = part(SQUARE, SQUARE, (cv) => paintCarrot(cv, PLANT, 0, 9, CARROT_W, LEAF, sway));
+  ));
+for (const sway of [-6, 0, 6]) addPart(`planted:${sway}`, () => part(SQUARE, SQUARE, (cv) => paintCarrot(cv, PLANT, 0, 9, CARROT_W, LEAF, sway)));
 /** The whole carrot, out of the ground: its top `rise` pixels above where it was planted, tilted `deg`. */
 const pulledName = (rise: number, deg: number) => {
   const name = `pulled:${rise}:${deg}`;
@@ -155,13 +154,13 @@ const pulledName = (rise: number, deg: number) => {
 };
 /** The side's token in the square's bottom-right corner: a disc in its color, a little carrot on it. */
 for (const side of ["W", "B"] as const)
-  PARTS[`token${side}`] = part(SQUARE, SQUARE, (cv) => {
+  addPart(`token${side}`, () => part(SQUARE, SQUARE, (cv) => {
     const disc = inEllipse(26.5, 26.5, 4.3, 4.3);
     for (let y = 20; y < SQUARE; y++)
       for (let x = 20; x < SQUARE; x++) if (disc(x, y)) cv[y]![x] = side === "W" ? (x + y > 54 ? "X" : "W") : x + y < 51 ? "A" : "B";
     const glyph = ["...dc", "..RJd", ".RRJ.", ".KR..", "K...."];
     glyph.forEach((row, j) => [...row].forEach((k, i) => k !== "." && (cv[24 + j]![24 + i] = k)));
-  });
+  }));
 
 const L = (name: string, x = 0, y = 0): Layer => ({ part: name, x, y });
 /** The dug square, once the carrot's out. */
@@ -186,7 +185,7 @@ const anims: Record<string, Anim> = {
    * Planted: the flying carrot comes down point first into the square (the board flies it there, carrotFly); the soil
    * heaps up round it as it sinks in (`thunk`), crumbs flying, it springs up a pixel and settles.
    */
-  plant: {
+  plant: lazyAnim(() => ({
     loop: false,
     frames: [
       { ms: 50, cue: "thunk", layers: [L(`planted:6`, 0, 2), L("mound", 0, 2)], specks: crumbs(0) },
@@ -194,12 +193,12 @@ const anims: Record<string, Anim> = {
       { ms: 70, layers: [L(`planted:6`), L("mound")], specks: crumbs(2) },
       { ms: 90, layers: planted(0) },
     ],
-  },
+  })),
   /** Planted, while it waits: its leaves sway, a glint now and then on its shoulder. */
-  planted: {
+  planted: lazyAnim(() => ({
     loop: true,
     frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: planted([0, 0, 6, 6, 0, 0, -6, -6][i]!), specks: i === 2 ? sparkle([13, 19]) : [] })),
-  },
+  })),
 };
 for (const side of ["W", "B"] as const) {
   /**
@@ -242,13 +241,13 @@ export const CARROT_FLY: Character = {
   foot: [16, 16],
   palette: CARROT_PALETTE,
   parts: { fly: part(SQUARE, SQUARE, (cv) => paintCarrot(cv, [19, 12], 45, 10, 5, 6)) },
-  anims: { fly: { loop: true, frames: ([0, 1, 2, 3] as const).map((rot): Frame => ({ ms: 70, layers: [{ part: "fly", x: 0, y: 0, rot }] })) } },
+  anims: { fly: lazyAnim(() => ({ loop: true, frames: ([0, 1, 2, 3] as const).map((rot): Frame => ({ ms: 70, layers: [{ part: "fly", x: 0, y: 0, rot }] })) })) },
 };
 
 // ---- His attack on a king: a carrot bonking the king.
 
 /** A small carrot for the bonk, pointing `deg`, its middle at the square's (16, 16). */
-const BONK_PARTS: Record<string, Part> = {};
+const { parts: BONK_PARTS, add: addBonkPart } = lazyParts();
 const bonkCarrot = (deg: number): string => {
   const name = `bonk:${deg}`;
   const a = (deg * Math.PI) / 180;
@@ -312,7 +311,7 @@ export const CARROT_ICON: Character = {
     slot: part(ICON, ICON, (cv) => paintCarrot(cv, [8.6, 5.4], 45, 8.5, 4.6, 4.6, 0, true), false),
   },
   anims: {
-    icon: { loop: true, frames: [{ ms: 1000, layers: [L("icon")] }] },
-    slot: { loop: true, frames: [{ ms: 1000, layers: [L("slot")] }] },
+    icon: lazyAnim(() => ({ loop: true, frames: [{ ms: 1000, layers: [L("icon")] }] })),
+    slot: lazyAnim(() => ({ loop: true, frames: [{ ms: 1000, layers: [L("slot")] }] })),
   },
 };

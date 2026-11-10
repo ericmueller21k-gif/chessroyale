@@ -10,6 +10,7 @@
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { GINGER_PALETTE } from "../../characters/gingerbread.ts";
 import { grain, groundShadow, ICE_LIGHT, paint, signBoard, signFace, signPost, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const G = GINGER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -284,7 +285,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((i) => ({
   specks: [...flake(40 + (i % 2), 6 + 7 * i), ...flake(108 - (i >> 1), 14 + 7 * ((i + 2) % 4)), ...(i === 2 ? glint(CX - 3, 27) : [])],
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_GINGER: Character = {
   id: "house-gingerbread",

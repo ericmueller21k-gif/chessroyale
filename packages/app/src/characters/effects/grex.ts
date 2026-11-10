@@ -2,6 +2,7 @@
 import { canvas, ellipse, flame, line, poly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { hitAnims, SQUARE, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 // ---- G-REX's fire: a tile that burns up in three stages, a piece burnt to ash, his thrown sparkler, the Roman
 // candle's rockets, the fireballs that fall from them, and the count of shots still up there.
@@ -185,7 +186,7 @@ export const FIRE_TILE: Character = {
   parts: FIRE_PARTS,
   anims: {
     /** The sparkler lands in the middle: a white-hot star, a ring of fire runs out to the edges, and the borders singe. */
-    ignite: {
+    ignite: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 70, cue: "crackle", layers: [], specks: star(16, 16, 3) },
@@ -194,18 +195,18 @@ export const FIRE_TILE: Character = {
         { ms: 90, layers: [{ part: "scorch1", x: 0, y: 0 }, { part: "flare1", x: 0, y: 0 }], specks: ring(15) },
         { ms: 110, layers: tileLayers(1, 0) },
       ],
-    },
+    })),
     /** Stage 1, while it lasts: a light singe at the tile's borders, a few small flickers. */
-    stage1: stageLoop(1),
+    stage1: lazyAnim(() => stageLoop(1)),
     /** Up to stage 2: the flames leap, then settle. */
-    spread2: spread(2),
+    spread2: lazyAnim(() => spread(2)),
     /** Stage 2, while it lasts: the scorch creeps in, flames along the bottom and up the sides, embers. */
-    stage2: stageLoop(2),
-    spread3: spread(3),
+    stage2: lazyAnim(() => stageLoop(2)),
+    spread3: lazyAnim(() => spread(3)),
     /** Stage 3, while it lasts: ablaze. The tile glows, flames climb its sides and burn tall along the bottom (lower in the middle, where a piece stands). */
-    stage3: stageLoop(3),
+    stage3: lazyAnim(() => stageLoop(3)),
     /** It burns out (after a piece burnt up on it, or none was there): the flames die to embers and smoke, the scorch fades. The last frame is empty. */
-    burnOut: {
+    burnOut: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 90, cue: "crackle", layers: [{ part: "heata", x: 0, y: 0 }, { part: "scorch3", x: 0, y: 0 }, { part: "flames2:0", x: 0, y: 0 }], specks: tileEmbers(3, 0) },
@@ -216,9 +217,9 @@ export const FIRE_TILE: Character = {
         { ms: 120, layers: [{ part: "scorch1", x: 0, y: 0 }], pal: fadeFire("20"), specks: smoke(4, 2) },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
     /** The king is fireproof: the fire just fizzles out under him, a puff of smoke and a couple of sparks. The last frame is empty. */
-    fizzle: {
+    fizzle: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 80, cue: "fizzle", layers: [{ part: "scorch2", x: 0, y: 0 }, { part: "flames1:0", x: 0, y: 0 }], specks: [[8, 20, "x"], [24, 18, "x"]] },
@@ -227,7 +228,7 @@ export const FIRE_TILE: Character = {
         { ms: 110, layers: [], specks: smoke(2, 2, 28) },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -352,7 +353,7 @@ export const PIECE_BURN: Character = {
   foot: [16, 31],
   palette: FIRE_PALETTE,
   parts: BURN_PARTS,
-  anims: { burn: burnUp(), ...Object.fromEntries(PIECES.map((pc) => [pc, burnUp(pc)])) },
+  anims: { burn: lazyAnim(() => burnUp()), ...Object.fromEntries(PIECES.map((pc) => [pc, burnUp(pc)])) },
 };
 
 // ---- G-REX's sparkler, thrown, tumbling end over end to its square.
@@ -388,14 +389,14 @@ export const SPARK_FLY: Character = {
   parts: Object.fromEntries(SPARK_DIRS.map((d, i) => [`s${i}`, sparklerPart(d)])),
   anims: {
     /** In flight, tumbling end over end (an eighth of a turn a frame), its head fizzing. Loops while it flies; move it, no need to turn it. */
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: SPARK_DIRS.map((d, i): Frame => ({
         ms: 50,
         layers: [{ part: `s${i}`, x: 10, y: 10 }],
         specks: [...fizz(16 + Math.round(d[0] * 4), 16 + Math.round(d[1] * 4), i + 1), ...([[16 - Math.round(d[0] * 9), 16 - Math.round(d[1] * 9), "e"]] as Speck[])],
       })),
-    },
+    })),
   },
 };
 
@@ -420,9 +421,9 @@ export const CANDLE_SHOT: Character = {
   parts: { rocket: ROCKET },
   anims: {
     /** Streaking up, its trail sparkling below it. Loops while it flies; move it up (it points up). */
-    fly: { loop: true, frames: [0, 1, 2].map((i): Frame => ({ ms: 60, layers: [{ part: "rocket", x: 15, y: 9 }], specks: [...rocketTrail(i), ...(i === 1 ? ([[13, 6, "x"], [19, 7, "Y"]] as Speck[]) : [])] })) },
+    fly: lazyAnim(() => ({ loop: true, frames: [0, 1, 2].map((i): Frame => ({ ms: 60, layers: [{ part: "rocket", x: 15, y: 9 }], specks: [...rocketTrail(i), ...(i === 1 ? ([[13, 6, "x"], [19, 7, "Y"]] as Speck[]) : [])] })) })),
     /** It bursts high up (a little star, then sparks falling away). The last frame is empty. */
-    pop: {
+    pop: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 70, layers: [], specks: star(16, 12, 4) },
@@ -430,7 +431,7 @@ export const CANDLE_SHOT: Character = {
         { ms: 90, layers: [], specks: ring(12).map(([x, y]): Speck => [x, y - 2, "F"]) },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -458,12 +459,12 @@ export const FIREBALL_FALL: Character = {
   parts: FALL_PARTS,
   anims: {
     /** Falling: a fireball, its flames streaming up behind it. Loops while it falls; move it down onto the square. */
-    fall: { loop: true, frames: [0, 1, 2, 3].map((i): Frame => ({ ms: 60, layers: [{ part: i % 2 ? "fireballF" : "fireball", x: 10, y: 6 }], specks: tileEmbers(1, i).map(([x, y, k]): Speck => [x, Math.min(30, y + 4), k]) })) },
+    fall: lazyAnim(() => ({ loop: true, frames: [0, 1, 2, 3].map((i): Frame => ({ ms: 60, layers: [{ part: i % 2 ? "fireballF" : "fireball", x: 10, y: 6 }], specks: tileEmbers(1, i).map(([x, y, k]): Speck => [x, Math.min(30, y + 4), k]) })) })),
     /**
      * It lands on the square: a burst of flame and embers, then it settles into a stage-1 fire tile (its last frame is
      * the fire tile's `stage1` first frame: carry on with fireTile `stage1` on the square).
      */
-    land: {
+    land: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 70, cue: "land", layers: [{ part: "heatH", x: 0, y: 0 }, { part: "flare3", x: 0, y: 0 }], specks: star(16, 20, 6) },
@@ -471,7 +472,7 @@ export const FIREBALL_FALL: Character = {
         { ms: 100, layers: [{ part: "scorch1", x: 0, y: 0 }, { part: "flare1", x: 0, y: 0 }], specks: [...ring(15), ...tileEmbers(2, 2)] },
         { ms: 110, layers: tileLayers(1, 0) },
       ],
-    },
+    })),
   },
 };
 
@@ -557,12 +558,12 @@ export const FIRE_SHADOW: Character = {
   parts: SHADOW_PARTS,
   anims: {
     /** It appears (small), grows to the middle size, grows to the biggest; each then loops at that size. */
-    grow1: { loop: false, frames: shadowFrames(1, SHADOW_R[1], false) },
-    grow2: { loop: false, frames: shadowFrames(SHADOW_R[1], SHADOW_R[2], false) },
-    grow3: { loop: false, frames: shadowFrames(SHADOW_R[2], SHADOW_R[3], true) },
-    shadow1: shadowLoop(1),
-    shadow2: shadowLoop(2),
-    shadow3: shadowLoop(3),
+    grow1: lazyAnim(() => ({ loop: false, frames: shadowFrames(1, SHADOW_R[1], false) })),
+    grow2: lazyAnim(() => ({ loop: false, frames: shadowFrames(SHADOW_R[1], SHADOW_R[2], false) })),
+    grow3: lazyAnim(() => ({ loop: false, frames: shadowFrames(SHADOW_R[2], SHADOW_R[3], true) })),
+    shadow1: lazyAnim(() => shadowLoop(1)),
+    shadow2: lazyAnim(() => shadowLoop(2)),
+    shadow3: lazyAnim(() => shadowLoop(3)),
   },
 };
 

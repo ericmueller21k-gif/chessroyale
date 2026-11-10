@@ -4,6 +4,7 @@
  */
 import { canvas, edge, ellipse, line, poly, tint, toGrid } from "./paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 const PALETTE = {
   k: "#0b0b0f", // outline, seams
@@ -333,10 +334,10 @@ function pose(p: Pose): Layer[] {
 const TAU = Math.PI * 2;
 const BREATH = [0, 0, 0, 1, 1, 1, 1, 0];
 
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: BREATH.map((bob, i): Frame => ({ ms: 140, layers: pose({ bob, capePhase: (TAU * i) / 8, plumePhase: (TAU * i) / 8 + 1.2 }) })),
-};
+}));
 
 /** His eyes light in the visor as he winds up, white-hot at the strike. */
 const EYES = { j: PALETTE.E, J: PALETTE.E };
@@ -367,7 +368,7 @@ function spark(dx: number, bob: number, reach: number): Speck[] {
   return out;
 }
 
-const attack: Anim = {
+const attack: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 110, layers: pose({ capePhase: 0, plumePhase: 1.2 }) },
@@ -382,7 +383,7 @@ const attack: Anim = {
     { ms: 140, layers: pose({ dx: -2, spear: { level: true, reach: 0 }, capePhase: 4.2, plumePhase: 5.4 }) },
     { ms: 140, layers: pose({ capePhase: 5, plumePhase: 6.2 }) },
   ],
-};
+}));
 
 export const BLACK_KNIGHT: Character = {
   id: "black-knight",

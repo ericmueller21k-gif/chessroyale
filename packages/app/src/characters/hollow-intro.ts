@@ -30,7 +30,7 @@
  * `bulbs0`) as the drain reaches him (see the notes, intro-hollow-nov3.md).
  */
 import { HOLLOW, HOLLOW_LOOKS, hollowBuild, type HollowPose } from "./hollow.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 type Pt = readonly [number, number];
 
@@ -197,22 +197,22 @@ const CHARGE_P = (i: number): IntroPose => ({
   sway: [0, 1, 1, 0, -1, -1, 0, 0][i]!,
   ball: { R: i % 2 ? 7.5 : 7, mode: "charge" },
 });
-const charge: Anim = {
+const charge: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p = CHARGE_P(i);
     return frame(100, p, { cue: i === 0 ? "hum" : undefined, pal: i % 4 === 3 ? { ...EYES_HOT, ...VOID_HOT } : i % 2 ? VOID_HOT : undefined, specks: material(heartOf(p), i) });
   }),
-};
+}));
 
 /** The swell: a pulse, the ball growing 8, 9, 10; a judder. */
-const swell: Anim = {
+const swell: Anim = lazyAnim(() => ({
   loop: false,
   frames: [8, 9, 10, 10].map((R, i) => {
     const p: IntroPose = { crouch: 2 - (i >> 1), feet: "wide", free: i < 2 ? "wind" : "out", arm: "low", mood: i === 2 ? "roar" : "grim", phase: 2 * i, ball: { R, mode: i < 3 ? "charge" : "drink" } };
     return frame(i === 3 ? 140 : 110, p, { cue: i === 0 ? "swell" : undefined, shake: i === 1 ? [1, 0] : i === 2 ? [-1, 0] : undefined, pal: i === 2 ? { ...EYES_HOT, ...VOID_HOT } : VOID_HOT, specks: i < 2 ? material(heartOf(p), i * 3, 3, 16, R + 2) : [] });
   }),
-};
+}));
 
 /** Drinking the light: braced wide, claws out low and open, roaring; he shakes with the pull. */
 const DRINK_P = (i: number): IntroPose => ({
@@ -227,14 +227,14 @@ const DRINK_P = (i: number): IntroPose => ({
   sway: i % 2 ? 1 : -1,
   ball: { R: i % 4 < 2 ? 10 : 10.5, mode: "drink" },
 });
-const drink: Anim = {
+const drink: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p = DRINK_P(i);
     const [hx, hy] = heartOf(p);
     return frame(100, p, { shake: i % 2 ? [1, 0] : [0, 0], pal: i % 2 ? EYES_HOT : { ...EYES_HOT, ...VOID_HOT }, specks: flecks([hx, hy], i, p.ball!.R) });
   }),
-};
+}));
 
 /** Full: standing tall in the dark, eyes slits, the ball at its biggest, nearly black, throbbing slowly. */
 const FULL_P = (i: number): IntroPose => ({
@@ -246,16 +246,16 @@ const FULL_P = (i: number): IntroPose => ({
   phase: Math.floor(i / 2),
   ball: { R: i < 4 ? 11.5 : 11, mode: "full" },
 });
-const full: Anim = {
+const full: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const p = FULL_P(i);
     return frame(120, p, { cue: i === 0 ? "hum" : undefined, pal: FULL_PAL, specks: humRing(heartOf(p), i, p.ball!.R) });
   }),
-};
+}));
 
 /** Settle: the ball sinks back into him, to his own void; he stands, his idle's first frame last. */
-const settle: Anim = {
+const settle: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     frame(110, { feet: "wide", free: "out", arm: "low", mood: "dark", phase: 0, crouch: 1, ball: { R: 9.5, mode: "full" } }, { cue: "settle", pal: FULL_PAL }),
@@ -265,9 +265,9 @@ const settle: Anim = {
     frame(140, { mood: "sneer", phase: 4 }),
     frame(300, { phase: 0 }),
   ],
-};
+}));
 
-const idle: Anim = { loop: true, frames: [frame(1000, { phase: 0 })] };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames: [frame(1000, { phase: 0 })] }));
 
 /**
  * Hollow for his battle intro: his own drawing, parts and palette (plus the light landing on the ball), in his own frame

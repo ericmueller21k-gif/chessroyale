@@ -14,7 +14,8 @@ import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/Bo
 import { BossInviteSheet } from "../components/BossParty.tsx";
 import type { PartyClient } from "../squads.ts";
 import { openProfile } from "../profile-nav.ts";
-import { BossFace } from "../components/BossCharacter.tsx";
+import { BossFace, bossAnims, portraitAnims } from "../components/BossCharacter.tsx";
+import { prewarmAnims } from "../components/BossEffect.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { useMedia } from "../components/QuickChat.tsx";
 import { LiveWindow } from "../components/LiveWindow.tsx";
@@ -676,6 +677,14 @@ export function HomeScreen({
       setDifficulty(pv.boss.difficulty);
     } else if (pv.boss.id !== pick || pv.boss.difficulty !== difficulty) bp!.choose(pick, difficulty);
   }, [inParty, leading, pv?.boss?.id, pv?.boss?.difficulty]);
+  // The bosses' art is made the first time it's shown (sprite.ts lazyAnim): their tiles' and faces' made here in quiet slices,
+  // a moment after home shows, so the Boss Battle screen opens without building them; and there, the picked boss's moves.
+  useEffect(() => {
+    let stop = () => {};
+    const t = setTimeout(() => (stop = prewarmAnims(portraitAnims())), 1500);
+    return () => (clearTimeout(t), stop());
+  }, []);
+  useEffect(() => (raid ? prewarmAnims(bossAnims(bossDef(pick)?.name)) : undefined), [raid, pick]);
   // (Not while Solo and Boss alone rest: the hidden /bosses lands here too, and the Boss raid screen says why.)
   const bossAlone = () => (rest("solo") ? undefined : bossInUrl() ? onSolo("raid") : setBossMenu("solo"));
   // Boss Battle's START: Maia's files fetched ahead as the old Boss alone menu did when it opened, then the battle.

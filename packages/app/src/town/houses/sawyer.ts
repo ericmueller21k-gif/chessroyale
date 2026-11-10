@@ -9,6 +9,7 @@
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { SAWYER_PALETTE } from "../../characters/sawyer.ts";
 import { grain, groundShadow, lantern, LANTERN_LIGHT, logEnd, paint, pine, signBoard, signFace, signPost, tuft, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const S_ = SAWYER_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -312,7 +313,7 @@ const frames: Frame[] = [
   { ms: 240, layers, pal: { w: "#fff8d0", W: "#ffd23a", j: "#e8aa4c", "~": "#ffcf5a44", "^": "#ffcf5a80" } },
 ];
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_SAWYER: Character = {
   id: "house-sawyer",

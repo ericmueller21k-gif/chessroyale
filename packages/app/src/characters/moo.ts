@@ -27,7 +27,11 @@
 import { canvas, flame, inEllipse, line, poly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { frameKeys, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnimsTogether, frameKeys, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+
+// Its frames share parts cached by rounded poses (and Moo's powered frames count across his moves), so the first frame made
+// decides them: his animations are made all together, in this file's order (sprite.ts lazyAnimsTogether).
+const lazyAnim = lazyAnimsTogether();
 
 export const MOO_PALETTE: Record<string, string> = {
   k: "#25140d", // outline
@@ -1115,7 +1119,7 @@ const NUZZLE: readonly Pt[] = [[-1, 0], [-2, 1], [-2, 1], [-1, 0]];
  * still); the moon looks about curiously (open eyes wandering over to the board, a word, a blink) and now and then he
  * nuzzles it, his eyes shut. Frame 1 is the still.
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const e = Math.sin((Math.PI * i) / 16) ** 2;
@@ -1133,11 +1137,11 @@ const idle: Anim = {
       moonMouth: m.mouth ?? "smile",
     });
   }),
-};
+}));
 
 const SIT_MOON: readonly MoonLook[] = [{ eyes: "happy" }, { eyes: "happy" }, { eyes: "open", gaze: [-1, 0] }, { eyes: "open", gaze: [0, -1] }, { eyes: "open", gaze: [1, 0], mouth: "open" }, { eyes: "flat" }, { eyes: "happy" }, { eyes: "happy" }];
 /** Sitting on the moon, floating: the boat bobs a pixel, he nods, his ears and tail sway, the moon looks about. Frame 1 is the approved sit. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const e = Math.sin((Math.PI * i) / 8) ** 2;
@@ -1154,13 +1158,13 @@ const sit: Anim = {
       moonMouth: m.mouth ?? "smile",
     }, { stance: "sit" });
   }),
-};
+}));
 
 /**
  * Entrance: his shadow spreads, he drops in from above hugging the moon (the moon gasping, his ears up), lands (a thump,
  * dust, his eyes shut), bounces; then he lifts his head and moos, the moon chattering, and settles with a smile.
  */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "drop" },
@@ -1174,7 +1178,7 @@ const entrance: Anim = {
     F(160, { head: [-1, 1], eyes: "shut", moonEyes: "happy", moonMouth: "smile", tail: 4 }),
     F(300, {}),
   ],
-};
+}));
 
 /** Thinking: he chews, his eyes up toward the board, his ears and tail easing; the moon glances at the board, mouth a line; a thought rises (moonlit dots, then a pawn). */
 const thinking = (F: FrameFn): Anim => ({
@@ -1354,8 +1358,8 @@ const SWITCH: readonly { ms: number; pose: MooPose; stance?: Stance; cue?: strin
   { ms: 120, pose: { head: [2, 1], tail: 6, moonEyes: "happy", moonMouth: "smile" }, stance: "sit" },
 ];
 const switchFrames = (list: typeof SWITCH, cues: readonly (string | undefined)[]): Frame[] => list.map((s, i) => F(s.ms, s.pose, { stance: s.stance, cue: cues[i], shake: s.shake }));
-const toSit: Anim = { loop: false, frames: switchFrames(SWITCH, SWITCH.map((s) => s.cue)) };
-const toHug: Anim = { loop: false, frames: switchFrames([...SWITCH].reverse(), [undefined, "hop", undefined, undefined, "catch", undefined, undefined, undefined]) };
+const toSit: Anim = lazyAnim(() => ({ loop: false, frames: switchFrames(SWITCH, SWITCH.map((s) => s.cue)) }));
+const toHug: Anim = lazyAnim(() => ({ loop: false, frames: switchFrames([...SWITCH].reverse(), [undefined, "hop", undefined, undefined, "catch", undefined, undefined, undefined]) }));
 
 // ---- His own moments.
 
@@ -1395,7 +1399,7 @@ const moonbeam = (F: FrameFn): Anim => {
  * of its light flow into him, he flashes white and flickers (`swap`: his colors go gold, his eyes glow, the aura flares
  * on), growls, then a big "MOO" with the aura blazing, and settles powered up.
  */
-const fullMoon: Anim = {
+const fullMoon: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { moonGlow: 1, moonEyes: "open", moonGaze: [1, 0], moonMouth: "open", gaze: [-1, 1], head: [0, 1] }, { cue: "swell" }),
@@ -1413,15 +1417,15 @@ const fullMoon: Anim = {
     FP(120, { aura: 0, moonGlow: 1, moonEyes: "happy", moonMouth: "smile", head: [0, 2], earN: -40, earF: -40 }),
     FP(140, { aura: 1, moonEyes: "happy" }),
   ],
-};
+}));
 
 /** He stands powered up, the aura flickering round him, breathing hard: a loop for the moves he plays at full strength. */
-const powerIdle: Anim = {
+const powerIdle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) =>
     FP(110, { aura: (i % 3) as 0 | 1 | 2, bob: i % 3 === 1 ? 1 : 0, earN: -36 + rnd(4 * Math.sin((TAU * i) / 6)), earF: -36 - rnd(4 * Math.sin((TAU * i) / 6)), tail: 8 + rnd(6 * Math.sin((TAU * i) / 3)), moonEyes: i % 3 === 2 ? "flat" : "happy", moonMouth: "smile", moonGlow: 1 }),
   ),
-};
+}));
 
 /**
  * The flurry, on the first of his powered moves: the moon leaves his arms and rises over his head, glowing (it fires a
@@ -1429,7 +1433,7 @@ const powerIdle: Anim = {
  * blazing); then they all stand together a moment (the last frame before the board fades them) and the moon comes
  * back down into his arms.
  */
-const flurry: Anim = (() => {
+const flurry: Anim = lazyAnim(() => (() => {
   const rise = (dy: number, glowL: 0 | 1 | 2 | 3, extra: MooPose = {}): MooPose => ({ moonT: 0, moon: [0, dy], moonBack: dy < -30, handN: [12, 38], handF: [18, 36], moonEyes: "happy", moonMouth: "smile", moonGlow: glowL, ...extra });
   const shot = (i: number): Frame =>
     FP(120, rise(-46 + (i % 2 ? 1 : 0), 3, { aura: (i % 3) as 0 | 1 | 2, moonMouth: "o", mouth: "open", head: [0, 1], earN: -58, earF: -58, tail: 14 + (i % 2) * 8, bob: i % 2, dy: i % 2 ? 0 : -1 }), {
@@ -1452,13 +1456,13 @@ const flurry: Anim = (() => {
       FP(100, { aura: 2, moonGlow: 0 }),
     ],
   };
-})();
+})());
 
 /**
  * Dazed, after his five powered moves: the aura fizzles and he flickers back to himself (`calm`: the colors swap back), a
  * wobble, his eyes shut, a Zzz rising over his head; the moon floats up and pats him, twice, and he comes round.
  */
-const dazed: Anim = {
+const dazed: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     FP(100, { aura: 1, auraSize: 0.75, dx: -1, brows: "worry", head: [0, 4], moonEyes: "open", moonMouth: "o", moonGaze: [1, 0] }, { cue: "fizz" }),
@@ -1473,7 +1477,7 @@ const dazed: Anim = {
     F(140, { eyes: "half", earN: 30, earF: 30, head: [0, 1], moonEyes: "happy" }),
     F(160, {}),
   ],
-};
+}));
 
 // ---- His attack on a king (for his kit's `kingAttack` once he's wired in: perSquare 36, stand 1.8, facesLeft).
 
@@ -1575,35 +1579,35 @@ export const MOO: Character = {
     idle,
     sit,
     entrance,
-    thinking: thinking(F),
-    move: move(F),
-    capture: capture(F),
-    hurt: hurt(F),
-    check: check(F),
-    smug: smug(F),
-    rattled: rattled(F),
-    defeat: defeat(F),
-    victory: victory(F),
+    thinking: lazyAnim(() => thinking(F)),
+    move: lazyAnim(() => move(F)),
+    capture: lazyAnim(() => capture(F)),
+    hurt: lazyAnim(() => hurt(F)),
+    check: lazyAnim(() => check(F)),
+    smug: lazyAnim(() => smug(F)),
+    rattled: lazyAnim(() => rattled(F)),
+    defeat: lazyAnim(() => defeat(F)),
+    victory: lazyAnim(() => victory(F)),
     toSit,
     toHug,
-    moonbeam: moonbeam(F),
+    moonbeam: lazyAnim(() => moonbeam(F)),
     fullMoon,
     powerIdle,
     flurry,
     dazed,
-    power: { loop: true, frames: [F(1000, POWERED, { power: true })] },
+    power: lazyAnim(() => ({ loop: true, frames: [F(1000, POWERED, { power: true })] })),
     // The same moves powered up, for as long as the Full Moon lasts (poweredPose: the director's call, Oct 20: every animation
     // he plays during it draws powered). A beat's loop `idle` is `powerIdle` then.
-    p_thinking: thinking(Fp),
-    p_move: move(Fp),
-    p_capture: capture(Fp),
-    p_hurt: hurt(Fp),
-    p_check: check(Fp),
-    p_smug: smug(Fp),
-    p_rattled: rattled(Fp),
-    p_defeat: defeat(Fp),
-    p_victory: victory(Fp),
-    p_moonbeam: moonbeam(Fp),
+    p_thinking: lazyAnim(() => thinking(Fp)),
+    p_move: lazyAnim(() => move(Fp)),
+    p_capture: lazyAnim(() => capture(Fp)),
+    p_hurt: lazyAnim(() => hurt(Fp)),
+    p_check: lazyAnim(() => check(Fp)),
+    p_smug: lazyAnim(() => smug(Fp)),
+    p_rattled: lazyAnim(() => rattled(Fp)),
+    p_defeat: lazyAnim(() => defeat(Fp)),
+    p_victory: lazyAnim(() => victory(Fp)),
+    p_moonbeam: lazyAnim(() => moonbeam(Fp)),
   },
 };
 
@@ -1617,7 +1621,7 @@ export const MOO_ATTACK: Character = {
   name: "Moo (his attack)",
   w: AW,
   foot: [MOO.foot[0] + ATTACK_REACH, MOO.foot[1]],
-  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack: kingAttack(F), p_kingAttack: kingAttack(Fp) },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(F(1000))] })), kingAttack: lazyAnim(() => kingAttack(F)), p_kingAttack: lazyAnim(() => kingAttack(Fp)) },
 };
 
 /** What a portrait shows (his head, an ear, his horns and a bit of the moon's face), in frame pixels. */

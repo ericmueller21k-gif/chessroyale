@@ -11,7 +11,7 @@
  * once; the tail, the legs, the arms and the brush are painted from points per pose, so a new pose is a few numbers.
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "../paint.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 
 export const SIDEKICK_PALETTE = {
   k: "#14210f", // outline
@@ -731,7 +731,7 @@ const LOW = holding([41, 47], 68);
 // ---- Animations.
 
 /** Idle (3 s): breathes, its turret eyes roll about each on its own and blink, its tail curls and uncurls, the brush held up proudly. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 24 }, (_, i) => {
     const e = Math.sin((Math.PI * i) / 24) ** 2;
@@ -754,10 +754,10 @@ const idle: Anim = {
       cas: i >= 4 && i <= 6 ? -1 : 0,
     }, { specks: i === 7 || i === 19 ? sparkle(...glintAt(i)) : [] });
   }),
-};
+}));
 
 /** Walk (0.6 s): a careful step-and-grip, the head bobbing, the brush held up. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) => {
     // A foot on the ground slides back; in the air it swings forward in an arc.
@@ -786,11 +786,11 @@ const walk: Anim = {
       low ? { cue: "step" } : {},
     );
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the chess table, facing the board, legs dangling, the brush lowered, thinking about a move. */
 const SIT: Pose = { sit: true, ...LOW, tilt: 68, paint: "full" };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
@@ -815,11 +815,11 @@ const sit: Anim = {
       swayPhase: (TAU * i) / 16,
     });
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): it lifts the brush and waves it hello, flicking a dab of paint, then settles back to its idle pose. */
 const WAVES = [WAVE_L, WAVE_M, WAVE_R, WAVE_M, WAVE_L, WAVE_M, WAVE_R, WAVE_M];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 1, mouth: "grin", lidN: "joy", lidF: "joy", ...BACK }),
@@ -831,10 +831,10 @@ const wave: Anim = {
     F(100, { ...UP, mouth: "grin", lidN: "joy", lidF: "joy" }),
     F(100, { ...UP }),
   ],
-};
+}));
 
 /** Entrance: its shadow spreads, it drops in from above and lands (dust), then lifts the brush: ta-da. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 100, layers: [], specks: groundShadow(6), cue: "drop" },
@@ -849,10 +849,10 @@ const entrance: Anim = {
     F(140, { ...UP, mouth: "grin" }),
     F(300, {}),
   ],
-};
+}));
 
 /** Thinking (loops): the brush's handle at its chin, head tipped back, eyes rolled up, thought dots popping up, the tail curling slowly. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const n = i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3;
@@ -877,10 +877,10 @@ const thinking: Anim = {
       { specks: thoughts(n) },
     );
   }),
-};
+}));
 
 /** Its move: a crouch, a hop toward the board with a flick of the brush at it, a landing and a settle. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, ...BACK, mouth: "grin" }),
@@ -891,10 +891,10 @@ const move: Anim = {
     F(110, { dx: 1, ...UP, paint: "smear" }),
     F(150, {}),
   ],
-};
+}));
 
 /** A capture: two cheering hops, the brush pumping, flicking paint, sparkles. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(90, { bob: 2, ...BACK, mouth: "grin" }, { cue: "splat" }),
@@ -906,10 +906,10 @@ const capture: Anim = {
     }),
     F(160, { mouth: "smile", lidN: "half", lidF: "half" }),
   ],
-};
+}));
 
 /** Hurt: a flash, knocked back with eyes squeezed shut and the brush drooping; then it shakes it off. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(70, { bob: 2, dx: -1, lidN: "shut", lidF: "shut", mouth: "o", curl: 0.7, sway: 0.5, ...DOWN, cas: 1 }, { cue: "oof", pal: FLASH, shake: [1, 0] }),
@@ -920,11 +920,11 @@ const hurt: Anim = {
     F(120, { lidN: "open", lidF: "half", mouth: "smile", ...UP }),
     F(160, {}),
   ],
-};
+}));
 
 /** Check: it jabs the brush at the board, twice, with a flourish of sparkle, eyes bright. */
 const JAB: Pose = { ...POINT, mouth: "grin", gazeN: [1.4, 0], gazeF: [1.3, 0], hx: 1, paint: "full" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(100, { bob: 2, ...BACK, mouth: "grin" }),
@@ -936,10 +936,10 @@ const check: Anim = {
     F(150, { lidN: "half", lidF: "half", mouth: "smile" }),
     F(160, { lidN: "half", lidF: "half", mouth: "grin" }),
   ],
-};
+}));
 
 /** Smug: chin up, lids half shut, a smirk, a slow nod, the tail lazily swaying, one eye wandering. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(150, {
@@ -958,19 +958,19 @@ const smug: Anim = {
       cas: i === 5 ? -1 : 0,
     }),
   ),
-};
+}));
 
 /** Rattled: shaking, eyes wide, mouth working, sweat flying, the tail wound tight, the brush trembling. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     F(80, { dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, lidN: "wide", lidF: "wide", mouth: i % 2 ? "o" : "wavy", curl: 1, sway: 0.14 * (i % 2 ? 1 : -1), swayPhase: i, cas: 1, ...holding([45 + (i % 2 ? 1 : 0), 46], i % 2 ? 24 : 16), gazeN: [i % 2 ? 0.6 : -0.3, 0], gazeF: [i % 2 ? 0.4 : -0.4, 0] }, { specks: sweat(i) }),
   ),
-};
+}));
 
 /** Defeat: hit, a flash, dizzy eyes; the brush drops, it sits down hard with its legs out, the tail limp, stars wheeling over its head. */
 const SLUMP: Pose = { flop: true, bob: 0, brush: [[38, 58], [56, 57.4]], fist: [34, 49], lidN: "dizzy", lidF: "dizzy", mouth: "wavy", hx: 2, hy: 2, cas: 2 };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(80, { bob: 2, dx: -1, lidN: "shut", lidF: "shut", mouth: "o", curl: 0.6, sway: 0.5, ...DOWN, cas: 1 }, { cue: "oof", pal: FLASH, shake: [1, 0], specks: flecks(tipOf(UP), 20, 1, 4) }),
@@ -981,10 +981,10 @@ const defeat: Anim = {
     F(160, { ...SLUMP, spin: 6 }, { specks: stars(28, 17, 1.6) }),
     F(1000, { ...SLUMP, spin: 7.5 }, { specks: stars(28, 17, 3.2) }),
   ],
-};
+}));
 
 /** Victory: it hops in place, the brush waving over its head and flicking paint, the tail corkscrewing, sparkles. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 4, 5, 4, 2, 0, 0, 0, 0, 0, 0][i]!;
@@ -1005,7 +1005,7 @@ const victory: Anim = {
     };
     return F(110, pose, { cue: i === 2 ? "giggle" : i === 6 ? "thump" : undefined, specks: [...(i === 6 ? dust(0, 2) : i === 7 ? dust(1, 2) : []), ...(i % 3 === 0 ? flecks(tipOf(pose), 30, 2, 3) : []), ...(i % 4 === 1 ? sparkle(14 + (i % 3) * 3, 10) : [])] });
   }),
-};
+}));
 
 export const sidekickSmudgy: Character = {
   id: "sidekick-smudgy",

@@ -78,7 +78,7 @@ export function gardenerFen(boss: Pick<BossView, "id">, moments: readonly Moment
 
 // ---------------- The plain plants ----------------
 
-const GONE_MS = animLength(EFFECTS.gardenPlant.ch.anims.gone!);
+const GONE_MS = () => animLength(EFFECTS.gardenPlant.ch.anims.gone!);
 /** Each plant's state as this device first saw it, and when it last changed (0: it was so when first seen: a reload shows it as it is). */
 const plantSeen = new Map<string, { left: number; since: number }>();
 /** The plants drawn last time in each battle (id to square), and those that have just left (id to square and when). */
@@ -127,11 +127,11 @@ function plantItems(boss: BossView, g: GardenView, now: number, skip: ReadonlySe
   plantLast.set(bkey, here);
   for (const [id, gone] of plantGone) {
     if (!id.startsWith(`${bkey}:`)) continue;
-    if (now >= gone.at + GONE_MS) plantGone.delete(id);
+    if (now >= gone.at + GONE_MS()) plantGone.delete(id);
     else {
       items.push({ square: gone.square, name: "gardenPlant", anim: "gone", since: gone.at });
       marks.push({ square: gone.square, state: "gone" });
-      wake.push(gone.at + GONE_MS + 30);
+      wake.push(gone.at + GONE_MS() + 30);
     }
   }
   return { items, marks, wake };
@@ -175,7 +175,7 @@ export const HAND = { x: 23, y: 54.5 } as const;
 /** A seed's flight from his hand to its square (ms), and the gap between the five of the opening (ms). */
 export const SEED_FLY_MS = 620;
 export const SEED_GAP_MS = 80;
-const PLOP_MS = animLength(EFFECTS.seedPlop.ch.anims.plop!);
+const PLOP_MS = () => animLength(EFFECTS.seedPlop.ch.anims.plop!);
 
 /**
  * Where his hand is on the board (the board's size as 1, the squares' origin at 0,0), from where his figure stands on this screen: a
@@ -272,8 +272,8 @@ function SeedFlights({ orientation }: { orientation: Orientation }) {
   for (const t of currentTosses())
     t.seeds.forEach((s, i) => {
       const land = s.leaveAt + SEED_FLY_MS;
-      wake.push(s.leaveAt, land, land + PLOP_MS);
-      if (now < s.leaveAt || now >= land + PLOP_MS) return;
+      wake.push(s.leaveAt, land, land + PLOP_MS());
+      if (now < s.leaveAt || now >= land + PLOP_MS()) return;
       const id = `${t.id}:${i}`;
       if (now < land) {
         const { col, row } = cellOf(s.to, orientation);
@@ -390,7 +390,7 @@ export function SeedMeter({ boss }: { boss: BossView }) {
 const nothing = () => null;
 
 /** He says it as the plant gulps (ms into its outcome): its `gulp` cue. */
-const EATEN_AT = cueAt(EFFECTS.gardenPlant.ch.anims.kill!, "gulp") ?? GARDEN_ART.killSnap;
+const EATEN_AT = () => cueAt(EFFECTS.gardenPlant.ch.anims.kill!, "gulp") ?? GARDEN_ART.killSnap;
 
 /** The watering: his cast at the board's corner (the sweep, the sprouts and the outcomes are the board layer's), the queen's chime, his word for a meal of his own piece. */
 function waterMoment({ boss, moment, now, cast, kit }: MomentProps) {
@@ -401,7 +401,7 @@ function waterMoment({ boss, moment, now, cast, kit }: MomentProps) {
     <div class="power-moment pm-water">
       {cast("spray", WATER_BEATS.sprayAt)}
       {growth.map((x, i) => (x.kind === "q" ? <SoundAt key={`chime-${i}`} id={`${moment.key}:${boss.startMove}:chime:${i}`} at={moment.at + growthAt(i) + GARDEN_ART.budPop} now={now} sound="gardenerChime" /> : null))}
-      {eaten >= 0 && now >= moment.at + growthAt(eaten) + EATEN_AT && <Say voice={bossVoice} text={line} sayKey={`${boss.id}:${boss.startMove}:${moment.key}:eaten`} priority={NORMAL} />}
+      {eaten >= 0 && now >= moment.at + growthAt(eaten) + EATEN_AT() && <Say voice={bossVoice} text={line} sayKey={`${boss.id}:${boss.startMove}:${moment.key}:eaten`} priority={NORMAL} />}
     </div>
   );
 }

@@ -17,6 +17,7 @@ import { BOSS_POWERS } from "@chessroyale/core";
 import { BOSS_BLITZ, PALETTE, layers, star, type Pose } from "./boss-blitz.ts";
 import { moved } from "./attack-frame.ts";
 import type { Anim, Character, Frame, Speck } from "./sprite.ts";
+import { lazyAnim } from "./sprite.ts";
 
 /** The room added on his right, in his own pixels (his zip-in's blur reaches 32 past the art's frame). */
 export const DASH_ROOM = 33;
@@ -31,22 +32,22 @@ const noCue = (f: Frame): Frame => (f.cue ? { ...f, cue: undefined } : f);
  * His idle without its two clock slaps (and the flag's wobble after them): those frames drawn as rest frames of the same bounce
  * (the same step of its four).
  */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: A.idle!.frames.map((f, i) => (i >= 4 && i <= 8 ? as(A.idle!, i, i + 8) : i >= 20 && i <= 24 ? as(A.idle!, i, i - 8) : (i >= 9 && i <= 11) || (i >= 25 && i <= 27) ? as(A.idle!, i, i % 4) : noCue(f))),
-};
+}));
 /** His thinking without the drumming on the clock: each tap drawn as the frame before it; his yawn kept. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: A.thinking!.frames.map((f, i) => (i % 2 === 1 && !(i >= 12 && i <= 15) ? as(A.thinking!, i, i - 1) : f)),
-};
+}));
 /** Rattled without the nervous taps on the clock: each tap drawn as the frame before it (the sweat and the shake kept). */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: A.rattled!.frames.map((f, i) => (i % 2 === 1 ? { ...as(A.rattled!, i, i - 1), shake: f.shake } : noCue(f))),
-};
+}));
 /** His capture without its slap: his Clock Slap's slam (as your turn begins) is that move's smack. */
-const capture: Anim = { loop: false, frames: A.capture!.frames.map((f, i) => (i === 5 ? as(A.capture!, i, 4) : f)) };
+const capture: Anim = lazyAnim(() => ({ loop: false, frames: A.capture!.frames.map((f, i) => (i === 5 ? as(A.capture!, i, 4) : f)) }));
 
 /**
  * A clock multi-hit: `n` quick smacks of the clock, `ms` a smack (his move's slap: the paw up, then down with its click, the up a
@@ -72,10 +73,10 @@ export const DASH_FIGURE: Character = {
     thinking,
     rattled,
     capture,
-    fit3: fit(3, BOSS_POWERS.dashClockFit.smackMs),
-    fit4: fit(4, BOSS_POWERS.dashClockFit.smackMs),
-    fit5: fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs),
-    fit10: fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs),
+    fit3: lazyAnim(() => fit(3, BOSS_POWERS.dashClockFit.smackMs)),
+    fit4: lazyAnim(() => fit(4, BOSS_POWERS.dashClockFit.smackMs)),
+    fit5: lazyAnim(() => fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs)),
+    fit10: lazyAnim(() => fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs)),
   },
 };
 
@@ -109,7 +110,7 @@ const swipe = (low: boolean): Frame => F(90, { dx: -2, lift: 1, at: low ? [12, 5
 const recoil = (low: boolean): Frame => F(80, { lift: 1, at: low ? [30, 50] : [30, 44], gesture: "open", eyes2: "sly", mouth: "grin", brow: 1, tail: 2 });
 const into = (f: Frame, ground: readonly Speck[] = []) => moved(f, DX, DY, AW, AH, 0, ground);
 
-const kingAttack: Anim = {
+const kingAttack: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     // He comes in from the right in a blur (his zip-in's speed lines) and skids to a stop beside the king (by 470 ms).
@@ -127,7 +128,7 @@ const kingAttack: Anim = {
     into(F(120, { dx: 26, lift: 2, tail: 4, ears: 2, head: [1, 0], hand: "up", mouth: "grin" }), trail(DX + 76, [36, 52, 68, 84], 18)),
     { ms: 160, layers: [], specks: trail(DX + 80, [44, 64, 84], 12) },
   ],
-};
+}));
 
 /** His attack on a king (the kit's `kingAttack`: the God King's Last Stand and his mate): his own parts and palette in a bigger frame. */
 export const DASH_ATTACK: Character = { ...BOSS_BLITZ, id: "dash-attack", w: AW, h: AH, foot: [BOSS_BLITZ.foot[0] + DX, BOSS_BLITZ.foot[1] + DY], palette: PALETTE, anims: { kingAttack } };

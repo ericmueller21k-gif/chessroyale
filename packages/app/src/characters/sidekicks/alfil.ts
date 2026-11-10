@@ -13,6 +13,7 @@
  */
 import { canvas, ellipse, inPoly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const SIDEKICK_ALFIL_PALETTE = {
   k: "#1d120d", // outline
@@ -638,7 +639,7 @@ const tipOf = (p: Pose): Pt => build(p).tip;
 
 /** Idle (3 s): breathes, blinks, its trunk curls and uncurls, an ear flaps, its tail flicks, the tassel nods. */
 const CURL: readonly TrunkKind[] = ["hang1", "hang1", "hang1", "hang1", "hang2", "hang2", "hang2", "hang3", "hang3", "hang3", "hang2", "hang2", "hang1", "hang1", "hang1", "hang0", "hang0", "hang0", "hang0", "hang1", "hang1", "hang1", "hang1", "hang1"];
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 24 }, (_, i) => {
     const bob = i % 12 >= 6 ? 1 : 0;
@@ -647,10 +648,10 @@ const idle: Anim = {
     const tail = ([14, 16].includes(i) ? 1 : i === 15 ? 2 : 0) as 0 | 1 | 2;
     return f(125, { bob, hx, mood: blink ? "blink" : "calm", trunk: CURL[i]!, tail, ear: i === 6 || i === 7 ? "up" : i === 19 || i === 20 ? "down" : "mid", tassel: i === 5 || i === 11 ? 1 : i === 4 || i === 10 ? -1 : 0 });
   }),
-};
+}));
 
 /** Walk (0.6 s): a plodding four-legged step, diagonal pairs, the head bobbing, the tassel swinging. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) => {
     const th = (i / 6) * Math.PI * 2;
@@ -658,21 +659,21 @@ const walk: Anim = {
     const down = i % 3 === 0 ? 0 : 1;
     return f(100, { bob: down, hy: i % 3 === 0 ? -1 : 0, hx: 1, mood: "calm", feet: { nh: leg(0), ff: leg(0), fh: leg(0.5), nf: leg(0.5) }, trunk: i % 3 === 0 ? "hang1" : "hang2", tail: i < 3 ? 1 : 0, ear: down ? "down" : "mid", tassel: [1, 2, 0, -1, -2, 0][i]! }, i % 3 === 0 ? { cue: "step" } : {});
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the chess table, feet dangling, a slow blink, a thinking lean now and then. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
     const blink = i === 3 || i === 4 || i === 13;
     return f(200, { sit: true, mood: blink ? (lean ? "thinkBlink" : "blink") : lean ? "think" : "calm", bob: i % 8 >= 4 ? 1 : 0, hx: lean ? 2 : 0, hy: lean ? 1 : 0, trunk: lean ? "chin" : "hang2", swing: i % 8 < 4 ? 0 : 1, ear: i === 9 ? "down" : "mid", tail: i % 8 < 4 ? 0 : 1, tassel: lean ? 1 : 0 });
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): lifts its trunk, waves it hello with a toot, then settles. */
 const SWAYS = [-1, 0, 1, 0, -1, 0, 1, 0];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 1, mood: "happy", trunk: "hang3", tassel: 1 }),
@@ -685,10 +686,10 @@ const wave: Anim = {
     f(100, { mood: "happy", trunk: "hang2" }),
     f(120, { mood: "calm", trunk: "hang1" }),
   ],
-};
+}));
 
 /** Entrance: drops in from above on its shadow, lands with a squash and a puff of dust, then waves hello. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: dropShadow(4) },
@@ -703,18 +704,18 @@ const entrance: Anim = {
     f(120, { mood: "happy", trunk: "lift" }),
     f(300, { mood: "calm", trunk: "hang1" }),
   ],
-};
+}));
 
 /** Thinking (loops): eyes rolled up, trunk curled to its chin, a foot tapping, thought bubbles. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", trunk: i % 6 < 3 ? "chin" : "hang3", hx: 2, hy: -1, bob: i % 6 >= 3 ? 1 : 0, feet: { ff: i % 4 === 1 ? { lift: 2 } : {} }, tail: i % 6 < 3 ? 1 : 0, ear: i === 5 ? "down" : "mid", tassel: i % 6 < 3 ? 1 : 0 }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a hop toward the board and a trunk-point at it. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, mood: "bold", trunk: "hang2", capDy: 1 }),
@@ -725,10 +726,10 @@ const move: Anim = {
     f(110, { dx: 1, mood: "happy", trunk: "hang2" }),
     f(150, { mood: "calm", trunk: "hang1" }),
   ],
-};
+}));
 
 /** A capture: two excited hops, trunk high, hearts and twinkles. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "bold", trunk: "hang2" }),
@@ -743,10 +744,10 @@ const capture: Anim = {
     f(120, { bob: 1, mood: "happy", trunk: "hang2" }),
     f(160, { mood: "smug", trunk: "hang1" }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, eyes screwed shut, tufts fly; then it shakes it off with a brave little smile. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, mood: "hurt", trunk: "hang0", ear: "down", dx: 1, tassel: 2 }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -757,11 +758,11 @@ const hurt: Anim = {
     f(120, { mood: "bold", trunk: "hang2", tassel: -1 }),
     f(160, { mood: "calm", trunk: "hang1" }),
   ],
-};
+}));
 
 /** Check: two sharp trunk-pointings at the board, eyes bright. */
 const JAB: Pose = { bob: 1, dx: 1, mood: "bold", trunk: "point", ear: "up" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "bold", trunk: "lift" }),
@@ -772,23 +773,23 @@ const check: Anim = {
     f(150, { dx: 1, mood: "happy", trunk: "point" }),
     f(160, { mood: "smug", trunk: "hang2" }),
   ],
-};
+}));
 
 /** Smug: chin up, eyes half shut, a little smirk, a slow nod, its trunk curled just so. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: "smug", trunk: i % 4 < 2 ? "hang3" : "hang2", hy: i < 3 || i > 5 ? -1 : 0, hx: i < 4 ? 0 : 1, bob: i % 4 === 2 ? 1 : 0, ear: i === 5 ? "up" : "mid", tassel: i % 4 === 1 ? 1 : 0 })),
-};
+}));
 
 /** Rattled: wide eyes, worried brows, sweat flying, trembling where it stands. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", trunk: i % 2 ? "hang0" : "hang1", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, ear: "up", tail: i % 2 ? 1 : 2, tassel: i % 2 ? 2 : -2 }, { specks: sweat(i) })),
-};
+}));
 
 /** Defeat: hit, dizzy eyes, it wobbles and plops onto its belly, the cap askew, the trunk limp (the last frame holds). */
 const FLOP: Pose = { lie: true, mood: "out", ear: "down", trunk: "limp", tassel: 2, capDx: 2, capDy: 1, hx: 1 };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "hurt", trunk: "hang0", ear: "down", tassel: 2 }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -801,17 +802,17 @@ const defeat: Anim = {
     f(200, { ...FLOP }, { specks: dizzy(2, 38, 13) }),
     f(1000, { ...FLOP }, { specks: dizzy(3, 38, 13) }),
   ],
-};
+}));
 
 /** Victory: jumping for joy, trunk high, hearts and twinkles. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 4, 5, 4, 2, 0, 0, 2, 4, 2, 0][i]!;
     const lift = air > 1 ? 3 : 0;
     return f(110, { bob: i === 0 || i === 6 || i === 7 ? 2 : 0, air, mood: air > 1 ? "happy" : "cheer", trunk: "up", ts: [0, -1, 0, 1, 0, -1, 0, 0, 1, 0, -1, 0][i]!, feet: lift ? { nh: { lift }, fh: { lift }, ff: { lift }, nf: { lift } } : {}, hy: i % 2 && air < 5 ? -1 : 0, ear: air > 3 ? "up" : "mid", tail: i % 2 ? 2 : 0, tassel: i % 2 ? 2 : -2 }, { cue: i === 2 ? "toot" : undefined, specks: [...(i % 4 === 1 ? star(10 + (i % 3) * 3, 14) : i % 4 === 3 ? heart(55, 5 + (i % 3)) : []), ...(i === 6 ? dust(0) : [])] });
   }),
-};
+}));
 
 export const sidekickAlfil: Character = {
   id: "sidekick-alfil",

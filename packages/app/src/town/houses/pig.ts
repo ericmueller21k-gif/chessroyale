@@ -8,6 +8,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { PIG_PALETTE } from "../../characters/pig.ts";
 import { grain, groundShadow, lantern, LANTERN_LIGHT, paint, signBoard, signFace, tuft, WARM, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const P_ = PIG_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -239,7 +240,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((f) => ({
   ...(f === 1 ? { pal: { w: "#ffe58a", W: "#e0a514", "~": "#ffcf5a22", "^": "#ffcf5a48" } } : f === 3 ? { pal: { w: "#fff8d0", W: "#ffd23a", "~": "#ffcf5a44", "^": "#ffcf5a80" } } : {}),
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_PIG: Character = {
   id: "house-pig",

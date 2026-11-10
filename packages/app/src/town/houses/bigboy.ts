@@ -8,6 +8,7 @@
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { BIGBOY_PALETTE } from "../../characters/bigboy.ts";
 import { ball, groundShadow, LANTERN_LIGHT, paint, signBoard, signFace, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const B = BIGBOY_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -262,7 +263,7 @@ const frames: Frame[] = [0, 1, 2, 3, 4, 5].map((f) => {
   return { ms: 220, layers: [...still.slice(0, 7).map(L), ...hung, ...still.slice(7).map(L)] };
 });
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_BIGBOY: Character = {
   id: "house-bigboy",

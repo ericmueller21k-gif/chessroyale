@@ -9,6 +9,7 @@
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../../characters/sprite.ts";
 import { ALFIL_PALETTE } from "../../characters/alfil.ts";
 import { grain, groundShadow, paint, signBoard, signFace, signPost, TORCH, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const A_ = ALFIL_PALETTE;
 const PALETTE: Record<string, string> = {
@@ -243,7 +244,7 @@ const frames: Frame[] = [0, 1, 2, 3].map((f) => {
   };
 });
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_ALFIL: Character = {
   id: "house-alfil",

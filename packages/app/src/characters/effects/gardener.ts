@@ -33,6 +33,7 @@
 import { canvas, inPoly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims } from "./common.ts";
+import { lazyAnim, lazyParts } from "../sprite.ts";
 
 export const GARDEN_PALETTE: Record<string, string> = {
   k: "#10261a", // outline: a near-black green (the plants' and the soil's)
@@ -239,15 +240,16 @@ function plant(cv: Canvas, o: PlantLook): void {
 
 /** A part from a canvas. */
 const asPart = (cv: Canvas): Part => ({ grid: toGrid(cv), outline: false });
-const parts: Record<string, Part> = {};
+const { parts, add } = lazyParts();
 const L0 = (name: string): Layer => ({ part: name, x: 0, y: 0 });
 const fr = (ms: number, name: string | null, extra: Partial<Frame> = {}): Frame => ({ ms, layers: name ? [L0(name)] : [], ...extra });
 /** Makes a frame's part from a painter, once, under `name`. */
 function draw(name: string, painter: (cv: Canvas) => void): string {
-  const cv = canvas(SQUARE, SQUARE);
-  painter(cv);
-  parts[name] = asPart(cv);
-  return name;
+  return add(name, () => {
+    const cv = canvas(SQUARE, SQUARE);
+    painter(cv);
+    return asPart(cv);
+  });
 }
 
 // ---- The seedling: the shared start of every outcome.
@@ -263,7 +265,7 @@ function seedling(cv: Canvas, open = 1, mnd = 1): void {
 const SEEDLING = draw("seedling", (cv) => seedling(cv));
 
 /** Everything starts here: the soil heaves, a sprout pokes up and opens two leaves. */
-const sprout: Anim = {
+const sprout: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(60, draw("sp0", (cv) => { mound(cv, 6, 2); dirt(cv, 15.5, 25, 7, 5, 1); }), { cue: "sprout" }),
@@ -271,14 +273,14 @@ const sprout: Anim = {
     fr(70, draw("sp2", (cv) => { mound(cv, 8, 2.8); shape(cv, pathIn([[15.5, 26], [15.5, 20]], 1.0), () => "g"); leaf(cv, 15.5, 21, -25, 3.5, 2.2, GREEN); leaf(cv, 15.5, 21, 25, 3.5, 2.2, GREEN); })),
     fr(100, SEEDLING),
   ],
-};
+}));
 
 // ---- The plain plant: green, then fall colors, then its leaves drop, then gone.
 
 const gParts = [0, 1].map((i) => draw(`green${i}`, (cv) => plant(cv, { grow: 1, season: "green", sway: i ? 2.5 : -1.5 })));
 const fParts = [0, 1].map((i) => draw(`fall${i}`, (cv) => plant(cv, { grow: 1, season: "fall", sway: i ? 2 : -1, droop: 0.12 })));
 
-const plainGrow: Anim = {
+const plainGrow: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(70, draw("gr0", (cv) => plant(cv, { grow: 0.4, season: "green" })), { cue: "grow" }),
@@ -286,13 +288,13 @@ const plainGrow: Anim = {
     fr(70, draw("gr2", (cv) => plant(cv, { grow: 0.82, season: "green", sway: -1.5 }))),
     fr(80, gParts[0]!),
   ],
-};
-const green: Anim = { loop: true, frames: [fr(520, gParts[0]!), fr(520, gParts[1]!)] };
+}));
+const green: Anim = lazyAnim(() => ({ loop: true, frames: [fr(520, gParts[0]!), fr(520, gParts[1]!)] }));
 
 /** One leaf mid-fall at (x, y), turned `a`, in a fall ramp. */
 const fallingLeaf = (cv: Canvas, x: number, y: number, a: number, i: number): void => leaf(cv, x, y, a, 4.2, 2.6, FALL[i % FALL.length]!);
 
-const toFall: Anim = {
+const toFall: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(80, draw("tf0", (cv) => plant(cv, { grow: 1, season: "green", sway: 1 }))),
@@ -309,8 +311,8 @@ const toFall: Anim = {
     })),
     fr(80, fParts[0]!),
   ],
-};
-const fall: Anim = { loop: true, frames: [fr(520, fParts[0]!), fr(520, fParts[1]!)] };
+}));
+const fall: Anim = lazyAnim(() => ({ loop: true, frames: [fr(520, fParts[0]!), fr(520, fParts[1]!)] }));
 
 /** The plant with its leaves dropping: the top leaves gone, falling past it. */
 const dropParts = [0, 1].map((i) =>
@@ -324,7 +326,7 @@ const dropParts = [0, 1].map((i) =>
     shape(cv, E(24.5, 27, 2.4, 1), () => "l");
   }),
 );
-const toDrop: Anim = {
+const toDrop: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(80, draw("td0", (cv) => { plant(cv, { grow: 1, season: "fall", leaves: 6, droop: 0.15 }); fallingLeaf(cv, 25, 11, -20, 1); })),
@@ -332,9 +334,9 @@ const toDrop: Anim = {
     fr(90, draw("td2", (cv) => { plant(cv, { grow: 1, season: "fall", leaves: 4, droop: 0.25, sway: -1 }); fallingLeaf(cv, 7, 18, 60, 2); fallingLeaf(cv, 23, 22, -70, 0); shape(cv, E(24.5, 27, 2.4, 1), () => "l"); })),
     fr(80, dropParts[0]!),
   ],
-};
-const drop: Anim = { loop: true, frames: [fr(480, dropParts[0]!), fr(480, dropParts[1]!)] };
-const gone: Anim = {
+}));
+const drop: Anim = lazyAnim(() => ({ loop: true, frames: [fr(480, dropParts[0]!), fr(480, dropParts[1]!)] }));
+const gone: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(90, draw("gn0", (cv) => {
@@ -354,7 +356,7 @@ const gone: Anim = {
     fr(80, draw("gn4", (cv) => mound(cv, 3.2, 1.2, 15.5, 27.5))),
     fr(40, null),
   ],
-};
+}));
 
 // ---- The snapping plant: rises, opens its jaws round the piece, snaps shut on it, chews, sinks.
 
@@ -441,7 +443,7 @@ function trap(cv: Canvas, o: Trap): void {
 }
 
 const trapPart = (name: string, o: Trap, extra?: (cv: Canvas) => void) => draw(name, (cv) => { trap(cv, o); extra?.(cv); });
-const kill: Anim = {
+const kill: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(60, draw("kl0", (cv) => { seedling(cv); shape(cv, E(15.5, 19.5, 3, 3.6), (x, y) => ramp("ggh", (x - 13 + (y - 16) * 0.3) / 6)); dirt(cv, 15.5, 25, 8, 4, 4); }), { cue: "rise" }),
@@ -458,7 +460,7 @@ const kill: Anim = {
     fr(60, draw("kl11", (cv) => mound(cv, 3.4, 1.2))),
     fr(40, null),
   ],
-};
+}));
 
 // ---- A bud that opens on one of his pieces (a pawn, or grander, a queen).
 
@@ -570,7 +572,7 @@ function wilting(cv: Canvas, top: Pt, a1: number, a2: number, dry: number, size:
   leaf(cv, top[0], top[1] + 1, a1, 5.8 * size, 3.4 * size, keys);
   leaf(cv, top[0], top[1] + 1, a2, 5.8 * size, 3.4 * size, keys);
 }
-const wilt: Anim = {
+const wilt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     fr(70, draw("wl0", (cv) => wilting(cv, [16.2, 20.5], -66, 56, 0, 1)), { cue: "wilt" }),
@@ -581,7 +583,7 @@ const wilt: Anim = {
     fr(60, draw("wl5", (cv) => mound(cv, 3.4, 1.2))),
     fr(40, null),
   ],
-};
+}));
 
 // ---- Seeds: they arc in, plop, and sink; nothing is left.
 
@@ -738,15 +740,15 @@ function sheenPart(i: number): Part {
 }
 
 const WATER_SWEEP: Character = (() => {
-  const ps: Record<string, Part> = {};
+  const { parts: ps, add: addPart } = lazyParts();
   const fronts = [-24, 26, 76, 126, 176, 226, 276];
   const sweepFrames = fronts.map((f, i): Frame => {
-    ps[`w${i}`] = sweepPart(f, 100 + i * 3, true);
+    addPart(`w${i}`, () => sweepPart(f, 100 + i * 3, true));
     return { ms: 60, layers: [L0(`w${i}`)], ...(i === 0 ? { cue: "spray" } : {}) };
   });
   const SHEEN_ALPHA = ["1a", "17", "12", "0d", "08", "04"] as const;
   const sheenFrames = SHEEN_ALPHA.map((a, i): Frame => {
-    ps[`h${i}`] = sheenPart(i);
+    addPart(`h${i}`, () => sheenPart(i));
     // Everything in it thins away together: the tint and the glints.
     const fadeTo = [1, 0.95, 0.8, 0.6, 0.38, 0.18][i]!;
     const al = Math.round(255 * fadeTo).toString(16).padStart(2, "0");
@@ -824,5 +826,5 @@ export const GARDEN_PLANT: Character = {
   foot: [16, 28],
   palette: GARDEN_PALETTE,
   parts,
-  anims: { sprout, grow: plainGrow, green, toFall, fall, toDrop, drop, gone, kill, bud: budAnim(false), budQueen: budAnim(true), wilt },
+  anims: { sprout, grow: plainGrow, green, toFall, fall, toDrop, drop, gone, kill, bud: lazyAnim(() => budAnim(false)), budQueen: lazyAnim(() => budAnim(true)), wilt },
 };

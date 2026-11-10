@@ -11,7 +11,7 @@
  * pixels (specks). A new pose is a handful of numbers.
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
-import { lieDown, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
+import { lazyAnim, lieDown, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "../sprite.ts";
 
 export const SIDEKICK_PALETTE = {
   k: "#1b150e", // outline
@@ -580,7 +580,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 // ---- Animations.
 
 /** Idle (3 s): breathes, blinks, twitches its nose, flicks an ear and its tail, glances ahead; the grasshopper waves its antennae and hops once. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 30 }, (_, i) => {
     const bob = i % 15 >= 8 ? 1 : 0;
@@ -593,7 +593,7 @@ const idle: Anim = {
     const hopping = i === 15 || i === 16;
     return f(100, { bob, mood: blink ? "blink" : "calm", ear, nose, tail, hx, ant, sway: i * 0.45, bugDy: i === 15 ? -2 : i === 16 ? -1 : 0, bugHop: hopping });
   }),
-};
+}));
 
 /** Walk (0.6 s): two soft hops, ears bouncing, the scarf flicking behind, the grasshopper bouncing on its head. */
 const HOP: readonly Pose[] = [
@@ -602,17 +602,17 @@ const HOP: readonly Pose[] = [
   { air: 5, mood: "happy", ear: "back", fx: -3, fy: 1, flow: true, bugDy: 0, bugHop: true, ant: "up" },
   { air: 2, mood: "calm", ear: "mid", fx: 2, fy: 2, flow: true, bugDy: -1, ant: "0" },
 ];
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const h = HOP[i % 4]!;
     return f(75, { ...h, sway: i * 1.1, arm: "hold", tail: i % 4 === 2 ? 1 : 0, nose: (i % 2) as 0 | 1 }, i % 4 === 0 ? { cue: "step" } : {});
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the chess table, facing the board, feet dangling, paws on the table's edge; a slow blink, a thoughtful lean. */
 const SIT: Pose = { sit: true, arm: "table" };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const lean = i >= 6 && i <= 11;
@@ -620,11 +620,11 @@ const sit: Anim = {
     const swing = i % 8 < 2 ? 1 : i % 8 >= 4 && i % 8 < 6 ? -1 : 0;
     return f(200, { ...SIT, mood: blink ? (lean ? "thinkBlink" : "blink") : lean ? "think" : i >= 14 ? "sleepy" : "calm", bob: i % 8 >= 4 ? 1 : 0, hx: lean ? 2 : 0, hy: lean ? 1 : 0, ear: i === 9 ? "flick" : "mid", swing, ant: (["0", "1", "2", "1"] as const)[i % 4]!, nose: i === 8 ? 1 : 0, tail: swing > 0 ? 1 : 0, sway: i * 0.5 });
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): a paw up and waving hello, the grasshopper hopping, a little heart; then it settles back to its idle pose. */
 const WAVES: readonly ArmName[] = ["waveL", "waveM", "waveR", "waveM", "waveL", "waveM", "waveR", "waveM"];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "happy", arm: "hold" }),
@@ -635,10 +635,10 @@ const wave: Anim = {
     f(100, { mood: "happy", arm: "hold", ant: "1" }),
     f(100, { mood: "calm", arm: "hold" }),
   ],
-};
+}));
 
 /** Entrance: drops in on its shadow, lands with a squash and a puff of dust, then waves hello. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     { ms: 90, layers: [], specks: dropShadow(4) },
@@ -653,18 +653,18 @@ const entrance: Anim = {
     f(120, { mood: "happy", arm: "hold", ant: "1" }),
     f(300, { mood: "calm", arm: "hold" }),
   ],
-};
+}));
 
 /** Thinking (loops): head tipped up, eyes rolled up, a paw to its chin, a foot tapping, thought dots popping up. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", arm: "chin", hx: 2, hy: -1, bob: i % 6 >= 3 ? 1 : 0, tap: i % 4 === 1 ? 1 : 0, ear: i === 5 ? "flick" : "bent", ant: (["0", "1", "2", "1"] as const)[i % 4]!, sway: i * 0.6, nose: i % 5 === 2 ? 1 : 0 }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a hop toward the board, a paw out. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { bob: 2, mood: "bold", ear: "down", ant: "1" }),
@@ -675,10 +675,10 @@ const move: Anim = {
     f(110, { dx: 1, mood: "happy", arm: "hold", ant: "0" }),
     f(150, { mood: "calm", arm: "hold" }),
   ],
-};
+}));
 
 /** A capture: two excited hops, paws up, hearts and sparkles. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "bold", ear: "down", ant: "1" }),
@@ -693,10 +693,10 @@ const capture: Anim = {
     f(120, { bob: 1, mood: "happy", arm: "up", ant: "1" }),
     f(160, { mood: "smug", arm: "hold" }),
   ],
-};
+}));
 
 /** Hurt: hit, a flash, fur flies, eyes squeezed shut, the grasshopper jumps in fright; then it shakes it off. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { bob: 2, mood: "hurt", arm: "down", ear: "down", ant: "up" }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -707,11 +707,11 @@ const hurt: Anim = {
     f(120, { mood: "bold", arm: "hold", ear: "up", ant: "up" }),
     f(160, { mood: "calm", arm: "hold" }),
   ],
-};
+}));
 
 /** Check: two sharp points at the board, eyes bright, the grasshopper's antennae straight up. */
 const JAB: Pose = { bob: 2, dx: 1, mood: "bold", arm: "point", ear: "up", ant: "up" };
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { bob: 1, mood: "bold", arm: "up", ear: "up", ant: "1" }),
@@ -722,19 +722,19 @@ const check: Anim = {
     f(150, { dx: 1, mood: "happy", arm: "point", ant: "0" }),
     f(160, { mood: "smug", arm: "hold" }),
   ],
-};
+}));
 
 /** Smug: chin up, eyes half shut, a little smirk, a slow nod, ears back; the grasshopper strikes a pose. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(150, { mood: "smug", arm: "hold", hy: i < 3 || i > 5 ? -1 : 0, hx: i < 4 ? 0 : 1, bob: i % 4 === 2 ? 1 : 0, ear: i === 5 ? "up" : "back", ant: (["0", "0", "1", "1", "0", "0", "2", "2"] as const)[i]!, sway: i * 0.7 })),
-};
+}));
 
 /** Rattled: wide eyes, worried brows, sweat flying, trembling where it stands, the grasshopper's antennae quivering. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => f(80, { mood: "rattled", arm: "hold", dx: i % 2 ? 1 : -1, bob: i % 4 === 2 ? 1 : 0, ear: "down", tail: i % 2, ant: i % 2 ? "up" : "2", bugDy: i % 4 === 1 ? -1 : 0, sway: i * 1.7 }, { specks: sweat(i) })),
-};
+}));
 
 /**
  * Defeat: hit, a flash, dizzy eyes, and it keels over onto its back (the standing bunny turned a quarter, its head to our
@@ -748,7 +748,7 @@ const flat = (ms: number, p: Pose, extra: Partial<Frame> = {}): Frame => {
 };
 const FLOP: Pose = { lie: true, mood: "out", ear: "flop", ant: "droop" };
 const SLUMP: Pose = { bob: 4, hx: 2, hy: 3, mood: "out", ear: "down", arm: "hold", ant: "droop" };
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { bob: 2, mood: "hurt", arm: "hold", ear: "down", ant: "up" }, { cue: "poof", pal: FLASH, shake: [1, 0], specks: tufts(0) }),
@@ -761,17 +761,17 @@ const defeat: Anim = {
     f(200, { ...FLOP }, { specks: dizzy(6) }),
     f(1000, { ...FLOP, tail: 1 }, { specks: dizzy(2) }),
   ],
-};
+}));
 
 /** Victory: jumping for joy, a paw high, the grasshopper bouncing on its head, hearts and sparkles. Then again. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 2, 4, 5, 4, 2, 0, 0, 2, 4, 2, 0][i]!;
     const arms: ArmName[] = ["cheer", "waveL", "waveM", "waveR", "waveM", "waveL", "cheer", "cheer", "waveR", "waveM", "waveL", "cheer"];
     return f(110, { bob: i === 0 || i === 6 || i === 7 ? 2 : 0, air, mood: air > 2 ? "happy" : "cheer", arm: arms[i]!, ear: air > 3 ? "back" : air > 0 ? "up" : "mid", fx: air > 0 ? -2 : 0, fy: air > 0 ? 2 : 0, flow: air > 0, hy: i % 2 ? -1 : 0, tail: i % 2, ant: (["up", "2", "0", "2", "up", "1"] as const)[i % 6]!, bugHop: air > 2, bugDy: air > 3 ? -1 : 0, sway: i * 1.3 }, { cue: i === 2 ? "squeak" : undefined, specks: [...(i % 4 === 0 ? heart(46 + (i % 3) * 3, 14 + (i % 2) * 4) : []), ...(i % 3 === 1 ? star(8 + (i % 4) * 4, 22 + (i % 3) * 5) : [])] });
   }),
-};
+}));
 
 export const sidekickChubChirp: Character = {
   id: "sidekick-chubchirp",

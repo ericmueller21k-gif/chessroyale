@@ -12,6 +12,7 @@
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const CUB_PALETTE = {
   k: "#1f1210", // outline
@@ -590,7 +591,7 @@ function f(ms: number, p: Pose, extra: Partial<Frame> = {}): Frame {
 
 /** Idle (3 s): sways, breathes, blinks, swishes its tail; once a loop a big happy squeeze, and the balloon springs back. */
 const SQ_IDLE: Record<number, number> = { 15: 1, 16: 2, 17: 2, 18: 2, 19: 1, 20: -1, 21: 0 };
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 30 }, (_, i) => {
     const th = (i / 30) * Math.PI * 2;
@@ -612,10 +613,10 @@ const idle: Anim = {
       specks: i >= 17 && i <= 22 ? heart(44, 26 - (i - 17) * 2) : i === 20 ? boing() : [],
     });
   }),
-};
+}));
 
 /** Walk (0.6 s): a waddly trot on its hind legs, the balloon hugged to its chest, head bobbing. */
-const walk: Anim = {
+const walk: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 6 }, (_, i) => {
     const th = (i / 6) * Math.PI * 2;
@@ -623,10 +624,10 @@ const walk: Anim = {
     const bob = [0, 1, 2, 0, 1, 2][i]!;
     return f(100, { mood: "calm", bob, hy: bob === 2 ? -1 : 0, hx: i < 3 ? 1 : 0, by: bob === 2 ? -1 : 0, feet: { n: leg(0), f: leg(Math.PI) }, tail: i < 3 ? 2 : -1, sway: i, ears: bob === 2 ? "perk" : "up" }, i % 3 === 0 ? { cue: "step" } : {});
   }),
-};
+}));
 
 /** Sit (loops): on a stool at the table, facing the board, feet dangling, the balloon in its lap; a slow blink, a think. */
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 16 }, (_, i) => {
     const thinking = i >= 7 && i <= 12;
@@ -643,11 +644,11 @@ const sit: Anim = {
       sway: i * 0.3,
     }, { specks: thinking ? thoughts(Math.min(3, i - 6)) : [] });
   }),
-};
+}));
 
 /** Wave (once, 1.2 s): peeks round the balloon and waves a paw hello, the other arm still hugging; then settles back. */
 const WAVES: readonly ArmName[] = ["w1", "w2", "w3", "w2", "w1", "w2", "w3", "w2"];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { mood: "cheer", hx: 1, hy: -1, arm: "up", ears: "perk" }),
@@ -656,10 +657,10 @@ const wave: Anim = {
     f(100, { mood: "calm", sq: -1 }),
     f(100, { mood: "calm" }),
   ],
-};
+}));
 
 /** Entrance: waddles in from the left, stops, and gives the balloon a big happy squeeze. */
-const entrance: Anim = {
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ...Array.from({ length: 9 }, (_, i) => {
@@ -673,18 +674,18 @@ const entrance: Anim = {
     f(90, { mood: "happy", sq: -1 }, { specks: [...heart(45, 18), ...boing()] }),
     f(300, { mood: "calm" }),
   ],
-};
+}));
 
 /** Thinking (loops): chin on the balloon, eyes rolled up, a paw tapping the balloon, thought bubbles. */
-const thinking: Anim = {
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     f(150, { mood: i === 8 ? "thinkBlink" : "think", hx: 1, hy: 1, arm: i % 4 < 2 ? "tap" : "hug", bob: i % 6 >= 3 ? 1 : 0, tail: i % 6 < 3 ? 1 : -1, sway: i * 0.5 }, { specks: thoughts(i % 6 < 1 ? 0 : i % 6 < 3 ? 1 : i % 6 < 5 ? 2 : 3) }),
   ),
-};
+}));
 
 /** Its move: a little hop toward the board, a squeeze as it lands. */
-const move: Anim = {
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { mood: "bold", bob: 2 }),
@@ -695,10 +696,10 @@ const move: Anim = {
     f(110, { mood: "happy", dx: 1 }),
     f(150, { mood: "calm" }),
   ],
-};
+}));
 
 /** A capture: bounces for joy, squeezing the balloon at each landing, hearts and twinkles. */
-const capture: Anim = {
+const capture: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { mood: "bold", bob: 2 }),
@@ -713,10 +714,10 @@ const capture: Anim = {
     f(100, { mood: "happy", sq: -1 }, { specks: [...heart(46, 15), ...boing()] }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Hurt: a flash, eyes screwed shut, clutching the balloon tight (it squishes, never pops); then a brave little smile. */
-const hurt: Anim = {
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(70, { mood: "hurt", bob: 2, sq: 2, ears: "down", hx: -1 }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -727,10 +728,10 @@ const hurt: Anim = {
     f(120, { mood: "calm", hx: 1 }),
     f(160, { mood: "calm" }),
   ],
-};
+}));
 
 /** Check: copies the big one, a tiny roar at the board (squeaky, not scary), then a proud little bounce. */
-const check: Anim = {
+const check: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { mood: "bold", bob: 1, ears: "perk" }),
@@ -741,26 +742,26 @@ const check: Anim = {
     f(110, { mood: "cheer", hx: 1, sq: -1 }),
     f(160, { mood: "smug" }),
   ],
-};
+}));
 
 /** Smug (loops): chin up, eyes half shut, a little smirk, a satisfied squeeze, its tail swishing. */
-const smug: Anim = {
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(160, { mood: i === 4 || i === 5 ? "squeeze" : "smug", hy: i === 4 || i === 5 ? 0 : -1, hx: i === 4 || i === 5 ? 1 : 0, sq: i === 4 || i === 5 ? 1 : i === 6 ? -1 : 0, tail: i % 4 < 2 ? 2 : 0, ears: i === 2 ? "perk" : "up" }),
   ),
-};
+}));
 
 /** Rattled (loops): wide eyes, worried brows, sweat, ears flat, trembling and holding the balloon tight. */
-const rattled: Anim = {
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(80, { mood: "rattled", dx: i % 2 ? 1 : 0, bob: 1, sq: 1, ears: "down", hx: -1, tail: i % 2 ? 1 : -1 }, { specks: sweat(i) }),
   ),
-};
+}));
 
 /** Defeat: a flash, a wobble, it plops down on its bottom, ears down, sniffling and cuddling the balloon (the last frame holds). */
-const defeat: Anim = {
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(80, { mood: "hurt", bob: 2, sq: 2, ears: "down" }, { cue: "poof", pal: FLASH, shake: [1, 0] }),
@@ -773,10 +774,10 @@ const defeat: Anim = {
     f(200, { mood: "sad", sit: "ground", ears: "down", sq: 1, hx: 1, hy: 1 }, { specks: tear(2) }),
     f(1000, { mood: "sad", sit: "ground", ears: "down", sq: 1, hx: 1, hy: 1 }, { specks: tear(4) }),
   ],
-};
+}));
 
 /** Victory (loops): hops for joy with its balloon, a squeeze at every landing, confetti in Babur's balloon colors. */
-const victory: Anim = {
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const air = [0, 3, 6, 7, 6, 3, 0, 0, 3, 6, 3, 0][i]!;
@@ -795,7 +796,7 @@ const victory: Anim = {
       sway: i,
     }, { specks: [...confetti(i), ...(landing ? heart(46, 18) : [])], cue: i === 1 ? "step" : undefined });
   }),
-};
+}));
 
 export const sidekickBabur: Character = {
   id: "sidekick-babur",

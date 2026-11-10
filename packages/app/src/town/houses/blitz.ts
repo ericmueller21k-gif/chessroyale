@@ -14,6 +14,7 @@
  */
 import type { Anim, Character, Frame, Layer, Part } from "../../characters/sprite.ts";
 import { grain, groundShadow, paint, signBoard, signFace, signPost, WARM, type LightPool, type LightSpot, type Pt } from "./kit.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#1a1210", // outline (Blitz's)
@@ -404,7 +405,7 @@ const frames: Frame[] = SWAY.map((dx, f) => ({
   pal: BUZZ[f],
 }));
 
-const idle: Anim = { loop: true, frames };
+const idle: Anim = lazyAnim(() => ({ loop: true, frames }));
 
 export const HOUSE_BLITZ: Character = {
   id: "house-blitz",

@@ -337,9 +337,104 @@ export function lieDown(
 }
 
 /**
+ * An animation made the first time it's read (its `frames` or `loop`), not when the app loads: a page then builds only
+ * the bosses it shows (Nov 10: every boss's poses cost about 1.4 s of a fast core on every load). Every boss wraps its
+ * top-level animations in it; the art comes out the same, pixel for pixel.
+ */
+let animsMadeSoFar = 0;
+/** How many lazy animations have been made so far (a unit test checks the app's load makes none). */
+export const animsMade = (): number => animsMadeSoFar;
+export function lazyAnim(make: () => Anim): Anim {
+  let made: Anim | undefined;
+  const get = () => (made ??= (animsMadeSoFar++, make()));
+  return {
+    get loop() {
+      return get().loop;
+    },
+    get frames() {
+      return get().frames;
+    },
+  };
+}
+
+/**
+ * A table made the first time one of its fields is read (timings read from a boss's animations, which reading would
+ * make): `lazyTable(() => ({ ... }))` in place of `(() => ({ ... }))()`, its uses unchanged.
+ */
+export function lazyTable<T extends object>(make: () => T): T {
+  let t: T | undefined;
+  const of = () => (t ??= make());
+  return new Proxy({} as T, {
+    get: (_, k) => Reflect.get(of(), k),
+    has: (_, k) => Reflect.has(of(), k),
+    ownKeys: () => Reflect.ownKeys(of()),
+    getOwnPropertyDescriptor: (_, k) => {
+      const d = Reflect.getOwnPropertyDescriptor(of(), k);
+      return d && { ...d, configurable: true };
+    },
+  });
+}
+
+/**
+ * lazyAnim for a file whose frames share what they make (a part cached by a rounded pose, a counter), so the frame made first
+ * decides it. There, reading an animation makes the file's animations up to it, in the file's order, as the load did before (the
+ * ones after it were made after it, so can't have changed it): the art comes out the same whichever the page shows first, and a
+ * warm-up can still make them one at a time. `const lazyAnim = lazyAnimsTogether();` in that file. Its `first()` makes them
+ * all: a pose builder another file uses calls it, so that file's frames come after the boss's own, as before.
+ */
+export function lazyAnimsTogether(): ((make: () => Anim) => Anim) & { first: () => void } {
+  const makers: (() => Anim)[] = [];
+  const made: Anim[] = [];
+  let making = 0;
+  const upTo = (i: number): Anim => {
+    making++;
+    try {
+      while (made.length <= i) made.push((animsMadeSoFar++, makers[made.length]!()));
+    } finally {
+      making--;
+    }
+    return made[i]!;
+  };
+  // (Not while one of the file's own is being made: its pose builder is calling, and the rest come after.)
+  const first = () => void (making === 0 && makers.length > made.length && upTo(makers.length - 1));
+  const wrap = (make: () => Anim): Anim => {
+    const i = makers.push(make) - 1;
+    return {
+      get loop() {
+        return upTo(i).loop;
+      },
+      get frames() {
+        return upTo(i).frames;
+      },
+    };
+  };
+  return Object.assign(wrap, { first });
+}
+
+/** A character's animations with every frame changed by `fn` (moved, cropped, a layer left out): each made when first read. */
+export function mapFrames(anims: Readonly<Record<string, Anim>>, fn: (f: Frame) => Frame): Record<string, Anim> {
+  return Object.fromEntries(Object.entries(anims).map(([k, a]) => [k, lazyAnim(() => ({ loop: a.loop, frames: a.frames.map(fn) }))]));
+}
+
+/**
+ * Two parts records read as one, live: a part added to either later (one made the first time a lazy animation draws it)
+ * is there too, where a copy (`{ ...a, ...b }`) would miss it. `a` wins a clash, as the later spread did.
+ */
+export function joinParts(a: Readonly<Record<string, Part>>, b: Readonly<Record<string, Part>>): Record<string, Part> {
+  const has = (k: string | symbol) => k in a || k in b;
+  return new Proxy({} as Record<string, Part>, {
+    get: (_, k) => (typeof k === "string" ? (a[k] ?? b[k]) : undefined),
+    has: (_, k) => has(k),
+    ownKeys: () => [...new Set([...Object.keys(b), ...Object.keys(a)])],
+    getOwnPropertyDescriptor: (_, k) => (typeof k === "string" && has(k) ? { enumerable: true, configurable: true, value: a[k] ?? b[k] } : undefined),
+  });
+}
+
+/**
  * Parts made the first time they're drawn: a boss's dozens of poses (each limb painted from its points), or a hundred
  * night tiles, cost nothing when the app loads, only when a frame that uses them first shows. `add` registers a part's
- * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all).
+ * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all), and a
+ * part set on it by hand is kept as set.
  */
 export function lazyParts(): { parts: Record<string, Part>; add: (name: string, make: () => Part) => string } {
   const makers = new Map<string, () => Part>();
@@ -359,6 +454,13 @@ export function lazyParts(): { parts: Record<string, Part>; add: (name: string, 
     ownKeys: () => [...makers.keys()],
     // (An accessor, so listing the parts doesn't make them; reading one does.)
     getOwnPropertyDescriptor: (_, k) => (typeof k === "string" && makers.has(k) ? { enumerable: true, configurable: true, get: () => get(k) } : undefined),
+    // A part set by hand (one already made, on first use) is kept as it is.
+    set: (_, k, p: Part) => {
+      if (typeof k !== "string") return false;
+      made.set(k, p);
+      makers.set(k, () => p);
+      return true;
+    },
   });
   return {
     parts,

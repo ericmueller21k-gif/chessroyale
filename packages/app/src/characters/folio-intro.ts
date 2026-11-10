@@ -19,7 +19,7 @@
  * notes: scripts/boss-art/out/shop-folio-nov5.md and intro-folio-nov5.md on that branch.
  */
 import { FOLIO, folioLayers, type FolioPose } from "./folio.ts";
-import { lazyParts, type Anim, type Character, type Frame, type Layer } from "./sprite.ts";
+import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer } from "./sprite.ts";
 
 const { parts, add } = lazyParts();
 /** One of its own parts, by its name (made by its rig on first use). */
@@ -31,7 +31,7 @@ const F = (ms: number, p: FolioPose, more: Partial<Frame> = {}): Frame => ({ ms,
 
 /** The glide: wings out lower and level, the neck forward, the tail back, bobbing over the shadow. */
 const BOB = [0, -1, -2, -2, -1, 0];
-const glide: Anim = {
+const glide: Anim = lazyAnim(() => ({
   loop: true,
   frames: BOB.map((dy, i) =>
     F(120, {
@@ -43,10 +43,10 @@ const glide: Anim = {
       shadow: 12 + Math.max(0, 2 + dy),
     }),
   ),
-};
+}));
 
 /** The bow. */
-const bow: Anim = {
+const bow: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     F(140, {}),
@@ -55,13 +55,13 @@ const bow: Anim = {
     F(140, { neck: [1, 3], head: "dip", eye: "happy", wingN: [0, 1] }),
     F(200, { eye: "happy" }),
   ],
-};
+}));
 
 /** Its own idle, its parts read from FOLIO. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: FOLIO.anims.idle!.frames.map((f) => ({ ...f, layers: f.layers.map((l) => ({ ...l, part: own(l.part) })) })),
-};
+}));
 
 export const BOSS_FOLIO_INTRO: Character = {
   id: "folio-intro",

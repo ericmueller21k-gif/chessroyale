@@ -35,9 +35,13 @@ export const CANDLE = {
   /** A shot's flight off the board. */
   shotMs: 700,
   /** He jumps off as his animation's last frame has held a moment. */
-  exitAt: 1300 + (ROMAN ? animLength(ROMAN) : 5600) - 200,
+  get exitAt() {
+    return 1300 + (ROMAN ? animLength(ROMAN) : 5600) - 200;
+  },
   /** The board jolts as he slams the candle down. */
-  slamAt: 1300 + ((ROMAN && cueAt(ROMAN, "slam")) ?? 1150),
+  get slamAt() {
+    return 1300 + ((ROMAN && cueAt(ROMAN, "slam")) ?? 1150);
+  },
   slamMs: 280,
 } as const;
 /** When each of the candle's 24 shots goes up (ms into his romanCandle): its `launch` and `shot` cues. */
@@ -57,7 +61,12 @@ export const shadowsAt = () => CANDLE.exitAt;
 export const FIREBALL = { fallMs: 620, stagger: 170 } as const;
 export const fireballLandAt = (i: number) => i * FIREBALL.stagger + FIREBALL.fallMs;
 /** A piece burning after the crowd's move: the real piece comes off at the burn's `poof`. */
-export const BURN = { goneAt: cueAt(EFFECTS.pieceBurn.ch.anims.burn!, "poof") ?? 520, ms: FIRE_BURN_MS } as const;
+export const BURN = {
+  get goneAt() {
+    return cueAt(EFFECTS.pieceBurn.ch.anims.burn!, "poof") ?? 520;
+  },
+  ms: FIRE_BURN_MS,
+} as const;
 
 /** A fire tile's look as the board shows it: its stage's loop, after the step up into it (or its landing). */
 function tileItem(t: { square: string; lit: number; stage: number }, since: number, landed: "spark" | "fireball" | null, now: number): BoardItem {
@@ -95,7 +104,7 @@ export function shadowItems(boss: Pick<BossView, "powers">, moments: readonly Mo
   const shadows = boss.powers?.shadows ?? [];
   const candle = moments.find((m) => m.kind === "candle");
   const wave = moments.find((m) => m.kind === "fireball");
-  const fresh = candle ? candle.at + shadowsAt() : wave ? wave.at + fireballLandAt((wave.squares?.length ?? 1) - 1) + LAND_MS : 0;
+  const fresh = candle ? candle.at + shadowsAt() : wave ? wave.at + fireballLandAt((wave.squares?.length ?? 1) - 1) + LAND_MS() : 0;
   const item = (square: string, lands: number, stage: number) => fireShadowItem(square, lands, stage, now);
   const out = shadows.flatMap((sh) => (sh.stage <= 1 && now < fresh ? [] : [item(sh.square, sh.lands, sh.stage)]));
   // (This turn's wave: its shadows stay at their biggest until each fireball lands.)
@@ -193,8 +202,8 @@ function Fireball({ square, orientation, since }: { square: string; orientation:
     </span>
   );
 }
-const LAND_MS = animLength(EFFECTS.fireballFall.ch.anims.land!);
-const FIZZLE_MS = animLength(EFFECTS.fireTile.ch.anims.fizzle!);
+const LAND_MS = () => animLength(EFFECTS.fireballFall.ch.anims.land!);
+const FIZZLE_MS = () => animLength(EFFECTS.fireTile.ch.anims.fizzle!);
 
 /**
  * The Roman candle's shots still up: the characters' column by the board's right edge (`candleShots`, `left<n>`), in
@@ -252,8 +261,8 @@ function fireballMoment({ moment, now, orientation, cast }: MomentProps) {
       <BoardEffects
         items={(moment.squares ?? []).flatMap((sq, i): BoardItem[] => {
           const land = moment.at + fireballLandAt(i);
-          if (moment.fizzled?.includes(sq)) return now >= land && now < land + FIZZLE_MS ? [{ square: sq, name: "fireTile", anim: "fizzle", since: land }] : [];
-          return now >= land && now < land + LAND_MS ? [{ square: sq, name: "fireballFall", anim: "land", since: land }] : [];
+          if (moment.fizzled?.includes(sq)) return now >= land && now < land + FIZZLE_MS() ? [{ square: sq, name: "fireTile", anim: "fizzle", since: land }] : [];
+          return now >= land && now < land + LAND_MS() ? [{ square: sq, name: "fireballFall", anim: "land", since: land }] : [];
         })}
         orientation={orientation}
         class="pw-fire-board"
@@ -294,7 +303,7 @@ export const GREX_UI = {
         const lit = (m.squares ?? []).filter((sq) => !m.fizzled?.includes(sq));
         return lit.length > 2 ? `Fire on ${lit.length} squares` : lit.length ? `Fire on ${lit.join(" and ")}` : "Your king is fireproof.";
       },
-      appearAt: (m, square) => (m.squares?.includes(square) ? m.at + fireballLandAt(m.squares.indexOf(square)) + LAND_MS : undefined),
+      appearAt: (m, square) => (m.squares?.includes(square) ? m.at + fireballLandAt(m.squares.indexOf(square)) + LAND_MS() : undefined),
       view: fireballMoment,
     },
     candle: { order: 2, kit: "ultimate", view: candleMoment },

@@ -17,6 +17,7 @@
  */
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part } from "../sprite.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const PALETTE: Record<string, string> = {
   k: "#08070c", // outline (Hollow's)
@@ -350,7 +351,7 @@ const frame = (ms: number, p: Partial<Pose>, more: Partial<Frame> = {}): Frame =
 // ---- The animations.
 
 /** Idle: he breathes slowly, his tail sways, an ear twitches, a slow droopy blink, the near antler wobbles on its string. */
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) =>
     frame(170, {
@@ -362,7 +363,7 @@ const idle: Anim = {
       hy: i >= 5 && i <= 6 ? 1 : 0,
     }),
   ),
-};
+}));
 
 /** Walk: a loose, shaggy trot; paws in diagonal pairs, the body bobbing, ears and scarf flopping, the tail swinging. */
 const WALK: readonly Partial<Pose>[] = [
@@ -373,11 +374,11 @@ const WALK: readonly Partial<Pose>[] = [
   { by: -1, nf: [41, 60], fh: [22, 60], ff: [41, 58], nh: [23, 58], tail: 0, ear: 0, scarf: 0 },
   { by: 0, nf: [44, 60], fh: [25, 60], ff: [38, 59], nh: [20, 59], tail: 1, ear: -1, scarf: -1 },
 ];
-const walk: Anim = { loop: true, frames: WALK.map((p, i) => frame(110, { ...p, hy: p.by === -1 ? -1 : 0 }, i === 1 || i === 4 ? { cue: "step" } : {})) };
+const walk: Anim = lazyAnim(() => ({ loop: true, frames: WALK.map((p, i) => frame(110, { ...p, hy: p.by === -1 ? -1 : 0 }, i === 1 || i === 4 ? { cue: "step" } : {})) }));
 
 /** Sit (at a table): down on his haunches, front legs straight; he breathes, blinks, tilts his head and thumps his tail. */
 const SIT: Partial<Pose> = { sit: true, nf: [40, 60], ff: [36, 60] };
-const sit: Anim = {
+const sit: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     frame(220, {
@@ -391,7 +392,7 @@ const sit: Anim = {
       ear: i === 6 ? -1 : 0,
     }),
   ),
-};
+}));
 
 /** Wave: he lifts a front paw and waves it, happy, tongue out, tail going; then puts it down. */
 const WAVE_PAWS: readonly [Pt, Pt][] = [
@@ -404,14 +405,14 @@ const WAVE_PAWS: readonly [Pt, Pt][] = [
   [[50, 45], [58, 42]],
   [[48, 47], [53, 47]],
 ];
-const wave: Anim = {
+const wave: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     ...WAVE_PAWS.map(([elbow, nf], i) => frame(i === 0 ? 130 : 110, { elbow, nf, mood: i === 0 ? "calm" : "happy", tongue: i > 0, tail: i % 2 ? 2 : -2, hy: -1, by: 0, ear: i % 2 ? -1 : 0, scarf: i % 2 ? 1 : 0 })),
     frame(160, { mood: "happy", tongue: true, tail: 1 }),
     frame(260, { mood: "calm" }),
   ],
-};
+}));
 
 export const sidekickHollowDog: Character = {
   id: "sidekick-hollow-dog",

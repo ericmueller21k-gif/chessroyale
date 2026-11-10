@@ -191,8 +191,8 @@ export function bounceJolt(m: Pick<Moment, "kind" | "at"> | null, now: number): 
 }
 
 const PIECE_CLASS: Record<string, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king" };
-const CRASH_MS = animLength(EFFECTS.bounceCrash.ch.anims.crash!);
-const PUFF_MS = animLength(EFFECTS.bouncePuff.ch.anims.puff!);
+const CRASH_MS = () => animLength(EFFECTS.bounceCrash.ch.anims.crash!);
+const PUFF_MS = () => animLength(EFFECTS.bouncePuff.ch.anims.puff!);
 
 /** The Big Bounce on the board (its moment's beats: BOUNCE in boss-timing.ts). */
 export function BigBounce({ boss, moment, now, orientation }: { boss: BossView; moment: Moment; now: number; orientation: Orientation }) {
@@ -210,10 +210,10 @@ export function BigBounce({ boss, moment, now, orientation }: { boss: BossView; 
   const puffs: BoardItem[] = [];
   b.spots.forEach((sp, k) => {
     const at = moment.at + (BOUNCE.lands[k] ?? 0);
-    if (now >= at && now < at + PUFF_MS) for (const sq of spotSquares(sp)) puffs.push({ square: sq, name: "bouncePuff", since: at, quiet: true });
+    if (now >= at && now < at + PUFF_MS()) for (const sq of spotSquares(sp)) puffs.push({ square: sq, name: "bouncePuff", since: at, quiet: true });
   });
   const crashAt = moment.at + BOUNCE.crashAt;
-  if (now >= crashAt && now < crashAt + PUFF_MS) for (const sq of spotSquares(CENTRE_SPOT)) puffs.push({ square: sq, name: "bouncePuff", since: crashAt, quiet: true });
+  if (now >= crashAt && now < crashAt + PUFF_MS()) for (const sq of spotSquares(CENTRE_SPOT)) puffs.push({ square: sq, name: "bouncePuff", since: crashAt, quiet: true });
   const flyers = bounceFlyers(b);
   return (
     <div class="hb-pieces bb-layer" aria-hidden="true" data-bounce={t < BOUNCE.settledAt ? "on" : "settled"}>
@@ -237,7 +237,7 @@ export function BigBounce({ boss, moment, now, orientation }: { boss: BossView; 
           />
         );
       })}
-      {now >= crashAt && now < crashAt + CRASH_MS && (
+      {now >= crashAt && now < crashAt + CRASH_MS() && (
         <span class="bb-crash">
           <BossEffect name="bounceCrash" since={crashAt} id={`crash-${moment.key}`} />
         </span>
@@ -359,12 +359,12 @@ function blockItems(boss: BossView, now: number, appearAt: (square: string) => n
       const tag = `${key}:${last.square}:${last.until}`;
       let at = blockGone.get(tag);
       if (at === undefined) blockGone.set(tag, (at = now));
-      if (now < at + POOF_MS) out.push(blockItem(last.square, "poof", at));
+      if (now < at + POOF_MS()) out.push(blockItem(last.square, "poof", at));
     }
   }
   return out;
 }
-const POOF_MS = animLength(EFFECTS.toyBlock.ch.anims.poofA!);
+const POOF_MS = () => animLength(EFFECTS.toyBlock.ch.anims.poofA!);
 
 function blockMoment({ moment, t, orientation, banner, cast }: MomentProps) {
   const letter = moment.square ? blockLetter(moment.square) : "A";
