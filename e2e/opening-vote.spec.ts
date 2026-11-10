@@ -113,8 +113,12 @@ test("the three votes in order: how it ends, how it starts, how fast; the start'
 
   // The game begins from the start that won: its pieces where the position has them.
   await expect.poll(() => phase(page), { timeout: 30_000 }).toMatch(/play|watching/);
-  await expect(page.locator(`.board-area ${BOARD_SEL.piece}`)).toHaveCount(32, { timeout: 10_000 });
   const b = await board(page);
+  // (Every piece of the start drawn: 32, or fewer when Random opening's line has a capture, as 35 of the 87 it draws from
+  // do. As play begins the board still shows 32 for a moment, so a look then passed a fixed 32; main run 1198, Nov 10,
+  // looked once it had settled at 31 and waited for a 32nd.)
+  await expect(page.locator(`.board-area ${BOARD_SEL.piece}`)).toHaveCount(Object.keys(placement(b.fen)).length, { timeout: 10_000 });
+  if (won.id !== "random") expect(Object.keys(placement(b.fen))).toHaveLength(32);
   const start = baseAt(0, b.bases).fen;
   if (won.id === "freestyle") {
     expect(isChess960Fen(start)).toBe(true);
