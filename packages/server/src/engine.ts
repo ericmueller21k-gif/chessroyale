@@ -38,6 +38,9 @@ let tableReady = false;
  */
 export type EnginePool = "match" | "solo";
 
+/** Solo's share of a day's `cap`: ENGINE_SERVER.soloDailySearches, and never more than `soloShare` of it (a lowered cap, staging). */
+export const soloCap = (cap: number): number => Math.min(ENGINE_SERVER.soloDailySearches, Math.floor(cap * ENGINE_SERVER.soloShare));
+
 /** Counts one search against today's budget (and solo's share); false once it's spent (or if counting fails). */
 async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<boolean> {
   if (!env.DB) return true;
@@ -52,9 +55,10 @@ async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<b
         .DB!.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1 RETURNING searches")
         .bind(key)
         .first<{ searches: number }>();
-    if (pool === "solo" && ((await take(`${day}:solo`))?.searches ?? Infinity) > ENGINE_SERVER.soloDailySearches) return false;
+    const cap = Number(env.ENGINE_DAILY_SEARCHES ?? 3000);
+    if (pool === "solo" && ((await take(`${day}:solo`))?.searches ?? Infinity) > soloCap(cap)) return false;
     const row = await take(day);
-    return (row?.searches ?? 0) <= Number(env.ENGINE_DAILY_SEARCHES ?? 3000);
+    return (row?.searches ?? 0) <= cap;
   } catch {
     return false;
   }

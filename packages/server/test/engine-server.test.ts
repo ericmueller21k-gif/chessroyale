@@ -25,7 +25,7 @@ import worker, { type Env } from "../src/index.ts";
 import { createGuest, ensureSchema, signInWithIdentity } from "../src/accounts.ts";
 import { SESSION_COOKIE } from "../src/api.ts";
 import { memoryDb } from "./memory-db.ts";
-import { serverScoreAt } from "../src/engine.ts";
+import { serverScoreAt, soloCap } from "../src/engine.ts";
 import { containerSearch } from "../src/fairplay-engine.ts";
 
 /** Positions Stockfish refuses, one of each kind the game could be handed (stockfishRefuses). */
@@ -190,5 +190,19 @@ describe("the engine server's open routes need an account and stop at a cap (Nov
     // A match's re-check still searches.
     expect(await serverScoreAt(env, START_FEN, ["e2e4"])).toEqual([{ move: "e2e4", expected: 0.5 }]);
     expect(sent).toHaveLength(1);
+  });
+
+  it("a lowered day's budget (staging, say): solo never takes more than ENGINE_SERVER.soloShare of it (the review of #610, m5)", async () => {
+    const { d1, db, guest, usage } = await accountsDb();
+    const env = { ENGINE: {} as never, DB: d1, ENGINE_DAILY_SEARCHES: "600" };
+    expect(soloCap(600)).toBe(Math.floor(600 * ENGINE_SERVER.soloShare));
+    expect(soloCap(600)).toBeLessThan(ENGINE_SERVER.soloDailySearches);
+    expect(soloCap(3000)).toBe(ENGINE_SERVER.soloDailySearches);
+    const day = new Date().toISOString().slice(0, 10);
+    db.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, ?), (?, ?)").run(`${day}:solo`, soloCap(600) - 1, day, soloCap(600) - 1);
+    expect((await score(env, legal, guest)).status).toBe(200);
+    expect((await score(env, legal, guest)).status).toBe(503);
+    expect(sent).toHaveLength(1);
+    expect(usage(day)).toBe(soloCap(600));
   });
 });

@@ -656,7 +656,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
         });
     const { game: _game, won: _won, resigned: _resigned, left: _left, test: _test, ...result } = b;
     // (`playMs`: the server's time, as XP counted it (a test server's ?xpgame minutes included); none for a game it never timed. The
-    // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinMinutes of it: Nov 10.)
+    // Welcome Crate counts a solo game only with WELCOME_GIFT.soloMinSeconds of it and XP.minMoves moves: Nov 10.)
     await recordResult(sql, current.id, { ...result, online: false, mode: b.mode === "crowd" || b.mode === "boss" ? b.mode : "classic", playMs: timed ? ms : null, moves, xp } as MatchResult, now);
     // (A finished game: maybe the Welcome Crate, once ever. The app's next /api/me shows it.)
     await grantWelcomeCrate(sql, current.id, now).catch(() => false);

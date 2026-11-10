@@ -122,7 +122,12 @@ export function withServerRecheck(engine: UciEngine, boards: () => number = () =
   };
 }
 
+/**
+ * The engine server said no for this game: none here (404, e.g. the dev server), not signed in (401) or today's calls used up (429).
+ * This device re-checks for the rest of the game, asking nothing more (the review of #610, m5); a new game asks again.
+ */
 let serverDown = false;
+const refusal = (status: number) => status === 404 || status === 401 || status === 429;
 
 async function serverScoreAt(fen: string, moves: readonly string[], boards: number): Promise<MoveScore[] | null> {
   if (serverDown) return null;
@@ -131,7 +136,7 @@ async function serverScoreAt(fen: string, moves: readonly string[], boards: numb
     const t = setTimeout(() => ctl.abort(), 9000);
     const res = await fetch("/api/engine/score", { method: "POST", body: JSON.stringify({ fen, moves, boards }), signal: ctl.signal });
     clearTimeout(t);
-    if (res.status === 404) serverDown = true; // no engine server here (e.g. the dev server): stop asking
+    if (refusal(res.status)) serverDown = true;
     if (!res.ok) return null;
     const body = (await res.json()) as { moves?: MoveScore[] };
     return Array.isArray(body.moves) && body.moves.length ? body.moves : null;
@@ -140,7 +145,10 @@ async function serverScoreAt(fen: string, moves: readonly string[], boards: numb
   }
 }
 
-/** Wakes the engine server as a game starts (so the first re-check doesn't wait for it to boot). */
+/** Wakes the engine server as a game starts (so the first re-check doesn't wait for it to boot); its refusal holds for the game. */
 export function warmEngineServer() {
-  void fetch("/api/engine/ping").catch(() => undefined);
+  serverDown = false;
+  void fetch("/api/engine/ping")
+    .then((res) => void (refusal(res.status) && (serverDown = true)))
+    .catch(() => undefined);
 }

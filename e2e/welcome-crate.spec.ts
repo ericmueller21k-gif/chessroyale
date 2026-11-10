@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { HUNCHESS_RIDES, WELCOME_CRATE_ID, WELCOME_GIFT } from "@chessroyale/core";
+import { HUNCHESS_RIDES, WELCOME_CRATE_ID, XP } from "@chessroyale/core";
 import { asSignedIn, named, test } from "./helpers.ts";
 
 /**
@@ -21,15 +21,15 @@ type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcom
 const lockerNow = (page: Page) => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
 /**
  * One finished game, saved as a solo game saves it (the app's own path): the server times it from its start (the test switch
- * ?xpgame counts it as WELCOME_GIFT.soloMinMinutes long), then its result. Since Nov 10 a result the server never timed, or timed
- * shorter, doesn't count toward a Welcome Crate.
+ * ?xpgame counts it as a minute long: WELCOME_GIFT.soloMinSeconds), then its result with XP.minMoves moves. Since Nov 10 a result
+ * the server never timed, or timed shorter, or with fewer moves, doesn't count toward a Welcome Crate.
  */
 const finishGame = (page: Page) =>
-  page.evaluate(async (minutes) => {
+  page.evaluate(async (moves) => {
     const json = { "content-type": "application/json" };
-    const { game } = (await (await fetch("/api/xp/solo/start", { method: "POST", headers: json, body: JSON.stringify({ xpgame: minutes }) })).json()) as { game: string };
-    return (await fetch("/api/results", { method: "POST", headers: json, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true, game }) })).ok;
-  }, WELCOME_GIFT.soloMinMinutes);
+    const { game } = (await (await fetch("/api/xp/solo/start", { method: "POST", headers: json, body: JSON.stringify({ xpgame: 1 }) })).json()) as { game: string };
+    return (await fetch("/api/results", { method: "POST", headers: json, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true, moves, game }) })).ok;
+  }, XP.minMoves);
 
 test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];

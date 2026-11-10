@@ -3103,13 +3103,15 @@ export const AGE_GATE = {
 /**
  * The engine server's two open routes (server/index.ts; the outside review of Nov 10, finding 4): POST /api/engine/score (a solo
  * game's close calls) and GET /api/engine/ping (waking it as a solo game starts). Only for an account (signed in, where sign-in is
- * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts), and solo's searches at most
- * `soloDailySearches` a day of the day's ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device
- * re-checks itself, as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
+ * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts; not yet measured against a
+ * keen solo player), and solo's searches at most `soloDailySearches` a day, never more than `soloShare` of the day's
+ * ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device re-checks itself for the rest of the game,
+ * as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
  */
 export const ENGINE_SERVER = {
   perAccountDaily: 200,
   soloDailySearches: 1000,
+  soloShare: 1 / 3,
 } as const;
 
 /**
@@ -3278,11 +3280,12 @@ export const OUTFIT = {
 export const WELCOME_GIFT = {
   milestones: [5, 25],
   /**
-   * A solo game counts toward them only when the server timed it (POST /api/xp/solo/start, then its result) for at least this long:
-   * its result is the device's word, and empty posts earned crates (the outside review of Nov 10, finding 10). Online games count as
-   * their rooms recorded them.
+   * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
+   * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
+   * review of Nov 10, finding 10). By moves, not 3 minutes, so a quick boss loss or a first-stage knockout still counts (the review of
+   * #610, m6). Online games count as their rooms recorded them.
    */
-  soloMinMinutes: 3,
+  soloMinSeconds: 60,
 } as const;
 
 /**

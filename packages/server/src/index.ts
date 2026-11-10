@@ -480,10 +480,6 @@ async function testPool(request: Request, env: Env, url: URL, waitUntil: WaitUnt
 }
 
 /**
- * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
- * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Null: go ahead.
- */
-/**
  * Who may call the engine server's open routes: an account (signed in, where sign-in is set up), within its calls for the day
  * (ENGINE_SERVER.perAccountDaily, engine-calls.ts). Null if so, else the answer: 401, or 429 for the day.
  */
@@ -494,6 +490,10 @@ async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): P
   return null;
 }
 
+/**
+ * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
+ * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Null: go ahead.
+ */
 async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | null> {
   if (!env.DB) return null;
   const me: User | null = await accountOf(request, env, waitUntil);
