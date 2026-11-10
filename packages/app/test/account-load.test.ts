@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { account, loadAccount } from "../src/account.ts";
+import { account, loadAccount, startSoloBossBattle } from "../src/account.ts";
 import { testSwitchesAllowed } from "../src/test-switches.ts";
 
 /**
@@ -53,5 +53,29 @@ describe("loading the account", () => {
     const calls = server([403]);
     await loadAccount();
     expect(calls.filter((c) => c.startsWith("/api/me"))).toHaveLength(1);
+  });
+});
+
+describe("a solo boss battle's start (Nov 10)", () => {
+  it("lost on the way once: asked again, and the battle's id comes back (a start that failed earned no token, and a town challenge said nothing in the chat)", async () => {
+    server([200]);
+    await loadAccount();
+    const starts: string[] = [];
+    vi.stubGlobal("fetch", async (path: string, init?: RequestInit) => {
+      starts.push(`${path} ${init?.body}`);
+      if (starts.length === 1) throw new TypeError("Failed to fetch");
+      return Response.json({ battle: "b2" });
+    });
+    expect(await startSoloBossBattle("alfil")).toBe("b2");
+    expect(starts).toEqual(['/api/boss/solo/start {"town":"alfil"}', '/api/boss/solo/start {"town":"alfil"}']);
+  });
+
+  it("refused (a 4xx): not asked again", async () => {
+    server([200]);
+    await loadAccount();
+    let n = 0;
+    vi.stubGlobal("fetch", async () => (n++, Response.json({ message: "no" }, { status: 403 })));
+    await expect(startSoloBossBattle()).rejects.toThrow("no");
+    expect(n).toBe(1);
   });
 });

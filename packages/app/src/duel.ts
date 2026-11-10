@@ -32,7 +32,7 @@ import { ownEngine, pauseEngines } from "./engine.ts";
 import { prefetchMaia, startMaia } from "./maia.ts";
 import { MaiaGate } from "./maia-gate.ts";
 import { crumb } from "./problems.ts";
-import { testParams, testSwitchesAllowed } from "./test-switches.ts";
+import { queuePool, testParams, testSwitchesAllowed } from "./test-switches.ts";
 
 /**
  * Ranked 1 v 1 in the app (docs/areas/ranked.md): the queue (`DuelQueue`), a game against a person through its
@@ -809,7 +809,8 @@ export class DuelQueue {
     this.test = resume && testSwitchesAllowed() ? { ...resume.test } : {};
     if (!resume)
       for (const k of ["pool", "clock", "fewAfter"]) {
-        const v = t.get(k);
+        // (The pool as App's and Squads' queues read it: kept after a mode switch or a left queue drops it from the address.)
+        const v = k === "pool" ? queuePool() : t.get(k);
         if (v) this.test[k] = v;
       }
     this.ticket = resume?.ticket ?? null;
