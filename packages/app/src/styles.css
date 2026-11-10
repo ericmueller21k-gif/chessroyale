@@ -8226,6 +8226,25 @@ button.history-label {
   font-size: 12px;
   line-height: 1.15;
 }
+/* An item an outfit hides (Nov 10): greyed, still there and still wearable underneath; its line over the art. */
+.locker-item.covered > :not(.locker-covered):not(.locker-worn) {
+  opacity: 0.45;
+  filter: grayscale(1);
+}
+.locker-covered {
+  position: absolute;
+  top: 46px;
+  left: 4px;
+  right: 4px;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-size: 9px;
+  line-height: 1.15;
+  pointer-events: none;
+}
 .locker-item.worn {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
@@ -8278,6 +8297,17 @@ button.history-label {
 }
 .locker-tabs {
   flex-wrap: wrap;
+}
+/* With the secret Outfit tab (only once you own an outfit, Nov 10): seven tabs, two even rows of four on a phone, one row on a
+   wider screen; never a lone stretched tab. Without it, the layout above, as before. */
+.locker-tabs.with-outfit {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (min-width: 600px) {
+  .locker-tabs.with-outfit {
+    grid-template-columns: repeat(7, 1fr);
+  }
 }
 .locker-item.default {
   --tier: var(--line);

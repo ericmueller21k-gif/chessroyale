@@ -60,7 +60,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { secondColor, sideOfPawn } from "@chessroyale/core";
+import { mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -788,7 +788,9 @@ function startTown(
   // the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
-    const look = account().profile?.locker?.look;
+    // (An outfit, Nov 10: only it and any eyewear are drawn, the outfit by the rides' machinery: core's shownLook, mountOf.)
+    const look = shownLook(account().profile?.locker?.look);
+    const on = mountOf(look);
     const color = myPawnColor();
     const side = color === "black" ? "dark" : "light";
     const key = `${side}|${lookKey(look)}`;
@@ -797,12 +799,12 @@ function startTown(
     town.you.look = { side, tint: null, wear: null };
     const wear = offRide(look);
     // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
-    town.you.walker.stepMs = f.youStepMs / rideSpeed(look?.ride?.def);
+    town.you.walker.stepMs = f.youStepMs / rideSpeed(on?.def);
     // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
     const mount = (art: YouArt | null, back: YouArt | null) => {
       const prev = youRide;
-      youRide = look?.ride
-        ? ride(look.ride, art, back, pawnImage(side, null), sideOfPawn(color), `${side}||${lookKey(wear)}`, (rd) => {
+      youRide = on
+        ? ride(on, art, back, pawnImage(side, null), sideOfPawn(color), `${side}||${lookKey(wear)}`, (rd) => {
             if (rd !== youRide || !alive) return;
             if (youShown && youShown !== rd) leaveRider(youShown);
             youShown = r.youRider = rd;
@@ -820,7 +822,7 @@ function startTown(
       r.youArt = null;
       mount(null, null);
     } else
-      void dressed(wear, pawnImage(side, null), !!look?.ride, sideOfPawn(color)).then(([art, back]) => {
+      void dressed(wear, pawnImage(side, null), !!on, sideOfPawn(color)).then(([art, back]) => {
         if (youLook !== key || !alive) return;
         r.youArt = art;
         mount(art, back);
@@ -853,8 +855,9 @@ function startTown(
     const lk = p.look;
     if (isSprite(lk) || !lk.wear) return;
     const plain = pawnImage(lk.side, lk.tint);
-    const on = lk.wear.ride;
-    const wear = offRide(lk.wear);
+    const shown = shownLook(lk.wear);
+    const on = mountOf(shown);
+    const wear = offRide(shown);
     // (Its pace on its ride, as yours: Cheetah Shoes twice a bot's.)
     p.walker.stepMs = TOWN_FEEL.botStepMs / rideSpeed(on?.def);
     const mount = (art: YouArt | null, back: YouArt | null) => {
@@ -922,7 +925,7 @@ function startTown(
       b.held = false;
       b.walker.stepMs = f.bossStepMs;
     }
-    if (challenging >= 0) town.you.walker.stepMs = f.youStepMs / rideSpeed(account().profile?.locker?.look?.ride?.def);
+    if (challenging >= 0) town.you.walker.stepMs = f.youStepMs / rideSpeed(mountOf(shownLook(account().profile?.locker?.look))?.def);
     challenging = -1;
   };
   /** When the last frame was drawn (its `now`). */

@@ -3215,10 +3215,19 @@ export type TownGlFallback = (typeof TOWN_GL_FALLBACK.reasons)[number];
  */
 export const RIDES = {
   defaultScale: 0.75,
-  scale: {} as Readonly<Record<string, number>>,
+  // (An outfit is drawn round the pawn's own head, so at its size as drawn.)
+  scale: { "banana-suit": 1 } as Readonly<Record<string, number>>,
   speed: { "cheetah-shoes": 2 } as Readonly<Record<string, number>>,
   tryScale: [0.5, 1.25] as const,
 };
+
+/**
+ * Outfits (Eric, Nov 10; docs/decisions/2026-11-10-outfit-slot.md): an outfit hides every other worn item. `eyewear`: face items
+ * tagged eyewear (goggles, shades) still show, over its face hole ("the only exception"); false hides them too.
+ */
+export const OUTFIT = {
+  eyewear: true,
+} as const;
 
 /**
  * The Welcome Crates (Eric, Nov 6: "you get it for completing 5 games in any mode or any boss … Limit one per account"; then "the

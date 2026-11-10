@@ -223,10 +223,14 @@ describe("Equipped Cosmetics", () => {
     const four = wornTiles({ ...look, face: { def: "smiley-face", color: "yellow", blemish: 0, seed: 1 } }).map((t) => t.slot);
     expect(four).toEqual(["skin", "head", "face", "weapon"]);
     // (The same order as today's profile's list: FrontDoor's WORN_ORDER, which lists a ride last since Oct 31.)
-    expect(four).toEqual(WORN_ORDER.filter((s) => s !== "ride"));
+    expect(four).toEqual(WORN_ORDER.filter((s) => s !== "ride" && s !== "outfit"));
     // A ride (Oct 31) isn't a tile: the row holds four at most. Its "View all" lists it (WORN_ORDER).
     expect(wornTiles({ ...look, ride: { def: "moon-ride", color: "pearl", blemish: 10, seed: 2 } }).map((t) => t.slot)).toEqual(["skin", "head", "weapon"]);
-    expect(WORN_ORDER).toEqual(["skin", "head", "face", "weapon", "ride"]);
+    expect(WORN_ORDER).toEqual(["outfit", "skin", "head", "face", "weapon", "ride"]);
+    // An outfit (Nov 10): first, and with it only eyewear (goggles, shades) shows, so only those are tiles.
+    const banana = { def: "banana-suit", color: "yellow", blemish: 5, seed: 4 };
+    expect(wornTiles({ ...look, outfit: banana, face: { def: "dark-shades", color: "red", blemish: 0, seed: 1 } }).map((t) => t.slot)).toEqual(["outfit", "face"]);
+    expect(wornTiles({ ...look, outfit: banana }).map((t) => t.name)).toEqual(["Banana Suit"]);
   });
   it("'<Slot> · <colors>': two colors with an &, one color alone", () => {
     const lines = Object.fromEntries(wornTiles(look).map((t) => [t.name, t.line]));

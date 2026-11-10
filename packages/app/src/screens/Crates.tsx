@@ -17,7 +17,9 @@ import {
   crateDef,
   fischerOdds,
   isAdminCopy,
+  hiddenByOutfit,
   isShiny,
+  ownsOutfit,
   itemChance,
   liveStrip,
   presentChance,
@@ -1001,6 +1003,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
   const pawn = myPawnColor();
   if (!locker) return <p class="muted">Your locker needs your account.</p>;
   const top = (s: ItemStack) => s.items[0]!;
+  // (The Outfit slot is secret, Eric, Nov 10: its tab shows only once you own an outfit; his exception to "nothing hidden".)
+  const outfits = ownsOutfit(locker.items);
   // (An item this app doesn't know, e.g. one added since it loaded, as an admin's copy of it: left out, not a crash.)
   const stacks = stackItems(locker.items)
     .filter((s) => itemDef(top(s).def) && (tab === "all" || itemDef(top(s).def)?.slot === tab))
@@ -1033,8 +1037,8 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
           ))}
         </div>
       </div>
-      <div class="shop-tabs locker-tabs" role="tablist">
-        {LOCKER_TABS.map((t) => (
+      <div class={`shop-tabs locker-tabs${outfits ? " with-outfit" : ""}`} role="tablist">
+        {(outfits ? [...LOCKER_TABS, "outfit" as const] : LOCKER_TABS).map((t) => (
           <button type="button" role="tab" key={t} aria-selected={tab === t} class={tab === t ? "on" : ""} onClick={() => setTab(t)}>
             {tabName(t)}
           </button>
@@ -1051,12 +1055,14 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
             const admin = isAdminCopy(it.id);
             // (A HunChess ride, the Welcome Crate's: no purity, and "Not tradeable"; Eric, Nov 6.)
             const hc = isHunchess(it.def);
+            // (An outfit on, Nov 10: every other item but eyewear shows greyed, still wearable underneath; nothing hidden.)
+            const covered = hiddenByOutfit(locker.look, it.def);
             return (
               <HoldButton
                 key={s.key}
-                class={`locker-item${worn ? " worn" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
+                class={`locker-item${worn ? " worn" : ""}${covered ? " covered" : ""}${!hc && isShiny(it.blemish) ? " shiny" : ""}${hc ? " hunchess-item" : ""}`}
                 style={{ "--tier": tierInfo(d.tier).color }}
-                label={`${d.name}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
+                label={`${d.name}${covered ? ", hidden by your outfit" : ""}, ${hc ? `HunChess gold and black, not tradeable` : `${colorName(it)}, purity ${purity(it.blemish).toFixed(1)}%`}${s.items.length > 1 ? `, ${s.items.length} of them` : ""}. ${admin ? "Admin copy." : "Hold to delete."}`}
                 onTap={() => {
                   play("menuSelect");
                   void equipLockerItem(d.slot, worn ? null : it.id);
@@ -1086,6 +1092,7 @@ export function LockerPanel({ onShop }: { onShop?: () => void }) {
                   </>
                 )}
                 {worn && <span class="locker-worn">Worn</span>}
+                {covered && <span class="locker-covered">Hidden by your outfit</span>}
                 {s.items.length > 1 && <span class="locker-count">×{s.items.length}</span>}
                 {admin && <span class="locker-admin">Admin</span>}
               </HoldButton>

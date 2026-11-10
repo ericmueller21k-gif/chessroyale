@@ -34,7 +34,7 @@ async function main() {
   const { createServer } = await import("vite");
   const server = await createServer({ root: "packages/app", configFile: "packages/app/vite.config.ts", server: { port: 5199, strictPort: false }, logLevel: "error" });
   await server.listen();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
   try {
     const page = await browser.newPage();
     page.on("pageerror", (e) => console.error("page:", e.message));
