@@ -3078,6 +3078,18 @@ export const AGE_GATE = {
 } as const;
 
 /**
+ * The engine server's two open routes (server/index.ts; the outside review of Nov 10, finding 4): POST /api/engine/score (a solo
+ * game's close calls) and GET /api/engine/ping (waking it as a solo game starts). Only for an account (signed in, where sign-in is
+ * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts), and solo's searches at most
+ * `soloDailySearches` a day of the day's ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device
+ * re-checks itself, as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
+ */
+export const ENGINE_SERVER = {
+  perAccountDaily: 200,
+  soloDailySearches: 1000,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */

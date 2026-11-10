@@ -47,6 +47,7 @@ import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -213,6 +214,8 @@ const SCHEMA = [
   ...XP_SCHEMA,
   // Quests (Nov 9, phase 3): each account's quests, each game that moved one, and the day last dealt (quests.ts).
   ...QUESTS_SCHEMA,
+  // The engine server's per-account cap (Nov 10): each account's calls to its open routes today (engine-calls.ts).
+  ...ENGINE_CALLS_SCHEMA,
 ];
 
 /**
@@ -594,6 +597,8 @@ export async function signInWithIdentity(
         ...rankedMoves(current.id, owner.id),
         // (Quests, Nov 9: the guest's go; the account keeps its own. What they paid is in the balances moved above.)
         ...questDeletes(current.id),
+        // (The guest's calls to the engine server today: the account's own count stands.)
+        stmt("DELETE FROM engine_calls WHERE user_id = ?", current.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
         stmt("DELETE FROM users WHERE id = ?", current.id),

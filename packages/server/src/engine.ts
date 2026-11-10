@@ -1,4 +1,5 @@
 import { Container, getContainer } from "@cloudflare/containers";
+import { ENGINE_SERVER } from "@chessroyale/core";
 import { recheckCloseCalls, stockfishRefuses, type EngineLike, type MoveScore, type RecheckSettings } from "@chessroyale/chess";
 
 /**
@@ -30,8 +31,15 @@ const TIMEOUT_MS = 12_000;
 
 let tableReady = false;
 
-/** Counts one search against today's budget; false once it's spent (or if counting fails). */
-async function takeBudget(env: EngineEnv): Promise<boolean> {
+/**
+ * Whose search it is: a match's (its re-checks and verdicts, Squads' bot work) or a solo game's (/api/engine/score). Solo's are
+ * counted twice: against their own share (ENGINE_SERVER.soloDailySearches, the row "<day>:solo") and the day's budget, so however
+ * busy solo is, matches always keep the rest of the day (the outside review of Nov 10, finding 4).
+ */
+export type EnginePool = "match" | "solo";
+
+/** Counts one search against today's budget (and solo's share); false once it's spent (or if counting fails). */
+async function takeBudget(env: EngineEnv, pool: EnginePool = "match"): Promise<boolean> {
   if (!env.DB) return true;
   try {
     if (!tableReady) {
@@ -39,11 +47,13 @@ async function takeBudget(env: EngineEnv): Promise<boolean> {
       tableReady = true;
     }
     const day = new Date().toISOString().slice(0, 10);
-    const row = await env.DB.prepare(
-      "INSERT INTO engine_usage (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1 RETURNING searches",
-    )
-      .bind(day)
-      .first<{ searches: number }>();
+    const take = (key: string) =>
+      env
+        .DB!.prepare("INSERT INTO engine_usage (day, searches) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET searches = searches + 1 RETURNING searches")
+        .bind(key)
+        .first<{ searches: number }>();
+    if (pool === "solo" && ((await take(`${day}:solo`))?.searches ?? Infinity) > ENGINE_SERVER.soloDailySearches) return false;
+    const row = await take(day);
     return (row?.searches ?? 0) <= Number(env.ENGINE_DAILY_SEARCHES ?? 3000);
   } catch {
     return false;
@@ -125,10 +135,10 @@ export async function engineHealth(env: EngineEnv, now: number): Promise<{ on: b
   return { on: engineOn(env), searches: used?.searches ?? 0, cap: Number(env.ENGINE_DAILY_SEARCHES ?? 3000), lastOk: ok ? Number(ok.value) : null, lastFail };
 }
 
-/** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. */
-export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly string[], nodes = SERVER_RECHECK_NODES): Promise<MoveScore[] | null> {
+/** One restricted search on the engine server; null if there's no server, no budget left, or no answer in time. `pool`: whose. */
+export async function serverScoreAt(env: EngineEnv, fen: string, moves: readonly string[], nodes = SERVER_RECHECK_NODES, pool: EnginePool = "match"): Promise<MoveScore[] | null> {
   if (!engineOn(env) || !moves.length) return null;
-  if (!(await takeBudget(env))) return null;
+  if (!(await takeBudget(env, pool))) return null;
   return containerScore(env, "engine-1", fen, moves, nodes, TIMEOUT_MS);
 }
 
