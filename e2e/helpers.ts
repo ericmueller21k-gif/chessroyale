@@ -482,6 +482,13 @@ async function withEmail(page: Page, email: string) {
 }
 
 /**
+ * The town's first frame drawn (its canvas's `data-ready`), within 20 s: as town.spec.ts and town-street.spec.ts wait. That first frame
+ * paints every house and boss sprite on the page's own thread (Town.tsx, startTown): about 1 s on a phone, 2 to 3 s on a busy CI
+ * runner, and past 5 s (the default wait) on a cold one (main run 42768777492, town-afk; colosseum, shop). Nov 10.
+ */
+export const townReady = (page: Page) => expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+
+/**
  * Runs `sql` on the local database, through the server's own D1 (`POST /api/e2e/sql`, server/src/e2e-sql.ts; the e2e's local server
  * only). Answers the last statement's rows. (Not `wrangler d1 execute --local` beside the server any more: while that second process
  * held the file's lock, a request on the server failed with SQLITE_BUSY, a 500 in whatever test was open. Nov 10.)
