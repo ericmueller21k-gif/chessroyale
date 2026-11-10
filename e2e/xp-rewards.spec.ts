@@ -26,7 +26,9 @@ async function wonGame(page: Page, xp: number, moves: number | null = null) {
       await route.continue({ postData: JSON.stringify({ ...body, moves }) });
     });
   }
-  await page.goto(`/?debug&pace=quick&win=1&boss=gingerbread&xp=${xp}&xpgame=12`);
+  // (Quests no solo boss game can finish: since Nov 10 a solo Boss Battle counts for the boss quests, and a dealt "Win a Boss Battle"
+  // added its own XP and crate to these counts.)
+  await page.goto(`/?debug&pace=quick&win=1&boss=gingerbread&xp=${xp}&xpgame=12&quests=squad-up,fifty-fifty,regular`);
   await xpIs(page, xp);
   await bossAloneFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");

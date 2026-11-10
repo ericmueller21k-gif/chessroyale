@@ -3443,6 +3443,10 @@ export const XP = {
  *     device). `counts`: which counted games move it: "any" any game, "win" a won online game, "boss" an online boss raid,
  *     "bossWin" a won raid, "squads" a Squads game, "crowd" a 50 v 50 game. `weight`: how often it's dealt (wins rarer: the
  *     design's "win quests stay rare"). `icon`: the row's picture ("boss": a live boss's portrait).
+ *   - **Progress shown (Eric, Nov 10; docs/decisions/2026-11-10-quest-progress.md):** back on home after a game that moved a quest,
+ *     the overlay opens by itself and slides each moved bar from its old count to its new, one after another: `show.startMs` after
+ *     it opens, `show.slideMs` each, `show.gapMs` between; a quest it finishes gets `show.finishMs` for its finish (the glow, "Done!",
+ *     its reward's burst). A count's tick sound plays at most every `show.tickGapMs`.
  */
 export type QuestCounts = "any" | "win" | "boss" | "bossWin" | "squads" | "crowd";
 export interface QuestDef {
@@ -3463,6 +3467,7 @@ export const QUESTS = {
   rerollsPerDaily: 1,
   weekStartDay: 1,
   soloMinMinutes: 3,
+  show: { startMs: 450, slideMs: 750, gapMs: 250, finishMs: 1100, tickGapMs: 70 },
   daily: [
     { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
     { id: "raid-party", name: "Boss Fighter", goal: "Play 2 Boss Battles", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },

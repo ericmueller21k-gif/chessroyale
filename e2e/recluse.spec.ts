@@ -864,10 +864,12 @@ test("phase 2's slow moves (?phase=2): each marks a red X for the team in one co
     if (before >= 10 || (await simulNow(page)).ultAt !== null) break;
     await page.evaluate((m) => (window as any).match.simulMove(0, m), move);
     await expect.poll(async () => (await simulNow(page)).slow, { timeout: 5_000 }).toBeGreaterThan(before);
-    // The marks say the team's count at once.
-    const n = Math.min(10, (await simulNow(page)).slow);
-    await expect(page.locator(`.rc-slow[data-slow="${n}"]`)).toHaveCount(1);
-    marked = n;
+    // The marks say the team's count at once. (Read together: a bot's slow move can add one between two reads, run 42800137294.)
+    const marks = page.locator(".rc-slow");
+    await expect
+      .poll(async () => (await marks.getAttribute("data-slow")) === String(Math.min(10, (await simulNow(page)).slow)), { timeout: 5_000 })
+      .toBe(true);
+    marked = Number(await marks.getAttribute("data-slow"));
   }
   // (Your board decided first, by any chance: the bots' slow moves bring the rest.)
   await expect.poll(async () => (await simulNow(page)).ultAt !== null, { timeout: 120_000 }).toBe(true);

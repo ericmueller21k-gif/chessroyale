@@ -34,17 +34,23 @@ let seenDefault = true;
 /**
  * The quests overlay's "shown today" key (packages/app/src/quests.ts, QUESTS_SEEN_KEY; Nov 9, phase 3): a signed-in account's first
  * home visit of the day opens it over home, which would block a signed-in test's clicks, so each context starts with it set past any
- * day. A test of that first visit sets `test.use({ questsSeen: false })`.
+ * day. The same for its opening by itself back on home after a game that moved a quest (QUESTS_NO_POP_KEY, Nov 10). A test of
+ * either sets `test.use({ questsSeen: false })`.
  */
 const QUESTS_SEEN_KEY = "hunchess.quests.seenDay";
+const QUESTS_NO_POP_KEY = "hunchess.quests.noPop";
 async function markQuestsSeen(context: import("@playwright/test").BrowserContext) {
-  await context.addInitScript((k: string) => {
-    try {
-      if (!localStorage.getItem(k)) localStorage.setItem(k, "9999999999999");
-    } catch {
-      /* no storage: the overlay may show over home */
-    }
-  }, QUESTS_SEEN_KEY);
+  await context.addInitScript(
+    ([k, off]: string[]) => {
+      try {
+        if (!localStorage.getItem(k!)) localStorage.setItem(k!, "9999999999999");
+        localStorage.setItem(off!, "1");
+      } catch {
+        /* no storage: the overlay may show over home */
+      }
+    },
+    [QUESTS_SEEN_KEY, QUESTS_NO_POP_KEY],
+  );
 }
 let questsSeenDefault = true;
 

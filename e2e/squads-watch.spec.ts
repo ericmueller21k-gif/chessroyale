@@ -191,7 +191,13 @@ test("who's watching: another player showing your board puts their pawn (their i
     wes.send({ t: "view", key: s.key, board: (s.duty!.board + 2) % 3 });
     await expect(page.locator(".sq-watchers")).toHaveCount(0, { timeout: 5_000 });
     wes.send({ t: "view", key: s.key, board: s.duty!.board });
-    await expect(pawn).toBeVisible({ timeout: 5_000 });
+    // (Run 42847929954 timed out here once, cause not found: a repeat says whether Wes's socket was open and what the page last heard.)
+    await expect(pawn)
+      .toBeVisible({ timeout: 5_000 })
+      .catch(async (e: Error) => {
+        const heard = await page.evaluate(() => JSON.stringify([...(window as any).squads.viewers]));
+        throw new Error(`${e.message}\nWes's socket ${wes.closed ? "closed" : "open"}; the page's viewers: ${heard}`);
+      });
     wes.close();
     await expect(page.locator(".sq-watchers")).toHaveCount(0, { timeout: 5_000 });
   } finally {
