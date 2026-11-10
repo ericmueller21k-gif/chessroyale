@@ -244,11 +244,15 @@ export async function rerollQuest(sql: Sql, userId: string, questId: unknown, no
   const [def] = pickQuests(QUESTS.daily, rows.map((r) => r.kind), 1, `${userId}:${day}:reroll:${q.id}`);
   if (!def) return { ok: false, message: NO_REROLL };
   const id = newId();
+  // (And only while you don't hold its kind: two dailies rerolled at once read the same quests and could both deal the same kind,
+  // and one game would then pay both. The second batch sees the first's row and goes in empty: a refusal. Review of #603.)
   const old = cond(
-    "EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND period = 'daily' AND done_at IS NULL AND (rerolled_day IS NULL OR rerolled_day <> ?))",
+    "EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND period = 'daily' AND done_at IS NULL AND (rerolled_day IS NULL OR rerolled_day <> ?)) AND NOT EXISTS (SELECT 1 FROM quests WHERE user_id = ? AND kind = ?)",
     questId,
     userId,
     day,
+    userId,
+    def.id,
   );
   const ours = cond("EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ?)", id, userId);
   await sql.batch([

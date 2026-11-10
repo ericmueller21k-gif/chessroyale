@@ -190,6 +190,19 @@ describe("the reroll: each unfinished daily its own free one a day (Eric, Nov 10
     expect(again.every((r) => !r.ok)).toBe(true);
     expect((await sql.all("SELECT id FROM quests WHERE rerolled_day IS NOT NULL")).length).toBe(1);
   });
+
+  it("two different dailies rerolled at once never end up the same quest (one game would pay both: review of #603)", async () => {
+    const { sql } = await world();
+    for (let i = 0; i < 40; i++) {
+      const u = await signedIn(sql, `u${i}@example.com`);
+      await set(sql, u.id, [["squad-up"], ["warm-up"], ["regular"]]);
+      const [a, b] = await quests(sql, u.id);
+      await Promise.all([rerollQuest(sql, u.id, a!.id, T0), rerollQuest(sql, u.id, b!.id, T0)]);
+      const kinds = (await sql.all<{ kind: string }>("SELECT kind FROM quests WHERE user_id = ? AND period = 'daily'", u.id)).map((r) => r.kind);
+      expect(kinds.length, `u${i}`).toBe(2);
+      expect(new Set(kinds).size, `u${i}: ${kinds.join(", ")}`).toBe(2);
+    }
+  });
 });
 
 describe("progress: only counted games, by mode, decided by the server", () => {
