@@ -235,7 +235,7 @@ describe("traced modules (areas.json, `traced`): a change followed through the c
     "packages/server/src/lobby.ts": same(`import { QUICK_CHAT, type Settings } from "@chessroyale/core";\nexport const gap = () => QUICK_CHAT.gapMs;\n// AUTOCHESS is named here only in a comment.\n`),
     "packages/core/test/chat.test.ts": same(`import { QUICK_CHAT } from "../src/settings.ts";\nexport const x = QUICK_CHAT;\n`),
   };
-  const autochess = ["e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"];
+  const autochess = ["e2e/autochess-board.spec.ts", "e2e/autochess.spec.ts", "e2e/home-layout.spec.ts"];
 
   it("a settings key: the specs of the areas whose files read it, plus the smoke set", () => {
     const r = select([SETTINGS], areas, all, repo({ ...base, [SETTINGS]: [settings(3000, 5), settings(3000, 6)] }));
