@@ -901,7 +901,6 @@ export function HomeScreen({
           quests={quests.answer.quests}
           dailyResetIn={questCountdowns(quests.answer, quests.receivedAt).daily}
           weeklyResetIn={questCountdowns(quests.answer, quests.receivedAt).weekly}
-          rerollLeft={quests.answer.rerollLeft}
           paused={!!quests.answer.paused}
           onReroll={quests.reroll}
           onClose={quests.close}

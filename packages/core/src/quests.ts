@@ -24,6 +24,8 @@ export interface QuestView {
   icon: QuestIcon;
   /** What finishing it pays (granted the moment it's done, by the server). */
   reward: { xp: number; crates?: number; keys?: number };
+  /** Its free reroll is there today (an unfinished daily that no reroll dealt today; each daily has its own, Nov 10). */
+  canReroll: boolean;
 }
 
 /** GET /api/quests's answer. */
@@ -37,8 +39,6 @@ export interface QuestsAnswer {
   weeklyResetAt: number;
   /** The server's time as it answered (the countdowns are worked out against it). */
   now: number;
-  /** Today's free reroll is still there. */
-  rerollLeft: boolean;
   /** PAUSE_REWARDS is on: quests don't move and pay nothing for now. */
   paused?: boolean;
 }

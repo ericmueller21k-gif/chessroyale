@@ -3323,7 +3323,8 @@ export const XP = {
  * docs/decisions/2026-11-09-quests-*.md; core's quests.ts has the rules, server/quests.ts deals them and pays them):
  *   - **Dailies:** `dailyPerDay` new ones each XP day (it starts at XP.dayStartUtcHour, 08:00 UTC), dealt the first time your quests
  *     are read that day (home, or a game's end). Unfinished ones carry over, but at most `maxDailies` wait (Hearthstone's kindness
- *     rule): a day's deal tops you up to it, never past it. `rerollsPerDay` free reroll a day, on an unfinished daily.
+ *     rule): a day's deal tops you up to it, never past it. Each unfinished daily has `rerollsPerDaily` free reroll a day (Eric, Nov 10: one per daily,
+ *     not one per day); its replacement's is used for that day. (The server keeps one: `quests.rerolled_day`; 1 is the only value.)
  *   - **The weekly:** one, dealt each week (from Monday at XP.dayStartUtcHour UTC: `weekStartDay`, 1 = Monday); it doesn't carry.
  *   - **Progress:** only a game that earned XP (a counted game: XP's rules) counts, once per game per quest, decided on the server:
  *     online games by their match room's facts; a solo game (its moves and its win are the device's word) only for "finish games"
@@ -3353,7 +3354,7 @@ export interface QuestDef {
 export const QUESTS = {
   dailyPerDay: 2,
   maxDailies: 3,
-  rerollsPerDay: 1,
+  rerollsPerDaily: 1,
   weekStartDay: 1,
   soloMinMinutes: 3,
   daily: [
