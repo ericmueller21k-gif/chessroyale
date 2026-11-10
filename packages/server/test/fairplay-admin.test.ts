@@ -323,10 +323,10 @@ describe("the review page and the reviewer's API", () => {
     const sure = await player(w.sql, "Sure");
     await recordFairPlay(w.sql, sure.id, { lobby: "BBBBB", mode: "crowd", moves: deep }, Date.now() - 2000);
     await recordFairPlay(w.sql, sure.id, { lobby: "CCCCC", mode: "crowd", moves: deep }, Date.now() - 1000);
-    // (Detection itself only flags: FAIRPLAY.enforcement "review".)
-    expect((await caseOf(w.sql, sure.id))?.status).toBe("review");
+    // (Detection never bans: FAIRPLAY.enforcement "pool" sends the ban bar to the engine pool, a person's to judge.)
+    expect((await caseOf(w.sql, sure.id))?.status).toBe("pool");
     expect((await decision(sure.id, { decision: "ban", reason: "2 deep-checked matches, every pick the engine's best" }))!.status).toBe(409);
-    expect((await caseOf(w.sql, sure.id))?.status).toBe("review");
+    expect((await caseOf(w.sql, sure.id))?.status).toBe("pool");
     expect((await decision(sure.id, { decision: "ban", reason: "2 deep-checked matches, every pick the engine's best" }, { cookie: w.ericCookie }))!.status).toBe(200);
     expect((await caseOf(w.sql, sure.id))?.status).toBe("banned");
     // An admin's decisions name them by email in the log; typed emails in a reason or an appeal: none of it reaches the reviewer.

@@ -382,12 +382,43 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
       reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves the engine's best, best strength ${bestPerf}`],
     };
   }
-  const one = checked.find(
-    (m) => (m.evidence ?? 0) >= lv.banOneEvidence && (m.deepChecked ?? 0) >= lv.banOneDeepChecked && (m.deepMatch ?? 0) / m.deepChecked! >= lv.banOneDeep && (m.perf ?? 0) >= lv.banOnePerf,
-  );
+  const one = checked.find((m) => atBanBar(m, lv));
   if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves the engine's best, strength ${one.perf}`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };
   return { level: "none", reasons: [] };
+}
+
+/**
+ * Whether a ban-level verdict rests on two matches or more: it still stands with any one of them left out (the engine pool's level
+ * path: docs/decisions/2026-11-10-engine-pool.md). Fair play records a match once per lobby, so one lobby's judges, honest or forged,
+ * never carry it alone (the #618 review, M3); a ban that rests on one match opens a review instead (a person looks).
+ */
+export function banSpread(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): boolean {
+  return playerLevel(matches, now, lv).level === "ban" && matches.every((_, i) => playerLevel(matches.filter((__, j) => j !== i), now, lv).level === "ban");
+}
+
+/**
+ * One match at the one-match ban bar (every `banOne*` bar, the deep re-check's numbers included): near-perfect engine play on its
+ * own. Read by playerLevel and by the engine pool's new-account rule.
+ */
+export function atBanBar(m: Omit<LevelInput, "at">, lv: Levels = FAIRPLAY.levels): boolean {
+  const checked = m.deepChecked ?? 0;
+  return checked >= lv.banMatchChecked && (m.evidence ?? 0) >= lv.banOneEvidence && checked >= lv.banOneDeepChecked && (m.deepMatch ?? 0) / checked >= lv.banOneDeep && (m.perf ?? 0) >= lv.banOnePerf;
+}
+
+/**
+ * The engine pool's new-account rule (Eric, Nov 10: "if 2 out of the first 3 games they play are just like straight stockfish" … "for
+ * the first 10 games"): of an account's first `pool.newGames` fair-play matches (`first`, oldest first, every one), those that count
+ * (`counts`: played after the case's last decision, which weighed the rest) at the one-match ban bar. `pool.newHits` or more: the
+ * reason to pool it; else null.
+ */
+export function newAccountPool(
+  first: readonly (Omit<LevelInput, "at"> & { counts: boolean })[],
+  pool: { newGames: number; newHits: number } = FAIRPLAY.pool,
+  lv: Levels = FAIRPLAY.levels,
+): string | null {
+  const hits = first.slice(0, pool.newGames).filter((m) => m.counts && atBanBar(m, lv)).length;
+  return hits >= pool.newHits ? `new account: ${hits} of its first ${Math.min(first.length, pool.newGames)} matches at the one-match ban bar` : null;
 }

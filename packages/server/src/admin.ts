@@ -9,7 +9,7 @@
  * Every decision goes in the case's log with who made it ("admin:<email>" or "reviewer") and why. The reviewer never
  * bans, decides appeals, nor changes a ban (fairplay.ts, decide).
  */
-import { CHAT_MOD, FAIRPLAY, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
+import { CHAT_MOD, FAIRPLAY, atBanBar, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import { toSan, type ChatBlock } from "@chessroyale/chess";
 import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
@@ -86,7 +86,10 @@ export interface CaseRow {
 }
 
 /** Open cases (review, watch, and bans with an open appeal), highest priority first. */
-export async function openCases(sql: Sql, now: number, status: "open" | "review" | "watch" | "banned" | "all" = "open", limit = 100): Promise<CaseRow[]> {
+/** The case lists (the page's tabs, the API's `status`). */
+const LISTS = ["open", "review", "watch", "pool", "banned", "all"] as const;
+
+export async function openCases(sql: Sql, now: number, status: (typeof LISTS)[number] = "open", limit = 100): Promise<CaseRow[]> {
   const where =
     status === "open"
       ? "c.status IN ('review', 'watch') OR c.user_id IN (SELECT user_id FROM fairplay_appeals WHERE status = 'open')"
@@ -132,6 +135,197 @@ export async function openCases(sql: Sql, now: number, status: "open" | "review"
     });
   }
   return out.sort((a, b) => b.priority - a.priority || b.updatedAt - a.updatedAt).slice(0, limit);
+}
+
+/** One pooled player on the engine pool's list (docs/decisions/2026-11-10-engine-pool.md). */
+export interface PoolRow {
+  userId: string;
+  name: string;
+  /** When they went in (the log's latest "pool" line), why (the case's reason) and by what ("detection", "evasion"). */
+  since: number;
+  why: string | null;
+  by: string | null;
+  /** Their rating (crowd modes) and 1 v 1 hidden rating, and games played online (crowd modes and 1 v 1), all time. */
+  rating: number | null;
+  rating1v1: number | null;
+  games: number;
+  /**
+   * The evidence: fair-play matches kept, those at the one-match ban bar, the deep re-check's best on how many checked, best strength;
+   * and the best strength of the matches that pooled them (played by `since`).
+   */
+  evidence: { matches: number; atBar: number; deepMatch: number; deepChecked: number; bestPerf: number | null; pooledPerf: number | null };
+  /**
+   * How they do in the pool, since they went in (everyone they meet there is pooled, or a bot): crowd-mode games and wins (their team
+   * or first place: mostly against bots and bosses, so never a hint), 1 v 1 wins, losses and draws, those against players still pooled
+   * (`vsPool`) and their score there (`vsPoolScore`: 1 a win, ½ a draw), and their fair-play matches: how many, how many at the one-match
+   * ban bar, their average strength and deep matches.
+   */
+  inPool: {
+    games: number;
+    wins: number;
+    duelWins: number;
+    duelLosses: number;
+    duelDraws: number;
+    vsPool: number;
+    vsPoolScore: number;
+    matches: number;
+    atBar: number;
+    avgPerf: number | null;
+    deepMatch: number;
+    deepChecked: number;
+  };
+}
+
+/**
+ * Pooled players (deleted accounts' kept cases too, as a deleted player): the latest in first (`limit`), or, with `after`, a page in id
+ * order after that id (the download). One query a column over all of them, never one a player (the #618 review, M4: D1 takes at most
+ * 1,000 queries a request, and the pool only grows).
+ */
+export async function poolPlayers(sql: Sql, opts: { limit?: number; after?: string } = {}): Promise<PoolRow[]> {
+  const paged = opts.after !== undefined;
+  // Who (as every query below reads them), and since when: the log's latest "pool" line.
+  const who = `WITH p AS (SELECT c.user_id, c.updated_at, COALESCE((SELECT MAX(l.at) FROM fairplay_log l WHERE l.user_id = c.user_id AND l.action = 'pool'), c.updated_at) AS since
+    FROM fairplay_cases c WHERE c.status = 'pool'${paged ? " AND c.user_id > ?" : ""} ORDER BY ${paged ? "c.user_id" : "c.updated_at DESC, c.user_id"} LIMIT ?)`;
+  const whoArgs = [...(paged ? [opts.after] : []), opts.limit ?? 200];
+  const cases = await sql.all<{ user_id: string; updated_at: number; since: number; reason: string | null; by: string | null; name: string; rating: number | null; r1: number | null; r1games: number | null }>(
+    `${who} SELECT p.user_id, p.updated_at, p.since, c.reason, COALESCE(u.name, ?) AS name, u.rating, r.rating AS r1, r.games AS r1games,
+       (SELECT l.by FROM fairplay_log l WHERE l.user_id = p.user_id AND l.action = 'pool' ORDER BY l.at DESC, l.id DESC LIMIT 1) AS by
+     FROM p JOIN fairplay_cases c ON c.user_id = p.user_id LEFT JOIN users u ON u.id = p.user_id LEFT JOIN ranked_1v1 r ON r.user_id = p.user_id`,
+    ...whoArgs,
+    DELETED_NAME,
+  );
+  if (!cases.length) return [];
+  const online = await sql.all<{ user_id: string; n: number; games: number; won: number }>(
+    `${who} SELECT r.user_id, COUNT(*) AS n, SUM(r.played_at > p.since) AS games, SUM(r.played_at > p.since AND (r.team_won = 1 OR r.placement = 1)) AS won
+     FROM results r JOIN p ON p.user_id = r.user_id WHERE r.online = 1 GROUP BY r.user_id`,
+    ...whoArgs,
+  );
+  // 1 v 1 since they went in, each game's score for them (1, ½, 0) and whether the other player is pooled now.
+  const duels = await sql.all<{ user_id: string; w: number; l: number; d: number; vs: number; vsScore: number }>(
+    `${who}, g AS (
+       SELECT p.user_id AS me, x.black_id AS opp, CASE x.result WHEN '1-0' THEN 1 WHEN '1/2-1/2' THEN 0.5 ELSE 0 END AS s
+       FROM p JOIN ranked_1v1_games x ON x.white_id = p.user_id WHERE x.ended_at > p.since AND x.result != 'aborted'
+       UNION ALL
+       SELECT p.user_id, x.white_id, CASE x.result WHEN '0-1' THEN 1 WHEN '1/2-1/2' THEN 0.5 ELSE 0 END
+       FROM p JOIN ranked_1v1_games x ON x.black_id = p.user_id WHERE x.ended_at > p.since AND x.result != 'aborted'
+     ), v AS (SELECT me, s, EXISTS (SELECT 1 FROM fairplay_cases o WHERE o.user_id = g.opp AND o.status = 'pool') AS vs FROM g)
+     SELECT me AS user_id, SUM(s = 1) AS w, SUM(s = 0) AS l, SUM(s = 0.5) AS d, SUM(vs) AS vs, SUM(vs * s) AS vsScore FROM v GROUP BY me`,
+    ...whoArgs,
+  );
+  // Each one's latest 200 fair-play matches, their numbers only (the summary's, read here: no moves, no whole summaries).
+  const num = (k: string) => `CASE WHEN json_valid(m.summary) THEN json_extract(m.summary, '$.${k}') END AS ${k}`;
+  const matches = await sql.all<{ user_id: string; in_pool: number; perf: number | null; counted: number | null; deepChecked: number | null; deepMatch: number | null; evidence: number | null }>(
+    `${who}, k AS (
+       SELECT m.user_id, m.played_at > p.since AS in_pool, m.perf, ${["counted", "deepChecked", "deepMatch", "evidence"].map(num).join(", ")},
+         ROW_NUMBER() OVER (PARTITION BY m.user_id ORDER BY m.played_at DESC, m.id DESC) AS nth
+       FROM fairplay_matches m JOIN p ON p.user_id = m.user_id
+     ) SELECT user_id, in_pool, perf, counted, deepChecked, deepMatch, evidence FROM k WHERE nth <= 200`,
+    ...whoArgs,
+  );
+  const by = <T extends { user_id: string }>(rows: T[]) => new Map(rows.map((r) => [r.user_id, r]));
+  const onlineOf = by(online);
+  const duelsOf = by(duels);
+  const rows = cases.map((c): PoolRow => {
+    const o = onlineOf.get(c.user_id);
+    const d = duelsOf.get(c.user_id);
+    return {
+      userId: c.user_id,
+      name: c.name,
+      since: c.since,
+      why: c.reason,
+      by: c.by,
+      rating: c.rating,
+      rating1v1: c.r1 === null ? null : Math.round(c.r1),
+      games: (o?.n ?? 0) + (c.r1games ?? 0),
+      evidence: { matches: 0, atBar: 0, deepMatch: 0, deepChecked: 0, bestPerf: null, pooledPerf: null },
+      inPool: {
+        games: o?.games ?? 0,
+        wins: o?.won ?? 0,
+        duelWins: d?.w ?? 0,
+        duelLosses: d?.l ?? 0,
+        duelDraws: d?.d ?? 0,
+        vsPool: d?.vs ?? 0,
+        vsPoolScore: d?.vsScore ?? 0,
+        matches: 0,
+        atBar: 0,
+        avgPerf: null,
+        deepMatch: 0,
+        deepChecked: 0,
+      },
+    };
+  });
+  const rowOf = new Map(rows.map((r) => [r.userId, r]));
+  const perfs = new Map<string, number[]>();
+  for (const m of matches) {
+    const r = rowOf.get(m.user_id);
+    if (!r) continue;
+    const one = { score: 0, perf: m.perf, counted: m.counted ?? 0, deepChecked: m.deepChecked ?? 0, deepMatch: m.deepMatch ?? 0, evidence: m.evidence ?? 0 };
+    const bar = atBanBar(one);
+    const ev = r.evidence;
+    ev.matches++;
+    if (bar) ev.atBar++;
+    ev.deepMatch += one.deepMatch;
+    ev.deepChecked += one.deepChecked;
+    if (m.perf !== null) ev.bestPerf = Math.max(ev.bestPerf ?? 0, m.perf);
+    if (!m.in_pool) {
+      if (m.perf !== null) ev.pooledPerf = Math.max(ev.pooledPerf ?? 0, m.perf);
+      continue;
+    }
+    const i = r.inPool;
+    i.matches++;
+    if (bar) i.atBar++;
+    i.deepMatch += one.deepMatch;
+    i.deepChecked += one.deepChecked;
+    if (m.perf !== null) perfs.set(m.user_id, [...(perfs.get(m.user_id) ?? []), m.perf]);
+  }
+  for (const [id, ps] of perfs) rowOf.get(id)!.inPool.avgPerf = Math.round(ps.reduce((a, b) => a + b, 0) / ps.length);
+  const updated = new Map(cases.map((c) => [c.user_id, c.updated_at]));
+  return rows.sort((a, b) => (paged ? (a.userId < b.userId ? -1 : 1) : updated.get(b.userId)! - updated.get(a.userId)! || (a.userId < b.userId ? -1 : 1)));
+}
+
+/** Every pooled player's id, in id order: how many there are, and where each download file starts. */
+export async function poolIds(sql: Sql): Promise<string[]> {
+  return (await sql.all<{ user_id: string }>("SELECT user_id FROM fairplay_cases WHERE status = 'pool' ORDER BY user_id")).map((r) => r.user_id);
+}
+
+/**
+ * How a pooled player is doing there, in a few words (the #618 review, M2). In-pool engine play first, whatever the results ("still
+ * playing like an engine": a match at the one-match ban bar, or the deep re-check's best on most of their moves); then results against
+ * people only ("getting crushed" in 1 v 1 by other pooled players); then a big drop in strength against what pooled them. Crowd and
+ * raid results are never a hint: bots and bosses beat cheaters and honest players alike.
+ */
+export function poolHint(p: PoolRow): string {
+  const i = p.inPool;
+  const h = FAIRPLAY.pool.hint;
+  const lv = FAIRPLAY.levels;
+  if (i.atBar) return `still playing like an engine: ${i.atBar} in-pool match${i.atBar === 1 ? "" : "es"} at the ban bar`;
+  if (i.deepChecked >= lv.banMatchChecked && i.deepMatch / i.deepChecked >= lv.banDeep) return "still playing like an engine";
+  if (i.vsPool >= h.games && i.vsPoolScore / i.vsPool < h.below) return "getting crushed in 1 v 1 by other pooled players: likely a false positive";
+  const drop = i.matches >= h.dropMatches && i.avgPerf !== null && p.evidence.pooledPerf !== null ? p.evidence.pooledPerf - i.avgPerf : 0;
+  if (drop >= h.drop) return `strength down ${drop} since pooled: maybe a false positive`;
+  return i.games + i.duelWins + i.duelLosses + i.duelDraws ? "" : "no games in the pool yet";
+}
+
+/**
+ * The engine pool's download, one file a page (FAIRPLAY.pool.exportPage players, in id order after `after`; `next`: the next file's
+ * `after`, or null): each pooled player's row and their whole file, moves and all. No email anywhere: the file as the reviewer's token
+ * reads it (forReviewer: the admins' in the log and decisions, any typed in a reason or an appeal; the #618 review, M1).
+ */
+export async function poolExport(sql: Sql, now: number, after = ""): Promise<{ exportedAt: string; about: string; after: string; next: string | null; players: (PoolRow & { file: CaseDetail | null })[] }> {
+  const size = FAIRPLAY.pool.exportPage;
+  const rows = await poolPlayers(sql, { limit: size + 1, after });
+  const players = [];
+  for (const p of rows.slice(0, size)) {
+    const d = await caseDetail(sql, p.userId, { email: false, lines: false, limit: 200 });
+    players.push({ ...p, why: noEmails(p.why), by: byForReviewer(p.by), file: d && forReviewer(d) });
+  }
+  return {
+    exportedAt: new Date(now).toISOString(),
+    about: `Fair play's engine pool: who is in it, why, the evidence kept and how each does in the pool, ${size} players a file in id order (next: the next file's ?after=). Times are ms since 1970 (UTC).`,
+    after,
+    next: rows.length > size ? players.at(-1)!.userId : null,
+    players,
+  };
 }
 
 /** One judged pick as evidence: moves in SAN, whether it counted (and why not), the crowd, time and look-aways. */
@@ -311,10 +505,10 @@ export async function handleAdmin(
   waitUntil?.(purgeEvidence(sql, now).catch(() => undefined));
 
   if (api) {
-    // GET /api/admin/fairplay/cases?status=open|review|watch|banned|all
+    // GET /api/admin/fairplay/cases?status=open|review|watch|pool|banned|all
     if (url.pathname === "/api/admin/fairplay/cases" && request.method === "GET") {
       const status = url.searchParams.get("status") ?? "open";
-      if (!["open", "review", "watch", "banned", "all"].includes(status)) return json({ message: "status must be open, review, watch, banned or all" }, 400);
+      if (!(LISTS as readonly string[]).includes(status)) return json({ message: `status must be ${LISTS.join(", ")}` }, 400);
       const cases = await openCases(sql, now, status as "open");
       return json({ cases: reviewer ? cases.map((c) => ({ ...c, reason: noEmails(c.reason) })) : cases, policy: policy() });
     }
@@ -374,6 +568,14 @@ export async function handleAdmin(
     const d = await caseDetail(sql, cm[1]!, { email: true, lines: true });
     return d ? adminPage("Fair play", casePage(d, url.searchParams.get("note"), await chatModDetail(sql, cm[1]!, now))) : notFound();
   }
+  // The engine pool's download, a file a page (?after=<userId>): pooled players, the evidence and how they do in the pool (JSON, no emails).
+  if (url.pathname === "/admin/fairplay/pool.json") {
+    const after = (url.searchParams.get("after") ?? "").slice(0, 100);
+    const file = `engine-pool-${new Date(now).toISOString().slice(0, 10)}${after ? `-after-${after.replace(/[^\w-]/g, "").slice(0, 40)}` : ""}.json`;
+    return new Response(JSON.stringify(await poolExport(sql, now, after), null, 1), {
+      headers: { "content-type": "application/json", "cache-control": "no-store", "content-disposition": `attachment; filename="${file}"` },
+    });
+  }
   // Any player's page by their id or their profile's link (to act on a name, an icon or their chat).
   if (url.pathname === "/admin/fairplay/find") {
     const id = (url.searchParams.get("q") ?? "").trim().split(/[/?#]/).filter(Boolean).find((p, i, all) => i === all.length - 1 || all[i - 1] === "profile");
@@ -381,7 +583,9 @@ export async function handleAdmin(
   }
   if (url.pathname === "/admin/fairplay") {
     const status = url.searchParams.get("status") ?? "open";
-    const cases = await openCases(sql, now, ["open", "review", "watch", "banned", "all"].includes(status) ? (status as "open") : "open");
+    // (The pool tab: its own list, its queries grouped over every pooled player; no other tab reads the pool. The #618 review, M4.)
+    const pool = status === "pool" ? { rows: await poolPlayers(sql), ids: await poolIds(sql) } : null;
+    const cases = pool ? [] : await openCases(sql, now, (LISTS as readonly string[]).includes(status) ? (status as "open") : "open");
     const appeals = await sql.all<Appeal & { name: string }>(
       "SELECT a.id, a.user_id, a.at, a.text, a.status, a.decided_at, a.decided_by, a.reply, u.name FROM fairplay_appeals a JOIN users u ON u.id = a.user_id WHERE a.status = 'open' ORDER BY a.at",
     );
@@ -389,7 +593,7 @@ export async function handleAdmin(
       `SELECT l.user_id, l.at, l.action, l.by, l.reason, u.name FROM fairplay_log l LEFT JOIN users u ON u.id = l.user_id
        WHERE l.by != 'detection' AND l.by != 'reports' ORDER BY l.at DESC, l.id DESC LIMIT 40`,
     );
-    return adminPage("Fair play", listPage(cases, appeals, log, status, by));
+    return adminPage("Fair play", listPage(cases, appeals, log, status, by, pool));
   }
   return notFound();
 }
@@ -435,7 +639,7 @@ h1{font-size:22px;margin:4px 0 12px}h2{font-size:17px;margin:22px 0 8px}a{color:
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:10px 0}
 .scroll{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top;white-space:nowrap}
 td.wrap{white-space:normal;min-width:180px}.pill{display:inline-block;border-radius:99px;padding:1px 8px;font-size:12px;border:1px solid var(--line)}
-.review,.banned{color:var(--bad)}.cleared{color:var(--ok)}.hard{font-weight:700}.skip{color:var(--muted)}
+.review,.banned,.pool{color:var(--bad)}.cleared{color:var(--ok)}.hard{font-weight:700}.skip{color:var(--muted)}
 form.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}input[type=text],textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg);flex:1 1 260px}
 button{font:inherit;min-height:40px;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}button.ban{border-color:var(--bad);color:var(--bad)}button.clear{border-color:var(--ok);color:var(--ok)}
 nav a{margin-right:12px}pre{white-space:pre-wrap;word-break:break-word;font-size:12px;margin:6px 0 0}details summary{cursor:pointer}
@@ -443,22 +647,52 @@ nav a{margin-right:12px}pre{white-space:pre-wrap;word-break:break-word;font-size
     { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-frame-options": "DENY" } },
   );
 
-function listPage(cases: CaseRow[], appeals: (Appeal & { name: string })[], log: { user_id: string; at: number; action: string; by: string; reason: string | null; name: string | null }[], status: string, by: string): string {
-  const tabs = ["open", "review", "watch", "banned", "all"].map((s) => (s === status ? `<b>${s}</b>` : `<a href="/admin/fairplay?status=${s}">${s}</a>`)).join(" · ");
+/**
+ * The engine pool's list (its tab): who, since when and why, their numbers, the evidence and how they do in the pool, each with Release;
+ * the latest `rows` of all `ids`, and the download a file per FAIRPLAY.pool.exportPage players.
+ */
+function poolSection({ rows: pool, ids }: { rows: PoolRow[]; ids: string[] }): string {
+  const pct = (a: number, b: number) => (b ? `${Math.round((100 * a) / b)}%` : "–");
+  const row = (p: PoolRow) => {
+    const i = p.inPool;
+    const hint = poolHint(p);
+    return `<tr><td><a href="/admin/fairplay/case/${esc(p.userId)}">${esc(p.name)}</a></td><td>${when(p.since)}${p.by && p.by !== "detection" ? ` <span class="pill">${esc(p.by)}</span>` : ""}</td><td class="wrap">${esc(p.why)}</td>
+<td>${p.rating ?? "–"} · 1 v 1 ${p.rating1v1 ?? "–"}</td><td>${p.games}</td>
+<td>${p.evidence.atBar} of ${p.evidence.matches} at the bar · deep ${pct(p.evidence.deepMatch, p.evidence.deepChecked)} of ${p.evidence.deepChecked} · best ${p.evidence.bestPerf ?? "–"} · pooled at ${p.evidence.pooledPerf ?? "–"}</td>
+<td class="wrap">${i.matches} matches, ${i.atBar} at the bar, strength ${i.avgPerf ?? "–"}, deep ${pct(i.deepMatch, i.deepChecked)} · 1 v 1 ${i.duelWins}-${i.duelLosses}-${i.duelDraws} (${i.vsPool} vs pooled, scoring ${pct(i.vsPoolScore, i.vsPool)}) · crowd and raid ${i.wins} of ${i.games} won${hint ? `<br><b>${esc(hint)}</b>` : ""}</td>
+<td><form method="post" action="/admin/fairplay/case/${esc(p.userId)}"><button class="clear" name="action" value="release">Release</button></form></td></tr>`;
+  };
+  const size = FAIRPLAY.pool.exportPage;
+  const files = ids.length ? Array.from({ length: Math.ceil(ids.length / size) }, (_, f) => `<a href="/admin/fairplay/pool.json${f ? `?after=${encodeURIComponent(ids[f * size - 1]!)}` : ""}">${f * size + 1}–${Math.min(ids.length, (f + 1) * size)}</a>`).join(" · ") : "";
+  return `<h2>Engine pool (${ids.length})</h2>
+<p class="muted">Detection's ban level on two matches or more (one opens a review), or a new account with ${FAIRPLAY.pool.newHits} of its first ${FAIRPLAY.pool.newGames} matches at the one-match ban bar. They meet only each other or bots, in every queue, and see nothing different. Release puts them back in the usual queues (logged). Crowd and raid results are mostly against bots and bosses, so they never make a hint.${files ? ` Download (JSON, ${size} players a file): ${files}` : ""}${ids.length > pool.length ? ` The latest ${pool.length} are listed here.` : ""}</p>
+<div class="card scroll"><table><tr><th>Player</th><th>In since</th><th>Why</th><th>Rating</th><th>Games</th><th>Evidence</th><th>In the pool (W-L-D)</th><th></th></tr>
+${pool.length ? pool.map(row).join("") : `<tr><td colspan="8" class="muted">Nobody is in the pool.</td></tr>`}</table></div>`;
+}
+
+function listPage(
+  cases: CaseRow[],
+  appeals: (Appeal & { name: string })[],
+  log: { user_id: string; at: number; action: string; by: string; reason: string | null; name: string | null }[],
+  status: string,
+  by: string,
+  pool: { rows: PoolRow[]; ids: string[] } | null = null,
+): string {
+  const tabs = LISTS.map((s) => (s === status ? `<b>${s}</b>` : `<a href="/admin/fairplay?status=${s}">${s}</a>`)).join(" · ");
   return `<h1>Fair play</h1>
-<p class="muted">Signed in as ${esc(by.replace("admin:", ""))}. Detection: <b>${esc(FAIRPLAY.enforcement)}</b>${FAIRPLAY.enforcement === "watch" ? " (records only; reviews come from reports)" : ""}.</p>
+<p class="muted">Signed in as ${esc(by.replace("admin:", ""))}. Detection: <b>${esc(FAIRPLAY.enforcement)}</b>${FAIRPLAY.enforcement === "watch" ? " (records only; reviews come from reports)" : FAIRPLAY.enforcement === "pool" ? " (reviews; a ban level goes to the engine pool, never a ban)" : ""}.</p>
 ${appeals.length ? `<h2>Appeals waiting (${appeals.length})</h2><div class="card scroll"><table><tr><th>When</th><th>Player</th><th>Appeal</th></tr>${appeals
     .map((a) => `<tr><td>${when(a.at)}</td><td><a href="/admin/fairplay/case/${esc(a.user_id)}">${esc(a.name)}</a></td><td class="wrap">${esc(a.text)}</td></tr>`)
     .join("")}</table></div>` : ""}
 <form class="row" method="get" action="/admin/fairplay/find"><input type="text" name="q" placeholder="A player's id or profile link" aria-label="A player's id or profile link"><button>Open</button></form>
 <h2>Cases</h2><nav>${tabs}</nav>
-<div class="card scroll"><table><tr><th>Player</th><th>Status</th><th>Why</th><th>Cheating reports (7 d)</th><th>Max score (30 d)</th><th>Latest strength</th><th>Matches</th><th>Updated</th></tr>
+${pool ? poolSection(pool) : `<div class="card scroll"><table><tr><th>Player</th><th>Status</th><th>Why</th><th>Cheating reports (7 d)</th><th>Max score (30 d)</th><th>Latest strength</th><th>Matches</th><th>Updated</th></tr>
 ${cases.length ? cases
     .map(
       (c) =>
         `<tr><td><a href="/admin/fairplay/case/${esc(c.userId)}">${esc(c.name)}</a>${c.openAppeal ? ' <span class="pill">appeal</span>' : ""}</td><td class="${esc(c.status)}">${esc(c.status)}</td><td class="wrap">${esc(c.reason)}</td><td>${c.cheatingReports} (${c.reports} all)</td><td>${c.maxScore ?? ""}</td><td>${c.latestPerf ?? ""}</td><td>${c.matches}</td><td>${when(c.updatedAt)}</td></tr>`,
     )
-    .join("") : `<tr><td colspan="8" class="muted">Nothing here.</td></tr>`}</table></div>
+    .join("") : `<tr><td colspan="8" class="muted">Nothing here.</td></tr>`}</table></div>`}
 <h2>Recent decisions</h2><div class="card scroll"><table><tr><th>When</th><th>Player</th><th>Action</th><th>By</th><th>Reason</th></tr>
 ${log.map((l) => `<tr><td>${when(l.at)}</td><td><a href="/admin/fairplay/case/${esc(l.user_id)}">${esc(l.name ?? DELETED_NAME)}</a></td><td>${esc(l.action)}</td><td>${esc(l.by)}</td><td class="wrap">${esc(l.reason)}</td></tr>`).join("")}</table></div>`;
 }
@@ -532,6 +766,7 @@ ${note ? `<div class="card">${esc(note)}</div>` : ""}
 <p class="muted">${esc(d.player.id)} · ${d.player.joinedAt === null ? "the account was deleted; its fair-play file is kept" : `${d.player.signedIn ? esc(d.player.email ?? "signed in (Google)") : "guest"} · joined ${when(d.player.joinedAt)}`} · ${d.player.onlineMatches} online matches</p>
 <div class="card">Status: <b class="${esc(c?.status ?? "")}">${esc(c?.status ?? "no case")}</b> ${c ? `· ${esc(c.reason)} · updated ${when(c.updated_at)}${c.decided_by ? ` · last decided by ${esc(c.decided_by)}` : ""}` : ""}</div>
 ${appealForm}
+${c?.status === "pool" ? `<div class="card"><b>In the engine pool</b>: they meet only other pooled players or bots, in every queue, and see nothing different. <form class="row" method="post"><input type="text" name="reason" placeholder="Reason (optional)"><button class="clear" name="action" value="release">Release</button></form></div>` : ""}
 <h2>Decide</h2>${decision}
 <form class="row" method="post"><button name="action" value="deep">Check the counted moves with the engine server now</button></form>
 <p class="muted">The button checks their 1 v 1 games too (below), reported ones first, within the day's budget: each move against every legal move, in groups of 8 (about 5 searches a move, so a press covers about 12 moves).</p>

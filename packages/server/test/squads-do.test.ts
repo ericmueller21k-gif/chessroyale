@@ -179,6 +179,29 @@ describe("the Squads lobby's Durable Object", () => {
     void SQUADS_LOBBY;
   });
 
+  it("a matchmade lobby seats newcomers from its own side of the engine pool only (a party's members by its pass)", async () => {
+    const rt = runtime();
+    const lobby = await rt.make();
+    // (The engine pool's queue made it: #618's review, m4. A party with a pooled member queued there, its clean members too.)
+    await lobby.create("POOLS", { fillAt: Date.now() + 60_000, reserve: [{ size: 2, pass: "PARTY1" }], engine: true });
+    const told = async (attached: Record<string, unknown>, party?: string) => {
+      const ws = rt.socket(attached);
+      await send(lobby, ws, { t: "hello", v: SQUADS_PROTOCOL, name: "P", ...(party ? { party } : {}) });
+      return ws.last("error")?.message ?? (ws.last("welcome") ? "seated" : "nothing");
+    };
+    expect(await told({ userId: "clean", pooled: false })).toBe("This match has already started.");
+    expect(await told({ userId: "cheat", pooled: true })).toBe("seated");
+    expect(await told({ userId: "friend", pooled: false }, "PARTY1")).toBe("seated");
+    // (A read that failed lets them in, as a ban's does.)
+    expect(await told({ userId: "unknown", pooled: null })).toBe("seated");
+    const usual = runtime();
+    const clean = await usual.make();
+    await clean.create("CLEAN", { fillAt: Date.now() + 60_000 });
+    const ws = usual.socket({ userId: "cheat", pooled: true });
+    await send(clean, ws, { t: "hello", v: SQUADS_PROTOCOL, name: "P" });
+    expect(ws.last("error")?.message).toBe("This match has already started.");
+  });
+
   it("a seat takes its account's name, whatever the device asks for (a moderator's reset sticks); no account's name: the device's", async () => {
     const rt = runtime();
     const lobby = await rt.make();

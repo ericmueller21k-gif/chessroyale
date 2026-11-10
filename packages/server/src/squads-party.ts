@@ -35,7 +35,10 @@ export interface PartyMember {
   look?: ItemLook;
   ready?: boolean;
   bot?: true;
-  /** Their account (a Boss Battle party: View profile; a kick bans the account; the battle admits only it to their seat). */
+  /**
+   * Their account (a Boss Battle party: View profile; a kick bans the account; the battle admits only it to their seat. A Squads
+   * party: whether it queues in fair play's engine pool, squads-do.ts).
+   */
   userId?: string;
 }
 
@@ -178,7 +181,16 @@ export class PartyCore {
     if (this.r.members.length >= this.max) return { ok: false, message: "This party is full." };
     const id = `m${++this.r.counter}`;
     const name = seatName(opts.name, `Player ${this.r.members.length + 1}`);
-    const member: PartyMember = { id, name, token: this.random(), connected: true, device: opts.device === "phone" ? "phone" : "computer", joinedAt: now, ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look), ...(opts.userId ? { userId: opts.userId } : {}) } : {}) };
+    const member: PartyMember = {
+      id,
+      name,
+      token: this.random(),
+      connected: true,
+      device: opts.device === "phone" ? "phone" : "computer",
+      joinedAt: now,
+      ...(this.r.kind === "boss" ? { seat: this.freeSeat(), look: cleanLook(opts.look) } : {}),
+      ...(opts.userId ? { userId: opts.userId } : {}),
+    };
     this.r.members.push(member);
     this.r.leaderId ??= id;
     this.io.send(id, { t: "welcome", v: SQUADS_PROTOCOL, memberId: id, token: member.token, code: this.r.code });

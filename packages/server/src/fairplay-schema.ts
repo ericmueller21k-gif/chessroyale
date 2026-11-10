@@ -100,8 +100,12 @@ export const FAIRPLAY_SCHEMA = [
 ];
 
 const DAY = 86_400_000;
-/** A case's status as a strength, in SQL, to keep the stricter of two: banned, review, watch, then the rest. */
-const strength = (status: string) => `CASE ${status} WHEN 'banned' THEN 3 WHEN 'review' THEN 2 WHEN 'watch' THEN 1 ELSE 0 END`;
+
+/** SQL: the account in `column` isn't in the engine pool (public leaderboards and percentiles leave pooled accounts out). */
+export const NOT_POOLED = (column: string) => `${column} NOT IN (SELECT user_id FROM fairplay_cases WHERE status = 'pool')`;
+
+/** A case's status as a strength, in SQL, to keep the stricter of two: banned, the engine pool, review, watch, then the rest. */
+const strength = (status: string) => `CASE ${status} WHEN 'banned' THEN 4 WHEN 'pool' THEN 3 WHEN 'review' THEN 2 WHEN 'watch' THEN 1 ELSE 0 END`;
 
 /**
  * A guest's fair-play file joins the account it signs in to: the statements, for the sign-in's one batch, run once the
@@ -136,7 +140,7 @@ export function fairPlayMoves(from: string, to: string, now: number, identities:
     s(
       `INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at, decided_at, decided_by)
        SELECT ?1, status, reason, opened_at, updated_at, CASE WHEN status = 'banned' THEN decided_at END, CASE WHEN status = 'banned' THEN decided_by END
-       FROM fairplay_cases WHERE user_id = ?2 AND status IN ('watch', 'review', 'banned')
+       FROM fairplay_cases WHERE user_id = ?2 AND status IN ('watch', 'review', 'pool', 'banned')
        ON CONFLICT (user_id) DO UPDATE SET status = excluded.status, reason = excluded.reason, updated_at = MAX(updated_at, excluded.updated_at),
          decided_at = CASE WHEN excluded.status = 'banned' THEN excluded.decided_at ELSE decided_at END,
          decided_by = CASE WHEN excluded.status = 'banned' THEN excluded.decided_by ELSE decided_by END
@@ -154,7 +158,7 @@ export function fairPlayMoves(from: string, to: string, now: number, identities:
     s("DELETE FROM reports WHERE reporter = ?1 AND target = ?1", to),
     s(
       `UPDATE fairplay_matches SET keep_until = MAX(COALESCE(keep_until, 0), ?3), deep_queued = CASE WHEN deep_done = 1 THEN deep_queued ELSE 1 END
-       WHERE user_id = ?1 AND moves IS NOT NULL AND ${hasCase("?2", "'watch', 'review', 'banned'")}`,
+       WHERE user_id = ?1 AND moves IS NOT NULL AND ${hasCase("?2", "'watch', 'review', 'pool', 'banned'")}`,
       to,
       from,
       now + FAIRPLAY.evidenceDays * DAY,

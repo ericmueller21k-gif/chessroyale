@@ -3539,12 +3539,31 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
-   * whatever this says; the automated reviewer never bans. "review" since Nov 10 (the outside review, finding 3: its
-   * evidence is the judges' numbers, which devices send): automatic bans stay off until Eric turns them back on, after the
-   * deep re-check's own facts land (ROADMAP.md, fair play; docs/decisions/2026-11-10-rewards-and-records.md).
+   * are in DECISIONS), "review" also opens reviews, "pool" also sends a level that used to ban to the engine pool (`pool`
+   * below), "ban" bans it instead. Reports and admins act whatever this says; the automated reviewer never bans. Automatic
+   * bans stay off (the outside review of Nov 10, finding 3: the ban bar's evidence is the judges' numbers, which devices
+   * send); "pool" since Nov 10 (Eric: "we just keep them in hell basically"), reversible by a person's Release.
    */
-  enforcement: "review" as "watch" | "review" | "ban",
+  enforcement: "pool" as "watch" | "review" | "pool" | "ban",
+  /**
+   * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): an account detection puts here only ever meets other
+   * pooled accounts (or bots) in every queue, and nothing on its screen differs. In: a level that used to ban (`enforcement` "pool"),
+   * or a new account with `newHits` of its first `newGames` fair-play matches at the one-match ban bar (`levels.banOne*`), with no
+   * review. Out: a person's Release on the review page. Its evidence is kept while it's pooled. (The level path pools only a ban that
+   * rests on two matches, so two lobbies: one match at the bar opens a review, core's banSpread.)
+   */
+  pool: {
+    newGames: 10,
+    newHits: 2,
+    /**
+     * The pool list's hints (admin.ts, poolHint): "getting crushed" from 1 v 1 games against pooled players only (at least `games`, scoring
+     * under `below`); crowd and raid results never (bots and bosses beat everyone). "Strength down": the in-pool matches' average
+     * (`dropMatches` or more) `drop` or more below the best of the matches that pooled them.
+     */
+    hint: { games: 5, below: 0.3, drop: 400, dropMatches: 3 },
+    /** The pool's JSON download: players per file (each file's full case: about 10 queries a player, under D1's 1,000 a request). */
+    exportPage: 50,
+  },
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,

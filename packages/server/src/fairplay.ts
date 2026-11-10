@@ -8,6 +8,9 @@
  *     (results.held: the rating, its chart, "Top N%", later leaderboards and ranked) and eligibleForRanked says no;
  *   - banned: no online play (solo stays open), with an appeal a person decides; their sign-in identities are kept
  *     (hashed) so a new account made with them is banned too, and a device it played from puts new accounts in review;
+ *   - pool: the engine pool (FAIRPLAY.pool; docs/decisions/2026-11-10-engine-pool.md): every queue seats them only with other pooled
+ *     accounts or bots, and nothing on their screen differs (their results count on their own profile, not held); kept off public
+ *     leaderboards (NOT_POOLED), their evidence kept while pooled. Detection puts them there; only a person takes them out (Release);
  *   - cleared: decided in their favor; held results count again;
  *   - closed: a watch that saw nothing new for FAIRPLAY.evidenceDays.
  * Every change goes in fairplay_log with who made it and why.
@@ -16,13 +19,13 @@
  * FAIRPLAY.evidenceDaysUnflagged days, so a report made after a match still finds its games; for FAIRPLAY.evidenceDays
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
-import { FAIRPLAY, matchSignals, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
+import { FAIRPLAY, banSpread, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
 import { getUser, identityHashes, refreshRating, type Sql, type User } from "./accounts.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
-export type CaseStatus = "watch" | "review" | "banned" | "cleared" | "closed";
+export type CaseStatus = "watch" | "review" | "pool" | "banned" | "cleared" | "closed";
 /** Open cases: their evidence is never deleted. */
-const OPEN: readonly CaseStatus[] = ["watch", "review"];
+const OPEN: readonly CaseStatus[] = ["watch", "review", "pool"];
 export type ReportReason = (typeof FAIRPLAY.reports.reasons)[number];
 export const REPORT_THANKS = "Thanks, we'll look into it.";
 
@@ -44,11 +47,21 @@ export const caseOf = (sql: Sql, userId: string) =>
 
 /**
  * Whether a player's results may count for ranked play and leaderboards: not while they're in review or banned.
- * The hook for the `ranked` delegate.
+ * The hook for the `ranked` delegate. (A pooled player's count, so their own profile looks as ever; public leaderboards leave the
+ * pool out with NOT_POOLED.)
  */
 export async function eligibleForRanked(sql: Sql, userId: string): Promise<boolean> {
   const c = await caseOf(sql, userId);
   return !c || (c.status !== "review" && c.status !== "banned");
+}
+
+export { NOT_POOLED } from "./fairplay-schema.ts";
+
+/** Whether any of these accounts is in the engine pool (a Squads party queues in the pool when one of its members is). */
+export async function anyPooled(sql: Sql, userIds: readonly string[]): Promise<boolean> {
+  const ids = [...new Set(userIds)].slice(0, 16);
+  if (!ids.length) return false;
+  return !!(await sql.first(`SELECT 1 FROM fairplay_cases WHERE status = 'pool' AND user_id IN (${ids.map(() => "?").join(", ")}) LIMIT 1`, ...ids));
 }
 
 /** A line in the case's log. */
@@ -87,7 +100,7 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
   }
   await logCase(sql, userId, status, by, reason, now);
   // Flagged or reported: their recent matches' evidence is kept the full time, and waits for the deep re-check.
-  if (status === "watch" || status === "review" || status === "banned") {
+  if (status === "watch" || status === "review" || status === "pool" || status === "banned") {
     await sql.run(
       "UPDATE fairplay_matches SET keep_until = MAX(COALESCE(keep_until, 0), ?) WHERE user_id = ? AND moves IS NOT NULL",
       now + FAIRPLAY.evidenceDays * DAY,
@@ -112,8 +125,8 @@ export async function setCase(sql: Sql, userId: string, status: CaseStatus, by: 
     for (const [kind, hash] of u ? await identityHashes(u) : []) {
       await sql.run("INSERT OR REPLACE INTO fairplay_identities (kind, hash, user_id, at) VALUES (?, ?, ?, ?)", kind, hash, userId, now);
     }
-  } else if (before?.status === "banned" || (before?.status === "review" && status !== "review")) {
-    // (A ban lifted, or a review decided: an account deleted while in review kept its identities, account-data.ts.)
+  } else if (before?.status === "banned" || ((before?.status === "review" || before?.status === "pool") && status !== before.status)) {
+    // (A ban lifted, or a review or a pool decided: an account deleted while in review or pooled kept its identities, account-data.ts.)
     await sql.run("DELETE FROM fairplay_identities WHERE user_id = ?", userId);
   }
 }
@@ -128,10 +141,11 @@ export const BANNED_MESSAGE = "Your account can't play online: it was banned for
  * account) is banned too; one seen on a device a banned account played from goes to review (families share devices).
  * `device`: the device marker cookie, recorded against the account.
  */
-export async function banCheck(sql: Sql, user: User | null, device: string | null, now: number): Promise<{ banned: boolean }> {
+export async function banCheck(sql: Sql, user: User | null, device: string | null, now: number): Promise<{ banned: boolean; pooled?: boolean }> {
   if (!user) return { banned: false };
   const c = await caseOf(sql, user.id);
   if (c?.status === "banned") return { banned: true };
+  let pooled = c?.status === "pool";
   if (device && /^[A-Za-z0-9_-]{16,64}$/.test(device)) {
     await sql.run(
       `INSERT INTO fairplay_devices (device, user_id, first_seen, last_seen) VALUES (?, ?, ?, ?)
@@ -167,6 +181,11 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
     if (owner?.status === "review" && c?.status !== "review" && c?.status !== "cleared") {
       await raiseCase(sql, user.id, "review", "evasion", `signed in with the ${what} of account ${owner.user_id}, deleted while in review`, now);
     }
+    // (An account deleted while in the engine pool: a new one with its identity goes back in, as quietly.)
+    if (owner?.status === "pool" && !pooled && c?.status !== "cleared") {
+      await setCase(sql, user.id, "pool", "evasion", `signed in with the ${what} of account ${owner.user_id}, deleted while in the engine pool`, now);
+      pooled = true;
+    }
   }
   if (device && c?.status !== "review" && c?.status !== "cleared") {
     const shared = await sql.first<{ user_id: string }>(
@@ -177,7 +196,7 @@ export async function banCheck(sql: Sql, user: User | null, device: string | nul
     );
     if (shared) await raiseCase(sql, user.id, "review", "evasion", `plays from a device banned account ${shared.user_id} played from`, now);
   }
-  return { banned: false };
+  return { banned: false, ...(pooled ? { pooled } : {}) };
 }
 
 // ---------------- Appeals ----------------
@@ -216,8 +235,9 @@ export async function fairStatus(sql: Sql, userId: string): Promise<{ banned: bo
 
 // ---------------- Decisions (an admin, the automated reviewer) ----------------
 
-export type Decision = "ban" | "clear" | "watch" | "review";
-const DECIDES: Record<Decision, CaseStatus> = { ban: "banned", clear: "cleared", watch: "watch", review: "review" };
+export type Decision = "ban" | "clear" | "watch" | "review" | "release";
+/** (Release: out of the engine pool, back to the usual queues: a clearing, so the level counts only matches from then on.) */
+const DECIDES: Record<Decision, CaseStatus> = { ban: "banned", clear: "cleared", watch: "watch", review: "review", release: "cleared" };
 
 /** Sends a player an email about their case (a ban, a clearing after a review, an appeal turned down); set up by the Worker. */
 export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", notice: string | null) => Promise<void>;
@@ -225,8 +245,9 @@ export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", not
 /**
  * A decision on a case by `by` ("admin:<email>" or "reviewer"), with a written reason for the log, and optionally a
  * note for the player (`notice`, in the email). A ban, or clearing someone who was in review or banned, emails them.
- * The automated reviewer never bans and never decides appeals: it reviews, watches and clears, and can't change a banned case or one
- * with an open appeal.
+ * The automated reviewer never bans and never decides appeals: it reviews, watches and clears, and can't change a banned case, a pooled
+ * one or one with an open appeal. Release (a person's): a pooled player back to the usual queues, cleared, with no email (they were never
+ * told); the reason may be left out.
  */
 export async function decide(
   sql: Sql,
@@ -237,19 +258,24 @@ export async function decide(
   now: number,
   opts: { notice?: unknown; mail?: CaseMailer } = {},
 ): Promise<{ ok: true; status: CaseStatus } | { ok: false; status: number; message: string }> {
-  const status = DECIDES[decision as Decision];
-  if (!status) return { ok: false, status: 400, message: "decision must be ban, clear, watch or review" };
-  const why = typeof reason === "string" ? reason.trim().slice(0, 2000) : "";
+  const status = Object.hasOwn(DECIDES, String(decision)) ? DECIDES[decision as Decision] : undefined;
+  if (!status) return { ok: false, status: 400, message: "decision must be ban, clear, watch, review or release" };
+  const release = decision === "release";
+  const typed = typeof reason === "string" ? reason.trim().slice(0, 2000) : "";
+  const why = release ? `released from the engine pool${typed ? `: ${typed}` : ""}` : typed;
   if (why.length < 5) return { ok: false, status: 400, message: "a written reason is required" };
   // (A deleted account's ban outlives it: its case can still be decided, a ban lifted, with no one to email.)
   const user = await getUser(sql, userId);
   const before = await caseOf(sql, userId);
   if (!user && !before) return { ok: false, status: 404, message: "no such player" };
+  if (release && before?.status !== "pool") return { ok: false, status: 409, message: "this player isn't in the engine pool" };
   if (by === "reviewer") {
     // (A ban is a person's, always: the ban bar's evidence still comes from the judges' numbers, which devices send, so a leaked token
     // or a steered reviewer could ban an honest player at it. The outside review of Nov 10, finding 6, and its review's M1.)
     if (status === "banned") return { ok: false, status: 409, message: "a ban is for a person: choose review or watch, or leave it for one" };
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
+    // (The pool is for a person to judge, from how the player does in it: docs/decisions/2026-11-10-engine-pool.md.)
+    if (before?.status === "pool" || release) return { ok: false, status: 409, message: "engine pool cases are for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
@@ -293,13 +319,14 @@ export async function decideAppeal(
 }
 
 /**
- * Raises a case to at least `status` (watch < review): never lowers it and never touches a ban. A cleared case can
- * be raised again; callers count only evidence from after the clearing (see reviewIfReported).
+ * Raises a case to at least `status` (watch < review): never lowers it and never touches a ban. A pooled case stays pooled (only a
+ * person's Release takes it out): the new evidence goes in its log. A cleared case can be raised again; callers count only evidence
+ * from after the clearing (see reviewIfReported).
  */
 export async function raiseCase(sql: Sql, userId: string, status: "watch" | "review", by: string, reason: string, now: number): Promise<boolean> {
   const c = await caseOf(sql, userId);
   if (c?.status === "banned") return false;
-  if (c && (c.status === status || (c.status === "review" && status === "watch"))) {
+  if (c && (c.status === status || (c.status === "review" && status === "watch") || c.status === "pool")) {
     // Already there: the new evidence goes in the log, and the case stays open.
     await sql.run("UPDATE fairplay_cases SET updated_at = MAX(updated_at, ?) WHERE user_id = ?", now, userId);
     await logCase(sql, userId, "note", by, reason, now);
@@ -388,9 +415,12 @@ async function reviewIfReported(sql: Sql, target: string, now: number): Promise<
 export interface FairRecord {
   summary: FairSummary;
   verdict: LevelVerdict;
-  /** What was done about it (the enforcement setting may hold detection to recording only). */
-  acted: FairLevel;
+  /** What was done about it (the enforcement setting may hold detection to recording only; "pool": into the engine pool). */
+  acted: Acted;
 }
+
+/** What detection did: a level's action, or the engine pool. */
+export type Acted = FairLevel | "pool";
 
 /**
  * A finished online match's fair play for one signed-in player, from the lobby's record of their judged picks: the
@@ -420,7 +450,9 @@ export async function recordFairPlay(
   const rating = account.rating ?? null;
   const summary = matchSignals(match.moves, referenceStrength(history.slice(0, 10).map((h) => h.perf), rating));
   const c = await caseOf(sql, userId);
-  let verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);
+  const inputs = [...levelInputs(history, c), { ...summary, at: now }];
+  let verdict = playerLevel(inputs, now, lv);
+  let spread = verdict.level === "ban" && banSpread(inputs, now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
   const added = await sql.first<{ id: number }>(
     `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
@@ -441,15 +473,16 @@ export async function recordFairPlay(
   );
   // (A retry whose row went in on an earlier try, which stopped before the steps below: the level from what's stored, as relevel's, so a
   // person's decision since counts; then the same steps, both safe to repeat. The review of #610, m1.)
-  if (!added) verdict = await levelNow(sql, userId, c, now);
+  if (!added) ({ verdict, spread } = await levelNow(sql, userId, c, now));
   // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
   if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
   // (A retry acts only when the case is still below what the verdict asks: it finishes what an earlier try missed, and writes no
   // second note when nothing was missed. The delta review of #610, m1-a.)
-  const aim = aimOf(verdict);
-  const acted = !added && aim && caseRank(c?.status) >= caseRank(aim) ? ACTED[aim] : await actOn(sql, userId, verdict, now, mail);
+  const aim = aimOf(verdict, spread);
+  const acted = !added && aim && caseRank(c?.status) >= caseRank(aim) ? ACTED[aim] : await actOn(sql, userId, verdict, spread, now, mail);
+  const pooled = await poolNewAccount(sql, userId, now);
   await purgeEvidence(sql, now);
-  return { summary, verdict, acted };
+  return { summary, verdict, acted: pooled ? "pool" : acted };
 }
 
 /** Queues every match of a player's still kept and not yet deep-checked for the deep re-check (fairplay-deep.ts). */
@@ -486,41 +519,85 @@ function levelInputs(history: readonly HistoryRow[], c: Case | null): LevelInput
  * A player's level again after their stored matches changed (the deep re-check added to one), and what detection
  * does about it. The deep re-check's entry point (fairplay-deep.ts).
  */
-export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: FairLevel }> {
-  const verdict = await levelNow(sql, userId, await caseOf(sql, userId), now);
-  return { verdict, acted: await actOn(sql, userId, verdict, now, mail) };
+export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: Acted }> {
+  const { verdict, spread } = await levelNow(sql, userId, await caseOf(sql, userId), now);
+  const acted = await actOn(sql, userId, verdict, spread, now, mail);
+  return { verdict, acted: (await poolNewAccount(sql, userId, now)) ? "pool" : acted };
 }
 
-/** A player's level from their stored matches now (since the case's last decision), acting on nothing. */
-async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): Promise<LevelVerdict> {
+/**
+ * The engine pool's new-account rule (core's newAccountPool; FAIRPLAY.pool): an account with `newHits` of its first `newGames`
+ * fair-play matches at the one-match ban bar goes to the pool straight away, with no review, when `enforcement` is "pool". Only
+ * matches since the case's last decision count (a Release weighed the rest). Whether it put them there now.
+ */
+async function poolNewAccount(sql: Sql, userId: string, now: number): Promise<boolean> {
+  if (FAIRPLAY.enforcement !== "pool") return false;
+  const c = await caseOf(sql, userId);
+  if (c?.status === "pool" || c?.status === "banned") return false;
+  const first = await sql.all<HistoryRow>(
+    "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at, id LIMIT ?",
+    userId,
+    FAIRPLAY.pool.newGames,
+  );
+  const since = c?.decided_at ?? 0;
+  const why = newAccountPool(levelInputs(first, null).map((m) => ({ ...m, counts: m.at > since })));
+  if (!why) return false;
+  await setCase(sql, userId, "pool", "detection", why, now);
+  return true;
+}
+
+/**
+ * A player's level from their stored matches now (since the case's last decision), acting on nothing; for a ban, whether it rests on two
+ * matches or more (`spread`: core's banSpread).
+ */
+async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): Promise<{ verdict: LevelVerdict; spread: boolean }> {
   const history = await sql.all<HistoryRow>(
     "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
     userId,
   );
-  return playerLevel(levelInputs(history, c), now, FAIRPLAY.levels);
+  const inputs = levelInputs(history, c);
+  const verdict = playerLevel(inputs, now, FAIRPLAY.levels);
+  return { verdict, spread: verdict.level === "ban" && banSpread(inputs, now, FAIRPLAY.levels) };
 }
+
+type Enforcement = "watch" | "review" | "pool" | "ban";
+
+/** The case status actOn moves a verdict to (as its branches below), for a retry's check. */
+function aimOf(verdict: LevelVerdict, spread: boolean): CaseStatus | undefined {
+  if (verdict.level === "none") return undefined;
+  const mode = FAIRPLAY.enforcement as Enforcement;
+  if (verdict.level === "watch" || mode === "watch") return "watch";
+  if (verdict.level === "ban" && mode === "pool") return spread ? "pool" : "review";
+  return verdict.level === "ban" && mode === "ban" ? "banned" : "review";
+}
+const ACTED = { watch: "watch", review: "review", pool: "pool", banned: "ban" } as Record<CaseStatus, Acted>;
+const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 4 : s === "pool" ? 3 : s === "review" ? 2 : s === "watch" ? 1 : 0);
 
 /**
  * What detection does with a level, as far as FAIRPLAY.enforcement allows: "watch" only records (a watch case, its
- * log saying what the level would have done), "review" also opens reviews, "ban" also bans. Returns what it did.
+ * log saying what the level would have done), "review" also opens reviews, "pool" sends a ban-level player to the engine pool
+ * (quietly: no email) when the ban rests on two matches or more (`spread`), else opens a review, "ban" bans them. Returns what it did.
  */
-/** The case status actOn moves a verdict to (as its branches below), for a retry's check. */
-function aimOf(verdict: LevelVerdict): CaseStatus | undefined {
-  if (verdict.level === "none") return undefined;
-  const mode = FAIRPLAY.enforcement as "watch" | "review" | "ban";
-  if (verdict.level === "watch" || mode === "watch") return "watch";
-  return verdict.level === "ban" && mode === "ban" ? "banned" : "review";
-}
-const ACTED = { watch: "watch", review: "review", banned: "ban" } as Record<CaseStatus, FairLevel>;
-const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 3 : s === "review" ? 2 : s === "watch" ? 1 : 0);
-
-async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: number, mail?: CaseMailer): Promise<FairLevel> {
+async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, spread: boolean, now: number, mail?: CaseMailer): Promise<Acted> {
   if (verdict.level === "none") return "none";
-  const mode = FAIRPLAY.enforcement as "watch" | "review" | "ban";
+  const mode = FAIRPLAY.enforcement as Enforcement;
   const why = verdict.reasons.join("; ");
   if (verdict.level === "watch" || mode === "watch") {
     await raiseCase(sql, userId, "watch", "detection", verdict.level === "watch" ? why : `level ${verdict.level}, not acted on (watch only): ${why}`, now);
     return "watch";
+  }
+  if (verdict.level === "ban" && mode === "pool" && !spread) {
+    // (One match at the bar, so one lobby's judges: a person looks first. Eric: "if some player accidentally does for a game, they won't
+    // get banned". The #618 review, M3.)
+    await raiseCase(sql, userId, "review", "detection", `level ban on one match (two would pool): ${why}`, now);
+    return "review";
+  }
+  if (verdict.level === "ban" && mode === "pool") {
+    // (Already pooled: the new evidence goes in its log, raiseCase's note. Banned by a person: nothing more.)
+    const c = await caseOf(sql, userId);
+    if (c?.status === "pool" || c?.status === "banned") await raiseCase(sql, userId, "review", "detection", `level ban: ${why}`, now);
+    else await setCase(sql, userId, "pool", "detection", `level ban: ${why}`, now);
+    return "pool";
   }
   if (verdict.level === "ban" && mode === "ban") {
     const c = await caseOf(sql, userId);
@@ -538,17 +615,18 @@ async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: numbe
 let purgedAt = 0;
 /**
  * Deletes old evidence (at most every 10 minutes per instance): picks past their keep date, unless the player's case
- * is open. A watch case that has seen nothing new for FAIRPLAY.evidenceDays closes first.
+ * is open (a pooled player's evidence stays while they're pooled). A watch case that has seen nothing new for FAIRPLAY.evidenceDays
+ * closes first.
  */
 export async function purgeEvidence(sql: Sql, now: number, force = false): Promise<void> {
   if (!force && now - purgedAt < 10 * 60_000) return;
   purgedAt = now;
   const stale = await sql.all<{ user_id: string }>("SELECT user_id FROM fairplay_cases WHERE status = 'watch' AND updated_at < ? LIMIT 100", now - FAIRPLAY.evidenceDays * DAY);
   for (const { user_id } of stale) await setCase(sql, user_id, "closed", "auto", `nothing new in ${FAIRPLAY.evidenceDays} days`, now);
-  // (Open: watch or review, or a ban with an appeal still waiting.)
+  // (Open: watch, review or the pool, or a ban with an appeal still waiting.)
   await sql.run(
     `UPDATE fairplay_matches SET moves = NULL, keep_until = NULL, deep_queued = 0
-     WHERE keep_until < ? AND user_id NOT IN (SELECT user_id FROM fairplay_cases WHERE status IN ('watch', 'review'))
+     WHERE keep_until < ? AND user_id NOT IN (SELECT user_id FROM fairplay_cases WHERE status IN ('watch', 'review', 'pool'))
        AND user_id NOT IN (SELECT user_id FROM fairplay_appeals WHERE status = 'open')`,
     now,
   );

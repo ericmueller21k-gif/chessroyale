@@ -62,15 +62,18 @@ describe("the review of #610: its findings, fixed", () => {
     expect(skipReason({ ...moves[1]!, gap: 35 })).toBe("only");
   });
 
-  it("M1: an honest player's obvious moves, reported by lying judges, reach the ban bar: the reviewer's token can't ban them; a person can", async () => {
-    expect(FAIRPLAY.enforcement).toBe("review");
+  it("M1: an honest player's obvious moves, reported by lying judges in one lobby, reach the ban bar: a review, never the pool; the reviewer's token can't ban them; a person can", async () => {
+    expect(FAIRPLAY.enforcement).toBe("pool");
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const p = await player(sql, "Honest");
-    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: forgedMatch() }, QUIET - 2 * HOUR);
-    await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: forgedMatch() }, QUIET - HOUR);
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: forgedMatch() }, QUIET - HOUR);
     expect((await caseOf(sql, p.id))?.status).toBe("review");
     for (let i = 0; i < 5; i++) await deepCheckRun(sql, onlyMoveSearch, QUIET, { all: true, perRun: 200 });
+    // At the ban bar on that one match, so on one lobby's judges: a review (a person looks), not the engine pool (the #618 review, M3).
+    expect((await sql.all<{ reason: string }>("SELECT reason FROM fairplay_log WHERE user_id = ? AND action = 'note'", p.id)).map((l) => l.reason)).toContainEqual(
+      expect.stringMatching(/^level ban on one match \(two would pool\): one match/),
+    );
     const r = await decide(sql, p.id, "ban", "reviewer", "deep re-check confirms engine moves", QUIET + 1000);
     expect(r).toEqual({ ok: false, status: 409, message: expect.stringMatching(/^a ban is for a person/) });
     expect((await caseOf(sql, p.id))?.status).toBe("review");

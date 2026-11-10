@@ -176,8 +176,8 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     ("Transcendent · 120 RP"). At the floor or more but outside the top 500 a player stays Radiant 1, the RP counting on
     past 80 ("Radiant 1 · 95 RP"). The place is 1 + how many ladders are higher (equal ladders share a place), counted
     by the server (`topPlace` in `ranked-schema.ts`): only for a ladder at the floor or more, one `COUNT(*)` on the
-    `ranked_1v1_ladder` index (the entries above it, never the table), kept a minute per ladder in each Worker
-    instance. Falling below the floor is Radiant 1 again.
+    `ranked_1v1_ladder` index (the entries above it, never the table), less fair play's engine pool's ladders above it
+    ([fairplay.md](fairplay.md)), kept a minute per ladder in each Worker instance. Falling below the floor is Radiant 1 again.
   - **Rank points a game:** 2 × 20 × (the result − the expected result from the two hidden ratings): ±20 between
     equals, more for beating someone stronger, less for beating someone weaker; plus 0.05 × (hidden rating − the
     ladder's rating), that adjustment within ±10 (a draw: half). A win never takes points, a loss never gives them.
