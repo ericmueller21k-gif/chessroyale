@@ -1,3 +1,4 @@
+- Nov 10 21:05 UTC: ERIC: live load 30 s white then 6 s (DCL 5 s); measured /api/me 1.1-1.7 s every load. Town: own rider pops in seconds late. Two helpers: claude/load-regress, claude/town-rider (high).
 - Nov 10 20:50 UTC: #618 ENGINE POOL MERGED (full suite green). Cheater demo helper running (on engine-pool; will merge main).
 - Nov 10 20:35 UTC: #618 fix round done (1d03b31). Notes: e2e/fairplay.spec.ts:96 ("reviewer API lists a reported case") NEVER RUNS (@phone-only + skip unless desktop) -> next tests batch; openCases 4 queries/case on the all tab -> later.
 - Nov 10 20:15 UTC: #619 Discord alerts MERGED (off until Eric adds ALERT_WEBHOOK; DEPLOY.md has the steps). Engine pool fix round + cheater demo running.
