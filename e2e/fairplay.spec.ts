@@ -1,5 +1,5 @@
 import { devices, expect, type Page } from "@playwright/test";
-import { asServerAdmin, createLobbyFromHome, joinFromInvite, named, test, pickMode, startBotLevel } from "./helpers.ts";
+import { asServerAdmin, createLobbyFromHome, joinFromInvite, localSql, named, test, pickMode, startBotLevel } from "./helpers.ts";
 
 /** The automated reviewer's token in the local Worker (playwright.config.ts). */
 const REVIEW = { authorization: "Bearer e2e-review-token-0123456789" };
@@ -114,4 +114,31 @@ test("the reviewer's API lists a reported player's case with its evidence", { ta
   expect(list.cases.find((c) => c.userId === target)).toMatchObject({ status: "watch", reports: 1 });
   const detail = (await (await page.request.get(`/api/admin/fairplay/cases/${target}`, { headers: REVIEW })).json()) as { reports: { reason: string; match: string | null }[] };
   expect(detail.reports).toEqual([expect.objectContaining({ reason: "Offensive name or icon", match: null })]);
+});
+
+test("the engine pool (Nov 10): pooled accounts' PLAY seats them together, apart from everyone else, with bots after the usual wait; the queue looks the same", { tag: "@phone-only" }, async ({ page, browser }) => {
+  test.setTimeout(2 * 60_000);
+  const code = (p: Page) => p.evaluate(() => (window as unknown as { match?: { code?: string } }).match?.code).catch(() => undefined);
+  const q = `ep-${Date.now().toString(36).slice(-6)}`;
+  const open = async (p: Page, name: string, pooled: boolean) => {
+    await named(p, name);
+    await p.goto(`/?debug&pool=${q}`);
+    await expect(p.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    // (Into the pool as detection would put them: the case's status, which the server reads from the account on each PLAY.)
+    if (pooled) await localSql(p, "INSERT INTO fairplay_cases (user_id, status, reason, opened_at, updated_at) VALUES (?, 'pool', 'e2e: the engine pool', ?, ?)", await myId(p), Date.now(), Date.now());
+    await pickMode(p);
+    return p;
+  };
+  const clean = await open(page, "Clean", false);
+  const a = await open(await (await browser.newContext()).newPage(), "Pooly", true);
+  const b = await open(await (await browser.newContext()).newPage(), "Poolette", true);
+  for (const p of [clean, a, b]) await p.getByRole("button", { name: "PLAY", exact: true }).click();
+  for (const p of [clean, a, b]) await expect.poll(() => code(p)).toBeTruthy();
+  // The two pooled players meet each other, never the clean one.
+  expect(await code(a)).toBe(await code(b));
+  expect(await code(a)).not.toBe(await code(clean));
+  // Nothing on screen differs: the same queue lines; bots fill each lobby after the usual wait (8 s here).
+  await expect(a.locator(".fd-queue-mode")).toHaveText((await clean.locator(".fd-queue-mode").textContent())!);
+  for (const p of [clean, a]) await expect(p.locator(".fd-count-n")).toHaveText("100", { timeout: 20_000 });
+  expect(await code(a)).not.toBe(await code(clean));
 });
