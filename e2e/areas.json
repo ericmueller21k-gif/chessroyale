@@ -39,6 +39,7 @@
   "full": [
     "package.json",
     "package-lock.json",
+    "packages/server/src/e2e-sql.ts",
     "packages/*/package.json",
     "tsconfig.base.json",
     "packages/*/tsconfig.json",

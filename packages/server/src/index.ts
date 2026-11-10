@@ -27,6 +27,7 @@ import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
 import { pruneChatMod } from "./chat-mod.ts";
+import { e2eSql, type E2eSqlEnv } from "./e2e-sql.ts";
 import type { AccessEnv } from "./access.ts";
 import { SERVER_RECHECK_NODES, serverScoreAt, warmEngine, type EngineEnv } from "./engine.ts";
 import { isPaused, pausedResponse, switchStatus, type KillSwitchEnv } from "./kill-switches.ts";
@@ -44,7 +45,7 @@ guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -172,6 +173,11 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
 }
 
 async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUntil): Promise<Response> {
+  // POST /api/e2e/sql: the e2e tests' writes to the local database, on its one writer (e2e-sql.ts; the e2e's local server only).
+  if (rawEnv.E2E_SQL === "1") {
+    const res = await e2eSql(request, url, rawEnv);
+    if (res) return res;
+  }
   // GET /api/status → { paused, banner }: the kill switches that are off and the maintenance banner (kill-switches.ts).
   if (url.pathname === "/api/status" && request.method === "GET") return json(switchStatus(rawEnv));
   {

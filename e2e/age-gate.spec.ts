@@ -1,12 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readdirSync } from "node:fs";
-import { createRequire } from "node:module";
-import { join } from "node:path";
 import { expect, type Page } from "@playwright/test";
 import { test } from "./helpers.ts";
 import { TOO_YOUNG_LINE } from "@chessroyale/core";
-import { D1_DIR, E2E_STATE, pickMode } from "./helpers.ts";
+import { localSql, pickMode } from "./helpers.ts";
 
 /**
  * The age gate (docs/decisions/2026-10-16-age-gate-and-real-money.md), on a phone: before signing in, a neutral
@@ -17,36 +13,11 @@ import { D1_DIR, E2E_STATE, pickMode } from "./helpers.ts";
  * the age gate and the account are the real server's.
  */
 
-// node:sqlite through require, to read the local D1 that wrangler dev keeps (read only).
-const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof import("node:sqlite");
-function d1<T>(query: string, ...params: string[]): T[] {
-  for (const f of readdirSync(D1_DIR).filter((x) => x.endsWith(".sqlite"))) {
-    const db = new DatabaseSync(join(D1_DIR, f), { readOnly: true });
-    try {
-      if (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'").get()) return db.prepare(query).all(...params) as T[];
-    } finally {
-      db.close();
-    }
-  }
-  throw new Error(`no local D1 with a users table in ${D1_DIR}`);
-}
+/** Runs a query on the local D1, through the server's own (helpers' localSql: no second process on its file). */
+const d1 = <T = Record<string, unknown>>(page: Page, query: string, ...params: string[]) => localSql<T>(page, query, ...params);
 
-/**
- * Writes to the local D1 (the running server writes to it too: on SQLITE_BUSY, wait a moment and ask again, as
- * problems.spec.ts does).
- */
-async function d1Write(page: Page, sql: string) {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      execFileSync("npx", ["wrangler", "d1", "execute", "hunchess", "--local", "--persist-to", E2E_STATE, "--command", sql], { stdio: "pipe" });
-      return;
-    } catch (e) {
-      const why = String((e as { stderr?: unknown }).stderr ?? e);
-      if (!why.includes("SQLITE_BUSY") || attempt >= 10) throw new Error(`d1 execute failed (attempt ${attempt}): ${why.slice(-500)}`);
-      await page.waitForTimeout(300);
-    }
-  }
-}
+/** Writes to the local D1, through the server's own (helpers' localSql: one writer, so the server is never locked out). */
+const d1Write = (page: Page, sql: string) => localSql(page, sql).then(() => undefined);
 
 /** The real config, with Google and email sign-in shown (as where they're set up). */
 async function signInOn(page: Page) {
@@ -150,7 +121,7 @@ test("under 13: a neutral question, a friendly line, guest play, and no sign-in 
   const shown = sheet.getByRole("status");
   await expect(shown).toHaveText(/^Report [A-HJKMNP-Z2-9]{6} — share this id$/);
   const id = (await shown.textContent())!.match(/Report (\w{6})/)![1]!;
-  expect(d1<{ kind: string; note: string }>("SELECT kind, note FROM ops_reports WHERE id = ?", id)).toEqual([{ kind: "bug", note: "" }]);
+  expect(await d1<{ kind: string; note: string }>(page, "SELECT kind, note FROM ops_reports WHERE id = ?", id)).toEqual([{ kind: "bug", note: "" }]);
 });
 
 test("13 or older: the sign-in options after the question, and the account made keeps when its holder said so", async ({ page }) => {
@@ -184,7 +155,7 @@ test("13 or older: the sign-in options after the question, and the account made 
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   const me = (await api(page, "/api/me")).body!;
   expect(me.user).toMatchObject({ signedIn: true, email });
-  const [row] = d1<{ age_ok_at: number | null }>("SELECT age_ok_at FROM users WHERE email = ?", email);
+  const [row] = await d1<{ age_ok_at: number | null }>(page, "SELECT age_ok_at FROM users WHERE email = ?", email);
   expect(row!.age_ok_at).toBeGreaterThanOrEqual(at - 60_000);
   expect((await api(page, "/api/auth/config")).body?.age).toBeUndefined();
 });
