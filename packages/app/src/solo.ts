@@ -64,6 +64,8 @@ export class SoloMatch implements GameView {
   phase: Phase = { kind: "loading" };
   /** Solo games never count for your ranking (all bots, and no server sees them). */
   readonly ranked = false;
+  /** A solo match (App.tsx tells it apart by this, without loading this chunk). */
+  readonly isSolo = true;
   /** The queue screen (Solo): who has a seat so far, and when they're all in. */
   readonly queueType: MatchmakingType = "solo";
   auto = false;

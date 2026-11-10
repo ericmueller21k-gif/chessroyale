@@ -410,6 +410,26 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
   }
 });
 
+test("the shell (index.html: what shows before the app's script has run) has the logo, the hero's panel and PLAY's outline where home draws them, so the swap can't be seen", async ({ page }) => {
+  // (Nov 10, phone load: nothing shifts. Home once, which marks this device for home's shell, then a load with the app's
+  // scripts held back: only the shell shows. Each box the same to the pixel, on a phone and a computer.)
+  const boxes = (root: string) =>
+    page.evaluate(async (root) => {
+      await document.fonts.ready;
+      const box = (c: string) => [...document.querySelectorAll(`${root} .${c}`)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => [r.x, r.y, r.width, r.height].map(Math.round))[0] ?? null;
+      return { logo: box("fd-logo"), hero: box("fd-hero"), play: box("fd-play") };
+    }, root);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.locator("#shell")).toHaveCount(0);
+  const home = await boxes("#app");
+  expect(home.play).not.toBeNull();
+  await page.route(/\/assets\/.*\.js$/, (r) => r.abort());
+  await page.reload();
+  await expect(page.locator("#shell .fd-root")).toHaveCount(1);
+  expect(await boxes("#shell")).toEqual(home);
+});
+
 test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits from 320 px up, with no coins in it", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
   for (const width of [320, 360, 375, 390, 430]) {

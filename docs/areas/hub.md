@@ -4,6 +4,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 ## How it works today
 
+- **Loading (Nov 10, [phone load 2](../decisions/2026-11-10-phone-load-2.md)):** `index.html`'s shell (home's markup, only the logo, hero
+  panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
+  the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
+  preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+
 - **The daily quests overlay (Nov 9; the mockup [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md), on real quests since
   phase 3: [2026-11-09-quests-screens.md](../decisions/2026-11-09-quests-screens.md); the rules and server: [accounts.md](accounts.md), "Quests"):**
   `components/QuestsOverlay.tsx` (props: the quests, the two countdowns, today's reroll, paused, callbacks), fed by `quests.ts` (`useQuests`:

@@ -29,7 +29,8 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   `in-frame` to its screen (`town.css`: in the page's flow, the window's height, not fixed). On a computer **the chat icon sits right
   after the "Town square" title and the gear alone at the right end** (`town-chat.css`: the tools' box `display: contents`, the gear
   `margin-left: auto`): the chat's place was hard to see at the far right. Every side-menu item leaves the town (`goHome` in
-  `App.tsx` closes it), Chess Town opens it again. Known limit: resizing a mouse window across 1024 px adds or takes away the
+  `App.tsx` closes it), Chess Town opens it again. Leaving asks "Leave Chess Town?" first (`town/LeaveTown.tsx`; Stay focused,
+  Escape is Stay; both set in layout effects so a key in the sheet's first frame isn't lost, Nov 10). Known limit: resizing a mouse window across 1024 px adds or takes away the
   frame, which starts the town again at its start square. The world never assumes a screen size: it fills its box and works its camera out
   from the box's shape, so the panels Eric designs around it can change without touching it. The back button, the chat icon, the
   gear and the buttons stay put. **The buttons** (Eric, Oct 28: "remove the 'Back to me' button … replace with circular focus
@@ -463,9 +464,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
     bot's pawn from its idle's top to its feet (`sidekickSquares`, 0.87), its feet where a pawn's base stands; its name
     tag over its head, as a pawn's. **Its frames are baked** (`scripts/bake-sidekicks.ts`, run after changing a sidekick's
     art): one PNG a sidekick (`town/sidekicks/<boss>.png`: rows idle, walk, sit, wave) and their times, feet and heads in
-    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts every frame into a canvas once
-    (`SpriteFrames` in `render.ts`), never per frame; a sidekick isn't drawn (or tapped) until its picture has loaded (a
-    moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
+    `town/sidekick-sheets.ts`; the town loads the fourteen pictures as it opens and cuts a sheet's frames into canvases once,
+    when its sidekick is first drawn (`SpriteFrames.cut` in `render.ts`; Nov 10, phone load), never per frame; a sidekick isn't
+    drawn (or tapped) until its picture has loaded (a moment). No art code runs in the town: the sprites' own code paints for about 3 s as it loads, which would hold the
     town's first frame back (measured: the decision).
   - **A person's card** (a tap on a bot, or on a real player once they walk in the town: `Card` kind `"person"`; placed over its
     name tag like a boss's, as before; the bot holds still while it's open, `hold`). **One row, one size, 210 × 53 px on a phone and
