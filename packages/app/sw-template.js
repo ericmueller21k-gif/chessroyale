@@ -34,7 +34,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || STREAMED.includes(url.pathname) || url.pathname.startsWith("/media/")) return;
+  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || STREAMED.includes(url.pathname)) return;
+  // (The landing page's demo video: streamed too, never cached.)
+  if (url.pathname.startsWith("/media/")) return;
 
   // Every page (including /lobby/CODE invite links) is the single-page app. Fetch it fresh so an
   // update shows up on the next open; fall back to the cached copy only when offline.
