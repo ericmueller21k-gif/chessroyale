@@ -16,8 +16,8 @@ const { default: worker } = await import("../src/index.ts");
 const { SquadsParty } = await import("../src/squads-do.ts");
 
 /**
- * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): detection's ban level, or a new account with 2 of its first
- * 10 matches at the one-match ban bar, puts an account in the pool; every queue then seats it only with other pooled accounts or bots,
+ * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): detection's ban level resting on two matches (so two lobbies;
+ * one match at the bar opens a review), or a new account with 2 of its first 10 matches at the one-match ban bar, puts an account in the pool; every queue then seats it only with other pooled accounts or bots,
  * from the account (never the browser); a person's Release takes it out; it's left out of public rankings; its evidence is kept.
  */
 
@@ -74,7 +74,7 @@ describe("into the pool", () => {
     expect(atBanBar(matchSignals(engineMatch(false), 1500))).toBe(false);
     expect(atBanBar(matchSignals(plain, 1500))).toBe(false);
     expect(FAIRPLAY.enforcement).toBe("pool");
-    expect(FAIRPLAY.pool).toEqual({ newGames: 10, newHits: 2 });
+    expect(FAIRPLAY.pool).toMatchObject({ newGames: 10, newHits: 2 });
   });
 
   it("the new-account rule (core): 2 of the first 10 at the bar pools; 1 doesn't; nor hits after the 10th, nor ones a decision weighed", () => {
@@ -112,7 +112,7 @@ describe("into the pool", () => {
     expect(sent).toEqual([]);
   });
 
-  it("the level path: what used to ban (here one match at the bar) pools any account; results not held, the profile as ever", async () => {
+  it("the level path: a ban resting on one match opens a review (a person looks); on two (two lobbies) it pools any account; results not held, the profile as ever", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const sent: string[] = [];
@@ -120,20 +120,23 @@ describe("into the pool", () => {
     const p = await player(sql, "Pat");
     await recordResult(sql, p.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2500, ranked: true }, T0 - 1000);
     const before = (await publicProfile(sql, p.id, T0))!;
-    const r = await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0, mail);
-    expect(r).toMatchObject({ verdict: { level: "ban" }, acted: "pool" });
-    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: one match/) });
+    const one = await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0, mail);
+    expect(one).toMatchObject({ verdict: { level: "ban" }, acted: "review" });
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "review", reason: expect.stringMatching(/^level ban on one match \(two would pool\): one match/) });
+    const two = await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0 + 1000, mail);
+    expect(two).toMatchObject({ verdict: { level: "ban" }, acted: "pool" });
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: 2 deep-checked matches/) });
     expect(sent).toEqual([]);
     expect(await eligibleForRanked(sql, p.id)).toBe(true);
     expect((await sql.first<{ held: number }>("SELECT held FROM results WHERE user_id = ?", p.id))?.held).toBe(0);
     const after = (await publicProfile(sql, p.id, T0))!;
     expect(after).toMatchObject({ banned: false, rating: before.rating, topPercent: before.topPercent });
     // More evidence, reports, a review's bar: they stay in the pool (only a person's Release takes them out), the log notes it.
-    await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0 + 1000, mail);
+    await recordFairPlay(sql, p.id, { lobby: "CCCCC", mode: "crowd", moves: bar }, T0 + 2000, mail);
     const reporter = await player(sql, "Rae");
-    await reportPlayer(sql, reporter, p.id, "Cheating", "BBBBB", T0 + 2000);
+    await reportPlayer(sql, reporter, p.id, "Cheating", "CCCCC", T0 + 3000);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
-    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", p.id)).map((l) => l.action)).toEqual(["pool", "note", "note"]);
+    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", p.id)).map((l) => l.action)).toEqual(["review", "pool", "note", "note"]);
   });
 
   it("public rankings leave the pool out: others' Top N% don't count a pooled player; theirs looks as ever", async () => {
@@ -170,11 +173,12 @@ describe("every queue sends a pooled account to the pool's own (from the account
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);
     const names: string[] = [];
+    const engines: boolean[] = [];
     const parties: { queue: string; pool?: string }[] = [];
     const MATCHMAKER = {
       idFromName: (n: string) => n,
       get: (n: string) => ({
-        next: async () => (names.push(n), { code: "ABCDE" }),
+        next: async (_o: unknown, _f: unknown, opts?: { engine?: boolean }) => (names.push(n), engines.push(!!opts?.engine), { code: "ABCDE" }),
         duelNext: async () => (names.push(n), { searching: true, ticket: "ticket-0001", waitedMs: 0 }),
         cancel: async () => (names.push(n), {}),
       }),
@@ -187,13 +191,14 @@ describe("every queue sends a pooled account to the pool's own (from the account
     const cookie = async (u: User) => `hc_session=${await createSession(sql, u.id, Date.now())}`;
     const post = async (u: User, path: string) => {
       names.length = 0;
+      engines.length = 0;
       const res = await worker.fetch(new Request(`https://hunchess.test${path}`, { method: "POST", headers: { cookie: await cookie(u), "cf-connecting-ip": `10.2.0.${++ip}` } }), env as never, ctx);
-      return { status: res.status, body: (await res.json()) as Record<string, unknown>, names: [...names] };
+      return { status: res.status, body: (await res.json()) as Record<string, unknown>, names: [...names], engines: [...engines] };
     };
     return { sql, cheat, honest, post, parties };
   }
 
-  it("50 v 50 and Boss Battle online (Default and Bots off), Squads alone, 1 v 1 and its Cancel; the answers look the same", async () => {
+  it("50 v 50 and Boss Battle online (Default and Bots off), Squads alone and 1 v 1 (its Cancel asks both queues); the answers look the same", async () => {
     const w = await world();
     const routes: [string, string][] = [
       ["/api/play", "crowd-default"],
@@ -202,16 +207,20 @@ describe("every queue sends a pooled account to the pool's own (from the account
       ["/api/play?mode=raid&type=botsoff", "raid-botsoff"],
       ["/api/squads/play", "squads-default"],
       ["/api/1v1/play", "ranked1v1-default"],
-      ["/api/1v1/cancel?ticket=ticket-0001", "ranked1v1-default"],
     ];
     for (const [path, queue] of routes) {
       const cheat = await w.post(w.cheat, path);
       const honest = await w.post(w.honest, path);
       expect(cheat.names, path).toEqual([`${queue}.engine`]);
       expect(honest.names, path).toEqual([queue]);
+      // (The pool's queue makes the pool's lobbies: the matchmaker is told, from the account.)
+      expect(cheat.engines, path).toEqual(honest.engines.map(() => true));
+      expect(honest.engines.every((e) => !e), path).toBe(true);
       expect(Object.keys(cheat.body).sort(), path).toEqual(Object.keys(honest.body).sort());
       expect(cheat.status, path).toBe(honest.status);
     }
+    // Cancel asks both queues, whoever asks: a ticket made before a Release, or before the pool, is in the other one (the #618 review, m3).
+    for (const u of [w.cheat, w.honest]) expect((await w.post(u, "/api/1v1/cancel?ticket=ticket-0001")).names).toEqual(["ranked1v1-default", "ranked1v1-default.engine"]);
     // A test's own pool keeps the engine pool apart too; the browser can't ask for the pool's queue (?pool=engine is a test's own).
     expect((await w.post(w.cheat, "/api/play?pool=t1")).names).toEqual(["crowd-default-t1.engine"]);
     expect((await w.post(w.honest, "/api/play?pool=engine")).names).toEqual(["crowd-default-engine"]);
@@ -231,7 +240,7 @@ describe("every queue sends a pooled account to the pool's own (from the account
     const asked = async (pooled: boolean) => {
       await setCase(sql, b.id, pooled ? "pool" : "cleared", "admin:eric@example.com", "test", Date.now());
       const names: string[] = [];
-      const env = { DB: d1, MATCHMAKER: { idFromName: (n: string) => n, get: (n: string) => ({ next: async () => (names.push(n), { code: "LOBBY" }) }) } };
+      const env = { DB: d1, MATCHMAKER: { idFromName: (n: string) => n, get: (n: string) => ({ next: async (_o: unknown, _f: unknown, opts?: { engine?: boolean }) => (names.push(`${n}${opts?.engine ? " (engine)" : ""}`), { code: "LOBBY" }) }) } };
       const party = await partyRuntime(env);
       await party.it.create("PARTY", "squads-default", 1000, undefined, "squads-default.engine");
       const ann = party.socket({ userId: a.id, name: "Ann" });
@@ -243,7 +252,7 @@ describe("every queue sends a pooled account to the pool's own (from the account
       return names[0];
     };
     expect(await asked(false)).toBe("squads-default");
-    expect(await asked(true)).toBe("squads-default.engine");
+    expect(await asked(true)).toBe("squads-default.engine (engine)");
   });
 });
 
@@ -271,8 +280,10 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     // Their next match, an honest one: the matches before the Release were weighed by it.
     await recordFairPlay(sql, p.id, { lobby: "CCCCC", mode: "crowd", moves: plain }, T0 + 4000, mail);
     expect((await caseOf(sql, p.id))?.status).not.toBe("pool");
-    // A new one at the bar (detection's level again, from the matches since): back in.
+    // A new one at the bar (detection's level again, from the matches since): a review (one match: a person looks); a second, back in.
     await recordFairPlay(sql, p.id, { lobby: "DDDDD", mode: "crowd", moves: bar }, T0 + 5000, mail);
+    expect((await caseOf(sql, p.id))?.status).toBe("review");
+    await recordFairPlay(sql, p.id, { lobby: "EEEEE", mode: "crowd", moves: bar }, T0 + 6000, mail);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
   });
 
@@ -281,7 +292,8 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const p = await player(sql, "Pat");
-    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0);
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0 - 1000);
+    await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
     await sql.run(
       "INSERT INTO ranked_1v1_games (id, white_id, black_id, control, result, reason, moves, times, started_at, ended_at, nonce) VALUES ('G1', ?, 'x', '5+0', '1-0', 'mate', '[]', '[]', ?, ?, 'n')",
@@ -302,7 +314,7 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     expect(await caseOf(sql, again.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/deleted while in the engine pool$/) });
   });
 
-  it("the Engine pool list: when and why, the numbers, the evidence and how they do in the pool; Release; the JSON download", async () => {
+  it("the Engine pool list (its own tab): when and why, the numbers, the evidence and how they do in the pool; Release; the JSON download, no emails", async () => {
     vi.setSystemTime(T0 + 10 * DAY);
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);
@@ -310,8 +322,10 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     const p = await player(sql, "Pat");
     const q = await player(sql, "Quinn");
     await recordResult(sql, p.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2400, ranked: true }, T0 - DAY);
-    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0);
-    await recordFairPlay(sql, q.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0);
+    for (const [u, lobby] of [[p, "AAAAA"], [q, "BBBBB"]] as const) {
+      await recordFairPlay(sql, u.id, { lobby, mode: "crowd", moves: bar }, T0 - 1000);
+      await recordFairPlay(sql, u.id, { lobby: `${lobby.slice(0, 4)}C`, mode: "crowd", moves: bar }, T0);
+    }
     // In the pool: Pat loses both 1 v 1 games to Quinn (pooled) and one crowd match.
     for (const [id, at] of [["G1", T0 + DAY], ["G2", T0 + 2 * DAY]] as const)
       await sql.run(
@@ -331,23 +345,33 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
       by: "detection",
       why: expect.stringMatching(/^level ban/),
       games: 2,
-      evidence: { matches: 1, atBar: 1, deepMatch: 20, deepChecked: 20, bestPerf: 3400 },
-      inPool: { games: 1, wins: 0, duelWins: 0, duelLosses: 2, duelDraws: 0, vsPool: 2, matches: 0 },
+      evidence: { matches: 2, atBar: 2, deepMatch: 40, deepChecked: 40, bestPerf: 3400, pooledPerf: 3400 },
+      inPool: { games: 1, wins: 0, duelWins: 0, duelLosses: 2, duelDraws: 0, vsPool: 2, vsPoolScore: 0, matches: 0, atBar: 0 },
     });
     const env = { DB: d1, ADMIN_EMAILS: "pat-admin@example.com,eric@example.com" };
     const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
     const call = (path: string, init: RequestInit = {}) => handleAdmin(new Request(`https://hunchess.test${path}`, { ...init, headers: { cookie, ...(init.headers ?? {}) } }), env);
-    const page = await (await call("/admin/fairplay"))!.text();
+    // The list is the pool tab's (the main page never reads the pool: the #618 review, M4).
+    expect(await (await call("/admin/fairplay"))!.text()).not.toContain("Engine pool");
+    const page = await (await call("/admin/fairplay?status=pool"))!.text();
     expect(page).toContain("Engine pool (2)");
     expect(page).toContain(`action="/admin/fairplay/case/${p.id}"`);
     expect(page).toContain('value="release">Release</button>');
-    // The download: every pooled player's file, moves and all, no emails.
+    expect(page).toContain('<a href="/admin/fairplay/pool.json">1–2</a>');
+    // A person's decision on Quinn's case (Eric releases them; two more matches at the bar put them back): the admin is in the log and
+    // the case's decided_by. The download: every pooled player's file, moves and all, and no email anywhere (the #618 review, M1).
+    expect(await decide(sql, q.id, "release", "admin:eric@example.com", "checking: reach me at eric@example.com", T0 + 4 * DAY)).toEqual({ ok: true, status: "cleared" });
+    for (const [lobby, at] of [["BBBBD", T0 + 5 * DAY], ["BBBBE", T0 + 6 * DAY]] as const) await recordFairPlay(sql, q.id, { lobby, mode: "crowd", moves: bar }, at);
+    expect(await caseOf(sql, q.id)).toMatchObject({ status: "pool", decided_by: "admin:eric@example.com" });
     const dl = (await call("/admin/fairplay/pool.json"))!;
     expect(dl.headers.get("content-disposition")).toMatch(/^attachment; filename="engine-pool-/);
     const text = await dl.text();
     expect(text).not.toMatch(/@/);
     const json = JSON.parse(text) as Awaited<ReturnType<typeof poolExport>>;
     expect(json.players.map((x) => x.userId).sort()).toEqual([p.id, q.id].sort());
+    expect(json).toMatchObject({ after: "", next: null });
+    expect(json.players.find((x) => x.userId === q.id)!.file).toMatchObject({ case: { decided_by: "admin" } });
+    expect(json.players.find((x) => x.userId === q.id)!.file!.log.map((l) => l.by)).toContain("admin");
     expect(json.players.find((x) => x.userId === p.id)!.file!.matches[0]!.moves).toHaveLength(20);
     // Release from the list (no reason needed).
     const origin = "https://hunchess.test";

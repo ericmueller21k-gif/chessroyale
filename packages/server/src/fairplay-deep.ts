@@ -120,8 +120,8 @@ interface QueueRow {
 /**
  * One scheduled run: matches waiting for the deep re-check (queueDeep: every match still kept of a player with a
  * flagged match or an open case), cases in review first and the rest only off-peak (`all` ignores the hours: an admin asking). Each counted
- * move is searched once; a match is done when all of them are (or can't be). Outside a review a match is checked only as far as a
- * ban could need (FAIRPLAY.levels.banMatchChecked counted moves), then leaves the queue undone: a review queues the rest again
+ * move is searched once; a match is done when all of them are (or can't be). Outside a review, a ban or the engine pool (off-peak,
+ * beside watch) a match is checked only as far as a ban could need (FAIRPLAY.levels.banMatchChecked counted moves), then leaves the queue undone: a review queues the rest again
  * (setCase). The player's level is worked out again afterwards. Returns how many searches it made (a position's whole budget).
  */
 export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, opts: { mail?: CaseMailer; all?: boolean; userId?: string; perRun?: number } = {}): Promise<{ searches: number; matches: number }> {
@@ -131,7 +131,7 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
   const rows = await sql.all<QueueRow & { status: string | null }>(
     `SELECT m.id, m.user_id, m.played_at, m.moves, c.status FROM fairplay_matches m LEFT JOIN fairplay_cases c ON c.user_id = m.user_id
      WHERE m.deep_queued = 1 ${opts.userId ? "AND m.user_id = ?" : ""}
-     ORDER BY CASE c.status WHEN 'review' THEN 0 WHEN 'watch' THEN 1 ELSE 2 END, m.played_at DESC LIMIT 50`,
+     ORDER BY CASE c.status WHEN 'review' THEN 0 WHEN 'watch' THEN 1 WHEN 'pool' THEN 1 ELSE 2 END, m.played_at DESC LIMIT 50`,
     ...(opts.userId ? [opts.userId] : []),
   );
   let searches = 0;
@@ -150,8 +150,9 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
     let complete = true;
     let changed = false;
     // (Outside a review or a ban, as far as a ban could need and no further: the day's budget goes round more players. The review of
-    // #610, m4. A banned case is checked in full, as a review's: a person's ban and its appeal rest on every counted move (delta m4-a).)
-    const cap = row.status === "review" || row.status === "banned" ? Infinity : FAIRPLAY.levels.banMatchChecked;
+    // #610, m4. A banned case is checked in full, as a review's: a person's ban and its appeal rest on every counted move (delta m4-a). So
+    // is a pooled one's: a person's Release reads how they play in the pool, and the pool's data is kept (the #618 review, m1).)
+    const cap = row.status === "review" || row.status === "banned" || row.status === "pool" ? Infinity : FAIRPLAY.levels.banMatchChecked;
     let checked = moves.filter((m) => m.deep && skipReason(m) === null).length;
     let capped = false;
     for (const m of moves) {

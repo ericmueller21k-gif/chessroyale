@@ -316,6 +316,8 @@ export interface SquadsRecord {
   filledAt: number | null;
   /** Matchmade (the queue), not a test lobby. */
   auto: boolean;
+  /** Matchmade by the engine pool's queue: its newcomers are pooled accounts only, a party's members by its pass excepted (squads-do.ts). */
+  engine?: true;
   bots: SquadsEntrant[];
   squads: Squad[];
   vote: SquadsVoteRecord | null;

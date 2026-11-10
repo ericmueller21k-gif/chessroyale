@@ -408,6 +408,11 @@ export interface LobbyRecord {
    * (admins' tests). `seats`: each person's seat in the party (their color, by seat); `leaderSeat`: the leader's.
    */
   party?: PartyLobby;
+  /**
+   * Matchmade by the engine pool's queue (fair play's pooled accounts: docs/decisions/2026-11-10-engine-pool.md): it seats only pooled
+   * accounts, and a lobby without it none, whoever has the code (lobby-do.ts). The #618 review, m4.
+   */
+  engine?: true;
   auto?: {
     /** When bots fill the empty seats (null: Bots off in a 50 v 50, which waits until it's full). */
     fillAt: number | null;
@@ -501,6 +506,8 @@ export interface JudgesRecord {
 
 /** What someone is told when they open a match that's over (results still up, or long gone). */
 export const MATCH_ENDED = "That match has ended.";
+/** A lobby that no longer takes new players (or, matchmade, not this one: the engine pool's apart, lobby-do.ts). */
+export const MATCH_STARTED = "This match has already started.";
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 const isChance = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
@@ -929,7 +936,7 @@ export class LobbyCore {
     // A seat this lobby never gave out: from an older lobby that had this code (it has closed since), so that match is over.
     else if (token) return { ok: false as const, message: MATCH_ENDED, ended: true as const };
     if (this.r.phase === "results") return { ok: false as const, message: MATCH_ENDED, ended: true as const };
-    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: "This match has already started." };
+    if (this.r.phase !== "lobby" || this.r.auto?.filledAt) return { ok: false as const, message: MATCH_STARTED };
     if (this.r.humans.length >= this.settings.lobbySize) return { ok: false as const, message: "This lobby is full." };
     // A party's battle: only its members, each by their own pass into their own seat, from their own account.
     const pl = this.r.party;
