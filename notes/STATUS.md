@@ -1,3 +1,4 @@
+- Nov 10 19:30 UTC: #611 (Fable b3) MERGED 384fd84. xp.spec:75 flaky = same solo-boss-quest cause -> PR #617 (light). Engine pool helper running.
 - Nov 10 18:45 UTC: QUEUED after engine pool: (1) CHEATER DEMO: admin-only test accounts w/o email (dummy emails, test flag, off leaderboards) + script playing real 50v50 on hunchess.com: "Engine Eddie" (Stockfish top), "Strong Sam" (Maia strongest), + a 2nd judging account; expect Eddie pooled, Sam not; Eric views /admin/fairplay. (2) DISCORD ALERTS step 1 of docs/ideas/live-ops.md (Eric adds Worker secret ALERT_WEBHOOK; told him how).
 - Nov 10 18:35 UTC: Eric: merge #611 (as is; FAQ may explain clearly); build the ENGINE POOL (flagged players only meet each other in all modes, bots fill; new accounts 2 of first 10 at ban bar; admin list + release + data kept). Brief brief-engine-pool.md; full lane, ONE fix round max.
 - Nov 10 18:25 UTC: #616 LIVE 96ec1ed; main full run 42870247964 GREEN, no flaky.
