@@ -75,7 +75,7 @@ function RealMatch({ match }: { match: NonNullable<LiveCounts["featured"]> }) {
   const b = match.board;
   // (The side that just moved: the one not to move now.)
   const moved = b.fen.split(" ")[1] === "w" ? "Black" : "White";
-  const mode = match.mode === "boss" ? `Boss raid${match.bossElo ? ` · ${"💀".repeat(bossThreat(match.bossElo))}` : ""}` : "Crowd · 50 v 50";
+  const mode = match.mode === "boss" ? `Boss Battle${match.bossElo ? ` · ${"💀".repeat(bossThreat(match.bossElo))}` : ""}` : "Crowd · 50 v 50";
   const meta = [b.ply ? `Move ${Math.ceil(b.ply / 2)}` : "Starting", match.alive !== null ? `${match.alive} left` : null].filter(Boolean).join(" · ");
   return (
     <section class="fd-livewin real" aria-label="Live match">

@@ -147,7 +147,7 @@ function resultRow(r: PublicProfile["recent"][number], i: number, now: number): 
       ...base,
       face: { kind: "boss", id: def?.id ?? null, name: info?.name ?? "Boss", icon: info?.icon ?? "👑" },
       pill: r.won === true ? RESULT_PILL.win : RESULT_PILL.loss,
-      title: info ? `vs. ${info.name}` : "Boss raid",
+      title: info ? `vs. ${info.name}` : "Boss Battle",
     };
   }
   if (r.mode === "crowd") {

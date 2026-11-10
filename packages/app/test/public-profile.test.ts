@@ -144,11 +144,11 @@ describe("Recent Matches", () => {
     expect(lost!.title.startsWith("vs. ")).toBe(true);
   });
 
-  it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss raid'", () => {
+  it("a raid from before bosses had identities keeps the tier's old name; one with nothing says 'Boss Battle'", () => {
     const [old, none] = recentRows([], [other({ mode: "boss", bossId: null, bossElo: 1500, won: true, playedAt: before(1) }), other({ mode: "boss", bossId: null, bossElo: null, won: null, playedAt: before(2) })], NOW);
     expect(old!.title).toMatch(/^vs\. /);
     expect(old!.face).toMatchObject({ kind: "boss", id: null });
-    expect(none).toMatchObject({ title: "Boss raid", pill: { text: "LOSS" } });
+    expect(none).toMatchObject({ title: "Boss Battle", pill: { text: "LOSS" } });
   });
 
   it("50 v 50: WIN or LOSS by its team's result, titled '50 v 50' with a mode icon", () => {

@@ -142,7 +142,7 @@ export function ShopScreen({ onBack, initial }: { onBack: () => void; initial?: 
           </div>
           {slot === "chat" ? (
             <div class="shop-soon shop-chat-foot">
-              <p class="muted small">Quick chat is in online 50 v 50 matches and boss raids: preset lines only, no typing.</p>
+              <p class="muted small">Quick chat is in online 50 v 50 matches and Boss Battles: preset lines only, no typing.</p>
               <button type="button" class="btn btn-small" onClick={pickInProfile}>
                 Choose your lines and emoji in your profile ›
               </button>
