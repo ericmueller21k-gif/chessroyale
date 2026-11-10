@@ -303,6 +303,46 @@ describe("the review page and the reviewer's API", () => {
     expect((await post({ decision: "clear", reason: "changed my mind" }, { token: TOKEN }))!.status).toBe(409);
   });
 
+  it("the reviewer's token (Nov 10, finding 6): review, watch and clear as before; never a ban, even at the ban bar; no email in anything it reads", async () => {
+    const w = await world();
+    const decision = (id: string, body: unknown, auth: { token?: string; cookie?: string } = { token: TOKEN }) =>
+      w.call(`/api/admin/fairplay/cases/${id}/decision`, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" }, ...auth });
+    // A player with no case, no reports and no matches: no ban (before: it went through).
+    const honest = await player(w.sql, "Honest");
+    const refused = (await decision(honest.id, { decision: "ban", reason: "the token alone says so" }))!;
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as { message: string }).message).toMatch(/^a ban is for a person/);
+    expect(await caseOf(w.sql, honest.id)).toBeNull();
+    // A case in review on one match the deep re-check hasn't seen: review and watch yes, a ban no.
+    expect((await decision(w.cheat.id, { decision: "review", reason: "super-GM strength on 20 counted moves" }))!.status).toBe(200);
+    expect((await decision(w.cheat.id, { decision: "ban", reason: "looks like an engine" }))!.status).toBe(409);
+    expect((await caseOf(w.sql, w.cheat.id))?.status).toBe("review");
+    // At the ban bar (two matches the deep re-check confirmed: every pick its best, the crowd mostly missing it): still no ban from the
+    // token (the review of #610, M1: that bar still rests on the judges' numbers); a person bans.
+    const deep = picks(20).map((m) => ({ ...m, top: ["a1a2", "a1b1", "a1b2"], deep: { best: "a1a2", rank: 1, loss: 0, top: ["a1a2", "a1b1", "a1b2"] } }));
+    const sure = await player(w.sql, "Sure");
+    await recordFairPlay(w.sql, sure.id, { lobby: "BBBBB", mode: "crowd", moves: deep }, Date.now() - 2000);
+    await recordFairPlay(w.sql, sure.id, { lobby: "CCCCC", mode: "crowd", moves: deep }, Date.now() - 1000);
+    // (Detection itself only flags: FAIRPLAY.enforcement "review".)
+    expect((await caseOf(w.sql, sure.id))?.status).toBe("review");
+    expect((await decision(sure.id, { decision: "ban", reason: "2 deep-checked matches, every pick the engine's best" }))!.status).toBe(409);
+    expect((await caseOf(w.sql, sure.id))?.status).toBe("review");
+    expect((await decision(sure.id, { decision: "ban", reason: "2 deep-checked matches, every pick the engine's best" }, { cookie: w.ericCookie }))!.status).toBe(200);
+    expect((await caseOf(w.sql, sure.id))?.status).toBe("banned");
+    // An admin's decisions name them by email in the log; typed emails in a reason or an appeal: none of it reaches the reviewer.
+    await decision(w.cheat.id, { decision: "review", reason: "watching; ask other@example.com about it" }, { cookie: w.ericCookie });
+    await w.sql.run("INSERT INTO fairplay_appeals (user_id, at, text, status, decided_by, reply) VALUES (?, ?, ?, 'upheld', ?, ?)", w.cheat.id, 5, "write to me at cheat@example.com", "admin:eric@example.com", "no, eric@example.com says");
+    const text = await (await w.call(`/api/admin/fairplay/cases/${w.cheat.id}`, { token: TOKEN }))!.text();
+    expect(text).not.toMatch(/@/);
+    const d = JSON.parse(text) as { case: { decided_by: string }; log: { by: string; reason: string }[]; appeals: { decided_by: string }[] };
+    expect(d.case.decided_by).toBe("admin");
+    expect(d.log[0]).toEqual(expect.objectContaining({ by: "admin", reason: "watching; ask [email] about it" }));
+    expect(d.appeals[0]!.decided_by).toBe("admin");
+    expect(await (await w.call("/api/admin/fairplay/cases?status=all", { token: TOKEN }))!.text()).not.toMatch(/@/);
+    // An admin's own reading of the API keeps them.
+    expect(await (await w.call(`/api/admin/fairplay/cases/${w.cheat.id}`, { cookie: w.ericCookie }))!.text()).toContain("admin:eric@example.com");
+  });
+
   it("the page's forms: a decision from this page only (its origin), then back to the case", async () => {
     const w = await world();
     const form = (fields: Record<string, string>, origin = "https://hunchess.test") =>

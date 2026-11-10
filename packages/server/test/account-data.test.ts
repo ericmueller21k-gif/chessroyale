@@ -127,6 +127,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   chat_picks: "user_id lines emoji",
   claw_plays: "id user_id request boss won crate at",
   email_codes: "email code_hash expires_at attempts sent_at hour_start sends_this_hour",
+  engine_calls: "user_id day n",
   equipped: "user_id slot item_id",
   equipped_items: "user_id slot item_id",
   fairplay_appeals: "id user_id at text status decided_at decided_by reply",

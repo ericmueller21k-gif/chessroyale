@@ -24,7 +24,7 @@ if (!process.env.E2E_STATE_DIR && process.env.E2E_KEEP_STATE !== "1") {
 process.env.E2E_STATE_DIR ||= ".wrangler/state";
 
 /** The local Worker's admins (asServerAdmin, e2e/helpers.ts): one address per lane, spec file and project, as files run side by side. */
-const ADMINS = [["ops", "problems"], ["ops", "profile"], ["chat", "chat-mod"], ["chat", "town-chat"], ["chat", "town-chat-history"], ["ops", "shop"], ["ops", "claw"], ["ops", "xp-rewards"]]
+const ADMINS = [["ops", "problems"], ["ops", "profile"], ["chat", "chat-mod"], ["chat", "town-chat"], ["chat", "town-chat-history"], ["ops", "shop"], ["ops", "claw"], ["ops", "xp-rewards"], ["ops", "fairplay"]]
   .flatMap(([who, file]) => ["phone", "desktop"].map((project) => `${who}-admin-${file}-${project}@e2e.test`))
   .join(",");
 

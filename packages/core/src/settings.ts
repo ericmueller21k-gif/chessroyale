@@ -2485,6 +2485,22 @@ export const LOBBY_LIFE = {
 } as const;
 
 /**
+ * A match's end on players' profiles (server/lobby-do.ts; the outside review of Nov 10, finding 9): each signed-in player's result,
+ * fair play, XP and rewards wait in the lobby's record (`saveQueue`) until written, each write keyed so a retry or a restart writes
+ * nothing twice. At most `perWake` players are written per wake (about 20 D1 calls each: far under D1's 1,000 queries per
+ * invocation), the next ones a second later. A failed write is tried again every `retrySeconds`, and the lobby waits to close for it
+ * up to `retryHours` past its closing time (then it closes, and says so on the ops page). Fair play, XP, the Welcome Crate and boss
+ * tokens stop holding a result up `strictMinutes` after its first failed try (logged): a lasting bug in one never blocks the result,
+ * and a short D1 outage never drops them (by time, not tries: the review of #610, m3).
+ */
+export const MATCH_SAVE = {
+  perWake: 20,
+  retrySeconds: 60,
+  retryHours: 24,
+  strictMinutes: 30,
+} as const;
+
+/**
  * Resigning and leaving a match (Eric, Oct 13: "we need a surrender button... for every game mode"; DECISIONS.md,
  * "Resign: leaving a match in every mode"). Resigning in a solo game ends it at once, a loss. Online you can't end the
  * game for everyone: you leave it, out in the last place still open (a loss on your record), and a bot plays your seat
@@ -2556,6 +2572,13 @@ export const RANKED_1V1 = {
   drawOfferEveryMoves: 3,
   /** A finished game's results stay up this long, then the game's object deletes everything it stored. */
   resultsKeepMinutes: 10,
+  /**
+   * Recording a finished game (server/duel-room.ts): tried at once, then 15 s after each try for the first four, then every
+   * `recordRetrySeconds`, up to `recordRetryHours` after the game ended (as Squads' rewards: the outside review of Nov 10, finding 7);
+   * the room waits to close for it that long (then it closes, and says so on the ops page).
+   */
+  recordRetrySeconds: 60,
+  recordRetryHours: 24,
   /** In the queue: after this long, "Few players online right now" offers Keep waiting and Play a bot (unranked). */
   fewPlayersSeconds: 45,
   /**
@@ -3078,6 +3101,20 @@ export const AGE_GATE = {
 } as const;
 
 /**
+ * The engine server's two open routes (server/index.ts; the outside review of Nov 10, finding 4): POST /api/engine/score (a solo
+ * game's close calls) and GET /api/engine/ping (waking it as a solo game starts). Only for an account (signed in, where sign-in is
+ * set up), at most `perAccountDaily` calls an account a UTC day (counted in D1: server/engine-calls.ts; not yet measured against a
+ * keen solo player), and solo's searches at most `soloDailySearches` a day, never more than `soloShare` of the day's
+ * ENGINE_DAILY_SEARCHES (3000), so matches always keep the rest. Past either, the device re-checks itself for the rest of the game,
+ * as when the server is down. Devices first (CLAUDE.md's computing priorities): this only stops strangers.
+ */
+export const ENGINE_SERVER = {
+  perAccountDaily: 200,
+  soloDailySearches: 1000,
+  soloShare: 1 / 3,
+} as const;
+
+/**
  * Capacity (the `ops` delegate): the matchmaker's batches and admission, overload, presence and the live line's
  * write limits, and the API's rate limits. See DECISIONS.md, "Capacity: built".
  */
@@ -3242,6 +3279,13 @@ export const OUTFIT = {
  */
 export const WELCOME_GIFT = {
   milestones: [5, 25],
+  /**
+   * A solo game counts toward them only with XP.minMoves of your own moves (as its XP) and at least this many seconds of the server's
+   * time (POST /api/xp/solo/start, then its result): its result is the device's word, and empty posts earned crates (the outside
+   * review of Nov 10, finding 10). By moves, not 3 minutes, so a quick boss loss or a first-stage knockout still counts (the review of
+   * #610, m6). Online games count as their rooms recorded them.
+   */
+  soloMinSeconds: 60,
 } as const;
 
 /**
@@ -3410,10 +3454,12 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
-   * automated reviewer act whatever this says.
+   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
+   * whatever this says; the automated reviewer never bans. "review" since Nov 10 (the outside review, finding 3: its
+   * evidence is the judges' numbers, which devices send): automatic bans stay off until Eric turns them back on, after the
+   * deep re-check's own facts land (ROADMAP.md, fair play; docs/decisions/2026-11-10-rewards-and-records.md).
    */
-  enforcement: "ban" as "watch" | "review" | "ban",
+  enforcement: "review" as "watch" | "review" | "ban",
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -3438,8 +3484,8 @@ export const FAIRPLAY = {
   holdBackDays: 7,
   /**
    * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
-   * (native Stockfish, the full network), restricted to the judges' top moves and the pick. "Deep match": the pick is
-   * the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * (native Stockfish, the full network), over every legal move (in groups of at most 8, one search each: the engine's
+   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
    * budget of its own (its own container instance, so matches never wait behind it).
    */
   deep: {
@@ -3451,7 +3497,7 @@ export const FAIRPLAY = {
     perRun: 40,
     /** Off-peak hours (UTC, from-to): watch cases are checked only then; reviews any time. */
     offPeakUtc: [3, 10] as readonly [number, number],
-    /** The candidate moves searched: the judges' best this many, plus the pick. */
+    /** The judges' best moves kept with each pick as evidence (FairMove.top): this many. (The re-check searches every legal move.) */
     candidates: 8,
   },
   /**

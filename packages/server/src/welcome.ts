@@ -1,4 +1,4 @@
-import { WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, mulberry32, nextWelcomeMilestone, rollWelcome, type CrateRoll, type ItemInstance } from "@chessroyale/core";
+import { WELCOME_CRATE, WELCOME_CRATE_ID, WELCOME_GIFT, XP, mulberry32, nextWelcomeMilestone, rollWelcome, type CrateRoll, type ItemInstance } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { applyOp, cond, leg, ledgerAccount, type LedgerAccount } from "./ledger.ts";
 
@@ -37,15 +37,18 @@ export const WELCOME_SCHEMA = [
 /**
  * An account's finished games, in SQL (`?` is the account's id, twice). A game counts when it reached a result (a win, a loss or a
  * draw), in any mode or against any boss:
- *   - every row of `results` (online matches, written by their match rooms: Classic, Crowd and 50 v 50, boss raids, friends' lobbies,
- *     Squads; and solo matches, posted by the app from the result screen, as every solo result is), except one recorded because its
- *     player abandoned it (`abandoned` = 1: gone too long, idle or removed mid-match; since Nov 6). A match left before its first
- *     move is never recorded, so never counted;
+ *   - every row of `results` for an online match (written by its match room: Classic, Crowd and 50 v 50, boss raids, friends' lobbies,
+ *     Squads), except one recorded because its player abandoned it (`abandoned` = 1: gone too long, idle or removed mid-match; since
+ *     Nov 6). A match left before its first move is never recorded, so never counted;
+ *   - a solo match's row (posted by the app from the result screen) only with XP.minMoves moves (as its XP) and when the server timed
+ *     it for WELCOME_GIFT.soloMinSeconds (`play_ms`, the server's clock: Nov 10, the outside review's finding 10; empty posts had
+ *     earned crates). Solo rows from before the server timed games (Nov 9) no longer count;
  *   - every ranked 1 v 1 game (`ranked_1v1.games`: aborted games are never recorded).
  * Results from before Nov 6 have `abandoned` NULL and count (they can't be told apart). Not stored anywhere, so not counted: auto
  * chess (played on the device), and a ranked 1 v 1 game while its player was held by fair play.
  */
-export const FINISHED_GAMES_SQL = `((SELECT COUNT(*) FROM results WHERE user_id = ? AND (abandoned IS NULL OR abandoned = 0))
+export const FINISHED_GAMES_SQL = `((SELECT COUNT(*) FROM results WHERE user_id = ? AND (abandoned IS NULL OR abandoned = 0)
+    AND (online = 1 OR (play_ms >= ${WELCOME_GIFT.soloMinSeconds * 1000} AND moves >= ${XP.minMoves})))
   + COALESCE((SELECT games FROM ranked_1v1 WHERE user_id = ?), 0))`;
 
 /** An account's finished games (as FINISHED_GAMES_SQL counts them). */

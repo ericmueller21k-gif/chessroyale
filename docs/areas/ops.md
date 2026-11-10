@@ -119,7 +119,7 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     player with a friend who shows when they're online, `/api/friends/online` once a minute (cached session, one D1
     read, one hub call).
   - **Quests at a game's end** (Nov 9, phase 3; review of #575, m5): each player's XP grant adds 3 to 5 D1 queries (the `quest_days`
-    read, the quests twice on a new day, the day's deal batch, the paid quests), in turn in the room's `saveResults` loop: about 300
+    read, the quests twice on a new day, the day's deal batch, the paid quests), in turn in the room's `writeResults` loop: about 300
     to 500 more for a 100-player Crowd game. Plus one `quest_games` row write per player per counted game (the replay claim; cleared after a day). Fine for now; if it shows, read `quest_days` and the quests in one query, and skip the claim when no unfinished quest counts the game.
   - **Rate limits:** per address, per account and (PLAY, new lobbies; friends' actions) per account again
     (`CAPACITY.rateLimits`, `limits.ts`), counted in each Worker instance's memory; past a limit, a friendly 429 with when to try again.
@@ -131,7 +131,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
 - **Nothing runs for no one:** a match everyone has left (resigned, or gone longer than `LEAVING.awayMs`) ends at once
   and its lobby closes, Squads too (DECISIONS.md, "Resign: leaving a match in every mode"); before Oct 13 such a match
   played itself out for up to an hour or more, counted on the live line all along.
-- **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`);
+- **A match's end** (Nov 10, the outside review's finding 9; `MATCH_SAVE`): results wait in the lobby's record (`saveQueue`) until
+  written in the background (never holding up the match's alarm), `perWake` (20) players a wake (about 20 D1 calls each), every write
+  keyed; a failure retries each minute for up to 24 h (fair play, XP and rewards stop holding a result up `strictMinutes`, 30, after
+  its first failure) and shows on the ops page as a server error (`Lobby.saveResults`; `Lobby.resultsLost` if it gave up).
+- **Costs and guards:** engine server re-checks capped by `ENGINE_DAILY_SEARCHES` (3000 a day, D1 `engine_usage`; solo at most
+  `ENGINE_SERVER.soloDailySearches`, and only for accounts: [engine.md](engine.md));
   fair play's deep re-checks by `FAIRPLAY.deep.dailySearches` (D1 `fairplay_budget`) on their own instance; the
   deep re-check's cron runs every 15 minutes (`triggers.crons`). Suggested budget alert: $20/month. The engine server
   never gets a position Stockfish refuses, which would take it down (`containerScore`; `/api/engine/score` answers

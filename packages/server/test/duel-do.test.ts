@@ -66,9 +66,11 @@ async function runtime(envExtra: Record<string, string> = {}) {
   await ensureSchema(sql);
   const ann = (await createGuest(sql, T0, "Ann")).user;
   const bob = (await createGuest(sql, T0, "Bob")).user;
-  const slow = { hang: false, fail: null as ((e: Error) => void) | null };
+  const slow = { hang: false, fail: null as ((e: Error) => void) | null, down: false };
   const db = new Proxy(d1 as object, {
     get(t, k) {
+      // (`down`: every batch fails at once, as in a D1 outage.)
+      if (k === "batch" && slow.down) return () => Promise.reject(new Error("D1 is down"));
       if (k === "batch" && slow.hang)
         return () =>
           new Promise((_, reject) => {
@@ -306,3 +308,52 @@ describe("the 1 v 1 game object", () => {
     expect(res.status).toBe(403);
   });
 });
+
+describe("a game's recording waits out a D1 outage (Nov 10, finding 7: before, four tries in a minute, then given up)", () => {
+  it("D1 down for an hour after checkmate: tried again each minute, the room stays past its closing; D1 back: recorded once, then it closes", async () => {
+    const rt = await runtime();
+    const game = await rt.make();
+    const sql = d1Sql(rt.d1);
+    // (Each failed try reports itself to the ops page, whose write waits on a timer these fake timers hold: so no rt.settle() here,
+    // just the recording's own steps.)
+    const tick = async () => {
+      for (let i = 0; i < 200; i++) await Promise.resolve();
+    };
+    await game.create("ABCDE", { w: (await duelEntrant(sql, rt.ann)).player, b: (await duelEntrant(sql, rt.bob)).player });
+    const w = rt.socket("w", rt.ann.id);
+    const b = rt.socket("b", rt.bob.id);
+    await game.webSocketMessage(w as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    await game.webSocketMessage(b as never, JSON.stringify({ t: "hello", v: DUEL_PROTOCOL }));
+    vi.setSystemTime(T0 + RANKED_1V1.versusMs + RANKED_1V1.voteSeconds * 1000 + RANKED_1V1.overlayMs);
+    await game.alarm();
+    await game.alarm();
+    rt.slow.down = true;
+    for (const [i, m] of ["f2f3", "e7e5", "g2g4", "d8h4"].entries()) {
+      vi.setSystemTime(Date.now() + 1000);
+      await game.webSocketMessage((i % 2 ? b : w) as never, JSON.stringify({ t: "move", uci: m, ply: i }));
+    }
+    await tick();
+    const end = Date.now();
+    // An hour of alarms with D1 down: no outcome, the room still there (its results keep 10 minutes).
+    for (let i = 0; i < 200 && rt.alarm !== null && rt.alarm < end + 3_600_000; i++) {
+      vi.setSystemTime(Math.max(Date.now(), rt.alarm));
+      await game.alarm();
+      await tick();
+    }
+    expect(Date.now()).toBeGreaterThan(end + RANKED_1V1.resultsKeepMinutes * 60_000);
+    expect(rt.store.has("game")).toBe(true);
+    expect((rt.store.get("game") as { recordTries: number }).recordTries).toBeGreaterThan(20);
+    expect(await duelGamesOf(sql, rt.ann.id)).toHaveLength(0);
+    // D1 back: the next try records it (once), each player hears, and the room closes.
+    rt.slow.down = false;
+    for (let i = 0; i < 10 && rt.store.has("game"); i++) {
+      vi.setSystemTime(Math.max(Date.now(), rt.alarm ?? Date.now()));
+      await game.alarm();
+      await tick();
+    }
+    expect(await duelGamesOf(sql, rt.ann.id)).toHaveLength(1);
+    expect(w.last("outcome")).toBeDefined();
+    expect(rt.store.has("game")).toBe(false);
+  });
+});
+

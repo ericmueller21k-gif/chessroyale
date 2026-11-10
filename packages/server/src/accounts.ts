@@ -47,6 +47,7 @@ import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
+import { ENGINE_CALLS_SCHEMA } from "./engine-calls.ts";
 import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
@@ -213,6 +214,8 @@ const SCHEMA = [
   ...XP_SCHEMA,
   // Quests (Nov 9, phase 3): each account's quests, each game that moved one, and the day last dealt (quests.ts).
   ...QUESTS_SCHEMA,
+  // The engine server's per-account cap (Nov 10): each account's calls to its open routes today (engine-calls.ts).
+  ...ENGINE_CALLS_SCHEMA,
 ];
 
 /**
@@ -594,6 +597,8 @@ export async function signInWithIdentity(
         ...rankedMoves(current.id, owner.id),
         // (Quests, Nov 9: the guest's go; the account keeps its own. What they paid is in the balances moved above.)
         ...questDeletes(current.id),
+        // (The guest's calls to the engine server today: the account's own count stands.)
+        stmt("DELETE FROM engine_calls WHERE user_id = ?", current.id),
         stmt("DELETE FROM sessions WHERE user_id = ?", current.id),
         ...socialDeletes(current.id),
         stmt("DELETE FROM users WHERE id = ?", current.id),
@@ -741,48 +746,53 @@ export async function recordResult(sql: Sql, userId: string, r: MatchResult, now
   // Only an online match the lobby judged ranked counts (a solo result, posted by the browser, never does).
   const ranked = r.online && r.ranked === true;
   const lobby = r.online && typeof r.lobby === "string" && /^[A-Z2-9]{5}$/.test(r.lobby) ? r.lobby : null;
-  await sql.run(
-    `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
-       brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
-       play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards)
-     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
-     ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
-    userId,
-    mode,
-    r.online ? 1 : 0,
-    Math.max(1, Math.round(r.placement)),
-    Math.max(1, Math.round(r.players)),
-    r.team ?? null,
-    r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
-    r.avgScore ?? null,
-    rating,
-    now,
-    count(r.brilliant),
-    cleanSan(r.bestMove),
-    cuts,
-    cuts === null ? null : Math.min(cuts, count(r.cutsSurvived) ?? 0),
-    strikes,
-    strikes === null ? null : Math.min(strikes, count(r.strikesSurvived) ?? 0),
-    flag(r.survived),
-    flag(r.lastStand),
-    mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
-    lobby,
-    ranked ? 1 : 0,
-    r.held ? 1 : 0,
-    typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
-    flag(r.evalBar),
-    // (Only an online match's room says a player abandoned it.)
-    r.online && r.abandoned === true ? 1 : null,
-    // (XP's facts are the server's: the caller's, never the app's.)
-    typeof r.playMs === "number" && Number.isFinite(r.playMs) ? Math.max(0, Math.round(r.playMs)) : null,
-    typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
-    ...xpColumns(r.xp),
-    // (An account deleted mid-match gets nothing new.)
-    userId,
-    ...(once ? [userId, lobby, once.since] : []),
-  );
-  // Only a ranked match moves your ranking (and not while fair play holds your results).
-  if (rating !== null && ranked && !r.held) await sql.run("UPDATE users SET rating = ? WHERE id = ?", rating, userId);
+  // (One batch: the row and the rating it moves go in together. The rating is the latest counting result's, read again, so a
+  // result written late, or twice, never puts an older rating back: Nov 10, finding 9.)
+  const rated = rating !== null && ranked && !r.held;
+  await sql.batch([
+    stmt(
+      `INSERT INTO results (user_id, mode, online, placement, players, team, team_won, avg_score, rating, played_at,
+         brilliant, best_move, cuts, cuts_survived, strikes, strikes_survived, survived, last_stand, boss_elo, lobby, ranked, held, boss_id, eval_bar, abandoned,
+         play_ms, moves, xp_before, xp_parts, xp_none, xp_rewards)
+       SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ${IF_ACCOUNT}
+       ${once ? "AND NOT EXISTS (SELECT 1 FROM results WHERE user_id = ? AND lobby = ? AND online = 1 AND played_at >= ?)" : ""}`,
+      userId,
+      mode,
+      r.online ? 1 : 0,
+      Math.max(1, Math.round(r.placement)),
+      Math.max(1, Math.round(r.players)),
+      r.team ?? null,
+      r.teamWon === undefined || r.teamWon === null ? null : r.teamWon ? 1 : 0,
+      r.avgScore ?? null,
+      rating,
+      now,
+      count(r.brilliant),
+      cleanSan(r.bestMove),
+      cuts,
+      cuts === null ? null : Math.min(cuts, count(r.cutsSurvived) ?? 0),
+      strikes,
+      strikes === null ? null : Math.min(strikes, count(r.strikesSurvived) ?? 0),
+      flag(r.survived),
+      flag(r.lastStand),
+      mode === "boss" && typeof r.bossElo === "number" && BOSS_TIERS.includes(r.bossElo) ? r.bossElo : null,
+      lobby,
+      ranked ? 1 : 0,
+      r.held ? 1 : 0,
+      typeof r.bossId === "string" && bossDef(r.bossId) ? r.bossId : null,
+      flag(r.evalBar),
+      // (Only an online match's room says a player abandoned it.)
+      r.online && r.abandoned === true ? 1 : null,
+      // (XP's facts are the server's: the caller's, never the app's.)
+      typeof r.playMs === "number" && Number.isFinite(r.playMs) ? Math.max(0, Math.round(r.playMs)) : null,
+      typeof r.moves === "number" && Number.isFinite(r.moves) ? Math.max(0, Math.min(10_000, Math.round(r.moves))) : null,
+      ...xpColumns(r.xp),
+      // (An account deleted mid-match gets nothing new.)
+      userId,
+      ...(once ? [userId, lobby, once.since] : []),
+    ),
+    // Only a ranked match moves your ranking (and not while fair play holds your results).
+    ...(rated ? [stmt(`UPDATE users SET rating = ${LATEST_RATING("users.id")} WHERE id = ?`, userId)] : []),
+  ]);
 }
 
 /** Your result in an online match, by its lobby's code (the latest, if a code was used again): for "See your result". */

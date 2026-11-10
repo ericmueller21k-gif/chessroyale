@@ -93,7 +93,7 @@ export class DuelGame extends DurableObject<Env> {
   /**
    * The finished game into D1 (ranks, coins, the kept game); each player then hears what it did for them. A game on a
    * test's clock where test switches are off (an admin's on the live game) is unranked: nothing recorded, no coins.
-   * A try that fails is tried again on the alarm (takeFinished), a few times.
+   * A try that fails is tried again on the alarm (takeFinished), for hours (RANKED_1V1.recordRetryHours).
    */
   private async recordFinished(finished: NonNullable<ReturnType<DuelCore["takeFinished"]>>) {
     try {
@@ -131,6 +131,13 @@ export class DuelGame extends DurableObject<Env> {
   private async closeIfDue(): Promise<boolean> {
     const r = this.record;
     if (!r || r.closeAt === null || r.closeAt > Date.now() || this.recording) return false;
+    // A finished game not recorded yet (D1 failing): the room stays, trying again, up to RANKED_1V1.recordRetryHours (Nov 10).
+    const core = this.core();
+    if (core.toRecord()) return false;
+    if (core.recordGivenUp()) {
+      countCall("ranked.recordLost");
+      serverError(this.env, { kind: "DuelGame.recordLost", route: "DuelGame.close", code: r.code }, new Error(`closing with the game never recorded (${r.recordTries} tries)`), (p) => this.ctx.waitUntil(p));
+    }
     await this.ctx.blockConcurrencyWhile(async () => {
       const text = JSON.stringify({ t: "closed", reason: "ended", now: Date.now() });
       for (const ws of this.ctx.getWebSockets()) {

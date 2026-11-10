@@ -1,5 +1,5 @@
 import type { ComponentChildren } from "preact";
-import { AGE_GATE, CHAT_MOD, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
+import { AGE_GATE, CHAT_MOD, ENGINE_SERVER, FAIRPLAY, FRIENDS, GLOBAL_CHAT, LOBBY_LIFE, LEAVES, OPS, RANKED_1V1, TOWN_CHAT } from "@chessroyale/core";
 
 /**
  * The privacy policy (/privacy), terms of service (/terms) and copyright page (/copyright): drafts written from what
@@ -220,6 +220,12 @@ function Privacy() {
         }
         why="so your level and quests are yours on every device, a game's XP, rewards and quest progress are counted once, and the result screen can show what a game gave you."
         kept="your XP, crates and boss crates to pick until you open or pick them, or the account is deleted; each game's XP with its result (a deleted account's results are kept without the account, as above); a game's start until its result comes in; a daily quest until the day after it's finished (one not finished waits), the weekly until the week ends, each with the games that moved it."
+      />
+      <Item
+        title="The engine server"
+        what={<p>How many times today your account asked our engine server for a deeper look at a solo game's moves, or to wake it.</p>}
+        why={`so no one can use up the server's day for everyone: at most ${ENGINE_SERVER.perAccountDaily} a day, then your device checks on its own.`}
+        kept="until the day ends (UTC), then it's deleted."
       />
       <Item
         title="Chat"
