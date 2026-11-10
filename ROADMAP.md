@@ -116,7 +116,11 @@ decisions. In this order:
    - the matchmaker's reservations per account, not per ticket: an account that queued twice holds two, one never
      filled (a bot takes it) (PR #601 review, minor 8);
    - a lone device's word where a reward rides on it (Squads' bots with one human; the main lobby's host under two
-     judges): a server sample, or no extra reward (outside review, finding 5).
+     judges): a server sample, or no extra reward (outside review, finding 5);
+   - close the test accounts' token path: `npx tsx scripts/cheater-demo.ts --delete` first (the demo's accounts and
+     their fair-play files), then `TEST_ACCOUNTS_CLIENT_ID` back to `""` in `wrangler.jsonc` and deployed (no token
+     can make or sign in to accounts on the live site; docs/decisions/2026-11-10-cheater-demo.md; PR #622 review,
+     finding 1).
 
 **Only Eric can do:**
 

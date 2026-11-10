@@ -61,7 +61,11 @@
   // At launch, when Access leaves the rest of the site, ACCESS_AUD becomes the health path's own application's.
   "vars": {
     "ACCESS_TEAM_DOMAIN": "odd-wildflower-a76c.cloudflareaccess.com",
-    "ACCESS_AUD": "647483892d23ca09bcddd71ba8e6c8b40a04f627ebfa4282c6504b0778ae30dd"
+    "ACCESS_AUD": "647483892d23ca09bcddd71ba8e6c8b40a04f627ebfa4282c6504b0778ae30dd",
+    // Test accounts (packages/server/src/test-accounts.ts; scripts/cheater-demo.ts): the one service token's client ID (an
+    // identifier, not a secret) whose scripts may make, sign in to and delete test accounts. Empty: no token gets in (an admin's
+    // session and the e2e's key still do). Before launch: `cheater-demo.ts --delete`, then back to "" (ROADMAP.md).
+    "TEST_ACCOUNTS_CLIENT_ID": ""
   },
   // Fair play's deep re-check of flagged players' moves (packages/server/src/fairplay-deep.ts), and old errors and
   // player reports deleted (problems.ts).

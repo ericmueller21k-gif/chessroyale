@@ -2,16 +2,20 @@
  * Test accounts (Eric, Nov 10: "if that requires you to make accounts for them, then that's fine ... you can just put dummy
  * emails in"; docs/decisions/2026-11-10-cheater-demo.md): named accounts with no real email, for scripts that play the live game
  * as people do (scripts/cheater-demo.ts). Admins only: an admin's session (from the site itself), a script through Cloudflare Access
- * with a service token (viaAccess, as the health view takes it), or the e2e's local key (`x-e2e-sql`, never set outside its server).
- * Anyone else: "Not found".
+ * with the one service token `TEST_ACCOUNTS_CLIENT_ID` names (unset or empty: no token gets in, whatever Access fronts; it's cleared
+ * before launch: ROADMAP.md), or the e2e's local key (`x-e2e-sql`, never set outside its server). Anyone else: "Not found".
  *
- *   POST   /api/admin/test-accounts {name}  → makes the account (or finds it) and signs this client in as it: the session cookie
+ *   POST   /api/admin/test-accounts {name}  → makes the account (or finds it); a script (the token or the e2e's key) is signed in as
+ *                                            it (the session cookie), an admin isn't (their own browser stays theirs)
  *   GET    /api/admin/test-accounts         → every test account, its fair-play case and its matches' numbers
- *   DELETE /api/admin/test-accounts         → deletes every test account and everything kept about it, fair play's file too
+ *   DELETE /api/admin/test-accounts         → deletes every test account as any account is deleted (account-data.ts: its results
+ *                                            and 1 v 1 games stay in the game's numbers re-keyed to the deleted id, its ledger rows
+ *                                            kept), and fair play's file on it too
  *
  * A test account: the email `<name>@test.hunchess` (no such domain: no mail, no sign-in by code) and `users.test` = 1. It plays as
- * anyone does, with normal play's rewards and nothing granted, and public rankings leave it out (`users.test`: the "Top N%" in
- * accounts.ts, 1 v 1's top places in ranked-schema.ts). Only a test account is ever signed in to here: an address on a real account is refused.
+ * anyone does, with normal play's rewards and nothing granted. Public rankings leave it out (`users.test`: the "Top N%" in
+ * accounts.ts, 1 v 1's top places in ranked-schema.ts), and its reports never put anyone in review (fairplay.ts, reviewIfReported).
+ * Only a test account is ever signed in to here: an address on a real account is refused.
  */
 import { cleanName, createSession, d1Sql, ensureSchema, getUser, userFromToken, type Sql, type User } from "./accounts.ts";
 import { viaAccess, type AccessEnv } from "./access.ts";
@@ -20,7 +24,19 @@ import { SESSION_COOKIE, readCookie, sessionCookie } from "./api.ts";
 import { deleteAccount } from "./account-data.ts";
 import { e2eSqlAllowed, type E2eSqlEnv } from "./e2e-sql.ts";
 
-export type TestAccountsEnv = AdminEnv & AccessEnv & E2eSqlEnv;
+export type TestAccountsEnv = AdminEnv &
+  AccessEnv &
+  E2eSqlEnv & {
+    /**
+     * The switch for scripts through Access: the one service token's client ID (its JWT's `common_name`) the route takes. Unset or
+     * empty, no token gets in (an admin's session and the e2e's key still do). A client ID is an identifier, not a secret
+     * (wrangler.jsonc's `vars`); `OPS_ACCESS_CLIENT_ID`, the health view's pin, has no say here.
+     */
+    TEST_ACCOUNTS_CLIENT_ID?: string;
+  };
+
+/** Checks Access's token for the route, with `env.OPS_ACCESS_CLIENT_ID` set to the one client ID it may carry (viaAccess). */
+type AccessCheck = (request: Request, env: AccessEnv) => Promise<boolean>;
 
 /** The test accounts' email domain: not a real one, so nothing is ever sent and no code sign-in can reach them. */
 export const TEST_DOMAIN = "test.hunchess";
@@ -40,11 +56,15 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 const notFound = () => json({ message: "Not found" }, 404);
 
 /**
- * Who's asking, if they may: "access" (a service token through Access), "e2e" (the local e2e's key), "admin:<email>" (an admin's
- * session; a change only from the site itself: the origin is checked); null for anyone else.
+ * Who's asking, if they may: "access" (through Access with the service token `TEST_ACCOUNTS_CLIENT_ID` names, while it's set), "e2e"
+ * (the local e2e's key), "admin:<email>" (an admin's session; a change only from the site itself: the origin is checked); null for
+ * anyone else.
  */
-async function caller(request: Request, env: TestAccountsEnv, sql: Sql, now: number, access: (r: Request) => Promise<boolean>): Promise<string | null> {
-  if (await access(request)) return "access";
+async function caller(request: Request, env: TestAccountsEnv, sql: Sql, now: number, access: AccessCheck): Promise<string | null> {
+  // (The route's own switch, not Access's setup: a token Access issued for another path, the health view's at launch, carries a valid
+  // signature and audience too. The PR #622 review, finding 1.)
+  const client = env.TEST_ACCOUNTS_CLIENT_ID?.trim();
+  if (client && (await access(request, { ...env, OPS_ACCESS_CLIENT_ID: client }))) return "access";
   if (e2eSqlAllowed(env.E2E_SQL, request.headers.get("x-e2e-sql"))) return "e2e";
   const user = await userFromToken(sql, readCookie(request, SESSION_COOKIE), now);
   if (!isAdmin(env, user)) return null;
@@ -116,7 +136,10 @@ export async function testAccountsReport(sql: Sql) {
   return out;
 }
 
-/** Deletes every test account: everything kept about it, fair play's file included (a test account's case is never evidence). */
+/**
+ * Deletes every test account as any account is deleted (account-data.ts: results re-keyed to the deleted id, ledger rows kept), fair
+ * play's file included (a test account's case is never evidence).
+ */
 export async function deleteTestAccounts(sql: Sql, now: number): Promise<number> {
   const ids = await sql.all<{ id: string }>("SELECT id FROM users WHERE test = 1");
   for (const { id } of ids) {
@@ -130,7 +153,7 @@ export async function deleteTestAccounts(sql: Sql, now: number): Promise<number>
 export async function handleTestAccounts(
   request: Request,
   env: TestAccountsEnv,
-  opts: { now?: number; access?: (r: Request) => Promise<boolean> } = {},
+  opts: { now?: number; fetcher?: typeof fetch; access?: AccessCheck } = {},
 ): Promise<Response | null> {
   const url = new URL(request.url);
   if (url.pathname !== "/api/admin/test-accounts") return null;
@@ -138,7 +161,7 @@ export async function handleTestAccounts(
   const sql = d1Sql(env.DB);
   await ensureSchema(sql, env.DB);
   const now = opts.now ?? Date.now();
-  const who = await caller(request, env, sql, now, opts.access ?? ((r) => viaAccess(r, env, now)));
+  const who = await caller(request, env, sql, now, opts.access ?? ((r, e) => viaAccess(r, e, now, opts.fetcher)));
   if (!who) return notFound();
   if (request.method === "GET") return json({ accounts: await testAccountsReport(sql) });
   if (request.method === "DELETE") {
@@ -151,8 +174,10 @@ export async function handleTestAccounts(
     const r = await testAccount(sql, body?.name, now);
     if ("error" in r) return json({ message: r.error }, r.status);
     if (r.created) console.log(`test account ${r.user.id} (${r.user.name}) made by ${who}`);
-    const token = await createSession(sql, r.user.id, now);
-    return json({ id: r.user.id, name: r.user.name, email: r.user.email, created: r.created }, 200, { "set-cookie": sessionCookie(token) });
+    const answer = { id: r.user.id, name: r.user.name, email: r.user.email, created: r.created };
+    // (An admin on the site isn't signed in as it: that would sign them out of their own account in that browser. The review, minor 1.)
+    if (who.startsWith("admin:")) return json(answer);
+    return json(answer, 200, { "set-cookie": sessionCookie(await createSession(sql, r.user.id, now)) });
   }
   return json({ message: "GET, POST or DELETE" }, 405);
 }

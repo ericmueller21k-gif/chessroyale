@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { createGuest, createSession, ensureSchema, publicProfile, recordResult, signInWithIdentity, userFromToken, type Sql } from "../src/accounts.ts";
-import { caseOf, logCase, setCase } from "../src/fairplay.ts";
+import { afterEach, describe, expect, it } from "vitest";
+import { forgetAccessKeys } from "../src/access.ts";
+import { createGuest, createSession, ensureSchema, getUser, publicProfile, recordResult, signInWithIdentity, userFromToken, type Sql } from "../src/accounts.ts";
+import { caseOf, logCase, reportPlayer, setCase } from "../src/fairplay.ts";
 import { forgetTopPlaces, topPlace } from "../src/ranked-schema.ts";
 import { handleTestAccounts, testEmail } from "../src/test-accounts.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -8,19 +9,23 @@ import { memoryDb } from "./memory-db.ts";
 /**
  * Test accounts (docs/decisions/2026-11-10-cheater-demo.md): an admin's script makes named accounts with a dummy email
  * (`<name>@test.hunchess`, `users.test` = 1), signs in as them, lists their fair play and deletes them all in one call. Nobody else
- * can reach the route, a real account is never signed in to through it, and public rankings leave test accounts out.
+ * can reach the route (a service token only the one `TEST_ACCOUNTS_CLIENT_ID` names, while it's set), a real account is never signed
+ * in to through it, public rankings leave test accounts out, and their reports never put anyone in review.
  */
 
 const T0 = Date.UTC(2026, 10, 10, 12);
 const ADMIN = "boss@example.com";
 const E2E_KEY = "k".repeat(40);
 const URL_ = "https://hunchess.test/api/admin/test-accounts";
+const CLIENT = "demo-client.access";
+
+afterEach(() => forgetAccessKeys());
 
 async function world() {
   const { sql, d1 } = memoryDb();
   await ensureSchema(sql);
-  const env = { DB: d1, ADMIN_EMAILS: ADMIN };
-  /** A request through the route, as `as` (headers), with `access` saying whether it came through Access with a service token. */
+  const env = { DB: d1, ADMIN_EMAILS: ADMIN, TEST_ACCOUNTS_CLIENT_ID: CLIENT };
+  /** A request through the route, as `as` (headers), with `access` saying whether it came through Access with the named service token. */
   const call = (method: string, headers: Record<string, string> = {}, body?: unknown, opts: { access?: boolean; e2e?: string } = {}) =>
     handleTestAccounts(new Request(URL_, { method, headers: { ...(body ? { "content-type": "application/json" } : {}), ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) }), { ...env, ...(opts.e2e ? { E2E_SQL: opts.e2e } : {}) }, {
       now: T0,
@@ -66,10 +71,62 @@ describe("test accounts: who may use the route", () => {
     const { sql, call } = await world();
     const admin = await signedIn(sql, ADMIN);
     expect((await call("GET", { cookie: admin.cookie }))!.status).toBe(200);
-    expect((await call("POST", { cookie: admin.cookie, origin: "https://hunchess.test" }, { name: "Judge Jo" }))!.status).toBe(200);
+    // (The admin's own browser isn't signed in as the test account: no session cookie for them.)
+    const made = (await call("POST", { cookie: admin.cookie, origin: "https://hunchess.test" }, { name: "Judge Jo" }))!;
+    expect(made.status).toBe(200);
+    expect(made.headers.get("set-cookie")).toBeNull();
     expect((await call("POST", {}, { name: "Judge Jay" }, { access: true }))!.status).toBe(200);
     expect((await call("POST", { "x-e2e-sql": E2E_KEY }, { name: "Strong Sam" }, { e2e: E2E_KEY }))!.status).toBe(200);
     expect((await sql.all<{ name: string }>("SELECT name FROM users WHERE test = 1 ORDER BY name")).map((u) => u.name)).toEqual(["Judge Jay", "Judge Jo", "Strong Sam"]);
+  });
+});
+
+// ---------------- The service token's switch (the PR #622 review, finding 1) ----------------
+
+const TEAM = "team.cloudflareaccess.com";
+const AUD = "aud-health-0123";
+const b64url = (bytes: Uint8Array) => Buffer.from(bytes).toString("base64url");
+const part = (o: unknown) => b64url(new TextEncoder().encode(JSON.stringify(o)));
+
+/** A signing key like Access's team's, a token signer, and its public half as Access publishes it (as health.test.ts). */
+async function team() {
+  const pair = (await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"])) as CryptoKeyPair;
+  const jwk = { ...(await crypto.subtle.exportKey("jwk", pair.publicKey)), kid: "k1" };
+  const sign = async (claims: Record<string, unknown>) => {
+    const data = `${part({ alg: "RS256", kid: "k1" })}.${part(claims)}`;
+    return `${data}.${b64url(new Uint8Array(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", pair.privateKey, new TextEncoder().encode(data))))}`;
+  };
+  const fetcher = (async () => new Response(JSON.stringify({ keys: [jwk] }))) as unknown as typeof fetch;
+  return { sign, fetcher };
+}
+
+describe("test accounts: the service token's switch", () => {
+  it("unset or empty, no token gets in; set, only the token it names (the health view's pin has no say)", async () => {
+    const { sql, d1 } = memoryDb();
+    await ensureSchema(sql);
+    const t = await team();
+    // (A token as Access issues it for the health path's own application at launch: the team's signature, the right audience.)
+    const token = (who: Record<string, unknown>) => t.sign({ aud: [AUD], iss: `https://${TEAM}`, exp: T0 / 1000 + 600, ...who });
+    const post = async (jwt: string, vars: { TEST_ACCOUNTS_CLIENT_ID?: string; OPS_ACCESS_CLIENT_ID?: string } = {}) =>
+      (await handleTestAccounts(
+        new Request(URL_, { method: "POST", headers: { "cf-access-jwt-assertion": jwt, "content-type": "application/json" }, body: JSON.stringify({ name: "Engine Eddie" }) }),
+        { DB: d1, ACCESS_TEAM_DOMAIN: TEAM, ACCESS_AUD: AUD, ...vars },
+        { now: T0, fetcher: t.fetcher },
+      ))!;
+    const demo = await token({ common_name: CLIENT });
+    const ops = await token({ common_name: "ops-client.access" });
+    // Unset or empty: a valid token is Not found.
+    for (const vars of [{}, { TEST_ACCOUNTS_CLIENT_ID: "" }, { TEST_ACCOUNTS_CLIENT_ID: "  " }, { OPS_ACCESS_CLIENT_ID: CLIENT }]) expect((await post(demo, vars)).status).toBe(404);
+    // Set: another token's common_name (the ops scripts', the fair-play reviewer's), or a person's login, is Not found.
+    expect((await post(ops, { TEST_ACCOUNTS_CLIENT_ID: CLIENT })).status).toBe(404);
+    expect((await post(ops, { TEST_ACCOUNTS_CLIENT_ID: CLIENT, OPS_ACCESS_CLIENT_ID: "ops-client.access" })).status).toBe(404);
+    expect((await post(await token({ email: ADMIN }), { TEST_ACCOUNTS_CLIENT_ID: CLIENT })).status).toBe(404);
+    expect(await sql.first("SELECT id FROM users WHERE test = 1")).toBeNull();
+    // The named one: made and signed in, whatever the health view is pinned to.
+    const res = await post(demo, { TEST_ACCOUNTS_CLIENT_ID: CLIENT });
+    expect(res.status).toBe(200);
+    expect(await userFromToken(sql, tokenOf(res), T0)).toMatchObject({ name: "Engine Eddie" });
+    expect((await post(demo, { TEST_ACCOUNTS_CLIENT_ID: CLIENT, OPS_ACCESS_CLIENT_ID: "ops-client.access" })).status).toBe(200);
   });
 });
 
@@ -128,6 +185,21 @@ describe("test accounts: off public rankings", () => {
     forgetTopPlaces();
     expect(await topPlace(sql, 3000, T0)).toBe(1);
     expect(await topPlace(sql, 3100, T0)).toBe(1);
+  });
+});
+
+describe("test accounts: their reports", () => {
+  it("never put anyone in review (a real account's still do)", async () => {
+    const { sql, call } = await world();
+    // (A new account: two players' reports put it in review.)
+    const real = await signedIn(sql, "new@example.com");
+    for (const name of ["Judge Jo", "Judge Jay", "Strong Sam"]) {
+      const t = (await (await call("POST", {}, { name }, { access: true }))!.json()) as { id: string };
+      expect((await reportPlayer(sql, (await getUser(sql, t.id))!, real.user.id, "Cheating", null, T0 + 1000)).ok).toBe(true);
+    }
+    expect((await caseOf(sql, real.user.id))?.status).not.toBe("review");
+    for (const email of ["a@example.com", "b@example.com"]) await reportPlayer(sql, (await signedIn(sql, email)).user, real.user.id, "Cheating", null, T0 + 2000);
+    expect((await caseOf(sql, real.user.id))?.status).toBe("review");
   });
 });
 

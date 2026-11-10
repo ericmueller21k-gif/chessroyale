@@ -305,7 +305,7 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
-  // (The few test accounts, so leaving them out of a ranking never scans the table: test-accounts.ts, NOT_TEST.)
+  // (The few test accounts, so 1 v 1's top places leave them out without scanning the table: ranked-schema.ts, topPlace.)
   `CREATE INDEX IF NOT EXISTS users_test ON users (id) WHERE test = 1`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
@@ -1031,8 +1031,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
  * look has the admin copies they wear (the email is read only for that, never answered).
  */
 export async function publicProfile(sql: Sql, userId: string, now: number, admins: AdminCheck = NO_ADMINS): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null }>(
-    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null; test: number | null }>(
+    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color, test FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -1048,8 +1048,7 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
     // (The engine pool is left out of everyone's "Top N%": a pooled player's own is worked out among the rest and them, so it looks
     // as ever: fairplay.ts, NOT_POOLED. Test accounts likewise: test-accounts.ts.)
     const pooled = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "pool";
-    const test = (await sql.first<{ test: number | null }>("SELECT test FROM users WHERE id = ?", userId))?.test === 1;
-    const self = pooled || test ? 1 : 0;
+    const self = pooled || u.test === 1 ? 1 : 0;
     const total = ((await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL AND test IS NOT 1 AND ${NOT_POOLED("id")}`))?.n ?? 0) + self;
     if (total >= FRONT_DOOR.percentileMinPlayers) {
       const above = (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating > ? AND test IS NOT 1 AND ${NOT_POOLED("id")}`, rating))?.n ?? 0;
