@@ -1,6 +1,6 @@
 # Live ops: knowing when the live game breaks, and fixing it fast (design, Nov 9, 2026)
 
-**Status:** designed, not built. Build it before launch (ROADMAP.md, "Live ops"). Eric, Nov 9: "we don't have developers, we just
+**Status:** piece 1 (alerts to Discord) built Nov 10 (`alerts.ts`; docs/areas/ops.md, "Alerts to Discord"), without the abandon rates, the bot and known-noise labels; pieces 2 to 4 designed, not built. Build it before launch (ROADMAP.md, "Live ops"). Eric, Nov 9: "we don't have developers, we just
 have Claude Code agents … if the game comes out, there might be some issues, and the best case scenario is we're already seeing
 them on the back end … and deploying fixes." And: "the last thing I'd want is the game's live and we're in panic thinking there's
 issues when there's really not."
