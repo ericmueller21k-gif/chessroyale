@@ -7,7 +7,9 @@ Lanes: `hub` (joining and filling a lobby, the queue screen), `ranked` (the matc
 
 - **"Play now" is the queue.** POST `/api/play` hands the press to the matchmaker (a Durable Object), which answers
   with a lobby code, or "Servers are busy, you're in line: about N s" with a ticket to ask again with.
-- **One queue per mode and type** (`queueName`): crowd-default, crowd-botsoff, raid-default, raid-botsoff. The three
+- **One queue per mode and type** (`queueName`): crowd-default, crowd-botsoff, raid-default, raid-botsoff; each with an engine pool's
+  own (`.engine`) for accounts fair play pooled, set from the account on every ask (1 v 1 and Squads too; a party with a pooled member
+  queues there), never by the browser ([fairplay.md](fairplay.md)). The three
   matchmaking types, picked on the home screen under the mode and remembered per device:
   - **Default:** real players; bots fill the empty seats once the lobby has waited `MATCH_FILL_SECONDS` (60 s; 8 s in
     the e2e suite). Bots pop into the seats over `FRONT_DOOR.fillShowMs`.

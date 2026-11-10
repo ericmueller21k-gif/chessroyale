@@ -35,10 +35,14 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   they leave (`takeLeftResults`, queued by the Durable Object's `queueResults`, once per lobby: `since`), as everyone's are at the end.
 - **The suspicion score** turns a player's evidence into a level; every threshold is in `FAIRPLAY`.
 - **A case** is one player's file. Its status: **watch** (recorded only), **review** (a person or the automated
-  reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **banned**
+  reviewer decides; meanwhile their online results are held off ranking and `eligibleForRanked` says no), **pool** (below), **banned**
   (no online play, solo stays open; an appeal a person decides; their sign-in identities are kept hashed so a new
   account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
+- **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level, or a new
+  account with 2 of its first 10 matches at the one-match ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or
+  bots (`mayPlay`, `queueName`'s `engine`); results not held, their profile as ever, public rankings leave them out (`NOT_POOLED`), evidence kept.
+  The review page's "Engine pool" list: why, the evidence, how they do there (crushed: likely a false positive), Release, a JSON download.
 - **Each banned account keeps its own identity rows** (`fairplay_identities` is keyed by identity and account), so
   clearing one forgets only its own: another ban with the same email still catches new accounts, banned owners
   first. For an account cleared by a person or the reviewer (its latest "cleared" line in the log), `banCheck`
@@ -66,8 +70,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
   off-peak), over every legal move in groups of at most 8 (`moveGroups`, as 1 v 1's check), never the judges' list, which a device
   sent (Nov 10); a position's whole budget taken before its first search, and outside a review a match only as far as
-  `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection only flags since Nov 10**
-  (`FAIRPLAY.enforcement: "review"`, the outside review's finding 3): no automatic bans until Eric turns them back on. A move in a position Stockfish refuses is
+  `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection never bans since Nov 10**
+  (the outside review's finding 3): at the ban bar it pools (`FAIRPLAY.enforcement: "pool"`); bans are a person's. A move in a position Stockfish refuses is
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
@@ -108,8 +112,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 ## Tests
 
 - Unit: `packages/core/test/fairplay.test.ts`, `packages/server/test/fairplay.test.ts`, `fairplay-lobby.test.ts`,
-  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`.
-- e2e: `e2e/fairplay.spec.ts` (reporting, a banned account; the review token is set in `playwright.config.ts`).
+  `fairplay-deep.test.ts`, `fairplay-admin.test.ts`, `engine-pool.test.ts`.
+- e2e: `e2e/fairplay.spec.ts` (reporting, a banned account, the engine pool; the review token is set in `playwright.config.ts`).
 
 ## Rules for this area
 
