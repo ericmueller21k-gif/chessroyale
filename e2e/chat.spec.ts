@@ -307,6 +307,9 @@ test("quick chat picks in the profile: search, a check, n/10, free lines only (t
   await expect(phone.locator(".under-board.ub-tab .qchat-tab")).toBeVisible();
   await expect(phone.locator(".qchat-tab .qline", { hasText: "GG" }).filter({ hasText: "Desky" })).toBeVisible();
   await expect(unread).toHaveCount(0);
+  // (Measured on the phone's turn, as the checks above are: between turns the Crowd's next phase draws its own screen, with
+  // no board to measure. Main run 1197, Nov 10.)
+  await untilMyTurn(phone, desk);
   expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
 });
 
