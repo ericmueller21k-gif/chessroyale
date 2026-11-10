@@ -4,6 +4,9 @@ Lane: the director (the match screens are the director's; other lanes add to the
 The bosses' rules are on [bosses.md](bosses.md), the judge on [engine.md](engine.md).
 
 ## How it works today
+- **Its queue while you browse** (Nov 10; [matchmaking.md](matchmaking.md), "Stepping out of a lobby"; home's rows: [hub.md](hub.md)): the 50 v 50
+  lobby's Exit with "Keep me in the queue" keeps your seat as you look around ("Searching · 50 v 50", "Solo queue · 37 of 100"); the lobby
+  filling takes you in. Home's Start with bots ("Play bots?", Yes) leaves the queue for you and 99 bots at once, at your last Bot level.
 - **The XP box** (Nov 9; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)): the result screen (`screens/Results.tsx`; online, asked for by the lobby's code) shows `XpResult`, a fixed 78 px box (its top row: the gain, your name, your level): the
   bar filling from your old XP to the new, "+170 XP", "Level 7", the parts ("Win +50": never the minutes, Eric, Nov 9), or why there was none. Its rules
   and storage: [accounts.md](accounts.md), "XP and levels".

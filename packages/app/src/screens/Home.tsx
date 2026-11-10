@@ -38,6 +38,8 @@ import { SwordsIcon } from "../town/CardIcons.tsx";
 import { Pic, Scene } from "../home-art/Pic.tsx";
 import { ARENA_AUTO_CARD } from "../home-art/arena-auto-card.ts";
 import { TOWN_PICTURE, TOWN_SCENE, TOWN_SKY } from "../home-art/town.ts";
+import { setSearchOnHome, type AwaySearch } from "../search.ts";
+import { clockShown } from "../clock-text.ts";
 
 const MODE_KEY = "brc.mode";
 
@@ -505,6 +507,7 @@ function RaidOption({ label, sub, disabled, locked, onClick }: { label: string; 
  */
 export function HomeScreen({
   queue,
+  search = null,
   chat,
   side = true,
   intent,
@@ -535,6 +538,11 @@ export function HomeScreen({
 }: {
   /** In the queue: the queue screen (or the line for a seat), shown in place of the play column. */
   queue?: ComponentChildren;
+  /**
+   * A search going on while you browse (search.ts; Eric, Nov 10): the modes row shows it and the row under it its three
+   * actions; PLAY, Chess Town and the cards grey in place.
+   */
+  search?: AwaySearch | null;
   /** In the queue on a computer: the lobby's chat, under your pawn. */
   chat?: ComponentChildren;
   /** In the queue: draw the computer's column (your card, the chat) beside it. A phone shows only the queue. */
@@ -777,6 +785,15 @@ export function HomeScreen({
   const look = profile?.locker?.look;
   const name = profile?.user.name ?? "Player";
   const queueing = queue !== undefined && queue !== null;
+  // Searching while you browse (Eric, Nov 10: "the exact container ... that would be lit up, but everything else below it would be
+  // gray"): home's rows show it, so the bar on other pages stands aside here.
+  const searching = !!search && !queueing && !raid;
+  useLayoutEffect(() => {
+    if (!searching) return;
+    setSearchOnHome(true);
+    return () => setSearchOnHome(false);
+  }, [searching]);
+  const off = searching ? " fd-off" : "";
   // A screen that replaces home (a phone's queue, the Boss raid screen, and home again) starts at its top, wherever home
   // was scrolled to (its card and PLAY sit low on a small phone). Before its first paint.
   const view = raid ? "raid" : queueing && !side ? "queue" : "home";
@@ -1030,19 +1047,24 @@ export function HomeScreen({
   }
   // The RANKED row: the three ranked modes, one picked (Eric, Oct 16).
   const ranked = (
-    <div class="fd-ranked">
-      <h2 class="fd-label" id="fd-ranked-label">
+    <div class={`fd-ranked${searching ? " fd-searching" : ""}`}>
+      <h2 class={`fd-label${off}`} id="fd-ranked-label">
         RANKED
       </h2>
-      <div class="fd-modes" role="radiogroup" aria-labelledby="fd-ranked-label">
-        {MODES.map((m) => (
-          <button type="button" role="radio" key={m.id} data-tour={`mode-${m.id}`} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
-            {m.label}
-            <br />
-            <span>{m.sub}</span>
-          </button>
-        ))}
-      </div>
+      {searching ? (
+        // (Searching: the same box, the same size, the search in it.)
+        <SearchRow search={search!} />
+      ) : (
+        <div class="fd-modes" role="radiogroup" aria-labelledby="fd-ranked-label">
+          {MODES.map((m) => (
+            <button type="button" role="radio" key={m.id} data-tour={`mode-${m.id}`} aria-checked={mode === m.id} class={mode === m.id ? "on" : ""} onClick={() => pickMode(m.id)}>
+              {m.label}
+              <br />
+              <span>{m.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
   // The panel under the row (Eric, Oct 18: "it should never change size, and it should be dedicated to whatever text we
@@ -1052,7 +1074,12 @@ export function HomeScreen({
   // page's layout. Always there (Eric, Oct 25: "the menu buttons should never be like invisible"):
   // with no mode picked it shows 50 v 50's options greyed, none selected and none tappable; the first pick wakes them.
   const rank1v1 = mode === "1v1" ? ranked1v1Rank() : null;
-  const panel = (
+  const panel = searching ? (
+    // (Searching: the same box, its three actions: Cancel, Lobby, Start with bots.)
+    <div class="fd-mode-panel fd-searching">
+      <SearchActions search={search!} />
+    </div>
+  ) : (
     <div class={`fd-mode-panel${mode ? "" : " idle"}`}>
       {mode === "squads" ? (
         <div class="fd-modes fd-types fd-squad-pick fd-three" role="radiogroup" aria-label="Squads">
@@ -1125,12 +1152,12 @@ export function HomeScreen({
   // The line above PLAY (what PLAY does, for this pick) and PLAY (and an error, if any). Eric, Oct 28: the line moved from under
   // PLAY to just above it. It has one place and one height whatever is picked (styles.css, `fd-hint`).
   const go = (
-    <div class="fd-go">
+    <div class={`fd-go${off}`} inert={searching}>
       <div class="fd-hint" aria-live="polite">
         <span>{loading ? "Loading the engine…" : hint}</span>
       </div>
       {/* (Dimmed until a mode is picked: Eric, Oct 18.) */}
-      <button type="button" class="fd-play" data-tour="play" disabled={!mode || loading || !!resting || !!lockUntil || (mode === "classic" && type !== "solo")} onClick={play}>
+      <button type="button" class="fd-play" data-tour="play" disabled={searching || !mode || loading || !!resting || !!lockUntil || (mode === "classic" && type !== "solo")} onClick={play}>
         PLAY
       </button>
       {error && <p class="fd-error">{error}</p>}
@@ -1141,7 +1168,7 @@ export function HomeScreen({
   // of the device's time of day (day, dusk or night; picked as the page loads too, home-art/town.ts). Its own class, not PLAY's
   // (`fd-town`; styles.css gives both the same size at every width).
   const chessTownButton = (
-    <button type="button" class="fd-town" data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
+    <button type="button" class={`fd-town${off}`} inert={searching} data-tour="chess-town" onClick={onChessTown} data-picture={TOWN_PICTURE.id} data-sky={TOWN_SKY}>
       <Scene ch={TOWN_SCENE} dropBottom={TOWN_PICTURE.dropBottom} groundRow={TOWN_PICTURE.groundRow} class="fd-town-scene" />
       <span class="fd-town-label">Chess Town</span>
     </button>
@@ -1230,14 +1257,110 @@ export function HomeScreen({
           {panel}
           {go}
           {chessTownButton}
-          <h2 class="fd-label fd-other-label">Other modes</h2>
-          <div class="rd-pair">
+          <h2 class={`fd-label fd-other-label${off}`}>Other modes</h2>
+          <div class={`rd-pair${off}`} inert={searching}>
             {soloCard}
             {autoCard}
           </div>
         </div>
       </div>
       {overlays}
+    </div>
+  );
+}
+
+/** Now, every second (a search's time). */
+function useSecond(): number {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return now;
+}
+
+/**
+ * Searching (Eric, Nov 10; the approved mockup, notes/assets/search-rows2-*.png): the modes row's own box and size shows the
+ * search: a green spinning ring, "Searching · 50 v 50", the queue type and the lobby's count, and the time searched in green
+ * on the right.
+ */
+function SearchRow({ search }: { search: AwaySearch }) {
+  const now = useSecond();
+  const [words, more] = search.detail(now);
+  return (
+    <div class="fd-modes fd-search" role="group" aria-label={`Searching ${search.name}`}>
+      <span class="fd-search-ring" aria-hidden="true" />
+      <span class="fd-search-words">
+        <strong class="fd-search-title">Searching · {search.name}</strong>
+        <span class="fd-search-detail">
+          {words}
+          {more && <span class="fd-search-more">{more}</span>}
+        </span>
+      </span>
+      <span class="fd-search-time">{clockShown(Math.max(0, now - search.since))}</span>
+    </div>
+  );
+}
+
+/**
+ * The row under it: the search's three actions (data: search.ts's `slots`), no lines between them, as home's rows are. One
+ * that asks first (Cancel, Start with bots) asks in the same three slots (Eric: "you hit cancel and then you just hit yes or
+ * no"): the question where the first slot was (not a button, so a double tap can't confirm), Yes, No. No, or
+ * FRONT_DOOR.searchAskMs without a tap, puts the actions back. Nothing moves or opens.
+ */
+function SearchActions({ search }: { search: AwaySearch }) {
+  const [asking, setAsking] = useState<number | null>(null);
+  useEffect(() => {
+    if (asking === null) return;
+    const t = setTimeout(() => setAsking(null), FRONT_DOOR.searchAskMs);
+    return () => clearTimeout(t);
+  }, [asking]);
+  const slot = asking === null ? null : search.slots[asking]!;
+  if (slot?.ask) {
+    const a = slot.ask;
+    return (
+      <div class="fd-modes fd-types fd-three fd-search-acts asking" role="group" aria-label={a.question}>
+        <div class="fd-search-ask" role="status">
+          {a.question}
+          <br />
+          <span>{a.note}</span>
+        </div>
+        <button
+          type="button"
+          class={`fd-search-yes ${a.red ? "red" : "go"}`}
+          onClick={() => {
+            setAsking(null);
+            slot.run?.();
+          }}
+        >
+          Yes
+          <br />
+          <span>{a.yes}</span>
+        </button>
+        <button type="button" class="fd-search-no" onClick={() => setAsking(null)}>
+          No
+          <br />
+          <span>keep searching</span>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div class="fd-modes fd-types fd-three fd-search-acts" role="group" aria-label={`${search.name} search`}>
+      {search.slots.map((s, i) => (
+        <button
+          type="button"
+          key={i}
+          aria-disabled={!s.run || undefined}
+          class={`${s.red ? "red" : ""}${s.run ? "" : " off"}`}
+          title={s.run ? undefined : "Coming soon"}
+          onClick={() => (!s.run ? undefined : s.ask ? setAsking(i) : s.run())}
+        >
+          {s.label}
+          <br />
+          <span>{s.line}</span>
+        </button>
+      ))}
     </div>
   );
 }

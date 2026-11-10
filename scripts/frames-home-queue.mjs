@@ -207,8 +207,10 @@ for (const scheme of ["dark", "light"]) {
       await click(p2, p2.getByRole("button", { name: "PLAY", exact: true }));
       await p2.locator(".fd-seats").waitFor();
       await p2.waitForTimeout(1500);
-      mark("click Cancel");
-      await click(p2, p2.getByRole("button", { name: "Cancel" }));
+      // (Out of the queue: "Keep me in the queue" unchecked, then Exit, Nov 10.)
+      await p2.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
+      mark("click Exit");
+      await click(p2, p2.getByRole("button", { name: "Exit", exact: true }));
       await p2.getByRole("button", { name: "PLAY", exact: true }).waitFor();
       await p2.waitForTimeout(800);
     },
@@ -304,8 +306,9 @@ const themePick = (p, name) => p.getByRole("radiogroup", { name: "Theme" }).getB
     await p.locator(".fd-seats").waitFor();
     await p.waitForTimeout(1500);
     await p.screenshot({ path: `${out}/phone-queue-light.png` });
-    mark("tap Cancel");
-    await tap(p, p.getByRole("button", { name: "Cancel" }));
+    await p.getByRole("checkbox", { name: "Keep me in the queue" }).uncheck();
+    mark("tap Exit");
+    await tap(p, p.getByRole("button", { name: "Exit", exact: true }));
     await p.getByRole("button", { name: "PLAY", exact: true }).waitFor();
     await p.waitForTimeout(800);
   });

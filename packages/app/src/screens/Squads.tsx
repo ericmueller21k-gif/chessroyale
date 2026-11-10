@@ -10,6 +10,7 @@ import type { SquadsClient } from "../squads.ts";
 import { ROUND_NAME, placementText, squadColour, squadName, standingsOrder } from "../squads-view.ts";
 import type { VoteView } from "../game.ts";
 import { VoteScreen, type VoteHost, type VotePlayer } from "./Vote.tsx";
+import { useQueueExit } from "./Queue.tsx";
 import { SquadsMatchScreen } from "./SquadsMatch.tsx";
 import { TokenBreakdown } from "../components/SquadsBlocks.tsx";
 import { MercenaryShop } from "../components/MercenaryShop.tsx";
@@ -58,7 +59,7 @@ function SquadsResigned({ client, actions }: { client: SquadsClient; actions: Sq
 }
 
 /** The waiting room: "12 / 32", the seconds until bots fill, and the 32 seats (your party's together), then the squads. */
-export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCancel: () => void }) {
+export function SquadsQueue({ client, onCancel, onAway }: { client: SquadsClient; onCancel: () => void; onAway?: () => void }) {
   const now = useNow(250);
   const lobby = client.lobby;
   const size = lobby?.seats ?? SQUADS.squadCount * SQUADS.squadSize;
@@ -74,6 +75,8 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
       ? `Test lobby · starts at ${ROUND_NAME[test.start]} · bots fill in ${left ?? "…"} s`
       : `Finding players · ${left ?? "…"} s, then bots fill the rest`;
   const myLook = account().profile?.locker?.look;
+  // (Exit with "Keep me in the queue": Queue.tsx's, the same as 50 v 50's.)
+  const exit = useQueueExit(onCancel, onAway, filled);
   // Before the fill: people in the order they joined (you first). After: the eight squads of four.
   const squads = lobby?.squads.length ? lobby.squads : null;
   const pawn = (id: string | null) => {
@@ -90,7 +93,7 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
   return (
     <div class="fd-page fd-queue sq-queue">
       <header class="fd-page-head">
-        <BackButton onClick={onCancel} label="Leave the queue" />
+        <BackButton onClick={exit.go} label={exit.label} />
         <h1 class="fd-queue-mode">Squads · 8 squads of 4</h1>
         <span class="fd-queue-mute">
           <MuteButton />
@@ -133,9 +136,11 @@ export function SquadsQueue({ client, onCancel }: { client: SquadsClient; onCanc
           </div>
         </div>
       </div>
-      <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
-        Cancel
-      </button>
+      {exit.row ?? (
+        <button type="button" class="fd-btn fd-cancel" onClick={onCancel}>
+          Cancel
+        </button>
+      )}
     </div>
   );
 }

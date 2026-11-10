@@ -10076,6 +10076,147 @@ button.fd-logo {
   font-size: 12px;
   text-align: center;
 }
+/*
+ * Searching while you browse (Eric, Nov 10; the approved mockup, notes/assets/search-rows2-*.png; Home.tsx, search.ts): the
+ * modes row's own box shows the search, at the row's own height (52 px buttons and 5 px round them), so nothing moves. The row
+ * under it holds the three actions (and, in place, a question with Yes and No). Everything under them greys in place, not
+ * tappable (`fd-off` and `inert`); the top bar and your card stay lit.
+ */
+.fd-off {
+  opacity: 0.38;
+  filter: grayscale(1);
+  pointer-events: none;
+}
+.fd-modes.fd-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 62px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  color: var(--fd-text);
+}
+.fd-search-ring {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 4px solid color-mix(in srgb, var(--fd-green) 25%, transparent);
+  border-top-color: var(--fd-green);
+  animation: fd-search-spin 1s linear infinite;
+}
+@keyframes fd-search-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-search-ring {
+    animation: none;
+  }
+}
+.fd-search-words {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  text-align: left;
+}
+.fd-search-title,
+.fd-search-detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-title {
+  font: 800 17px Archivo, system-ui, sans-serif;
+}
+.fd-search-detail {
+  font-size: 13px;
+  color: var(--fd-sub);
+}
+.fd-search-time {
+  flex: none;
+  font: 800 22px Archivo, system-ui, sans-serif;
+  color: var(--fd-green);
+  font-variant-numeric: tabular-nums;
+}
+/* (The actions: the options row's buttons, lit, with no lines between them; Cancel and a red Yes in the danger color.) */
+.fd-modes.fd-search-acts > * {
+  color: var(--fd-text);
+}
+.fd-modes.fd-search-acts button span,
+.fd-search-ask span {
+  color: var(--fd-sub);
+}
+.fd-modes.fd-search-acts button.red,
+.fd-modes.fd-search-acts .fd-search-yes.red {
+  color: var(--fd-danger);
+}
+.fd-modes.fd-search-acts .fd-search-yes.go {
+  color: var(--fd-green);
+}
+.fd-modes.fd-search-acts .fd-search-yes,
+.fd-search-ask {
+  font-weight: 800;
+}
+/* (The question: where the first action was, the same box, not a button.) */
+.fd-search-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-search-ask br {
+  display: none;
+}
+.fd-search-ask span {
+  font-size: 11px;
+  font-weight: 400;
+}
+/*
+ * Narrow rows (a phone under 375 px, a 1280 px computer's 320 px column): a little smaller, and the detail's ending ("in the
+ * lobby") goes, so nothing is cut (measured at 320 px with the widest words: e2e/search-home.spec.ts). The rows are
+ * containers only while searching, so home's own layout is untouched.
+ */
+.fd-searching {
+  container-type: inline-size;
+}
+@container (max-width: 339px) {
+  .fd-modes.fd-search {
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .fd-search-ring {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+  }
+  .fd-search-title {
+    font-size: 15px;
+  }
+  .fd-search-detail {
+    font-size: 12px;
+  }
+  .fd-search-more {
+    display: none;
+  }
+  .fd-search-time {
+    font-size: 19px;
+  }
+  .fd-modes.fd-search-acts button,
+  .fd-search-ask {
+    font-size: 12.5px;
+  }
+}
 
 /* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
 .fd-panel-words.fd-rank-words {
@@ -11810,6 +11951,46 @@ a.fd-row-link {
   font-weight: 800;
 }
 /*
+ * A lobby's way out (Nov 10, Queue.tsx's useQueueExit): "Keep me in the queue" and Exit in Cancel's place and height, so the
+ * chat under it doesn't move.
+ */
+.fd-exit-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 56px;
+}
+.fd-keep {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: var(--fd-panel);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fd-text);
+  cursor: pointer;
+}
+.fd-keep input {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  accent-color: var(--fd-gold);
+}
+.fd-keep span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fd-exit-row .fd-exit {
+  flex: none;
+  min-width: 110px;
+}
+/*
  * A phone's queue fits a common phone (390 x 664, 375 x 667) with the count, the grid and Cancel in view: your seat is
  * one line under the grid (your pawn is the gold-ringed one), and the lobby's chat goes under Cancel, filling the rest
  * of the screen (on a short phone, a scroll away; its header shows). A computer keeps the card (below).
@@ -12518,6 +12699,31 @@ button.fd-seat {
     align-self: stretch;
     min-width: 150px;
     padding: 0 28px;
+  }
+  /* (Keep me in the queue over Exit, in Cancel's cell beside your seat, about Cancel's width, so your seat's card keeps its room.) */
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row {
+    grid-area: cancel;
+    flex-direction: column;
+    gap: 6px;
+    width: 168px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep {
+    flex: none;
+    min-height: 32px;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep input {
+    width: 16px;
+    height: 16px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-cancel {
+    flex: 1;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0;
   }
 }
 @media (min-width: 1024px) {
