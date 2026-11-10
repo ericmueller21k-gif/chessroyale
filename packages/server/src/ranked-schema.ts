@@ -104,7 +104,7 @@ const topPlaces = new Map<number, { place: number; at: number }>();
  * the entries above it, never the table), and kept a minute per ladder in this Worker instance (`TOP_PLACE_MS`), so a
  * busy profile or queue costs one count a minute per ladder. Fair play's engine pool is left out of the count (its ladders above,
  * taken away: the pool's few cases, never a scan of the table): a pooled player never takes an honest player's place, and theirs is
- * counted the same way, so it looks as ever.
+ * counted the same way, so it looks as ever. Test accounts (test-accounts.ts) are left out the same way.
  */
 export async function topPlace(sql: Sql, ladder: number | null | undefined, now = Date.now()): Promise<number | null> {
   if (!mayBeTop(ladder)) return null;
@@ -114,7 +114,8 @@ export async function topPlace(sql: Sql, ladder: number | null | undefined, now 
     (
       await sql.first<{ n: number }>(
         `SELECT (SELECT COUNT(*) FROM ranked_1v1 WHERE ladder > ?1)
-           - (SELECT COUNT(*) FROM fairplay_cases c JOIN ranked_1v1 r ON r.user_id = c.user_id WHERE c.status = 'pool' AND r.ladder > ?1) AS n`,
+           - (SELECT COUNT(*) FROM ranked_1v1 r WHERE r.ladder > ?1 AND (r.user_id IN (SELECT user_id FROM fairplay_cases WHERE status = 'pool')
+                OR r.user_id IN (SELECT id FROM users WHERE test = 1))) AS n`,
         ladder,
       )
     )?.n ?? 0;

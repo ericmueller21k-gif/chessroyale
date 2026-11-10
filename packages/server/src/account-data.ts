@@ -323,9 +323,10 @@ export async function accountDownload(sql: Sql, user: User, now: number, extra: 
  * Deletes an account: every store's statements, then the account and its sessions (signed out on every device), in
  * one batch, so it's all or nothing. What stays and why: this file's header.
  */
-export async function deleteAccount(sql: Sql, user: User, now: number): Promise<{ keptFairPlay: boolean }> {
+export async function deleteAccount(sql: Sql, user: User, now: number, opts: { purgeFairPlay?: boolean } = {}): Promise<{ keptFairPlay: boolean }> {
   const status = (await caseOf(sql, user.id))?.status;
-  const keepFairPlay = status === "banned" || status === "review" || status === "pool";
+  // (`purgeFairPlay`: a test account, deleted by an admin's call (test-accounts.ts): its case was never evidence about a person.)
+  const keepFairPlay = !opts.purgeFairPlay && (status === "banned" || status === "review" || status === "pool");
   const ctx: EraseContext = { now, keepFairPlay, identities: keepFairPlay ? await identityHashes(user) : [] };
   await sql.batch([
     ...ACCOUNT_STORES.flatMap((s) => s.erase(user, ctx)),

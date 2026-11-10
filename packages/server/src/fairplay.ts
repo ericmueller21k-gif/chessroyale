@@ -390,7 +390,10 @@ export async function reportPlayer(sql: Sql, reporter: User, target: unknown, re
   return { ok: true };
 }
 
-/** Puts a player in review when enough different signed-in accounts reported them for cheating this week. */
+/**
+ * Puts a player in review when enough different signed-in accounts reported them for cheating this week. Test accounts
+ * (test-accounts.ts) never count: an admin's script can't put a real player in review (the PR #622 review, finding 2).
+ */
 async function reviewIfReported(sql: Sql, target: string, now: number): Promise<void> {
   const r = FAIRPLAY.reports;
   // (Reports from before a decision on the case, a clearing say, were weighed then.)
@@ -399,7 +402,7 @@ async function reviewIfReported(sql: Sql, target: string, now: number): Promise<
   const reporters = (
     await sql.all<{ email: string | null; google_sub: string | null }>(
       `SELECT DISTINCT u.id, u.email, u.google_sub FROM reports p JOIN users u ON u.id = p.reporter
-       WHERE p.target = ? AND p.reason = 'Cheating' AND p.at > ?`,
+       WHERE p.target = ? AND p.reason = 'Cheating' AND p.at > ? AND u.test IS NOT 1`,
       target,
       since,
     )

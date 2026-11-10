@@ -299,9 +299,14 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   { table: "users", column: "chat_on", type: "INTEGER" },
   // Quests (Nov 10, 2026: one reroll per daily): the day a reroll dealt a quest (quests.ts).
   ...QUESTS_COLUMNS,
+  // Test accounts (Nov 10, 2026; test-accounts.ts): 1 for an account an admin's script made (a dummy email at test.hunchess), left out
+  // of public rankings; NULL for everyone else.
+  { table: "users", column: "test", type: "INTEGER" },
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
+  // (The few test accounts, so 1 v 1's top places leave them out without scanning the table: ranked-schema.ts, topPlace.)
+  `CREATE INDEX IF NOT EXISTS users_test ON users (id) WHERE test = 1`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)
   `CREATE INDEX IF NOT EXISTS fairplay_matches_deep ON fairplay_matches (deep_queued) WHERE deep_queued = 1`,
   // Solo results stopped counting for ranking (Oct 16, 2026: their rating is the browser's word, and the ones from
@@ -1041,8 +1046,8 @@ export function raidStats(rows: ResultRow[]): RaidStats {
  * look has the admin copies they wear (the email is read only for that, never answered).
  */
 export async function publicProfile(sql: Sql, userId: string, now: number, admins: AdminCheck = NO_ADMINS): Promise<PublicProfile | null> {
-  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null }>(
-    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color FROM users WHERE id = ?",
+  const u = await sql.first<{ id: string; name: string; icon: string; email: string | null; created_at: number; last_seen: number | null; rating: number | null; hide_online: number | null; pawn_color: string | null; test: number | null }>(
+    "SELECT id, name, icon, email, created_at, last_seen, rating, hide_online, pawn_color, test FROM users WHERE id = ?",
     userId,
   );
   if (!u) return null;
@@ -1056,11 +1061,12 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
   let top: number | null = null;
   if (rating !== null) {
     // (The engine pool is left out of everyone's "Top N%": a pooled player's own is worked out among the rest and them, so it looks
-    // as ever: fairplay.ts, NOT_POOLED.)
-    const pooled = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "pool" ? 1 : 0;
-    const total = ((await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL AND ${NOT_POOLED("id")}`))?.n ?? 0) + pooled;
+    // as ever: fairplay.ts, NOT_POOLED. Test accounts likewise: test-accounts.ts.)
+    const pooled = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "pool";
+    const self = pooled || u.test === 1 ? 1 : 0;
+    const total = ((await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL AND test IS NOT 1 AND ${NOT_POOLED("id")}`))?.n ?? 0) + self;
     if (total >= FRONT_DOOR.percentileMinPlayers) {
-      const above = (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating > ? AND ${NOT_POOLED("id")}`, rating))?.n ?? 0;
+      const above = (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating > ? AND test IS NOT 1 AND ${NOT_POOLED("id")}`, rating))?.n ?? 0;
       top = topPercent(above + 1, total);
     }
   }

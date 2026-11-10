@@ -124,6 +124,7 @@
     "packages/chess/scripts/**",
     "packages/chess/data/sources/**",
     "packages/chess/src/node.ts",
+    "packages/server/src/test-accounts.ts",
     "packages/app/scripts/**",
     "packages/app/stockfish-source/**",
     "packages/app/public/licenses/**",
