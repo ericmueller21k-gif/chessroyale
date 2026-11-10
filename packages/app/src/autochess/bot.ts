@@ -1,6 +1,7 @@
 import { AUTOCHESS, mulberry32, shuffle, weightedIndex, type AutoChessSettings, type Rng } from "@chessroyale/core";
 import { adjustBlock, adjustMove, adjustTargets, startAdjust, startMove, startStars, starTargets } from "./adjust.ts";
 import { boardCount, buyBlock, buyOffer, emptyArmy, heldBlock, heldStars, holdBlock, holdOffer, placeHeld, priceOf, starUp, starUpTarget, starsAt, type StarTarget } from "./army.ts";
+import { incomeFor } from "./economy.ts";
 import { addXp, buyXp, xpBlock, type Level } from "./level.ts";
 import { newShop, refillSlot, replaceTaken, rerollPrice, rerollShop, type Shop } from "./shop.ts";
 import { type Army, type Color, type Held, type Kind, type Offer, type StarCount } from "./types.ts";
@@ -37,6 +38,42 @@ export function botStarUps(shop: Shop, army: Army, budget: number, cfg: AutoChes
   return ups.sort((a, b) => b.target.becomes - a.target.becomes || priceOf(b.offer.kind, cfg) - priceOf(a.offer.kind, cfg));
 }
 
+/**
+ * What the bot reads of you at a round's start (from round 2; Eric, Nov 10): your gold then, what you banked from the last round (the gold
+ * you carried over), and both sides' HP. Never this round's buys: they're hidden until the reveal.
+ */
+export interface BotRead {
+  /** Your gold at the round's start (the result line's total). */
+  gold: number;
+  /** What you carried over from the last round, unspent. */
+  banked: number;
+  /** Your HP and the bot's, at the round's start. */
+  hp: number;
+  ownHp: number;
+}
+
+/**
+ * The gold the bot banks for interest this round, of its `gold` (whole `interest.per`s, never past the interest's top, always leaving `saveKeep`
+ * to spend), and whether it is saving because you are (`lean`: then it buys only what it needs, no rerolls, XP or holds). With `read` (`bot.follow`):
+ * you saving, it banks to your steps (the tens you kept beyond this round's income), `follow.chance` of the time; you spending down, late in the
+ * match or with either side low, it banks nothing. Without (round 1): the old coin flip, `saveChance`. One draw of `rng`, as before, whenever it
+ * has the gold to bank (so the draws after it stay where they were).
+ */
+export function botBank(gold: number, round: number, rng: Rng, cfg: AutoChessSettings = AUTOCHESS, read?: BotRead): { bank: number; lean: boolean } {
+  const { per } = cfg.interest;
+  const keep = cfg.bot.saveKeep;
+  if (gold < per + keep) return { bank: 0, lean: false };
+  const roll = rng();
+  const room = Math.min(Math.floor((gold - keep) / per), cfg.interest.max / cfg.interest.gold);
+  if (!read) return { bank: roll < cfg.bot.saveChance ? room * per : 0, lean: false };
+  const f = cfg.bot.follow;
+  if (round >= f.lateRound || Math.min(read.hp, read.ownHp) <= f.lowHp) return { bank: 0, lean: false };
+  const saving = read.banked >= f.banked || read.gold >= f.gold;
+  const steps = Math.min(cfg.interest.max / cfg.interest.gold, Math.floor(Math.max(read.banked, read.gold - incomeFor(round, cfg)) / per));
+  const bank = saving && roll < f.chance ? Math.min(room, steps) * per : 0;
+  return { bank, lean: bank > 0 };
+}
+
 /** What the bot does: buys a piece onto its board, holds one on its bench, places a held one (free), rerolls its shop, or buys XP. */
 export type BotAct = "buy" | "hold" | "place" | "reroll" | "xp" | "starup";
 
@@ -56,8 +93,8 @@ export interface BotBuy {
  * buys from its own shop (a piece on a square of its half: it picks among what is on offer by its weights, and a bought slot rolls
  * a new offer), now and then rerolling when it has gold to spare (more often when the shop shows nothing but pawns). It buys XP now
  * and then, when that would give it a level (room for another piece) or it is rich; with its board full (its level's number of pieces)
- * it may hold a good piece on its bench instead (not a pawn). Sometimes it banks gold for interest (whole `interest.per`s, up to the interest's top). `army`: its army
- * when it is done, bench included; `level`: its level and XP after what it bought (`from`: what it had).
+ * it may hold a good piece on its bench instead (not a pawn). It banks gold for interest by `botBank`: from round 2 when you do (`read`), to your
+ * steps, buying only what it needs. `army`: its army when it is done, bench included; `level`: its level and XP after what it bought (`from`: what it had).
  */
 export function botBuys(
   start: Army,
@@ -66,12 +103,10 @@ export function botBuys(
   rng: Rng,
   cfg: AutoChessSettings = AUTOCHESS,
   from: Level = { level: cfg.levels.start, xp: 0 },
+  read?: BotRead,
 ): { buys: BotBuy[]; army: Army; level: Level } {
-  const per = cfg.interest.per;
-  let budget = gold;
-  // (Saving: only when the interest is worth it and a few pieces' worth is left to spend.)
-  const keep = cfg.bot.saveKeep;
-  if (gold >= per + keep && rng() < cfg.bot.saveChance) budget = gold - Math.min(Math.floor((gold - keep) / per), cfg.interest.max / cfg.interest.gold) * per;
+  const { bank, lean } = botBank(gold, round, rng, cfg, read);
+  let budget = gold - bank;
   const t = Math.min(1, (round - 1) / (LATE_ROUND - 1));
   const seed = (rng() * 2 ** 32) >>> 0;
   let army = start;
@@ -81,7 +116,7 @@ export function botBuys(
   /** XP, when it is worth it (it gives a level, or the bot is rich), the bot can pay, and it hasn't bought its share: `chance` of the time. */
   const tryXp = (chance: number) => {
     const worth = addXp(level, cfg.levels.buyXp, cfg).level > level.level || budget >= cfg.bot.xpRichGold;
-    if (xpBuys >= cfg.bot.maxXpBuys || xpBlock(level, budget, cfg) || !worth || rng() >= chance) return false;
+    if (lean || xpBuys >= cfg.bot.maxXpBuys || xpBlock(level, budget, cfg) || !worth || rng() >= chance) return false;
     const next = buyXp(level, budget, cfg);
     level = { level: next.level, xp: next.xp };
     budget = next.gold;
@@ -119,7 +154,7 @@ export function botBuys(
     const holding = !boardRoom;
     // A full board: a level makes room, when it comes to that; else a good piece goes to the bench.
     if (holding && tryXp(cfg.bot.xpChanceFull)) continue;
-    if (holding && (army.bench.length >= cfg.benchSlots || holds >= cfg.bot.maxHolds)) break;
+    if (holding && (lean || army.bench.length >= cfg.benchSlots || holds >= cfg.bot.maxHolds)) break;
     const options = shop.slots
       .map((offer, slot) => ({ offer, slot }))
       .filter(({ offer }) => {
@@ -131,7 +166,7 @@ export function botBuys(
     const bare = options.every((o) => o.offer.kind === "p");
     // Gold to spare: a reroll (at the same climbing price as yours, `rerollPrice`) leaves enough for a knight and the bot has the gold it likes to keep.
     const price = rerollPrice(rerolls, cfg);
-    const spare = rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - price >= priceOf("n", cfg);
+    const spare = !lean && rerolls < cfg.bot.maxRerolls && budget >= cfg.bot.rerollGold && budget - price >= priceOf("n", cfg);
     if (spare && rng() < (bare && boardRoom ? cfg.bot.rerollChanceBare : cfg.bot.rerollChance)) {
       shop = rerollShop(shop, seed, army, cfg, level.level);
       rerolls++;
@@ -176,7 +211,7 @@ export interface BotEvent {
  * The bot's whole buy-and-place step: what it does (and when: seconds into the step, spread over the part of it that isn't
  * locked, in the order it did them), and when it locks in (`lockAt`, seconds into the step; null: never). Its army when it is
  * done is `army`, the bench it carries into the next round included, and its level and XP after what it bought is `level`.
- * `bench`: what it held coming in; `from`: its level and XP coming in.
+ * `bench`: what it held coming in; `from`: its level and XP coming in; `read`: what it reads of you (from round 2), for its saving.
  */
 export function botPlan(
   color: Color,
@@ -187,10 +222,11 @@ export function botPlan(
   cfg: AutoChessSettings = AUTOCHESS,
   bench: Held[] = [],
   from: Level = { level: cfg.levels.start, xp: 0 },
+  read?: BotRead,
 ): { events: BotEvent[]; army: Army; level: Level; spent: number; lockAt: number | null } {
   // (Its lock-in time comes from a draw of its own, so changing how it buys never moves it: the e2e tests pick seeds by it.)
   const lockRng = mulberry32((rng() * 2 ** 32) >>> 0);
-  const { buys, army, level } = botBuys(emptyArmy(color, king, bench), gold, round, rng, cfg, from);
+  const { buys, army, level } = botBuys(emptyArmy(color, king, bench), gold, round, rng, cfg, from, read);
   const open = cfg.buySeconds - cfg.lockSeconds - 1;
   // It locks in (its board freezes) at a seeded time in the open part of the step, or now and then never; its last piece goes down a moment before.
   const never = lockRng() < cfg.bot.neverLockChance;
