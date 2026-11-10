@@ -132,6 +132,7 @@
     "**/*.md",
     "docs/**",
     ".claude/**",
+    ".github/workflows/branch-cleanup.yml",
     "reports/**",
     "scripts/**",
     "engine/**",

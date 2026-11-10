@@ -1,0 +1,49 @@
+# Deletes branches that are already merged (Eric, Nov 10: "you have permission to bulk delete the branches that are already
+# merged"). Run by hand from the Actions tab or the API; a dry run (the default) only lists them. Merged means: the branch's
+# tip is in main's history, or is exactly the head a merged pull request merged. Never touched: main, claude/director-notes,
+# stills/*, any branch with an open pull request, and any branch whose tip is under 2 days old (a helper's fresh branch).
+name: branch-cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only list what would be deleted"
+        type: boolean
+        default: true
+permissions:
+  contents: write
+  pull-requests: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git fetch -q origin '+refs/heads/*:refs/remotes/origin/*'
+          gh api --paginate "repos/$REPO/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at) | "\(.head.ref) \(.head.sha)"' > merged-heads.txt
+          gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].head.ref' > open-heads.txt
+          cutoff=$(( $(date +%s) - 2*24*3600 ))
+          : > delete.txt
+          for ref in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | sed 's#^origin/##'); do
+            case "$ref" in HEAD|origin|main|claude/director-notes|stills/*) continue;; esac
+            grep -qxF "$ref" open-heads.txt && continue
+            tip=$(git rev-parse "origin/$ref")
+            [ "$(git log -1 --format=%ct "$tip")" -gt "$cutoff" ] && continue
+            if git merge-base --is-ancestor "$tip" origin/main || grep -qxF "$ref $tip" merged-heads.txt; then
+              echo "$tip $ref" >> delete.txt
+            fi
+          done
+          echo "Merged branches: $(wc -l < delete.txt) of $(git for-each-ref refs/remotes/origin | wc -l)"
+          cat delete.txt
+          { echo "### Merged branches ($([ "$DRY_RUN" = true ] && echo 'dry run' || echo deleted)): $(wc -l < delete.txt)"; echo '```'; cat delete.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [ "$DRY_RUN" = true ] && exit 0
+          awk '{print ":refs/heads/" $2}' delete.txt | xargs -r -n 50 git push -q origin
