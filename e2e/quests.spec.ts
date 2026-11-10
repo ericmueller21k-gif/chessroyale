@@ -5,7 +5,8 @@ import { asSignedIn, bossAloneFromHome, pickMode, leaveQueue, submitMove, test }
  * Quests (XP phase 3, Nov 9; docs/decisions/2026-11-09-quests-*.md), phone and computer: the overlay with the server's quests from the
  * Quests button and the reroll (once a day per daily, kept by the server); the overlay by itself on a signed-in account's first home visit of
  * the day, once; the entry greyed for a guest where sign-in is set up; a quest finished by a game: its line in the result's toast, its
- * XP in the box ("Quests +1,800") and "Done!" in the overlay after. The test switch ?quests=<kind>[:<progress>],… sets your quests.
+ * XP in the box ("Quests +1,800") and "Done!" in the overlay after; back on home after a game that moved quests, the overlay by itself,
+ * sliding them (and not after one that moved none). The test switch ?quests=<kind>[:<progress>],… sets your quests.
  * QUESTS_SHOTS=<dir> saves the stills (the overlay light and dark, a finished quest, the result's toast, a 320 px top bar).
  */
 const SHOTS = process.env.QUESTS_SHOTS;
@@ -164,6 +165,71 @@ test("a game that finishes quests: \"Quests +1,800\" in its XP box, \"Quest done
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/quests-done-${testInfo.project.name}.png` });
   // (Paid once: a reload of the result changes nothing; the server has both done.)
   expect((await answer(page)).quests.map((q) => `${q.progress}/${q.target}`)).toEqual(["3/3", "0/2", "10/10"]);
+});
+
+test.describe("quest progress back on home (Nov 10)", () => {
+  test.use({ questsSeen: false });
+
+  test("a game that moves quests: the overlay opens by itself and slides them one after another; a game that moves none: it doesn't open", async ({ page }) => {
+    test.setTimeout(5 * 60_000);
+    // Warm Up at 1 of 3 and the weekly at 5 of 10: a counted Boss alone game (?xpgame=12) moves both; Squad Up stays at 0.
+    await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xpgame=12&quests=warm-up:1,squad-up,regular:5");
+    await expect.poll(async () => (await page.context().cookies()).some((c) => c.name === "hc_session"), { timeout: 20_000 }).toBe(true);
+    // (Home has seen these counts: what the next home visit compares with.)
+    const remembered = () => page.evaluate(() => Object.values(JSON.parse(localStorage.getItem("hunchess.quests.shown") ?? "{}").at ?? {}));
+    await expect.poll(remembered, { timeout: 20_000 }).toEqual([1, 0, 5]);
+    await expect(dialog(page)).toHaveCount(0);
+    await bossAloneFromHome(page);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    await submitMove(page, "h5f7");
+    await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
+    await expect(page.getByTestId("xp-box")).toHaveClass(/xp-done/, { timeout: 20_000 });
+    // (Every count each row shows, the first time it shows it, watched from before home: the slide is about a second a row.)
+    await page.evaluate(() => {
+      const seen: { name: string; count: string; at: number }[] = [];
+      (window as any).__questCounts = seen;
+      (window as any).__soundLog = [];
+      const look = () => {
+        for (const row of document.querySelectorAll(".qo-row")) {
+          const name = row.querySelector(".qo-name")?.textContent ?? "";
+          const count = row.querySelector(".qo-count")?.textContent ?? "";
+          if (!seen.some((s) => s.name === name && s.count === count)) seen.push({ name, count, at: performance.now() });
+        }
+        requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    const d = dialog(page);
+    await expect(d).toBeVisible({ timeout: 20_000 });
+    await expect(d.locator(".qo-count")).toHaveText(["2/3", "0/2", "6/10"], { timeout: 10_000 });
+    const seen = (await page.evaluate(() => (window as any).__questCounts)) as { name: string; count: string; at: number }[];
+    const at = (name: string, count: string) => seen.find((s) => s.name === name && s.count === count)?.at ?? NaN;
+    // Each moved row starts at its old count and reaches its new one; Warm Up's turn before the weekly's; Squad Up never moves.
+    expect(seen.filter((s) => s.name === "Warm Up").map((s) => s.count)).toEqual(["1/3", "2/3"]);
+    expect(seen.filter((s) => s.name === "Regular").map((s) => s.count)).toEqual(["5/10", "6/10"]);
+    expect(seen.filter((s) => s.name === "Squad Up").map((s) => s.count)).toEqual(["0/2"]);
+    expect(at("Warm Up", "2/3")).toBeLessThan(at("Regular", "6/10"));
+    expect(at("Regular", "6/10") - at("Warm Up", "2/3")).toBeGreaterThan(400);
+    // (Its sounds, by name: a tick per count.)
+    expect(((await page.evaluate(() => (window as any).__soundLog)) as string[]).filter((s) => s.startsWith("questTick")).length).toBe(2);
+    await d.getByRole("button", { name: "Got it" }).click();
+    await expect(d).toHaveCount(0);
+    // A game that moves nothing (a solo game without ?xpgame: under the solo minutes, not counted): home again, no overlay.
+    await page.goto("/?debug&pace=quick&win=1&boss=gingerbread");
+    await expect.poll(remembered, { timeout: 20_000 }).toEqual([2, 0, 6]);
+    await bossAloneFromHome(page);
+    await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
+    await submitMove(page, "h5f7");
+    await expect(page.locator(".results h1")).toHaveText("Victory!", { timeout: 120_000 });
+    await expect(page.getByTestId("xp-box")).toHaveClass(/xp-done/, { timeout: 20_000 });
+    const came = page.waitForResponse((r) => r.url().endsWith("/api/quests"));
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await came;
+    await page.waitForTimeout(1_000);
+    await expect(dialog(page)).toHaveCount(0);
+    expect((await answer(page)).quests.map((q) => q.progress)).toEqual([2, 0, 6]);
+  });
 });
 
 test("a 320 px phone's top bar: the logo, your pawn, Quests, the shop, Friends and the gear in one row, every button 40 px", { tag: "@phone-only" }, async ({ page }, testInfo) => {
