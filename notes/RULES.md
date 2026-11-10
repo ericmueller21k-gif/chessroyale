@@ -22,12 +22,14 @@ notes to a private place or strip them). Never put a secret value here or anywhe
   - Cloud helpers tend to end their turn right after a push, even when told to wait (#551 pilot, 3 times). The director runs
     `wait-ci.sh` itself (a background script, no tokens) and sends the `ci-fail.sh` output back, or fixes a one-liner itself.
   - Watch children through PR events and `list_events` (kinds `result`); they can't message back.
-  - Stills come on `stills/<PR#>` orphan branches. Deleting a remote branch is blocked by the permission classifier (Nov 8):
-    leave them, and list them for Eric to delete in GitHub (or to allow it).
-- **One Opus helper at a time.** Never more. A Haiku helper beside it only for a small UI/docs job Eric OK'd. CI and
-  deploy watchers (scripts) don't count. (October, after ~10 at once used ~30% of a week; lost after the Nov 1 restart.)
-- Models: Haiku for UI, docs and simple jobs; never Sonnet. Opus high for rules, engine, bosses, sims, reviews, art,
-  risky wiring. Opus xhigh only for money, sign-in, stored data, fair play. Never max.
+  - Stills come on `stills/<PR#>` orphan branches. Deleting a remote branch is blocked from the session (Nov 8, again Nov 10: proxy 403).
+    Eric OK'd deleting merged branches (Nov 10): run `.github/workflows/branch-cleanup.yml` by hand (dry run first).
+- **Opus helpers at once (Eric, Nov 9):** one at `xhigh`, up to two at `medium`/`high`; Haiku helpers for simple jobs
+  may run beside. CI and deploy watchers (scripts) don't count. (October, after ~10 at once used ~30% of a week.)
+- **Models by complexity, not length (Eric, Nov 10; CLAUDE.md updated):** Opus for logic, code, the engine, rules, server,
+  stored data, and ALL drawings/rendering/animation (Haiku did badly at those). Haiku for UI/copy/docs jobs I can hand
+  plain step-by-step directions, however long. Never Sonnet. Opus xhigh for money, sign-in, stored data, fair play,
+  engine/judge; never max.
 - Working lean (CLAUDE.md): a fresh helper per round with a one-page handoff; helpers wait in one foreground Bash call
   (`timeout 590 bash -c 'until <done>; do sleep 30; done'`), never Monitor, never poll faster than 30 s; run only the
   tests being changed; about 10 images a job; `flock /tmp/claude-0/e2e.lock` for local e2e; stop servers with
