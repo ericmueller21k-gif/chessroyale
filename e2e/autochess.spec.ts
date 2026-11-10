@@ -119,16 +119,16 @@ test("the shop: four offers, each a piece and a square of your own, on a square 
   expect(errors).toEqual([]);
 });
 
-test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four offers (the same for the same seed), and is refused without the gold", { tag: "@phone-only" }, async ({ page }) => {
+test("the shop: a reroll is free first (then 1, then 2, capped at 2) and rolls all four offers (the same for the same seed), and is refused without the gold", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const first = await offers(page);
   expect(await goldOf(page)).toBe(10);
   await expect(reroll(page)).toContainText("Reroll");
-  await expect(reroll(page)).toContainText("2");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("0");
   await tap(page, reroll(page));
-  expect(await goldOf(page)).toBe(8);
+  expect(await goldOf(page)).toBe(10);
   // (A shuffle and a coin's clink.)
   expect(await soundCount(page, "acReroll")).toBe(1);
   const rolled = await offers(page);
@@ -142,18 +142,18 @@ test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four 
   expect(await offers(page)).toEqual(first);
   await tap(page, reroll(page));
   expect(await offers(page)).toEqual(rolled);
-  // Without the gold it is refused, with the reason (the other rerolls in one go: the same button, the same code). From 8 gold: 3, then 4, and 1 is
-  // left, which is under the next price (5).
+  // Without the gold it is refused, with the reason (the other rerolls in one go: the same button, the same code). From 10 gold: 1, then 2 a time, and
+  // 1 is left, which is under the next price (2).
   await page.evaluate(() => {
     const b = document.querySelector<HTMLButtonElement>(".ac-reroll")!;
     for (let i = 0; i < 49; i++) b.click();
   });
   expect(await goldOf(page)).toBe(1);
   await expect(reroll(page)).toHaveAttribute("aria-disabled", "true");
-  await expect(reroll(page)).toContainText("5");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("2");
   const before = await offers(page);
   await reroll(page).click({ force: true });
-  await expect(say(page)).toHaveText("Need 4 more");
+  await expect(say(page)).toHaveText("Need 1 more");
   expect(await goldOf(page)).toBe(1);
   expect(await offers(page)).toEqual(before);
   // Buy XP says so too (4 XP cost 4).
@@ -164,17 +164,17 @@ test("the shop: a reroll costs 2 (1 more each time, up to 5) and rolls all four 
   expect(errors).toEqual([]);
 });
 
-test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button shows it, each one charged at that price, and is back to 2 in the next round", { tag: "@phone-only" }, async ({ page }) => {
+test("the reroll's price climbs 0, 1, 2 and stays at 2 as the Reroll button shows it, each one charged at that price, and is free again in the next round", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(4 * 60_000);
   const errors = watchErrors(page);
-  // (Gold enough for the whole climb: 2 + 3 + 4 + 5 + 5 + 5 + 5 = 29.)
+  // (Gold enough for the whole climb: 0 + 1 + 2 + 2 + 2 + 2 + 2 = 11.)
   await page.goto("/autochess?quick=1&seed=9&adjust=0&gold=30&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   const price = async () => Number(await reroll(page).locator(".ac-cost b").innerText());
   let gold = await goldOf(page);
-  // (The start gold of 30, its interest (3) and the round's income (10): the whole climb, 29, is there.)
+  // (The start gold of 30, its interest (3) and the round's income (10): the whole climb, 11, is there.)
   expect(gold).toBe(43);
-  const climb = [2, 3, 4, 5, 5, 5, 5];
+  const climb = [0, 1, 2, 2, 2, 2, 2];
   for (const [i, expected] of climb.entries()) {
     expect(await price(), `the button shows the price of reroll ${i + 1}`).toBe(expected);
     await expect(reroll(page)).toHaveAttribute("aria-label", `Reroll the shop, ${expected} gold`);
@@ -182,15 +182,15 @@ test("the reroll's price climbs 2, 3, 4, 5 and stays at 5 as the Reroll button s
     gold -= expected;
     expect(await goldOf(page), `reroll ${i + 1} cost ${expected}`).toBe(gold);
   }
-  expect(await price(), "it stays at 5").toBe(5);
-  // The next round's shop starts at 5 again (play the round out; the fight has no move step here).
+  expect(await price(), "it stays at 2").toBe(2);
+  // The next round's shop starts free again (play the round out; the fight has no move step here).
   await expect(root(page)).toHaveAttribute("data-phase", /^(result|over)$/, { timeout: 200_000 });
   await page.getByRole("button", { name: "Next round" }).click();
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
   await expect(root(page)).toHaveAttribute("data-round", "2");
-  expect(await price(), "back to 2 at the next round's start").toBe(2);
+  expect(await price(), "free again at the next round's start").toBe(0);
   await tap(page, reroll(page));
-  await expect(reroll(page).locator(".ac-cost b")).toHaveText("3");
+  await expect(reroll(page).locator(".ac-cost b")).toHaveText("1");
   expect(errors).toEqual([]);
 });
 

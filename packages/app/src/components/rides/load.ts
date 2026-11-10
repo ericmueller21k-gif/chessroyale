@@ -32,6 +32,8 @@ const DRAWINGS: Readonly<Record<string, () => Promise<RiderDraft>>> = {
   "cheetah-shoes": () => import("./cheetah-shoes.tsx").then((m) => m.cheetahShoes),
   "log-roller": () => import("./log-roller.tsx").then((m) => m.logRoller),
   "pen-pony": () => import("./pen-pony.tsx").then((m) => m.penPony),
+  // (An outfit, Nov 10: drawn with the rides' kit, the pawn's head in its face hole.)
+  "banana-suit": () => import("./banana-suit.tsx").then((m) => m.bananaSuit),
 };
 
 /** Every ride's item id. */

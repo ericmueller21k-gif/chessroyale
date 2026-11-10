@@ -1336,3 +1336,11 @@ test("the action box is one panel (Nov 8, was v9's): the band, Buy XP, Reroll an
   expect(look.bg).not.toBe("rgba(0, 0, 0, 0)");
   expect(errors).toEqual([]);
 });
+
+test("the board's squares part (Eric, Nov 10: \"the colors fuse\"): Classic's dark square is a touch darker here (#b39c7c), only on this board", async ({ page }) => {
+  await page.goto(PLAIN);
+  await expect(root(page)).toHaveAttribute("data-phase", "buy");
+  expect(await page.locator(".ac-board .hb-board").evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(179, 156, 124)");
+  await page.goto("/");
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--sq-dark").trim())).toBe("#c0ad90");
+});

@@ -519,6 +519,8 @@ export const TOWN_FEEL = {
     "cheetah-shoes": { foot: 95, shadow: 0.9 },
     "log-roller": { foot: 96, shadow: 0 },
     "pen-pony": { foot: 98.5, shadow: 1.3 },
+    // (An outfit, Nov 10: drawn with the rides' kit; its shoes' soles.)
+    "banana-suit": { foot: 98, shadow: 1.1 },
   } as Readonly<Record<string, { foot: number; shadow: number }>>,
   /**
    * The shadows under a pawn (and a boss): the soft one this strong (as before), and a contact shadow right under the

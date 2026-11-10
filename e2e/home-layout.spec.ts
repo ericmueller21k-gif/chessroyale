@@ -464,6 +464,9 @@ test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits fro
     const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
     const profile = await bar.getByRole("button", { name: "Your profile", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, ring: getComputedStyle(el).borderTopWidth, animations: el.getAnimations({ subtree: true }).length }));
     expect(profile, `profile at ${width}`).toEqual({ ...shop, ring: "0px", animations: 0 });
+    // Quests, the shop and Friends are outlines like the gear (Eric, Nov 10: "just black and empty on the inside"): no fill, the gear's color.
+    const looks = await bar.locator(".fd-top-quests svg, .fd-top-shop svg, .fd-top-friends svg, .fd-top-gear svg").evaluateAll((els) => els.map((el) => ({ fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke })));
+    expect(looks, `icons at ${width}`).toEqual(Array(4).fill({ fill: "none", stroke: looks[3]!.stroke }));
     expect(await sideways(page), `${width} px`).toBe(0);
   }
 });

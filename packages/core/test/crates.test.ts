@@ -24,7 +24,15 @@ import {
   secondColor,
   rollCrate,
   stackItems,
+  shownLook,
+  mountOf,
+  hiddenByOutfit,
+  ownsOutfit,
+  BOSS_CRATES,
+  MYTHIC_CRATE_ITEMS,
+  OUTFIT,
   type CrateDef,
+  type ItemLook,
 } from "../src/index.ts";
 
 /** Items in no crate yet (Oct 31: the rides; admins have them, and their crate comes later). One by one, never a whole slot. */
@@ -45,7 +53,7 @@ describe("crates", () => {
       expect(new Set(c.items).size).toBe(c.items.length);
     }
     // (A HunChess colorway, Nov 6: in none of these, only the Welcome Crate: welcome.test.ts.)
-    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess ? 0 : 1);
+    for (const d of ITEM_DEFS) expect(CRATES.filter((c) => c.items.includes(d.id)).map((c) => c.id), d.id).toHaveLength(NO_CRATE_YET.includes(d.id) || d.hunchess || d.slot === "outfit" ? 0 : 1);
     expect(CRATES.map((c) => c.id)).toEqual(["beta-001", "winter-1"]);
   });
 
@@ -363,7 +371,7 @@ describe("face items over or under a hat", () => {
 
 describe("rides (Oct 31)", () => {
   it("a slot of their own, one ride at a time, Mythic, in no crate yet (admins only until its crate comes)", () => {
-    expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride"]);
+    expect(ITEM_SLOTS).toEqual(["head", "face", "skin", "weapon", "ride", "outfit"]);
     expect(SLOT_NAMES.ride).toBe("Ride");
     // (Nov 6: each ride's HunChess colorway is a ride too, made from it: welcome.test.ts. These are the rides themselves.)
     const rides = ITEM_DEFS.filter((d) => d.slot === "ride" && !d.hunchess);
@@ -402,5 +410,39 @@ describe("rides (Oct 31)", () => {
     expect(cleanLook({ ride: { def: "beanie", color: "red", blemish: 1, seed: 2 } })).toEqual({});
     expect(cleanLook({ head: ride })).toEqual({});
     expect(cleanLook({ ride: { def: "riding-chirp", color: "nope", blemish: 500, seed: -3 } }).ride).toEqual({ def: "riding-chirp", color: "red", blemish: 100, seed: 3 });
+  });
+});
+
+describe("outfits (Eric, Nov 10)", () => {
+  const it_ = (def: string) => ({ def, color: "red", blemish: 10, seed: 3 });
+  const look: ItemLook = { head: it_("top-hat"), face: it_("ski-goggles"), skin: it_("snowman"), weapon: it_("katana"), ride: it_("moon-ride"), outfit: it_("banana-suit") };
+
+  it("a secret slot of its own; the Banana Suit is Mythic, the Mythic Crate's secret item, in no crate that rolls yet", () => {
+    expect(SLOT_NAMES.outfit).toBe("Outfit");
+    expect(ITEM_DEFS.filter((d) => d.slot === "outfit").map((d) => [d.id, d.name, d.tier])).toEqual([["banana-suit", "Banana Suit", "mythic"]]);
+    expect(MYTHIC_CRATE_ITEMS).toEqual(["banana-suit"]);
+    for (const c of [...CRATES, ...BOSS_CRATES]) expect(c.items, c.id).not.toContain("banana-suit");
+    expect(ownsOutfit([{ def: "top-hat" }])).toBe(false);
+    expect(ownsOutfit([{ def: "top-hat" }, { def: "banana-suit" }])).toBe(true);
+    expect(cleanLook({ outfit: it_("banana-suit") }).outfit?.def).toBe("banana-suit");
+    expect(cleanLook({ outfit: it_("top-hat") }).outfit).toBeUndefined();
+  });
+
+  it("an outfit hides every other worn item but eyewear (goggles, shades), which still shows", () => {
+    expect(OUTFIT.eyewear).toBe(true);
+    expect(ITEM_DEFS.filter((d) => d.eyewear).map((d) => d.id).sort()).toEqual(["dark-shades", "ski-goggles"]);
+    expect(shownLook(look)).toEqual({ outfit: look.outfit, face: look.face });
+    expect(shownLook({ ...look, face: it_("santa-beard") })).toEqual({ outfit: look.outfit });
+    expect(mountOf(shownLook(look))?.def).toBe("banana-suit");
+    for (const d of ["top-hat", "snowman", "katana", "moon-ride", "santa-beard"]) expect(hiddenByOutfit(look, d), d).toBe(true);
+    for (const d of ["ski-goggles", "dark-shades", "banana-suit"]) expect(hiddenByOutfit(look, d), d).toBe(false);
+  });
+
+  it("taking it off brings everything back: nothing else is unequipped (the look keeps every slot)", () => {
+    const { outfit: _, ...rest } = look;
+    expect(shownLook(rest)).toBe(rest);
+    expect(mountOf(rest)?.def).toBe("moon-ride");
+    expect(hiddenByOutfit(rest, "top-hat")).toBe(false);
+    expect(shownLook(undefined)).toBeUndefined();
   });
 });

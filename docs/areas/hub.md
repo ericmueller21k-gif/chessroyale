@@ -181,7 +181,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   - A screen that replaces home (a phone's queue, the Boss raid screen, home again) starts at its top. A match's Home
     and a closed lobby's note land on home itself; Cancel in a raid's queue goes back to the Boss raid screen (the full one).
   - **Phone:** a top bar (the logo, your pawn (your profile), the shop, **Friends** (with a count
-    of requests and invites), then a gear that opens Settings in one tap (Nov 9: the icons a size bigger and in colour (gold shop and Quests, blue Friends); the profile is the shop's square showing only your pawn's face, still: [decision](../decisions/2026-11-09-topbar-color.md)); a computer's are its side menu's, so none is
+    of requests and invites), then a gear that opens Settings in one tap (Nov 9: the icons a size bigger; Nov 10: Quests, the shop, Friends and the gear plain outlines in the text color, no fill, [decision](../decisions/2026-11-10-quick-fixes.md); the profile is the shop's square showing only your pawn's face, still: [decision](../decisions/2026-11-09-topbar-color.md)); a computer's are its side menu's, so none is
     there; [docs/decisions/2026-10-17-phone-settings-gear.md](../decisions/2026-10-17-phone-settings-gear.md),
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)), then one column: your card, the RANKED row, its panel, the line
     above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side, at the bottom. Your pawn's card takes the room
