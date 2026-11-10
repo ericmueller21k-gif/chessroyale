@@ -699,3 +699,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   keep 50v50 at launch, add a "beta / quiet hours: expect more bots" notice (todo, small, hub lane); Access on /admin: go.
   TEST_SWITCHES checked by me: off in production (/api/auth/config has no testSwitches). Starting phone-load-2 helper beside
   lazy-art (both high: Eric's 2-at-once rule). Batches 1-5 (xhigh) after.
+
+- Nov 10 05:05 UTC (Nov 9 11:05 pm Central): #598 lazy boss art OPEN (home load at 4x phone 5.2 s → 0.5 s; town ready ~half; 1,902 characters hash-identical). Helper archived. CI watching. phone-load-2 helper (session_01JuCWRrQyK8J5CUCpZ6RQDL) told to merge main after #598 and keep home's prewarm. Known tooling bug: `npm run frames:boss` stuck on main (welcome tour overlay takes the first tap). perf.spec :43/:133 DOM counts fail locally on main too.
