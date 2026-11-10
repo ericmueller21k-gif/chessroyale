@@ -1,24 +1,19 @@
-# Search while you browse: one banner for every queue (Eric, Nov 10)
+# Search while you browse: home's own mode rows become the search (Eric, Nov 10)
 
-Eric (paraphrased, his words in quotes): tap a mode and you go into its lobby or search; you can go back and keep searching. While
-searching, a banner at the top says what you're searching for and for how long, with a cancel. "It should be like a solid banner,
-nothing see-through behind it. It should overlap on the profile a little bit. It should overlap completely where it shows like how
-many players are online ... not blocking the icons at the top because you can still click on those." While queued, "gray out the
-ability to tap on any other modes on the main page ... you can go to your shop, you can go to your inventory, but you can't tap on
-other game modes". Tapping one (e.g. Chess Town) opens "a pop-up ... you are currently in queue. Would you like to cancel your
-queue?" In a lobby (50 v 50, Squads): an exit "but stay in the queue", e.g. a checkbox "Keep me in the queue" next to Exit. "We
-just want every container to have the same pattern and theme as the rest, so nothing looks out of place."
+Eric (his words in quotes): tap a mode and you go into its lobby or search; you can go back and keep searching. His design
+(replacing an earlier floating-banner mockup): "Take the exact container that the 50v50, the 1v1, the squads is in, and that
+becomes a replacement. The exact container now will contain the information ... that would be lit up, but everything else below it
+would be gray ... the ranked [label] becomes grayed out as well. But then everything above that, like our profile container and
+the settings and stuff, that all stays lit." The second row (Solo queue / Party / Bots) becomes the actions: "start with bots ...
+for any mode ... we can also put the cancel down there ... three different spots ... separate buttons, but there's not like lines
+between them ... if you were to hit cancel though, it would like ask if you're sure ... if you hit bots, it would be like, cancel
+your player search and play with bot, yes, no." In a lobby (50 v 50, Squads): an exit "but stay in the queue", e.g. a checkbox
+"Keep me in the queue". "We just want every container to have the same pattern and theme as the rest, so nothing looks out of place."
 
 **The mockup is the spec.** On claude/director-notes:
-- the stills `notes/assets/search-banner-phone.png`, `search-banner-desktop.png` and `search-popup-phone.png`;
-- their code, `notes/assets/search-banner-mock.spec.ts`;
-- Eric's own screenshot of the area, `notes/assets/eric-banner-area-nov10.jpg`.
-
-What the mockup shows:
-- **The card:** a solid `--fd-panel` card with a 2 px `--fd-line` border and an 18 px radius.
-- **Its contents:** a green spinning ring; "<Mode> · <m:ss>" with the time in green; "Searching · <queue type>" under it; a Cancel button.
-- **Phone:** over the online-count row, its bottom 22 px over the profile card's top, with the top icons clear.
-- **Computer:** across the top of the two middle columns.
+- the stills `notes/assets/search-rows-phone.png`, `search-rows-desktop.png` and `search-rows-bots-phone.png`;
+- their code, `notes/assets/search-rows-mock.spec.ts`;
+- the pop-up's look, `notes/assets/search-popup-phone.png` (from the earlier mockup).
 
 ## Build
 1. **One app-wide "search" state** for every queue:
@@ -27,34 +22,38 @@ What the mockup shows:
    - Squads' queue and lobby (solo queue and party).
 
    Generalize the 1 v 1 one; don't build a second. The connection that holds your place lives with the app, not the screen.
-2. **The banner** replaces today's slim `dq-` bar.
-   - On home: as the mockup shows, as an overlay.
-   - On other screens (shop, locker, profile, friends, settings): the same card at the top, under the screen's header, never covering a header button.
-   - Nothing shifts (Eric's rule). Off home, pick a place that doesn't move the page, and say how.
-3. **While searching:**
-   - PLAY, the mode buttons, Chess Town, Boss Battle, Auto chess and any other "play" entry are greyed in place, not hidden.
-   - Tapping one opens the pop-up from the mockup: "You're in a queue", with "Keep searching" and "Cancel search" (red).
-   - Shop, locker, profile, friends, quests and settings work normally.
-4. **In a lobby:** an "Exit" with a checkbox "Keep me in the queue", checked by default and remembered.
-   - Checked: you go home and the banner shows.
+2. **Home while searching:**
+   - The modes row (50 v 50 · 1 v 1 · Squads) keeps its exact container and size and shows the search instead:
+     - a green spinning ring;
+     - "Searching · <mode>";
+     - the queue type and the lobby's count ("Solo queue · 37 of 100 in the lobby");
+     - the time searched (m:ss) in green on the right.
+   - The second row keeps its exact container and shows three actions, with no lines between them, as home's rows are:
+     - **Start with bots** ("play now"): a confirm, "Play with bots?", "This stops your player search and starts a <mode> with bots now." / Keep searching / Play with bots.
+     - **Lobby** ("see who's in"): back to the lobby or search screen.
+     - **Cancel** ("stop searching", in red): a confirm, "Stop searching?" / Keep searching / Stop searching.
+   - **Greyed in place** (not hidden, not tappable): the RANKED label, the hint line, PLAY, Chess Town, Other modes, Boss Battle and Auto chess.
+   - **Lit:** the top bar and the profile card.
+   - Nothing moves or resizes (Eric's rule).
+3. **Other screens** (shop, locker, profile, friends, settings): today's slim 1 v 1 search bar stays, extended to every queue (the director's call; Eric may revisit).
+4. **In a lobby:** "Exit" with a checkbox "Keep me in the queue", checked by default and remembered.
+   - Checked: you go home and see the search rows.
    - Unchecked: you leave the queue, as today.
-   - When the match is found while you browse: the existing found alert (sound and buzz), and you're taken in, as 1 v 1 does today.
-5. Tapping the banner (not Cancel) takes you back to the lobby or search screen.
-6. **An optional second action on the banner** (Eric, Nov 10): a queue can add one more button beside Cancel. The first user is
-   auto chess against people (its own job, next): "Play vs bot" starts a bot match at once and leaves the queue. Build the banner
-   with that slot (one prop: a label and what it does). No queue uses it yet, but a test shows it renders and fits on a 320 px phone.
+   - A match found while you browse: the existing found alert (sound and buzz), and you're taken in, as 1 v 1 does today.
+5. **The action row's three slots are data** (a label, a line and what it does), so a mode can change one later. That's for auto chess's own landing page and search, a later job: "Play vs bot" there.
 
 **Lane:** targeted, but this touches online sync and the lobbies' seats and connections, so effort xhigh.
 
 **Tests:**
-- e2e for each queue: going home while searching, the banner and its timer, a greyed mode's pop-up, Cancel, Keep searching, and a match found while away.
+- e2e for each queue: home while searching (both rows, the timer, what's greyed), Start with bots' confirm, Lobby, Cancel's confirm, and a match found while away.
 - The lobbies' "Keep me in the queue".
-- The 1 v 1 tests updated for the new banner; list each changed check.
+- The 1 v 1 tests updated; list each changed check.
+- Any home guard test in docs/rules/eric.md touched: say which and why.
 
-**Docs:** decision note `docs/decisions/2026-11-10-search-banner.md` (≤ 120 words), and the `docs/areas` pages for hub, matchmaking, ranked, squads and crowd.
+**Docs:** decision note `docs/decisions/2026-11-10-search-on-home.md` (≤ 120 words), and the `docs/areas` pages for hub, matchmaking, ranked, squads and crowd.
 
-**Stills** (on stills/search-banner): home on a phone and a computer while searching, the pop-up, and a lobby's Exit.
+**Stills** (on stills/search-home): home on a phone and a computer while searching, both confirms, and a lobby's Exit.
 
-Push to claude/search-banner at each real step; when done write `.pr-body.md` and push. Don't open the PR. Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md` and `notes/briefs/rules-common.md` first.
+Push to claude/search-home at each real step; when done write `.pr-body.md` and push. Don't open the PR. Read CLAUDE.md, `.claude/LESSONS.md`, `docs/rules/eric.md` and `notes/briefs/rules-common.md` first.
 
-**Not in this job:** auto chess against people. It has no server today, so it gets its own design next.
+**Not in this job:** auto chess's landing page and its queue against people (it has no server today).
