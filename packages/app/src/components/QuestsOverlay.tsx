@@ -15,7 +15,7 @@ import { KeyArt, WinterCrateArt } from "./Items.tsx";
  * `from` (each quest a game moved, with its old count), the moved rows start at their old counts and slide to their new ones one
  * after another, the count ticking up with the bar (questSound "tick"). One that finishes gets its finish: the bar fills and glows,
  * the row pops, the check pops in, "Done!", its reward bursts, and questSound "done". Only the row whose turn it is redraws, a frame
- * at a time (its fill's width and count, in a box of fixed size: nothing else moves). Reduced motion: the new counts at once.
+ * at a time (its fill's transform and its count's text, as the XP box's: nothing else moves). Reduced motion: the new counts at once.
  *
  * It draws what it's given and calls back (Nov 9, phase 3: home gives it the server's quests, quests.ts; the server deals, counts,
  * rerolls and pays them, server/quests.ts). Eric approved its look (the mockup of Nov 9).
@@ -141,25 +141,31 @@ function Reward({ reward }: { reward: QuestView["reward"] }) {
  * `onShown` after its finish (or a short gap).
  */
 function QuestRow({ q, onReroll, from, go = false, onShown }: { q: QuestView; onReroll: (id: string) => void; from?: number; go?: boolean; onShown?: () => void }) {
-  const [shown, setShown] = useState<number | null>(null);
   const [finished, setFinished] = useState(false);
-  // (The slide, from its first frame: a layout effect, so its sound plays as it starts. LESSONS.md.)
+  const fill = useRef<HTMLSpanElement>(null);
+  const counted = useRef<HTMLSpanElement>(null);
+  // (The slide, from its first frame: a layout effect, so its sound plays as it starts (LESSONS.md). Each frame sets only the fill's
+  // transform and the count's text, as the XP box's; the row draws again once, as it ends.)
   useLayoutEffect(() => {
     if (!go || from === undefined) return;
     const S = QUESTS.show;
     const to = Math.min(q.progress, q.target);
+    const text = counted.current?.firstChild;
     let raf = 0;
     let wait = 0;
-    let last = Math.floor(from);
+    let last = Math.round(from);
     let tickAt = 0;
     const t0 = performance.now();
     const frame = (now: number) => {
       const t = Math.min(1, (now - t0) / S.slideMs);
       const v = from + (to - from) * ease(t);
-      setShown(v);
-      if (Math.floor(v) !== last && now - tickAt >= S.tickGapMs) {
-        last = Math.floor(v);
+      if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, v / q.target)})`;
+      // (The count goes up as the bar passes halfway to it: it ticks with the bar, not at the slide's end.)
+      const n = Math.round(v);
+      if (n !== last && now - tickAt >= S.tickGapMs) {
+        last = n;
         tickAt = now;
+        if (text instanceof Text && n < q.target) text.data = `${count(n)}/${count(q.target)}`;
         questSound("tick");
       }
       if (t < 1) {
@@ -179,8 +185,9 @@ function QuestRow({ q, onReroll, from, go = false, onShown }: { q: QuestView; on
       clearTimeout(wait);
     };
   }, [go]);
-  // (What the row shows: its old count while it waits its turn, the slide's during it, its count once it's over.)
-  const at = from === undefined ? q.progress : go ? (shown ?? from) : from;
+  // (What the row draws: its old count while it waits its turn and slides (each frame then sets the fill and the count), its own
+  // once its turn is over, or as it finishes.)
+  const at = from === undefined || finished ? q.progress : from;
   const done = at >= q.target;
   const share = Math.min(1, at / q.target);
   const canReroll = q.period === "daily" && q.canReroll && q.progress < q.target;
@@ -215,10 +222,12 @@ function QuestRow({ q, onReroll, from, go = false, onShown }: { q: QuestView; on
         </div>
         <span class="qo-goal">{q.goal}</span>
         <div class="qo-progress">
-          <span class="qo-bar" role="progressbar" aria-label={`${q.name} progress`} aria-valuemin={0} aria-valuemax={q.target} aria-valuenow={Math.min(Math.floor(at), q.target)}>
-            <span class="qo-fill" style={{ width: `${share * 100}%` }} />
+          <span class="qo-bar" role="progressbar" aria-label={`${q.name} progress`} aria-valuemin={0} aria-valuemax={q.target} aria-valuenow={Math.min(at, q.target)}>
+            <span class="qo-fill" ref={fill} style={{ transform: `scaleX(${share})` }} />
           </span>
-          <span class="qo-count">{done ? "Done!" : `${count(Math.floor(at))}/${count(q.target)}`}</span>
+          <span class="qo-count" ref={counted}>
+            {done ? "Done!" : `${count(at)}/${count(q.target)}`}
+          </span>
         </div>
       </div>
       <Reward reward={q.reward} />

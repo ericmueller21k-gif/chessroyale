@@ -25961,18 +25961,22 @@ button.sq-tiny {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
   overflow: hidden;
 }
+/* (Its share is its transform, as the XP bar's: a quest's slide moves it without a layout.) */
 .qo-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(#f8d77e, #e2a92c);
+  transform-origin: left center;
+  will-change: transform;
 }
 .qo-row.done .qo-fill {
   background: var(--fd-green);
 }
+/* (Wide enough for "Done!": a count turning into it never narrows the bar.) */
 .qo-count {
   flex: none;
-  min-width: 36px;
+  min-width: 46px;
   text-align: right;
   font: 800 14px Archivo, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
@@ -26059,7 +26063,7 @@ button.sq-tiny {
   border: 2px solid var(--qo-ink);
 }
 /*
- * Quest progress shown (Nov 10; QuestsOverlay's `from`): a moved row slides its fill's width (in a bar of fixed size); one that
+ * Quest progress shown (Nov 10; QuestsOverlay's `from`): a moved row slides its fill (its transform); one that
  * finishes pops (transform), its bar glows (a shadow), the check and "Done!" pop in, and its reward bursts: a gold ring and sparks
  * (the present's burst and the splinters' box-shadow dots, in gold) while its XP and things pop. Transforms, opacity and shadows only:
  * nothing around it moves. The back clips sideways so a spark past the card never scrolls the page.
