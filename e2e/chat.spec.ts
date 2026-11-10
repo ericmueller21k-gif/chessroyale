@@ -39,16 +39,21 @@ async function untilMyTurn(p: Page, other: Page) {
 /** Plays a legal move by tapping its two squares on the board (real taps). Returns the move. */
 async function tapMove(p: Page): Promise<string> {
   // (Picks are recorded as the board hands them over, whatever the phase is by the time we look.)
-  await p.evaluate(() => {
+  // (And the board's box at that moment, `__boardAtPick`: a pick that's the team's last ends the turn at once, and the Crowd's
+  // next phase draws its own screen, with no board left to measure by the time the test looks. Main run 42768777492, Nov 10.)
+  await p.evaluate((sel) => {
     const m = (window as any).match;
     if (m.__recorded) return;
     m.__recorded = true;
     const submit = m.submit.bind(m);
     m.submit = (mv: string) => {
-      ((window as any).__picked ??= []).push(mv);
+      const w = window as any;
+      (w.__picked ??= []).push(mv);
+      const r = document.querySelector(sel)?.getBoundingClientRect();
+      (w.__boardAtPick ??= []).push(r ? { x: r.x, y: r.y, width: r.width, height: r.height } : null);
       submit(mv);
     };
-  });
+  }, `.board-area ${BOARD_SEL.squares}`);
   const fen: string = await p.evaluate(() => (window as any).match.phase.board.fen);
   const side = fen.split(" ")[1];
   const moves = legalMoves(fen)
@@ -276,8 +281,8 @@ test("quick chat picks in the profile: search, a check, n/10, free lines only (t
   const picked = () => phone.evaluate(() => (window as any).__picked ?? []);
   const first = await tapMove(phone);
   await expect.poll(picked).toEqual([first]);
-  // The board never moved or resized for chat.
-  expect(await rect(phone, `.board-area ${BOARD_SEL.squares}`)).toEqual(boardBefore);
+  // The board never moved or resized for chat: as the move was made (the turn may be over by now: see tapMove).
+  expect(await phone.evaluate(() => (window as any).__boardAtPick[0])).toEqual(boardBefore);
 
   // The scoreboard (chat hidden, "‹ Back"): a new line shows nowhere over or above the board (Eric, Nov 4: the
   // new-message bubble went; chat stays in its box), watched from before it's sent; a move made meanwhile still lands.

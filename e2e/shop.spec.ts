@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { SHOP, bossCrateOf, discountLabel, shopPrice } from "@chessroyale/core";
-import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem } from "./helpers.ts";
+import { asAdmin, asServerAdmin, asSignedIn, backdateSoloBattle, bossAloneFromHome, giveItems, test, wearItem, townReady } from "./helpers.ts";
 
 /**
  * Inside a shop (Nov 2, round 1; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer: walk up to Babur's
@@ -151,7 +151,7 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   page.on("pageerror", (e) => errors.push(String(e)));
   page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await goIn(page, "tiger", "Babur's Circus");
   // Outside, you stood at the tent's door (the square in front of it) as you went in.
   const door = await town(page).getAttribute("data-you");
@@ -223,7 +223,7 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   page.on("pageerror", (e) => errors.push(String(e)));
   // (By night outside: the chat's words are white in the town, dark in the greenhouse.)
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
   await goIn(page, "gardener", "Puddles' Botanical Garden");
   await expect(room(page)).toHaveAttribute("data-room", "gardener");
@@ -243,7 +243,7 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(errors).toEqual([]);
 });
 
@@ -251,7 +251,7 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   // (His Pyramid is across the map: the camera glides there, as its chip would.)
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("alfil"));
   await expect.poll(() => homeAt(page, "alfil"), { message: "the Pyramid comes into view" }).not.toBeNull();
@@ -278,7 +278,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
   // A player's town: no lodge on its ground west of the Colosseum (open ground there), no Rivet (Timber is in the game for admins first).
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.([11, 31]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "timber")).toBeNull();
@@ -287,7 +287,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   // An admin's: the lodge there, Rivet among the bots.
   await asAdmin(page);
   await page.reload();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(await bots()).toContain("Rivet (bot)");
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.("timber"));
   await expect.poll(() => homeAt(page, "timber"), { message: "the lodge comes into view" }).not.toBeNull();
@@ -339,7 +339,7 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
   const bots = async () => (await page.evaluate(() => (window as unknown as Hook).__townBots?.() ?? []))!.map((b) => b.name);
   // A player's town: no store on its ground beside Timber's (open ground there), no Tick (Dash is in the game for admins first).
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as Hook).__townGlide?.([4, 33]));
   await page.waitForTimeout(1500);
   expect(await homeAt(page, "dash")).toBeNull();
@@ -349,7 +349,7 @@ test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go
   await asAdmin(page);
   for (const sky of SHOTS ? ["night", "day"] : ["day"]) {
     await page.goto(`/town?sky=${sky}`);
-    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    await townReady(page);
     expect(await bots()).toContain("Tick (bot)");
     await page.evaluate(() => (window as unknown as Hook).__townGlide?.("dash"));
     await expect.poll(() => homeAt(page, "dash"), { message: "the store comes into view" }).not.toBeNull();
@@ -404,7 +404,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("hollow"));
   await expect.poll(() => homeAt(page, "hollow"), { message: "Hollow Peak comes into view" }).not.toBeNull();
   // (Hollow live for everyone, so his cave is too: a player's town. His card keeps his line over "Go in": the next each time.)
@@ -498,7 +498,7 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Wrangler is live for everyone, so his barn is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("pig"));
   await expect.poll(() => homeAt(page, "pig"), { message: "Wrangler's Stall comes into view" }).not.toBeNull();
   await goIn(page, "pig", "Wrangler's Stall");
@@ -545,7 +545,7 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Folio is live for everyone, so its sanctuary is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("folio"));
   await expect.poll(() => homeAt(page, "folio"), { message: "Folio's Folded House comes into view" }).not.toBeNull();
   await goIn(page, "folio", "Folio's Folded House");
@@ -611,7 +611,7 @@ test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Smudgy is live for everyone, so his studio is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("smudgy"));
   await expect.poll(() => homeAt(page, "smudgy"), { message: "Smudgy's Art Gallery comes into view" }).not.toBeNull();
   await goIn(page, "smudgy", "Smudgy's Art Gallery");
@@ -683,7 +683,7 @@ test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his wa
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Jefferson is live for everyone, so his warehouse is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("grex"));
   await expect.poll(() => homeAt(page, "grex"), { message: "Jefferson's Fireworks comes into view" }).not.toBeNull();
   await goIn(page, "grex", "Jefferson's Fireworks");
@@ -766,7 +766,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Ginger is live for everyone, so his igloo is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("gingerbread"));
   await expect.poll(() => homeAt(page, "gingerbread"), { message: "Ginger Igloo comes into view" }).not.toBeNull();
   await goIn(page, "gingerbread", "Ginger Igloo");
@@ -906,7 +906,7 @@ test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the ch
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("bigboy"));
   await expect.poll(() => homeAt(page, "bigboy"), { message: "the Crib comes into view" }).not.toBeNull();
   await goIn(page, "bigboy", "Big Boy's Crib");
@@ -977,7 +977,7 @@ async function followsFinger(p: Page, at: () => Promise<{ x: number; y: number }
 
 test("inside, a drag looks around as the town's does (Eric, Nov 2: \"when I drag from down to up, it should be the same as the town movement\"): what's under the finger follows it, both ways", async ({ page }) => {
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   // The town: Babur's tent, dragged down, up and sideways, follows the finger.
   if (!(await homeAt(page, "tiger"))) await page.getByRole("button", { name: "Go to Babur's Circus" }).dispatchEvent("click");
   await expect.poll(() => homeAt(page, "tiger"), { message: "Babur's tent in view" }).not.toBeNull();
@@ -1104,7 +1104,7 @@ for (const ride of [false, true])
       await wearItem(page, "ride", chirp!);
     }
     await page.goto("/town?sky=day");
-    await expect(town(page)).toHaveAttribute("data-ready", "1");
+    await townReady(page);
     if (ride) await expect.poll(async () => (await page.evaluate(() => (window as unknown as Hooks).__townRide!().you)).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
     for (const [id, name] of KEY_ROOMS) {
       await goIn(page, id, name);
@@ -1115,7 +1115,7 @@ for (const ride of [false, true])
       if (SHOTS) await page.screenshot({ path: `${SHOTS}/room-keys-${id}-${ride ? "ride" : "foot"}-${test.info().project.name}.png` });
       await leaveRoom(page);
       await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
-      await expect(town(page)).toHaveAttribute("data-ready", "1");
+      await townReady(page);
     }
     expect(errors).toEqual([]);
   });
@@ -1130,7 +1130,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   const townRide = () => page.evaluate(() => (window as unknown as Hooks).__townRide!().you);
   await expect.poll(async () => (await townRide()).ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
   const outside = await townRide();
@@ -1163,7 +1163,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   // Out by the back button (a computer: the door, no bar since Nov 7): in the town again, still on it.
   await leaveRoom(page);
   await expect(room(page)).toHaveCount(0, { timeout: 10_000 });
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   expect(await townRide()).toMatchObject({ ride: "riding-chirp", ready: true });
   expect(errors).toEqual([]);
 });
@@ -1195,7 +1195,7 @@ test("boss tokens: an admin gives himself Babur tokens and a crate key in the Cr
 
   // Babur's tent: the card has the real counts, both ways open.
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await goIn(page, "tiger", "Babur's Circus");
   await talk(page);
   const crate = page.getByRole("dialog", { name: "Babur's Boss Crate", exact: true });
@@ -1304,7 +1304,7 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
   page.on("pageerror", (e) => errors.push(String(e)));
   // (Boingo is live for everyone, so his Funhouse is too: a player's town.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await townReady(page);
   await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
   await expect.poll(() => homeAt(page, "clown"), { message: "Boingo's Funhouse comes into view" }).not.toBeNull();
   await goIn(page, "clown", "Boingo's Funhouse");

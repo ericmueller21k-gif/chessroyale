@@ -441,7 +441,8 @@ the overload limit counts their players (since Oct 15); the home page's line sti
   ignored, an admin's working), `problems.spec.ts` (errors reach the store, the error boundary, a bug report's id and
   feedback by kind on `/admin/ops`, the size and rate caps, the health view), `kill-switches.spec.ts` (its own server
   on port 8789: Squads resting, the banner). The e2e Worker's `ADMIN_EMAILS` has one email per project; a test makes
-  its account an admin with `wrangler d1 execute --local`.
+  its account an admin through `POST /api/e2e/sql` (helpers' `localSql`; `server/src/e2e-sql.ts`): the server's own D1, so a test's
+  write never locks it out (SQLITE_BUSY). Only where `E2E_SQL` is "1": playwright.config.ts sets it, wrangler.jsonc never does.
 - Load: see `DEPLOY.md`, "Load testing". Run wrangler from a copy you aren't editing (it reloads on every change).
 
 ## Rules for this area
