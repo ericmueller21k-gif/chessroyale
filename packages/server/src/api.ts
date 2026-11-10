@@ -649,7 +649,8 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
           signedInOnly: signInRequired(env),
           now,
           paused: isPaused(env, "rewards", now),
-          quest: "solo",
+          // (A solo Boss Battle moves the boss quests too, Nov 10: the device names the mode, as it does its moves and its win.)
+          quest: b.mode === "boss" ? "soloBoss" : "solo",
         }).catch((e: unknown) => {
           console.log(`xp for a solo game: ${String(e)}`);
           return null;

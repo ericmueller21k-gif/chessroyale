@@ -3416,8 +3416,8 @@ export const QUESTS = {
   weekStartDay: 1,
   soloMinMinutes: 3,
   daily: [
-    { id: "boss-hunter", name: "Boss Hunter", goal: "Beat a boss in a raid", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
-    { id: "raid-party", name: "Raid Party", goal: "Play 2 boss raids", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
+    { id: "boss-hunter", name: "Boss Hunter", goal: "Win a Boss Battle", target: 1, counts: "bossWin", weight: 1, xp: 300, crates: 1, icon: { kind: "boss" } },
+    { id: "raid-party", name: "Boss Fighter", goal: "Play 2 Boss Battles", target: 2, counts: "boss", weight: 2, xp: 300, icon: { kind: "boss" } },
     { id: "squad-up", name: "Squad Up", goal: "Play 2 Squads games", target: 2, counts: "squads", weight: 2, xp: 300, icon: { kind: "squad" } },
     { id: "fifty-fifty", name: "Fifty-Fifty", goal: "Play a 50 v 50 game", target: 1, counts: "crowd", weight: 2, xp: 300, icon: { kind: "board", piece: "queen" } },
     { id: "warm-up", name: "Warm Up", goal: "Finish 3 games", target: 3, counts: "any", weight: 2, xp: 300, icon: { kind: "board", piece: "pawn" } },
