@@ -1,3 +1,4 @@
+- Nov 10 16:10 UTC: #604 LIVE 8f42757. Main run 42847929954: shards passed; flaky squads-watch:167 [phone], home-layout:207 [desktop], matchmaking:22 [desktop] -> flaky batch 7 (now tiger:305, recluse:824, search-home:61 + these 3; home-layout/matchmaking may be #607 queue changes).
 - Nov 10 16:05 UTC: #611 fix round 2 done (e576a8e); helper missed Eric's lone-party change, I made it (a6ddc0c). Delta review 2 started; CI running.
 - Nov 10 15:50 UTC: #604 MERGED 8f42757 (Eric OK); #612 squads-replay MERGED 688ed8b. search-home:61 flaky again (batch 7).
 - Nov 10 15:35 UTC: Eric OKed #604 (guard edits). Merged main into it (a87b214), CI running; merge when green.
