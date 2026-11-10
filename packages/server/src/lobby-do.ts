@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
+import { LobbyCore, MATCH_STARTED, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type PendingResult, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
@@ -438,9 +438,16 @@ export class Lobby extends DurableObject<Env> {
    * A new lobby under this code: false if the code is in use (a lobby that hasn't closed), so the caller tries
    * another. `keepMs`: how long its results stay up (playtests).
    */
-  async create(code: string, overrides?: LobbyRecord["overrides"], auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number }, keepMs?: number, party?: PartyLobby): Promise<boolean | number> {
+  async create(
+    code: string,
+    overrides?: LobbyRecord["overrides"],
+    auto?: { fillAt: number | null; botsOff?: boolean; reserve?: number; reserveMs?: number; engine?: boolean },
+    keepMs?: number,
+    party?: PartyLobby,
+  ): Promise<boolean | number> {
     if (this.record && !(await this.closeIfDue())) return false;
     this.record = newLobbyRecord(code, Date.now(), overrides, party);
+    if (auto?.engine) this.record.engine = true;
     this.lastStored.clear();
     this.fairStored = 0;
     this.reservations = [];
@@ -507,16 +514,18 @@ export class Lobby extends DurableObject<Env> {
     // banned for fair play (only someone new to this lobby: a seat already taken stays, the ban counts from the next).
     const guest = !!this.env.DB && signInRequired(await withSecrets(this.env)) && !isSignedIn(account);
     const seated = !!account && Object.values(this.record.accounts ?? {}).includes(account.id);
-    const banned =
-      !guest && !seated && !!account && !!this.env.DB
-        ? (await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
-        : false;
+    const check = !guest && !seated && !!account && !!this.env.DB ? await banCheck(d1Sql(this.env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => null) : null;
+    const banned = !!check?.banned;
+    // A matchmade lobby seats newcomers from its own side of fair play's engine pool only, whoever has the code (a seat already taken stays;
+    // a failed read lets them in, as a ban's does). Private lobbies and invites: anyone. The #618 review, m4.
+    const pooled = account ? (check ? !!check.pooled : null) : false;
+    const apart = !guest && !seated && !!this.record.auto && pooled !== null && pooled !== !!this.record.engine;
     // (Admins, ADMIN_EMAILS as for the fair-play review: the boss battle's test trigger.)
     const admin = !guest && isAdmin(await withSecrets(this.env), account);
     // Typed chat (typed-chat.ts): a signed-in account may type, never from a device the age gate marked too young.
     const young = ageAnswer(request) === "under";
     const typer = !!account && isSignedIn(account) && !young;
-    server.serializeAttachment({ userId: account?.id, guest, banned, ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}) });
+    server.serializeAttachment({ userId: account?.id, guest, banned, ...(apart ? { apart } : {}), ...(admin ? { admin } : {}), ...(typer ? { typer } : {}), ...(young ? { young } : {}) });
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -529,7 +538,7 @@ export class Lobby extends DurableObject<Env> {
       return;
     }
     if (!atTheDoor(msg)) return;
-    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
+    const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; apart?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.
     if (msg.t === "scores" && this.engineUp && this.record?.scoreRequest?.key === msg.key && attached?.playerId === this.record.hostId && !this.record.judges?.tasks) {
@@ -556,6 +565,12 @@ export class Lobby extends DurableObject<Env> {
       if (attached?.banned) {
         ws.send(JSON.stringify({ t: "error", message: BANNED_MESSAGE, banned: true, now: Date.now() }));
         ws.close(1008, "Banned");
+        return;
+      }
+      // (The other side of the engine pool: told what anyone is told once a match has begun.)
+      if (attached?.apart) {
+        ws.send(JSON.stringify({ t: "error", message: MATCH_STARTED, now: Date.now() }));
+        ws.close(1008, MATCH_STARTED);
         return;
       }
       const before = this.record.humans.length;
