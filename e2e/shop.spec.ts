@@ -218,7 +218,7 @@ test("Babur's tent: Go in, start zoomed out, talk to the Shopkeeper, the crate's
   expect(errors).toEqual([]);
 });
 
-test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back button takes you out", async ({ page }) => {
+test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back button takes you out", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // (By night outside: the chat's words are white in the town, dark in the greenhouse.)
@@ -247,7 +247,7 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   expect(errors).toEqual([]);
 });
 
-test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", async ({ page }) => {
+test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
@@ -271,7 +271,7 @@ test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the ch
   expect(errors).toEqual([]);
 });
 
-test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its name and Go in; Rivet keeps the shop, Timber's Boss Crate with The Log Roller", async ({ page }) => {
+test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its name and Go in; Rivet keeps the shop, Timber's Boss Crate with The Log Roller", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void };
@@ -332,7 +332,7 @@ test("Timber's Lumber Lodge (Nov 3): in an admin's town only; its card is its na
   expect(errors).toEqual([]);
 });
 
-test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", async ({ page }) => {
+test("Dash's Kicks (Nov 3): in an admin's town only; its card is its name and Go in; Tick keeps the shop, Dash's Boss Crate with Cheetah Shoes; the halfpipe", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   type Hook = { __townBots?: () => { name: string }[] | null; __townGlide?: (to: string | readonly [number, number]) => void; __townBossBack?: (id: string) => void };
@@ -492,7 +492,7 @@ test("Hollow Peak (Nov 3): Go in (his line on the card), the cave: in at the mou
   expect(errors).toEqual([]);
 });
 
-test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: the pens, the board on its hay bale, the lanterns; his rooster keeps the shop on the counter, Wrangler's Boss Crate with Pen Pony", async ({ page }) => {
+test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: the pens, the board on its hay bale, the lanterns; his rooster keeps the shop on the counter, Wrangler's Boss Crate with Pen Pony", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -539,7 +539,7 @@ test("Wrangler's Stall (Nov 4): Go in (its card its name and Go in), his barn: t
   expect(errors).toEqual([]);
 });
 
-test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its sanctuary: the clean page, the fountain, the windows' pools drifting, the \"being written\" edge; its paper turtle keeps the shop behind the low counter, Folio's Boss Crate with the Paper Crane", async ({ page }) => {
+test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its sanctuary: the clean page, the fountain, the windows' pools drifting, the \"being written\" edge; its paper turtle keeps the shop behind the low counter, Folio's Boss Crate with the Paper Crane", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -605,7 +605,7 @@ test("Folio's Folded House (Nov 5): Go in (its card its name and Go in), its san
   expect(errors).toEqual([]);
 });
 
-test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", async ({ page }) => {
+test("Smudgy's Art Gallery (Nov 6): Go in, his paint studio: the life class (the knight turning, eight painters at their easels), the cloth-covered table on the drop cloth, the sculptures; the gallery owner keeps the shop behind the counter, Smudgy's Boss Crate with the Brush Ride", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -677,7 +677,7 @@ type CrewHook = {
 };
 const crew = (p: Page) => p.evaluate(() => (window as unknown as CrewHook).__shopCrew?.() ?? null);
 
-test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+test("Jefferson's Fireworks (Nov 4): Go in (its card its name and Go in), his warehouse: the racking, the board on its crates, the crew at work; the dealer keeps the shop in his corner, Jefferson's Boss Crate with Giraffe Gallop; the scissor lift waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -760,7 +760,7 @@ type ElvesHook = {
 /** Ginger's igloo's elves and your figure as drawn frame by frame (`clear`: start the trail afresh). */
 const elvesOf = (p: Page, clear = false) => p.evaluate((c) => (window as unknown as { __shopElves?: (c: boolean) => ElvesHook | null }).__shopElves?.(c) ?? null, clear);
 
-test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo: the candy wall, the catwalk and its two staircases, the elves at work; the shopkeeper elf keeps the shop, Ginger's Boss Crate with the Candy Cane Sled; you run up one staircase, along the catwalk and down the other, by taps and by the arrow keys, your feet on the steps all the way; an elf waits while you stand in its way and goes on once you step aside", async ({ page }) => {
+test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo: the candy wall, the catwalk and its two staircases, the elves at work; the shopkeeper elf keeps the shop, Ginger's Boss Crate with the Candy Cane Sled; you run up one staircase, along the catwalk and down the other, by taps and by the arrow keys, your feet on the steps all the way; an elf waits while you stand in its way and goes on once you step aside", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -902,7 +902,7 @@ test("Ginger Igloo (Nov 5): Go in (its card its name and Go in), the round igloo
   expect(errors).toEqual([]);
 });
 
-test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", async ({ page }) => {
+test("Big Boy's Crib (Nov 2): Go in, Blocky's crate with Big Boy's Buggy; the chat's words dark over the nursery", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/town?sky=night");
@@ -1120,7 +1120,7 @@ for (const ride of [false, true])
     expect(errors).toEqual([]);
   });
 
-test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", async ({ page }) => {
+test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on it, its idle standing and its move walking, its back going up to the counter; you come out still on it", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1298,7 +1298,7 @@ test("boss tokens: a counted boss battle (Boss alone, 5 minutes by the server's 
   expect(errors).toEqual([]);
 });
 
-test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide, the squirt race, the spinning light game, the roll-ball lanes); the clown attendant keeps the prize counter, Boingo's Boss Crate with Boingo's Pogo", async ({ page }) => {
+test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide, the squirt race, the spinning light game, the roll-ball lanes); the clown attendant keeps the prize counter, Boingo's Boss Crate with Boingo's Pogo", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

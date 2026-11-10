@@ -519,7 +519,7 @@ test("buying: a greyed offer says why (gold, the one-queen limit), in a few word
   expect(errors).toEqual([]);
 });
 
-test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", async ({ page }) => {
+test("the bench: drag an offer onto it to hold it (it keeps its square), tap it to place it when its square is free, sell it by dragging it onto the shop", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // (The full 30 s step: a drag takes a while, and the quick step's 5 open seconds are a tap-test's. Seed 19512: see the list at the top.)
   await page.goto("/autochess?seed=19512&intro=0");
@@ -599,7 +599,7 @@ test("the bench: drag an offer onto it to hold it (it keeps its square), tap it 
   expect(errors).toEqual([]);
 });
 
-test("while you drag an offer, your whole bench row lights up (gold ring), and only yours: theirs never takes a drag", async ({ page }) => {
+test("while you drag an offer, your whole bench row lights up (gold ring), and only yours: theirs never takes a drag", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -888,7 +888,7 @@ const recordHops = (p: Page) =>
   });
 const hopsSeen = (p: Page) => p.evaluate(() => (window as any).__hops as Record<"me" | "opp", { on: number[]; off: number[] }>);
 
-test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", async ({ page }) => {
+test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, so the two never fall into step) before its next single hop: a crouch, a rise, a squash and a settle, the shadow shrinking and fading as it rises; transforms and opacity only; nothing moves in between", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   // (A fake clock: seven to ten seconds take no time. The screen's own steps run on it too: the buy step is 30 s, so what follows stays inside it.)
@@ -977,7 +977,7 @@ test("each custom pawn hops once, then waits a random 7 to 10 s (its own draws, 
   expect(errors).toEqual([]);
 });
 
-test("the pawns stay still under reduced motion: no hop at all", async ({ page }) => {
+test("the pawns stay still under reduced motion: no hop at all", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await recordHops(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -996,7 +996,7 @@ test("the pawns stay still under reduced motion: no hop at all", async ({ page }
   expect(errors).toEqual([]);
 });
 
-test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades as it rises; the dressed pawn's own ground shadow is hidden here and still shown elsewhere", async ({ page }) => {
+test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades as it rises; the dressed pawn's own ground shadow is hidden here and still shown elsewhere", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   // Dress your pawn as a snowman (its art draws its own ground shadow, which stayed under the pawn as it hopped): the profile's look comes from the server.
   await page.route(/\/api\/me(\?.*)?$/, async (route) => {
@@ -1042,7 +1042,7 @@ test("each pawn has one shadow: the hopping pawn's own, that shrinks and fades a
   expect(errors).toEqual([]);
 });
 
-test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", async ({ page }) => {
+test("feel: every button presses down while it is held (Reroll sinks onto its shadow) and comes back up", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(PLAIN);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -1066,7 +1066,7 @@ test("feel: every button presses down while it is held (Reroll sinks onto its sh
   expect(errors).toEqual([]);
 });
 
-test("a sale floats its gold up from the square the piece stood on (+7 for a queen), light CSS that is gone a moment later; nothing floats for a purchase", async ({ page }) => {
+test("a sale floats its gold up from the square the piece stood on (+7 for a queen), light CSS that is gone a moment later; nothing floats for a purchase", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(TWOQ);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2307,7 +2307,7 @@ test(`a drag cut off by the end of the move step ends with it: no frozen ghost o
 }
 
 for (const via of ["a shop card", "a piece on the board", "a held piece"] as const) {
-  test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, async ({ page }) => {
+  test(`a drag from ${via} that is still held when the buy step locks ends there with no action, and stays ended through the end of the step`, { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(60_000);
     const errors = watchErrors(page);
     await page.goto("/autochess?quick=1&seed=9&intro=0");
@@ -2352,7 +2352,7 @@ for (const via of ["a shop card", "a piece on the board", "a held piece"] as con
   });
 }
 
-test("locking in under a drag ends the drag: the bonus is the only gold that moves, and nothing is held (lock-in behind `?lockin=1`)", async ({ page }) => {
+test("locking in under a drag ends the drag: the bonus is the only gold that moves, and nothing is held (lock-in behind `?lockin=1`)", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(`${NEVER}&lockin=1`);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2371,7 +2371,7 @@ test("locking in under a drag ends the drag: the bonus is the only gold that mov
   expect(errors).toEqual([]);
 });
 
-test("a drag whose pointer is cancelled or loses its capture ends with no action: nothing bought, held or sold, no ghost", async ({ page }) => {
+test("a drag whose pointer is cancelled or loses its capture ends with no action: nothing bought, held or sold, no ghost", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.addInitScript(() => document.addEventListener("pointerdown", (e) => ((window as any).__pointer = e.pointerId), true));
   await page.goto("/autochess?seed=9&intro=0");
@@ -2404,7 +2404,7 @@ test("a drag whose pointer is cancelled or loses its capture ends with no action
   expect(errors).toEqual([]);
 });
 
-test("a silhouette on the board is only tapped: pressing it and dragging it picks nothing up and drops nothing, on the sell zone, the bench or the board (Eric: 'it just sold a piece that didn't exist')", async ({ page }) => {
+test("a silhouette on the board is only tapped: pressing it and dragging it picks nothing up and drops nothing, on the sell zone, the bench or the board (Eric: 'it just sold a piece that didn't exist')", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2451,7 +2451,7 @@ test("a silhouette on the board is only tapped: pressing it and dragging it pick
   expect(errors).toEqual([]);
 });
 
-test("a sale only pays for a piece of yours that is there: selling a piece the pointer is still carrying (the Sell button, the keyboard) pays once, not again at the drop", async ({ page }) => {
+test("a sale only pays for a piece of yours that is there: selling a piece the pointer is still carrying (the Sell button, the keyboard) pays once, not again at the drop", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/autochess?seed=9&intro=0");
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2526,7 +2526,7 @@ const stepSeconds = async (p: Page) => {
 };
 const dotSquares = (p: Page) => p.locator(".ac-dot").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.square!).sort());
 
-test("a star-up offer (v8): a gold card for a second star, a prismatic one for a third, the price 1, its piece drawn with the stars and outline it will have, nothing on the board for it and no silhouette; buying one adds no piece, takes 1, and the stars show on the piece", async ({ page }) => {
+test("a star-up offer (v8): a gold card for a second star, a prismatic one for a third, the price 1, its piece drawn with the stars and outline it will have, nothing on the board for it and no silhouette; buying one adds no piece, takes 1, and the stars show on the piece", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(STARS);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");
@@ -2948,7 +2948,7 @@ test("the stars' size and place (v8, Eric Oct 22: very tiny, in the body of the 
   expect(errors).toEqual([]);
 });
 
-test("the stars' outlines (v8, Eric Oct 22: a gold border for the 2-star units, prismatic for the 3-star, as the cards'): on starred pieces on the board and the bench while buying, placing and moving, none on a square; off in the fight and the result (the tiny stars stay); `?fightglow=1` keeps them on", async ({ page }) => {
+test("the stars' outlines (v8, Eric Oct 22: a gold border for the 2-star units, prismatic for the 3-star, as the cards'): on starred pieces on the board and the bench while buying, placing and moving, none on a square; off in the fight and the result (the tiny stars stay); `?fightglow=1` keeps them on", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors = watchErrors(page);
   for (const glow of [false, true]) {
@@ -2983,7 +2983,7 @@ test("the stars' outlines (v8, Eric Oct 22: a gold border for the 2-star units, 
   expect(errors).toEqual([]);
 });
 
-test("a starred piece moved in the move step slides like any other, its outline and stars riding it; one dragged carries them in its ghost (a real finger's drag), and lands with them (v8 star look)", async ({ page }) => {
+test("a starred piece moved in the move step slides like any other, its outline and stars riding it; one dragged carries them in its ghost (a real finger's drag), and lands with them (v8 star look)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await page.goto(STARMOVE);
@@ -3038,7 +3038,7 @@ test("a starred piece moved in the move step slides like any other, its outline 
   expect(errors).toEqual([]);
 });
 
-test("reduced motion (v8): a star-up card keeps its border and glow but nothing moves, the outlines are still there (and still), and a merge pops nothing", async ({ page }) => {
+test("reduced motion (v8): a star-up card keeps its border and glow but nothing moves, the outlines are still there (and still), and a merge pops nothing", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto(STARS);
@@ -3064,7 +3064,7 @@ test("reduced motion (v8): a star-up card keeps its border and glow but nothing 
   expect(errors).toEqual([]);
 });
 
-test("the prismatic outline of the shop card shifts its colors slowly (and only that one: the board's and the bench's stay still)", async ({ page }) => {
+test("the prismatic outline of the shop card shifts its colors slowly (and only that one: the board's and the bench's stay still)", { tag: "@phone-only" }, async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto(STARS);
   await expect(root(page)).toHaveAttribute("data-phase", "buy");

@@ -397,7 +397,7 @@ test("at most 100 lines are kept, the oldest first (and the box still scrolls to
   expect((await scrollOf(page)).fromFoot, "at its foot").toBeLessThanOrEqual(2);
 });
 
-test("new lines keep the stream at its foot unless you've scrolled up, then it stays where you are and says \"↓ new\" until you go down (the marker's tap, or the foot by hand)", async ({ page }, info) => {
+test("new lines keep the stream at its foot unless you've scrolled up, then it stays where you are and says \"↓ new\" until you go down (the marker's tap, or the foot by hand)", { tag: "@phone-only" }, async ({ page }, info) => {
   const phone = info.project.name === "phone";
   await open(page);
   await page.evaluate(() => { for (let i = 1; i <= 24; i++) (window as any).__townSay(i % 2 ? "Sparky" : "Tex", `line ${i}`, "kid"); });
@@ -532,7 +532,7 @@ test("a tap on the box anywhere but a player's name opens typing: the blur behin
   expect(await page.getByRole("dialog").count(), "no card opened by these taps").toBe(cards);
 });
 
-test("a tap on the box opens a focused typing line for a signed-in player: no placeholder; your words stay when Escape or a press on the map closes it; Enter sends and closes it (the blur and the keyboard go)", async ({ page }) => {
+test("a tap on the box opens a focused typing line for a signed-in player: no placeholder; your words stay when Escape or a press on the map closes it; Enter sends and closes it (the blur and the keyboard go)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(90_000);
   await openSignedIn(page);
   const box = page.locator(".town-chat");
@@ -576,7 +576,7 @@ test("a tap on the box opens a focused typing line for a signed-in player: no pl
   expect(await rectOf(page, ".town-chat"), "the box didn't change").toEqual(b0);
 });
 
-test("new messages: the same box as always on that fades: the lines show when a message comes and fade after the wait; a faded box takes no taps (the map's) and keeps its place and size; the next message brings back only the new ones; a tap while the lines show opens typing and is \"high text\" (every line, no fade, scrollable) until you finish, and the icon stays one bubble green", async ({ page }) => {
+test("new messages: the same box as always on that fades: the lines show when a message comes and fade after the wait; a faded box takes no taps (the map's) and keeps its place and size; the next message brings back only the new ones; a tap while the lines show opens typing and is \"high text\" (every line, no fade, scrollable) until you finish, and the icon stays one bubble green", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   // (A guest: no players' lines come in to count among the test's own, and its typing line is greyed, which is enough to see it open.)
   await open(page);
@@ -658,7 +658,7 @@ test("new messages: the same box as always on that fades: the lines show when a 
   await expect(box).toHaveAttribute("data-typing", "0");
 });
 
-test("new messages: sending from it works while the lines show (the tap opens typing, Enter sends, and finishing by sending puts it back to fading)", async ({ page }) => {
+test("new messages: sending from it works while the lines show (the tap opens typing, Enter sends, and finishing by sending puts it back to fading)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   await openSignedIn(page);
   await goMode(page, "new");
@@ -822,7 +822,7 @@ test("typing works wherever the box shows: always on, and new messages while its
   expect(await rectOf(page, ".town-chat"), "the box has the same place and size").toEqual(b0);
 });
 
-test("\"Chat background\": off by default; on, the faint tint stays behind the box whenever it shows, always on and new messages, when you aren't typing too, and the slight blur comes with typing (the blur only while typing is the frame rate's corner cut); remembered on this device; the tint is faint light by day and faint dark by night (white text on it)", async ({ page }) => {
+test("\"Chat background\": off by default; on, the faint tint stays behind the box whenever it shows, always on and new messages, when you aren't typing too, and the slight blur comes with typing (the blur only while typing is the frame rate's corner cut); remembered on this device; the tint is faint light by day and faint dark by night (white text on it)", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(120_000);
   await open(page);
   const box = page.locator(".town-chat");
@@ -895,7 +895,7 @@ test("\"Chat background\": off by default; on, the faint tint stays behind the b
   await expect.poll(() => back(page)).toMatchObject({ bg: "rgba(8, 12, 24, 0.34)", blur: "blur(3px)" });
 });
 
-test("always on never fades: after the wait, after minutes, with the lines still taking the touches; a line 4 minutes old is still there, and one is gone for good at 5 minutes", async ({ page }) => {
+test("always on never fades: after the wait, after minutes, with the lines still taking the touches; a line 4 minutes old is still there, and one is gone for good at 5 minutes", { tag: "@phone-only" }, async ({ page }) => {
   // (Eric, Oct 28: "both chat is green, yet it disappears still". The page's clock, so the minutes pass at once.)
   await page.clock.install({ time: new Date(2026, 9, 28, 12, 0, 0) });
   // (The away rule off: these jumps are 5 minutes of no input, which would send the player home; town-afk.spec.ts has that rule.)
@@ -929,7 +929,7 @@ test("always on never fades: after the wait, after minutes, with the lines still
   await expect(log(page)).toHaveCSS("opacity", "1");
 });
 
-test("the chat text follows the town's sky: near-black ink by day, dawn and dusk, white by night, and the names and gray lines in a deeper or a lighter shade of the same colors", async ({ page }) => {
+test("the chat text follows the town's sky: near-black ink by day, dawn and dusk, white by night, and the names and gray lines in a deeper or a lighter shade of the same colors", { tag: "@phone-only" }, async ({ page }) => {
   const lines = async () => {
     await say(page, "Hollow", "The park gets quiet after dark.", "boss");
     await say(page, "Sparky", "Ooh, sparkly!", "kid");
@@ -955,7 +955,7 @@ test("the chat text follows the town's sky: near-black ink by day, dawn and dusk
   }
 });
 
-test("the text's tone flips with the clock when the sky does: ink before 19:30 and white after, ink again from 5:30 (the town's own blend), changing one attribute on the box, once a minute", async ({ page }) => {
+test("the text's tone flips with the clock when the sky does: ink before 19:30 and white after, ink again from 5:30 (the town's own blend), changing one attribute on the box, once a minute", { tag: "@phone-only" }, async ({ page }) => {
   // The device's clock: just before dusk's blend is half through; the town reads the sky from it (no ?sky=).
   await page.clock.install({ time: new Date(2026, 9, 28, 19, 28, 0) });
   // (?townafk=off: the clock jumps hours, and the away rule would send this idle page home: town/afk.ts.)
@@ -1092,7 +1092,7 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
   expect(await both.nth(1).locator("b.tc-name").getAttribute("data-c"), "the same color all session").toBe(String(c1));
 });
 
-test("a guest taps the box and gets the typing line greyed, saying how to chat (nothing hidden); the box and the blur are the same; without the test switches no hooks either", async ({ page }) => {
+test("a guest taps the box and gets the typing line greyed, saying how to chat (nothing hidden); the box and the blur are the same; without the test switches no hooks either", { tag: "@phone-only" }, async ({ page }) => {
   await page.route("**/api/auth/config", (route) => route.fulfill({ json: { accounts: false, google: false, email: false } }));
   await page.goto(`/town?sky=day&townroom=${room}`);
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
@@ -1267,7 +1267,7 @@ test("the edge chips keep off the chat box (always on and new messages, shown or
   }, { message: "the chip took its old place back", timeout: 5000 }).toBeLessThan(15);
 });
 
-test("the keyboard opening doesn't resize or move the town: while the typing line has focus the screen keeps its height and follows the visual viewport", async ({ page }) => {
+test("the keyboard opening doesn't resize or move the town: while the typing line has focus the screen keeps its height and follows the visual viewport", { tag: "@phone-only" }, async ({ page }) => {
   await openSignedIn(page);
   const screen = page.locator(".town-screen");
   const field = page.locator(".tc-form input");

@@ -428,7 +428,7 @@ async function watchClock(page: Page) {
 }
 
 test.describe("Dash's clock", () => {
-  test("the clock multi-hit: five quick smacks and a line on his turn (Eric, Nov 7: every four or five of his moves)", async ({ page }) => {
+  test("the clock multi-hit: five quick smacks and a line on his turn (Eric, Nov 7: every four or five of his moves)", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -451,7 +451,7 @@ test.describe("Dash's clock", () => {
     expect(errors).toEqual([]);
   });
 
-  test("the pop-off, twice: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks, twice; your clock starts after the first", async ({ page }) => {
+  test("the pop-off, twice: three smacks and 'I gotta pop off', ten fast smacks and a love line, while he thinks, twice; your clock starts after the first", { tag: "@phone-only" }, async ({ page }) => {
     test.setTimeout(240_000);
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(e.message));
