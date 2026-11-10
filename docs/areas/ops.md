@@ -73,7 +73,9 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     simulating Playwright's order (project by project, files by name, 2 workers). Inside a file the tests run in order. Each runner builds the app once (`E2E_PREBUILT=1` tells Playwright's web server to start
     wrangler without building again) and serves it with the same `wrangler dev` and test variables as locally
     (`playwright.config.ts`). A test tagged `@phone-only` (logic, server and flow; Nov 6) skips the desktop project;
-    layout, the board, home and every guard test of `docs/rules/eric.md` run on both. 2 workers per runner, as locally
+    layout, the board, home, desktop input (mouse drags, the wheel, arrow keys) and every guard test of `docs/rules/eric.md` run
+    on both (Nov 10: long boss intros, room tours and town flows went phone-only). No spec file over about 6 minutes a project:
+    split a long one in two (autochess, crowd; Nov 10). 2 workers per runner, as locally
     (half the runner's 4 CPUs). Setup (checkout, npm ci, the build) takes about a minute per shard.
   - **Reading a run:** `result`'s summary on the run's page (each shard's reporter, `e2e/ci-summary.ts`, writes a
     record; `e2e/ci-summary-merge.mjs` renders them): the plan's line (what this run tested and why), flaky tests,
