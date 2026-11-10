@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS, FRONT_DOOR, JUDGES, RAID_SETTINGS, SQUADS, SQUADS_LOBBY, modeSettings, mulberry32, voteResultMs, type Settings } from "@chessroyale/core";
 import { legalMoves, type BoardScore, type ScoreJob, type ServerMessage } from "@chessroyale/chess";
 import { SQUADS_PROTOCOL, squadsLegalMoves, squadsVotes } from "@chessroyale/chess/squads";
-import { LobbyCore, OTHER_ACCOUNT, hostBoardOk, newLobbyRecord } from "../src/lobby.ts";
+import { LobbyCore, OTHER_ACCOUNT, atTheDoor, hostBoardOk, newLobbyRecord } from "../src/lobby.ts";
 import { drawJudges, judgeWeight } from "../src/judges.ts";
 import { SQUADS_OTHER_ACCOUNT, clearTopCache } from "../src/squads-lobby.ts";
 import { fallbackTop } from "../src/squads-bots.ts";
@@ -335,5 +335,20 @@ describe("Squads: seats and the shared answers", () => {
     const jobs = L.core.allMatches().flatMap((m) => Object.values(m.half?.work ?? {})).filter((j) => j.devices.length);
     expect(jobs.length).toBeGreaterThan(0);
     for (const j of jobs) expect(j.devices.filter((d) => party.includes(d)).length).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("the lobby's door (the review's minor 5)", () => {
+  it("lets in an object with a type; the host's scores only as a list of at most 64 board objects", () => {
+    expect(atTheDoor({ t: "pick", key: "k", move: "e2e4" })).toBe(true);
+    expect(atTheDoor(null)).toBe(false);
+    expect(atTheDoor("scores")).toBe(false);
+    expect(atTheDoor({ t: 3 })).toBe(false);
+    expect(atTheDoor({ t: "scores", key: "k", boards: [{ boardId: 0 }] })).toBe(true);
+    expect(atTheDoor({ t: "scores", key: "k", boards: [null] })).toBe(false);
+    expect(atTheDoor({ t: "scores", key: "k", boards: [{ boardId: 0 }, 7] })).toBe(false);
+    expect(atTheDoor({ t: "scores", key: "k", boards: [[]] })).toBe(false);
+    expect(atTheDoor({ t: "scores", key: "k", boards: {} })).toBe(false);
+    expect(atTheDoor({ t: "scores", key: "k", boards: Array.from({ length: 65 }, () => ({})) })).toBe(false);
   });
 });

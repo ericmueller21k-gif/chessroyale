@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { ClientMessage, LobbyCloseReason, Opening, ServerMessage } from "@chessroyale/chess";
 import openings from "@chessroyale/chess/data/openings.json";
-import { LobbyCore, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
+import { LobbyCore, atTheDoor, hostBoardOk, lobbyClosing, newLobbyRecord, type LobbyRecord, type PartyLobby, type ServerScoreRequest } from "./lobby.ts";
 import { DEVICE_COOKIE, SIGN_IN_TO_PLAY, accountOf, ageAnswer, isSignedIn, readCookie, signInRequired, withSecrets } from "./api.ts";
 import { ICONS, d1Sql, ensureSchema, isPixelIcon, recordResult, shopState } from "./accounts.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
@@ -466,9 +466,7 @@ export class Lobby extends DurableObject<Env> {
     } catch {
       return;
     }
-    // The door: a message is an object with a type (the host's scores: a list of boards); the lobby checks each field it uses.
-    if (!msg || typeof msg !== "object" || typeof msg.t !== "string") return;
-    if (msg.t === "scores" && !(Array.isArray(msg.boards) && msg.boards.length <= 64)) return;
+    if (!atTheDoor(msg)) return;
     const attached = ws.deserializeAttachment() as { playerId?: string; userId?: string; guest?: boolean; banned?: boolean; admin?: boolean; typer?: boolean; young?: boolean } | null;
     // The host's scores: the engine server re-checks the close calls first (before the lobby is touched, so
     // nothing changes under it while it waits), and its numbers are the ones used.

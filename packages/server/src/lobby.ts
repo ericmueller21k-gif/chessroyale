@@ -453,6 +453,17 @@ const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const isChance = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
 
 /**
+ * The lobby Durable Object's door: a message is an object with a type; the host's scores, a list of at most 64 boards,
+ * each an object (the lobby checks each field it uses).
+ */
+export function atTheDoor(msg: unknown): msg is ClientMessage {
+  if (!msg || typeof msg !== "object" || typeof (msg as { t?: unknown }).t !== "string") return false;
+  if ((msg as { t: string }).t !== "scores") return true;
+  const boards = (msg as { boards?: unknown }).boards;
+  return Array.isArray(boards) && boards.length <= 64 && boards.every(isRecord);
+}
+
+/**
  * Whether a host's scores for a board hold together, as a judge's must (judgedBoard in @chessroyale/chess): a legal best
  * move, every number a chance from 0 to 1, a legal pick for every bot, and every pick scored. A board that doesn't is
  * scored as when nobody could score it: every pick the same (2026-11-10-device-trust.md).
