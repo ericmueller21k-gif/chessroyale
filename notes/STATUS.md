@@ -1,3 +1,4 @@
+- Nov 10 10:34 UTC: Fable batch 2 helper session_01JuCWRre56rdF7caATPjdJY (xhigh, ALONE) on claude/fable-b2. Full lane: full-e2e label + independent review after.
 - Nov 10 10:40 UTC: #609 phone-load-3 MERGED 0506f33. Watching deploy + main full run (reruns shard 11 specs).
 - Nov 10 10:30 UTC: main 3163543 run 42792103353 red: shard 11 runner LOST (infra; its specs unrun; #609 merge reruns all) + flaky tiger.spec.ts:305 [phone] (Babur balloon frame list) -> flaky batch 7.
 - Nov 10 10:25 UTC: phone-load-3 PR #609 open (town opens 5.8→2.1 s street, 3.2→1.7 s player on 4x phone). CI running. #608 live 3163543.
