@@ -16,6 +16,9 @@ that share one lobby).
    (the account wait, `ACCOUNT_WAIT_MS` 3 s, then its code) and fix it in the app if a player would feel it, else make the
    specs wait on the town's own ready signal with the same budget their other waits use.
 
+4. `colosseum.spec.ts:42` [desktop] (main run 42769640391, shard 13): a `toEqual` deep-equality failure this time (not the
+   5 s mount timeout seen before). Read its trace and fix at the cause.
+
 Lane: targeted. Effort high. Decision note docs/decisions/2026-11-10-flaky-batch-5.md (≤ 120 words). Push to
 claude/flaky-nov10c at each real step; when done write .pr-body.md and push. Don't open the PR. Read CLAUDE.md and
 notes/briefs/rules-common.md first.
