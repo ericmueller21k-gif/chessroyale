@@ -56,12 +56,14 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   - **motion:** transforms and opacity only (the drops, the waiting rings and outline, a slight breathing of each pawn
     from its foot, "VS"); `prefers-reduced-motion` turns them all off.
 - **Browsing while queued** (Eric, Oct 16: "a back button or they can view inventory", "no confirmation needed";
-  `components/DuelQueueBar.tsx`, styles `dq-`; why:
-  [docs/decisions/2026-10-16-1v1-browse-while-queued.md](../decisions/2026-10-16-1v1-browse-while-queued.md)):
+  every queue's since Nov 10: `search.ts`, `components/SearchBar.tsx`, styles `dq-`; home's rows: [hub.md](hub.md); why:
+  [docs/decisions/2026-10-16-1v1-browse-while-queued.md](../decisions/2026-10-16-1v1-browse-while-queued.md),
+  [2026-11-10-search-on-home.md](../decisions/2026-11-10-search-on-home.md)):
   - **away from the stage:** "‹ Home" on the search stage (or a computer's side menu) goes home and keeps the search
     going: the queue is the app's (`DuelQueue` in App.tsx), not the screen's, so it keeps asking (and its ticket stays
     known) wherever you are. No confirm. Cancel on the stage still leaves the queue;
-  - **the bar,** at the top of every screen while you browse: a green dot, "Searching 1 v 1 · 0:42 ›" (back to the
+  - **home's rows** show it ("Searching · 1 v 1", "Ranked · near your level"; Cancel, Lobby (the stage), Start with bots
+    (a bot, unranked), the two asking in place); **the bar,** on every other screen while you browse: a green dot, "Searching 1 v 1 · 0:42 ›" (back to the
     stage, the same search and wait) and Cancel (out of the queue, no confirm; the page stays). Under the maintenance
     banner; its height is `--qbar-h`, which `--banner-h` adds to the banner's `--maint-h`, so the page starts under it;
   - **few players:** at `fewPlayersSeconds` the bar turns gold and says "Few players online · 0:45 ›"; its words take
@@ -69,13 +71,12 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
     it holds as you come and go;
   - **found while browsing:** a sound (`bannerStart`) and a buzz (`navigator.vibrate`, 90-60-160 ms; none while sound is
     off), the page you were on closes, and the stage opens with the game's waiting and versus moment as ever;
-  - **another mode while searching** (PLAY for 50 v 50 or Squads, the Boss raid's choices, Boss alone, a lobby made or
-    joined from home): "Leave the 1 v 1 queue?" / "Starting this ends your 1 v 1 search." / Stay, Leave queue: the only
-    confirm. 1 v 1's PLAY goes back to the stage. Anything else that puts you in a match (an invite's lobby, a party's)
-    ends the search;
+  - **another mode while searching** (home's PLAY greys; the Boss raid's choices, Boss alone, a lobby made or joined):
+    "Leave the 1 v 1 queue?" / "Starting this ends your 1 v 1 search." / Stay, Leave queue: the only confirm (any
+    queue's name). Anything else that puts you in a match (an invite's lobby, a party's) ends the search;
   - **a reload** carries on with the search (`savedDuelQueue`: its ticket, when it began and its test switches in the
     tab's sessionStorage after every ask; dropped when found, cancelled or refused, or 2 minutes after the last ask):
-    on the stage from /1v1, else with the bar. A refusal while browsing (the mode resting) brings you to the stage,
+    on the stage from /1v1, else in home's rows or the bar. A refusal while browsing (the mode resting) brings you to the stage,
     which says why.
 - **A game** (`duel-room.ts`, pure, around the rules in `@chessroyale/chess/duel`; `duel-do.ts`, the `DuelGame` object):
   - **waiting** for both players' sockets (seats by account: a reload or another device of theirs goes straight back
@@ -286,7 +287,7 @@ entry says the same.
 | The emblems: the drawing, its bake, the baked picture | `packages/app/src/characters/rank-set.ts`, `scripts/bake-emblems.ts`, `packages/app/src/emblems/` |
 | The top tiers' place (the count and its minute's cache), a rank with it | `packages/server/src/ranked-schema.ts` (`topPlace`, `rankOf`) |
 | The stage, recorded (GIFs and stills, light and dark, 320-1280 px) | `scripts/frames-versus.mjs` |
-| Browsing while queued: the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/components/DuelQueueBar.tsx` (mounted in `main.tsx`), `App.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
+| Browsing while queued (every queue's since Nov 10): the search, the bar, the leave confirm, the found alert; App's `duelAway` | `packages/app/src/search.ts`, `components/SearchBar.tsx` (mounted in `main.tsx`), `App.tsx`; home's rows in `screens/Home.tsx`; recorded by `scripts/frames-queue-browse.mjs` |
 | The home screen's helper; an admin's `?rank=` | `packages/app/src/ranked.ts` (`ranked1v1Label`, `ranked1v1Rank`, `rankFromSwitch`, `yourRankShown`) |
 | Wiring (`/1v1`, `/1v1/CODE`) | `packages/app/src/App.tsx` |
 
