@@ -283,8 +283,10 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   `{ size, pass }`. A lobby takes a group only if every party in it still fits the squads whole (`partiesFit`: the
   rules' own `formSquads` packing); otherwise the next lobby. Solo players are parties of one. One seat per account: a
   second connect takes over that seat; a seat token from another account is refused (`SQUADS_OTHER_ACCOUNT`).
-- **Bot work's trust** (Nov 10): a job never goes to two devices of one party, and only the engine server's answers go
-  in the cache every lobby here shares (`TOP_CACHE`); devices' answers serve their own job.
+- **Bot work's trust** (Nov 10): a job never goes to two devices of one party, except a second party device as a
+  checker when no outside device is free (agreement counts as one answer, `"one"`; disagreement goes to the server).
+  No answer is shared between lobbies for now (`TOP_CACHE` stays empty until the server picks its own top moves, ROADMAP);
+  every answer serves its own job.
 - **Parties.** `POST /api/squads/party` makes one (a 5-character code; the invite link is `/squads/party/CODE`). Up to
   4 connect to `/api/squads/party/CODE/ws`. The leader (the first in; the next if they leave or drop) sends `queue`:
   the party asks the matchmaker for seats for everyone connected under a fresh pass (again every
