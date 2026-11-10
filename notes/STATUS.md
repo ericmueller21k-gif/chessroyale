@@ -1,3 +1,4 @@
+- Nov 10 09:37 UTC: phone-load-3 helper session_01JuCWRrWnYg4bw55BUdWdiD (high) on claude/phone-load-3 (town first frame + redraw).
 - Nov 10 09:40 UTC: #608 flaky batch 6 MERGED 3163543. Waiting on Eric: #604 guard edits; squads-replay:230 spec fix (guard). Next queue: phone-load-3, Fable batches 2-5, tests 7, cleanup 8, auto chess landing page, settings menu (await Eric).
 - Nov 10 09:25 UTC: #607 LIVE eec7200; main full run 42788354486 GREEN (no flaky).
 - Nov 10 09:22 UTC: flaky batch 6 PR #608 open (global-chat pool, boss solo start askTwice). desktop-board:260 is fixed by #604. squads-replay:230 needs Eric OK (guard test, proposed spec-only fix in #608 body). CI running.
