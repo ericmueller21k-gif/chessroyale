@@ -1,3 +1,4 @@
+- Nov 10 19:50 UTC: #611 LIVE 384fd84 (main run: flaky boss-challenge:1169 Timber admin town "drawn" -> next flaky batch). #617 xp test fix merged.
 - Nov 10 19:45 UTC: started cheater demo (claude/cheater-demo, on engine-pool) and Discord alerts (claude/discord-alerts) beside the #618 review.
 - Nov 10 19:40 UTC: engine pool PR #618 (full-e2e). Review on review/engine-pool (ONE round). Then cheater demo + Discord alerts.
 - Nov 10 19:30 UTC: #611 (Fable b3) MERGED 384fd84. xp.spec:75 flaky = same solo-boss-quest cause -> PR #617 (light). Engine pool helper running.
