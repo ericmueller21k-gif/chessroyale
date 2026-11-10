@@ -1,6 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { relaySeat } from "@chessroyale/chess/squads";
+import { SQUADS_LOBBY } from "@chessroyale/core";
 import { BOARD_SEL, named, test } from "./helpers.ts";
 
 /**
@@ -207,6 +208,11 @@ test("the turn order: one queue for the board on screen, one size on every board
   await play(page, quiet(s.fen!));
   // Moved: you're no longer lit; each board of your match in turn, the box the same size, you on it somewhere.
   await expect(page.locator(".sq-to-row.you.lit")).toHaveCount(0);
+  // Your own board, opened at once (before "Jump to my next board" comes, a beat after your move), stays: the jump is called
+  // off by a board you open yourself. (Main run 1171: the jump took the screen from the board just tapped to the next.)
+  await page.locator(".sq-match.ours button.sq-tiny").nth(s.duty!.board).click();
+  await page.waitForTimeout(SQUADS_LOBBY.watching.jumpAfterMs + 400);
+  await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${s.duty!.board + 1}`);
   for (let i = 0; i < 3; i++) {
     await page.locator(".sq-match.ours button.sq-tiny").nth(i).click();
     await expect(page.locator(".sq-to-list")).toHaveAttribute("aria-label", `Turn order on board ${i + 1}`);

@@ -471,7 +471,12 @@ export function SquadsMatchScreen({
       watching={!!watch && !onMine}
       studying={!onMine && !!mine && vm.key === mine.key && vb.id === studyBoard({ ...mine, turn: shownTurn(mine) }, me)}
       canWatch={!duty || myLocked || vm.state !== "half"}
-      onWatch={(key, board) => setWatch(mine && key === mine.key && board === myBoard ? null : { key, board })}
+      onWatch={(key, board) => {
+        // (A board you open yourself, your own too, calls off the jump still to come: it once took you from your own board, a
+        // beat after you'd opened it, to the next one. Main run 1171.)
+        clearTimeout(jumpTimer.current);
+        setWatch(mine && key === mine.key && board === myBoard ? null : { key, board });
+      }}
       onShow={(board, ply) => setWatch({ key: vm.key, board, ply, at: Date.now() })}
       showAt={viewing.ply !== undefined ? { ply: viewing.ply, at: viewing.at ?? 0 } : null}
       canShow={!duty || myLocked || vm.state !== "half"}

@@ -1,4 +1,5 @@
 import { devices, expect, type Browser, type Page } from "@playwright/test";
+import { TOWN_AFK } from "@chessroyale/core";
 import { asSignedIn, giveItems, test, wearItem } from "./helpers.ts";
 
 /**
@@ -248,10 +249,14 @@ test("your default pawn color goes with you (Eric, Nov 7): you're black in your 
 });
 
 test("the rule off with ?townafk=off: no zzz and no boot however long", { tag: "@phone-only" }, async ({ page }) => {
+  // (The page's clock, jumped past the real rule's boot (TOWN_AFK.bootAfterSec) rather than 4 s of real waiting: the rule reads the
+  // wall clock, Date.now().)
+  await page.clock.install();
   await page.goto("/town?sky=day&townafk=off");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await page.waitForFunction(() => typeof (window as any).__townHere === "function");
-  await page.waitForTimeout(4_000);
+  await page.clock.fastForward((TOWN_AFK.bootAfterSec + 60) * 1000);
+  await page.clock.runFor(2_000); // (the away check's 1 s interval, twice past the jump)
   expect((await me(page)).zzz).toBe(false);
   await expect(canvas(page)).toHaveCount(1);
 });

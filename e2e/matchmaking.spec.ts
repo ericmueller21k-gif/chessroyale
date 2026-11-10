@@ -97,6 +97,7 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   await expect(page.locator(".fd-queue-mode")).toHaveText("Crowd · 50 v 50 · Bots off");
   await expect(page.locator(".fd-queue-line")).toContainText("No bots");
   const first = (await code(page))!;
+  const openedAt = Date.now();
   // Someone else with Bots off: the same lobby.
   const other = await (await browser.newContext()).newPage();
   await named(other, "Also patient");
@@ -106,8 +107,9 @@ test("Bots off: people only, it waits; one tap switches to Default, keeping your
   await other.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect.poll(() => code(other)).toBe(first);
   await expect(page.locator(".fd-count-n")).toHaveText("2");
-  // Past the fill time (8 s here): still waiting, no bots.
-  await page.waitForTimeout(10_000);
+  // Past the fill time (8 s here, MATCH_FILL_SECONDS in playwright.config.ts) since the lobby opened: still waiting, no bots.
+  // (What's left of it, 2 s over: the second player's join took some of it already.)
+  await page.waitForTimeout(Math.max(0, openedAt + 10_000 - Date.now()));
   expect(await phase(page)).toBe("lobby");
   expect(await seats(page)).toBe(2);
   // Someone with Default meanwhile gets a lobby of their own (never this one).

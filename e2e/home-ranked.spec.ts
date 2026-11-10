@@ -338,6 +338,10 @@ test("home keeps still: no click on a mode or an option moves or resizes the boa
     }
     // The panel is there from the first view, greyed (Eric, Oct 25). The first pick wakes it and moves nothing: the RANKED
     // row, PLAY, the cards, the panel and the board stay where they were.
+    // (The web fonts in first: home's own render asks for Archivo after the page's load (so goto doesn't wait), and it comes in
+    // with font-display: swap about 2 s later, every line a px or two shorter: 1 px here, 3 px on CI's fallback font. On the first
+    // size only (cached after). Main run 1155: "390×844, the first pick: ranked's y", 3 px, the swap between the two measures.)
+    await page.evaluate(() => document.fonts.ready);
     const before = await measure();
     expect(before.panel, `${w}: the panel is there before a pick`).toBeDefined();
     await radio(/^50 v 50/).click();

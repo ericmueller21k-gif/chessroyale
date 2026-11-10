@@ -1,6 +1,7 @@
 import { devices, expect, request as apiRequest, type Browser, type Page, type Request } from "@playwright/test";
 import { CHAT, tooSoonText } from "../packages/app/src/town/chat.ts";
 import { NAME_COLORS } from "../packages/app/src/town/names.ts";
+import { TOWN_CHAT } from "@chessroyale/core";
 import { asServerAdmin, asSignedIn, test } from "./helpers.ts";
 
 /**
@@ -1239,6 +1240,11 @@ test("the edge chips keep off the chat box (always on and new messages, shown or
       if (d) expect(Math.hypot(c.x - d.x, c.y - d.y), `${c.name} stays put ${when}`).toBeLessThan(15);
     }
   };
+  // (The town held still first: no bot sets off, and the walks under way end. A bot walking by an edge chip pushes it along the
+  // edge by its name tag, by as many steps as the tag is wide: main run 1171, Crumb's tag took Wrangler's chip 24-30 px down
+  // the left edge as the log faded. What's measured here is the log, not the walkers.)
+  await page.evaluate(() => (window as any).__townStill());
+  await expect.poll(() => page.evaluate(() => ((window as any).__townBots() as { moving: boolean; fading: string | null }[]).filter((b) => b.moving || b.fading).length), { timeout: 30_000 }).toBe(0);
   await goMode(page, "new");
   await page.waitForTimeout(300);
   const before = await byTheBox();
@@ -1412,6 +1418,7 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await openSignedIn(cy);
   await send(bo, `Bo says something rude ${run}`);
   await send(cy, `Cy says hello ${run}`);
+  const cySaidAt = Date.now();
   const boLine = lineOf(page, `Bo says something rude ${run}`);
   const cyLine = lineOf(page, `Cy says hello ${run}`);
   await expect(boLine).toHaveCount(1, { timeout: 10_000 });
@@ -1463,7 +1470,8 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await cyLine.locator(".tc-name").click();
   await menu.getByRole("button", { name: "Mute" }).click();
   await expect(cyLine).toHaveCount(0);
-  await cy.waitForTimeout(15_500);
+  // (Cy's next line once the server's one-a-player gap since his first has passed: what's left of it, not the whole of it again.)
+  await cy.waitForTimeout(Math.max(0, cySaidAt + TOWN_CHAT.gapMs + 500 - Date.now()));
   await send(cy, `Cy again ${run}`);
   await expect(lineOf(bo, `Cy again ${run}`), "others still see Cy").toHaveCount(1, { timeout: 10_000 });
   await expect(lineOf(page, `Cy again ${run}`), "muted here").toHaveCount(0);

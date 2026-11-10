@@ -496,7 +496,7 @@ door's look; every class is `sq-`.
     the board). On (the default, `watching.jumpToNext`;
     remembered on the device, `brc.squads.jumpNext`, `squadsJumpNext` in prefs.ts), once you've made your Relay move the
     big board goes to the board you play next turn, `watching.jumpAfterMs` (600 ms) later so your piece lands first
-    (your move shows nowhere else until the half ends), unless you've opened another board meanwhile. Next turn's board
+    (your move shows nowhere else until the half ends), unless you've opened a board meanwhile (your own included: a tap on any tiny board calls the jump off; Nov 9, the flaky sweep). Next turn's board
     finished (you'd scout it): the first board after it still going; none but yours: you stay (`studyBoard`). The line
     above the board says "Watching Board 3 · your next board"; a tap on your own tiny board brings you back ("Back to
     my board" is gone, Nov 5), and the jump comes once a half. **Your turn snaps the big board live** (Eric, Nov 9; docs/decisions/2026-11-09-squads-snap-live.md): when a new half asks your move on the board in view, that board's history goes back to live, even if you had stepped back with « while waiting (`MatchView`, `turnHalf`; check: `e2e/squads-three-boards.spec.ts`, "your turn snaps you live"). Off: you stay on your board until the game moves you. Pairs and the final have no next board.

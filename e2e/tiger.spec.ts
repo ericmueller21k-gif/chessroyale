@@ -316,7 +316,14 @@ test("Babur: a balloon put on the pump at the start of his turn (a phone: his ho
   const first = await state(page);
   await submitMove(page, quiet(first.fen, first.allowed), first.fen);
   await expect.poll(() => kinds(page), { timeout: 30_000 }).toContain("place");
-  await page.waitForTimeout(7000);
+  // (Until the pump's balloon is ready (its stages a second each on the 12× clock) and, on a phone, he's home on the bar again:
+  // what the 7 s wait was for.)
+  await expect
+    .poll(async () => {
+      const r = await recorded(page);
+      return r.some((x) => /^ready/.test(x.pump ?? "")) && (desktop() || r.at(-1)!.bar?.translate === "");
+    }, { timeout: 30_000 })
+    .toBe(true);
   const rec = await recorded(page);
   const b = (await state(page)).boss.powers.balloon;
   expect(b, "a balloon on the nozzle").toBeTruthy();
