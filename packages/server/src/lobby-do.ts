@@ -564,7 +564,7 @@ export class Lobby extends DurableObject<Env> {
       const practice = !!msg.practice && (this.env.TEST_SWITCHES === "1" || !!attached?.admin);
       // Their rating is the one stored on their account, never the app's word: a low one claimed would meet a weaker raid
       // boss. None yet, or no account: null, the prior (docs/decisions/2026-10-16-server-side-rating.md).
-      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat });
+      const result = core.connect(msg.token, joining?.name ?? msg.name, msg.device, practice, joining?.rating ?? null, msg.look, attached?.userId, typeof msg.lastBoss === "string" ? msg.lastBoss : null, typeof msg.evalBar === "boolean" ? msg.evalBar : null, !!attached?.admin || this.env.MAIA_TEST === "1", { pass: msg.party, seat: msg.seat }, msg.seeded === true);
       // A new player took a seat: one held for the players on their way is theirs (the oldest).
       if (result.ok && this.record.humans.length > before) this.reservations.shift();
       if (!result.ok) {
@@ -719,7 +719,8 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
       countCall(`lobby.${what}Failed`);
       return fallback;
     });
-  const moves = rec.fair?.[p.playerId] ?? [];
+  // (A match that rested on one device's word (unvouched) builds no fair-play case: its numbers are that device's alone.)
+  const moves = rec.unvouched ? [] : (rec.fair?.[p.playerId] ?? []);
   if (moves.length) await soft("fairPlay", recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail), null);
   // (A player in review, or banned, has their results held off ranking until they're cleared.)
   const held = !(await eligibleForRanked(c.sql, p.userId));

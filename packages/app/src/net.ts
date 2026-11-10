@@ -87,7 +87,7 @@ import { MatchChat } from "./chat.ts";
 import { isAdmin, maiaAllowed } from "./boss-brain.ts";
 import { resetKingSpeech } from "./godKing.ts";
 import { bossVoice } from "./speech.tsx";
-import { prefetchMaia, startMaia } from "./maia.ts";
+import { maiaSaved, prefetchMaia, startMaia } from "./maia.ts";
 import { setGardenSource } from "./garden-clock.ts";
 import { timingOnDevice } from "./test-switches.ts";
 import { gameKey, onYours, yours } from "./board/yours.ts";
@@ -120,6 +120,9 @@ export async function lobbyStatus(code: string, timeoutMs = 5000): Promise<Lobby
     return null;
   }
 }
+
+/** This device's class as the lobby is told it at hello: a touch screen is a phone. */
+const deviceKind = (): "phone" | "computer" => (typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches ? "phone" : "computer");
 
 /** This device's seat in a lobby (and its queue mode): kept to rejoin it, forgotten once you're done with it. */
 export const seatKey = (code: string) => `brc.lobby.${code.toUpperCase()}`;
@@ -206,6 +209,8 @@ export class NetMatch implements GameView {
   botsOff = false;
   /** It counted for your ranking (from the results; null until then). */
   ranked: boolean | null = null;
+  /** Something in it stood on one device's word alone: it pays as a solo game (from the results). */
+  unvouched = false;
   /** How you were matched (the queue screen's wording). */
   get queueType(): MatchmakingType {
     return this.botsOff ? "botsoff" : "default";
@@ -493,8 +498,10 @@ export class NetMatch implements GameView {
       } catch {
         // No storage: join as a new player.
       }
-      const device = matchMedia("(pointer: coarse)").matches ? "phone" : "computer";
-      this.send({ t: "hello", token, name: this.playerName, device, practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn(), ...(this.partyPass && !token ? { party: this.partyPass, seat: this.partySeat } : {}) });
+      // (`seeded`: this app plays a boss request's seed, so it may check the boss's moves: BOSS_CHECK.)
+      this.send({ t: "hello", token, name: this.playerName, device: deviceKind(), practice: this.practice, look: account().profile?.locker?.look ?? {}, lastBoss: lastBoss(), evalBar: evalBarOn(), seeded: true, ...(this.partyPass && !token ? { party: this.partyPass, seat: this.partySeat } : {}) });
+      // (Back after a dropped connection with Maia still loaded: the lobby forgot it on the reconnect.)
+      if (this.maia?.ready()) this.send({ t: "maiaReady" });
     };
     ws.onmessage = (e) => this.onMessage(JSON.parse(e.data as string) as ServerMessage);
     ws.onclose = () => {
@@ -798,8 +805,9 @@ export class NetMatch implements GameView {
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
         return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null);
       case "bossBrain":
-        // The battle is on the Maia brain and this device plays the boss: Maia loads during the intro.
-        return void this.useBrain(m.brain);
+        // The battle is on the Maia brain and this device plays the boss (Maia loads during the intro), or (`check`) it was drawn
+        // to check his moves (BOSS_CHECK): a computer loads it, a phone only if its files are saved here already.
+        return void this.useBrain(m.brain, !!m.check);
       case "chat":
         return this.chat.onLine(m.line);
       case "chatLog":
@@ -815,6 +823,7 @@ export class NetMatch implements GameView {
         }
         if (m.standings) this.standingsList = m.standings;
         if (m.ranked !== undefined) this.ranked = m.ranked;
+        this.unvouched = !!m.unvouched;
         return this.showResults(m);
     }
   }
@@ -900,18 +909,20 @@ export class NetMatch implements GameView {
       // (The server's seed for this move (BOSS_CHECK): the random source and Maia's draw, so the second device asked plays the
       // same move. This request may come to this device as that second device: it plays it the same way.)
       const rng = draw ? mulberry32(draw) : Math.random;
-      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => (this.brainNote = n) } : undefined;
+      // (Which brain played it, from its last note: sent with it, so two devices' different moves are settled fairly.)
+      let by: "maia" | "stockfish" = "stockfish";
+      const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => ((this.brainNote = n), (by = n.by)) } : undefined;
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
       if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;
       // (Chub & Chirp's Carrot Patch: his race brain on this device's engine, with the race the server sent.)
       const look = race && !funhouse ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;
-      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look);
+      const ordinary = () => bossMoveFrom(engine!, fen, elo, nodes, kind, rng, this.settings.kingStrikeLoss, bossGuardFrom(this.settings), allowed, maia, ahead, look, !!draw);
       if (asks && !funhouse) {
         // Wrangler's turn: his long pull (his first move) or his move, then his drag or his showdown's line-up after it,
         // on this device's engines (the scout's line-ups first). The server checks them against his rules.
         const answer = await pigTurn(engines, fen, asks, ordinary, this.scout);
-        this.send({ t: "bossMove", key, move: answer.move, ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}) });
+        this.send({ t: "bossMove", key, move: answer.move, ...(answer.drag !== undefined ? { drag: answer.drag } : {}), ...(answer.showdown !== undefined ? { showdown: answer.showdown } : {}), ...(brain ? { by } : {}) });
         return this.emit();
       }
       // Boingo's funhouse: the crowd's move, played for it (a weak but recoverable one); else the boss's own (a pie
@@ -920,7 +931,7 @@ export class NetMatch implements GameView {
       const lines = beam && !funhouse ? await beamLines(engine!, fen, move, beam) : null;
       const end = (balloon || hoops) && !funhouse ? await (async () => hoopsAnswer(engines, applyMove(fen, move), hoops, balloon))().catch(() => null) : null;
       const line = crease && !funhouse ? await (async () => creaseAnswer(engines, applyMove(fen, move), crease))().catch(() => "") : "";
-      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(line ? { crease: line } : {}) });
+      this.send({ t: "bossMove", key, move, ...(lines ? { beam: lines } : {}), ...(end?.land ? { balloon: end.land.square } : {}), ...(end?.answer ? { hoops: end.answer } : {}), ...(line ? { crease: line } : {}), ...(brain && !funhouse ? { by } : {}) });
       this.emit();
     } catch {
       // No engine here: the server asks someone else, or plays a random move.
@@ -954,12 +965,21 @@ export class NetMatch implements GameView {
 
   /**
    * The lobby's plan for the battle (on the Maia brain): start loading Maia, once, if this device may run it at all
-   * (an admin, or everyone once forPlayers is on). A device that may not plays Stockfish's move, as before.
+   * (an admin, or everyone once forPlayers is on). A device that may not plays Stockfish's move, as before. `check` (drawn to
+   * check the boss's moves, BOSS_CHECK): a phone loads it only if its files are saved here already (no download for this).
    */
-  private useBrain(plan: NetBossBrain) {
+  private useBrain(plan: NetBossBrain, check = false) {
     if (!maiaAllowed()) return;
     this.bossPlan = plan;
-    if (!this.maia) this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs);
+    if (this.maia) return;
+    if (check && deviceKind() === "phone") return void maiaSaved().then((saved) => saved && !this.maia && this.loadMaia());
+    this.loadMaia();
+  }
+
+  /** Starts Maia; once it's loaded the lobby is told (`maiaReady`: this device may check the boss's Maia moves). */
+  private loadMaia() {
+    const maia = (this.maia = startMaia(BOSS_BRAIN.loadTimeoutMs));
+    void maia?.loaded().then((ok) => ok && this.maia === maia && this.send({ t: "maiaReady" }));
   }
 
   /** Frees Maia (its model holds a few hundred MB). */
@@ -1036,7 +1056,9 @@ export class NetMatch implements GameView {
   private async reportSpeed() {
     try {
       await this.engines();
-      this.send({ t: "speed", nps: await engineSpeed() });
+      const nps = await engineSpeed();
+      // (Maia's files saved here already: a phone may be drawn to check the boss's Maia moves, BOSS_CHECK.)
+      this.send({ t: "speed", nps, ...(maiaAllowed() && (await maiaSaved()) ? { maiaSaved: true as const } : {}) });
     } catch {
       // No engine here: this device doesn't judge.
     }

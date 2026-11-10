@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, BOSS_POWERS, openingPlies, type BossBrain, type BossPowerSettings, type Rng } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_POWERS, lossForRating, openingPlies, type BossBrain, type BossPowerSettings, type Rng } from "@chessroyale/core";
 import type { BoardSlot, NetBoard } from "./protocol.ts";
 import { recentMoves, type BoardState } from "./boards.ts";
 import { applyMove, gameEnd, legalMoves, sideToMove } from "./rules.ts";
@@ -402,6 +402,9 @@ function pickByLoss(top: readonly MoveScore[], range: readonly [number, number],
  * Whichever of those picks it, the move is one of `allowed` (the moves the powers leave him; null: any legal move): a
  * pick that isn't (an engine's answer for another position, say) is logged and his best allowed move played instead
  * (the first allowed one if that search fails too), and the admins' debug line says it was replaced.
+ *
+ * `seeded` (an online move two devices play with one seed, `rng` from it: BOSS_CHECK): Stockfish at a strength draws from the
+ * top-8 search with `rng` (eloDraw) in place of UCI_LimitStrength's own draw (seeded by the clock), so two honest devices agree.
  */
 export async function bossMoveFrom(
   engine: EngineLike,
@@ -416,9 +419,10 @@ export async function bossMoveFrom(
   brain?: BossBrainCall,
   ahead: BossAhead | null = null,
   race: BossRace | null = null,
+  seeded = false,
 ): Promise<string> {
   const searched: { top: readonly MoveScore[] } = { top: [] };
-  let move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain, searched);
+  let move = await pickBossMove(engine, fen, elo, nodes, kind, rng, strikeLoss, guard, allowed, brain, searched, seeded);
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
   if (race && k === "elo" && searched.top.length) {
     try {
@@ -478,6 +482,7 @@ async function pickBossMove(
   allowed: readonly string[] | null,
   brain: BossBrainCall | undefined,
   searched: { top: readonly MoveScore[] },
+  seeded = false,
 ): Promise<string> {
   const k: BossMoveKind = kind === true ? "stumble" : kind === false ? "elo" : kind;
   if (k === "best") {
@@ -538,12 +543,31 @@ async function pickBossMove(
     const g = strikeGuard(guard, strikeLoss);
     return confirm(pickByLoss(top, strikeLoss, g), g);
   }
-  if (!engine.playAtElo) return bestMove;
-  const move = await engine.playAtElo(fen, elo, nodes);
+  // (Seeded: drawn from the search with the seed, so the checker plays the same move: BOSS_CHECK.)
+  if (!seeded && !engine.playAtElo) return bestMove;
+  const move = seeded ? eloDraw(top, elo, rng) : await engine.playAtElo!(fen, elo, nodes);
   if (ok && !ok.has(move)) return confirm(pickByLoss(top, guard.slipLoss, guard), guard);
   const best = top[0]!.expected;
   const got = top.find((m) => m.move === move)?.expected ?? (await engine.scoreMoves(fen, [move]))[0]?.expected ?? 0;
   return confirm(withinGuard(moveLoss(best, got), guard) ? move : pickByLoss(top, guard.slipLoss, guard), guard);
+}
+
+/**
+ * Stockfish at a strength, drawn from its top moves with a given random source (an online boss move two devices play with one seed:
+ * BOSS_CHECK; UCI_LimitStrength draws with the clock): each move weighed exp(−loss ÷ T), T the mean loss per move Stockfish gives
+ * away at that UCI_Elo (RATING_CURVE), so the best is the likeliest and a move T points worse about a third as likely. The guard
+ * and the head-to-head check after it are the same as for UCI_LimitStrength's move.
+ */
+export function eloDraw(top: readonly MoveScore[], elo: number, rng: Rng): string {
+  const best = top[0]!.expected;
+  const t = Math.max(0.5, lossForRating(elo));
+  const weights = top.map((m) => Math.exp(-moveLoss(best, m.expected).points / t));
+  let r = rng() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < top.length; i++) {
+    r -= weights[i]!;
+    if (r < 0) return top[i]!.move;
+  }
+  return top[0]!.move;
 }
 
 /**

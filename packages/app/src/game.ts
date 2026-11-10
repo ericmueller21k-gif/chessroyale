@@ -407,6 +407,8 @@ export interface GameView {
   readonly chat?: MatchChat;
   /** It counts for your ranking (at least 30% real players; never solo). Null or missing: not known (yet). */
   readonly ranked?: boolean | null;
+  /** Online: something in the match stood on one device's word alone, so it pays as a solo game (the results say so). */
+  readonly unvouched?: boolean;
   /** What leaving means now (null: nothing to leave: the results, or still connecting). */
   readonly exit: ExitKind | null;
   /** Leaving goes straight home, with no results screen (before move 1; online, once you're out). */

@@ -565,7 +565,8 @@ export type ClientMessage =
   /** `lastBoss`: the boss this player met last (a BOSS_ROSTER id), so a raid can avoid the one most of the lobby met. */
   /** No rating: the lobby reads the one stored on the player's account (one an older app still sends is ignored). */
   /** `party`, `seat`: a Boss Battle party's battle, its pass (from the party's `placed`) and this member's seat in it. */
-  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean; party?: string; seat?: number }
+  /** `seeded`: this app plays a boss request's `draw` (BOSS_CHECK): only such devices check the boss's moves or have theirs compared. */
+  | { t: "hello"; token?: string; name?: string; device?: "phone" | "computer"; practice?: boolean; look?: unknown; lastBoss?: string | null; evalBar?: boolean; party?: string; seat?: number; seeded?: true }
   | { t: "start" }
   /** A Boss Battle party's AFK kick: `playerId` hasn't picked a minute after the turn's first pick (the lobby's partyKickable). */
   | { t: "kick"; playerId: string }
@@ -604,7 +605,13 @@ export type ClientMessage =
    * (hoopsAnswer's, "c3 f5 b6"; "" none); the server checks it (hoopsCheck). `crease` (Folio's, asked with `crease`): the
    * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck).
    */
-  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string }
+  /**
+   * `by` (a request with a `brain`): which brain played it, "maia", or "stockfish" (a fallback: Maia not ready, late or failed, the
+   * bridge band's share, a guard's swap). Two devices' different moves are settled by it (BOSS_CHECK). Missing: "stockfish".
+   */
+  | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; by?: "maia" | "stockfish" }
+  /** This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves (BOSS_CHECK). */
+  | { t: "maiaReady" }
   /** Leaving before the match starts (Cancel in the queue): the seat is freed. */
   | { t: "leave" }
   /**
@@ -621,8 +628,11 @@ export type ClientMessage =
    * for this match (their lines aren't sent to it).
    */
   | { t: "chatPrefs"; off?: boolean; muted?: string[]; /** Chat is on for typed lines here (its opt-in; the server checks the account and the age gate). */ typed?: boolean }
-  /** Many judges: this device's engine speed (nodes per second), from its speed check on joining. */
-  | { t: "speed"; nps: number }
+  /**
+   * Many judges: this device's engine speed (nodes per second), from its speed check on joining. `maiaSaved`: Maia's files are saved
+   * on this device already (a phone may then be drawn to check the boss's Maia moves: BOSS_CHECK.loaders).
+   */
+  | { t: "speed"; nps: number; maiaSaved?: true }
   /** Many judges: this device's answer to one scoring job. */
   | { t: "judged"; key: string; id: string; report: JudgeReport }
   /** Many judges, deep checks: this device's re-check of the job's close calls (sent after its "judged"). */
@@ -870,9 +880,10 @@ export type ServerMessage = { now: number } & (
       /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
       brain?: NetBossBrain;
       /**
-       * His own move and the funhouse's (BOSS_CHECK): the seed to play it with, for the random source and Maia's draw (1 to
-       * 2147483647). The same request goes to a second device, and the two moves are compared: the same seed, the same move.
-       * Missing from older servers (and for his powers' picks): play as before.
+       * His own move and the funhouse's (BOSS_CHECK): the seed to play it with, for the random source, Maia's draw and limited-strength
+       * Stockfish's (1 to 2147483647). The request goes to a checker too (without his powers' extras: drag, showdown, beam, balloon,
+       * hoops, crease), and the two moves are compared: the same seed, the same move. Missing (nobody to check it, older servers, his
+       * powers' picks): play as before.
        */
       draw?: number;
       /**
@@ -973,9 +984,11 @@ export type ServerMessage = { now: number } & (
     }
   /**
    * The boss's brain for this battle, to the host as the battle begins (on the Maia brain only): it starts loading
-   * Maia during the intro, so the first move can be Maia's.
+   * Maia during the intro, so the first move can be Maia's. `check`: to a device drawn to check his moves (BOSS_CHECK.loaders): a
+   * computer loads Maia; a phone only if Maia's files are already saved on it (no download for this). Either says `maiaReady` once
+   * loaded.
    */
-  | { t: "bossBrain"; brain: NetBossBrain }
+  | { t: "bossBrain"; brain: NetBossBrain; check?: true }
   /** Quick chat: a line for you (your own included, echoed back). */
   | { t: "chat"; line: NetChatLine }
   /**
@@ -1005,6 +1018,8 @@ export type ServerMessage = { now: number } & (
       carrots?: boolean;
       /** It counted for ranking (real players filled at least RANKING.rankedMinHumanShare of the seats). Missing: an older server. */
       ranked?: boolean;
+      /** Something in it stood on one device's word alone (LobbyRecord.unvouched): it pays as a solo game, and the results say so. */
+      unvouched?: true;
     }
 );
 

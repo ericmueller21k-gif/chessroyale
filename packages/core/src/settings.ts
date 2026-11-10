@@ -2191,18 +2191,22 @@ export const BOSS_BRAIN = {
 export type BossBrainSettings = typeof BOSS_BRAIN;
 
 /**
- * Who plays the boss online (the outside review of Nov 10, finding 2; docs/decisions/2026-11-10-boss-and-lone-devices.md): his own
- * move (the brain's, a slip, the King's stagger, a power's best) and Boingo's funhouse move are asked of the host and a second device
- * with one seed, so two honest devices give the same move (Stockfish's searches are exact at a node count, Maia draws with the seed).
- * The same move plays; two different ones go to the engine server, and the better for him plays; the host's alone (nobody to ask,
- * or the other gone) plays and the match pays as a solo game. A loss guard can't do it: Maia's own moves (no guard, Eric's) give
- * away 25 points or more about one move in five at a raid's levels (reports/maia-boss.md).
- *   - `waitMs`: once one answer is in, how long the other device has (both search at once).
- *   - `strikeLoss`: a device whose move the engine server finds this much worse than the other's (points of expected score, 0 to
- *     1) gets a judge's strike (benched at JUDGES.strikes: no more hosting or judging this match). Two honest devices differ only
- *     when one's Maia wasn't ready or answered late, never by a thrown piece.
+ * Who plays the boss online (the outside review of Nov 10, finding 2, and its review; docs/decisions/2026-11-10-boss-and-lone-devices.md
+ * and docs/areas/bosses.md, "Who plays the boss online"): his own move (the brain's, a slip, the King's stagger, a power's best) and
+ * Boingo's funhouse move are asked of the host and a checker (an up-to-date app outside the host's account and party, drawn at random;
+ * for Maia's moves one whose Maia is loaded) with one seed, so two honest devices give the same move (Stockfish at a node count; Maia
+ * and limited-strength Stockfish draw with the seed). The same move plays. Two differ: the engine server scores both; Maia's move
+ * against a device's fallback to Stockfish (its Maia late or not ready) plays unless it's a throw, else the better for him plays.
+ * Nobody to ask, or no verdict: the host's plays, and the match pays as a solo game.
+ *   - `waitMs`: once the host has answered, how long the checker has (both search at once; the checker skips his powers' extras).
+ *   - `throwLoss`: a move the engine server finds this much worse than the other device's (points of expected score, 0 to 1) is a
+ *     throw: it never plays, and its device gets a judge's strike (benched at JUDGES.strikes). Above Maia's honest worst: its
+ *     unguarded moves in reports/maia-sim (maia-raw, 317 moves) gave away at most 0.76; one in five gave away 0.25 or more.
+ *   - `missStrikes`: a checker that misses its window is replaced next move; this many misses in a battle are a strike.
+ *   - `loaders`: on the Maia brain, how many devices are told to load Maia to check his moves as the battle begins (drawn at random:
+ *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
  */
-export const BOSS_CHECK = { waitMs: 4_000, strikeLoss: 0.4 } as const;
+export const BOSS_CHECK = { waitMs: 4_000, throwLoss: 0.8, missStrikes: 2, loaders: 2 } as const;
 
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
@@ -2777,6 +2781,8 @@ export const SQUADS_LOBBY = {
     perJob: 2,
     maxInFlight: { computer: 4, phone: 2 },
     graceMs: 400,
+    /** The second answer's grace is at least graceMs, or this share of the first's own time (as JUDGES.graceFactor). */
+    graceFactor: 0.5,
     answerMs: 4_000,
     serverNodes: 400_000,
     strikes: 2,
