@@ -40,6 +40,7 @@ import {
   TopMovesCache,
   allowedSearch,
   deepCheck,
+  isChess960Fen,
   jobEscapes,
   jobOffers,
   jobRanked,
@@ -208,6 +209,12 @@ class Seat {
   private voted = new Set<string>();
   private judged = 0;
   private picks = 0;
+  /** Picks that fell back to the prefetched top move (the person's own choice wasn't ready or legal in time). */
+  private fallbacks = 0;
+  /** Picks sent, and those the lobby took (its `moved` for this seat): a pick it never took is a miss. */
+  private sent = new Set<string>();
+  private taken = new Set<string>();
+  private missed = 0;
   private key: string | null = null;
   private reconnects = 0;
   private done: ((o: MatchOutcome) => void) | null = null;
@@ -311,7 +318,22 @@ class Seat {
       case "results":
         return this.finish("results", { placement: this.playerId ? m.placements[this.playerId] : undefined, ranked: m.ranked, unvouched: !!m.unvouched });
       case "vote":
+        // (The crowd's choices, logged once a match: how it ends, how it starts, the clock.)
+        if (m.vote.result !== null && this.persona === playing[0] && !this.voted.has(`${m.vote.key}:result`)) {
+          this.voted.add(`${m.vote.key}:result`);
+          const def = PREGAME_VOTES[m.vote.index];
+          log(`vote "${def?.title ?? m.vote.index}": ${def?.options[m.vote.result]?.label ?? m.vote.result}`);
+        }
         return this.vote(m.vote);
+      case "moved":
+        if (m.playerId === this.playerId) this.taken.add(m.key);
+        return;
+      case "locked":
+        if (this.sent.has(m.key) && !this.taken.has(m.key)) {
+          this.missed++;
+          log(`${this.persona.name}: the lobby didn't take this seat's pick (${m.key})`);
+        }
+        return;
       case "stageBreak":
         // (Knocked out: the page stays open, watching, and its device keeps judging, as most people's do.)
         if (this.playerId && m.knockedOut.includes(this.playerId)) log(`${this.persona.name}: knocked out after stage ${m.stage} (watching and judging on)`);
@@ -363,14 +385,18 @@ class Seat {
     const think = this.persona.style === "engine" ? rand(2500, 6000) : this.persona.style === "strong" ? rand(4000, 10_000) : rand(3000, 11_000);
     // (When to send it, on this machine's clock: after the think time, or as soon as the move is found if that takes longer.)
     const target = Date.now() + startIn + Math.min(think, latest);
-    // (A search still going near the deadline: the prefetched top move instead, so the turn is never missed.)
-    const move = await Promise.race([this.choose(fen, clockMs).catch(() => null), sleep(startIn + latest - 1000).then(() => null)]);
-    const fallback = legalMoves(fen)[0];
-    const chosen = move ?? (await this.top.get(this.engine, fen).catch(() => []))[0]?.move ?? fallback;
+    // (A search still going near the deadline: the prefetched top move instead, so the turn is never missed. Every pick is a legal
+    // move here: the lobby refuses any other, and four misses in a row take a seat away.)
+    const legal = legalMoves(fen);
+    const ok = (mv: string | null | undefined) => (mv && legal.includes(mv) ? mv : null);
+    const move = ok(await Promise.race([this.choose(fen, clockMs).catch(() => null), sleep(startIn + latest - 1000).then(() => null)]));
+    if (!move) this.fallbacks++;
+    const chosen = move ?? ok((await this.top.get(this.engine, fen).catch(() => []))[0]?.move) ?? legal[0];
     if (!chosen) return;
     this.later(target - Date.now(), () => {
       if (this.key !== key || this.finished) return;
       this.picks++;
+      this.sent.add(key);
       this.send({ t: "pick", key, move: chosen });
     });
   }
@@ -383,10 +409,14 @@ class Seat {
       return best?.move ?? null;
     }
     const strong = this.persona.style === "strong";
-    if (maia?.ready()) {
+    // (Not on a Freestyle position that can still castle: the Maia box reads only standard castling rights, and answers such a
+    // position as if it were the usual start. Its move is checked against the legal ones besides.)
+    if (maia?.ready() && !isChess960Fen(fen)) {
       // Sam: Maia's likeliest move at its top rating; an everyday player: drawn from its moves at 1500, as people vary.
       const a = await maia.candidates(fen, strong ? 2500 : 1500, null, strong ? { temperature: 0, topP: 1, multipv: 5 } : { temperature: 1, topP: 0.95, multipv: 5 });
-      if (a?.best) return a.best;
+      const legal = new Set(legalMoves(fen));
+      const pick = [a?.best, ...(a?.moves ?? []).map((m) => m.move)].find((mv) => !!mv && legal.has(mv));
+      if (pick) return pick;
     }
     // (No Maia: Stockfish's top three, weighted, for Sam; one of its top five for the others.)
     const top = await this.top.get(this.engine, fen);
@@ -510,6 +540,12 @@ class Seat {
   get jobsJudged() {
     return this.judged;
   }
+  get fallbackPicks() {
+    return this.fallbacks;
+  }
+  get missedPicks() {
+    return this.missed;
+  }
 }
 
 // ---------------- The report ----------------
@@ -592,7 +628,7 @@ if (!arg("report") && matches > 0) {
     log(`match ${n} over after ${Math.round((Date.now() - started) / 60_000)} min`);
     for (const [i, o] of outcomes.entries()) {
       log(
-        `  ${o.persona.name}: ${o.how}${o.code ? ` in ${o.code}` : ""}${o.placement ? `, placed ${o.placement}` : ""}, ${o.picks} picks, ${seats[i]!.jobsJudged} jobs judged${o.unvouched ? ", UNVOUCHED (no fair play recorded)" : ""}${o.ranked !== undefined ? `, ranked ${o.ranked}` : ""}${o.note ? ` (${o.note})` : ""}`,
+        `  ${o.persona.name}: ${o.how}${o.code ? ` in ${o.code}` : ""}${o.placement ? `, placed ${o.placement}` : ""}, ${o.picks} picks (${seats[i]!.fallbackPicks} fallbacks, ${seats[i]!.missedPicks} not taken), ${seats[i]!.jobsJudged} jobs judged${o.unvouched ? ", UNVOUCHED (no fair play recorded)" : ""}${o.ranked !== undefined ? `, ranked ${o.ranked}` : ""}${o.note ? ` (${o.note})` : ""}`,
       );
     }
     // (Results are written as the lobby wraps up: a moment before the report sees them.)
