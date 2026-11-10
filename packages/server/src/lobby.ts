@@ -364,10 +364,11 @@ export interface LobbyRecord {
    * The boss's own move (and Boingo's funhouse move) asked of two devices (the outside review of Nov 10, finding 2): the seed both
    * play it with (`draw`: the app's random source, Maia's draw and limited-strength Stockfish's; 0 with no checker), so two honest
    * devices give the same move; whether it's Maia's (`maia`: its checker must have Maia loaded); the devices asked (`asked`: the
-   * host first; more after a host change or a missed window, `second`: one more asked once); each one's answer, by device; and the
+   * host first; more after a host change or a missed window, `second`: one more asked once; `missed`: those counted as missing it);
+   * each one's answer, by device; and the
    * engine server's id while it's asked which of two different moves stands. checkBoss and settleBoss; docs/areas/bosses.md.
    */
-  bossCheck?: { draw: number; maia: boolean; asked: string[]; answers: Record<string, BossAnswer>; second?: true; server?: string };
+  bossCheck?: { draw: number; maia: boolean; asked: string[]; answers: Record<string, BossAnswer>; missed?: string[]; second?: true; server?: string };
   /** The device that checks the boss's moves this battle (kept while it can and doesn't miss, so its Maia stays loaded). */
   bossChecker?: string;
   /** On the Maia brain: the devices told to load Maia to check his moves (BOSS_CHECK.loaders), this battle. */
@@ -1881,7 +1882,7 @@ export class LobbyCore {
     }
     const waiting = c.asked.some((id) => !c.answers[id] && !!this.human(id)?.connected);
     if ((waiting && !late) || !ids.length) return;
-    for (const id of c.asked) if (!c.answers[id]) this.bossMissed(id);
+    for (const id of c.asked) if (!c.answers[id] && !c.missed?.includes(id)) this.bossMissed(id);
     // (Before it stands alone: one more device, once, with the same seed: M2.)
     const next = c.draw && !c.second ? this.bossCheckerFor(this.r.hostId ?? ids[0]!, c.asked, c.maia) : null;
     if (next) {
@@ -1898,6 +1899,8 @@ export class LobbyCore {
 
   /** A device asked for a checked boss move missed its window: replaced as checker next move; BOSS_CHECK.missStrikes misses, a strike. */
   private bossMissed(id: string) {
+    const c = this.r.bossCheck;
+    if (c) (c.missed ??= []).push(id);
     const m = (this.r.bossMisses ??= {});
     m[id] = (m[id] ?? 0) + 1;
     console.log(`boss move in ${this.r.code}: ${id} missed its window (${m[id]} this battle)`);
@@ -2321,7 +2324,7 @@ export class LobbyCore {
     // (A checked move with an answer in: the other device is out of time.)
     if (c && Object.keys(c.answers).length) return this.settleBoss(true);
     // (Nobody answered a checked move: each device asked missed it.)
-    for (const id of c?.asked ?? []) this.bossMissed(id);
+    for (const id of c?.asked ?? []) if (!c!.missed?.includes(id)) this.bossMissed(id);
     const next = this.pickHost(this.r.hostId ?? undefined);
     if (next && next !== this.r.hostId) {
       this.r.hostId = next;

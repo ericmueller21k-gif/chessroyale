@@ -242,6 +242,20 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     expect(L.core.record.judges!.devices.p2!.strikes).toBe(0);
   });
 
+  it("M2: the second device asked is silent too: each miss counts once, and the host's move stands alone (unvouched)", () => {
+    const L = raid({ server: true });
+    people(L, ["computer", "phone", "phone"]);
+    L.core.record.bossChecker = "p2";
+    const { key, reqs } = nextBossTurn(L, ["p1", "p2", "p3"]);
+    L.core.record.unvouched = undefined;
+    const r = reqs[0]!.r;
+    L.core.message("p1", { t: "bossMove", key, move: honestMove(r.fen, allowedOf(r)) });
+    while (L.core.record.bossKey === key) L.advance(100);
+    expect(L.core.record.bossCheck).toBeUndefined();
+    expect(L.core.record.bossMisses).toEqual({ p2: 1, p3: 1 });
+    expect(L.core.record.unvouched).toMatch(/no second device/);
+  });
+
   it("M2: two people and a silent checker: each move stands alone after the window (unvouched), and BOSS_CHECK.missStrikes misses are a strike", () => {
     const L = raid({ server: true });
     people(L);
