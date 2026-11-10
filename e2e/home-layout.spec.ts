@@ -420,24 +420,67 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
   }
 });
 
-test("the shell (index.html: what shows before the app's script has run) has the logo, the hero's panel and PLAY's outline where home draws them, so the swap can't be seen", async ({ page }) => {
-  // (Nov 10, phone load: nothing shifts. Home once, which marks this device for home's shell, then a load with the app's
-  // scripts held back: only the shell shows. Each box the same to the pixel, on a phone and a computer.)
-  const boxes = (root: string) =>
-    page.evaluate(async (root) => {
-      await document.fonts.ready;
-      const box = (c: string) => [...document.querySelectorAll(`${root} .${c}`)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => [r.x, r.y, r.width, r.height].map(Math.round))[0] ?? null;
-      return { logo: box("fd-logo"), hero: box("fd-hero"), play: box("fd-play") };
-    }, root);
+test("the shell (index.html: what shows before the app's script has run) is the splash: the HunChess logo centered, on a phone and a computer, even on a device that has seen home", async ({ page }) => {
+  // (Eric, Nov 10: "You load the game, hun chess in the middle ... it doesn't start putting in the containers until everything is
+  // able to load at once." Home's outline in the shell was dropped.)
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(page.locator("#shell")).toHaveCount(0);
-  const home = await boxes("#app");
-  expect(home.play).not.toBeNull();
   await page.route(/\/assets\/.*\.js$/, (r) => r.abort());
   await page.reload();
-  await expect(page.locator("#shell .fd-root")).toHaveCount(1);
-  expect(await boxes("#shell")).toEqual(home);
+  await expect(page.locator("#shell .fd-splash")).toHaveCount(1);
+  await expect(page.locator("#shell .fd-root, #shell .fd-hero, #shell .fd-play")).toHaveCount(0);
+  const logo = await page.locator("#shell .fd-logo").boundingBox();
+  const vp = page.viewportSize()!;
+  expect(Math.abs(logo!.x + logo!.width / 2 - vp.width / 2)).toBeLessThan(3);
+  expect(Math.abs(logo!.y + logo!.height / 2 - vp.height / 2)).toBeLessThan(vp.height * 0.1);
+});
+
+test("the loading bar (Eric, Nov 10): only past a 2-second hang; then a bar and what's loading, under the logo, and nothing else moves", async ({ page }) => {
+  // (Every class the bar takes and when, from the very start of each load, and when the shell went.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__bar = { shown: null, lines: [], gone: null };
+    new MutationObserver(() => {
+      const bar = document.querySelector("#shell .hc-load");
+      if (bar?.classList.contains("on") && w.__bar.shown === null) w.__bar.shown = performance.now();
+      const line = bar?.querySelector(".hc-load-line")?.textContent;
+      if (bar?.classList.contains("on") && line && w.__bar.lines.at(-1) !== line) w.__bar.lines.push(line);
+      if (!document.getElementById("shell") && document.getElementById("app") && w.__bar.gone === null) w.__bar.gone = performance.now();
+    }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  const logo = () => page.locator("#shell .fd-logo").evaluate((el) => el.getBoundingClientRect().toJSON());
+  // Your profile held 3 s: past 2 s the bar shows under the splash's logo, on the "account" line; then home, the shell (and bar) gone.
+  await page.route("**/api/me*", async (r) => {
+    await new Promise((d) => setTimeout(d, 3_000));
+    await r.continue();
+  });
+  await page.goto("/");
+  const before = await logo();
+  const bar = page.locator("#shell .hc-load.on");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".hc-load-line")).toHaveText("Loading your account…");
+  expect(await logo(), "the logo stays put").toEqual(before);
+  const placed = await bar.evaluate((el) => {
+    const b = el.querySelector(".hc-load-track")!.getBoundingClientRect(), l = document.querySelector("#shell .fd-logo")!.getBoundingClientRect();
+    return { under: b.top >= l.bottom, centered: Math.abs(b.left + b.width / 2 - (l.left + l.width / 2)) <= 1, inside: b.left >= 0 && b.right <= innerWidth };
+  });
+  expect(placed).toEqual({ under: true, centered: true, inside: true });
+  await expect(bar.getByRole("button", { name: "Try again", includeHidden: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.locator("#shell")).toHaveCount(0);
+  const held = await page.evaluate(() => (window as any).__bar);
+  // (A timer's few hundredths of a millisecond of rounding.)
+  expect(held.shown, "shown at 2 s, not before").toBeGreaterThanOrEqual(1_990);
+  expect(held.lines.at(-1)).toBe("Loading your account…");
+  // Nothing held: the bar shows only if the load really ran past 2 s (on a quick load, never).
+  await page.unrouteAll();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  const quick = await page.evaluate(() => (window as any).__bar);
+  expect(quick.gone).not.toBeNull();
+  if (quick.gone < 1_990) expect(quick.shown, `shell gone at ${Math.round(quick.gone)} ms: no bar`).toBeNull();
+  if (quick.gone > 2_100) expect(quick.shown, `shell gone at ${Math.round(quick.gone)} ms: the bar showed`).not.toBeNull();
 });
 
 test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits from 320 px up, with no coins in it", async ({ page }) => {

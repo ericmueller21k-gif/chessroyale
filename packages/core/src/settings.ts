@@ -2294,6 +2294,14 @@ export const FRONT_DOOR = {
    * back to the three actions after this long without a tap.
    */
   searchAskMs: 6_000,
+  /**
+   * The loading bar (Eric, Nov 10: "only … if it's going to be more than like a 2-second hang"): the splash (or home's shell) under
+   * the logo shows a thin bar and what's loading once the page has been loading this long. index.html's shell runs it, before the
+   * app's script: it has these numbers written in (a unit test checks they agree).
+   */
+  loadBarAfterMs: 2_000,
+  /** No step done for this long: the bar's line says so, with "Try again" (a reload), never an endless bar. */
+  loadBarStallMs: 20_000,
 } as const;
 
 /**
