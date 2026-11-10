@@ -73,8 +73,8 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     once the boss kit lands): about 15 to 20 minutes for a targeted PR, and as long as main's run for one that runs
     everything (most did on Nov 6: PR median 33.6 minutes before that day's speed-ups). `e2e/areas.json` maps paths
     to specs; a shared foundation (package.json, the lockfile, the Playwright config, `packages/core/src/index.ts`, the runner, the
-    protocol, the board, …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts`, the other
-    `packages/core` modules, a few server modules and shared app modules are traced instead (Nov 1; Nov 6, #530): the specs of whatever uses what the diff changes. Every push to
+    protocol, the board, …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every `packages/core/src` module but
+    `index.ts` (new ones too, Nov 10), `e2e/helpers.ts`, a few server modules and shared app modules are traced instead (Nov 1; Nov 6, #530): the specs of whatever uses what the diff changes; a new file `areas.json` doesn't place fails `check`. Every push to
     `main` runs the whole suite, both projects, on 15 runners since Nov 9 (on 10, about 28 minutes: measured Nov 6, the slowest shard's
     tests 26 and a minute of setup, plus any wait for runners), one run at a time (a newer push
     waiting replaces an older one; the next run covers both). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
