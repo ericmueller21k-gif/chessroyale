@@ -276,7 +276,7 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     expect(L.core.record.judges!.devices.p2!.strikes).toBe(1);
   });
 
-  it("M2: the checker's request has only what the move needs (none of his powers' extras), with the host's seed", () => {
+  it("M2 / D2: on a turn without his powers' extras, the checker's request has only what the move needs, with the host's seed", () => {
     const L = raid({ server: true });
     people(L);
     for (let turn = 0; turn < 3 && L.core.record.phase !== "results"; turn++) {
@@ -285,12 +285,14 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
       const checker = reqs.find((x) => x.id === "p2")!.r;
       expect(checker.draw).toBe(host.draw);
       for (const k of ["drag", "showdown", "beam", "balloon", "hoops", "crease"]) expect(checker).not.toHaveProperty(k);
-      for (const k of Object.keys(checker)) if (k !== "now") expect(host).toHaveProperty(k);
+      // (Marked as a check: a phone doesn't download Maia for it, D6.)
+      expect(checker.check).toBe(true);
+      for (const k of Object.keys(checker)) if (k !== "now" && k !== "check") expect(host).toHaveProperty(k);
       answer(L, key, reqs, (_, r) => ({ move: honestMove(r.fen, allowedOf(r)) }));
     }
   });
 
-  it("B1: an honest Maia host and a checker that fell back to Stockfish (its Maia late): Maia's move plays, nobody is struck, the host keeps hosting", () => {
+  it("B1 / D1: an honest Maia host and a checker that fell back to Stockfish (its Maia late): Maia's move plays within BOSS_CHECK.maiaGap of the other's (else the better), nobody is struck, the host keeps hosting", () => {
     const L = raid({ server: true });
     people(L);
     for (let turn = 0; turn < 3; turn++) {
@@ -300,9 +302,10 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
       const sf = honestMove(r.fen, allowed);
       const maia = allowed.find((m) => m !== sf)!;
       answer(L, key, reqs, (id) => (id === "p1" ? { move: maia, by: "maia" } : { move: sf }));
-      // The engine server: Stockfish's move 0.90, Maia's unguarded one 0.45 (a fifth of its moves give away 25 points or more).
-      for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === maia ? 0.45 : 0.9 })));
-      expect(played(L)).toBe(maia);
+      // The engine server: Stockfish's move 0.90; Maia's just within the gap (four in five of its honest moves), then just past it.
+      const gap = turn < 2 ? BOSS_CHECK.maiaGap - 0.01 : BOSS_CHECK.maiaGap + 0.01;
+      for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === maia ? 0.9 - gap : 0.9 })));
+      expect(played(L)).toBe(turn < 2 ? maia : sf);
       L.advance(1000);
     }
     expect(L.core.record.judges!.devices.p1!.strikes).toBe(0);
@@ -310,7 +313,7 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     expect(nextBossTurn(L).reqs.map((x) => x.id).sort()).toEqual(["p1", "p2"]);
   });
 
-  it("B1: the same the other way round (the host's Maia late): the checker's Maia move plays, no strike", () => {
+  it("B1 / D1: the same the other way round (the host's Maia late): the checker's Maia move plays within the gap, no strike", () => {
     const L = raid({ server: true });
     people(L);
     const { key, reqs } = nextBossTurn(L);
@@ -319,7 +322,7 @@ describe("review of PR #611 (BOSS_CHECK), turned around", () => {
     const sf = honestMove(r.fen, allowed);
     const maia = allowed.find((m) => m !== sf)!;
     answer(L, key, reqs, (id) => (id === "p2" ? { move: maia, by: "maia" } : { move: sf }));
-    for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === maia ? 0.3 : 0.9 })));
+    for (const req of L.asks.splice(0)) L.core.serverScored(req.id, req.moves.map((move) => ({ move, expected: move === maia ? 0.7 : 0.9 })));
     expect(played(L)).toBe(maia);
     expect(L.core.record.judges!.devices.p1!.strikes + L.core.record.judges!.devices.p2!.strikes).toBe(0);
   });

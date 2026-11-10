@@ -355,8 +355,11 @@ export interface SquadsRecord {
    * pay as usual. docs/decisions/2026-11-10-boss-and-lone-devices.md.
    */
   unvouched?: Record<number, string>;
-  /** A late answer that disagreed with the one used (lateTop): its position and the two answers, by device, until the server's verdict. */
-  lateChecks?: Record<string, { fen: string; tops: Record<string, MoveScore[]> }>;
+  /**
+   * A late answer that disagreed with the one used (lateTop): its position and the two answers, by device, until the server's verdict
+   * (or, with no engine server, the `referee` device's answer).
+   */
+  lateChecks?: Record<string, { fen: string; tops: Record<string, MoveScore[]>; referee?: string }>;
   /** People whose placement reward the daily cap took (SQUADS_LOBBY.rewardsPerDay: its write found today's spent), told so. */
   capped?: Record<string, true>;
   /** XP (Nov 9): when the bracket began, and each person's own moves (halves they acted in) and when their last one went in. */
@@ -2288,11 +2291,12 @@ export class SquadsCore {
   }
 
   private botTop(id: string, jobId: string, top: unknown) {
+    if (String(jobId).endsWith("~late")) return this.lateRefereed(id, String(jobId), top);
     const found = this.jobById(jobId);
     if (!found) return;
     const { lm, job } = found;
     // (Settled on another's answer while this device still searched: compared now.)
-    if (job.how && job.late?.includes(id)) return this.lateTop(job, id, top);
+    if (job.how && job.late?.includes(id)) return this.lateTop(lm, job, id, top);
     if (job.how || (!job.devices.includes(id) && job.referee !== id) || id in job.answers) return;
     const clean = cleanTop(job.fen, top, this.s.bots.candidates);
     job.answers[id] = clean;
@@ -2383,9 +2387,10 @@ export class SquadsCore {
   /**
    * An answer that came after its job was settled on another's (the review of #611, M3; as the match room's late judges): compared now.
    * Agreeing: nothing more. One that doesn't hold together: a strike. Disagreeing: the engine server's verdict (lateVerdict), and the
-   * device further from it gets a strike (the bots' moves already made stand; a liar is benched after botWork.strikes).
+   * device further from it gets a strike (the bots' moves already made stand; a liar is benched after botWork.strikes). No engine
+   * server: a referee device of another party, as in time (settle; lateRefereed).
    */
-  private lateTop(job: WorkJob, id: string, top: unknown) {
+  private lateTop(lm: LiveMatch, job: WorkJob, id: string, top: unknown) {
     job.late = job.late!.filter((d) => d !== id);
     const clean = cleanTop(job.fen, top, this.s.bots.candidates);
     job.answers[id] = clean;
@@ -2393,10 +2398,29 @@ export class SquadsCore {
     const first = job.devices.find((d) => d !== id && job.answers[d]);
     if (!first || !job.top || topsAgree(job.top, clean)) return;
     console.log(`squads ${this.r.code}: ${job.id}: ${id}'s late answer disagrees with ${first}'s, used`);
-    if (!this.io.serverEngine || !this.io.serverTop) return;
     const lid = `${job.id}~late`;
-    (this.r.lateChecks ??= {})[lid] = { fen: job.fen, tops: { [first]: job.top, [id]: clean } };
-    this.io.serverTop({ id: lid, fen: job.fen, moves: verdictMovesOf([job.top, clean]), nodes: SQUADS_LOBBY.botWork.serverNodes });
+    const check: { fen: string; tops: Record<string, MoveScore[]>; referee?: string } = { fen: job.fen, tops: { [first]: job.top, [id]: clean } };
+    if (this.io.serverEngine && this.io.serverTop) {
+      (this.r.lateChecks ??= {})[lid] = check;
+      return this.io.serverTop({ id: lid, fen: job.fen, moves: verdictMovesOf([job.top, clean]), nodes: SQUADS_LOBBY.botWork.serverNodes });
+    }
+    const referee = this.pickDevices(lm, 1, job.devices)[0];
+    if (!referee) return;
+    (this.r.lateChecks ??= {})[lid] = { ...check, referee };
+    this.r.devices[referee]!.jobs++;
+    this.send(referee, { t: "botWork", jobs: [{ id: lid, fen: job.fen, n: this.s.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes }] });
+  }
+
+  /** The referee's answer to a late answer's dispute (no engine server): as in time, the one it agrees with stands, the other is struck. */
+  private lateRefereed(id: string, lid: string, top: unknown) {
+    const check = this.r.lateChecks?.[lid];
+    if (!check || check.referee !== id) return;
+    delete this.r.lateChecks![lid];
+    const ref = cleanTop(check.fen, top, this.s.bots.candidates);
+    if (!ref) return this.strike(id, `${lid}: an answer that doesn't hold together`);
+    const [a, b] = Object.keys(check.tops) as [string, string];
+    const right = topsAgree(ref, check.tops[a]!) ? a : topsAgree(ref, check.tops[b]!) ? b : null;
+    if (right) this.strike(right === a ? b : a, `${lid}: outvoted (a late answer's dispute)`);
   }
 
   /** The engine server's verdict on a late answer's disagreement: the device further from it gets a strike (none: nothing). */

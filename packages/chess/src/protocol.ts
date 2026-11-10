@@ -606,8 +606,8 @@ export type ClientMessage =
    * Crease's line after his move (creaseAnswer's, "d|e" or "4|5"; "" none); the server checks it (creaseCheck).
    */
   /**
-   * `by` (a request with a `brain`): which brain played it, "maia", or "stockfish" (a fallback: Maia not ready, late or failed, the
-   * bridge band's share, a guard's swap). Two devices' different moves are settled by it (BOSS_CHECK). Missing: "stockfish".
+   * `by` (a request with a `brain`): which brain played it, "maia", or "stockfish" (a fallback: Maia not ready, late or failed, a
+   * guard's swap). Two devices' different Maia moves are settled by it (BOSS_CHECK). Missing: "stockfish".
    */
   | { t: "bossMove"; key: string; move: string; drag?: string; showdown?: string; outside?: boolean; beam?: string[]; balloon?: string; hoops?: string; crease?: string; by?: "maia" | "stockfish" }
   /** This device's Maia is loaded (its `init` succeeded): it may check the boss's Maia moves (BOSS_CHECK). */
@@ -877,13 +877,20 @@ export type ServerMessage = { now: number } & (
        * as `move`; "" when none is within the cap (nothing moves).
        */
       bounce?: string[];
-      /** The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). */
+      /**
+       * The boss's own move on the Maia brain (BOSS_BRAIN): with Maia, at this rating (the lobby decides, once a battle). The bridge
+       * band's share of Stockfish's moves is the lobby's draw: a request with no `stockfishShare` draws none.
+       */
       brain?: NetBossBrain;
+      /** On the Maia brain, this move is the bridge band's share (the lobby drew it): Stockfish's, with no brain (BOSS_CHECK). */
+      share?: true;
+      /** This device checks the host's move (BOSS_CHECK): a phone doesn't download Maia for it. */
+      check?: true;
       /**
        * His own move and the funhouse's (BOSS_CHECK): the seed to play it with, for the random source, Maia's draw and limited-strength
-       * Stockfish's (1 to 2147483647). The request goes to a checker too (without his powers' extras: drag, showdown, beam, balloon,
-       * hoops, crease), and the two moves are compared: the same seed, the same move. Missing (nobody to check it, older servers, his
-       * powers' picks): play as before.
+       * Stockfish's (1 to 2147483647). The request goes to a checker too (without his powers' extras, drag, showdown, beam, balloon,
+       * hoops and crease, unless the turn has any), and the two moves are compared: the same seed, the same move. Missing (nobody to
+       * check it, older servers, his powers' picks): play as before.
        */
       draw?: number;
       /**

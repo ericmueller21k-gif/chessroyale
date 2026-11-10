@@ -803,7 +803,7 @@ export class NetMatch implements GameView {
         if (m.water) return void this.hostPick(m.key, async (engines) => (await waterAnswer(engines, m.fen, m.water!, !!m.waterAny)).answer);
         // (Chub & Chirp's Carrot Patch cast spends his whole turn: only the pass guard to ask.)
         if (m.pass) return void this.hostPick(m.key, (engines) => castAnswer(engines, m.fen));
-        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null);
+        return void this.hostBoss(m.key, m.fen, m.elo, m.nodes, m.best ? "best" : m.stumble ? "stumble" : m.stagger ? "stagger" : "elo", m.allowed ?? null, !!m.funhouse, m.brain, m.seed !== undefined ? { seed: m.seed, ...(m.pull ? { pull: m.pull } : {}), ...(m.drag ? { drag: true as const } : {}), ...(m.showdown ? { showdown: m.showdown } : {}) } : null, m.land ?? null, m.race ?? null, m.beam ?? null, m.balloon ?? null, m.hoops ?? null, m.crease ?? null, typeof m.draw === "number" ? m.draw : null, !!m.check, !!m.share);
       case "bossBrain":
         // The battle is on the Maia brain and this device plays the boss (Maia loads during the intro), or (`check`) it was drawn
         // to check his moves (BOSS_CHECK): a computer loads it, a phone only if its files are saved here already.
@@ -899,13 +899,14 @@ export class NetMatch implements GameView {
    * move, then the cast on the position after it (hoopsAnswer: its blocks go with the move as `hoops`). `balloon` (his
    * balloon is due at the end of this turn): where it lands after the move and the cast goes with it (landFrom, outside
    * the hoops), the same whether it will pop or not. `crease` (Folio's Crease is wanted with this move): its line on the
-   * position after the move goes with it (creaseAnswer).
+   * position after the move goes with it (creaseAnswer). `check` (BOSS_CHECK): this device checks the host's move, so a phone
+   * doesn't download Maia for it. `share`: the bridge band's share, drawn by the lobby (Stockfish's move, no brain).
    */
-  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null) {
+  private async hostBoss(key: string, fen: string, elo: number, nodes: number, kind: BossMoveKind, allowed: string[] | null = null, funhouse = false, brain?: NetBossBrain, asks: BossAsks | null = null, land: SlamPiece[] | null = null, race: CarrotRace | null = null, beam: number | null = null, balloon: BalloonAsk | null = null, hoops: HoopsAsk | null = null, crease: CreaseAsk | null = null, draw: number | null = null, check = false, share = false) {
     try {
       const engines = await this.engines();
       const [engine] = engines;
-      if (brain) this.useBrain(brain);
+      if (brain) this.useBrain(brain, check);
       // (The server's seed for this move (BOSS_CHECK): the random source and Maia's draw, so the second device asked plays the
       // same move. This request may come to this device as that second device: it plays it the same way.)
       const rng = draw ? mulberry32(draw) : Math.random;
@@ -913,7 +914,7 @@ export class NetMatch implements GameView {
       let by: "maia" | "stockfish" = "stockfish";
       const maia = brain && this.maia ? { brain: brain.brain, rating: brain.rating, ...(brain.stockfishShare ? { stockfishShare: brain.stockfishShare } : {}), ...(draw ? { seed: draw } : {}), engine: this.maia, onNote: (n: BrainNote) => ((this.brainNote = n), (by = n.by)) } : undefined;
       // (The admins' debug line: the battle is on Maia, but this move is the engine's.)
-      if (kind === "best" && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: "power" };
+      if ((kind === "best" || share) && this.bossPlan) this.brainNote = { brain: this.bossPlan.brain, rating: this.bossPlan.rating, ...(this.bossPlan.stockfishShare ? { share: this.bossPlan.stockfishShare } : {}), by: "stockfish", why: share ? "share" : "power" };
       const ahead = land?.length && !funhouse ? slamAhead(land) : null;
       // (Chub & Chirp's Carrot Patch: his race brain on this device's engine, with the race the server sent.)
       const look = race && !funhouse ? { race, looks: BOSS_POWERS.carrotLooks, nodes: BOSS_POWERS.carrotNodes } : null;

@@ -2195,18 +2195,23 @@ export type BossBrainSettings = typeof BOSS_BRAIN;
  * and docs/areas/bosses.md, "Who plays the boss online"): his own move (the brain's, a slip, the King's stagger, a power's best) and
  * Boingo's funhouse move are asked of the host and a checker (an up-to-date app outside the host's account and party, drawn at random;
  * for Maia's moves one whose Maia is loaded) with one seed, so two honest devices give the same move (Stockfish at a node count; Maia
- * and limited-strength Stockfish draw with the seed). The same move plays. Two differ: the engine server scores both; Maia's move
- * against a device's fallback to Stockfish (its Maia late or not ready) plays unless it's a throw, else the better for him plays.
- * Nobody to ask, or no verdict: the host's plays, and the match pays as a solo game.
- *   - `waitMs`: once the host has answered, how long the checker has (both search at once; the checker skips his powers' extras).
- *   - `throwLoss`: a move the engine server finds this much worse than the other device's (points of expected score, 0 to 1) is a
- *     throw: it never plays, and its device gets a judge's strike (benched at JUDGES.strikes). Above Maia's honest worst: its
- *     unguarded moves in reports/maia-sim (maia-raw, 317 moves) gave away at most 0.76; one in five gave away 0.25 or more.
+ * and limited-strength Stockfish draw with the seed; the bridge band's share is drawn by the server). The same move plays. Two differ:
+ * the engine server scores both and the better for him plays, but for Maia's move against a device's fallback to Stockfish (its Maia
+ * late or not ready), which plays if it's within `maiaGap` of the other. Nobody to ask, or no verdict: the host's plays, and the
+ * match pays as a solo game.
+ *   - `waitMs`: once the host has answered, how long the checker has (both search at once; the checker skips his powers' extras
+ *     on a turn that has none).
+ *   - `maiaGap`: Maia's move against a fallback plays if the engine server finds it at most this much worse (points of expected
+ *     score, 0 to 1), else the better: four honest Maia moves in five (reports/maia-sim, maia-raw: one in five gave away 0.25 or more).
+ *     A device that lies "Maia played it" gains at most this, and only on moves where the other device really fell back.
+ *   - `throwLoss`: a move the engine server finds this much worse than the other device's is a throw: its device gets a judge's
+ *     strike (benched at JUDGES.strikes). Above Maia's honest worst: its unguarded moves in reports/maia-sim (317 moves) gave away at
+ *     most 0.76.
  *   - `missStrikes`: a checker that misses its window is replaced next move; this many misses in a battle are a strike.
  *   - `loaders`: on the Maia brain, how many devices are told to load Maia to check his moves as the battle begins (drawn at random:
  *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
  */
-export const BOSS_CHECK = { waitMs: 4_000, throwLoss: 0.8, missStrikes: 2, loaders: 2 } as const;
+export const BOSS_CHECK = { waitMs: 4_000, maiaGap: 0.25, throwLoss: 0.8, missStrikes: 2, loaders: 2 } as const;
 
 /** How long the cut screen shows: longer when there's an augment vote to make. */
 export const cutSeconds = (s: Pick<Settings, "cutClockVote" | "stageBreakSeconds">) => (s.cutClockVote ? Math.max(s.stageBreakSeconds, 7) : s.stageBreakSeconds);
