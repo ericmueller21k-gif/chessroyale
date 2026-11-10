@@ -601,7 +601,7 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   }
 
   // Quests (Nov 9, phase 3; quests.ts). GET /api/quests: your quests (the day's dealt first, on the day's first read), the resets and
-  // today's reroll. POST /api/quests/reroll {quest}: today's free reroll ({ok, quests} or a refusal). POST /api/quests/test {quests}
+  // each daily's reroll. POST /api/quests/reroll {quest}: that daily's free reroll today ({ok, quests} or a refusal). POST /api/quests/test {quests}
   // (test servers only): your quests set, for tests and stills. A guest where sign-in is set up has none ("Sign in for quests.").
   if (path === "/api/quests" || path.startsWith("/api/quests/")) {
     if (signInRequired(env) && !isSignedIn(current)) return json({ message: SIGN_IN_FOR_QUESTS }, 403);
