@@ -1347,7 +1347,7 @@ export class LobbyCore {
         return;
       }
       case "bossMove":
-        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key && typeof msg.move === "string" && msg.move.length <= 8)
+        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key && typeof msg.move === "string" && msg.move.length <= 128)
           this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) });
         return;
       case "leave":

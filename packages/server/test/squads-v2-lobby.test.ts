@@ -74,8 +74,9 @@ describe("squads v2 server: same-move tokens and the judge", () => {
     const { L, party, solo, lm, move, duty } = sameMove(true);
     const id = `${lm.key}/t/0`;
     // Devices are asked the position it was played in (the party's own here: the only devices; the squad's own last).
+    // Never two of one party (2026-11-10-device-trust.md): one party's devices give one answer.
     const asked = party.filter((p) => L.all(p, "botWork").some((w) => w.jobs.some((j) => j.id === id)));
-    expect(asked.length).toBe(SQUADS_LOBBY.botWork.perJob);
+    expect(asked.length).toBe(1);
     const job = L.all(asked[0]!, "botWork").flatMap((w) => w.jobs).find((j) => j.id === id)!;
     expect(job).toMatchObject({ fen: START_FEN, n: SQUADS.bots.candidates, nodes: SQUADS_LOBBY.botWork.nodes });
     const other = squadsLegalMoves(START_FEN).find((m) => m !== move)!;
