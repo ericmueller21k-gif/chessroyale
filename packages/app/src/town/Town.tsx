@@ -629,6 +629,68 @@ function padPress(e: PointerEvent, d: Dir, down: boolean): void {
   hold(d, down);
 }
 
+/** Your look as the town dresses you (dress(), readyYou): what's drawn (an outfit, Nov 10: only it and any eyewear, the outfit by the
+ * rides' machinery: core's shownLook, mountOf), your ride, your pawn's color and the key your pictures are made for. */
+function yourLook() {
+  const look = shownLook(account().profile?.locker?.look);
+  const color = myPawnColor();
+  const side: "light" | "dark" = color === "black" ? "dark" : "light";
+  return { on: mountOf(look), color, side, key: `${side}|${lookKey(look)}`, wear: offRide(look) };
+}
+/**
+ * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
+ * rides v2, the director's call: from behind a face item doesn't show, a hat does).
+ */
+const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
+  const front = dressedPawn(wear, plain, PAWN_PX, side);
+  if (!riding || !wear?.face) return front.then((a) => [a, a]);
+  return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
+};
+/**
+ * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
+ * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
+ */
+const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
+  const ra = rideArt(on.def);
+  const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
+  const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
+  return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
+};
+/** Your pawn made ready before the town shows (readyYou): its dressed pictures and its rider (a share of it held), for its look's key. */
+let prepared: { key: string; art: YouArt | null; back: YouArt | null; rider: Rider | null } | null = null;
+
+/**
+ * Your pawn made ready before the town shows (Eric, Nov 10: "a big bug happens every town load, your rider doesnt appear for a few
+ * seconds"): its dressed pictures, and its rider's frames composed in one go (rides.ts `hurry`; one an animation frame took 1.5 to
+ * 2 s), so the town's first frame has you on your ride. `ready` once they are, or after TOWN_FEEL.youWaitMs (the town then shows
+ * with you on foot, and the ride appears the moment it's ready); `done` gives back what the town didn't take (TownPage, as it closes).
+ */
+export function readyYou(): { ready: Promise<void>; done: () => void } {
+  const { on, color, side, key, wear } = yourLook();
+  const plain = pawnImage(side, null);
+  let over = false;
+  let mine: typeof prepared = null;
+  const ready = new Promise<void>((go) => {
+    setTimeout(go, TOWN_FEEL.youWaitMs);
+    void dressed(wear, plain, !!on, sideOfPawn(color)).then(([art, back]) => {
+      if (over) return go();
+      const rider = on ? ride(on, art, back, plain, sideOfPawn(color), `${side}||${lookKey(wear)}`, () => go()) : null;
+      rider?.hurry();
+      prepared = mine = { key, art, back, rider };
+      if (!rider) go();
+    });
+  });
+  return {
+    ready,
+    done: () => {
+      over = true;
+      if (prepared !== mine || !mine) return;
+      prepared = null;
+      if (mine.rider) leaveRider(mine.rider);
+    },
+  };
+}
+
 /** Runs the world in `box` on `cv`: the loop, the camera, the input and the chips. Returns its controls and its stop. */
 function startTown(
   box: HTMLDivElement,
@@ -788,16 +850,10 @@ function startTown(
   // the last ones kept until they're ready.
   let youLook: string | null = null;
   const dress = () => {
-    // (An outfit, Nov 10: only it and any eyewear are drawn, the outfit by the rides' machinery: core's shownLook, mountOf.)
-    const look = shownLook(account().profile?.locker?.look);
-    const on = mountOf(look);
-    const color = myPawnColor();
-    const side = color === "black" ? "dark" : "light";
-    const key = `${side}|${lookKey(look)}`;
+    const { on, color, side, key, wear } = yourLook();
     if (key === youLook) return;
     youLook = key;
     town.you.look = { side, tint: null, wear: null };
-    const wear = offRide(look);
     // (Your ride's pace, Nov 1: Cheetah Shoes walk twice as fast; RIDES.speed. As the look is put on, before its frames are ready.)
     town.you.walker.stepMs = f.youStepMs / rideSpeed(on?.def);
     // (The ride drawn now stays drawn until the new one's frames are ready; then it's given back. One share of a rider each.)
@@ -813,12 +869,24 @@ function startTown(
       if (prev && (prev !== youShown || prev === youRide)) leaveRider(prev);
       // (Its frames on their way, the drawing's chunk first: you walk on foot meanwhile, in its box, under its tag.)
       r.youSoon = youRide;
+      // (Its frames already composed, as the town opens (readyYou): drawn from this frame on, not the next.)
+      if (youRide?.ready && youShown !== youRide) {
+        if (youShown) leaveRider(youShown);
+        youShown = r.youRider = youRide;
+      }
       if (!youRide) {
         if (youShown) leaveRider(youShown);
         youShown = r.youRider = null;
       }
     };
-    if (!lookKey(wear)) {
+    // (Made ready before the town showed, readyYou: in its first frame. Its share of the rider given back once mount has its own.)
+    const pre = prepared?.key === key ? prepared : null;
+    if (pre) {
+      prepared = null;
+      r.youArt = pre.art;
+      mount(pre.art, pre.back);
+      if (pre.rider) leaveRider(pre.rider);
+    } else if (!lookKey(wear)) {
       r.youArt = null;
       mount(null, null);
     } else
@@ -827,25 +895,6 @@ function startTown(
         r.youArt = art;
         mount(art, back);
       });
-  };
-  /**
-   * A pawn's dressed picture, and (`riding`: its ride has a back view) the same seen from behind, its face items left off (Nov 1,
-   * rides v2, the director's call: from behind a face item doesn't show, a hat does).
-   */
-  const dressed = (wear: ItemLook | null, plain: HTMLCanvasElement, riding: boolean, side: "w" | "b" = "w"): Promise<[YouArt | null, YouArt | null]> => {
-    const front = dressedPawn(wear, plain, PAWN_PX, side);
-    if (!riding || !wear?.face) return front.then((a) => [a, a]);
-    return Promise.all([front, dressedPawn(offFace(wear), plain, PAWN_PX, side)]);
-  };
-  /**
-   * A rider (rides.ts) for a pawn wearing `ride`: its dressed picture (or the plain pawn) on it, and from behind (`back`), shared
-   * with anyone whose pawn looks the same (`pawnKey`: its side, tint and items); `done` once it's ready. Null if it isn't a ride.
-   */
-  const ride = (on: NonNullable<ItemLook["ride"]>, art: YouArt | null, back: YouArt | null, plain: HTMLCanvasElement, side: "w" | "b", pawnKey: string, done: (rd: Rider) => void): Rider | null => {
-    const ra = rideArt(on.def);
-    const bare: RiderPawn = { img: plain, pad: 0, top: PAWN_HEAD - 0.75 / 45 };
-    const colors = { color: on.color, color2: secondColor(on) ?? on.color, side };
-    return ra ? shareRider(ra, colors, pawnKey, art ?? bare, back ?? art ?? bare, done) : null;
   };
   /** The rider your look asked for last (its frames may still be coming), and the one drawn now: each holds a share. */
   let youRide: Rider | null = null;

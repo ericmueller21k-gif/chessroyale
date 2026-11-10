@@ -146,34 +146,41 @@ export const RECENT_GAMES = 5;
  * opponent's look has the admin copies they wear (their email is read only for that, never answered).
  */
 export async function rankedSummary(sql: Sql, userId: string, admins: AdminCheck = NO_ADMINS): Promise<RankedSummary> {
-  const row = await sql.first<{ games: number; wins: number; losses: number; draws: number; ladder: number | null; peak: number | null; streak: number | null }>(
-    "SELECT games, wins, losses, draws, ladder, peak, streak FROM ranked_1v1 WHERE user_id = ?",
-    userId,
-  );
-  const games = await sql.all<{ ended_at: number; white_id: string; black_id: string; result: string; white_points: number | null; black_points: number | null; name: string | null; email: string | null }>(
-    `SELECT g.ended_at, g.white_id, g.black_id, g.result, g.white_points, g.black_points, u.name, u.email FROM ranked_1v1_games g
-     LEFT JOIN users u ON u.id = CASE WHEN g.white_id = ?1 THEN g.black_id ELSE g.white_id END
-     WHERE g.white_id = ?1 OR g.black_id = ?1 ORDER BY g.ended_at DESC, g.id DESC LIMIT ?2`,
-    userId,
-    RECENT_GAMES,
-  );
+  // (Each step's reads at once: every D1 read is a round trip, and /api/me waits on this.)
+  const [row, games] = await Promise.all([
+    sql.first<{ games: number; wins: number; losses: number; draws: number; ladder: number | null; peak: number | null; streak: number | null }>(
+      "SELECT games, wins, losses, draws, ladder, peak, streak FROM ranked_1v1 WHERE user_id = ?",
+      userId,
+    ),
+    sql.all<{ ended_at: number; white_id: string; black_id: string; result: string; white_points: number | null; black_points: number | null; name: string | null; email: string | null }>(
+      `SELECT g.ended_at, g.white_id, g.black_id, g.result, g.white_points, g.black_points, u.name, u.email FROM ranked_1v1_games g
+       LEFT JOIN users u ON u.id = CASE WHEN g.white_id = ?1 THEN g.black_id ELSE g.white_id END
+       WHERE g.white_id = ?1 OR g.black_id = ?1 ORDER BY g.ended_at DESC, g.id DESC LIMIT ?2`,
+      userId,
+      RECENT_GAMES,
+    ),
+  ]);
   const opponentOf = (g: (typeof games)[number]) => (g.white_id === userId ? g.black_id : g.white_id);
   const adminIds = new Set(games.filter((g) => admins(g)).map(opponentOf));
-  const looks = await looksOf(sql, [...new Set(games.map(opponentOf).filter((id) => id !== DELETED))], adminIds);
+  const peak = row && row.games >= RANKED_1V1.placements.games ? (row.peak ?? row.ladder) : null;
+  const [looks, rank, peakRank] = await Promise.all([
+    looksOf(sql, [...new Set(games.map(opponentOf).filter((id) => id !== DELETED))], adminIds),
+    rankOf(sql, row),
+    peak === null ? null : rankOf(sql, { games: row!.games, ladder: peak }),
+  ]);
   const recent: RankedRecentGame[] = games.map((g) => {
     const white = g.white_id === userId;
     const id = opponentOf(g);
     const result: RankedRecentGame["result"] = g.result === "1/2-1/2" ? "draw" : (g.result === "1-0") === white ? "win" : "loss";
     return { at: g.ended_at, opponent: { id, name: g.name ?? "Deleted account", look: looks.get(id) ?? (g.name === null ? null : {}) }, result, points: white ? g.white_points : g.black_points };
   });
-  const peak = row && row.games >= RANKED_1V1.placements.games ? (row.peak ?? row.ladder) : null;
   return {
-    rank: await rankOf(sql, row),
+    rank,
     games: row?.games ?? 0,
     wins: row?.wins ?? 0,
     losses: row?.losses ?? 0,
     draws: row?.draws ?? 0,
-    peak: peak === null ? null : await rankOf(sql, { games: row!.games, ladder: peak }),
+    peak: peakRank,
     streak: row?.streak ?? 0,
     recent,
   };
@@ -224,8 +231,10 @@ export async function marksOf(sql: Sql, userId: string): Promise<(LeaveMark & { 
 
 /** A player's standing with ranked's leave rules at `now` (their marks and their ranked games played). */
 export async function rankedLeaves(sql: Sql, userId: string, now: number): Promise<RankedLeaves> {
-  const marks = await marksOf(sql, userId);
-  const row = await sql.first<{ games: number; last_at: number | null; ladder: number | null }>("SELECT games, last_at, ladder FROM ranked_1v1 WHERE user_id = ?", userId);
+  const [marks, row] = await Promise.all([
+    marksOf(sql, userId),
+    sql.first<{ games: number; last_at: number | null; ladder: number | null }>("SELECT games, last_at, ladder FROM ranked_1v1 WHERE user_id = ?", userId),
+  ]);
   const games = row?.games ?? 0;
   const last = marks.find((m) => m.kind === "dodge");
   const fresh = !!last && now - last.at < LEAVES.noteMinutes * 60_000 && (row?.last_at ?? 0) <= last.at;

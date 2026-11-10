@@ -98,8 +98,14 @@ function serviceWorker(): Plugin {
       const maiaDir = join(outDir, "engine/maia");
       const maia = createHash("sha256");
       if (existsSync(maiaDir)) for (const f of readdirSync(maiaDir).filter((f) => !f.endsWith(".tar.gz")).sort()) maia.update(f).update(readFileSync(join(maiaDir, f)));
+      // Each file's contents' hash, but under /assets/ (Vite puts it in the name there): a later version's worker copies a file it
+      // already keeps with the same hash instead of downloading it again (sw-template.js, precache).
+      const hashes = Object.fromEntries(
+        files.filter((f) => !f.startsWith("/assets/")).map((f) => [f, createHash("sha256").update(readFileSync(join(outDir, f === "/" ? "index.html" : f))).digest("hex").slice(0, 12)]),
+      );
       const sw = readFileSync(join(APP, "sw-template.js"), "utf8")
         .replace("__VERSION__", `brc-${hash.digest("hex").slice(0, 12)}`)
+        .replace("__HASHES__", JSON.stringify(hashes))
         .replace("__MAIA__", `brc-maia-${maia.digest("hex").slice(0, 12)}`)
         .replace("__FILES__", JSON.stringify(files));
       writeFileSync(join(outDir, "sw.js"), sw);

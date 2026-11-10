@@ -183,14 +183,18 @@ export function askAgeAgain(why: string = ASK_AGE_LINE) {
 /** Loads the sign-in options and your profile (making a guest account the first time). */
 export async function loadAccount(name?: string): Promise<void> {
   let config: NonNullable<AccountState["config"]> | null = null;
+  // Your profile is asked for beside the options, not after them (Nov 10: home waits on it, and each request is a round trip). The
+  // server plays a device it knows is too young under the default name, whatever name this one sends.
+  const storedYoung = storedTooYoung();
+  const me = profileFrom(`/api/me${name && !storedYoung ? `?name=${encodeURIComponent(name)}` : ""}`);
+  me.catch(() => undefined);
   try {
     config = await api<NonNullable<AccountState["config"]>>("/api/auth/config");
-    const young = storedTooYoung() || config.age === "under";
+    const young = storedYoung || config.age === "under";
     set({ config, age: young ? "under" : (config.age ?? null) });
     if (young) rememberTooYoung();
     if (!config.accounts) return;
-    const q = name && !young ? `?name=${encodeURIComponent(name)}` : "";
-    set({ profile: await profileFrom(`/api/me${q}`) });
+    set({ profile: await me });
     // The server forgot (its cookie was cleared): tell it again, which also puts the guest back to the defaults.
     if (young && config.age !== "under") await sendAgeAnswer(false).catch(() => undefined);
   } catch {

@@ -8,6 +8,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   panel and PLAY's outline visible; the splash where this device hasn't landed on home: `shell.ts`) shows before the script runs and goes as
   the first real screen draws. The match screens (`screens/game-screens.ts`), solo, FAQ, Legal and Auto chess are chunks (`lazy.tsx`),
   preloaded when play is near. Pictures are cached on first show, not precached; the demo video is MP4 only. `scripts/measure-load.mjs`.
+  Your profile (`/api/me`) is asked for beside the sign-in options, not after them (`account.ts` `loadAccount`, Nov 10). The service
+  worker precaches one file at a time at low priority and, after a deploy, copies what's unchanged from the old version's cache
+  (same name under `/assets/`, else the same hash in `sw.js`'s `HASHES`) instead of downloading it again.
 
 - **The daily quests overlay (Nov 9; the mockup [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md), on real quests since
   phase 3: [2026-11-09-quests-screens.md](../decisions/2026-11-09-quests-screens.md); the rules and server: [accounts.md](accounts.md), "Quests"):**

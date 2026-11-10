@@ -405,7 +405,9 @@ behind Cloudflare Access like the rest of the site). Phone and computer; **on a 
   own worn ride's is asked for as the app starts, after its first paint: `components/rides/load.ts`,
   [2026-11-01-rides-lazy.md](../decisions/2026-11-01-rides-lazy.md)). A rider's frames are composed once from the ride's own drawing (`components/rides/draw.tsx`: each layer of each frame as SVG,
   made into an image, in the ride's colors at the rider's size, as `dressedPawn` makes your dressed pawn), with the pawn on its seat
-  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks; each
+  (its back, the pawn, its front), **one frame an animation frame** (`Rider` in `town/rides.ts`), every view, then its trail marks
+(**yours all at once, before the town shows**, Nov 10: `readyYou` in Town.tsx, `Rider.hurry`; the town waits up to `TOWN_FEEL.youWaitMs`,
+1 s, so its first frame has you on your ride: [2026-11-10-town-rider.md](../decisions/2026-11-10-town-rider.md)); each
   view's box comes from `town/ride-cells.ts` (measured ahead by `scripts/measure-rides.ts`, with each view's frames' seats, times and lift,
   the tile's box and the trail's numbers; a hash test keeps it fresh). Until that's done (its drawing loaded, then about 2 s on a phone)
   the person walks on foot, **in the box and under the tag the rider will have** (Nov 1, rides lazy: the renderer's `youSoon` and
