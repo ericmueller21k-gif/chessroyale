@@ -49,6 +49,7 @@
     "packages/chess/src/runner.ts",
     "packages/chess/src/runner-tools.ts",
     "packages/app/src/lazy.tsx",
+    "packages/app/src/shell.ts",
     "packages/app/src/screens/game-screens.ts",
     "packages/chess/src/protocol.ts",
     "packages/chess/src/index.ts",
