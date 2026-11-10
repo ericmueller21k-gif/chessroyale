@@ -95,7 +95,7 @@ describe("the review of #618: its findings, fixed", () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const raids = async (u: User) => {
-      for (let i = 1; i <= 5; i++) await recordResult(sql, u.id, { mode: "raid", online: true, placement: 2, players: 100, teamWon: false, rating: 2400, ranked: true }, T0 + i * HOUR);
+      for (let i = 1; i <= 5; i++) await recordResult(sql, u.id, { mode: "boss", online: true, placement: 2, players: 100, teamWon: false, rating: 2400, ranked: true }, T0 + i * HOUR);
     };
     // Pat: five raids the boss won, and a match at the ban bar again.
     const pat = await pooled(sql, "Pat", T0);
