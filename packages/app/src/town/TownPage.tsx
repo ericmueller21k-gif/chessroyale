@@ -71,8 +71,18 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
   const [Town, setTown] = useState<Screen | null>(null);
   useEffect(() => {
     let live = true;
-    // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.)
-    const load = () => void import("./Town.tsx").then((m) => live && m && setTown(() => m.TownScreen));
+    /** What the town didn't take of your pawn made ready (Town.tsx readyYou), given back as the page closes. */
+    let release = () => {};
+    // (No module when its chunk was gone after a deploy: the page is loading again, stale.ts.) The town shows once your pawn is ready on
+    // its ride (Eric, Nov 10: "your rider doesnt appear for a few seconds"), or after a moment (TOWN_FEEL.youWaitMs) without it.
+    const load = () =>
+      void import("./Town.tsx").then((m) => {
+        if (!live || !m) return;
+        const you = m.readyYou();
+        release = you.done;
+        // (In a task of its own: the town's start isn't added to the long task that composed your ride, Nov 10.)
+        void you.ready.then(() => setTimeout(() => live && setTown(() => m.TownScreen)));
+      });
     // Your account first (a moment, on a page opened at /town; at once from home): an admin's town has the homes of the bosses in
     // the game for admins first (admin-town.ts), read as the town's code loads. Not waiting past ACCOUNT_WAIT_MS: a town without them.
     if (accountKnown()) load();
@@ -86,11 +96,15 @@ export function TownPage({ nav, ...props }: Props & { nav: FrontNav }) {
       const timer = setTimeout(go, ACCOUNT_WAIT_MS);
       return () => {
         live = false;
+        release();
         off();
         clearTimeout(timer);
       };
     }
-    return () => void (live = false);
+    return () => {
+      live = false;
+      release();
+    };
   }, []);
   const screen = Town ? <Town {...props} framed={framed} /> : <div class="screen" />;
   return framed ? (

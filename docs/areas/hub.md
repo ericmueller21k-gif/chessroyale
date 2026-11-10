@@ -11,6 +11,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   Past `FRONT_DOOR.loadBarAfterMs` (2 s) the shell shows a thin bar and what's loading (under the splash's logo, or in home's hero panel),
   moved by the app's steps (`loadbar.ts`); a script that won't load, or no step for 20 s: "Try again" (a reload).
   [Decision](../decisions/2026-11-10-loading-bar.md); guard: `e2e/home-layout.spec.ts`, "the loading bar".
+  Your profile (`/api/me`) is asked for beside the sign-in options, not after them (`account.ts` `loadAccount`, Nov 10). The service
+  worker precaches one file at a time at low priority and, after a deploy, copies what's unchanged from the old version's cache
+  (same name under `/assets/`, else the same hash in `sw.js`'s `HASHES`) instead of downloading it again.
 
 - **The daily quests overlay (Nov 9; the mockup [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md), on real quests since
   phase 3: [2026-11-09-quests-screens.md](../decisions/2026-11-09-quests-screens.md); the rules and server: [accounts.md](accounts.md), "Quests"):**

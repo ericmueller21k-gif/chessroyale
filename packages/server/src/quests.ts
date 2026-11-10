@@ -209,9 +209,14 @@ const view = (q: QuestRow, def: QuestDef, day: number): QuestView => ({
 
 /** GET /api/quests: your quests (dealt first if it's a new day or week; each daily says if its reroll is there today), the resets. */
 export async function questsAnswer(sql: Sql, userId: string, now: number, paused = false): Promise<QuestsAnswer> {
-  await ensureQuests(sql, userId, now);
-  const rows = await rowsOf(sql, userId);
+  // (The day's check and the quests at once, Nov 10: each D1 read is a round trip. Read again only after a new day's deal.)
   const day = xpDayStart(now);
+  const [at, held] = await Promise.all([sql.first<{ day: number; week: number }>("SELECT day, week FROM quest_days WHERE user_id = ?", userId), rowsOf(sql, userId)]);
+  let rows = held;
+  if (!at || at.day !== day || at.week !== questWeekStart(now)) {
+    await ensureQuests(sql, userId, now);
+    rows = await rowsOf(sql, userId);
+  }
   return {
     quests: rows.flatMap((q) => {
       const def = questDef(q.kind);
