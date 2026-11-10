@@ -12688,21 +12688,30 @@ button.fd-seat {
     min-width: 150px;
     padding: 0 28px;
   }
-  /* (Keep me in the queue over Exit, in Cancel's cell beside your seat.) */
+  /* (Keep me in the queue over Exit, in Cancel's cell beside your seat, about Cancel's width, so your seat's card keeps its room.) */
   .fd-root.framed .fd-home .fd-queue .fd-exit-row {
     grid-area: cancel;
     flex-direction: column;
     gap: 6px;
+    width: 168px;
   }
   .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep {
     flex: none;
-    min-height: 36px;
-    padding: 0 10px;
-    font-size: 14px;
+    min-height: 32px;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-keep input {
+    width: 16px;
+    height: 16px;
   }
   .fd-root.framed .fd-home .fd-queue .fd-exit-row .fd-cancel {
     flex: 1;
+    min-width: 0;
     min-height: 44px;
+    padding: 0;
   }
 }
 @media (min-width: 1024px) {
