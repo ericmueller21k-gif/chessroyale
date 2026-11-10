@@ -1,20 +1,22 @@
 # eloDraw against UCI_LimitStrength
 
-`npx tsx packages/sim/scripts/elo-draw.ts 200 3` (Nov 10, the delta review's D5): 200 positions, Stockfish lite at 250000 nodes, the
-raid's guard, mean loss a move (points), at the old T (scale 1: the mean loss a move at that Elo, RATING_CURVE).
+`npx tsx packages/sim/scripts/elo-draw.ts 200 3`: 200 positions, Stockfish lite at 250000 nodes, the raid's guard, mean loss a move (points).
 
-| Elo | T | UCI (± se) | seeded, scale 1: a move / exact | scale | seeded at scale (exact) |
-|---|---|---|---|---|---|
-| 1600 | 9.30 | 1.06 ± 0.08 (600) | 1.11 / 1.33 | 0.53 | 1.06 |
-| 2200 | 5.37 | 1.06 ± 0.08 (600) | 0.88 / 1.10 | 0.92 | 1.06 |
-| 2500 | 4.08 | 0.93 ± 0.08 (600) | 0.88 / 0.95 | 0.96 | 0.93 |
-| 2800 | 3.10 | 0.82 ± 0.07 (600) | 0.74 / 0.79 | 1.04 | 0.82 |
+| Elo | T (table) | UCI (± se) | seeded at T: a move / exact | scale (table) | scale fitted | seeded at it (exact) |
+|---|---|---|---|---|---|---|
+| 1600 | 7.44 | 1.27 ± 0.09 (600) | 0.96 / 1.19 | 0.80 | 1.02 | 1.27 |
+| 2200 | 6.71 | 0.99 ± 0.08 (600) | 0.93 / 1.15 | 1.25 | 0.88 | 0.99 |
+| 2500 | 5.10 | 0.84 ± 0.07 (600) | 0.81 / 1.02 | 1.25 | 0.88 | 0.84 |
+| 2800 | 3.87 | 0.71 ± 0.06 (600) | 0.86 / 0.88 | 1.25 | 0.94 | 0.71 |
 
-- "A move": one real seeded move a position (bossMoveFrom, guard and head-to-head check), so its own error is about ±0.14.
-  "Exact": the draw's mean over every seed, through the guard but before the head-to-head check, which only ever lowers the loss.
-- The 40-position run's trend (seeded 23% and 40% over UCI at 2200 and 2800) doesn't hold at 200: a real seeded move gives away
-  5% more than UCI's at 1600 and 17%, 5% and 10% less at 2200, 2500 and 2800 (all within about one standard error).
-- The table (`BOSS_CHECK.eloDrawScale`): the exact mean times the check's measured share (real ÷ exact, all four Elos: 0.866)
-  brought to UCI's, through a power law in the scale fitted on each row's two points: 0.79, 1.27, 1.27, 1.21 (2800's slope is
-  the least sure: 1.44 at the others' slope), set to 0.8, 1.25, 1.25, 1.25. Predicted: within a few % of UCI's at each Elo (its
-  own error is about 8%).
+- "A move": one real seeded move a position at the table's T (bossMoveFrom: the guard and the head-to-head check), so its own error
+  is about ±0.14. "Exact": the draw's mean over every seed at that T, through the guard but before the head-to-head check, which
+  only ever lowers the loss. "Scale fitted": the factor on RATING_CURVE's loss that brings the exact mean to UCI's.
+- This run (Nov 10, delta review 2's N4) was at the table then in use: 0.8, 1.25, 1.25, 1.25. A real seeded move gave away 24% less
+  than UCI's at 1600 and 21% more at 2800; 6% and 4% less at 2200 and 2500.
+- The run before it (Nov 10, D5; scale 1 at every Elo, other positions: UCI 1.06, 1.06, 0.93, 0.82; a real seeded move 1.11, 0.88,
+  0.88, 0.74) put 1600 at +5% and 2800 at -10%. Run to run, UCI's own mean moves up to 0.2 here (other positions each run).
+- The table now: both runs' real moves against their own UCI, pooled, each brought to a common scale through its exact means' slope
+  (loss ∝ scale^0.31 at 1600, ^0.85 at 2800): 1600 1.25 (pooled within 1%; the runs are +12% and -13% at it) and 2800 1.05 (-6%
+  and +4%). 2200 and 2500 stay at 1.25 (pooled -7% and +2%). The head-to-head check cuts less at 2800 (real ÷ exact 0.94 and 0.98,
+  against about 0.83 elsewhere): why 2800's factor is lower. Above 2800 (the Stockfish brain) it is held at 1.05, unmeasured.

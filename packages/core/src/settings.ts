@@ -2212,7 +2212,7 @@ export type BossBrainSettings = typeof BOSS_BRAIN;
  *     computers, and phones whose Maia is already saved; no phone downloads it for this); one more each move while none is ready.
  *   - `eloDrawScale`: Stockfish at a strength with a seed (eloDraw) draws with T = the mean loss a move at that Elo (RATING_CURVE)
  *     times this factor, by Elo (straight between the points, held past the ends), so it gives away what UCI_LimitStrength does
- *     through the same guard: reports/elo-draw.md (200 positions; the delta review's D5).
+ *     through the same guard: reports/elo-draw.md (two 200-position runs pooled; the delta reviews' D5 and N4).
  */
 export const BOSS_CHECK = {
   waitMs: 4_000,
@@ -2221,10 +2221,10 @@ export const BOSS_CHECK = {
   missStrikes: 2,
   loaders: 2,
   eloDrawScale: [
-    [1600, 0.8],
+    [1600, 1.25],
     [2200, 1.25],
     [2500, 1.25],
-    [2800, 1.25],
+    [2800, 1.05],
   ] as readonly (readonly [number, number])[],
 } as const;
 
