@@ -36,6 +36,11 @@ jobs:
             echo "$bad"
             exit 1
           fi
+      # A new file under packages/ (or a new spec) that e2e/areas.json doesn't place would run every e2e spec on every
+      # pull request that touches it; this names it in the first minute (Nov 10, audit F3). Plain Node: no install.
+      - name: Every new file is in e2e/areas.json
+        if: ${{ github.event_name == 'pull_request' }}
+        run: node e2e/ci-select.mjs unmapped HEAD^1
       - uses: actions/setup-node@v7
         with:
           node-version: 22

@@ -34,7 +34,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
   - **Traced modules** (Nov 1, `docs/decisions/2026-11-01-ci-selection.md`; `traced` in `areas.json`):
     `packages/core/src/settings.ts`, `packages/core/src/boss.ts`, `e2e/helpers.ts`, the app's `net.ts`, `solo.ts`,
     `main.tsx`, `board/OwnBoard.tsx`, `account.ts`, and since Nov 2 `game.ts`, `prefs.ts`, `test-switches.ts`,
-    `screens/Hud.tsx` and `components/EvalBar.tsx`, and since Nov 6 every `packages/core/src` module but `index.ts` and
+    `screens/Hud.tsx` and `components/EvalBar.tsx`, and every `packages/core/src` module but `index.ts` (since Nov 10 without a list, new ones included:
+    `TRACED_BY_DEFAULT` in `ci-select.mjs`; `docs/decisions/2026-11-10-trace-core-by-default.md`) and
     the server's `accounts.ts`, `api.ts`, `account-data.ts`, `locker.ts`, `boss-tokens.ts` and `ranked.ts`, are followed
     through the code instead of running everything (a change that reaches the server's `index.ts` still runs it all). The
     plan reads the module before and after (`traceModule`, plain text, no parser: about a second): the top-level
@@ -45,14 +46,15 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     area's specs, a spec itself, a unit test nothing. So a settings change runs the specs of the files that read that
     object, and a helper's change the specs that call it. It still runs everything when a user is a shared foundation
     or in no area, when it reaches `App.tsx` (`traced.hubs`: it hands the matches and the account to every screen),
-    or when the change can't be placed (the module new or removed, code outside any declaration, a file that doesn't
+    or when the change can't be placed (the module removed (a new one is followed from all it exports), code outside any declaration, a file that doesn't
     read cleanly). The plan's table says, per traced module, what changed and who uses it. A file reached through a
     trace counts like the table counts its own changes, nothing more: what it passes on to other files isn't followed.
   - **The whole suite on a PR** when it touches a shared foundation (`full` in `areas.json`: package.json, the
     lockfile, the Playwright and Wrangler config, `packages/core/src/index.ts` (its other modules traced), the runner, the protocol and chess's shared rules, the server's entry points (`index.ts`,
     `api.ts`, `lobby.ts`, `lobby-do.ts`) and its stored-data, sign-in, money, ranked and fair-play files, the app's
     entry, board, match flow (`game.ts`; `solo.ts` and `net.ts` traced), the play screen and the components every
-    mode shares), or a path no area has. A CI-only change (`e2e.yml`, `e2e/ci-*`) runs the smoke set (Nov 6), (a new file: add it to its area, or leave it out if it's shared). **To force it**, add the `full-e2e` label to the
+    mode shares), or a path no area has. A CI-only change (`e2e.yml`, `e2e/ci-*`) runs the smoke set (Nov 6), (a new file under `packages/`, or a new spec, that no entry places fails `check` in its first minute
+    (`node e2e/ci-select.mjs unmapped`, Nov 10): add it to its area, to `none`, or to `full` if every screen shares it). **To force it**, add the `full-e2e` label to the
     PR (that starts a new run, and every push after runs everything until the label is removed): the full lane's PRs
     do. Or Actions → e2e → Run workflow on the PR's branch (a manual run tests everything).
   - **On every push to main: the whole suite**, both projects, on 15 shards since Nov 9 (Eric: "Sure try it"; on 10, about 28 minutes, Nov 6: the slowest
@@ -85,11 +87,12 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     (a traced module's change is read from where your branch left `origin/main` to your working tree); its tests are
     `packages/server/test/ci-select.test.ts` (one area's file, docs only, foundations, unknown paths, changed and
     removed specs, every spec reachable, shard counts; traced: a settings key, a helper, a shared module and the hub,
-    comments and types only, changes it can't place).
-  - **Retries and traces:** `--retries 1` in CI (PR and main) until the flaky-test batch lands; the goal is 0, as
-    `playwright.config.ts` has it. A test that passes only on its retry is "flaky": the summary lists it first, so
-    it stays in view. Traces only on that retry (`on-first-retry`): recording every test measured about 8% slower.
-    Flakes only: "Re-run failed jobs" once; a test that fails again is real.
+    comments and types only, changes it can't place; core traced by default; new files no entry places).
+  - **Retries and traces:** `--retries 1` in CI (PR and main), kept for the trace it records: traces only on that
+    retry (`on-first-retry`; recording every test measured about 8% slower). A test that passes only on its retry is
+    "flaky": the summary lists it first, and **on main it turns the run red** (the `result` job's "No flaky test on
+    main", Nov 10, audit F1): fix it at its cause from its trace, never with a longer wait or a retry. A PR isn't held
+    up by one. A red run with no failed test (GitHub dropped shards): "Re-run failed jobs" once.
   - **Left out: `@perf`** (`e2e/perf.spec.ts`, frame budgets on a 4x-slowed phone), because they measure the machine.
     Run them locally under the e2e lock, or from Actions → e2e → Run workflow with "perf" ticked (a `perf` job, phone,
     1 worker; its report is kept 7 days: read its numbers as a trend, not a verdict).

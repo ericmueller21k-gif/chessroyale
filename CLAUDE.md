@@ -73,14 +73,15 @@ spelling in names too; older names (e.g. `colour`) stay until touched.
     once the boss kit lands): about 15 to 20 minutes for a targeted PR, and as long as main's run for one that runs
     everything (most did on Nov 6: PR median 33.6 minutes before that day's speed-ups). `e2e/areas.json` maps paths
     to specs; a shared foundation (package.json, the lockfile, the Playwright config, `packages/core/src/index.ts`, the runner, the
-    protocol, the board, …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Settings, `e2e/helpers.ts`, the other
-    `packages/core` modules, a few server modules and shared app modules are traced instead (Nov 1; Nov 6, #530): the specs of whatever uses what the diff changes. Every push to
+    protocol, the board, …) or a path it doesn't know runs the whole suite, and so does the `full-e2e` label. Every `packages/core/src` module but
+    `index.ts` (new ones too, Nov 10), `e2e/helpers.ts`, a few server modules and shared app modules are traced instead (Nov 1; Nov 6, #530): the specs of whatever uses what the diff changes; a new file `areas.json` doesn't place fails `check`. Every push to
     `main` runs the whole suite, both projects, on 15 runners since Nov 9 (on 10, about 28 minutes: measured Nov 6, the slowest shard's
     tests 26 and a minute of setup, plus any wait for runners), one run at a time (a newer push
     waiting replaces an older one; the next run covers both). `docs/areas/ops.md`, "CI e2e". A new boss (or any new
     area) adds its paths and spec to `e2e/areas.json`, or its PRs keep running everything. CI retries a failed test
-    once until the flaky-test batch lands (the goal is no retries); its `result` job lists flaky tests (passed only on
-    the retry) first, then failed ones, each with its shard, `file:line`, project and error. Not a required check yet
+    once, for its trace; on main a test that passed only on the retry turns the run red (Nov 10), so a flake is fixed
+    at its cause, never hidden. The `result` job lists flaky tests first, then failed ones, each with its shard,
+    `file:line`, project and error. Not a required check yet
     (the director decides when). Flakes only: "Re-run failed jobs" once; a test that fails again is real. Locally, run
     just the specs you're working on, and the `@perf` specs (frame budgets, which CI leaves out:
     `npx playwright test --grep @perf --project phone`), under the shared e2e lock.
@@ -135,10 +136,11 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
   reviews what comes back and merges.
 - **How the director runs a delegate:** it can run the delegate itself as a sub-agent in its own window (the Agent
   tool, with the agent's name), which is simplest for Eric. Or Eric can open a window for a delegate and paste a brief.
-- **Same model, always (Eric, Oct 7):** delegates and every other helper run on the director's own model (the agent
-  files say `model: inherit`). Never pick a smaller or cheaper model for any helper, built-in ones included: when
-  starting one, leave the model unset or set it to the director's. Eric pays for the top model and wants it on all work.
-- **Effort per task (Eric, Oct 11):** the model stays the same; the *effort* is chosen per task so the weekly usage
+- **The model goes by complexity, not length (Eric, Nov 9; replaces Oct 7's "same model, always"):** Opus for anything
+  that touches logic, code paths, rules, the engine, the server or stored data, and for drawings, rendering and
+  animation (Haiku hasn't done well at those), usually at a higher effort. Haiku for UI, copy or docs jobs that can be
+  handed plain, step-by-step directions, however long the job. The director decides per job; never Sonnet.
+- **Effort per task (Eric, Oct 11):** besides the model, the *effort* is chosen per task so the weekly usage
   goes further. Before starting a helper, the director weighs the task and sets the Agent tool's `effort` to `medium`,
   `high` or `xhigh`: never lower than `medium`, never higher than `xhigh`, and when torn between two, the higher one.
   Say which and why in one line of the brief.
@@ -160,11 +162,10 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
     `notes/RULES.md` (every standing rule), `notes/STATUS.md` (the live state and queue), `notes/CHANGELOG.md`; scripts in
     `notes/tools/`, briefs in `notes/briefs/`. Update and push them after every change. Helpers push work in progress
     at each real step. (The repo is public by Eric's choice, Nov 1; revisit before launch. Never a secret value.)
-  - **One Opus helper at a time (Eric's rule, restated Nov 1, 2026; first set in October after a night of about ten
-    helpers at once used about 30% of a week's usage).** The director never has more than one Opus helper running;
-    the next starts when it finishes. A Haiku helper for a small UI or docs job may run beside it only if Eric has OK'd
-    that job. Background scripts (CI and deploy watchers) don't count. Nov 1: the rule was lost after a restart and four
-    Opus helpers ran at once; this line is here so it survives restarts.
+  - **How many Opus helpers at once (Eric, Nov 9; first set in October after a night of about ten helpers at once used
+    about 30% of a week's usage):** one if its job is `xhigh`; up to two if both are `medium` or `high`. Haiku helpers
+    for simple jobs may run beside them. Background scripts (CI and deploy watchers) don't count. Nov 1: the rule was
+    lost after a restart and four Opus helpers ran at once; this line is here so it survives restarts.
   - A review round, a fix round after a merge, or a new job goes to a fresh helper with a one-page handoff (the PR, the
     findings, the files), never to a resumed one carrying hundreds of thousands of tokens (Nov 1 audit: seven of the ten
     costliest helpers had been resumed for more rounds or handed the next job). A helper mid-task keeps going.
@@ -180,7 +181,7 @@ Specialist agents live in `.claude/agents/` (one file each: a name, when to use 
     attempt. Small checks go together in one command.
   - After each batch of work the director runs `python3 .claude/tools/helper-usage.py <its task folder>` (one line per
     helper: steps, peak history, re-read, hours, waits, big outputs, images). Only when a helper stands out or a new
-    waste pattern shows, it starts an audit helper (same model, `medium`, read-only) on those helpers. The audit only
+    waste pattern shows, it starts an audit helper (Opus, `medium`, read-only) on those helpers. The audit only
     proposes: the director weighs each proposal, and Eric approves any that touch a quality gate (tests, reviews, CI,
     effort) or this file. Two audits in a row that change nothing retire it. `docs/decisions/2026-10-17-working-lean.md`;
     the Nov 1 audit and what came of it: `docs/decisions/2026-11-01-usage-audit.md`.
