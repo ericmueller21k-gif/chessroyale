@@ -701,3 +701,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   lazy-art (both high: Eric's 2-at-once rule). Batches 1-5 (xhigh) after.
 
 - Nov 10 05:05 UTC (Nov 9 11:05 pm Central): #598 lazy boss art OPEN (home load at 4x phone 5.2 s → 0.5 s; town ready ~half; 1,902 characters hash-identical). Helper archived. CI watching. phone-load-2 helper (session_01JuCWRrQyK8J5CUCpZ6RQDL) told to merge main after #598 and keep home's prewarm. Known tooling bug: `npm run frames:boss` stuck on main (welcome tour overlay takes the first tap). perf.spec :43/:133 DOM counts fail locally on main too.
+
+- Nov 10 05:35 UTC (Nov 9 11:35 pm Central): #598 lazy boss art MERGED and LIVE (7bfd6e5). Main 7bfd6e5 red on 2 flaky: town-leave:87 [phone] (Leave dialog not closing on Stay/Escape) and dash:241 "4 of 6" (a put-back lost again: likely app). Helper flaky batch 4 (claude/flaky-nov10b, high) beside phone-load-2.
