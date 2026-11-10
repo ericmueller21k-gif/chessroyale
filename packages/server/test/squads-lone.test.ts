@@ -45,15 +45,16 @@ describe("Squads: a lobby that rests on one party's devices pays no coins or cra
     return { L, ids, job };
   }
 
-  it("two parties, one device up to do bot work: a job it answers alone unvouches the squads of that match its party plays in, no other", () => {
+  it("two parties, one device up to do bot work: a job it answers alone (and those following it) unvouches only its own party's squad", () => {
     const { L, ids, job } = firstTurn(1);
     expect(L.core.record.unvouched).toBeUndefined();
     expect(job.devices).toEqual([ids[0]]);
     L.core.message(ids[0]!, { t: "botTop", id: job.id, top: fallbackTop(job.fen, SQUADS.bots.candidates) });
     expect(job.how).toBe("one");
-    const lm = L.core.allMatches().find((m) => Object.values(m.half?.work ?? {}).includes(job))!;
-    const own = lm.m.sides.filter((x) => x.seats.includes(ids[0]!)).map((x) => x.squadId);
-    expect(Object.keys(L.core.record.unvouched ?? {}).map(Number)).toEqual(own);
+    const squadOf = (id: string) => L.core.allMatches().flatMap((m) => m.m.sides).find((x) => x.seats.includes(id))!.squadId;
+    const marked = Object.keys(L.core.record.unvouched ?? {}).map(Number);
+    // (Its own match follows the same start here: its squad rests on it, the other party's player in it too. No other squad does.)
+    expect(marked).toEqual([squadOf(ids[0]!)]);
   });
 
   it("two parties, both devices up: a first answer that stands alone after the grace (the other slower) doesn't", () => {

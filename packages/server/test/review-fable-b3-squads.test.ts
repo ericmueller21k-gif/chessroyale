@@ -63,7 +63,7 @@ describe("review of PR #611 (Squads, two parties), turned around", () => {
     expect(L.core.record.devices[first]!.strikes + L.core.record.devices[second]!.strikes).toBe(0);
   });
 
-  it("M4: two parties, the other one's device goes: the bot work its party answers alone unvouches only the squad that party plays in, every other squad pays", () => {
+  it("M4: two parties, the other one's device goes: the bot work its party answers alone unvouches only the squad that party plays in, no other", () => {
     const L = squadsLobby({ test: { start: 0 }, fillInMs: 5_000 });
     const ids = [L.join("D0", { device: "computer" }), L.join("D1", { device: "computer" })];
     ids.forEach((id) => L.core.message(id, { t: "speed", nps: 1_000_000 }));
@@ -79,7 +79,7 @@ describe("review of PR #611 (Squads, two parties), turned around", () => {
     for (const m of matches) for (const job of Object.values(m.half!.work)) if (job.devices.includes(ids[0]!) && !job.how) L.core.message(ids[0]!, { t: "botTop", id: job.id, top: fallbackTop(job.fen, SQUADS.bots.candidates) });
     expect(matches.length).toBeGreaterThan(1);
     expect(L.core.record.unvouched?.[sq]).toMatch(/own party/);
-    // Only its own squad: the other side of its match, and every other match's squads (the departed party's among them), pay as usual.
+    // Only its own squad: the other side of its match, and every other match's squads, pay as usual.
     expect(Object.keys(L.core.record.unvouched ?? {}).map(Number)).toEqual([sq]);
   });
 });
