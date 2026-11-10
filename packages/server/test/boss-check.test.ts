@@ -97,11 +97,22 @@ function raid(opts: { server?: boolean; judges?: Partial<JudgeConfig>; settings?
   return { core, last, take, advance, serve, asks, now: () => now };
 }
 
-/** Two people in a raid: `p1` a computer (the host), `p2` a phone; both up-to-date apps (their speed known: they can check). */
+/** Someone joins with an up-to-date app (it plays the boss's seed: hello's `seeded`). */
+const join = (L: ReturnType<typeof raid>, name: string, device: "phone" | "computer", userId?: string) => L.core.connect(undefined, name, device, false, 1500, undefined, userId, null, null, false, {}, true);
+
+/** A device's speed known (it can judge and check) and its Maia loaded (it can check Maia's moves). */
+function ready(L: ReturnType<typeof raid>, ids: string[]) {
+  for (const id of ids) {
+    L.core.message(id, { t: "speed", nps: 800_000 });
+    L.core.message(id, { t: "maiaReady" });
+  }
+}
+
+/** Two people in a raid: `p1` a computer (the host), `p2` a phone; both up-to-date apps (their speed known, Maia loaded: they can check). */
 function twoPeople(L: ReturnType<typeof raid>, speed = true) {
-  L.core.connect(undefined, "Cheat", "computer", false, 1500);
-  L.core.connect(undefined, "Friend", "phone", false, 1500);
-  if (speed) for (const id of ["p1", "p2"]) L.core.message(id, { t: "speed", nps: 800_000 });
+  join(L, "Cheat", "computer");
+  join(L, "Friend", "phone");
+  if (speed) ready(L, ["p1", "p2"]);
   L.core.message("p1", { t: "start" });
   L.advance(1000);
 }
@@ -139,11 +150,12 @@ function hostScores(L: ReturnType<typeof raid>, ids: string[]) {
 }
 
 describe("the boss's move, played by two devices with one seed (the review's lying-host proof, turned around)", () => {
-  it("a host that throws the boss's move each turn: the checker's honest move plays (the engine server's pick), the host is benched, and the crowd hasn't won in 8 moves", () => {
+  it("a host that throws the boss's move each turn: the checker's honest move plays (the engine server's pick), the host is struck for each throw-sized one, and the crowd hasn't won in 8 moves", () => {
     const L = raid({ server: true });
     twoPeople(L);
     const played: { honest: string; got: string | null }[] = [];
     let crowdMoves = 0;
+    let throws = 0;
     for (let i = 0; i < 600 && L.core.record.phase !== "results" && crowdMoves < 8; i++) {
       const phase = L.core.record.phase;
       if (phase === "boss" && L.core.record.bossKey) {
@@ -157,6 +169,8 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
           L.core.message(id, { t: "bossMove", key: r.key, move });
           if (id === "p2") played.push({ honest: move, got: null });
         }
+        // (A strike for each move BOSS_CHECK.throwLoss worse than the honest one: a throw. Smaller lies just never play.)
+        for (const a of L.asks) if (a.moves.length === 2 && Math.abs(worth(a.fen, a.moves[0]!) - worth(a.fen, a.moves[1]!)) >= BOSS_CHECK.throwLoss) throws++;
         L.serve();
         const b = L.last("p2", "boss");
         if (played.length && played.at(-1)!.got === null && b?.boss.lastMove) played.at(-1)!.got = b.boss.lastMove.move;
@@ -170,13 +184,11 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
       L.advance(1000);
     }
     const asked = played.filter((p) => p.got !== null);
-    // (A raid whose thrower was benched rests on one device from then on: it pays as a solo game.)
-    expect(L.core.record.unvouched).toBeTruthy();
     expect(asked.length).toBeGreaterThanOrEqual(4);
     // Every boss move that played was the honest one: the thrower's never.
     for (const p of asked) expect(p.got).toBe(p.honest);
-    // The thrower was benched (its moves a queen or a mate worse), so it hosts nothing more.
-    expect(L.core.record.judges!.devices.p1!.strikes).toBeGreaterThanOrEqual(JUDGES.strikes);
+    // A strike for each throw (benched at JUDGES.strikes: it hosts nothing more), none for the smaller lies.
+    expect(L.core.record.judges!.devices.p1!.strikes).toBe(Math.min(throws, JUDGES.strikes));
     // The crowd hasn't won in 8 moves (the review's host won in 8).
     const won = L.core.record.phase === "results" && L.core.humanResults().every((r) => r.teamWon === true);
     expect(won).toBe(false);
@@ -259,7 +271,7 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
   it("the checker silent: the host's move waits BOSS_CHECK.waitMs, then plays alone (unvouched); a stranger's answer counts for nothing", () => {
     const L = raid();
     twoPeople(L);
-    L.core.connect(undefined, "Stranger", "computer", false, 1500);
+    join(L, "Stranger", "computer");
     untilBoss(L);
     const key = L.core.record.bossKey!;
     const r = L.last("p1", "bossRequest")!;
@@ -278,7 +290,7 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
 
   it("one person alone: their device's move plays at once; the match is unvouched, unranked, and its XP game is capped as a solo game's", () => {
     const L = raid();
-    L.core.connect(undefined, "Alone", "computer", false, 1500, undefined, "user-1");
+    join(L, "Alone", "computer", "user-1");
     L.core.message("p1", { t: "speed", nps: 800_000 });
     L.core.message("p1", { t: "start" });
     L.advance(1000);
