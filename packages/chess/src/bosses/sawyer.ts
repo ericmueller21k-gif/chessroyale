@@ -16,6 +16,7 @@
  * components/Sawyer.tsx, the cuts in characters/effects/sawyer.ts).
  */
 import { BOSS_POWERS, type BossPowerState, type BossState, type SawCut, type SplitPawn } from "@chessroyale/core";
+import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { legalMoves, pieceAt, withPiece } from "../rules.ts";
 import { VALUE, crowdHalf, from, meterFull, other, powerRoll, testSwitch, to, turnOf, type Battle, type BossRules, type Side, type TurnContext } from "./base.ts";
 
@@ -52,6 +53,17 @@ const rank = (sq: string) => Number(sq[1]);
 const square = (f: number, r: number) => `${"abcdefgh"[f]}${r}`;
 
 // ---------------- The split pawn ----------------
+
+/**
+ * The test switch (?power=split): the battle starts a few real moves in, one of his pawns taken by the crowd and the crowd
+ * to move, so his first move (a pawn's) has room to split at once. The split otherwise waits for room and then for his
+ * next pawn move, both up to his brain, and the e2e's game ran past its 20 moves now and then (main run 1199, Nov 10).
+ * The crowd White: 1.e4 d5 2.exd5 Nf6; Black: 1.e4 d5 2.Nc3 dxe4 3.Nxe4.
+ */
+export const SPLIT_TEST_MOVES: Readonly<Record<Side, readonly string[]>> = {
+  w: ["e2e4", "d7d5", "e4d5", "g8f6"],
+  b: ["e2e4", "d7d5", "b1c3", "d5e4", "c3e4"],
+};
 
 /** Sawyer's first move is still to come: it must be a pawn move. */
 export const firstMoveDue = (p: Pick<BossPowerState, "split"> | null | undefined): boolean => !!p && !p.split;
@@ -352,7 +364,16 @@ export const SAWYER: BossRules = {
     if (move) sawyerBattle.track(b, move);
   },
   // From the game so far; his cuts start a turn later than the others' passives (the split has turn 2 to itself).
-  opening: { setUp: () => ({ nextPassive: BOSS_POWERS.sawFirst }) },
+  opening: {
+    setUp(b, at) {
+      // (The test switch: a pawn of his already gone, the crowd to move: SPLIT_TEST_MOVES.)
+      if (b.settings.bossPowerTest === "split") {
+        const moves = SPLIT_TEST_MOVES[at.crowdSide];
+        b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...moves] }, moves.length, at.generation));
+      }
+      return { nextPassive: BOSS_POWERS.sawFirst };
+    },
+  },
   view: (p) => ({ split: p.split ?? null, cut: p.cut ? { ...p.cut } : null, boardSaw: p.boardSaw ? { ...p.boardSaw } : null }),
 };
 

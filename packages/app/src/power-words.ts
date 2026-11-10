@@ -45,6 +45,7 @@ export const POWER_WORDS: Record<PowerId, string> = {
   rush: "Scramble Rush",
   clockfit: "taps his clock (a multi-hit)",
   popoff: "pops off, then hits his clock ten times",
+  split: "saws a pawn in two",
 };
 
 /** A boss's card line for its powers: its passive, then its ultimate; empty for a boss without powers yet. */

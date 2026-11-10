@@ -100,31 +100,24 @@ const morph = SAWYER_LOOKS.split === "morph";
 const inAir = morph ? "piece.sw-mini:not(.saw-half-l):not(.saw-half-r) + piece.sw-mini:not(.saw-half-l):not(.saw-half-r)" : "piece.sw-half";
 const pairLook = morph ? (SAWYER_LOOKS.settle === "small" ? "small" : null) : "halves";
 
-/**
- * Until the split comes: a move that takes one of his pawns (so his split gets its room: the engine plays no ninth pawn)
- * if one costs little (within a fifth of the best's expected score: never a piece for it), else the engine's best. A
- * crowd that took any pawn it could, or drifted on the quiet moves, now and then lost before the split (Oct 15).
- */
-async function roomMove(page: Page): Promise<string> {
-  const { top, takes } = await ranked(page);
-  return top.find((m) => takes.includes(m.move) && m.expected >= top[0]!.expected - 0.2)?.move ?? top[0]!.move;
-}
-
 test("Sawyer: his first move a pawn's, then the split (two small whole pawns that grow; or halves) once there's room; your move's knock; his saw cuts", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(8 * 60_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto("/?debug&clock=60&boss=sawyer&laststand=0");
+  // (`?power=split`: a few real moves in, one of his pawns already taken (SPLIT_TEST_MOVES), so his first move splits. As the
+  // game came, the split waited for room and then for his next pawn move, both up to his brain: main run 1199, Nov 10, took
+  // his pawn on move 16 and saw no pawn move of his by move 21. The wait for room is the unit tests'.)
+  await page.goto("/?debug&clock=60&boss=sawyer&laststand=0&power=split");
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.boss.name)).toBe("Sawyer");
 
-  // Move 1, after a real think: your move's knock is the first sound heard. His reply is a pawn move.
+  // Move 1, after a real think: your move's knock is the first sound heard. His reply is a pawn move, and the split.
   await yourMove(page);
   await page.waitForTimeout(2500);
   await page.evaluate(() => ((window as any).__soundLog = []));
   const before = await page.evaluate(() => (window as any).match.phase.board.fen as string);
-  let split = await watchFor(page, {
+  const split = await watchFor(page, {
     banner: { selector: ".fight-banner.power-cut", text: /SPLIT PAWN!/ },
     boy: { selector: ".pm-split .sw-boy" },
     saw: { selector: '.sw-layer[data-split="saw"]' },
@@ -137,36 +130,12 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   await expect.poll(async () => (await soundsHeard(page)).map((s) => s.split(":")[0]), { timeout: 10_000 }).toContain("move");
   expect((await soundsHeard(page))[0]!.split(":")[0]).toBe("move");
   await yourMove(page);
-  const first = await page.evaluate(() => (window as any).match.boss);
-  const mine = first.crowdSide === "w" ? "b" : "w";
-  const mid = new Chess(before);
-  mid.move({ from: first.board.history.at(-2).slice(0, 2), to: first.board.history.at(-2).slice(2, 4), promotion: "q" });
-  expect(mid.get(first.board.history.at(-1).slice(0, 2) as never)).toMatchObject({ type: "p", color: mine });
-
-  // Until the split comes (at once, or after his first pawn move once one of his pawns is gone): take his pawns when
-  // that costs little (roomMove). Any saw cut on the way: nothing crosses it, and its groove is on its edge.
-  let cuts = 0;
-  for (let i = 0; i < 20 && !(await powers(page))?.split?.square; i++) {
-    const p = await powers(page);
-    if (p.cut && !cuts) {
-      cuts++;
-      await expect(page.locator(`.sw-cut[data-cut="${p.cut.a}-${p.cut.b}"]`)).toHaveCount(1);
-      await expect.poll(() => coveredBetween(page, p.cut.a, p.cut.b, ".sw-cut-board", 0.47), { timeout: 5000 }).toBeGreaterThan(0);
-      expect(await coveredBetween(page, p.cut.a, p.cut.b, ".sw-cut-board", 0)).toBe(0);
-      for (const m of p.allowed ?? []) expect([`${p.cut.a}${p.cut.b}`, `${p.cut.b}${p.cut.a}`]).not.toContain(m);
-    }
-    split = await watchFor(page, {
-      banner: { selector: ".fight-banner.power-cut", text: /SPLIT PAWN!/ },
-      boy: { selector: ".pm-split .sw-boy" },
-      saw: { selector: '.sw-layer[data-split="saw"]' },
-      crack: { selector: ".sw-layer .sw-crack" },
-      apart: { selector: `.sw-layer[data-split="apart"] ${inAir}` },
-      line: { selector: ".bc-bubble", text: /Two for one!|Half off!|Double trouble!/ },
-    });
-    await play(page, await roomMove(page));
-    await yourMove(page);
-  }
   const boss = await page.evaluate(() => (window as any).match.boss);
+  const mine = boss.crowdSide === "w" ? "b" : "w";
+  const mid = new Chess(before);
+  mid.move({ from: boss.board.history.at(-2).slice(0, 2), to: boss.board.history.at(-2).slice(2, 4), promotion: "q" });
+  expect(mid.get(boss.board.history.at(-1).slice(0, 2) as never)).toMatchObject({ type: "p", color: mine });
+
   const sp = boss.powers.split;
   expect(sp.square, "the split came").toBeTruthy();
   expect(await split.seen()).toEqual({ banner: true, boy: true, saw: true, crack: true, apart: true, line: true });
@@ -187,6 +156,24 @@ test("Sawyer: his first move a pawn's, then the split (two small whole pawns tha
   }
   // (Never a ninth pawn: the engine plays every position.)
   expect([...boss.board.fen.split(" ")[0]].filter((c) => c === (mine === "w" ? "P" : "p")).length).toBeLessThanOrEqual(8);
+
+  // His first saw cut (crowd turn BOSS_POWERS.sawFirst; a turn later when no edge fits): nothing crosses it, and its groove
+  // is on its edge. Quiet moves until then.
+  let cut: { a: string; b: string } | null = null;
+  for (let i = 0; i < BOSS_POWERS.sawFirst + 3 && !cut; i++) {
+    const p = await powers(page);
+    if (p.cut) {
+      cut = p.cut;
+      await expect(page.locator(`.sw-cut[data-cut="${p.cut.a}-${p.cut.b}"]`)).toHaveCount(1);
+      await expect.poll(() => coveredBetween(page, p.cut.a, p.cut.b, ".sw-cut-board", 0.47), { timeout: 5000 }).toBeGreaterThan(0);
+      expect(await coveredBetween(page, p.cut.a, p.cut.b, ".sw-cut-board", 0)).toBe(0);
+      for (const m of p.allowed ?? []) expect([`${p.cut.a}${p.cut.b}`, `${p.cut.b}${p.cut.a}`]).not.toContain(m);
+    } else {
+      await play(page, await allowedMove(page));
+      await yourMove(page);
+    }
+  }
+  expect(cut, "his first saw cut came").not.toBeNull();
   expect(errors).toEqual([]);
 });
 
