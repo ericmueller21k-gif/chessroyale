@@ -67,9 +67,8 @@ one person anyway; small boss raids?).
   Nothing is slower than the all-phone case; I'd accept it.
 - **`kind` on refills, replacements, referees: no stall.** `from` falls back to the whole `pool` whenever the class is
   empty or under the threshold (`judges.ts:167`), so `drawJudges` returns exactly as many judges as without `kind`.
-  `kindOf(undefined)` (no remaining judge) and a gone human give `undefined`, which with `paired = true` filters to
-  undefined-kind devices; with none, back to the pool. Referee `kind` only when the two share one; `undefined ===
-  undefined` there gives an unrestricted-or-fallback draw, fine.
+  `kindOf(undefined)` (no remaining judge) and a gone human give `undefined`, so `paired` starts false and the draw is
+  the old one. Referee `kind` only when the two share one; two gone humans give `undefined`, an unrestricted draw.
 - **One owner.** Exclusion is by owner of the excluded ids found in the pool passed (`judges.ts`, `owners`); refill
   excludes the planned judges, replace and referee exclude `t.tried` (which holds both judges). The capable-only pool in
   `replaceJudge` / `dispute` could miss an excluded judge's owner if it's not capable, but one seat per account
