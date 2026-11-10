@@ -676,3 +676,5 @@ BLOCKED on Eric: the settings redesign (he said he'd send the UI first), the cla
   → phone-only review, split autochess/crowd specs. FOR ERIC: F10 (helper model rule: CLAUDE.md "same model always" vs RULES Nov 8
   "Haiku for UI/simple") and F9 (turn on auto-delete head branches; bulk-delete merged branches). #588 live-ops design (docs).
 - Nov 9 ~22:10: #587 haptics LIVE; #588 live-ops design and #589 sweep quick wins merged; main 993103d GREEN. Running: flaky batch (session_01JuCWRvnVy1qgtFZ27K1vPx, claude/flaky-nov9b; NOT claude/flaky-batch-2, a stale Oct branch). Waiting on Eric: F10 model rule, F9 branch cleanup.
+
+- Nov 10 ~00:05 UTC (Nov 9 ~6:05 pm Central): flaky batch done, PR #590 open (claude/flaky-nov9b, targeted lane; app fixes in DashRush drag refs, SquadsMatch jump cancel, Town `__townStill`). Helper session archived. Open item from it: one Rush 0-of-6 phone red (profile without `user`, "reading 'signedIn'"), seen once in 60. Next after #590 merges: propose retries 0 on main (F1). Still waiting on Eric: F10 model rule, F9 branch cleanup. Bloat sweeps: Thu Nov 12 11:47 am Central, Sun Nov 15 11:47 pm Central.
