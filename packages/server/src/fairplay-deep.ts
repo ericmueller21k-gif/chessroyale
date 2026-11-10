@@ -149,8 +149,9 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
     }
     let complete = true;
     let changed = false;
-    // (Outside a review, as far as a ban could need and no further: the day's budget goes round more players. The review of #610, m4.)
-    const cap = row.status === "review" ? Infinity : FAIRPLAY.levels.banMatchChecked;
+    // (Outside a review or a ban, as far as a ban could need and no further: the day's budget goes round more players. The review of
+    // #610, m4. A banned case is checked in full, as a review's: a person's ban and its appeal rest on every counted move (delta m4-a).)
+    const cap = row.status === "review" || row.status === "banned" ? Infinity : FAIRPLAY.levels.banMatchChecked;
     let checked = moves.filter((m) => m.deep && skipReason(m) === null).length;
     let capped = false;
     for (const m of moves) {

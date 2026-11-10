@@ -301,7 +301,7 @@ export async function raiseCase(sql: Sql, userId: string, status: "watch" | "rev
   if (c?.status === "banned") return false;
   if (c && (c.status === status || (c.status === "review" && status === "watch"))) {
     // Already there: the new evidence goes in the log, and the case stays open.
-    await sql.run("UPDATE fairplay_cases SET updated_at = ? WHERE user_id = ?", now, userId);
+    await sql.run("UPDATE fairplay_cases SET updated_at = MAX(updated_at, ?) WHERE user_id = ?", now, userId);
     await logCase(sql, userId, "note", by, reason, now);
     return false;
   }
@@ -412,7 +412,7 @@ export async function recordFairPlay(
   // match as its first try did, its own row left out.)
   const once = match.since !== undefined && match.lobby !== null;
   const history = await sql.all<HistoryRow>(
-    `SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ${once ? "AND NOT (lobby = ? AND played_at >= ?)" : ""}
+    `SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ${once ? "AND NOT (lobby IS ? AND played_at >= ?)" : ""}
      ORDER BY played_at DESC, id DESC LIMIT 20`,
     userId,
     ...(once ? [match.lobby, match.since] : []),
@@ -444,7 +444,10 @@ export async function recordFairPlay(
   if (!added) verdict = await levelNow(sql, userId, c, now);
   // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
   if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
-  const acted = await actOn(sql, userId, verdict, now, mail);
+  // (A retry acts only when the case is still below what the verdict asks: it finishes what an earlier try missed, and writes no
+  // second note when nothing was missed. The delta review of #610, m1-a.)
+  const aim = aimOf(verdict);
+  const acted = !added && aim && caseRank(c?.status) >= caseRank(aim) ? ACTED[aim] : await actOn(sql, userId, verdict, now, mail);
   await purgeEvidence(sql, now);
   return { summary, verdict, acted };
 }
@@ -501,6 +504,16 @@ async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): 
  * What detection does with a level, as far as FAIRPLAY.enforcement allows: "watch" only records (a watch case, its
  * log saying what the level would have done), "review" also opens reviews, "ban" also bans. Returns what it did.
  */
+/** The case status actOn moves a verdict to (as its branches below), for a retry's check. */
+function aimOf(verdict: LevelVerdict): CaseStatus | undefined {
+  if (verdict.level === "none") return undefined;
+  const mode = FAIRPLAY.enforcement as "watch" | "review" | "ban";
+  if (verdict.level === "watch" || mode === "watch") return "watch";
+  return verdict.level === "ban" && mode === "ban" ? "banned" : "review";
+}
+const ACTED = { watch: "watch", review: "review", banned: "ban" } as Record<CaseStatus, FairLevel>;
+const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 3 : s === "review" ? 2 : s === "watch" ? 1 : 0);
+
 async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: number, mail?: CaseMailer): Promise<FairLevel> {
   if (verdict.level === "none") return "none";
   const mode = FAIRPLAY.enforcement as "watch" | "review" | "ban";
