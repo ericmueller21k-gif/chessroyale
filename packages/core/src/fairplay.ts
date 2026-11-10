@@ -391,6 +391,15 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
 }
 
 /**
+ * Whether a ban-level verdict rests on two matches or more: it still stands with any one of them left out (the engine pool's level
+ * path: docs/decisions/2026-11-10-engine-pool.md). Fair play records a match once per lobby, so one lobby's judges, honest or forged,
+ * never carry it alone (the #618 review, M3); a ban that rests on one match opens a review instead (a person looks).
+ */
+export function banSpread(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): boolean {
+  return playerLevel(matches, now, lv).level === "ban" && matches.every((_, i) => playerLevel(matches.filter((__, j) => j !== i), now, lv).level === "ban");
+}
+
+/**
  * One match at the one-match ban bar (every `banOne*` bar, the deep re-check's numbers included): near-perfect engine play on its
  * own. Read by playerLevel and by the engine pool's new-account rule.
  */

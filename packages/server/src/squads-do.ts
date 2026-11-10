@@ -3,7 +3,7 @@ import { SQUADS, SQUADS_LOBBY, pausedLine } from "@chessroyale/core";
 import type { LobbyCloseReason, Opening } from "@chessroyale/chess";
 import type { PartyClientMessage, PlayerBadge, SquadsClientMessage } from "@chessroyale/chess/squads";
 import openings from "@chessroyale/chess/data/openings.json";
-import { SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
+import { SQUADS_STARTED, SquadsCore, newSquadsRecord, squadsClosing, squadsLiveKey, squadsLiveSummary, type LiveMatch, type SquadsRecord, type SquadsReward, type SquadsServerRequest } from "./squads-lobby.ts";
 import { PartyCore, newPartyRecord, partyClosing, type PartyRecord } from "./squads-party.ts";
 import { bossPartyOverrides, partyLobby } from "./boss-party.ts";
 import { openLobbyCode } from "./codes.ts";
@@ -32,6 +32,8 @@ interface Attached {
   name?: string;
   guest?: boolean;
   banned?: boolean;
+  /** In fair play's engine pool (null: not known, the read failed; false for no account). */
+  pooled?: boolean | null;
   /** May use the test controls (an admin, or SQUADS_TEST on). */
   test?: boolean;
   /** Their badge in the turn order (a lobby's sockets only). */
@@ -59,12 +61,11 @@ async function whoIsAsking(request: Request, env: Env, waitUntil: (p: Promise<un
   const account = await accountOf(request, env, waitUntil).catch(() => null);
   const secrets = await withSecrets(env);
   const guest = !!env.DB && signInRequired(secrets) && !isSignedIn(account);
-  const banned =
-    !guest && !!account && !seated(account.id) && !!env.DB
-      ? (await banCheck(d1Sql(env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }))).banned
-      : false;
+  const check = !guest && !!account && !seated(account.id) && !!env.DB ? await banCheck(d1Sql(env.DB), account, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => null) : null;
+  const banned = !!check?.banned;
+  const pooled = account ? (check ? !!check.pooled : null) : false;
   const test = !guest && (env.SQUADS_TEST === "1" || isAdmin(secrets, account));
-  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, ...(test ? { test: true } : {}) };
+  return { userId: account?.id, ...(account?.name ? { name: account.name } : {}), guest, banned, pooled, ...(test ? { test: true } : {}) };
 }
 
 /**
@@ -287,11 +288,12 @@ export class SquadsLobby extends DurableObject<Env> {
    */
   async create(
     code: string,
-    opts: { fillAt: number | null; reserve?: { size: number; pass: string }[]; reserveMs?: number; test?: SquadsRecord["test"]; keepMs?: number },
+    opts: { fillAt: number | null; reserve?: { size: number; pass: string }[]; reserveMs?: number; test?: SquadsRecord["test"]; keepMs?: number; engine?: boolean },
   ): Promise<false | number[]> {
     if (this.record && !(await this.closeIfDue())) return false;
     const seed = crypto.getRandomValues(new Uint32Array(1))[0]!;
     this.record = newSquadsRecord(code, Date.now(), seed, { auto: !opts.test, fillAt: opts.fillAt, test: opts.test, keepMs: opts.keepMs });
+    if (opts.engine) this.record.engine = true;
     this.matches = {};
     const core = this.core();
     const took = opts.reserve?.length ? core.reserve(opts.reserve, opts.reserveMs ?? 20_000) : [];
@@ -342,6 +344,10 @@ export class SquadsLobby extends DurableObject<Env> {
       // (Attached first, so what connect() sends reaches this socket.)
       const token = typeof msg.token === "string" ? msg.token : undefined;
       const known = token ? this.record.humans.find((h) => h.token === token) : undefined;
+      // A matchmade lobby seats newcomers from its own side of fair play's engine pool only, whoever has the code; a party's members come in
+      // by its pass, as their party queued (a failed read lets them in, as a ban's does). The #618 review, m4.
+      const member = typeof msg.party === "string" && !!msg.party && Object.values(this.record.parties).some((p) => p.pass === msg.party);
+      if (!known && this.record.auto && !member && attached.pooled !== undefined && attached.pooled !== null && attached.pooled !== !!this.record.engine) return refuse(SQUADS_STARTED);
       if (known) ws.serializeAttachment({ ...attached, playerId: known.id });
       const result = core.connect(token, {
         name: attached.name ?? (typeof msg.name === "string" ? msg.name : undefined),
@@ -626,7 +632,7 @@ export class SquadsParty extends DurableObject<Env> {
       const answer = isPaused(this.env, "squads")
         ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine("squads") }
         : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(queue))
-            .next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass })
+            .next({}, this.record.fillMs, { squads: true, ...(pooled ? { engine: true } : {}) }, want.ticket, { size: want.size, pass: want.pass })
             .catch(() => null);
       if (!this.record) return;
       const core = this.core();

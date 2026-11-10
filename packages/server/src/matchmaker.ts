@@ -48,6 +48,11 @@ export interface PlayOptions {
    * server), paired by rating (PAIR_BY_RATING); each pair gets a game of its own (a DuelGame object).
    */
   duel?: boolean;
+  /**
+   * The engine pool's queue (an account fair play pooled: set by the Worker from the account, never the browser): its lobbies say so, and
+   * seat no one else who has their code (lobby-do.ts, squads-do.ts). The #618 review, m4.
+   */
+  engine?: boolean;
 }
 
 /**
@@ -70,13 +75,14 @@ export class Matchmaker extends DurableObject<Env> {
   private current = new Map<string, string>();
   private forming: Promise<void> | null = null;
   private again: ReturnType<typeof setTimeout> | null = null;
-  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean } = {
+  private lobbyOptions: { overrides: LobbyRecord["overrides"]; fillMs: number; botsOff: boolean; crowdWaitsForFull: boolean; squads: boolean; duel: boolean; engine: boolean } = {
     overrides: {},
     fillMs: 60_000,
     botsOff: false,
     crowdWaitsForFull: false,
     squads: false,
     duel: false,
+    engine: false,
   };
   private players: { at: number; n: number } = { at: 0, n: 0 };
   /** The matching rules (ranked replaces these). */
@@ -111,7 +117,7 @@ export class Matchmaker extends DurableObject<Env> {
 
   private async ask(overrides: LobbyRecord["overrides"], fillMs: number, opts: PlayOptions, ticketId?: string | null, info?: Record<string, unknown>): Promise<DuelPlayAnswer> {
     countCall("mm.next");
-    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel };
+    this.lobbyOptions = { overrides, fillMs, botsOff: !!opts.botsOff, crowdWaitsForFull: !!opts.crowdWaitsForFull, squads: !!opts.squads, duel: !!opts.duel, engine: !!opts.engine };
     const now = Date.now();
     const t = this.q.enqueue(ticketId, now, opts.since !== undefined ? { ...info, since: opts.since } : info);
     const done = this.q.placedIn(t.id);
@@ -243,7 +249,7 @@ export class Matchmaker extends DurableObject<Env> {
       }
     }
     while (rest.length) {
-      const { overrides, fillMs, botsOff, crowdWaitsForFull } = this.lobbyOptions;
+      const { overrides, fillMs, botsOff, crowdWaitsForFull, engine } = this.lobbyOptions;
       let granted: number | boolean = false;
       countCall("mm.create");
       const want = rest.length;
@@ -260,7 +266,7 @@ export class Matchmaker extends DurableObject<Env> {
           : now + fillMs;
       // A fresh code: one whose lobby is still open (a match, or its results) is never handed out.
       const fresh = await openLobbyCode(async (c) => {
-        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs });
+        granted = await this.lobby(c).create(c, overrides, { fillAt, botsOff, reserve: want, reserveMs: CAPACITY.queue.reservationMs, ...(engine ? { engine } : {}) });
         return granted !== false;
       });
       if (!fresh || !granted) {
@@ -298,7 +304,7 @@ export class Matchmaker extends DurableObject<Env> {
       const fillAt = Date.now() + this.lobbyOptions.fillMs;
       let took: number[] | false = false;
       const fresh = await openLobbyCode(async (c) => {
-        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs });
+        took = await this.squadsLobby(c).create(c, { fillAt, reserve: groups(rest), reserveMs: CAPACITY.queue.reservationMs, ...(this.lobbyOptions.engine ? { engine: true } : {}) });
         return took !== false;
       });
       const placed = fresh && took ? rest.filter((_, i) => (took as number[]).includes(i)) : [];

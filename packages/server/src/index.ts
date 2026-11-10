@@ -13,7 +13,7 @@ import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
-import { BANNED_MESSAGE, banCheck, caseOf } from "./fairplay.ts";
+import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
@@ -27,6 +27,7 @@ import { handleFriendsApi } from "./friends-api.ts";
 import { countCall, countRoute, opsStats, routeOf } from "./ops.ts";
 import { codeInPath, guardEntries, handleProblems, pruneProblems, serverError } from "./problems.ts";
 import { handleOpsAdmin } from "./ops-admin.ts";
+import { checkAlerts, type AlertEnv } from "./alerts.ts";
 import { pruneChatMod } from "./chat-mod.ts";
 import { e2eSql, type E2eSqlEnv } from "./e2e-sql.ts";
 import type { AccessEnv } from "./access.ts";
@@ -47,7 +48,7 @@ guardEntries(Matchmaker, "Matchmaker", ["next", "duelNext", "cancel"]);
 guardEntries(DuelGame, "DuelGame", ["fetch", "webSocketMessage", "webSocketClose", "alarm", "exists", "status", "create", "abandon"]);
 guardEntries(LiveHub, "LiveHub", ["seen", "arrive", "report", "forget", "liveCounts", "players", "health", "presence", "chatRead", "chatPost", "chatIcon", "alarm"]);
 
-export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv {
+export interface Env extends AccountEnv, EngineEnv, AdminEnv, AccessEnv, KillSwitchEnv, E2eSqlEnv, AlertEnv {
   LOBBIES: DurableObjectNamespace<Lobby>;
   /** Squads: one object per lobby, and one per party (squads-do.ts). */
   SQUADS: DurableObjectNamespace<SquadsLobby>;
@@ -92,13 +93,15 @@ export default {
 
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
-   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
+   * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
    * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
     const db = rawEnv.DB;
     const failed = (route: string) => (e: unknown) => serverError(rawEnv, { kind: "cron", route }, e, (p) => ctx.waitUntil(p));
+    // Alerts to Discord (alerts.ts): apart from the jobs below, so a database that doesn't answer still pages.
+    ctx.waitUntil(checkAlerts(rawEnv, d1Sql(db), Date.now()).catch(failed("alerts")));
     ctx.waitUntil(
       (async () => {
         const sql = d1Sql(db);
@@ -256,7 +259,8 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       }
       try {
         // A code, or "Servers are busy, you're in line: about N s" (busy, with the ticket to ask again with).
-        const opts = { botsOff: type === "botsoff", crowdWaitsForFull: !raid, since };
+        // (`engine`: the pool's queue makes the pool's lobbies, which seat no one else who has the code: lobby-do.ts.)
+        const opts = { botsOff: type === "botsoff", crowdWaitsForFull: !raid, since, ...(may.pooled ? { engine: true } : {}) };
         return json(await mm.next(JSON.parse(JSON.stringify(overrides)), fill * 1000, opts, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null));
       } catch {
         return json({ message: "Couldn't find a match. Try again." }, 500);
@@ -349,7 +353,7 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
     const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue(may.pooled)), region ? { locationHint: REGION_HINT[region] } : undefined);
     const ticket = url.searchParams.get("ticket");
     try {
-      return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
+      return json(await mm.next({}, fill * 1000, { squads: true, ...(may.pooled ? { engine: true } : {}) }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
     }
@@ -406,21 +410,19 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   if (!url.pathname.startsWith("/api/1v1/")) return null;
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
   // (An account in the engine pool: the pool's own queue, read from the account on every ask: mayPlay.)
-  let pooled = false;
-  const queue = async () => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region, pooled)), region ? { locationHint: REGION_HINT[region] } : undefined);
+  const queue = async (engine: boolean) => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region, engine)), region ? { locationHint: REGION_HINT[region] } : undefined);
   const ticket = ((t) => (t && /^[\w-]{8,64}$/.test(t) ? t : null))(url.searchParams.get("ticket"));
   if (url.pathname === "/api/1v1/play" && request.method === "POST") {
     if (isPaused(env, "ranked1v1")) return pausedResponse("ranked1v1");
     const may = await mayPlay(request, env, waitUntil);
     if (may instanceof Response) return may;
-    pooled = may.pooled;
     if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
     try {
       if (ticket) {
         // Ranked's leave rules read again on each ask (L1): a ticket made before a dodge elsewhere (a second tab or device) is
         // taken out of line by a lockout and held by the delayed queue. A read that fails changes nothing.
         const check = isPaused(env, "leave-penalties") ? null : await leavesRecheck(request, env, waitUntil).catch(() => null);
-        const answer = await (await queue()).duelNext(ticket, undefined, check ? { uid: check.uid, drop: !!check.leaves.lockedUntil, notBefore: check.leaves.delaySec ? Date.now() + check.leaves.delaySec * 1000 : null } : undefined);
+        const answer = await (await queue(may.pooled)).duelNext(ticket, undefined, check ? { uid: check.uid, drop: !!check.leaves.lockedUntil, notBefore: check.leaves.delaySec ? Date.now() + check.leaves.delaySec * 1000 : null } : undefined);
         if (check?.leaves.lockedUntil && !("code" in answer)) {
           countCall("ranked.locked");
           return json({ message: lockedLine(check.leaves.lock), lockedUntil: check.leaves.lockedUntil, lock: check.leaves.lock }, 403);
@@ -448,7 +450,7 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
       // (The device's marker, hashed: two accounts on one device never meet. Fair play's device cookie.)
       const deviceCookie = readCookie(request, DEVICE_COOKIE);
       const device = deviceCookie ? (await sha256(`1v1:${deviceCookie}`)).slice(0, 24) : null;
-      const first = await (await queue()).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
+      const first = await (await queue(may.pooled)).duelNext(null, { uid: me.id, rating, rd, player, device, ...delay, ...(testSeconds ? { testSeconds } : {}) });
       return json({ ...first, botRating: Math.round(rating) });
     } catch {
       return json({ message: "Couldn't find a match. Try again." }, 500);
@@ -456,12 +458,14 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   }
   if (url.pathname === "/api/1v1/cancel" && request.method === "POST") {
     if (!ticket) return json({});
-    // (A pooled account's ticket is in the pool's queue.)
-    pooled = await inPool(request, env, waitUntil);
-    const placed: { code?: string } = await (await queue()).cancel(ticket).catch(() => ({}));
-    if (placed.code) {
-      const me = await accountOf(request, env, waitUntil).catch(() => null);
-      if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+    // (Both queues, the usual one and the engine pool's: a ticket made before a Release, or before the pool, is in the other one. The #618
+    // review, m3.)
+    for (const engine of [false, true]) {
+      const placed: { code?: string } = await (await queue(engine)).cancel(ticket).catch(() => ({}));
+      if (placed.code) {
+        const me = await accountOf(request, env, waitUntil).catch(() => null);
+        if (me) await env.DUELS.get(env.DUELS.idFromName(placed.code)).abandon(me.id).catch(() => undefined);
+      }
     }
     return json({});
   }
@@ -505,13 +509,6 @@ async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): P
   if (!me || (signInRequired(env) && !isSignedIn(me))) return json({ message: "Sign in to use the engine server." }, 401);
   if (!(await takeEngineCall(d1Sql(env.DB!), me.id, Date.now()))) return json({ message: "Today's engine server checks are used up." }, 429);
   return null;
-}
-
-/** Whether the asking account is in fair play's engine pool (its queues are the pool's own). */
-async function inPool(request: Request, env: Env, waitUntil: WaitUntil): Promise<boolean> {
-  if (!env.DB) return false;
-  const me = await accountOf(request, env, waitUntil).catch(() => null);
-  return !!me && (await caseOf(d1Sql(env.DB), me.id).catch(() => null))?.status === "pool";
 }
 
 /**

@@ -7,12 +7,13 @@
  * item ledger's backfill (POST /api/admin/ledger/backfill: ledgerBackfill below).
  */
 import { OPS } from "@chessroyale/core";
-import { d1Sql, ensureSchema, userFromToken } from "./accounts.ts";
+import { d1Sql, ensureSchema, userFromToken, type Sql } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie } from "./api.ts";
 import { adminPage, esc, isAdmin, when, type AdminEnv } from "./admin.ts";
 import { REPORT_KINDS, latestReports, reportById, topErrors, type ErrorRow, type ProblemsEnv, type ReportKind, type ReportRow } from "./problems.ts";
 import { viaAccess, type AccessEnv } from "./access.ts";
 import { health, type Health } from "./health.ts";
+import { alertState, alertsStatus, SIGNALS, type AlertEnv, type Signal } from "./alerts.ts";
 import { backfillLedger, ledgerCheck } from "./ledger.ts";
 import type { EngineEnv } from "./engine.ts";
 import type { Env } from "./index.ts";
@@ -31,7 +32,7 @@ const pretty = (s: string) => {
   }
 };
 
-type OpsEnv = AdminEnv & ProblemsEnv & AccessEnv & EngineEnv & Pick<Env, "LIVE">;
+type OpsEnv = AdminEnv & ProblemsEnv & AccessEnv & EngineEnv & AlertEnv & Pick<Env, "LIVE">;
 
 /**
  * GET /admin/ops[?report=ID][&q=TEXT: only errors whose message contains it][&kind=bug|feedback|idea: only reports of
@@ -53,7 +54,8 @@ export async function handleOpsAdmin(request: Request, env: OpsEnv): Promise<Res
       if (!isAdmin(env, await userFromToken(sql, readCookie(request, SESSION_COOKIE), now))) return notFound();
     }
     await ensureSchema(sql, env.DB).catch(() => undefined);
-    return new Response(JSON.stringify(await health(env, sql, now)), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    const [h, alerts] = await Promise.all([health(env, sql, now), alertsView(env, sql)]);
+    return new Response(JSON.stringify({ ...h, alerts }), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
   }
   await ensureSchema(sql, env.DB);
   const user = await userFromToken(sql, readCookie(request, SESSION_COOKIE), now);
@@ -62,8 +64,19 @@ export async function handleOpsAdmin(request: Request, env: OpsEnv): Promise<Res
   const q = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
   const kind = REPORT_KINDS.find((k) => k === url.searchParams.get("kind")) ?? "";
   const found = /^[A-Z2-9]{6}$/.test(id) ? await reportById(sql, id) : null;
-  const [errors, reports, h] = await Promise.all([topErrors(sql, now, 30, q), latestReports(sql, 50, kind), health(env, sql, now)]);
-  return adminPage("Ops", page(user!.email!, h, { id, q, kind }, found, errors, reports));
+  const [errors, reports, h, alerts] = await Promise.all([topErrors(sql, now, 30, q), latestReports(sql, 50, kind), health(env, sql, now), alertsView(env, sql)]);
+  return adminPage("Ops", page(user!.email!, { ...h, alerts }, { id, q, kind }, found, errors, reports));
+}
+
+/** Alerts to Discord (alerts.ts): on or off and why, and what's paging now. */
+export interface AlertsView {
+  on: boolean;
+  why: string;
+  paging: Signal[];
+}
+async function alertsView(env: AlertEnv, sql: Sql): Promise<AlertsView> {
+  const s = await alertState(sql);
+  return { ...alertsStatus(env), paging: (Object.keys(SIGNALS) as Signal[]).filter((k) => s.signals[k].pagedAt) };
 }
 
 /**
@@ -91,7 +104,7 @@ function reportCard(r: ReportRow): string {
 const ago = (t: number | null, now: number) => (t ? `${when(t)} (${Math.round((now - t) / 60_000)} min ago)` : "never");
 
 /** The health view, as the page's first section. */
-function healthSection(h: Health): string {
+function healthSection(h: Health & { alerts: AlertsView }): string {
   const modes = h.live
     ? Object.entries(h.live.modes)
         .map(([m, c]) => `${m} ${c.playing} playing, ${c.waiting} waiting (${c.humans} people)`)
@@ -112,10 +125,11 @@ function healthSection(h: Health): string {
 <p><b>Reports (24 hours):</b> ${REPORT_KINDS.map((k) => `${h.reports.day[k] ?? 0} ${KIND_NAMES[k].toLowerCase()}`).join(", ")}</p>
 <p><b>Engine server:</b> ${e.on ? "on" : "off"} · ${e.searches} of ${e.cap} searches today · last answer ${ago(e.lastOk, h.at)} · last failure ${e.lastFail ? `${ago(e.lastFail.at, h.at)}: ${esc(e.lastFail.why)}` : "never"}</p>
 <p><b>Fair play's deep re-checks:</b> ${h.fairplay.searches} of ${h.fairplay.cap} searches today · <b>D1:</b> ${h.d1.ok ? `ok (${h.d1.ms} ms)` : `failing: ${esc(h.d1.error ?? "")}`}</p>
+<p><b>Alerts:</b> ${h.alerts.on ? `on, ${esc(h.alerts.why)}` : `alerts off: ${esc(h.alerts.why)}`} · paging now: ${h.alerts.paging.length ? esc(h.alerts.paging.map((k) => SIGNALS[k]).join(", ")) : "nothing"}</p>
 <p class="muted">As JSON for scripts: <a href="/api/admin/health">/api/admin/health</a> (<code>npm run ops:report</code>).</p></div>`;
 }
 
-function page(admin: string, h: Health, { id, q, kind }: { id: string; q: string; kind: ReportKind | "" }, found: ReportRow | null, errors: ErrorRow[], reports: ReportRow[]): string {
+function page(admin: string, h: Health & { alerts: AlertsView }, { id, q, kind }: { id: string; q: string; kind: ReportKind | "" }, found: ReportRow | null, errors: ErrorRow[], reports: ReportRow[]): string {
   const errorRows = errors
     .map(
       (e) => `<tr><td>${e.day}</td><td>${e.week}</td><td>${esc(e.source)}<br><span class="muted">${esc(e.kind)}</span></td>
