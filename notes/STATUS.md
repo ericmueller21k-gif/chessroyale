@@ -1,3 +1,4 @@
+- Nov 10 20:35 UTC: #618 fix round done (1d03b31). Notes: e2e/fairplay.spec.ts:96 ("reviewer API lists a reported case") NEVER RUNS (@phone-only + skip unless desktop) -> next tests batch; openCases 4 queries/case on the all tab -> later.
 - Nov 10 20:15 UTC: #619 Discord alerts MERGED (off until Eric adds ALERT_WEBHOOK; DEPLOY.md has the steps). Engine pool fix round + cheater demo running.
 - Nov 10 20:05 UTC: #618 review: no blocker; M1 emails in export, M2 crushed hint wrong, M3 one forged lobby pools (-> two lobbies), M4 per-player queries. ONE fix round started.
 - Nov 10 19:50 UTC: #611 LIVE 384fd84 (main run: flaky boss-challenge:1169 Timber admin town "drawn" -> next flaky batch). #617 xp test fix merged.
