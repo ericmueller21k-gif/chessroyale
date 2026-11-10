@@ -107,6 +107,13 @@ async function nextReplaying(page: Page, after: number | null): Promise<Seen> {
 }
 
 /** The moves on a board of your match now. */
+const boardResult = (page: Page, board: number) =>
+  page.evaluate((b) => {
+    const s = (window as any).squads;
+    const m = [...s.matches.values()].find((x: any) => x.sides.some((sd: any) => sd.seats.includes(s.myId)) && x.boards[b]?.result);
+    return (m?.boards[b].result ?? null) as unknown;
+  }, board);
+
 const plies = (page: Page, board: number) =>
   page.evaluate((b) => {
     const s = (window as any).squads;
@@ -243,7 +250,13 @@ test("Relay with Quick board jump: on your next board, no replay if you watched 
     const board = await page.locator(".sq-board-no").innerText().then((t) => Number(t) - 1);
     const arrived = await plies(page, board);
     const next = await nextDuty(page, s.seq);
-    expect(next.duty!.board).toBe(board);
+    if (next.duty!.board !== board) {
+      // (The board shown finished before your turn there (a win or a draw on it), so the server rightly gave you the next one:
+      // that turn shows nothing of the replay rule. Flaky batch 6, approved by Eric Nov 10.)
+      expect(await boardResult(page, board)).not.toBeNull();
+      s = next;
+      continue;
+    }
     const total = await plies(page, board);
     const watchedBoth = arrived <= total - 2;
     seenCases.add(watchedBoth ? "watched" : "arrived");
