@@ -41,6 +41,8 @@
       #shell * { visibility: hidden; }
       #shell .fd-side, #shell .fd-right, #shell .fd-hero, #shell .fd-play, #shell .fd-logo, #shell .fd-logo * { visibility: visible; }
       #shell .fd-play { color: transparent; background: none; box-shadow: inset 0 0 0 2px var(--fd-line); }
+      /* While the shell is up it is the splash: the app's own splash under it stays hidden, so the two never show at once. */
+      #shell ~ #app .fd-splash { visibility: hidden; }
     </style>
   </head>
   <body>

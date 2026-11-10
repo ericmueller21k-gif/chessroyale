@@ -25,3 +25,21 @@ export function markHome(home: boolean): void {
     // No storage: the splash next time.
   }
 }
+
+/**
+ * Drops the shell the moment #app shows anything but the splash, whichever component drew it (Nov 10: App's own check runs
+ * only when App renders, so a home a child drew could sit under the shell until App's next render, and the shell covers the
+ * screen). A MutationObserver runs before the browser paints, so the swap still can't be seen.
+ */
+export function watchShell(): void {
+  const app = document.getElementById("app");
+  if (!app || gone) return;
+  const obs = new MutationObserver(() => {
+    if (!app.firstElementChild || app.querySelector(".fd-splash")) return;
+    obs.disconnect();
+    dropShell();
+    if (app.querySelector(".fd-home")) markHome(true);
+    else if (app.querySelector(".landing")) markHome(false);
+  });
+  obs.observe(app, { childList: true, subtree: true });
+}

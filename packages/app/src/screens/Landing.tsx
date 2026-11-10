@@ -41,6 +41,8 @@ function DemoVideo() {
   return (
     <video ref={ref} class="demo-video" poster="/media/crowd-demo.jpg" autoplay muted loop playsInline preload="auto" aria-label="A 50 v 50 match being played">
       <source src="/media/crowd-demo.mp4" type="video/mp4" />
+      {/* (WebM too, for browsers without H.264, e.g. open-source Chromium; neither is precached: vite.config.ts.) */}
+      <source src="/media/crowd-demo.webm" type="video/webm" />
     </video>
   );
 }
