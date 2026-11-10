@@ -4068,8 +4068,8 @@ export interface AutoChessSettings {
   /**
    * The shop (v5, Eric Oct 20; v6 Oct 20 evening; v7 Oct 21): this many offers (4 since v7, was 5), each a piece and a square on
    * your half where it will land; buying an offer rolls a new one into its slot; one reroll of all the offers costs `reroll.first`
-   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (the TFT-style economy, Eric Oct 25:
-   * 2, 3, 4, 5, 5, ...; v7.1's was 5, 6, ... 10 on the old ×10 scale), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
+   * gold the first time in a round and `reroll.step` more each time after it, up to `reroll.max` (Eric Nov 10: "1 free reroll every round,
+   * and then it costs 1 for the next one, and then 2, and it's capped at 2": 0, 1, 2, 2, ...; Oct 25's was 2, 3, 4, 5, 5), back to the first price at each round's start. The shop refills free at each round's start. **The odds follow the level of whoever's shop it is** (v7, Eric Oct 21: "when
    * you level you have slightly higher chances for better pieces and pawn odds slightly decrease... [queens] shouldn't even appear
    * till level 7 like in TFT"): `oddsByLevel[level - 1]` is the percent of each kind for a shop rolled at that level, level 1 first
    * (play starts at `levels.start`, 4, and tops at `levels.max`, 10); each row adds up to 100. No rooks before level 5, no queens
@@ -4275,7 +4275,10 @@ export interface AutoChessSettings {
     readonly holdChance: number;
     /** Its pieces go down evenly over the step's open part, the last by this share of it (so something is on its board early, to scout). */
     readonly placeBy: number;
-    /** It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room). */
+    /**
+     * It buys XP (4 gold for 4 XP) now and then: at most this many a round, with this chance each time it has the gold (more with its board full: a level is room).
+     * Nov 10: `xpChanceFull` 0.8 → 0.7 with the free first reroll, so the bot, keeping the gold it spent on rerolls, levels at about the same pace (214 → 210 of 300 test rounds).
+     */
     readonly maxXpBuys: number;
     readonly xpGold: number;
     /** With this much gold it buys XP even when that gives no level yet (it saves up for the next). */
@@ -4313,7 +4316,7 @@ export const AUTOCHESS: AutoChessSettings = {
       { p: 42, n: 20, b: 19, r: 14, q: 5 },
       { p: 36, n: 21, b: 20, r: 16, q: 7 },
     ],
-    reroll: { first: 2, step: 1, max: 5 },
+    reroll: { first: 0, step: 1, max: 2 },
   },
   sellBack: 0.75,
   benchSlots: 4,
@@ -4374,5 +4377,5 @@ export const AUTOCHESS: AutoChessSettings = {
   queenLimit: 1,
   maxPawns: 8,
   pawnsPerFile: 3,
-  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.8, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
+  bot: { lockFrom: 0.3, lockTo: 0.95, neverLockChance: 0.15, maxRerolls: 3, rerollGold: 7, rerollChance: 0.06, rerollChanceBare: 0.2, maxHolds: 2, holdChance: 0.5, placeBy: 0.7, maxXpBuys: 3, xpGold: 6, xpRichGold: 14, xpChance: 0.3, xpChanceFull: 0.7, saveChance: 0.3, saveKeep: 8, queenChange: 4, starUpChance: 0.95, adjustTries: 16, adjustDestinations: 3, adjustNodes: 8000, adjustMargin: 0.02 },
 };

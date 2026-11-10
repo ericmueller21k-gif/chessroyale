@@ -1219,7 +1219,7 @@ function AutoChessGame({ onBack }: { onBack: () => void }) {
   const introLeft = Math.max(1, Math.ceil((cfg.introSeconds * 1000 - elapsed) / 1000));
   // This round's income, line by line (the Income button's breakdown).
   const income = incomeLines(g.round.gold.you, g.match.you.wins, g.match.you.losses, cfg);
-  // The next reroll's price (v7.1: 5, then 1 more each time, up to 10; back to 5 each round).
+  // The next reroll's price (Nov 10: free, then 1, then 2 and it stays 2; free again each round).
   const rerollNow = rerollPrice(g.round.shop.rerolls, cfg);
 
   return (

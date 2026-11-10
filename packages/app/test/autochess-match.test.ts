@@ -277,7 +277,7 @@ describe("auto chess: the bot", () => {
     expect(kept).toBeLessThan(100);
   });
 
-  it("rerolls its shop now and then when it has gold to spare: at most 3 a round, never when it is poor, and every reroll costs the climbing price (2, 3, 4)", () => {
+  it("rerolls its shop now and then when it has gold to spare: at most 3 a round, never when it is poor, and every reroll costs the climbing price (0, 1, 2)", () => {
     let withReroll = 0;
     let rerolls = 0;
     for (let seed = 0; seed < 300; seed++) {

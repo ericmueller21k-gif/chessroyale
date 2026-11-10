@@ -61,14 +61,14 @@ export const QuestsIcon = () => (
 );
 
 /**
- * The quests icon in a phone's top bar (Nov 9): a clipboard with its check, filled so its gold reads (the stylesheet
- * colors the three parts `.fd-qbar-*`; QuestsIcon above stays the outline for the panels).
+ * The quests icon in a phone's top bar (Nov 9; an outline since Nov 10, like the gear): a clipboard with its check, in the text
+ * color with no fill (the body's line stops at the clip, so nothing crosses it). QuestsIcon above stays the panels' icon.
  */
 export const QuestsBarIcon = () => (
-  <svg viewBox="0 0 24 24" width="29" height="29" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <rect class="fd-qbar-body" x="4" y="4" width="16" height="18" rx="2.5" />
-    <rect class="fd-qbar-clip" x="8" y="2" width="8" height="4" rx="1.2" />
-    <path class="fd-qbar-check" d="M8.5 13.2l2.3 2.3 4.2-4.4" fill="none" />
+  <svg viewBox="0 0 24 24" width="29" height="29" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M8 4H6.5A2.5 2.5 0 0 0 4 6.5v13A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 17.5 4H16" />
+    <rect x="8" y="2" width="8" height="4" rx="1.2" />
+    <path d="M8.5 13.2l2.3 2.3 4.2-4.4" />
   </svg>
 );
 
