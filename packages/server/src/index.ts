@@ -16,6 +16,7 @@ import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccoun
 import { BANNED_MESSAGE, banCheck, caseOf } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
+import { handleTestAccounts } from "./test-accounts.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
 import { deepCheckRun } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
@@ -186,6 +187,9 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     if (url.pathname === "/api/problems") return handleProblems(request, rawEnv, waitUntil);
     // (The sign-in secrets may live in the Secrets Store: read them as strings.)
     const env = await withSecrets(rawEnv);
+    // Test accounts (admins, a script through Access, the e2e's key: test-accounts.ts): made, listed and deleted.
+    const tests = await handleTestAccounts(request, env);
+    if (tests) return tests;
     // Fair play's review page and the automated reviewer's API (admins and the reviewer's token only).
     const review = await handleAdmin(request, env, caseMailer(env), waitUntil, containerSearch(env));
     if (review) return review;

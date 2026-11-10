@@ -124,7 +124,7 @@ export function readCookie(request: Request, name: string): string | null {
 }
 const cookie = (name: string, value: string, maxAge: number) =>
   `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAge}`;
-const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
+export const sessionCookie = (token: string) => cookie(SESSION_COOKIE, token, 365 * 86_400);
 
 /**
  * This device's answer to the age question (AGE_COOKIE), or null if it hasn't answered (or its "ok" has run out). An

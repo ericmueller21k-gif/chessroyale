@@ -164,7 +164,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   sessions: "token_hash user_id created_at expires_at",
   solo_battles: "user_id id started_at",
   solo_games: "user_id id started_at test_minutes",
-  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online pawn_color age_ok_at chat_on",
+  users: "id name icon email google_sub created_at last_seen rating allow_invites hide_online pawn_color age_ok_at chat_on test",
   wallets: "user_id coins crates crate_keys xp boss_picks",
   welcome_crates: "user_id milestone granted_at games seen_at opened_at item_id def",
 };
