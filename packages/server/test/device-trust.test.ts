@@ -127,7 +127,7 @@ describe("the host's scores are checked as a judge's are (the review's lying-hos
       const legal = legalMoves(j.fen);
       // Everything scored low but its own pick, which it leaves out (it used to "count as the best"); one junk value.
       const expectedAfter = Object.fromEntries(legal.filter((m) => m !== mine).map((m) => [m, 0.1]));
-      return { boardId: j.boardId, bestMove: mine ?? legal[0]!, bestExpected: 0.99, expectedAfter: { ...expectedAfter, ...(mine ? { a1a1: "x" as never } : {}) }, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, legal.find((m) => m !== mine)!])), botThinkMs: {} };
+      return { boardId: j.boardId, bestMove: mine ?? legal[0]!, bestExpected: 0.99, expectedAfter: { ...expectedAfter, ...(mine ? ({ a1a1: "x" } as unknown as Record<string, number>) : {}) }, botPicks: Object.fromEntries(j.bots.map((b) => [b.id, legal.find((m) => m !== mine)!])), botThinkMs: {} };
     });
     L.core.message("p1", { t: "scores", key: req.key, boards });
     const rv = L.last("p1", "reveal")!;
