@@ -1401,9 +1401,24 @@ test("rides (Oct 31; Nov 1, every boss's): your pawn sits on its ride, the ride'
       },
     });
   });
+  // Your ride is in the town's first drawn frame (Eric, Nov 10: "your rider doesnt appear for a few seconds"; it came 1.5 to 2 s after):
+  // read as that frame sets `data-ready`. (Within 500 ms of it at worst: past TOWN_FEEL.youWaitMs the town shows without it.)
+  await page.addInitScript(() => {
+    const w = window as unknown as { __townRide?: () => RideSeen; __firstRide?: { anim: string; gap: number | null } };
+    new MutationObserver(() => {
+      if (w.__firstRide || document.querySelector("canvas.town-canvas")?.getAttribute("data-ready") !== "1") return;
+      const t0 = performance.now();
+      const first = (w.__firstRide = { anim: w.__townRide!().you.anim, gap: null as number | null });
+      const look = () => (w.__townRide?.().you.anim ? (first.gap = performance.now() - t0) : requestAnimationFrame(look));
+      look();
+    }).observe(document, { subtree: true, attributes: true, attributeFilter: ["data-ready"] });
+  });
   await page.goto("/town?sky=day");
   await expect(canvas(page)).toHaveAttribute("data-ready", "1");
   await expect.poll(async () => (await rideNow(page)).you.ready, { message: "your ride's frames are ready", timeout: 30_000 }).toBe(true);
+  const first = await page.evaluate(() => (window as unknown as { __firstRide: { anim: string; gap: number | null } }).__firstRide);
+  console.log(`your ride in the town's first frame: ${first.anim || "on foot"}, drawn ${Math.round(first.gap ?? -1)} ms after it`);
+  expect(first.gap, "your ride drawn within 500 ms of the town's first frame").toBeLessThanOrEqual(500);
   expect(fetched).toEqual([]);
   // Standing: its idle, frame after frame, at every ride's size (0.75, Nov 1).
   const seen = new Set<number>();

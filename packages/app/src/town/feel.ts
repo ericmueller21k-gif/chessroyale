@@ -51,6 +51,11 @@ export interface SkyLook {
 }
 
 export const TOWN_FEEL = {
+  /**
+   * The longest the town waits, as it opens, for your pawn's pictures and your ride's frames (Eric, Nov 10: "your rider doesnt appear
+   * for a few seconds"; Town.tsx readyYou): past it the town shows with you on foot and the ride appears the moment it's ready.
+   */
+  youWaitMs: 1000,
   // ---- The walk (Eric: "perfect"; square to square "makes it feel like chess").
   /** Your step: one square in this many ms. (Prototype: 90.) */
   youStepMs: 90,

@@ -193,9 +193,11 @@ export async function battleToken(sql: Sql, userId: string, battle: unknown, now
 
 /** An account's boss tokens (only bosses it has some of) and crate keys, for its locker. */
 export async function tokenHoldings(sql: Sql, userId: string): Promise<{ tokens: Record<string, number>; keys: number }> {
-  const rows = await sql.all<{ boss: string; n: number }>("SELECT boss, n FROM boss_tokens WHERE user_id = ? AND n > 0 ORDER BY boss", userId);
-  const keys = (await sql.first<{ crate_keys: number | null }>("SELECT crate_keys FROM wallets WHERE user_id = ?", userId))?.crate_keys ?? 0;
-  return { tokens: Object.fromEntries(rows.map((r) => [r.boss, r.n])), keys };
+  const [rows, wallet] = await Promise.all([
+    sql.all<{ boss: string; n: number }>("SELECT boss, n FROM boss_tokens WHERE user_id = ? AND n > 0 ORDER BY boss", userId),
+    sql.first<{ crate_keys: number | null }>("SELECT crate_keys FROM wallets WHERE user_id = ?", userId),
+  ]);
+  return { tokens: Object.fromEntries(rows.map((r) => [r.boss, r.n])), keys: wallet?.crate_keys ?? 0 };
 }
 
 /** A boss crate's two prices: all tokens, or a token and a crate key. */
