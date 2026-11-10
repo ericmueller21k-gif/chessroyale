@@ -1,3 +1,4 @@
+- Nov 10 09:25 UTC: #607 LIVE eec7200; main full run 42788354486 GREEN (no flaky).
 - Nov 10 09:22 UTC: flaky batch 6 PR #608 open (global-chat pool, boss solo start askTwice). desktop-board:260 is fixed by #604. squads-replay:230 needs Eric OK (guard test, proposed spec-only fix in #608 body). CI running.
 - Nov 10 09:10 UTC: #607 search-on-home MERGED eec7200 (full suite green on PR, no flaky). Watching deploy + main run.
 - Nov 10 08:55 UTC: search build done (45 min). PR #607 open (draft), CI running (every spec). Merge when green: Eric said "build it and push it live". Then flaky batch 6 (squads-replay:230, global-chat:241, boss-challenge:155, desktop-board:260).
