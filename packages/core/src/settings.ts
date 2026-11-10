@@ -2355,6 +2355,7 @@ export interface JudgeConfig {
   maxNps: number;
   medianCap: number;
   pairClassMin: number;
+  pairClassShare: number;
   benchNodes: number;
   defaultNps: number;
   deepOnDevices: boolean;
@@ -2418,9 +2419,12 @@ export const JUDGES: JudgeConfig = {
   medianCap: 3,
   /**
    * The second judge comes from the first's class (computer or phone, the device's own word) only when that class has
-   * at least this many other accounts left; else from everyone, so a claimed class never decides who the second is.
+   * at least this many other accounts left, and at least `pairClassShare` of the lobby's accounts; else from everyone.
+   * A fixed count alone let an attacker supply it (four accounts claiming "computer" in a lobby of phones: both judges
+   * 29%; with the share, 7%, as if classes were ignored). Delta review 2, 2026-11-10-judge-pairing.md.
    */
   pairClassMin: 3,
+  pairClassShare: 0.1,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
@@ -2435,6 +2439,8 @@ export const JUDGES: JudgeConfig = {
    * decide, and a device could copy that to dodge blame. Revisit before turning this on:
    * docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md.)
    */
+  // (Before turning this on: two accounts claiming "computer" at a fast speed would make deepMode() true and the judging
+  // pool only the capable devices, the two of them, in a lobby of phones. Delta review 2 of PR #601, Nov 10.)
   deepOnDevices: false,
   /** The re-check's node count at most: the engine server's (shared by the round's boards, as the server's is). */
   deepNodes: 2_000_000,

@@ -132,7 +132,7 @@ export interface JudgeCandidate {
 const ownerOf = (d: JudgeCandidate) => d.owner ?? d.id;
 
 /** What `drawJudges` reads: the weight, and (each optional, none: no limit) the caps and the class threshold. */
-export type DrawConfig = Pick<JudgeConfig, "speedWeight"> & Partial<Pick<JudgeConfig, "maxNps" | "medianCap" | "pairClassMin">>;
+export type DrawConfig = Pick<JudgeConfig, "speedWeight"> & Partial<Pick<JudgeConfig, "maxNps" | "medianCap" | "pairClassMin" | "pairClassShare">>;
 
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -145,8 +145,9 @@ const median = (xs: number[]) => {
  * is excluded: two judges that agree are accepted unchecked, so they must be two people (2026-11-10-device-trust.md).
  * A speed counts at most `maxNps` and `medianCap` times the median of `devices` (a claimed speed buys little in a
  * lobby of phones). Each judge after the first, and the first when `kind` is given (a refill beside a remaining judge),
- * comes from that class (computer with computer) only while the class has `pairClassMin` other owners left; else from
- * everyone, so a pair finishes together but a class nobody else claims can't pick the second (2026-11-10-judge-pairing.md).
+ * comes from that class (computer with computer) only while the class has `pairClassMin` other owners left, and at least
+ * `pairClassShare` of the lobby's owners; else from everyone, so a pair finishes together but a class an attacker fills
+ * can't pick the second (2026-11-10-judge-pairing.md).
  */
 export function drawJudges(
   rng: () => number,
@@ -161,10 +162,11 @@ export function drawJudges(
   const owners = new Set(devices.filter((d) => exclude.has(d.id)).map(ownerOf));
   let pool = devices.filter((d) => !exclude.has(d.id) && !owners.has(ownerOf(d)));
   const out: string[] = [];
+  const minOwners = Math.max(cfg.pairClassMin ?? 1, Math.ceil((cfg.pairClassShare ?? 0) * new Set(devices.map(ownerOf)).size));
   let paired = kind !== undefined;
   while (out.length < count && pool.length) {
     const same = paired ? pool.filter((d) => d.kind === kind) : pool;
-    const from = same.length && new Set(same.map(ownerOf)).size >= (cfg.pairClassMin ?? 1) ? same : pool;
+    const from = same.length && new Set(same.map(ownerOf)).size >= minOwners ? same : pool;
     const weights = from.map((d) => judgeWeight(Math.min(d.nps, cap), load.get(d.id) ?? 0, cfg));
     const total = weights.reduce((a, b) => a + b, 0);
     let x = rng() * total;

@@ -20,5 +20,10 @@ Two attacker accounts claiming "computer" at 3M, both judges of one board (20,00
 review's lobby (20 computers 2M + 78 phones) 0.35%; 98 phones 1.5% (was 66.8%); 98 phones, no speed lie 0.02%;
 3 computers + 95 phones **3.3% (the worst case)**; 62 phones 2.9%; 98 computers, attackers claiming "phone" 0.1%.
 The review's lobby keeps real computers together: mixed pairs 0% (linear 47%), a computer judges first 70%.
-Left over: a small lobby (about 20 devices) still gives two claimed accounts a bigger share; measured speed fixes it
-(ROADMAP).
+**Round 3 (delta review 2, director):** a fixed 3 could be supplied by the attacker (four accounts claiming "computer"
+among phones: both judges 29%). The class must also hold `pairClassShare` **10%** of the lobby's accounts; then the draw
+is as if classes were ignored: 4 accounts 5.9%, 6 accounts 11.7%, 10 accounts 23.4% (in 100). Honest lobbies with 11+
+computers keep 0% mixed pairs; 5-10 computers among phones get mixed pairs again (about 25%).
+Left over, by lobby size (two accounts claiming "computer" at 3M among phones): 20 devices 18%, 10: 36%, 6: 58% (the
+median cap is 9 phones' weight). Lobbies that small with judging are private ones and small raids. Measured speed fixes
+it (ROADMAP).

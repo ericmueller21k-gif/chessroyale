@@ -161,6 +161,15 @@ describe("drawing judges", () => {
     const reviewMixedLinear = share(review.map(({ kind: _, ...d }) => d), mixed, { speedWeight: 1 });
     const reviewComputerFirst = share(review, (pair) => pair[0]!.startsWith("c"));
     console.log("judge pairs", JSON.stringify({ rows, reviewMixed, reviewMixedLinear, reviewComputerFirst }));
+    // (More accounts, delta review 2: four, six and ten claiming "computer" in a lobby of phones. With the class share the
+    // second judge is drawn as if classes were ignored: about 7%, 13% and 23%, against 29%, 40% and 52% with a fixed 3.)
+    const crowd = (k: number) => [...many(100 - k, "phone", 300_000, "p"), ...Array.from({ length: k }, (_, i) => ({ id: `A${i + 1}`, nps: 3_000_000, kind: "computer" as const }))];
+    const theirs = (pair: string[]) => pair.every((id) => id.startsWith("A"));
+    const accounts = { four: share(crowd(4), theirs), six: share(crowd(6), theirs), ten: share(crowd(10), theirs) };
+    console.log("attacker accounts", JSON.stringify(accounts));
+    expect(accounts.four).toBeLessThan(0.1);
+    expect(accounts.six).toBeLessThan(0.17);
+    expect(accounts.ten).toBeLessThan(0.27);
     for (const [row, v] of Object.entries(rows)) expect(v, row).toBeLessThanOrEqual(0.05);
     expect(rows.phones98NoSpeedLie).toBeLessThan(0.005);
     expect(reviewMixedLinear).toBeGreaterThan(0.4);
