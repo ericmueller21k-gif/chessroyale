@@ -1,3 +1,4 @@
+- Nov 10 11:45 UTC: #610 review: B1 (fixed by me, 2970b78), M1 (reviewer can still ban on forged evidence -> reviewer never bans), m1-m7. Fix helper on claude/fable-b2 (fix-fable-b2.md).
 - Nov 10 11:22 UTC: Fable b2 PR #610 open (full-e2e). NEW D1 table engine_calls (ensureSchema). Review helper on review/fable-b2.
 - Nov 10 10:48 UTC: #609 LIVE 0506f33. Main run 42800137294: all shards passed; flaky recluse.spec.ts:824 [phone] (toHaveCount) -> flaky batch 7 (with tiger:305).
 - Nov 10 10:34 UTC: Fable batch 2 helper session_01JuCWRre56rdF7caATPjdJY (xhigh, ALONE) on claude/fable-b2. Full lane: full-e2e label + independent review after.
