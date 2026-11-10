@@ -224,7 +224,7 @@ export class SquadsClient {
   vote: NetSquadsVote | null = null;
   readonly matches = new Map<string, LocalMatch>();
   clocks: NetTeamClock[] = [];
-  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean; why?: "alone" | "daily" } | null = null;
+  placed: { squadId: number; placement: SquadsPlacement; coins: number; crates: number; recorded: boolean; why?: "daily" } | null = null;
   results: Record<number, SquadsPlacement> | null = null;
   /** What each person wears (sent once per player: the last one seen is kept). */
   readonly looks = new Map<string, ItemLook>();

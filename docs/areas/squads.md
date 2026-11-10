@@ -367,10 +367,10 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
   the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). **One party's word
   (Nov 10):** a squad whose own match's bot work only its own party's devices answered, no other party's up (a lobby of one party
-  and bots: all its squads; `SquadsRecord.unvouched`, by squad), pays no coins or crates ("nobody outside your party checked the
-  bots' moves") and its XP as a solo game's; a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
+  and bots: all its squads; `SquadsRecord.unvouched`, by squad), is noted in the logs and paid as any (Eric, Nov 10: "If you play
+  with just all bots, you still get rewards from that"; the daily cap bounds it); a late answer is still compared (the server's verdict strikes the one further; no server: a referee device of another party, as in time); at most `SQUADS_LOBBY.rewardsPerDay` (5)
   paying lobbies a UTC day per account (checked as it's written; past it the placement is sent again with nothing). The
-  placement says why (`placed.why`, `NO_REWARD` in Squads.tsx). docs/decisions/2026-11-10-boss-and-lone-devices.md.
+  placement says why (`placed.why` "daily", `NO_REWARD` in Squads.tsx). docs/decisions/2026-11-10-boss-and-lone-devices.md.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a

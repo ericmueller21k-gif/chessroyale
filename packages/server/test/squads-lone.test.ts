@@ -1,6 +1,6 @@
 /**
  * Squads and the outside review of Nov 10 (finding 5; docs/decisions/2026-11-10-boss-and-lone-devices.md): a lobby whose bots one
- * party's devices moved alone pays no coins or crates (XP as a solo game's), and a placement's coins and crates have a daily cap
+ * party's devices moved alone is noted, and paid as any (Eric, Nov 10), and a placement's coins and crates have a daily cap
  * (SQUADS_LOBBY.rewardsPerDay), checked as the reward is written.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -18,11 +18,11 @@ const { writeReward } = await import("../src/squads-do.ts");
 
 const VOTES_MS = FRONT_DOOR.fillShowMs + SQUADS.firstVoteDelaySeconds * 1000 + squadsVotes().length * (SQUADS.voteSeconds * 1000 + voteResultMs(SQUADS));
 
-describe("Squads: a lobby that rests on one party's devices pays no coins or crates", () => {
+describe("Squads: a lobby that rests on one party's devices (noted, paid under the daily cap)", () => {
   beforeEach(() => clearTopCache());
   afterEach(() => clearTopCache());
 
-  it("one person alone with bots: every placement pays nothing, says why, and its XP is a solo game's", () => {
+  it("one person alone with bots: noted, and paid as any placement (Eric, Nov 10), XP as an online game's", () => {
     const L = squadsLobby({ seed: 3 });
     const a = L.join("Ann", { userId: "ua" });
     L.players.add(a);
@@ -30,9 +30,10 @@ describe("Squads: a lobby that rests on one party's devices pays no coins or cra
     const ann = L.core.takeRewards().find((r) => r.playerId === a)!;
     expect(L.core.record.unvouched?.[ann.squadId]).toBe("one party in the lobby");
     const pays = SQUADS_LOBBY.rewards[ann.placement];
-    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: 0, crates: 0, solo: true });
-    if (pays.coins || pays.crates) expect(ann.why).toBe("alone");
-    expect(L.last(a, "placed")).toMatchObject({ coins: 0, crates: 0, ...(pays.coins ? { why: "alone" } : {}) });
+    expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: pays.coins, crates: pays.crates });
+    expect(ann.solo).toBeUndefined();
+    expect(ann.why).toBeUndefined();
+    expect(L.last(a, "placed")).toMatchObject({ coins: pays.coins, crates: pays.crates });
   }, 120_000);
 
   /** A test lobby on its first turn: two people of two parties, `speeds` of them with apps that take bot work. */
@@ -103,12 +104,12 @@ describe("Squads: the daily cap on placement rewards (SQUADS_LOBBY.rewardsPerDay
     expect(coins()).toBe(100 * (SQUADS_LOBBY.rewardsPerDay + 1));
   });
 
-  it("a lobby of one party (solo): its XP goes in as a solo game's, under solo's daily caps", async () => {
+  it("a reward marked solo (writeReward's own path; no lobby marks one since Nov 10): its XP goes in as a solo game's", async () => {
     const { sql, db } = memoryDb();
     await ensureSchema(sql);
     const bo = await signedIn(sql, "Bo");
     const now = Date.UTC(2026, 10, 10, 12);
-    await writeReward(sql, "SQS", now - 3_600_000, { playerId: "p1", userId: bo.id, squadId: 0, placement: 1, coins: 0, crates: 0, recorded: true, solo: true, why: "alone", moves: 30, playMs: 20 * 60_000 }, now, false);
+    await writeReward(sql, "SQS", now - 3_600_000, { playerId: "p1", userId: bo.id, squadId: 0, placement: 1, coins: 0, crates: 0, recorded: true, solo: true, moves: 30, playMs: 20 * 60_000 }, now, false);
     const legs = db.prepare("SELECT reason, source_id FROM ledger WHERE asset_kind = 'xp' AND reason IN ('xp', 'xp-win') ORDER BY reason").all() as { reason: string; source_id: string }[];
     expect(legs).toEqual([
       { reason: "xp", source_id: "solo" },
