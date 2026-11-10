@@ -1866,6 +1866,12 @@ export class LobbyCore {
     const c = this.r.bossCheck;
     if (!c || c.server || this.r.phase !== "boss" || !this.r.bossKey) return;
     const ids = Object.keys(c.answers);
+    // (No seed (nobody to check it): two devices' answers would differ honestly. The first stands, as the host's alone.)
+    if (!c.draw && ids.length) {
+      this.unvouch("the boss's move with no second device to check it");
+      const one = c.answers[ids[0]!]!;
+      return this.playBoss(one.move, one.extras);
+    }
     if (ids.length >= 2) {
       const [a, b] = [c.answers[ids[0]!]!, c.answers[ids[1]!]!];
       // (His powers' extras from the one that worked them out: the host's whole request, not the checker's.)
