@@ -2606,7 +2606,7 @@ export class LobbyCore {
     // (`owner`: the account, so no two judges of a job are one person's; one seat per account makes it so already.)
     return this.r.humans
       .filter((h) => h.connected && devices[h.id] && !this.benched(h.id))
-      .map((h) => ({ id: h.id, nps: devices[h.id]!.nps, owner: this.r.accounts?.[h.id] ?? h.id }));
+      .map((h) => ({ id: h.id, nps: devices[h.id]!.nps, owner: this.r.accounts?.[h.id] ?? h.id, kind: h.device }));
   }
 
   /** Two judges per job when two devices can judge (else the host, as before). */

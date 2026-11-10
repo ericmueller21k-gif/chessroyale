@@ -88,9 +88,60 @@ describe("drawing judges", () => {
     expect(drawJudges(rng, [{ id: "a", nps: 1 }, { id: "b", nps: 1 }], 2, JUDGES).sort()).toEqual(["a", "b"]);
   });
 
-  it("a claimed speed buys little: at the cap, 2.5 times a fast computer's weight (was about 16 times at 50M with the cube)", () => {
-    expect(JUDGES.speedWeight).toBe(1);
-    expect(judgeWeight(JUDGES.maxNps, 0, JUDGES) / judgeWeight(2_000_000, 0, JUDGES)).toBeCloseTo(2.5, 6);
+  it("a claimed speed buys little: at the cap, 2.25 times a fast computer's weight (was about 16 times at 50M with the cube)", () => {
+    expect(JUDGES).toMatchObject({ speedWeight: 2, maxNps: 3_000_000 });
+    expect(judgeWeight(JUDGES.maxNps, 0, JUDGES) / judgeWeight(2_000_000, 0, JUDGES)).toBeCloseTo(2.25, 6);
+  });
+
+  it("the second judge comes from the first's class when it can (computer with computer), else from anyone", () => {
+    const devices = [
+      { id: "c1", nps: 2_000_000, kind: "computer" as const },
+      { id: "c2", nps: 2_000_000, kind: "computer" as const },
+      { id: "p1", nps: 300_000, kind: "phone" as const },
+      { id: "p2", nps: 300_000, kind: "phone" as const },
+    ];
+    const rng = mulberry32(5);
+    const kind = (id: string) => devices.find((d) => d.id === id)!.kind;
+    for (let i = 0; i < 200; i++) {
+      const [a, b] = drawJudges(rng, devices, 2, JUDGES);
+      expect(kind(a!)).toBe(kind(b!));
+    }
+    // One computer only: its partner is a phone (a pair beats one judge).
+    const lone = [devices[0]!, devices[2]!];
+    expect(drawJudges(rng, lone, 2, JUDGES).sort()).toEqual(["c1", "p1"]);
+  });
+
+  /**
+   * The review's lobby (20 computers at 2M, 80 phones at 300k): the share of jobs given a computer and a phone (the
+   * computer answers first, the phone is past the grace, so the computer's answer is used alone), before and after;
+   * and a two-account attacker claiming the cap, both judges of one board (2026-11-10-judge-pairing.md).
+   */
+  it("judge pairs at the review's lobby: mixed pairs (one answer alone) and an attacker's both-judges chance", () => {
+    const lobby = [
+      ...Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, nps: 2_000_000, kind: "computer" as const })),
+      ...Array.from({ length: 80 }, (_, i) => ({ id: `p${i}`, nps: 300_000, kind: "phone" as const })),
+    ];
+    const N = 20_000;
+    const share = (devices: typeof lobby, cfg: { speedWeight: number }, hit: (pair: string[]) => boolean, classes = true) => {
+      const rng = mulberry32(11);
+      const pool = classes ? devices : devices.map(({ kind: _, ...d }) => d);
+      let n = 0;
+      for (let i = 0; i < N; i++) if (hit(drawJudges(rng, pool, 2, cfg))) n++;
+      return n / N;
+    };
+    const mixed = (pair: string[]) => pair.filter((id) => id.startsWith("p")).length === 1;
+    const before = share(lobby, { speedWeight: 1 }, mixed, false);
+    const weightOnly = share(lobby, JUDGES, mixed, false);
+    const after = share(lobby, JUDGES, mixed);
+    // Two attacker accounts (computers claiming the cap) in place of two honest computers.
+    const attacked = lobby.map((d) => (d.id === "c0" || d.id === "c1" ? { ...d, nps: JUDGES.maxNps } : d));
+    const both = (pair: string[]) => pair.includes("c0") && pair.includes("c1");
+    const attackBefore = share(attacked.map((d) => (d.id === "c0" || d.id === "c1" ? { ...d, nps: 5_000_000 } : d)), { speedWeight: 1 }, both, false);
+    const attackAfter = share(attacked, JUDGES, both);
+    console.log("judge pairs", JSON.stringify({ before, weightOnly, after, attackBefore, attackAfter }));
+    expect(before).toBeGreaterThan(0.4);
+    expect(after).toBe(0);
+    expect(attackAfter).toBeLessThan(0.03);
   });
 });
 

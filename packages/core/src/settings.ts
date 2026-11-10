@@ -2401,12 +2401,13 @@ export const JUDGES: JudgeConfig = {
   graceMs: 150,
   graceFactor: 0.25,
   /**
-   * Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. 1 (was 3):
-   * the speed is the device's own word until it's measured, so a claimed speed buys little (2026-11-10-device-trust.md).
+   * Choosing judges: weight = (nodes per second) ^ speedWeight, so a computer judges more often than a phone. 2 (was 3,
+   * then 1): the speed is the device's own word until it's measured, so the cap below keeps what a claim buys small,
+   * while computers still mostly judge with computers (2026-11-10-judge-pairing.md).
    */
-  speedWeight: 1,
+  speedWeight: 2,
   /** The fastest a device's claimed speed counts (nodes/s; a fast desktop's real engine is about 2 to 3 million). */
-  maxNps: 5_000_000,
+  maxNps: 3_000_000,
   /** A device's speed check on joining: one search of this many nodes, timed. */
   benchNodes: 150_000,
   /** A device that hasn't reported its speed yet counts as this fast (nodes/s): a typical phone. */
