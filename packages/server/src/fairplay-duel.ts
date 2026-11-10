@@ -15,28 +15,9 @@
 import { FAIRPLAY, ratingForLoss } from "@chessroyale/core";
 import { START_FEN, applyMove, legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import type { Sql } from "./accounts.ts";
-import { deepResult, takeBudget, type DeepSearch } from "./fairplay-deep.ts";
+import { ENGINE_MOVES_MAX, deepResult, moveGroups, takeBudget, type DeepSearch } from "./fairplay-deep.ts";
 
-/** The most moves the engine server scores in one search (it answers 400 to more: engine/server.mjs). */
-export const ENGINE_MOVES_MAX = 8;
-
-/**
- * A position's legal moves in as few groups as the engine server takes (at most ENGINE_MOVES_MAX each), as near equal
- * in size as they can be (17 moves: 6, 6 and 5, never 8, 8 and 1, which would search the lone move eight times as
- * deep), the played move first. Searches of the same position at the same nodes, over about as many moves each, give
- * comparable expected scores, so the groups' answers together score every move.
- */
-export function moveGroups(legal: readonly string[], played: string): string[][] {
-  const order = [played, ...legal.filter((m) => m !== played)].filter((m) => legal.includes(m));
-  const count = Math.ceil(order.length / ENGINE_MOVES_MAX);
-  const groups: string[][] = [];
-  for (let g = 0, at = 0; g < count; g++) {
-    const size = Math.floor(order.length / count) + (g < order.length % count ? 1 : 0);
-    groups.push(order.slice(at, at + size));
-    at += size;
-  }
-  return groups;
-}
+export { ENGINE_MOVES_MAX, moveGroups };
 
 /** One checked move: its place (ply), the pick, the engine's best, the pick's rank among the legal moves, its loss and the think time. */
 export interface DuelCheckedMove {

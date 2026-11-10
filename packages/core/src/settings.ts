@@ -3410,10 +3410,12 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports, admins and the
-   * automated reviewer act whatever this says.
+   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
+   * whatever this says; the automated reviewer bans only a case at the ban bar (`levels`). "review" since Nov 10 (the
+   * outside review, finding 3: its evidence is the judges' numbers, which devices send): automatic bans stay off until
+   * Eric turns them back on (docs/decisions/2026-11-10-rewards-and-records.md).
    */
-  enforcement: "ban" as "watch" | "review" | "ban",
+  enforcement: "review" as "watch" | "review" | "ban",
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,
@@ -3438,8 +3440,8 @@ export const FAIRPLAY = {
   holdBackDays: 7,
   /**
    * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
-   * (native Stockfish, the full network), restricted to the judges' top moves and the pick. "Deep match": the pick is
-   * the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * (native Stockfish, the full network), over every legal move (in groups of at most 8, one search each: the engine's
+   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
    * budget of its own (its own container instance, so matches never wait behind it).
    */
   deep: {
@@ -3451,7 +3453,7 @@ export const FAIRPLAY = {
     perRun: 40,
     /** Off-peak hours (UTC, from-to): watch cases are checked only then; reviews any time. */
     offPeakUtc: [3, 10] as readonly [number, number],
-    /** The candidate moves searched: the judges' best this many, plus the pick. */
+    /** The judges' best moves kept with each pick as evidence (FairMove.top): this many. (The re-check searches every legal move.) */
     candidates: 8,
   },
   /**

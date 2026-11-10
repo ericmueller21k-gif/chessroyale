@@ -1,18 +1,51 @@
 /**
  * Fair play's deep re-check: a flagged player's counted moves searched again on the engine server (native Stockfish
- * 17.1, the full network, FAIRPLAY.deep.nodes), restricted to the judges' best moves and the pick. It answers the
- * question the judges' quick search can't settle on its own: are the picks the moves a strong engine plays, far more
- * often than even a very strong player's would be? A ban needs this confirmation (core/fairplay.ts, playerLevel).
+ * 17.1, the full network, FAIRPLAY.deep.nodes), over every legal move of the position: the candidates are the engine's
+ * own, never the judges' list, which a device sent and could have forged (the outside review of Nov 10, finding 3). The
+ * engine server takes at most ENGINE_MOVES_MAX moves a search, so the legal moves go in near-equal groups (moveGroups, as
+ * 1 v 1's check: fairplay-duel.ts), one search each from the day's budget. It answers the question the judges' quick
+ * search can't settle on its own: are the picks the moves a strong engine plays, far more often than even a very strong
+ * player's would be? A ban needs this confirmation (core/fairplay.ts, playerLevel).
  *
  * Eric's computing rule: the game first, then players' devices, then our servers where truly needed. Detection uses
  * the server's own record of each match and the server's own engine, never a device's say-so; and this heavy work
  * runs from the Worker's schedule: cases in review at once, the rest off-peak, within its own daily budget, on its own
  * container instance ("fairplay-1", fairplay-engine.ts), so a match's re-checks never wait behind it.
  */
-import { stockfishRefuses } from "@chessroyale/chess";
+import { legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import { FAIRPLAY, matchSignals, referenceStrength, skipReason, type FairMove } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { relevel, type CaseMailer } from "./fairplay.ts";
+
+/** The most moves the engine server scores in one search (it answers 400 to more: engine/server.mjs). */
+export const ENGINE_MOVES_MAX = 8;
+
+/**
+ * A position's legal moves in as few groups as the engine server takes (at most ENGINE_MOVES_MAX each), as near equal
+ * in size as they can be (17 moves: 6, 6 and 5, never 8, 8 and 1, which would search the lone move eight times as
+ * deep), the played move first. Searches of the same position at the same nodes, over about as many moves each, give
+ * comparable expected scores, so the groups' answers together score every move.
+ */
+export function moveGroups(legal: readonly string[], played: string): string[][] {
+  const order = [played, ...legal.filter((m) => m !== played)].filter((m) => legal.includes(m));
+  const count = Math.ceil(order.length / ENGINE_MOVES_MAX);
+  const groups: string[][] = [];
+  for (let g = 0, at = 0; g < count; g++) {
+    const size = Math.floor(order.length / count) + (g < order.length % count ? 1 : 0);
+    groups.push(order.slice(at, at + size));
+    at += size;
+  }
+  return groups;
+}
+
+/** A position's legal moves, or none (a position chess.js can't read: never searched). */
+function legalOf(fen: string): string[] {
+  try {
+    return legalMoves(fen);
+  } catch {
+    return [];
+  }
+}
 
 /** One deep search over some moves: each one's expected score (the mover's), or null when the server can't answer. */
 export type DeepSearch = (fen: string, moves: readonly string[]) => Promise<{ move: string; expected: number }[] | null>;
@@ -88,15 +121,31 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
       // (A position Stockfish refuses is never sent, so it never gets an answer: passed over rather than waited on, or
       // the queue would stop at it every run. No game makes one: engine.ts, containerScore.)
       if (m.deep || skipReason(m) !== null || stockfishRefuses(m.fen)) continue;
-      if (searches >= perRun || !(await takeBudget(sql, now))) {
+      // Every legal move, the pick's group first: the engine's own candidates (a pick that isn't legal here gets no result).
+      const groups = moveGroups(legalOf(m.fen), m.move);
+      if (!groups.length) continue;
+      // (All of a position's groups within this run's share, or it waits for the next run: half a position is never kept.)
+      if (searches + groups.length > perRun) {
         complete = false;
         break;
       }
-      searches++;
-      const candidates = [...new Set([...(m.top ?? [m.best]).slice(0, dp.candidates), m.move])];
-      const scores = await search(m.fen, candidates);
-      if (!scores) {
-        // The server didn't answer: try again on a later run.
+      const scores: { move: string; expected: number }[] = [];
+      let ok = true;
+      for (const group of groups) {
+        if (!(await takeBudget(sql, now))) {
+          ok = false;
+          break;
+        }
+        searches++;
+        const got = await search(m.fen, group);
+        if (!got) {
+          // The server didn't answer: try again on a later run.
+          ok = false;
+          break;
+        }
+        scores.push(...got);
+      }
+      if (!ok) {
         complete = false;
         break;
       }

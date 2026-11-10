@@ -63,7 +63,7 @@ export interface FairMove {
   recapture?: boolean;
   /** Legal moves in the position. */
   legal: number;
-  /** The judges' best moves, best first (up to FAIRPLAY.deep.candidates): what a deep re-check searches. */
+  /** The judges' best moves, best first (up to FAIRPLAY.deep.candidates): evidence for a person (the deep re-check searches every legal move). */
   top?: string[];
   /**
    * The deep re-check (on the engine server, afterwards): its best of the candidates, where the pick ranked among them

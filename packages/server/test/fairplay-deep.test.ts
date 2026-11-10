@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { stockfishRefuses } from "@chessroyale/chess";
+import { legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import { FAIRPLAY, type FairMove } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { caseOf, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
@@ -63,7 +63,7 @@ describe("the deep re-check", () => {
     expect(offPeak(BUSY)).toBe(false);
   });
 
-  it("checks a flagged player's counted moves (the judges' top moves and the pick), then the level can ban", async () => {
+  it("checks a flagged player's counted moves (every legal move, the pick's group first), then the level can ban", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const p = await player(sql, "Cheat");
@@ -80,7 +80,9 @@ describe("the deep re-check", () => {
       const { calls, search } = fakeSearch();
       const r = await deepCheckRun(sql, search, QUIET, { mail, perRun: 100 });
       expect(r).toEqual({ searches: 40, matches: 2 });
-      expect(calls[0]).toEqual(["a1a2", "a1b1", "a1b2"]);
+      // (The engine's own candidates: every legal move of the position, the pick first; a1 has three.)
+      expect(calls[0]![0]).toBe("a1a2");
+      expect([...calls[0]!].sort()).toEqual(["a1a2", "a1b1", "a1b2"]);
       const rows = await sql.all<{ summary: string; deep_done: number }>("SELECT summary, deep_done FROM fairplay_matches ORDER BY id");
       expect(rows.map((x) => x.deep_done)).toEqual([1, 1]);
       expect(JSON.parse(rows[0]!.summary)).toMatchObject({ deepChecked: 20, deepMatch: 20 });
@@ -91,6 +93,21 @@ describe("the deep re-check", () => {
     } finally {
       (FAIRPLAY as { enforcement: string }).enforcement = saved;
     }
+  });
+
+  it("as shipped (Nov 10, finding 3), detection only flags: the same overwhelming evidence opens a review, never a ban, and emails nobody", async () => {
+    expect(FAIRPLAY.enforcement).toBe("review");
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Cheat");
+    const sent: string[] = [];
+    const mail: CaseMailer = async (_u, kind) => void sent.push(kind);
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: engineMatch() }, QUIET - 2 * HOUR, mail);
+    await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: engineMatch() }, QUIET - HOUR, mail);
+    await deepCheckRun(sql, fakeSearch().search, QUIET, { mail, perRun: 100 });
+    expect(JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches ORDER BY id LIMIT 1"))!.summary)).toMatchObject({ deepChecked: 20, deepMatch: 20 });
+    expect((await caseOf(sql, p.id))?.status).toBe("review");
+    expect(sent).toEqual([]);
   });
 
   it("a strong player whose picks often aren't the engine's: no ban", async () => {
@@ -160,6 +177,33 @@ describe("the deep re-check", () => {
     expect((await sql.first<{ deep_done: number | null }>("SELECT deep_done FROM fairplay_matches"))!.deep_done ?? 0).toBe(0);
     const { search } = fakeSearch();
     expect((await deepCheckRun(sql, search, QUIET + 1, { perRun: 100 })).matches).toBe(1);
+  });
+
+  it("the candidates are the engine's own: a judges' list forged to make the pick look best (poor moves and the pick) can't (Nov 10, finding 3)", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Victim");
+    // Kings and a rook: 19 legal moves for White, so three searches (7, 6 and 6). The engine's best is the mate in one (a1a8), which the
+    // forged list leaves out; it names the pick (g6h6) best among two other king moves.
+    const fen = "6k1/8/6K1/8/8/8/8/R7 w - - 0 1";
+    const forged = engineMatch(12).map((m) => ({ ...m, fen, move: "g6h6", best: "g6h6", top: ["g6h6", "g6f6", "g6f5"] }));
+    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: forged }, QUIET - HOUR);
+    await setCase(sql, p.id, "review", "reports", "forged", QUIET - HOUR);
+    const calls: string[][] = [];
+    const search: DeepSearch = async (_fen, moves) => {
+      calls.push([...moves]);
+      return moves.map((m) => ({ move: m, expected: m === "a1a8" ? 1 : m === "g6h6" ? 0.6 : 0.55 }));
+    };
+    await deepCheckRun(sql, search, QUIET, { perRun: 100 });
+    // Every legal move searched, at most 8 a search, the pick's group first.
+    expect(calls.slice(0, 3).flat().sort()).toEqual(legalMoves(fen).sort());
+    expect(calls.every((c) => c.length <= 8)).toBe(true);
+    expect(calls[0]![0]).toBe("g6h6");
+    const kept = JSON.parse((await sql.first<{ moves: string }>("SELECT moves FROM fairplay_matches"))!.moves) as FairMove[];
+    const checked = kept.filter((m) => m.deep);
+    expect(checked.length).toBeGreaterThan(0);
+    // The engine's best is its own (the mate), so the pick is never a "deep match".
+    expect(checked.every((m) => m.deep!.best === "a1a8" && m.deep!.rank === 2)).toBe(true);
   });
 
   it("a position Stockfish refuses is passed over, not waited on: the match is still done", async () => {
