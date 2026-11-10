@@ -356,8 +356,8 @@ export interface LobbyRecord {
   bossPendingExtras?: BossExtras;
   /**
    * The boss's own move (and Boingo's funhouse move) asked of two devices (the outside review of Nov 10, finding 2): the seed both
-   * play it with (`draw`: the app's random source and Maia's draw), so two honest devices give the same move; the second device
-   * (`checker`; null: nobody could be asked); each one's answer; when the first came; and the engine server's id while it's asked
+   * play it with (`draw`: the app's random source and Maia's draw; 0 with no checker), so two honest devices give the same move;
+   * the second device (`checker`; null: nobody could be asked); each one's answer; when the first came; and the engine server's id while it's asked
    * which of two different moves is better for the boss. checkBoss and settleBoss; docs/areas/bosses.md, "Who plays the boss".
    */
   bossCheck?: { draw: number; checker: string | null; answers: Record<string, { move: string; extras: BossExtras }>; firstAt?: number; server?: string };
@@ -1714,7 +1714,8 @@ export class LobbyCore {
     const kind = this.r.bossKind;
     if (!kind || !CHECKED_BOSS_KINDS.has(kind)) return void (this.r.bossCheck = undefined);
     const checker = this.bossCheckerFor(host);
-    this.r.bossCheck = { draw: 1 + Math.floor(this.jrng() * 2_147_483_646), checker, answers: {} };
+    // (No second device: no seed either; the host plays as it always has.)
+    this.r.bossCheck = { draw: checker ? 1 + Math.floor(this.jrng() * 2_147_483_646) : 0, checker, answers: {} };
     this.keepChecker(checker);
   }
 
@@ -1883,7 +1884,7 @@ export class LobbyCore {
       // bounce keep their own engine picks, and so does Wrangler's reply to the showdown's duel: the engine's best.)
       ...(this.r.bossBrain && !funhouse && !pick && this.r.bossKind !== "extra" && this.r.bossKind !== "best" ? { brain: this.r.bossBrain } : {}),
       // (His own move and the funhouse's: the seed the host and the checker both play it with.)
-      ...(this.r.bossCheck ? { draw: this.r.bossCheck.draw } : {}),
+      ...(this.r.bossCheck?.draw ? { draw: this.r.bossCheck.draw } : {}),
       ...(asks ? { ...(asks.pull ? { pull: asks.pull } : {}), ...(asks.drag ? { drag: true as const } : {}), ...(asks.showdown ? { showdown: asks.showdown } : {}), seed: asks.seed } : {}),
       ...(land ? { land: land.map((x) => ({ ...x })) } : {}),
       ...(race ? { race } : {}),

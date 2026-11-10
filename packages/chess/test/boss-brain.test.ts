@@ -1,4 +1,4 @@
-import { BOSS_BRAIN, BOSS_ROSTER, bossBrainFor, isPlayable, maiaRatingFor } from "@chessroyale/core";
+import { BOSS_BRAIN, BOSS_ROSTER, bossBrainFor, isPlayable, maiaRatingFor, mulberry32 } from "@chessroyale/core";
 import { describe, expect, it } from "vitest";
 import {
   bossMoveFrom,
@@ -221,6 +221,20 @@ describe("the boss's move with a Maia brain (bossMoveFrom)", () => {
     expect(brainLine(note!)).toBe("Maia 1100 · no guard · Maia's #2 · 90 ms");
   });
 
+  it("an online move's seed (BOSS_CHECK) goes to Maia's draw, and the rest of the move draws from the seeded source", async () => {
+    const opts: { seed?: number }[] = [];
+    const maia: HumanEngineLike = { ready: () => true, candidates: async (_f, _r, _a, o) => (opts.push(o), answer("g2g4", [["e2e4", 0.5], ["g2g4", 0.2]])) };
+    const move = await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", mulberry32(77), [5, 15], undefined, null, { brain: "maia-raw", rating: 1100, engine: maia, settings, seed: 77 });
+    expect(move).toBe("g2g4");
+    expect(opts[0]!.seed).toBe(77);
+    // (No seed, as before: none sent.)
+    await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, null, { brain: "maia-raw", rating: 1100, engine: maia, settings });
+    expect(opts[1]!.seed).toBeUndefined();
+    // Two devices with one seed: the same slip (the rest of the move's draws come from the seed too).
+    const slip = async () => bossMoveFrom(scripted(), START_FEN, 1400, 1000, "stumble", mulberry32(5), [5, 15]);
+    expect(await slip()).toBe(await slip());
+  });
+
   it("the full guard turns Maia's blunder down for its next likely move", async () => {
     let note: BrainNote | null = null;
     const move = await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, null, {
@@ -352,9 +366,15 @@ describe("speaking to the Maia box (HumanUciEngine)", () => {
       "setoption name Temperature value 0.8",
       "setoption name TopP value 0.9",
       "setoption name MultiPV value 8",
+      // (No seed: the box's own random draw.)
+      "setoption name Seed value 0",
       `position fen ${START_FEN}`,
       "go searchmoves e2e4 d2d4",
     ]);
+    // An online boss move (BOSS_CHECK): the server's seed, for this draw alone, so two devices draw the same move.
+    const before = t.sent.length;
+    await maia.candidates(START_FEN, 1200, null, { temperature: 0.8, topP: 0.9, multipv: 8, seed: 123456789 });
+    expect(t.sent.slice(before)).toContain("setoption name Seed value 123456789");
     maia.close();
     expect(t.closed).toBe(true);
     expect(t.sent.at(-1)).toBe("quit");
