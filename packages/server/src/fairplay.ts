@@ -401,7 +401,7 @@ export interface FairRecord {
 export async function recordFairPlay(
   sql: Sql,
   userId: string,
-  match: { lobby: string | null; mode: string; moves: readonly FairMove[] },
+  match: { lobby: string | null; mode: string; moves: readonly FairMove[]; since?: number },
   now: number,
   mail?: CaseMailer,
 ): Promise<FairRecord> {
@@ -418,9 +418,12 @@ export async function recordFairPlay(
   const c = await caseOf(sql, userId);
   const verdict = playerLevel([...levelInputs(history, c), { ...summary, at: now }], now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
-  await sql.run(
+  // (`since`: once per lobby, as recordResult's: a lobby writing its end again (a retry, a restart) records nothing more.)
+  const once = match.since !== undefined && match.lobby !== null;
+  const added = await sql.first<{ id: number }>(
     `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+     ${once ? "WHERE NOT EXISTS (SELECT 1 FROM fairplay_matches WHERE user_id = ? AND lobby = ? AND played_at >= ?)" : ""} RETURNING id`,
     userId,
     match.lobby,
     match.mode,
@@ -432,7 +435,9 @@ export async function recordFairPlay(
     JSON.stringify(summary),
     JSON.stringify(match.moves),
     now + (flagged ? FAIRPLAY.evidenceDays : FAIRPLAY.evidenceDaysUnflagged) * DAY,
+    ...(once ? [userId, match.lobby, match.since] : []),
   );
+  if (!added) return { summary, verdict, acted: "none" };
   // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
   if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
   const acted = await actOn(sql, userId, verdict, now, mail);

@@ -2485,6 +2485,21 @@ export const LOBBY_LIFE = {
 } as const;
 
 /**
+ * A match's end on players' profiles (server/lobby-do.ts; the outside review of Nov 10, finding 9): each signed-in player's result,
+ * fair play, XP and rewards wait in the lobby's record (`saveQueue`) until written, each write keyed so a retry or a restart writes
+ * nothing twice. At most `perWake` players are written per wake (about 20 D1 calls each: far under D1's 1,000 queries per
+ * invocation), the next ones a second later. A failed write is tried again every `retrySeconds`, and the lobby waits to close for it
+ * up to `retryHours` past its closing time (then it closes, and says so on the ops page). XP, the Welcome Crate and boss tokens
+ * stop holding a result up after `strictTries` failed tries (logged): a lasting bug in one never blocks the result.
+ */
+export const MATCH_SAVE = {
+  perWake: 20,
+  retrySeconds: 60,
+  retryHours: 24,
+  strictTries: 3,
+} as const;
+
+/**
  * Resigning and leaving a match (Eric, Oct 13: "we need a surrender button... for every game mode"; DECISIONS.md,
  * "Resign: leaving a match in every mode"). Resigning in a solo game ends it at once, a loss. Online you can't end the
  * game for everyone: you leave it, out in the last place still open (a loss on your record), and a bot plays your seat

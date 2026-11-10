@@ -185,6 +185,24 @@ export type HumanResult = {
 } & MatchFeats;
 
 /**
+ * A signed-in player's result waiting to be written (server/lobby-do.ts; MATCH_SAVE in settings.ts): queued as they leave mid-match,
+ * or with everyone's at the end, with what the room counted for it then; taken out of the record only once written.
+ */
+export interface PendingResult {
+  playerId: string;
+  userId: string;
+  result: HumanResult & { abandoned?: true };
+  /** When it was queued: the result's time, and its XP's day. */
+  at: number;
+  /** XP's facts (xpSpan), the people against them (xpOpponents: a friends' lobby's win cap; none when matchmade), a boss battle's span. */
+  span: { moves: number; ms: number };
+  opponents: string[];
+  battle: { moves: number; ms: number } | null;
+  /** Tries that failed so far. */
+  tries?: number;
+}
+
+/**
  * Someone who left the match (LEAVING in settings.ts): resigned, gone longer than LEAVING.awayMs, left before move 1
  * or after they were out. Their seat is a bot's now, or out (or, before move 1, gone).
  */
@@ -297,7 +315,10 @@ export interface LobbyRecord {
   };
   /** Signed-in players' account ids (by player id), so results go on their profiles. */
   accounts?: Record<string, string>;
+  /** The match's end has been queued for profiles (saveQueue): everyone's results, once. */
   resultsSaved?: boolean;
+  /** Results waiting to be written (lobby-do.ts), oldest first; each leaves only once written. */
+  saveQueue?: PendingResult[];
   /** Crowd augments: the move clock as voted (seconds), and this cut's votes. */
   moveClock?: number;
   augmentVotes?: Record<string, Augment>;
