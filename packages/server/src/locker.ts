@@ -62,10 +62,18 @@ export interface LockerState {
 }
 
 /** A player's locker. `admin`: theirs is an admin's, so it has an admin copy of every item they don't own. */
-export async function lockerState(sql: Sql, userId: string, admin = false): Promise<LockerState> {
-  const stored = await sql.all<ItemInstance>("SELECT id, def, color, color2, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId);
+export async function lockerState(sql: Sql, userId: string, admin = false, before?: Promise<unknown>): Promise<LockerState> {
+  // Two waves of reads, each at once (Nov 10: every D1 read is a round trip, about 40 ms from a Worker, and home waits on this):
+  // the items, what's worn and the old crates' move (with `before`, a write the holdings must see: the profile's Welcome Crate);
+  // then the holdings.
+  const [stored, rows] = await Promise.all([
+    sql.all<ItemInstance>("SELECT id, def, color, color2, blemish, seed FROM items WHERE user_id = ? ORDER BY created_at DESC", userId),
+    sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId),
+    // (Crates held before Nov 9 had no series: they're Winter Crates from now on, moved once as the locker is read: rewards.ts.)
+    seriesFromWallet(sql, userId, Date.now()).catch((e: unknown) => console.log(`crates to series: ${String(e)}`)),
+    before,
+  ]);
   const items = admin ? [...stored, ...adminCopies(stored)] : stored;
-  const rows = await sql.all<{ slot: ItemSlot; item_id: string }>("SELECT slot, item_id FROM equipped_items WHERE user_id = ?", userId);
   const equipped: LockerState["equipped"] = {};
   const look: ItemLook = {};
   // An admin's worn admin copy of an item they've since really got (so it has no copy): the purest real one of that item
@@ -78,12 +86,14 @@ export async function lockerState(sql: Sql, userId: string, admin = false): Prom
     look[r.slot] = { def: it.def, color: it.color, blemish: it.blemish, seed: it.seed, ...(it.color2 ? { color2: it.color2 } : {}) };
   }
   for (const it of items) if (!it.color2) delete it.color2;
-  // (Crates held before Nov 9 had no series: they're Winter Crates from now on, moved once as the locker is read: rewards.ts.)
-  await seriesFromWallet(sql, userId, Date.now()).catch((e: unknown) => console.log(`crates to series: ${String(e)}`));
-  const { seriesCrates, bossPicks } = await seriesHoldings(sql, userId);
+  const [{ seriesCrates, bossPicks }, { tokens, keys }, bossCrates, welcome] = await Promise.all([
+    seriesHoldings(sql, userId),
+    tokenHoldings(sql, userId),
+    bossCrateHoldings(sql, userId),
+    welcomeState(sql, userId),
+  ]);
   const crates = Object.values(seriesCrates).reduce((s, n) => s + n, 0);
-  const { tokens, keys } = await tokenHoldings(sql, userId);
-  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates: await bossCrateHoldings(sql, userId), welcome: await welcomeState(sql, userId) };
+  return { items, equipped, look, crates, seriesCrates, keys, bossPicks, tokens, bossCrates, welcome };
 }
 
 /**

@@ -510,11 +510,16 @@ export const getUser = (sql: Sql, id: string) =>
  */
 export async function userFromToken(sql: Sql, token: string | null | undefined, now: number, touch?: (userId: string) => unknown): Promise<User | null> {
   if (!token) return null;
-  const s = await sql.first<{ user_id: string; expires_at: number }>("SELECT user_id, expires_at FROM sessions WHERE token_hash = ?", await sha256(token));
+  // (The session and its account in one read, Nov 10: each D1 read is a round trip, and every signed-in request starts here.)
+  const s = await sql.first<User & { expires_at: number }>(
+    "SELECT u.id, u.name, u.icon, u.email, u.google_sub, u.created_at, u.pawn_color, s.expires_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?",
+    await sha256(token),
+  );
   if (!s || s.expires_at < now) return null;
-  if (touch) touch(s.user_id);
-  else await touchUser(sql, s.user_id, now);
-  return getUser(sql, s.user_id);
+  if (touch) touch(s.id);
+  else await touchUser(sql, s.id, now);
+  const { expires_at: _, ...user } = s;
+  return user;
 }
 
 /** Marks an account as seen now (what "online" counts). Written at most every 15 s per account. */
@@ -848,12 +853,23 @@ export interface Profile {
 export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMINS, opts: { leaves?: boolean } = {}): Promise<Profile> {
   const admin = admins(user);
   // The Welcome Crate's backfill (Nov 6): an account that has finished enough games gets it here, on its next sign-in or app load,
-  // once ever (welcome.ts). Never in the way of the profile.
-  await grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
-  const rows = await sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
-    "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
-    user.id,
-  );
+  // once ever (welcome.ts). Never in the way of the profile. The locker's holdings are read after it; nothing else waits on it.
+  const welcome = grantWelcomeCrate(sql, user.id, Date.now()).catch((e: unknown) => console.log(`welcome crate for ${user.id}: ${String(e)}`));
+  // Every part's reads at once (Nov 10): each D1 read is a round trip (about 40 ms from a Worker), and the app's home waits on this.
+  // One after another they were 28 round trips, over a second; at once, about four (test/me-round-trips.test.ts).
+  const [rows, chatMod, chatOnRow, shop, locker, ranked1v1, xp, leaves] = await Promise.all([
+    sql.all<{ mode: string; online: number; placement: number; players: number; team_won: number | null; rating: number | null; played_at: number; ranked: number | null; held: number | null }>(
+      "SELECT mode, online, placement, players, team_won, rating, played_at, ranked, held FROM results WHERE user_id = ? ORDER BY played_at DESC",
+      user.id,
+    ),
+    chatStanding(sql, user.id, Date.now()).catch(() => null),
+    sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null),
+    shopState(sql, user.id, admin),
+    lockerState(sql, user.id, admin, welcome),
+    rankedSummary(sql, user.id, admins),
+    xpOf(sql, user.id),
+    opts.leaves === false ? null : rankedLeaves(sql, user.id, Date.now()).catch(() => null),
+  ]);
   const stats = (rs: typeof rows): ModeStats => ({
     matches: rs.length,
     wins: rs.filter((r) => r.placement === 1).length,
@@ -862,17 +878,16 @@ export async function profile(sql: Sql, user: User, admins: AdminCheck = NO_ADMI
     best: rs.length ? Math.min(...rs.map((r) => r.placement)) : null,
     teamWins: rs.filter((r) => r.team_won === 1).length,
   });
-  const chatMod = await chatStanding(sql, user.id, Date.now()).catch(() => null);
-  const chatOn = (await sql.first<{ chat_on: number | null }>("SELECT chat_on FROM users WHERE id = ?", user.id).catch(() => null))?.chat_on === 1;
+  const chatOn = chatOnRow?.chat_on === 1;
   return {
     user: { id: user.id, name: user.name, icon: user.icon, signedIn: !!(user.email || user.google_sub), email: user.email, google: !!user.google_sub, pawn: pawnColorOf(user.pawn_color) },
-    shop: await shopState(sql, user.id, admin),
-    locker: await lockerState(sql, user.id, admin),
+    shop,
+    locker,
     stats: { all: stats(rows), classic: stats(rows.filter((r) => r.mode === "classic")), crowd: stats(rows.filter((r) => r.mode === "crowd")), boss: stats(rows.filter((r) => r.mode === "boss")) },
     rating: rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null,
-    ranked1v1: await rankedSummary(sql, user.id, admins),
-    xp: await xpOf(sql, user.id),
-    leaves: opts.leaves === false ? null : await rankedLeaves(sql, user.id, Date.now()).catch(() => null),
+    ranked1v1,
+    xp,
+    leaves,
     recent: rows.slice(0, 10).map((r) => ({
       mode: r.mode,
       online: !!r.online,
@@ -1099,19 +1114,24 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
  * admin's are what they really own.
  */
 export async function shopState(sql: Sql, userId: string, admin = false): Promise<ShopState> {
-  const stored = (await sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId)).map((r) => r.item_id).filter((id) => shopItem(id));
+  // (Its four reads at once: every D1 read is a round trip, and /api/me waits on this.)
+  const [inventory, rows, wallet, picks] = await Promise.all([
+    sql.all<{ item_id: string }>("SELECT item_id FROM inventory WHERE user_id = ?", userId),
+    sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId),
+    sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId),
+    storedChatPicks(sql, userId),
+  ]);
+  const stored = inventory.map((r) => r.item_id).filter((id) => shopItem(id));
   const starters = SHOP_ITEMS.filter((i) => i.starter).map((i) => i.id);
   const all = [...new Set([...starters, ...stored])];
   const copies = admin ? adminShopCopies(all) : [];
   const owned = [...all, ...copies];
-  const rows = await sql.all<{ slot: string; item_id: string }>("SELECT slot, item_id FROM equipped WHERE user_id = ?", userId);
   const equipped = Object.fromEntries(SHOP_CATEGORIES.filter((c) => !c.ownOnly).map((c) => [c.slot, starterItem(c.slot).id])) as Record<EquipSlot, string>;
   for (const r of rows) {
     const item = shopItem(r.item_id);
     if (item && item.slot !== "chat" && item.slot === r.slot && owned.includes(item.id)) equipped[item.slot] = item.id;
   }
-  const wallet = await sql.first<{ coins: number }>("SELECT coins FROM wallets WHERE user_id = ?", userId);
-  return { coins: wallet?.coins ?? 0, owned, equipped, chat: chatPicks(await storedChatPicks(sql, userId), all), ...(copies.length ? { admin: copies } : {}) };
+  return { coins: wallet?.coins ?? 0, owned, equipped, chat: chatPicks(picks, all), ...(copies.length ? { admin: copies } : {}) };
 }
 
 /** Quick chat picks as stored (each kind a list, or null for the defaults). */

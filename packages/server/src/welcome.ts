@@ -115,13 +115,15 @@ export interface WelcomeState {
 
 /** An account's Welcome Crates, read only (an account with no rows: none earned yet, as every account before Nov 6). */
 export async function welcomeState(sql: Sql, userId: string): Promise<WelcomeState> {
-  const rows = await sql
-    .all<{ milestone: number; seen_at: number | null; opened_at: number | null; item_id: string | null }>(
-      "SELECT milestone, seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ? ORDER BY milestone",
-      userId,
-    )
-    .catch(() => []);
-  const games = await finishedGames(sql, userId).catch(() => 0);
+  const [rows, games] = await Promise.all([
+    sql
+      .all<{ milestone: number; seen_at: number | null; opened_at: number | null; item_id: string | null }>(
+        "SELECT milestone, seen_at, opened_at, item_id FROM welcome_crates WHERE user_id = ? ORDER BY milestone",
+        userId,
+      )
+      .catch(() => []),
+    finishedGames(sql, userId).catch(() => 0),
+  ]);
   const unopened = rows.filter((r) => r.opened_at === null).length;
   const latest = rows.filter((r) => r.opened_at !== null && r.item_id).sort((a, b) => b.opened_at! - a.opened_at! || b.milestone - a.milestone)[0];
   return {
