@@ -63,7 +63,7 @@ async function once(device, throttle) {
   const cdp = await ctx.newCDPSession(page);
   if (throttle > 1) await cdp.send("Emulation.setCPUThrottlingRate", { rate: throttle });
   await page.goto(url, { waitUntil: "commit" });
-  await page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "PLAY" && b.offsetParent), null, { timeout: 60000, polling: 50 });
+  await page.waitForFunction(() => [...document.querySelectorAll("#app button")].some((b) => b.textContent.trim() === "PLAY" && b.offsetParent), null, { timeout: 60000, polling: 50 });
   const ready = await page.evaluate(() => performance.now());
   const fcp = await page.evaluate(() => performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? NaN);
   // Settled on home: the engines asked for on home have started.
