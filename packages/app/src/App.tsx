@@ -44,6 +44,7 @@ import { queuedSquads } from "./move-replay.ts";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
 import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
 import { lazyGroup } from "./lazy.tsx";
+import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
@@ -815,6 +816,14 @@ export function App() {
     if ((match || squads) && duelQueue && !duel) dropDuelSearch();
   }, [match, squads]);
   // The bar over every screen while you browse with a search going (DuelQueueBar reads this after every render).
+  // The shell (index.html) goes as the first screen that isn't the splash draws, in the same frame (shell.ts); home or the
+  // landing page marks which one the next load's shell is.
+  useLayoutEffect(() => {
+    if (document.querySelector("#app .fd-splash")) return;
+    dropShell();
+    if (document.querySelector("#app .fd-home")) markHome(true);
+    else if (document.querySelector("#app .landing")) markHome(false);
+  });
   useLayoutEffect(() => setAwaySearch(duelQueue && duelAway && !duel && !match && !squads ? { queue: duelQueue, back: duelBackToStage, cancel: dropDuelSearch } : null));
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so

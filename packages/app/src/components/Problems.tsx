@@ -1,4 +1,5 @@
 import { Component, type ComponentChildren } from "preact";
+import { dropShell } from "../shell.ts";
 import { useEffect, useState } from "preact/hooks";
 import { youngGuest } from "../account.ts";
 import { captureError, reportProblem, type ReportKind } from "../problems.ts";
@@ -14,6 +15,8 @@ export class ErrorBoundary extends Component<{ children: ComponentChildren }, { 
   componentDidCatch(error: unknown) {
     captureError("render", error);
     this.setState({ failed: true });
+    // (The shell, index.html, never covers the error.)
+    dropShell();
     // (Still a page error too, as before the boundary: the console and the e2e tests' error checks see it. Reported
     // once: the page's listener skips an error already captured.)
     queueMicrotask(() => {
