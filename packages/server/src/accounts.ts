@@ -47,7 +47,7 @@ import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
 import { CHAT_MOD_SCHEMA } from "./chat-mod-schema.ts";
 import { XP_SCHEMA, xpColumns, xpOf } from "./xp.ts";
-import { QUESTS_SCHEMA, questDeletes } from "./quests.ts";
+import { QUESTS_COLUMNS, QUESTS_SCHEMA, questDeletes } from "./quests.ts";
 import { isBlockedText } from "./text-filter.ts";
 import { chatModMoves, chatStanding, type ChatNotice } from "./chat-mod.ts";
 import type { ChatBlock } from "@chessroyale/chess";
@@ -294,6 +294,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
   // The chat's opt-in (Nov 7, 2026: typed chat, off by default): 1 once the player turned chat on (after its one-time notice); NULL off.
   // Only a signed-in account's; a guest's is on its device. docs/decisions/2026-11-07-typed-chat-column.md.
   { table: "users", column: "chat_on", type: "INTEGER" },
+  // Quests (Nov 10, 2026: one reroll per daily): the day a reroll dealt a quest (quests.ts).
+  ...QUESTS_COLUMNS,
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,

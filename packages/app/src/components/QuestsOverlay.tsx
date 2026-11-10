@@ -7,7 +7,7 @@ import { KeyArt, WinterCrateArt } from "./Items.tsx";
  * The daily quests overlay (design: notes/briefs/design-xp-quests.md, section 5; Eric's reference of Nov 9): a framed card over
  * home, the HunChess app icon in a crest, "Daily Quests", when the dailies renew, then one row per quest (its picture, name, goal,
  * progress bar and count, its reward drawn with the shop's art) and "Got it". Two daily rows and the weekly one under its own
- * label and countdown. Each daily has a small reroll button (one free a day: greyed once used, or on a finished quest). The ×,
+ * label and countdown. Each daily has a small reroll button (each its own free one a day: greyed once used, or on a finished quest). The ×,
  * "Got it", Escape or a tap outside close it.
  *
  * It draws what it's given and calls back (Nov 9, phase 3: home gives it the server's quests, quests.ts; the server deals, counts,
@@ -24,8 +24,6 @@ export interface QuestsOverlayProps {
   dailyResetIn: string;
   /** Until the weekly resets ("4d"). */
   weeklyResetIn: string;
-  /** Today's free reroll is still there. */
-  rerollLeft: boolean;
   /** PAUSE_REWARDS is on: the head says quests are paused, in place of the countdown. */
   paused?: boolean;
   onReroll: (id: string) => void;
@@ -125,10 +123,10 @@ function Reward({ reward }: { reward: QuestView["reward"] }) {
   );
 }
 
-function QuestRow({ q, rerollLeft, onReroll }: { q: QuestView; rerollLeft: boolean; onReroll: (id: string) => void }) {
+function QuestRow({ q, onReroll }: { q: QuestView; onReroll: (id: string) => void }) {
   const done = q.progress >= q.target;
   const share = Math.min(1, q.progress / q.target);
-  const canReroll = q.period === "daily" && rerollLeft && !done;
+  const canReroll = q.period === "daily" && q.canReroll && !done;
   return (
     <li class={`qo-row${q.period === "weekly" ? " weekly" : ""}${done ? " done" : ""}`} data-quest={q.id}>
       <span class="qo-pic">
@@ -144,14 +142,14 @@ function QuestRow({ q, rerollLeft, onReroll }: { q: QuestView; rerollLeft: boole
       <div class="qo-text">
         <div class="qo-name-line">
           <strong class="qo-name">{q.name}</strong>
-          {/* (Dailies only; always there, greyed when it can't be used: today's reroll spent, or the quest done. Nothing hidden.) */}
+          {/* (Dailies only; always there, greyed when it can't be used: this daily's reroll spent today, or the quest done. Nothing hidden.) */}
           {q.period === "daily" && (
             <button
               type="button"
               class="qo-reroll"
               disabled={!canReroll}
-              aria-label={done ? "Reroll (quest done)" : rerollLeft ? `Reroll ${q.name} (1 free today)` : "Reroll (used today)"}
-              title={done ? "Done" : rerollLeft ? "Swap this quest (1 free a day)" : "Today's free reroll is used"}
+              aria-label={done ? "Reroll (quest done)" : canReroll ? `Reroll ${q.name} (1 free today)` : "Reroll (used today)"}
+              title={done ? "Done" : canReroll ? "Swap this quest (1 free a day per quest)" : "This quest's free reroll is used today"}
               onClick={() => canReroll && onReroll(q.id)}
             >
               <RerollIcon />
@@ -171,7 +169,7 @@ function QuestRow({ q, rerollLeft, onReroll }: { q: QuestView; rerollLeft: boole
   );
 }
 
-export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft, paused, onReroll, onClose }: QuestsOverlayProps) {
+export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, onReroll, onClose }: QuestsOverlayProps) {
   const ok = useRef<HTMLButtonElement>(null);
   // (A layout effect, as the other notices': Escape closes it from its first frame, and "Got it" has the focus.)
   useLayoutEffect(() => {
@@ -204,7 +202,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft,
         </header>
         <ul class="qo-rows">
           {dailies.map((q) => (
-            <QuestRow key={q.id} q={q} rerollLeft={rerollLeft} onReroll={onReroll} />
+            <QuestRow key={q.id} q={q} onReroll={onReroll} />
           ))}
         </ul>
         <div class="qo-label">
@@ -216,7 +214,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, rerollLeft,
         </div>
         <ul class="qo-rows">
           {weekly.map((q) => (
-            <QuestRow key={q.id} q={q} rerollLeft={rerollLeft} onReroll={onReroll} />
+            <QuestRow key={q.id} q={q} onReroll={onReroll} />
           ))}
         </ul>
         <button type="button" class="fd-btn primary qo-ok" ref={ok} onClick={onClose}>

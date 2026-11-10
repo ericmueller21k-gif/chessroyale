@@ -215,7 +215,7 @@ function Privacy() {
             the XP it gave you and what for, or why it gave none, and the crates and keys it gave you (the daily reward, your levels' and
             your quests'). The crates you hold by series, and the boss crates you have to pick. When a game you play on your device began
             (our server times it). Your quests: which ones you have, when each was given and finished, which games moved each one, and the
-            day of your last reroll.
+            day a reroll gave it.
           </p>
         }
         why="so your level and quests are yours on every device, a game's XP, rewards and quest progress are counted once, and the result screen can show what a game gave you."

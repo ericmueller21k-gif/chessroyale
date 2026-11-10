@@ -15,7 +15,7 @@ vi.mock("../src/engine.ts", () => ({ SERVER_RECHECK_NODES: 2_000_000, serverRech
 /**
  * Quests (XP phase 3; server/quests.ts, core's quests.ts; QUESTS in settings.ts; docs/decisions/2026-11-09-quests-*.md): dealt lazily
  * from a seed on the day's first read (two at once deal once), the XP day's and the week's resets, the carry-over cap, one reroll a
- * day, progress from each mode's counted games (none from a game with no XP, a solo game only for "finish games" with enough of the
+ * day per daily, progress from each mode's counted games (none from a game with no XP, a solo game only for "finish games" with enough of the
  * server's time, a win only when its XP was paid), completion paid once through the ledger in the game's XP batch (replays, two tabs,
  * two games at once), the weekly, PAUSE_REWARDS, and quests through a guest's merge, the download and deleting the account.
  */
@@ -57,7 +57,8 @@ describe("dealing: lazily, from a seed, on the day's first read", () => {
     expect(a.quests.map((q) => q.period)).toEqual(["daily", "daily", "weekly"]);
     expect(new Set(a.quests.map((q) => q.name)).size).toBe(3);
     expect(a.quests.every((q) => q.progress === 0)).toBe(true);
-    expect(a).toMatchObject({ day: xpDayStart(T0), dailyResetAt: xpDayStart(T0) + DAY, weeklyResetAt: questWeekStart(T0) + 7 * DAY, rerollLeft: true });
+    expect(a).toMatchObject({ day: xpDayStart(T0), dailyResetAt: xpDayStart(T0) + DAY, weeklyResetAt: questWeekStart(T0) + 7 * DAY });
+    expect(a.quests.map((q) => q.canReroll)).toEqual([true, true, false]);
     expect((await questsAnswer(sql, ann.id, T0 + 3 * 3_600_000)).quests).toEqual(a.quests);
     expect((await sql.all("SELECT id FROM quests")).length).toBe(3);
   });
@@ -135,24 +136,39 @@ describe("resets and the carry-over cap", () => {
   });
 });
 
-describe("the reroll: one free a day, an unfinished daily", () => {
-  it("swaps it for a quest you don't hold, its progress gone; a second is refused today; tomorrow there's one again", async () => {
+describe("the reroll: each unfinished daily its own free one a day (Eric, Nov 10)", () => {
+  it("swaps only that quest (its progress gone, its place kept); the other daily keeps its own reroll; the replacement can't be rerolled today; tomorrow both can", async () => {
     const { sql } = await world();
     const ann = await signedIn(sql, "ann@example.com");
     await set(sql, ann.id, [["squad-up", 1], ["warm-up"], ["regular"]]);
     const [squad] = await quests(sql, ann.id);
     expect(await rerollQuest(sql, ann.id, squad!.id, T0)).toEqual({ ok: true });
     const after = await questsAnswer(sql, ann.id, T0);
-    expect(after.rerollLeft).toBe(false);
     const swapped = after.quests[0]!;
     expect([swapped.period, swapped.progress]).toEqual(["daily", 0]);
     expect(["Squad Up", "Warm Up"]).not.toContain(swapped.name);
-    // (Its place kept: the first row.)
+    // (Only the one: its place kept, the other daily and the weekly as they were.)
     expect(after.quests.map((q) => q.name).slice(1)).toEqual(["Warm Up", "Regular"]);
-    expect(await rerollQuest(sql, ann.id, after.quests[1]!.id, T0)).toEqual({ ok: false, message: NO_REROLL });
+    expect(after.quests.map((q) => q.canReroll)).toEqual([false, true, false]);
+    // The replacement's reroll is used today.
+    expect(await rerollQuest(sql, ann.id, swapped.id, T0)).toEqual({ ok: false, message: NO_REROLL });
+    // The other daily's is still there; then neither has one.
+    const warm = after.quests[1]!;
+    expect(await rerollQuest(sql, ann.id, warm.id, T0 + MIN)).toEqual({ ok: true });
+    const both = await questsAnswer(sql, ann.id, T0 + MIN);
+    expect(both.quests[0]!.id).toBe(swapped.id);
+    expect(both.quests[1]!.id).not.toBe(warm.id);
+    expect(both.quests[1]!.name).not.toBe("Warm Up");
+    expect(new Set(both.quests.map((q) => q.name)).size).toBe(3);
+    expect(both.quests.map((q) => q.canReroll)).toEqual([false, false, false]);
+    for (const q of both.quests) expect(await rerollQuest(sql, ann.id, q.id, T0 + 2 * MIN)).toEqual({ ok: false, message: NO_REROLL });
+    // Tomorrow: the two carried over (unfinished) can each be rerolled again; the day's deal tops up to three, that one too.
     const tomorrow = await questsAnswer(sql, ann.id, T0 + DAY);
-    expect(tomorrow.rerollLeft).toBe(true);
-    expect((await rerollQuest(sql, ann.id, tomorrow.quests[0]!.id, T0 + DAY)).ok).toBe(true);
+    const dailies = tomorrow.quests.filter((q) => q.period === "daily");
+    expect(dailies.slice(0, 2).map((q) => q.id)).toEqual([swapped.id, both.quests[1]!.id]);
+    expect(dailies.every((q) => q.canReroll)).toBe(true);
+    expect((await rerollQuest(sql, ann.id, dailies[0]!.id, T0 + DAY)).ok).toBe(true);
+    expect((await rerollQuest(sql, ann.id, dailies[1]!.id, T0 + DAY)).ok).toBe(true);
   });
 
   it("never the weekly, a finished daily, someone else's quest or a made-up id; two at once reroll once", async () => {
@@ -168,6 +184,24 @@ describe("the reroll: one free a day, an unfinished daily", () => {
     const both = await Promise.all([rerollQuest(sql, ann.id, warm!.id, T0), rerollQuest(sql, ann.id, warm!.id, T0)]);
     expect(both.filter((r) => r.ok).length).toBe(1);
     expect((await quests(sql, ann.id)).length).toBe(3);
+    // (Two tabs on the replacement too: refused, it's used today; the slot was swapped once.)
+    const [, swapped] = await quests(sql, ann.id);
+    const again = await Promise.all([rerollQuest(sql, ann.id, swapped!.id, T0), rerollQuest(sql, ann.id, swapped!.id, T0)]);
+    expect(again.every((r) => !r.ok)).toBe(true);
+    expect((await sql.all("SELECT id FROM quests WHERE rerolled_day IS NOT NULL")).length).toBe(1);
+  });
+
+  it("two different dailies rerolled at once never end up the same quest (one game would pay both: review of #603)", async () => {
+    const { sql } = await world();
+    for (let i = 0; i < 40; i++) {
+      const u = await signedIn(sql, `u${i}@example.com`);
+      await set(sql, u.id, [["squad-up"], ["warm-up"], ["regular"]]);
+      const [a, b] = await quests(sql, u.id);
+      await Promise.all([rerollQuest(sql, u.id, a!.id, T0), rerollQuest(sql, u.id, b!.id, T0)]);
+      const kinds = (await sql.all<{ kind: string }>("SELECT kind FROM quests WHERE user_id = ? AND period = 'daily'", u.id)).map((r) => r.kind);
+      expect(kinds.length, `u${i}`).toBe(2);
+      expect(new Set(kinds).size, `u${i}: ${kinds.join(", ")}`).toBe(2);
+    }
   });
 });
 
@@ -382,11 +416,13 @@ describe("the API", () => {
     const ann = await signedIn(sql, "ann@example.com");
     const cookie = `hc_session=${await createSession(sql, ann.id, Date.now())}`;
     const got = await call(d1, cookie, "/api/quests");
-    expect([got.status, (got.body.quests as unknown[]).length, got.body.rerollLeft]).toEqual([200, 3, true]);
+    expect([got.status, (got.body.quests as unknown[]).length, (got.body.quests as { canReroll: boolean }[]).map((q) => q.canReroll)]).toEqual([200, 3, [true, true, false]]);
     const daily = (got.body.quests as { id: string }[])[0]!.id;
     const r = await call(d1, cookie, "/api/quests/reroll", { quest: daily });
-    expect([r.status, r.body.ok, (r.body.quests as { rerollLeft: boolean }).rerollLeft]).toEqual([200, true, false]);
+    expect([r.status, r.body.ok, ((r.body.quests as { quests: { canReroll: boolean }[] }).quests).map((q) => q.canReroll)]).toEqual([200, true, [false, true, false]]);
     expect((await call(d1, cookie, "/api/quests/reroll", { quest: daily })).status).toBe(409);
+    const fresh = (r.body.quests as { quests: { id: string }[] }).quests[0]!.id;
+    expect((await call(d1, cookie, "/api/quests/reroll", { quest: fresh })).status).toBe(409);
     expect((await call(d1, cookie, "/api/quests/test", { quests: [{ kind: "warm-up", progress: 2 }] })).status).toBe(403);
     const t = await call(d1, cookie, "/api/quests/test", { quests: [{ kind: "warm-up", progress: 2 }, { kind: "regular" }] }, { TEST_SWITCHES: "1" });
     expect((t.body.quests as { name: string; progress: number }[]).map((q) => [q.name, q.progress])).toEqual([

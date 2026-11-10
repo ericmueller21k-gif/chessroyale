@@ -3,14 +3,14 @@ import { asSignedIn, bossAloneFromHome, pickMode, submitMove, test } from "./hel
 
 /**
  * Quests (XP phase 3, Nov 9; docs/decisions/2026-11-09-quests-*.md), phone and computer: the overlay with the server's quests from the
- * Quests button and the reroll (once a day, kept by the server); the overlay by itself on a signed-in account's first home visit of
+ * Quests button and the reroll (once a day per daily, kept by the server); the overlay by itself on a signed-in account's first home visit of
  * the day, once; the entry greyed for a guest where sign-in is set up; a quest finished by a game: its line in the result's toast, its
  * XP in the box ("Quests +1,800") and "Done!" in the overlay after. The test switch ?quests=<kind>[:<progress>],… sets your quests.
  * QUESTS_SHOTS=<dir> saves the stills (the overlay light and dark, a finished quest, the result's toast, a 320 px top bar).
  */
 const SHOTS = process.env.QUESTS_SHOTS;
 
-type Answer = { quests: { id: string; name: string; progress: number; target: number }[]; rerollLeft: boolean; day: number };
+type Answer = { quests: { id: string; name: string; progress: number; target: number; canReroll: boolean }[]; day: number };
 const answer = async (page: Page) => (await (await page.request.get("/api/quests")).json()) as Answer;
 
 /** Home with your quests set by the test switch, once the server has them. */
@@ -23,7 +23,7 @@ async function homeWith(page: Page, quests: string, names: string[]) {
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Daily Quests" });
 const entry = (page: Page) => page.getByRole("button", { name: "Quests", exact: true });
 
-test("the Quests button opens the server's quests (names, goals, progress, rewards, the countdowns); the reroll swaps a daily once a day and the server keeps it", async ({ page }, testInfo) => {
+test("the Quests button opens the server's quests (names, goals, progress, rewards, the countdowns); the reroll swaps a daily once a day (each its own) and the server keeps it", async ({ page }, testInfo) => {
   await homeWith(page, "squad-up:1,fifty-fifty,regular:3", ["Squad Up", "Fifty-Fifty", "Regular"]);
   await expect(entry(page)).toBeEnabled();
   await entry(page).click();
@@ -42,21 +42,23 @@ test("the Quests button opens the server's quests (names, goals, progress, rewar
       await page.screenshot({ path: `${SHOTS}/quests-overlay-${testInfo.project.name}-${scheme}.png` });
     }
   }
-  // The reroll: Squad Up (1/2) swapped for a quest you don't hold, at 0; both dailies' rerolls grey (still there).
+  // The reroll: Squad Up (1/2) swapped for a quest you don't hold, at 0; only its reroll greys (still there), Fifty-Fifty keeps its own.
   await d.locator(".qo-row").first().locator(".qo-reroll").click();
   await expect(d.locator(".qo-name").first()).not.toHaveText("Squad Up");
   await expect(d.locator(".qo-name").first()).not.toHaveText("Fifty-Fifty");
-  for (const r of await d.locator(".qo-reroll").all()) await expect(r).toBeDisabled();
+  await expect(d.locator(".qo-reroll").first()).toBeDisabled();
+  await expect(d.locator(".qo-reroll").nth(1)).toBeEnabled();
   const swapped = await d.locator(".qo-name").first().textContent();
   await d.getByRole("button", { name: "Got it" }).click();
   await expect(d).toHaveCount(0);
-  // (The server's: home again (without the test switch, which would set them again), the same quests and no reroll left today.)
+  // (The server's: home again (without the test switch, which would set them again), the same quests, the swapped one's reroll used.)
   await page.goto("/");
   await expect(entry(page)).toBeEnabled({ timeout: 20_000 });
   await entry(page).click();
   await expect(dialog(page).locator(".qo-name")).toHaveText([swapped!, "Fifty-Fifty", "Regular"]);
-  for (const r of await dialog(page).locator(".qo-reroll").all()) await expect(r).toBeDisabled();
-  expect((await answer(page)).rerollLeft).toBe(false);
+  await expect(dialog(page).locator(".qo-reroll").first()).toBeDisabled();
+  await expect(dialog(page).locator(".qo-reroll").nth(1)).toBeEnabled();
+  expect((await answer(page)).quests.map((q) => q.canReroll)).toEqual([false, true, false]);
   await dialog(page).getByRole("button", { name: "Close" }).click();
   await expect(dialog(page)).toHaveCount(0);
 });

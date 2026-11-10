@@ -581,7 +581,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   }
 });
 
-test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry opens the overlay over home, 2 dailies and the weekly, one reroll a day, Got it and × close it, the entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row, every button 40 px, and the card fits", async ({ page }) => {
+test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry opens the overlay over home, 2 dailies and the weekly, one reroll a day per daily, Got it and × close it, the entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row, every button 40 px, and the card fits", async ({ page }) => {
   await named(page, "Christopher Wallace");
   await page.goto("/?quests=boss-hunter,squad-up,regular:3");
   const quests = page.getByRole("dialog", { name: "Daily Quests" });
@@ -595,10 +595,17 @@ test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry ope
   await expect(quests.locator(".qo-row.weekly .qo-name")).toHaveText("Regular");
   await expect(quests.getByText(/^New quests in \d+[hm]$/)).toBeVisible();
   await expect(quests.getByText(/^Resets in \d+[dhm]$/)).toBeVisible();
-  // One free reroll a day: both dailies offer it; once used, both grey (still there).
+  // Each daily its own free reroll a day (Eric, Nov 10): reroll the first, only the first greys and only its quest changes; the
+  // second still works; then both grey (still there).
   const rerolls = quests.locator(".qo-reroll");
   await expect(rerolls).toHaveCount(2);
   await rerolls.first().click();
+  await expect(rerolls.first()).toBeDisabled();
+  await expect(quests.locator(".qo-name").first()).not.toHaveText("Boss Hunter");
+  await expect(quests.locator(".qo-name").nth(1)).toHaveText("Squad Up");
+  await expect(rerolls.nth(1)).toBeEnabled();
+  await rerolls.nth(1).click();
+  await expect(quests.locator(".qo-name").nth(1)).not.toHaveText("Squad Up");
   for (const r of await rerolls.all()) await expect(r).toBeDisabled();
   await quests.getByRole("button", { name: "Got it" }).click();
   await expect(quests).toHaveCount(0);
