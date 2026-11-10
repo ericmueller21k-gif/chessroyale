@@ -906,7 +906,7 @@ export class NetMatch implements GameView {
     try {
       const engines = await this.engines();
       const [engine] = engines;
-      if (brain) this.useBrain(brain, check);
+      if (brain) this.useBrain(brain, check, true);
       // (The server's seed for this move (BOSS_CHECK): the random source and Maia's draw, so the second device asked plays the
       // same move. This request may come to this device as that second device: it plays it the same way.)
       const rng = draw ? mulberry32(draw) : Math.random;
@@ -967,11 +967,13 @@ export class NetMatch implements GameView {
   /**
    * The lobby's plan for the battle (on the Maia brain): start loading Maia, once, if this device may run it at all
    * (an admin, or everyone once forPlayers is on). A device that may not plays Stockfish's move, as before. `check` (drawn to
-   * check the boss's moves, BOSS_CHECK): a phone loads it only if its files are saved here already (no download for this).
+   * check the boss's moves, BOSS_CHECK): a phone loads it only if its files are saved here already (no download for this). `request`:
+   * a boss request's brain, which has no share: the bossBrain message's plan stays (the admins' line keeps its share; N5).
    */
-  private useBrain(plan: NetBossBrain, check = false) {
+  private useBrain(plan: NetBossBrain, check = false, request = false) {
     if (!maiaAllowed()) return;
-    this.bossPlan = plan;
+    if (request) this.bossPlan ??= plan;
+    else this.bossPlan = plan;
     if (this.maia) return;
     if (check && deviceKind() === "phone") return void maiaSaved().then((saved) => saved && !this.maia && this.loadMaia());
     this.loadMaia();

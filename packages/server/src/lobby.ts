@@ -1755,6 +1755,8 @@ export class LobbyCore {
     // (Maia's move only with the host's Maia loaded: else no brain to anyone, and both play the seeded Stockfish move the host would
     // have fallen back to, so nobody's "Maia played it" is heard (delta review 2, N1).)
     const maia = brain && !share && !!host && !!this.human(host)?.maiaReady;
+    // (Its Maia not loaded yet (a new host, say): told the battle's brain, so it loads it for his moves to come, as a request's did.)
+    if (brain && !share && host && !maia) this.io.send(host, { t: "bossBrain", brain: b! });
     const checker = host && this.human(host)?.seeded ? this.bossCheckerFor(host, [host], maia) : null;
     // (No checker: no seed either; the host plays as it always has.)
     this.r.bossCheck = { draw: checker ? 1 + Math.floor(this.jrng() * 2_147_483_646) : 0, maia, ...(share ? { share: true as const } : {}), asked: host ? [host, ...(checker ? [checker] : [])] : [], ...(host ? { hosts: [host] } : {}), answers: {} };

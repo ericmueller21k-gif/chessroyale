@@ -290,8 +290,6 @@ export interface SquadsReward {
   recorded: boolean;
   /** Why a placement that pays had nothing: "daily" (the daily cap). */
   why?: "daily";
-  /** Their squad's matches rested on its own party's devices (`unvouched`): XP pays as a solo game's. */
-  solo?: true;
   /** XP (Nov 9; squads-do.ts): their own moves and their time in the lobby's games (`xpSpan`), and how they left, if they did. */
   moves?: number;
   playMs?: number;
@@ -350,9 +348,8 @@ export interface SquadsRecord {
   testUsed?: boolean;
   /**
    * The outside review of Nov 10 (finding 5) and its review (M4), by squad id: a squad whose own match's bot work its own party's devices
-   * answered with no other party's device up to ask (one person alone, or one party with only bots), and why, the first time. Its
-   * placement pays no coins or crates, and its XP pays as a solo game's (its bots' moves were its party's word alone); other squads
-   * pay as usual. docs/decisions/2026-11-10-boss-and-lone-devices.md.
+   * answered with no other party's device up to ask (one person alone, or one party with only bots), and why, the first time. Noted
+   * for the logs only: its placement pays as any, under the daily cap (Eric, Nov 10). docs/decisions/2026-11-10-boss-and-lone-devices.md.
    */
   unvouched?: Record<number, string>;
   /**
@@ -1066,7 +1063,7 @@ export class SquadsCore {
     this.r.bracket = bracket;
     this.r.bracketAt = this.io.now();
     // (One party in the whole lobby (one person, or friends with only bots): every bot move is that party's word, or the server's
-    // quick look when its devices don't answer. Its squads' placements pay no coins or crates: the outside review of Nov 10, finding 5.)
+    // quick look when its devices don't answer. Noted for the logs; its squads are paid as any (Eric, Nov 10).)
     const parties = new Set(this.r.squads.flatMap((sq) => sq.players.filter((p) => !p.isBot).map((p) => this.human(p.id)?.partyId || p.id)));
     if (parties.size < 2) for (const sq of this.r.squads) if (sq.players.some((p) => !p.isBot)) this.unvouchSquad(sq.id, "one party in the lobby");
     this.placeNew();

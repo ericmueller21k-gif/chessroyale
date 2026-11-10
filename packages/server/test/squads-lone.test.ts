@@ -31,7 +31,6 @@ describe("Squads: a lobby that rests on one party's devices (noted, paid under t
     expect(L.core.record.unvouched?.[ann.squadId]).toBe("one party in the lobby");
     const pays = SQUADS_LOBBY.rewards[ann.placement];
     expect(ann).toMatchObject({ userId: "ua", recorded: true, coins: pays.coins, crates: pays.crates });
-    expect(ann.solo).toBeUndefined();
     expect(ann.why).toBeUndefined();
     expect(L.last(a, "placed")).toMatchObject({ coins: pays.coins, crates: pays.crates });
   }, 120_000);
@@ -102,18 +101,5 @@ describe("Squads: the daily cap on placement rewards (SQUADS_LOBBY.rewardsPerDay
     // The next UTC day: pays again.
     expect(await writeReward(sql, "SQY", day + 100, won(), day + 24 * 3_600_000 + 60_000, false)).toBe("applied");
     expect(coins()).toBe(100 * (SQUADS_LOBBY.rewardsPerDay + 1));
-  });
-
-  it("a reward marked solo (writeReward's own path; no lobby marks one since Nov 10): its XP goes in as a solo game's", async () => {
-    const { sql, db } = memoryDb();
-    await ensureSchema(sql);
-    const bo = await signedIn(sql, "Bo");
-    const now = Date.UTC(2026, 10, 10, 12);
-    await writeReward(sql, "SQS", now - 3_600_000, { playerId: "p1", userId: bo.id, squadId: 0, placement: 1, coins: 0, crates: 0, recorded: true, solo: true, moves: 30, playMs: 20 * 60_000 }, now, false);
-    const legs = db.prepare("SELECT reason, source_id FROM ledger WHERE asset_kind = 'xp' AND reason IN ('xp', 'xp-win') ORDER BY reason").all() as { reason: string; source_id: string }[];
-    expect(legs).toEqual([
-      { reason: "xp", source_id: "solo" },
-      { reason: "xp-win", source_id: "solo" },
-    ]);
   });
 });

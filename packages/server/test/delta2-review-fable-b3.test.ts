@@ -304,8 +304,11 @@ describe("delta review 2 of PR #611, turned around", () => {
     expect(L.core.record.humans.find((h) => h.id === "p1")!.maiaReady).toBeUndefined();
     const plan = L.core.record.bossBrain!;
     const turn = (want: boolean) => {
+      L.take("p1", "bossBrain");
       const { key, reqs } = nextBossTurn(L);
       expect(L.core.record.bossCheck!.maia).toBe(want);
+      // (Its Maia not loaded: the host is told the battle's brain again, so it loads it, as a request's brain had it do.)
+      expect(L.take("p1", "bossBrain")).toEqual(want ? [] : [expect.objectContaining({ brain: plan })]);
       expect(reqs.map(({ r }) => r.brain)).toEqual(reqs.map(() => (want ? { brain: plan.brain, rating: plan.rating } : undefined)));
       answer(L, key, reqs, (_, r) => ({ move: honestMove(r.fen, allowedOf(r)), ...(want ? { by: "maia" as const } : {}) }));
       L.advance(1000);

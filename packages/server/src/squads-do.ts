@@ -645,8 +645,6 @@ export async function writeReward(sql: Sql, code: string, created: number, r: Sq
     const xp = await grantXp(sql, r.userId, {
       key: `squads:${code}:${created}`,
       facts: { ms: r.playMs ?? 0, moves: r.moves ?? 0, won: r.placement === 1, resigned: !!r.resigned, abandoned: !!r.abandoned },
-      // (A lobby of one party's devices alone (the bots' moves their word): XP as a solo game's, under its daily caps.)
-      ...(r.solo ? { cap: "solo" as const } : {}),
       signedInOnly,
       now,
       paused,
