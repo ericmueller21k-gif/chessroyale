@@ -10,10 +10,11 @@ between them ... if you were to hit cancel though, it would like ask if you're s
 your player search and play with bot, yes, no." In a lobby (50 v 50, Squads): an exit "but stay in the queue", e.g. a checkbox
 "Keep me in the queue". "We just want every container to have the same pattern and theme as the rest, so nothing looks out of place."
 
-**The mockup is the spec.** On claude/director-notes:
-- the stills `notes/assets/search-rows-phone.png`, `search-rows-desktop.png` and `search-rows-bots-phone.png`;
-- their code, `notes/assets/search-rows-mock.spec.ts`;
-- the pop-up's look, `notes/assets/search-popup-phone.png` (from the earlier mockup).
+**The mockup is the spec (v2, approved by Eric Nov 10: "that looks clean ... build it and push it live").** On claude/director-notes:
+- `notes/assets/search-rows2-phone.png` (searching), `search-rows2-cancel-phone.png` (after Cancel), `search-rows2-bots-phone.png`
+  (after Start with bots), `search-rows2-cancel-desktop.png`;
+- their code, `notes/assets/search-rows2-mock.spec.ts`.
+- **No pop-ups:** the confirms happen in place, in the second row (this replaces the earlier pop-up idea and v1's order).
 
 ## Build
 1. **One app-wide "search" state** for every queue:
@@ -28,10 +29,16 @@ your player search and play with bot, yes, no." In a lobby (50 v 50, Squads): an
      - "Searching · <mode>";
      - the queue type and the lobby's count ("Solo queue · 37 of 100 in the lobby");
      - the time searched (m:ss) in green on the right.
-   - The second row keeps its exact container and shows three actions, with no lines between them, as home's rows are:
-     - **Start with bots** ("play now"): a confirm, "Play with bots?", "This stops your player search and starts a <mode> with bots now." / Keep searching / Play with bots.
-     - **Lobby** ("see who's in"): back to the lobby or search screen.
-     - **Cancel** ("stop searching", in red): a confirm, "Stop searching?" / Keep searching / Stop searching.
+   - The second row keeps its exact container and shows three actions, with no lines between them, as home's rows are,
+     in this order (Eric: "cancel should be on the left ... where it says solo queue"):
+     - **Cancel** ("stop searching", in red), where Solo queue is.
+     - **Lobby** ("see who's in"), where Party is: back to the lobby or search screen.
+     - **Start with bots** ("play now"), where Bots is.
+   - **Confirms in place** (Eric: "you hit cancel and then you just hit yes or no"): the same three slots change, nothing moves or opens.
+     - After Cancel: **"Stop search?"** ("are you sure") / **Yes** ("stop", red) / **No** ("keep searching").
+     - After Start with bots: **"Play bots?"** ("ends your search") / **Yes** ("play now", green) / **No** ("keep searching").
+     - The first slot becomes the question and is NOT a button, so a double tap on Cancel can't confirm.
+     - No (or ~6 s with no tap, a setting) puts the three actions back. A match found while asking wins: you go in.
    - **Greyed in place** (not hidden, not tappable): the RANKED label, the hint line, PLAY, Chess Town, Other modes, Boss Battle and Auto chess.
    - **Lit:** the top bar and the profile card.
    - Nothing moves or resizes (Eric's rule).
