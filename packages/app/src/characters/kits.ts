@@ -40,7 +40,7 @@ import type { Stance } from "./stance.ts";
 import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
-import type { Character } from "./sprite.ts";
+import { mapFrames, type Character } from "./sprite.ts";
 import { ankusItem, balloonItem, bonkItem, chipItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
@@ -155,9 +155,7 @@ export interface BossKit extends BeatLines {
  */
 const FOLIO_BAR: Character = (() => {
   const cut = 5;
-  const anims = Object.fromEntries(
-    Object.entries(FOLIO.anims).map(([k, a]) => [k, { ...a, frames: a.frames.map((f) => ({ ...f, layers: f.layers.map((l) => ({ ...l, x: l.x - cut })), ...(f.specks ? { specks: f.specks.map(([x, y, c]) => [x - cut, y, c] as const).filter(([x]) => x >= 0) } : {}) })) }]),
-  );
+  const anims = mapFrames(FOLIO.anims, (f) => ({ ...f, layers: f.layers.map((l) => ({ ...l, x: l.x - cut })), ...(f.specks ? { specks: f.specks.map(([x, y, c]) => [x - cut, y, c] as const).filter(([x]) => x >= 0) } : {}) }));
   return { ...FOLIO, id: "folio-bar", halo: undefined, w: FOLIO.w - cut, foot: [FOLIO.foot[0] - cut, FOLIO.foot[1]], anims };
 })();
 

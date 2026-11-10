@@ -354,6 +354,11 @@ export function lazyAnim(make: () => Anim): Anim {
   };
 }
 
+/** A character's animations with every frame changed by `fn` (moved, cropped, a layer left out): each made when first read. */
+export function mapFrames(anims: Readonly<Record<string, Anim>>, fn: (f: Frame) => Frame): Record<string, Anim> {
+  return Object.fromEntries(Object.entries(anims).map(([k, a]) => [k, lazyAnim(() => ({ loop: a.loop, frames: a.frames.map(fn) }))]));
+}
+
 /**
  * Two parts records read as one, live: a part added to either later (one made the first time a lazy animation draws it)
  * is there too, where a copy (`{ ...a, ...b }`) would miss it. `a` wins a clash, as the later spread did.
