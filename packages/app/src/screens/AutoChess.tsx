@@ -216,7 +216,9 @@ function startRound(prev: MatchState, cfg: AutoChessSettings): { match: MatchSta
   const kings = kingSquares(seed, cfg);
   // (What each side held comes into the round on the same squares turned with the colors.)
   const botBench = carryBench(match.bot.bench);
-  const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, botBench, { level: match.bot.level, xp: match.bot.xp });
+  // (From round 2 the bot reads your gold and what you banked, to save when you save: Eric, Nov 10. Round 1 has nothing to read.)
+  const read = match.round > 1 ? { gold: gold.you.total, banked: gold.you.saved, hp: match.you.hp, ownHp: match.bot.hp } : undefined;
+  const plan = botPlan(theirs, kings[theirs], match.bot.gold, match.round, mulberry32(seed ^ 0x9e3779b9), cfg, botBench, { level: match.bot.level, xp: match.bot.xp }, read);
   const you = emptyArmy(mine, kings[mine], carryBench(match.you.bench));
   // (The shop rolls by the level you have now, the free XP of this round's start counted.)
   return { match, round: { you, shop: newShop(shopSeed(seed), you, cfg, match.you.level), locks: noLocks, adj: null, adjustMs: cfg.adjustSeconds * 1000, botStart: null, botBench, plan, log: [], botFinal: null, gold } };
