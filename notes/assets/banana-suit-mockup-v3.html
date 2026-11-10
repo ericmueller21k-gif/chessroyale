@@ -1,0 +1,139 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  body { margin: 0; background: #e9eef5; font: 600 15px system-ui, sans-serif; color: #1d1d1f; }
+  .row { display: flex; gap: 16px; padding: 14px 22px; align-items: flex-end; }
+  .cell { background: #fff; border-radius: 14px; padding: 8px 8px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .cell svg { display: block; margin: 0 auto 4px; }
+  .cell small { display: block; font-weight: 500; color: #555; margin-top: 2px; }
+  .town { background: #8fc46a; }
+  h1 { font-size: 18px; margin: 18px 22px 0; }
+  h2 { font-size: 15px; margin: 10px 22px 0; color: #333; }
+  p { margin: 4px 22px 0; font-weight: 500; color: #444; }
+</style></head><body>
+<h1>Banana Suit: crate-exclusive rider (mockup v3)</h1>
+<p>Takes the ride slot (no ride with it). Head and face items still go on. A real sprint in a banana suit; a little bounce standing still.</p>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <g id="glove">
+      <path d="M-13 -6 C-17 -14 -10 -20 -4 -16 C-3 -23 5 -23 6 -16 C9 -21 16 -18 14 -11 C19 -12 21 -5 16 -1 C17 6 10 13 1 13 C-9 13 -16 6 -13 -6 Z"
+        fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-4 -16 L-3 -6 M6 -16 L5 -6 M14 -11 L11 -3" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <!-- A fist (running): the glove balled up. -->
+    <g id="fist">
+      <path d="M-11 -8 C-11 -15 11 -15 11 -8 C14 -4 14 6 9 9 C3 13 -6 13 -10 8 C-14 4 -14 -3 -11 -8 Z" fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-6 -11 L-6 -3 M0 -12 L0 -3 M6 -11 L6 -3" fill="none" stroke="#1d1d1f" stroke-width="1.8" stroke-linecap="round"/>
+    </g>
+    <g id="shoe">
+      <path d="M-14 -7 C-14 -14 -4 -15 2 -11 C10 -10 20 -7 21 1 C22 7 16 9 8 9 L-12 9 C-18 9 -19 2 -14 -7 Z"
+        fill="#fff" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-15 4 L20 4" stroke="#c9ced6" stroke-width="2.5" stroke-linecap="round"/>
+      <path d="M2 -9 C4 -4 7 -3 10 -4" fill="none" stroke="#1d1d1f" stroke-width="2" stroke-linecap="round"/>
+    </g>
+    <g id="peel">
+      <path d="M104 30 C102 18 108 8 120 6 L123 13 C114 15 111 21 112 30 Z" fill="#7a5524" stroke="#1d1d1f" stroke-width="3.5" stroke-linejoin="round"/>
+      <path d="M100 26 C60 52 50 150 82 205 C92 222 116 226 128 210 C152 160 154 78 116 28 C112 22 104 22 100 26 Z"
+        fill="#ffd93b" stroke="#1d1d1f" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M92 40 C70 80 70 160 96 208" fill="none" stroke="#e8b80c" stroke-width="5" stroke-linecap="round"/>
+      <path d="M120 38 C140 80 140 160 118 208" fill="none" stroke="#e8b80c" stroke-width="4" stroke-linecap="round"/>
+      <path d="M82 70 C74 110 76 150 88 184" fill="none" stroke="#fff3a6" stroke-width="5" stroke-linecap="round"/>
+      <path d="M90 212 C98 226 116 228 124 214 C116 222 100 222 90 212 Z" fill="#6b4a1f" stroke="#1d1d1f" stroke-width="3" stroke-linejoin="round"/>
+    </g>
+    <!-- Front: the face hole in the middle. -->
+    <g id="suitFront"><use href="#peel"/>
+      <ellipse cx="106" cy="88" rx="27" ry="31" fill="#6b4a1f" stroke="#1d1d1f" stroke-width="3.5"/>
+      <circle cx="106" cy="91" r="21" fill="#f7f7f5" stroke="#1d1d1f" stroke-width="3.5"/>
+      <path d="M95 82 C98 78 103 77 106 78" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+    </g>
+    <!-- Side (facing right): the face hole toward the front. -->
+    <g id="suitSide"><use href="#peel"/>
+      <ellipse cx="124" cy="88" rx="19" ry="30" fill="#6b4a1f" stroke="#1d1d1f" stroke-width="3.5"/>
+      <path d="M126 70 C142 72 144 108 126 112 C118 112 113 101 113 91 C113 80 118 70 126 70 Z" fill="#f7f7f5" stroke="#1d1d1f" stroke-width="3.5"/>
+    </g>
+  </defs>
+</svg>
+
+<h2>Standing: a little bounce (two frames, looped slowly)</h2>
+<div class="row">
+  <div class="cell"><svg width="200" height="290" viewBox="0 0 210 290">
+    <!-- knees a bit bent, the suit low, arms a touch out -->
+    <path d="M96 216 C86 236 92 252 90 270" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M118 216 C128 236 122 252 124 270" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(84 274) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(130 274) scale(1.05)"/>
+    <g transform="translate(0 6)"><use href="#suitFront"/>
+      <path d="M70 128 C60 148 56 164 52 178" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M140 128 C150 148 154 164 158 178" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+      <use href="#glove" transform="translate(50 188) rotate(20) scale(1.05)"/>
+      <use href="#glove" transform="translate(160 188) rotate(-20) scale(-1.05 1.05)"/>
+    </g>
+  </svg>Idle 1<small>knees bent, a bit lower</small></div>
+  <div class="cell"><svg width="200" height="290" viewBox="0 0 210 290">
+    <!-- straighter, the suit up a little, arms in -->
+    <path d="M96 212 C93 234 92 252 90 270" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <path d="M118 212 C121 234 122 252 124 270" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+    <use href="#shoe" transform="translate(84 274) scale(-1.05 1.05)"/>
+    <use href="#shoe" transform="translate(130 274) scale(1.05)"/>
+    <g><use href="#suitFront"/>
+      <path d="M70 128 C64 150 62 166 60 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+      <path d="M140 128 C146 150 148 166 150 182" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round"/>
+      <use href="#glove" transform="translate(59 192) rotate(8) scale(1.05)"/>
+      <use href="#glove" transform="translate(151 192) rotate(-8) scale(-1.05 1.05)"/>
+    </g>
+  </svg>Idle 2<small>up a little, arms in</small></div>
+</div>
+
+<h2>Running: a real sprint, side-on (facing right; three frames)</h2>
+<div class="row">
+  <!-- Stride: right leg forward, left leg kicked back; far arm forward, near arm back (opposite the legs). -->
+  <div class="cell"><svg width="200" height="290" viewBox="0 0 210 290">
+    <!-- far limbs (behind the suit) -->
+    <path d="M118 128 L140 150 L156 132" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#fist" transform="translate(160 126) scale(.85)"/>
+    <path d="M104 210 L80 232 L58 226" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#shoe" transform="translate(50 222) rotate(-60) scale(.95)"/>
+    <g transform="rotate(10 105 150)"><use href="#suitSide"/></g>
+    <!-- near limbs (in front) -->
+    <path d="M110 214 L136 236 L132 266" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(140 270) scale(1.05)"/>
+    <path d="M112 132 L90 152 L74 140" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#fist" transform="translate(70 134) scale(.9)"/>
+  </svg>Run 1<small>stride: knee forward, back foot up</small></div>
+  <!-- Passing: legs under the body, the back knee coming through high. -->
+  <div class="cell"><svg width="200" height="290" viewBox="0 0 210 290">
+    <path d="M116 130 L124 154 L140 150" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#fist" transform="translate(146 148) scale(.85)"/>
+    <path d="M104 208 L124 226 L110 246" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#shoe" transform="translate(114 252) rotate(20) scale(.95)"/>
+    <g transform="rotate(8 105 150) translate(0 -6)"><use href="#suitSide"/></g>
+    <path d="M110 208 L106 236 L102 266" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(110 270) scale(1.05)"/>
+    <path d="M110 128 L100 154 L86 152" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#fist" transform="translate(80 150) scale(.9)"/>
+  </svg>Run 2<small>passing: a knee comes through high</small></div>
+  <!-- Stride, the other way: left leg forward, right kicked back; arms swapped. -->
+  <div class="cell"><svg width="200" height="290" viewBox="0 0 210 290">
+    <path d="M116 130 L96 152 L80 140" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#fist" transform="translate(76 134) scale(.85)"/>
+    <path d="M104 210 L130 232 L126 262" fill="none" stroke="#1d1d1f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <use href="#shoe" transform="translate(134 266) scale(.95)"/>
+    <g transform="rotate(10 105 150)"><use href="#suitSide"/></g>
+    <path d="M110 214 L86 236 L64 230" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(56 226) rotate(-60) scale(1.05)"/>
+    <path d="M114 132 L136 152 L152 134" fill="none" stroke="#1d1d1f" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#fist" transform="translate(156 128) scale(.9)"/>
+  </svg>Run 3<small>the other stride</small></div>
+  <div class="cell town"><svg width="92" height="128" viewBox="0 0 210 290">
+    <ellipse cx="108" cy="278" rx="62" ry="9" fill="#000" opacity=".18"/>
+    <path d="M118 128 L140 150 L156 132" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#fist" transform="translate(160 126)"/>
+    <path d="M104 210 L80 232 L58 226" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(50 222) rotate(-60) scale(1.1)"/>
+    <g transform="rotate(10 105 150)"><use href="#suitSide"/></g>
+    <path d="M110 214 L136 236 L132 266" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#shoe" transform="translate(140 270) scale(1.15)"/>
+    <path d="M112 132 L90 152 L74 140" fill="none" stroke="#1d1d1f" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <use href="#fist" transform="translate(70 134)"/>
+  </svg>In town<small>about its real size</small></div>
+</div>
+</body></html>
