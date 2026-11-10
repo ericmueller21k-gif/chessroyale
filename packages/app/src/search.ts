@@ -41,8 +41,11 @@ export interface AwaySearch {
   name: string;
   /** When the search began (ms, this device's clock). */
   since: number;
-  /** The queue type and the lobby's count ("Solo queue · 37 of 100 in the lobby"), now. */
-  detail(now: number): string;
+  /**
+   * The queue type and the lobby's count, now: its words, and an ending dropped where the row is narrow (a 360 px phone, a
+   * 1280 px computer's column): ["Solo queue · 37 of 100", " in the lobby"].
+   */
+  detail(now: number): readonly [string, string?];
   /** 1 v 1 at "Few players online": the bar turns gold (its choices are on the stage). */
   few(now: number): boolean;
   /** Back to the lobby or the search stage. */

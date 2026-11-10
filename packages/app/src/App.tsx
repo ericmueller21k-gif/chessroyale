@@ -948,7 +948,7 @@ export function App() {
         detail: (now) => {
           const s = q.state;
           const delay = s.kind === "searching" && s.delayUntil ? s.delayUntil - now : 0;
-          return delay > 0 ? `Delayed queue · ${clockShown(delay)}` : few(now) ? "Few players online right now" : "Ranked · a player near your level";
+          return [delay > 0 ? `Delayed queue · ${clockShown(delay)}` : few(now) ? "Few players online" : "Ranked · near your level"];
         },
         few,
         back: duelBackToStage,
@@ -962,7 +962,7 @@ export function App() {
         mode: "crowd",
         name: "50 v 50",
         since: sinceOf(m),
-        detail: () => `Solo queue · ${Math.max(1, m.players.filter((p) => !p.isBot).length)} of ${m.settings.lobbySize} in the lobby`,
+        detail: () => [`Solo queue · ${Math.max(1, m.players.filter((p) => !p.isBot).length)} of ${m.settings.lobbySize}`, " in the lobby"],
         few: () => false,
         back: () => backToLobby(),
         cancel: cancelAwayLobby,
@@ -978,7 +978,7 @@ export function App() {
         detail: () => {
           const l = c.lobby;
           const people = Math.max(1, l?.players.filter((p) => !p.isBot).length ?? 1);
-          return `${c.party ? "Party" : "Solo queue"} · ${people} of ${l?.seats ?? SQUADS.squadCount * SQUADS.squadSize} in the lobby`;
+          return [`${c.party ? "Party" : "Solo queue"} · ${people} of ${l?.seats ?? SQUADS.squadCount * SQUADS.squadSize}`, " in the lobby"];
         },
         few: () => false,
         back: () => backToLobby(),
@@ -1364,7 +1364,7 @@ export function App() {
   /** Whether PLAY run `run` is already waiting in line (a 429 then means "ask later", not an error). */
   // Once play is near (a match, the queue, the Boss raid screen, Squads, 1 v 1): the whole engine pool, the match's screens,
   // solo's code and its opening library (Nov 10, phone load: none of it on home), so entering a match doesn't wait for them.
-  const playNear = !!match || !!inLine || raidOpen || !!squads || !!duelQueue || !!duel;
+  const playNear = !!match || !!inLine || raidOpen || !!squads || !!duelQueue || !!duel || !!awayMatch || !!awaySquads;
   useEffect(() => {
     if (!playNear) return;
     void enginePool();

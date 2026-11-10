@@ -10170,6 +10170,41 @@ button.fd-logo {
   font-size: 11px;
   font-weight: 400;
 }
+/*
+ * Narrow rows (a phone under 375 px, a 1280 px computer's 320 px column): a little smaller, and the detail's ending ("in the
+ * lobby") goes, so nothing is cut (measured at 320 px with the widest words: e2e/search-home.spec.ts). The rows are
+ * containers only while searching, so home's own layout is untouched.
+ */
+.fd-searching {
+  container-type: inline-size;
+}
+@container (max-width: 339px) {
+  .fd-modes.fd-search {
+    gap: 9px;
+    padding: 0 12px;
+  }
+  .fd-search-ring {
+    width: 22px;
+    height: 22px;
+    border-width: 3px;
+  }
+  .fd-search-title {
+    font-size: 15px;
+  }
+  .fd-search-detail {
+    font-size: 12px;
+  }
+  .fd-search-more {
+    display: none;
+  }
+  .fd-search-time {
+    font-size: 19px;
+  }
+  .fd-modes.fd-search-acts button,
+  .fd-search-ask {
+    font-size: 12.5px;
+  }
+}
 
 /* Home, 1 v 1 picked: your rank's emblem (48 px, 1×) beside your rank and what 1 v 1 is, in the panel. */
 .fd-panel-words.fd-rank-words {

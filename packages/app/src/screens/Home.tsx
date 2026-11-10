@@ -1047,7 +1047,7 @@ export function HomeScreen({
   }
   // The RANKED row: the three ranked modes, one picked (Eric, Oct 16).
   const ranked = (
-    <div class="fd-ranked">
+    <div class={`fd-ranked${searching ? " fd-searching" : ""}`}>
       <h2 class={`fd-label${off}`} id="fd-ranked-label">
         RANKED
       </h2>
@@ -1076,7 +1076,7 @@ export function HomeScreen({
   const rank1v1 = mode === "1v1" ? ranked1v1Rank() : null;
   const panel = searching ? (
     // (Searching: the same box, its three actions: Cancel, Lobby, Start with bots.)
-    <div class="fd-mode-panel">
+    <div class="fd-mode-panel fd-searching">
       <SearchActions search={search!} />
     </div>
   ) : (
@@ -1286,12 +1286,16 @@ function useSecond(): number {
  */
 function SearchRow({ search }: { search: AwaySearch }) {
   const now = useSecond();
+  const [words, more] = search.detail(now);
   return (
     <div class="fd-modes fd-search" role="group" aria-label={`Searching ${search.name}`}>
       <span class="fd-search-ring" aria-hidden="true" />
       <span class="fd-search-words">
         <strong class="fd-search-title">Searching · {search.name}</strong>
-        <span class="fd-search-detail">{search.detail(now)}</span>
+        <span class="fd-search-detail">
+          {words}
+          {more && <span class="fd-search-more">{more}</span>}
+        </span>
       </span>
       <span class="fd-search-time">{clockShown(Math.max(0, now - search.since))}</span>
     </div>
