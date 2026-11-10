@@ -49,6 +49,24 @@ describe("loading the account", () => {
     expect(testSwitchesAllowed()).toBe(true);
   });
 
+  it("your profile is asked for beside the options, not after them (Nov 10: a round trip less before home knows you)", async () => {
+    let meAsked = false;
+    let meBeforeConfig = false;
+    vi.stubGlobal("fetch", async (path: string) => {
+      if (path.startsWith("/api/me")) {
+        meAsked = true;
+        return Response.json(PROFILE);
+      }
+      // (The options answer only after a moment, by when the profile has been asked for if it goes beside them.)
+      await new Promise((r) => setTimeout(r, 20));
+      meBeforeConfig = meAsked;
+      return Response.json(CONFIG);
+    });
+    await loadAccount("Ann");
+    expect(meBeforeConfig).toBe(true);
+    expect(account().profile?.user.id).toBe("u");
+  });
+
   it("a refusal (a 4xx) isn't asked again", async () => {
     const calls = server([403]);
     await loadAccount();

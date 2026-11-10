@@ -270,33 +270,36 @@ export type PresenceOf = (ids: string[]) => Promise<Record<string, { online: boo
  * requests, open invites to you, who you've blocked and your settings. Nothing from or about someone you've blocked.
  */
 export async function friendsState(sql: Sql, meId: string, now: number, presenceOf?: PresenceOf): Promise<FriendsState> {
-  const me = await sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId);
-  const rows = await sql.all<FriendRow & { name: string; since: number }>(
-    "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
-    meId,
-  );
+  // (Its reads at once, Nov 10: each D1 read is a round trip; then who's online among the friends.)
+  const [me, rows, requests, sent, invites, blocked] = await Promise.all([
+    sql.first<{ allow_invites: string | null; hide_online: number | null }>("SELECT allow_invites, hide_online FROM users WHERE id = ?", meId),
+    sql.all<FriendRow & { name: string; since: number }>(
+      "SELECT u.id, u.name, f.since, u.last_seen, u.hide_online FROM friends f JOIN users u ON u.id = f.friend_id WHERE f.user_id = ?",
+      meId,
+    ),
+    sql.all<{ id: string; name: string; at: number }>(
+      `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
+       WHERE r.to_id = ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = r.to_id AND b.blocked_id = r.from_id)
+       ORDER BY r.at DESC LIMIT 100`,
+      meId,
+    ),
+    sql.all<{ id: string; name: string; at: number }>(
+      "SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC",
+      meId,
+    ),
+    sql.all<{ from_id: string; name: string; kind: InviteKind; code: string; at: number; expires_at: number }>(
+      `SELECT i.from_id, u.name, i.kind, i.code, i.at, i.expires_at FROM invites i JOIN users u ON u.id = i.from_id
+       WHERE i.to_id = ? AND i.expires_at > ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = i.to_id AND b.blocked_id = i.from_id)
+       ORDER BY i.at DESC LIMIT 50`,
+      meId,
+      now,
+    ),
+    sql.all<{ id: string; name: string }>("SELECT u.id, u.name FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.at DESC", meId),
+  ]);
   const live = await presenceRows(rows, now, presenceOf);
   const friends = rows
     .map((r) => ({ id: r.id, name: r.name, since: r.since, ...live[r.id]!, hidden: !!r.hide_online, lastSeen: r.hide_online ? null : r.last_seen }))
     .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, "en", { sensitivity: "base" }));
-  const requests = await sql.all<{ id: string; name: string; at: number }>(
-    `SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.from_id
-     WHERE r.to_id = ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = r.to_id AND b.blocked_id = r.from_id)
-     ORDER BY r.at DESC LIMIT 100`,
-    meId,
-  );
-  const sent = await sql.all<{ id: string; name: string; at: number }>(
-    "SELECT u.id, u.name, r.at FROM friend_requests r JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.at DESC",
-    meId,
-  );
-  const invites = await sql.all<{ from_id: string; name: string; kind: InviteKind; code: string; at: number; expires_at: number }>(
-    `SELECT i.from_id, u.name, i.kind, i.code, i.at, i.expires_at FROM invites i JOIN users u ON u.id = i.from_id
-     WHERE i.to_id = ? AND i.expires_at > ? AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.user_id = i.to_id AND b.blocked_id = i.from_id)
-     ORDER BY i.at DESC LIMIT 50`,
-    meId,
-    now,
-  );
-  const blocked = await sql.all<{ id: string; name: string }>("SELECT u.id, u.name FROM blocks b JOIN users u ON u.id = b.blocked_id WHERE b.user_id = ? ORDER BY b.at DESC", meId);
   return {
     friends,
     requests,

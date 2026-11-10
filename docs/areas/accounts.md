@@ -131,6 +131,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   the same words as a setting) and chat lines (hidden in the app) away. "Show when I'm online" off hides online and
   last seen on your profile and in friends' lists, for everyone, and others get only the day of your recent matches. Not while banned (requests and invites). Switched off
   for everyone by the Worker variable `PAUSE_FRIENDS` ("1"). The screens are on [hub.md](hub.md).
+- **Round trips (Nov 10, [load regression](../decisions/2026-11-10-load-regression.md)):** every D1 read from the Worker is a round trip
+  (about 40 ms), so a route reads what it can at once (`Promise.all`): `/api/me` in 4 (5 with the D1 touch; it was 28 one after another),
+  `/api/quests` and `/api/friends` in 3. `packages/server/test/me-round-trips.test.ts` counts them on a fake D1; keep new reads beside
+  the others, not after them.
 
 ## Data stored by friends (for the privacy page and account deletion)
 
