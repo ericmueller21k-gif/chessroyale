@@ -440,6 +440,51 @@ test("the shell (index.html: what shows before the app's script has run) has the
   expect(await boxes("#shell")).toEqual(home);
 });
 
+test("the loading bar (Eric, Nov 10): only past a 2-second hang; then a bar and what's loading, under the logo, and nothing else moves", async ({ page }) => {
+  // (Every class the bar takes and when, from the very start of each load, and when the shell went.)
+  await page.addInitScript(() => {
+    const w = window as any;
+    w.__bar = { shown: null, lines: [], gone: null };
+    new MutationObserver(() => {
+      const bar = document.querySelector("#shell .hc-load");
+      if (bar?.classList.contains("on") && w.__bar.shown === null) w.__bar.shown = performance.now();
+      const line = bar?.querySelector(".hc-load-line")?.textContent;
+      if (bar?.classList.contains("on") && line && w.__bar.lines.at(-1) !== line) w.__bar.lines.push(line);
+      if (!document.getElementById("shell") && document.getElementById("app") && w.__bar.gone === null) w.__bar.gone = performance.now();
+    }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  const logo = () => page.locator("#shell .fd-logo").evaluate((el) => el.getBoundingClientRect().toJSON());
+  // Your profile held 3 s: past 2 s the bar shows under the splash's logo, on the "account" line; then home, the shell (and bar) gone.
+  await page.route("**/api/me*", async (r) => {
+    await new Promise((d) => setTimeout(d, 3_000));
+    await r.continue();
+  });
+  await page.goto("/");
+  const before = await logo();
+  const bar = page.locator("#shell .hc-load.on");
+  await expect(bar).toBeVisible();
+  await expect(bar.locator(".hc-load-line")).toHaveText("Loading your account…");
+  expect(await logo(), "the logo stays put").toEqual(before);
+  const placed = await bar.evaluate((el) => {
+    const b = el.querySelector(".hc-load-track")!.getBoundingClientRect(), l = document.querySelector("#shell .fd-logo")!.getBoundingClientRect();
+    return { under: b.top >= l.bottom, centered: Math.abs(b.left + b.width / 2 - (l.left + l.width / 2)) <= 1, inside: b.left >= 0 && b.right <= innerWidth };
+  });
+  expect(placed).toEqual({ under: true, centered: true, inside: true });
+  await expect(bar.getByRole("button", { name: "Try again", includeHidden: true })).toBeHidden();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.locator("#shell")).toHaveCount(0);
+  const held = await page.evaluate(() => (window as any).__bar);
+  expect(held.shown, "shown at 2 s, not before").toBeGreaterThanOrEqual(2_000);
+  expect(held.lines.at(-1)).toBe("Loading your account…");
+  // Nothing held: the bar shows only if the load really ran past 2 s (on a quick load, never).
+  await page.unrouteAll();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  const quick = await page.evaluate(() => (window as any).__bar);
+  expect(quick.gone).not.toBeNull();
+  expect(quick.shown !== null, `shell gone at ${Math.round(quick.gone)} ms`).toBe(quick.gone > 2_000);
+});
+
 test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits from 320 px up, with no coins in it", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
   for (const width of [320, 360, 375, 390, 430]) {
