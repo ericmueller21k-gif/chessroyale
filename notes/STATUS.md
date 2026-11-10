@@ -1,3 +1,4 @@
+- Nov 10 17:25 UTC: #615 quest progress MERGED e00b037 (PR flaky: shop.spec:1480 [desktop], boss-bar:204 [phone]; watch on main). Waiting on flaky batch 7, then tell Eric.
 - Nov 10 17:15 UTC: #611 fix round 3 done (head e45abc5, main merged). PARKED as draft per Eric (no more reviews until he resumes anti-cheat). #613 bot-save MERGED; #614 Boss Battle rename MERGED; #615 quest progress CI running; flaky batch 7 helper still working.
 - Nov 10 16:45 UTC: ERIC: finish the queue first, no new work. Message him ONCE when all four are coded and only tests remain, then when live. #611: let fix round 3 finish, then PARK as draft (no more review rounds) until Eric resumes anti-cheat.
 - Nov 10 16:40 UTC: ERIC OVERRODE the helper limit for today: start all four now in parallel (bot save, Boss Battle rename+quests, quest progress, flaky batch 7) beside #611 fix round 3. Message Eric only on live or decisions.
