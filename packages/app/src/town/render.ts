@@ -676,9 +676,19 @@ export class Renderer {
   /** Where each statue was drawn this frame (screen pixels), for taps, chips and tests. */
   readonly statueBox = STATUES.map(() => ({ on: false, x0: 0, y0: 0, x1: 0, y1: 0 }));
   /** The statues at the world's scale; their close-ups (null until made, a slice a frame) and when each was ready. */
-  private readonly statueImg: HTMLCanvasElement[];
+  private readonly statueImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
   /** Which of each world's-scale statue's pixels are drawn (taps read this, never the canvas: a read-back stalls). */
-  private readonly statueMask: Uint8Array[] = [];
+  private readonly statueMask: (Uint8Array | null)[] = STATUES.map(() => null);
+  /** Statue i at the world's scale and its mask, made the first time it's drawn (Nov 10, phone load 3: not all as the town opens). */
+  private statueAt(i: number): HTMLCanvasElement {
+    let c = this.statueImg[i];
+    if (!c) {
+      const m: Uint8Array[] = [];
+      c = this.statueImg[i] = canvasOf(statueArt(STATUES[i]!.id, 1), m);
+      this.statueMask[i] = m[0]!;
+    }
+    return c;
+  }
   private readonly closeImg: (HTMLCanvasElement | null)[] = STATUES.map(() => null);
   private readonly closeReady: number[] = STATUES.map(() => NaN);
   private closeJob: { i: number; steps: ReturnType<typeof statueSteps>; layers: { part: import("../characters/sprite.ts").Part; at: readonly [number, number] }[] | null; next: number; cv: HTMLCanvasElement | null } | null = null;
@@ -895,7 +905,6 @@ export class Renderer {
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.placeGlow = this.places.map(() => null);
     this.chipIcon = new FrameCache(COLISEUM_CHIP);
-    this.statueImg = STATUES.map((st) => canvasOf(statueArt(st.id, 1), this.statueMask));
     // Each square is kept this frame (its corners, its face's corners, its color) and drawn with all the others of its
     // color in one fill (drawGround): a few dozen fills a frame instead of two per square.
     this.drawSquare = (c, r, cu, ru, q) => {
@@ -1165,8 +1174,8 @@ export class Renderer {
       if (one > 0) {
         ctx.globalAlpha = alpha * one;
         ctx.imageSmoothingEnabled = px < 1.5;
-        if (soft > 0.02) this.blitSoft(this.statueImg[i]!, sx, sy, sw, sh, soft, 0.88 * soft);
-        else ctx.drawImage(this.statueImg[i]!, sx, sy, sw, sh);
+        if (soft > 0.02) this.blitSoft(this.statueAt(i), sx, sy, sw, sh, soft, 0.88 * soft);
+        else ctx.drawImage(this.statueAt(i), sx, sy, sw, sh);
       }
       if (fine > 0 && close) {
         ctx.globalAlpha = alpha * fine;
@@ -3834,7 +3843,7 @@ export class Renderer {
     for (let i = 0; i < STATUES.length; i++) {
       const b = this.statueBox[i]!;
       if (!b.on || x < b.x0 || x >= b.x1 || y < b.y0 || y >= b.y1) continue;
-      const img = this.statueImg[i]!;
+      const img = this.statueAt(i);
       const px = Math.floor(((x - b.x0) / (b.x1 - b.x0)) * img.width);
       const py = Math.floor(((y - b.y0) / (b.y1 - b.y0)) * img.height);
       if (this.statueMask[i]![py * img.width + px]) return STATUES[i]!;

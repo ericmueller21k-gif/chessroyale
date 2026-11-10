@@ -1,7 +1,7 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
 import { RECLUSE_PHASE2 } from "@chessroyale/core";
-import { BOARD_SEL, test, bossAloneFromHome } from "./helpers.ts";
+import { BOARD_SEL, asAdmin, test, bossAloneFromHome } from "./helpers.ts";
 import { counts, frameStats, instrument } from "./perf-probe.js";
 
 /**
@@ -400,3 +400,38 @@ test("the boss's attack on your pawn on a slow phone: a loss's result screen whi
   expect(s.p95, "95th percentile frame (ms)").toBeLessThan(50);
   expect(s.slow, "share of dropped frames").toBeLessThan(0.15);
 });
+
+for (const who of ["a player's town", "an admin's street town"] as const)
+  test(`Chess Town on a slow phone: ${who} draws its first frame soon after the tap, with no long freeze (Nov 10, phone load 3)`, { tag: "@perf" }, async ({ page }) => {
+    test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
+    test.setTimeout(2 * 60_000);
+    const street = who !== "a player's town";
+    if (street) await asAdmin(page);
+    await page.addInitScript(() => {
+      const w = window as unknown as { __long: { s: number; d: number }[] };
+      w.__long = [];
+      new PerformanceObserver((l) => l.getEntries().forEach((e) => w.__long.push({ s: e.startTime, d: e.duration }))).observe({ type: "longtask", buffered: true });
+    });
+    await page.goto("/?sky=day");
+    const town = page.getByRole("main").getByRole("button", { name: "Chess Town", exact: true }).first();
+    await town.waitFor({ timeout: 60_000 });
+    await page.waitForTimeout(3000);
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 });
+    await page.evaluate(() => addEventListener("pointerup", () => ((window as unknown as { __tap: number }).__tap = performance.now()), { capture: true, once: true }));
+    await town.click();
+    const canvas = page.locator("canvas.town-canvas");
+    await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+    await expect(canvas).toHaveAttribute("data-backend", street ? "webgl" : "2d");
+    const first = await page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
+    // (The first frame was drawn just before data-ready was read: within one frame of it.)
+    const long = await page.evaluate(() => {
+      const w = window as unknown as { __long: { s: number; d: number }[]; __tap: number };
+      return Math.max(0, ...w.__long.filter((e) => e.s >= w.__tap - 5).map((e) => e.d));
+    });
+    console.log(`${who} (slowed phone): first frame ${Math.round(first)} ms after the tap, longest task ${Math.round(long)} ms`);
+    // (Nov 10, headless Chromium: about 1.7 s and 1.1 s for a player's, 2.1 s and 1.4 s for the street town; before phone load 3,
+    // 3.2 s and 1.9 s, 5.8 s and 4.6 s.)
+    expect(first, "tap to first frame (ms)").toBeLessThan(street ? 3000 : 2500);
+    expect(long, "longest task (ms)").toBeLessThan(2000);
+  });
