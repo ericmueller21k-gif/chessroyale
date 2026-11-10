@@ -227,9 +227,10 @@ Lanes: `ranked` (the rating math, ranks, pairing), the director (the game's rule
   both records as they stand now), their coins. The game's row goes in only if neither player's record changed since it
   was read (another game of theirs ending at the same moment), and everything else applies only if that row is this
   recording's (its nonce), so a game is recorded once; a row that didn't go in is read again and retried. The object
-  starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started, 4
-  tries: a slow failure, an eviction or a deploy mid-way loses nothing); a game already in answers each player's rank as
-  it stands. A game on a test's clock where `TEST_SWITCHES` isn't "1" records nothing ("Unranked game").
+  starts a try at the end and again on any wake while no outcome has come back (15 s after the last try started for 4
+  tries, then every `recordRetrySeconds` (60) up to `recordRetryHours` (24) after the end, Nov 10; the room waits to close
+  for it, then says so on the ops page: a slow failure, an eviction, a deploy or a D1 outage loses nothing); a game
+  already in answers each player's rank as it stands. A game on a test's clock where `TEST_SWITCHES` isn't "1" records nothing ("Unranked game").
 - **The bot game** (`BotDuel` in `packages/app/src/duel.ts`): "Play a bot (unranked)" plays on the device by the same
   rules, the same vote (the bot picks at random) and the same board: Maia at the player's hidden rating (the first
   queue answer's `botRating`; the bosses' human-like engine, its own draw, `BOSS_BRAIN` temperature and top-p) when

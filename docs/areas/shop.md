@@ -105,7 +105,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     many guests could fill one account past the cap); locally and in e2e (no sign-in) guests do.
   - **Decided by the server only.** An online battle by its match room: `LobbyCore` counts each person's picks that went in (`picked`,
     at each turn's lock) and knows when the match began; `bossBattleSpan` gives their moves and time (to the end, or to when they left),
-    and the Durable Object's `saveResults` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
+    and the Durable Object's `writeResult` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
     the device, so the server can't see its moves: it counts by **the server's clock alone**: `POST /api/boss/solo/start` as the battle
     begins (App.tsx's `startSolo`, `noteSoloBattle`: the server notes the time in `solo_battles`, one open per account, a new start
     replacing it; each of the two asked once more a second later when it fails on the way or on the server: `askTwice`, account.ts), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
@@ -158,8 +158,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
 - **The HunChess Welcome Crate** (Eric, Nov 6; [2026-11-06-welcome-crate.md](../decisions/2026-11-06-welcome-crate.md); core's
   `welcome.ts`, the server's `welcome.ts`, `WELCOME_GIFT` in settings):
   - **Two, earned** each once per account, ever, at 5 and then 25 finished games (Eric: "the first one you get after 5 games, the next
-    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (a `results` row not marked `abandoned`, or a
-    ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
+    one you get after 25"; `WELCOME_GIFT.milestones`) in any mode or against any boss (an online `results` row not marked `abandoned`,
+    a solo one only with `WELCOME_GIFT.soloMinMinutes` (3) of the server's own time (`play_ms`; Nov 10: empty posts had earned
+    crates; idle open timers still count, accepted while items aren't traded), or a ranked 1 v 1 game), by the server only: one statement inserts a `welcome_crates` row per milestone reached (keyed by account and
     milestone) only while it's signed in, and does nothing for one that's there. The second's ride is never the first's. The app's
     `welcomeProgress()` answers `{ next: 5 | 25 | null, done }`. Checked on every `/api/me` (the backfill) and after every
     saved result, ranked game and Squads placement. Guests and bots never get one. A match room marks a player gone too long, idle or
