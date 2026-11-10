@@ -14,9 +14,21 @@ type Db = ReturnType<typeof memoryDb>;
 type Counts = { trips: number; statements: number };
 type Fakes = { refuse?: (sql: string) => boolean; beforeBatch?: (sqls: string[]) => void };
 
+/**
+ * What D1 refuses that the in-memory SQLite takes (measured on the local D1, Nov 10): pragma_table_info on a table that
+ * isn't named in the query, and more than 5 terms in a compound SELECT.
+ */
+function d1Refuses(q: string): string | null {
+  if (/pragma_table_info\((?!'\w+'\))/i.test(q)) return "not authorized: SQLITE_AUTH";
+  if ((q.match(/\b(UNION|INTERSECT|EXCEPT)\b/gi) ?? []).length > 4) return "too many terms in compound SELECT: SQLITE_ERROR";
+  return null;
+}
+
 /** A fake D1 over the in-memory SQLite that counts round trips (a statement on its own, or a batch) and statements. */
 function countingD1(inner: D1Database, counts: Counts, fakes: Fakes = {}): D1Database {
   const check = (q: string) => {
+    const no = d1Refuses(q);
+    if (no) throw new Error(`D1_ERROR: ${no}`);
     if (fakes.refuse?.(q)) throw new Error(`refused: ${q.slice(0, 60)}`);
   };
   type Wrapped = { inner: D1PreparedStatement; sql: string };

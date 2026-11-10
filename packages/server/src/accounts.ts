@@ -429,24 +429,22 @@ async function schemaRun(sql: Sql): Promise<void> {
 }
 
 /**
- * Each of COLUMN_TABLES' columns and its place in the table's primary key (0: not in it), in one read. A database that
- * refuses that read gets each table's `PRAGMA table_info`, one at a time, as before.
+ * Each of COLUMN_TABLES' columns and its place in the table's primary key (0: not in it), in one read: one row, a JSON list
+ * of [name, pk] for each table (D1 takes pragma_table_info only with the table named, and at most 5 terms in a UNION). A
+ * database that refuses it gets each table's `PRAGMA table_info`, one at a time, as before.
  */
 async function columnsOf(sql: Sql): Promise<Map<string, Map<string, number>>> {
-  type Column = { tbl: string; name: string; pk: number };
-  const read = COLUMN_TABLES.map((t) => `SELECT '${t}' AS tbl, name, pk FROM pragma_table_info('${t}')`).join(" UNION ALL ");
-  const rows = await sql.all<Column>(read).catch(async (e: unknown) => {
-    console.error(`schema: columns read a table at a time (${String(e)})`);
-    const each: Column[] = [];
-    for (const tbl of COLUMN_TABLES) for (const c of await sql.all<Column>(`PRAGMA table_info(${tbl})`)) each.push({ tbl, name: c.name, pk: c.pk });
-    return each;
-  });
-  const out = new Map<string, Map<string, number>>();
-  for (const r of rows) {
-    if (!out.has(r.tbl)) out.set(r.tbl, new Map());
-    out.get(r.tbl)!.set(r.name, Number(r.pk));
-  }
-  return out;
+  const read = `SELECT ${COLUMN_TABLES.map((t, i) => `(SELECT json_group_array(json_array(name, pk)) FROM pragma_table_info('${t}')) AS t${i}`).join(", ")}`;
+  const lists = await sql.first<Record<string, string | null>>(read).then(
+    (row) => COLUMN_TABLES.map((_, i) => JSON.parse(row?.[`t${i}`] ?? "[]") as [string, number][]),
+    async (e: unknown) => {
+      console.error(`schema: columns read a table at a time (${String(e)})`);
+      const each: [string, number][][] = [];
+      for (const t of COLUMN_TABLES) each.push((await sql.all<{ name: string; pk: number }>(`PRAGMA table_info(${t})`)).map((c) => [c.name, c.pk]));
+      return each;
+    },
+  );
+  return new Map(COLUMN_TABLES.map((t, i) => [t, new Map(lists[i])]));
 }
 
 // ---------------- Helpers ----------------
