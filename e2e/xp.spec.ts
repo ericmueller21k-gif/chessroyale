@@ -76,7 +76,7 @@ test("a counted game with a level-up: the bar fills from the old XP to the new, 
   test.setTimeout(3 * 60_000);
   await sampleXp(page);
   // 990 XP (Level 1, 99% of the way), then a won Boss alone game counted as 12 minutes: 120 + 50 = 170, to 1,160 (Level 2, 16%).
-  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12");
+  await page.goto("/?debug&pace=quick&win=1&boss=gingerbread&xp=990&xpgame=12&quests=squad-up,fifty-fifty,regular"); // (quests no solo boss game can finish: a dealt "Win a Boss Battle" adds its own XP since Nov 10)
   await xpIs(page, 990);
   await bossAloneFromHome(page);
   await expect.poll(() => page.evaluate(() => (window as any).match?.phase?.kind), { timeout: 60_000 }).toBe("play");
