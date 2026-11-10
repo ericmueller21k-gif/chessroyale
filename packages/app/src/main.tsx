@@ -5,7 +5,7 @@ import { watchShell } from "./shell.ts";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
-import { DuelQueueBar } from "./components/DuelQueueBar.tsx";
+import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
@@ -65,7 +65,7 @@ render(
     <BanNotice />
     <ReportSheet />
     <MaintenanceBanner />
-    <DuelQueueBar />
+    <SearchBar />
   </ErrorBoundary>,
   document.getElementById("app")!,
 );

@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, CROWD_MISSES, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type MatchmakingType, CROWD_MISSES, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -47,7 +47,9 @@ import { lazyGroup } from "./lazy.tsx";
 import { dropShell, markHome } from "./shell.ts";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
-import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
+import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchFoundAlert, searchSlots, setAwaySearch, type AwaySearch } from "./search.ts";
+import { chosenBotLevel } from "./components/BotLevelBox.tsx";
+import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { queuePool, testParams } from "./test-switches.ts";
@@ -208,10 +210,17 @@ function setCurrentMatch(code: string | null) {
     // No storage: no rejoining from a fresh start.
   }
 }
-/** Opened from scratch at home (not a link) with a seat in a match: check it's still on, and go back in. */
+/**
+ * A lobby you stepped out of to browse, still queued in it (search.ts, this tab's): a reload on any page carries on with
+ * it, as 1 v 1's search does.
+ */
+const awayLobby = savedAwayLobby();
+/** Opened from scratch at home (not a link) with a seat in a match (or anywhere, stepped out of its lobby): check it's still on, and go back in. */
 const rejoinCode = (() => {
-  if (linkCode || location.pathname !== "/") return null;
-  const code = currentMatch();
+  if (linkCode) return null;
+  const away = awayLobby?.kind === "crowd" ? awayLobby.code : null;
+  if (location.pathname !== "/" && !away) return null;
+  const code = away ?? currentMatch();
   return code && /^[A-Z2-9]{5}$/.test(code) && hasSeat(code) ? code : null;
 })();
 
@@ -232,7 +241,9 @@ const squadsTestStart = ((m) => (m ? (m[1] === undefined || m[1] === "start" ? "
 /** Opened from scratch at home with a seat in a Squads lobby (or its link): check it's still on, and go back in. */
 const squadsRejoin = (() => {
   if (squadsLinkCode) return squadsSeat(squadsLinkCode) ? squadsLinkCode : null;
-  if (linkCode || location.pathname !== "/") return null;
+  if (linkCode) return null;
+  if (awayLobby?.kind === "squads" && squadsSeat(awayLobby.code)) return awayLobby.code;
+  if (location.pathname !== "/") return null;
   return currentSquads();
 })();
 
@@ -505,7 +516,9 @@ export function App() {
   useEffect(() => {
     if (!squadsRejoin) return;
     void squadsStatus(squadsRejoin).then((st) => {
-      if (st?.open !== false && st?.phase !== "results") joinSquads(squadsRejoin);
+      const away = awayLobby?.kind === "squads" && awayLobby.code === squadsRejoin && st?.open && st.phase === "waiting" ? awayLobby.since : undefined;
+      if (away === undefined) saveAwayLobby(null);
+      if (st?.open !== false && st?.phase !== "results") joinSquads(squadsRejoin, undefined, away);
       else {
         forgetSquads(squadsRejoin);
         if (squadsLinkCode) setSquadsNote("That match has ended.");
@@ -560,7 +573,10 @@ export function App() {
   useEffect(() => {
     if (!rejoinCode) return;
     void lobbyStatus(rejoinCode).then((s) => {
-      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing" });
+      // (Stepped out of its lobby to browse and it's still filling: browsing still, its search on home's rows or the bar.)
+      const away = awayLobby?.kind === "crowd" && awayLobby.code === rejoinCode && s?.open && s.phase === "waiting" ? awayLobby.since : undefined;
+      if (away === undefined) saveAwayLobby(null);
+      if (s?.open && s.phase !== "over") joinLobby(rejoinCode, { resume: s.phase === "playing", away });
       else if (s) setCurrentMatch(null);
       setRejoining(false);
     });
@@ -596,7 +612,7 @@ export function App() {
   const [duel, setDuel] = useState<DuelSession | null>(null);
   /**
    * Browsing while queued (docs/areas/ranked.md, "Browsing while queued"): you went Home from the search stage, and
-   * the search goes on (the bar on every screen: DuelQueueBar.tsx). The ref is for the queue's own callbacks.
+   * the search goes on (home's rows, the bar on every other page: search.ts). The ref is for the queue's own callbacks.
    */
   const [duelAway, setDuelAwayState] = useState(false);
   const duelAwayRef = useRef(false);
@@ -607,7 +623,7 @@ export function App() {
   /** Into a ranked game (from the queue, or a link to it). Found while you browse: a sound and a buzz, then the stage. */
   const joinDuel = (code: string) => {
     if (duelAwayRef.current) {
-      duelFoundAlert();
+      searchFoundAlert();
       nav.home();
     }
     setDuelAway(false);
@@ -647,13 +663,15 @@ export function App() {
     history.replaceState(null, "", `/1v1${location.search}`);
   };
   /**
-   * Another mode while the search goes on: "Leave the 1 v 1 queue?" first (the only confirm), then the search ends and
-   * that mode starts.
+   * Another mode while a search goes on (any queue, browsing: search.ts): "Leave the 50 v 50 queue?" first (the only
+   * confirm), then the search ends and that mode starts.
    */
-  const leavingDuelFirst = (go: () => void) => {
-    if (!duelQueue || duel || duelQueue.state.kind !== "searching") return go();
-    confirmLeaveDuelQueue(() => {
-      dropDuelSearch();
+  const awayNow = useRef<AwaySearch | null>(null);
+  const leavingSearchFirst = (go: () => void) => {
+    const s = awayNow.current;
+    if (!s) return go();
+    confirmLeaveSearch(s.name, () => {
+      s.cancel();
       go();
     });
   };
@@ -815,7 +833,163 @@ export function App() {
   useEffect(() => {
     if ((match || squads) && duelQueue && !duel) dropDuelSearch();
   }, [match, squads]);
-  // The bar over every screen while you browse with a search going (DuelQueueBar reads this after every render).
+
+  // ---------------- Searching while you browse: 50 v 50's and Squads' lobbies (search.ts; Eric, Nov 10) ----------------
+
+  /**
+   * The 50 v 50 lobby or the Squads lobby you stepped out of with "Keep me in the queue" (its Exit): its connection, which
+   * holds your seat, kept by the app while you look around (home's rows, the bar on other pages). It fills: you're taken
+   * in, with the found alert, as 1 v 1 does. `searchSince`: when each search began (its lobby joined from the queue).
+   */
+  const [awayMatch, setAwayMatch] = useState<NetMatch | null>(null);
+  const [awaySquads, setAwaySquads] = useState<SquadsClient | null>(null);
+  const searchSince = useRef(new WeakMap<object, number>());
+  const sinceOf = (o: object) => {
+    let t = searchSince.current.get(o);
+    if (t === undefined) searchSince.current.set(o, (t = Date.now()));
+    return t;
+  };
+  useEffect(() => awayMatch?.subscribe(() => rerender(undefined)), [awayMatch]);
+  useEffect(() => awaySquads?.subscribe(() => rerender(undefined)), [awaySquads]);
+  /** 50 v 50's public queue, still gathering: a lobby you can step out of and stay queued in (not a raid's, a party's, Solo's or a friends' lobby). */
+  const steppable = (m: AnyMatch | null): m is NetMatch =>
+    m instanceof NetMatch && m.auto && !m.partyPass && !m.settings.raid && m.settings.mode === "crowd" && (m.phase.kind === "lobby" || m.phase.kind === "loading") && !m.gone && !m.error && !m.resuming;
+  /** Squads' lobby, still gathering (not a test lobby). */
+  const steppableSquads = (c: SquadsClient | null): boolean => !!c && !c.gone && !c.error && !c.left && !c.lobby?.test && (!c.lobby || c.lobby.phase === "waiting");
+  /** Exit with "Keep me in the queue" (or the side menu, so checked): home, still queued; the lobby's connection stays the app's. */
+  const stepOutOfLobby = () => {
+    if (steppable(match) && !match.filledAt) {
+      const m = match;
+      saveAwayLobby({ kind: "crowd", code: m.code, since: sinceOf(m) });
+      setAwayMatch(m);
+      setMatch(null);
+    } else if (squads && steppableSquads(squads)) {
+      const c = squads;
+      saveAwayLobby({ kind: "squads", code: c.code, since: sinceOf(c) });
+      setAwaySquads(c);
+      setSquads(null);
+    } else return false;
+    if (location.pathname !== "/") history.replaceState(null, "", `/${location.search}`);
+    return true;
+  };
+  /** Back into the lobby you stepped out of (Lobby, the bar's words, or found: with the alert), from any page. */
+  const backToLobby = (found = false) => {
+    const m = awayMatch;
+    const c = awaySquads;
+    if (!m && !c) return;
+    if (found) searchFoundAlert();
+    nav.home();
+    saveAwayLobby(null);
+    setAwayMatch(null);
+    setAwaySquads(null);
+    if (m) {
+      use(m);
+      history.replaceState(null, "", `/lobby/${m.code}${location.search}`);
+    } else if (c) {
+      setSquads(c);
+      history.replaceState(null, "", `/squads/${c.code}${location.search}`);
+    }
+  };
+  /** Out of the queue you stepped out of (Cancel's Yes, the bar's Cancel, or another mode): the seat freed; the page stays. */
+  const cancelAwayLobby = () => {
+    saveAwayLobby(null);
+    if (awayMatch) {
+      if (currentMatch() === awayMatch.code) setCurrentMatch(null);
+      awayMatch.leave();
+      setAwayMatch(null);
+    }
+    if (awaySquads) {
+      if (!awaySquads.left && !awaySquads.gone) awaySquads.leave();
+      else awaySquads.dispose();
+      setAwaySquads(null);
+    }
+  };
+  /** 50 v 50's Start with bots: out of the queue, then you and 99 bots at once, at your last Bot level (My level before any). */
+  const crowdBots = () => {
+    cancelAwayLobby();
+    void startSolo("crowd", { fill: true, botLevel: botLevelMean(chosenBotLevel() ?? "mine", account().profile?.rating ?? null) });
+  };
+  // Found (the lobby fills, or its match begins): you're taken in. Gone meanwhile: home's note.
+  useEffect(() => {
+    const m = awayMatch;
+    if (m && (m.gone || m.error || m.exited)) {
+      m.dispose();
+      forgetSeat(m.code);
+      if (currentMatch() === m.code) setCurrentMatch(null);
+      setAwayMatch(null);
+      saveAwayLobby(null);
+      setSquadsNote("That lobby has closed.");
+    } else if (m && (m.filledAt || m.started || (m.phase.kind !== "lobby" && m.phase.kind !== "loading"))) backToLobby(true);
+    const c = awaySquads;
+    if (c && (c.gone || c.error || c.left)) {
+      const why = c.gone ?? c.error;
+      c.dispose();
+      setAwaySquads(null);
+      saveAwayLobby(null);
+      setSquadsNote(why === "Banned" ? null : why);
+    } else if (c?.lobby && c.lobby.phase !== "waiting") backToLobby(true);
+  });
+  // Into another match or search meanwhile (an invite's lobby, a party's, a town game): the lobby's search ends.
+  useEffect(() => {
+    if ((match || squads || duel || duelQueue) && (awayMatch || awaySquads)) cancelAwayLobby();
+  }, [match, squads, duel, duelQueue]);
+
+  /** What's searching while you browse (home's rows; the bar elsewhere), with its three actions (search.ts). */
+  const awaySearchNow = ((): AwaySearch | null => {
+    if (match || squads || duel) return null;
+    const st = duelQueue?.state;
+    if (duelQueue && duelAway && st?.kind === "searching") {
+      const q = duelQueue;
+      const few = (now: number) => !q.keepWaiting && now >= q.fewAt;
+      return {
+        mode: "1v1",
+        name: "1 v 1",
+        since: st.since,
+        detail: (now) => {
+          const s = q.state;
+          const delay = s.kind === "searching" && s.delayUntil ? s.delayUntil - now : 0;
+          return delay > 0 ? `Delayed queue · ${clockShown(delay)}` : few(now) ? "Few players online right now" : "Ranked · a player near your level";
+        },
+        few,
+        back: duelBackToStage,
+        cancel: dropDuelSearch,
+        slots: searchSlots({ cancel: dropDuelSearch, back: duelBackToStage, bots: botDuel, backLine: "back to search" }),
+      };
+    }
+    if (awayMatch) {
+      const m = awayMatch;
+      return {
+        mode: "crowd",
+        name: "50 v 50",
+        since: sinceOf(m),
+        detail: () => `Solo queue · ${Math.max(1, m.players.filter((p) => !p.isBot).length)} of ${m.settings.lobbySize} in the lobby`,
+        few: () => false,
+        back: () => backToLobby(),
+        cancel: cancelAwayLobby,
+        slots: searchSlots({ cancel: cancelAwayLobby, back: () => backToLobby(), bots: crowdBots }),
+      };
+    }
+    if (awaySquads) {
+      const c = awaySquads;
+      return {
+        mode: "squads",
+        name: "Squads",
+        since: sinceOf(c),
+        detail: () => {
+          const l = c.lobby;
+          const people = Math.max(1, l?.players.filter((p) => !p.isBot).length ?? 1);
+          return `${c.party ? "Party" : "Solo queue"} · ${people} of ${l?.seats ?? SQUADS.squadCount * SQUADS.squadSize} in the lobby`;
+        },
+        few: () => false,
+        back: () => backToLobby(),
+        cancel: cancelAwayLobby,
+        // (Squads has no game with bots yet: greyed, "Soon", as on home.)
+        slots: searchSlots({ cancel: cancelAwayLobby, back: () => backToLobby(), bots: null }),
+      };
+    }
+    return null;
+  })();
+  awayNow.current = awaySearchNow;
   // The shell (index.html) goes as the first screen that isn't the splash draws, in the same frame (shell.ts); home or the
   // landing page marks which one the next load's shell is.
   useLayoutEffect(() => {
@@ -824,7 +998,8 @@ export function App() {
     if (document.querySelector("#app .fd-home")) markHome(true);
     else if (document.querySelector("#app .landing")) markHome(false);
   });
-  useLayoutEffect(() => setAwaySearch(duelQueue && duelAway && !duel && !match && !squads ? { queue: duelQueue, back: duelBackToStage, cancel: dropDuelSearch } : null));
+  // Home's rows and the bar on every other page read it (search.ts; the bar after every render).
+  useLayoutEffect(() => setAwaySearch(awaySearchNow));
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
@@ -833,12 +1008,21 @@ export function App() {
 
   // ---------------- Squads ----------------
 
-  /** Into a Squads lobby (with your party's pass, to sit with your party). */
-  const joinSquads = (code: string, pass?: string) => {
+  /**
+   * Into a Squads lobby (with your party's pass, to sit with your party). `away`: a reload carrying on with a lobby you'd
+   * stepped out of (when its search began): you browse on, still queued.
+   */
+  const joinSquads = (code: string, pass?: string, away?: number) => {
     unlockAudio();
     setSquadsNote(null);
     setPartyOpen(false);
     const c = new SquadsClient(code.toUpperCase(), { party: pass ?? null });
+    searchSince.current.set(c, away ?? Date.now());
+    if (away !== undefined) {
+      setAwaySquads(c);
+      c.connect();
+      return;
+    }
     setSquads((old) => {
       old?.dispose();
       return c;
@@ -1043,7 +1227,7 @@ export function App() {
    * Into a lobby by code. A queue lobby (PLAY) brings the queue's own settings (the server's, remembered with the
    * code for a reload); a lobby you made, the mode you made it in.
    */
-  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
+  const joinLobby = (code: string, opts: { queue?: "crowd" | "raid"; mode?: ModeChoiceId; typed?: boolean; resume?: boolean; away?: number; party?: { pass: string; seat: number; boss: string; difficulty: string } } = {}) => {
     const key = `brc.queue.${code.toUpperCase()}`;
     let queue = opts.queue;
     try {
@@ -1074,6 +1258,15 @@ export function App() {
     if (opts.resume) {
       m.resuming = true;
       m.auto = false;
+    }
+    // (When its search began: the queue's lobby, for home's rows and the bar.)
+    if (queue) searchSince.current.set(m, opts.away ?? Date.now());
+    // A reload carrying on with a lobby you'd stepped out of (`away`, when its search began): you browse on, still queued.
+    if (opts.away !== undefined && queue) {
+      setCurrentMatch(m.code);
+      setAwayMatch(m);
+      m.connect();
+      return;
     }
     use(m);
     // Seated here: opening the app from scratch comes back to it (until you leave on purpose or it ends).
@@ -1453,19 +1646,22 @@ export function App() {
    */
   const queueNav: FrontNav = {
     ...nav,
-    // (The 1 v 1 search: Play is home, and every page browses with the search still going, the bar along.)
+    // (The 1 v 1 search: Play is home, and every page browses with the search still going, home's rows or the bar along. A
+    // 50 v 50 or Squads lobby the same, as its Exit does, with "Keep me in the queue" checked.)
     home: () => {
       if (duelQueue && !duel) {
         duelGoAway();
         nav.home();
-      }
+      } else if (keepInQueue() && stepOutOfLobby()) nav.home();
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
       (["chessTown", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
-          if (match) leave();
+          if (keepInQueue() && stepOutOfLobby()) {
+            // (Stepped out, still queued.)
+          } else if (match) leave();
           else if (squads) leaveSquads();
           else if (duel) leaveDuel();
           else if (duelQueue) duelGoAway();
@@ -1542,7 +1738,7 @@ export function App() {
     if (squadsWaiting(squads.lobby))
       return (
         <>
-          {homeFrame(<SquadsQueue client={squads} onCancel={leaveSquads} />)}
+          {homeFrame(<SquadsQueue client={squads} onCancel={leaveSquads} onAway={steppableSquads(squads) || (!squads.lobby?.test && squads.lobby?.phase === "filled") ? stepOutOfLobby : undefined} />)}
           {overlayS}
         </>
       );
@@ -1789,6 +1985,7 @@ export function App() {
     <FrontFrame page={queue ? "queue" : raidOpen ? "raid" : "home"} nav={!queue ? nav : computer ? queueNav : undefined}>
       <HomeScreen
         queue={queue}
+        search={awaySearchNow}
         chat={chat}
         side={side}
         intent={homeIntent}
@@ -1834,11 +2031,11 @@ export function App() {
             : undefined
         }
         onlineLocked={mustSignInToPlayOnline()}
-        onPlay={(mode, type) => leavingDuelFirst(() => void playNow(mode, type))}
-        onSolo={(mode, opts) => leavingDuelFirst(() => void startSolo(mode, opts))}
-        onCreateLobby={(mode, made) => leavingDuelFirst(() => void createLobby(mode).then((code) => made?.(code ?? null)))}
-        onJoinLobby={(code) => leavingDuelFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
-        onSquads={() => leavingDuelFirst(() => void squadsPlay())}
+        onPlay={(mode, type) => leavingSearchFirst(() => void playNow(mode, type))}
+        onSolo={(mode, opts) => leavingSearchFirst(() => void startSolo(mode, opts))}
+        onCreateLobby={(mode, made) => leavingSearchFirst(() => void createLobby(mode).then((code) => made?.(code ?? null)))}
+        onJoinLobby={(code) => leavingSearchFirst(() => joinLobby(code, { typed: code !== inviteCode }))}
+        onSquads={() => leavingSearchFirst(() => void squadsPlay())}
         onParty={openParty}
         onFriends={nav.friendsList}
         onSignIn={() => chooseGuest(false)}
@@ -1904,7 +2101,7 @@ export function App() {
     // (The lobby's chat: a phone's is in the queue screen, under Cancel; a computer's under your card, beside the lobby.)
     return (
       <>
-        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
+        {home(<QueueScreen match={q} onCancel={leave} onLetBotsFill={letBots} onAway={steppable(match) ? stepOutOfLobby : undefined} chat={!computer} />, computer ? <LobbyChat match={q} /> : undefined, computer)}
         {overlay}
       </>
     );
