@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef } from "preact/hooks";
+import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { BossFace } from "./BossCharacter.tsx";
-import type { QuestIcon, QuestView } from "@chessroyale/core";
+import { QUESTS, type QuestIcon, type QuestView } from "@chessroyale/core";
+import { questSound, warmQuestSounds } from "../sound.ts";
 import { KeyArt, WinterCrateArt } from "./Items.tsx";
 
 /**
@@ -9,6 +10,12 @@ import { KeyArt, WinterCrateArt } from "./Items.tsx";
  * progress bar and count, its reward drawn with the shop's art) and "Got it". Two daily rows and the weekly one under its own
  * label and countdown. Each daily has a small reroll button (each its own free one a day: greyed once used, or on a finished quest). The ×,
  * "Got it", Escape or a tap outside close it.
+ *
+ * Progress shown (Eric, Nov 10: "it does like a little like animation to like move it towards ... the goal"; QUESTS.show): given
+ * `from` (each quest a game moved, with its old count), the moved rows start at their old counts and slide to their new ones one
+ * after another, the count ticking up with the bar (questSound "tick"). One that finishes gets its finish: the bar fills and glows,
+ * the row pops, the check pops in, "Done!", its reward bursts, and questSound "done". Only the row whose turn it is redraws, a frame
+ * at a time (its fill's width and count, in a box of fixed size: nothing else moves). Reduced motion: the new counts at once.
  *
  * It draws what it's given and calls back (Nov 9, phase 3: home gives it the server's quests, quests.ts; the server deals, counts,
  * rerolls and pays them, server/quests.ts). Eric approved its look (the mockup of Nov 9).
@@ -26,9 +33,15 @@ export interface QuestsOverlayProps {
   weeklyResetIn: string;
   /** PAUSE_REWARDS is on: the head says quests are paused, in place of the countdown. */
   paused?: boolean;
+  /** Each quest a game moved, with the count it had (home, after a game): those slide to their counts, one after another. */
+  from?: Readonly<Record<string, number>> | null;
   onReroll: (id: string) => void;
   onClose: () => void;
 }
+
+const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+/** The slide's ease: quick, then settling on the new count. */
+const ease = (t: number) => 1 - (1 - t) ** 3;
 
 const count = (n: number) => n.toLocaleString("en-US");
 
@@ -123,12 +136,56 @@ function Reward({ reward }: { reward: QuestView["reward"] }) {
   );
 }
 
-function QuestRow({ q, onReroll }: { q: QuestView; onReroll: (id: string) => void }) {
-  const done = q.progress >= q.target;
-  const share = Math.min(1, q.progress / q.target);
-  const canReroll = q.period === "daily" && q.canReroll && !done;
+/**
+ * A quest's row. `from` (a moved quest, until its turn is over): the count it starts at; `go`: its turn, sliding to its count, then
+ * `onShown` after its finish (or a short gap).
+ */
+function QuestRow({ q, onReroll, from, go = false, onShown }: { q: QuestView; onReroll: (id: string) => void; from?: number; go?: boolean; onShown?: () => void }) {
+  const [shown, setShown] = useState<number | null>(null);
+  const [finished, setFinished] = useState(false);
+  // (The slide, from its first frame: a layout effect, so its sound plays as it starts. LESSONS.md.)
+  useLayoutEffect(() => {
+    if (!go || from === undefined) return;
+    const S = QUESTS.show;
+    const to = Math.min(q.progress, q.target);
+    let raf = 0;
+    let wait = 0;
+    let last = Math.floor(from);
+    let tickAt = 0;
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min(1, (now - t0) / S.slideMs);
+      const v = from + (to - from) * ease(t);
+      setShown(v);
+      if (Math.floor(v) !== last && now - tickAt >= S.tickGapMs) {
+        last = Math.floor(v);
+        tickAt = now;
+        questSound("tick");
+      }
+      if (t < 1) {
+        raf = requestAnimationFrame(frame);
+        return;
+      }
+      const finishes = to >= q.target;
+      if (finishes) {
+        setFinished(true);
+        questSound("done");
+      }
+      wait = window.setTimeout(() => onShown?.(), finishes ? S.finishMs : S.gapMs);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(wait);
+    };
+  }, [go]);
+  // (What the row shows: its old count while it waits its turn, the slide's during it, its count once it's over.)
+  const at = from === undefined ? q.progress : go ? (shown ?? from) : from;
+  const done = at >= q.target;
+  const share = Math.min(1, at / q.target);
+  const canReroll = q.period === "daily" && q.canReroll && q.progress < q.target;
   return (
-    <li class={`qo-row${q.period === "weekly" ? " weekly" : ""}${done ? " done" : ""}`} data-quest={q.id}>
+    <li class={`qo-row${q.period === "weekly" ? " weekly" : ""}${done ? " done" : ""}${finished ? " qo-finish" : ""}${from !== undefined ? " qo-moving" : ""}`} data-quest={q.id}>
       <span class="qo-pic">
         <QuestPicture icon={q.icon} />
         {done && (
@@ -148,8 +205,8 @@ function QuestRow({ q, onReroll }: { q: QuestView; onReroll: (id: string) => voi
               type="button"
               class="qo-reroll"
               disabled={!canReroll}
-              aria-label={done ? "Reroll (quest done)" : canReroll ? `Reroll ${q.name} (1 free today)` : "Reroll (used today)"}
-              title={done ? "Done" : canReroll ? "Swap this quest (1 free a day per quest)" : "This quest's free reroll is used today"}
+              aria-label={q.progress >= q.target ? "Reroll (quest done)" : canReroll ? `Reroll ${q.name} (1 free today)` : "Reroll (used today)"}
+              title={q.progress >= q.target ? "Done" : canReroll ? "Swap this quest (1 free a day per quest)" : "This quest's free reroll is used today"}
               onClick={() => canReroll && onReroll(q.id)}
             >
               <RerollIcon />
@@ -158,10 +215,10 @@ function QuestRow({ q, onReroll }: { q: QuestView; onReroll: (id: string) => voi
         </div>
         <span class="qo-goal">{q.goal}</span>
         <div class="qo-progress">
-          <span class="qo-bar" role="progressbar" aria-label={`${q.name} progress`} aria-valuemin={0} aria-valuemax={q.target} aria-valuenow={Math.min(q.progress, q.target)}>
+          <span class="qo-bar" role="progressbar" aria-label={`${q.name} progress`} aria-valuemin={0} aria-valuemax={q.target} aria-valuenow={Math.min(Math.floor(at), q.target)}>
             <span class="qo-fill" style={{ width: `${share * 100}%` }} />
           </span>
-          <span class="qo-count">{done ? "Done!" : `${count(q.progress)}/${count(q.target)}`}</span>
+          <span class="qo-count">{done ? "Done!" : `${count(Math.floor(at))}/${count(q.target)}`}</span>
         </div>
       </div>
       <Reward reward={q.reward} />
@@ -169,8 +226,24 @@ function QuestRow({ q, onReroll }: { q: QuestView; onReroll: (id: string) => voi
   );
 }
 
-export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, onReroll, onClose }: QuestsOverlayProps) {
+export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, from, onReroll, onClose }: QuestsOverlayProps) {
   const ok = useRef<HTMLButtonElement>(null);
+  // (The moved quests in the overlay's order, decided once as it opens; reduced motion: none, the new counts at once.)
+  const [moved] = useState(() => (from && !reduced() ? quests.filter((q) => from[q.id] !== undefined).map((q) => q.id) : []));
+  // (Whose turn it is: -1 until `show.startMs` after it opens, then each moved quest's in order; past the end, all shown.)
+  const [turn, setTurn] = useState(-1);
+  useLayoutEffect(() => {
+    if (from && reduced() && quests.some((q) => from[q.id] !== undefined && q.progress >= q.target)) questSound("done");
+    if (!moved.length) return;
+    warmQuestSounds();
+    const t = setTimeout(() => setTurn(0), QUESTS.show.startMs);
+    return () => clearTimeout(t);
+  }, []);
+  const rowProps = (q: QuestView) => {
+    const i = moved.indexOf(q.id);
+    if (i < 0 || i < turn) return {};
+    return { from: from![q.id], go: i === turn, onShown: () => setTurn(i + 1) };
+  };
   // (A layout effect, as the other notices': Escape closes it from its first frame, and "Got it" has the focus.)
   useLayoutEffect(() => {
     ok.current?.focus({ preventScroll: true });
@@ -202,7 +275,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, onR
         </header>
         <ul class="qo-rows">
           {dailies.map((q) => (
-            <QuestRow key={q.id} q={q} onReroll={onReroll} />
+            <QuestRow key={q.id} q={q} onReroll={onReroll} {...rowProps(q)} />
           ))}
         </ul>
         <div class="qo-label">
@@ -214,7 +287,7 @@ export function QuestsOverlay({ quests, dailyResetIn, weeklyResetIn, paused, onR
         </div>
         <ul class="qo-rows">
           {weekly.map((q) => (
-            <QuestRow key={q.id} q={q} onReroll={onReroll} />
+            <QuestRow key={q.id} q={q} onReroll={onReroll} {...rowProps(q)} />
           ))}
         </ul>
         <button type="button" class="fd-btn primary qo-ok" ref={ok} onClick={onClose}>
