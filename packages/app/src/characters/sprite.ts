@@ -109,16 +109,28 @@ export interface Swap {
   keys: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
-/** Palette keys that mean "nothing here". */
-const EMPTY = new Set([".", " "]);
 const OUTLINE = "k";
 const HALO = "@";
 
 type Cells = (string | null)[][];
 
+// (Plain loops, no callbacks a pixel, here and in `ring` and `frameKeys`: Nov 10, phone load 3, the town's first frame composed its
+// buildings through them. The same pixels.)
 function toCells(grid: Grid): Cells {
-  const w = Math.max(0, ...grid.map((r) => r.length));
-  return grid.map((row) => Array.from({ length: w }, (_, x) => (x < row.length && !EMPTY.has(row[x]!) ? row[x]! : null)));
+  let w = 0;
+  for (const r of grid) if (r.length > w) w = r.length;
+  const out: Cells = new Array(grid.length);
+  for (let y = 0; y < grid.length; y++) {
+    const row = grid[y]!;
+    const cells = new Array<string | null>(w);
+    for (let x = 0; x < w; x++) {
+      const c = x < row.length ? row[x]! : ".";
+      // ("." and " " mean nothing here.)
+      cells[x] = c === "." || c === " " ? null : c;
+    }
+    out[y] = cells;
+  }
+  return out;
 }
 
 function rotate(cells: Cells, quarter: number): Cells {
@@ -163,12 +175,18 @@ const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 function ring(cells: Cells, key: string): Cells {
   const h = cells.length;
   const w = cells[0]?.length ?? 0;
-  const out: Cells = Array.from({ length: h + 2 }, (_, y) => Array.from({ length: w + 2 }, (_, x) => cells[y - 1]?.[x - 1] ?? null));
+  const out: Cells = new Array(h + 2);
   for (let y = 0; y < h + 2; y++) {
+    const up = cells[y - 2];
+    const at = cells[y - 1];
+    const down = cells[y];
+    const row = new Array<string | null>(w + 2);
     for (let x = 0; x < w + 2; x++) {
-      if (out[y]![x]) continue;
-      if (N4.some(([dx, dy]) => cells[y - 1 + dy]?.[x - 1 + dx])) out[y]![x] = key;
+      const c = at?.[x - 1] ?? null;
+      // (Empty with a filled 4-neighbor: the ring.)
+      row[x] = c ?? (at?.[x] || at?.[x - 2] || down?.[x - 1] || up?.[x - 1] ? key : null);
     }
+    out[y] = row;
   }
   return out;
 }
@@ -207,37 +225,39 @@ function placed(part: Part, layer: Layer): { cells: Cells; dx: number; dy: numbe
 
 /** A frame as palette keys (null = transparent), before colors. */
 export function frameKeys(ch: Character, frame: Frame): Cells {
-  const canvas: Cells = Array.from({ length: ch.h }, () => Array<string | null>(ch.w).fill(null));
-  // Pixels of outlined parts: the halo rings these only, not a ground shadow or a glow.
-  const solid = Array.from({ length: ch.h }, () => Array<boolean>(ch.w).fill(false));
+  const W = ch.w;
+  const H = ch.h;
+  const canvas: Cells = Array.from({ length: H }, () => new Array<string | null>(W).fill(null));
+  // Pixels of outlined parts: the halo rings these only, not a ground shadow or a glow (kept only for a halo).
+  const solid = ch.halo ? Array.from({ length: H }, () => new Array<boolean>(W).fill(false)) : null;
   const [sx, sy] = frame.shake ?? [0, 0];
-  const put = (x: number, y: number, c: string, isSolid: boolean) => {
-    const X = x + sx;
-    const Y = y + sy;
-    if (X < 0 || Y < 0 || X >= ch.w || Y >= ch.h) return;
-    canvas[Y]![X] = c;
-    solid[Y]![X] = isSolid;
-  };
   for (const layer of frame.layers) {
     const part = ch.parts[layer.part];
     if (!part) throw new Error(`${ch.id}: no part "${layer.part}"`);
     // (Writing drawn mirrored: its own pixels turned back where it stands, so the whole picture's mirror leaves it reading.)
     const { cells, dx, dy } = placed(part, ch.mirror && ch.reads?.includes(layer.part) ? { ...layer, flipX: !layer.flipX } : layer);
     const outlined = part.outline !== false;
-    const ox = layer.x + dx;
-    const oy = layer.y + dy;
+    const ox = layer.x + dx + sx;
+    const oy = layer.y + dy + sy;
     for (let y = 0; y < cells.length; y++) {
+      const Y = oy + y;
+      if (Y < 0 || Y >= H) continue;
       const row = cells[y]!;
+      const to = canvas[Y]!;
+      const so = solid?.[Y];
       for (let x = 0; x < row.length; x++) {
         const c = row[x];
-        if (c) put(ox + x, oy + y, c, outlined);
+        const X = ox + x;
+        if (!c || X < 0 || X >= W) continue;
+        to[X] = c;
+        if (so) so[X] = outlined;
       }
     }
   }
   let out = canvas;
   if (ch.halo) {
     out = canvas.map((row, y) =>
-      row.map((c, x) => c ?? (N4.some(([dx, dy]) => solid[y + dy]?.[x + dx]) ? HALO : null)),
+      row.map((c, x) => c ?? (N4.some(([dx, dy]) => solid![y + dy]?.[x + dx]) ? HALO : null)),
     );
   }
   for (const [x, y, k] of frame.specks ?? []) {
