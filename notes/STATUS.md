@@ -1,3 +1,4 @@
+- Nov 10 08:23 UTC: #605 (Banana Suit, outfit) merged 539ce42; #606 (quick fixes + bot xpChanceFull 0.7) merged 6e3caeb. Watching deploy + main run.
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
 # Director status: the current state only (keep under ~40 lines; old entries go to CHANGELOG.md). Rules: RULES.md.
 
