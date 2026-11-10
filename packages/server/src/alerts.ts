@@ -252,7 +252,7 @@ export async function checkAlerts(env: AlertEnvFull, sql: Sql, now: number, opts
       s.low++;
       s.high = 0;
     }
-    const counted = `${s.last.join(", then ")} in the last ${s.last.length === 1 ? "" : "two "}${ALERTS.checkMinutes}-minute window${s.last.length === 1 ? "" : "s"} (normal about ${Math.round(normal * (ALERTS.checkMinutes / 60))})`;
+    const counted = `${[...s.last].reverse().join(", then ")} in the last ${s.last.length === 1 ? "" : "two "}${ALERTS.checkMinutes}-minute window${s.last.length === 1 ? "" : "s"} (normal about ${Math.round(normal * (ALERTS.checkMinutes / 60))})`;
     if (!s.pagedAt && s.high >= ALERTS.page.inARow) {
       // A new problem: a page, unless the same one paged within the hour (then a quiet note).
       const repeat = now - s.lastSent < ALERTS.page.repeatMs;
@@ -295,7 +295,7 @@ export async function digest(env: AlertEnvFull, sql: Sql, now: number, state: Al
   const since = hourOf(now - DAY);
   const fallback = TOWN_GL_FALLBACK.kind;
   const safe = <T>(p: Promise<T>, none: T) => p.catch(() => none);
-  const [before, fresh] = await Promise.all([
+  const [before, newKinds] = await Promise.all([
     safe(sql.first<{ n: number | null }>("SELECT SUM(count) AS n FROM ops_errors WHERE hour >= ? AND hour < ? AND kind != ?", since - DAY, since, fallback), null),
     // (New: not seen in the week before the last 24 hours.)
     safe(
@@ -315,13 +315,13 @@ export async function digest(env: AlertEnvFull, sql: Sql, now: number, state: Al
   const counts = (o: Record<string, number>) => Object.entries(o).map(([k, n]) => `${k} ${n}`).join(", ") || "none";
   const r = h.reports.day;
   const untrusted = [
-    ...fresh.map((e) => `[new ${e.source} error, ${e.n}×] ${plain(e.kind, 40)}: ${plain(e.message)}`),
+    ...newKinds.map((e) => `[new ${e.source} error, ${e.n}×] ${plain(e.kind, 40)}: ${plain(e.message)}`),
     ...h.reports.latest.map((x) => `[${plain(x.kind, 10)} ${plain(x.id, 8)}] ${plain(x.note)}`),
   ];
   const lines = [
     `☀️ **HunChess digest, ${central(now, { weekday: "short", month: "short", day: "numeric" })}** (the last 24 hours)`,
     `**Pages:** ${pages.length ? pages.map((p) => `${p.what} ${p.signal} ${clock(p.at)}`).join("; ") : "none"}.${(Object.keys(SIGNALS) as Signal[]).some((s) => state.signals[s].pagedAt) ? " Still paging: " + (Object.keys(SIGNALS) as Signal[]).filter((s) => state.signals[s].pagedAt).join(", ") + "." : ""}`,
-    `**Errors:** ${h.errors.day} (the 24 hours before: ${before?.n ?? 0}), ${h.errors.kinds} kinds; ${fresh.length ? `${fresh.length === 5 ? "5 or more" : fresh.length} new` : "no new"} kinds. **Durable Objects:** ${counts(h.durableObjects.byEntry)}.`,
+    `**Errors:** ${h.errors.day} (the 24 hours before: ${before?.n ?? 0}), ${h.errors.kinds} kinds; ${newKinds.length ? `${newKinds.length === 5 ? "5 or more" : newKinds.length} new` : "no new"} kinds. **Durable Objects:** ${counts(h.durableObjects.byEntry)}.`,
     `**Players' reports:** ${r.bug ?? 0} bugs, ${r.feedback ?? 0} feedback, ${r.idea ?? 0} ideas.`,
     `**Live now:** ${h.live ? `${h.live.online} online, ${h.live.players} in lobbies` : "no answer from the live hub"}. **D1:** ${h.d1.ok ? `ok (${h.d1.ms} ms)` : "failing"}. **Deployed:** ${plain(h.deploy.version, 20)}.`,
     `**Engine server:** ${h.engine.on ? "on" : "off"}, ${h.engine.searches} of ${h.engine.cap} searches today${h.engine.lastFail && now - h.engine.lastFail.at < DAY ? `, last failure ${clock(h.engine.lastFail.at)}` : ""}. **Fair play's re-checks:** ${h.fairplay.searches} of ${h.fairplay.cap}.`,
