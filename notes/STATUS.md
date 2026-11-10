@@ -1,3 +1,4 @@
+- Nov 10 14:36 UTC: #611 fix helper still pushing after its report (a5dcf2e); I stopped+archived the delta reviewer (two xhigh at once). Waiting for `.done` on claude/fable-b3, then restart delta review on the final head.
 - Nov 10 14:35 UTC: #611 fix round done (c87ce56; head 2af2bd0). Delta review started; CI running.
 - Nov 10 13:56 UTC: #611 review: B1 blocker (honest devices differ -> strikes + stronger boss), M1-M4, E1 Maia 40 MB (chose c: phone only if Maia already cached), m1-m7. Fix helper on claude/fable-b3. ASK ERIC: Squads party alone with bots earns no coins/crates by design?
 - Nov 10 13:36 UTC: Fable b3 PR #611 open (full-e2e). 2nd device loads Maia 40 MB in raids (flag to Eric). Review on review/fable-b3.
