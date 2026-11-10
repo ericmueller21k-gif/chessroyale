@@ -47,6 +47,10 @@
     "e2e/helpers.ts",
     "packages/core/src/**",
     "packages/chess/src/runner.ts",
+    "packages/chess/src/runner-tools.ts",
+    "packages/app/src/lazy.tsx",
+    "packages/app/src/shell.ts",
+    "packages/app/src/screens/game-screens.ts",
     "packages/chess/src/protocol.ts",
     "packages/chess/src/index.ts",
     "packages/chess/src/rules.ts",
@@ -656,7 +660,7 @@
       "specs": ["e2e/piece-sounds.spec.ts", "e2e/sound.spec.ts"]
     },
     "the FAQ and the legal pages": {
-      "paths": ["packages/app/src/faq/**", "packages/app/src/screens/Faq.tsx", "packages/app/src/screens/Legal.tsx"],
+      "paths": ["packages/app/src/faq/**", "packages/app/src/screens/Faq.tsx", "packages/app/src/screens/Legal.tsx", "packages/app/src/screens/legal-page.ts"],
       "specs": ["e2e/faq.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts"]
     },
     "the landing page, sign-in and the age gate": {
@@ -741,6 +745,7 @@
         "packages/app/src/squads.ts",
         "packages/app/src/squads-view.ts",
         "packages/app/src/screens/Squads.tsx",
+        "packages/app/src/screens/squads-exit.ts",
         "packages/app/src/screens/SquadsMatch.tsx",
         "packages/app/src/screens/SquadsParty.tsx",
         "packages/app/src/components/SquadsBlocks.tsx",

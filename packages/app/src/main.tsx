@@ -1,6 +1,7 @@
 import { render } from "preact";
 import "./board/pieces.css";
 import { App } from "./App.tsx";
+import { watchShell } from "./shell.ts";
 import { BanNotice } from "./components/FairPlay.tsx";
 import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
@@ -52,6 +53,8 @@ prepareAudio();
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, wakeAudio, { passive: true, capture: true });
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.
 startStatus();
+// (The shell in index.html goes as soon as #app draws anything but the splash: shell.ts.)
+watchShell();
 // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the
 // feedback sheet, from the match menu or Settings, and the maintenance banner, at the top, with the 1 v 1 search's bar
 // under it while you browse. A render error anywhere
