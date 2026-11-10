@@ -9453,12 +9453,13 @@ button.fd-logo {
 }
 /* The Quests entry, greyed (muted, not tappable) until quests are yours: a guest where sign-in is set up, or the account still loading. */
 .fd-top-quests:disabled,
-.fd-quests-btn:disabled {
+.fd-menu-item:disabled {
   opacity: 0.45;
   cursor: default;
 }
-.fd-quests-btn:disabled:active {
-  transform: none;
+.fd-menu-item:disabled:hover {
+  background: transparent;
+  color: var(--fd-off);
 }
 /*
  * The phone's top bar (Eric, Nov 10, undoing Nov 9's colors: "just make them all black, like the settings, just black and empty on
@@ -26357,54 +26358,6 @@ button.sq-tiny {
   font-size: 13px;
 }
 /* ---------------- (end of the friends overlay) ---------------- */
-/* Home's Quests entry: in your card's top right corner, over nothing, so home never moves for it. */
-.fd-hero {
-  position: relative;
-}
-.fd-quests-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 3;
-  height: 36px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px 0 9px;
-  border-radius: 999px;
-  border: 1.5px solid var(--fd-gold);
-  background: var(--fd-gold-soft);
-  color: var(--fd-gold-text);
-  font: 800 13px Archivo, system-ui, sans-serif;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.fd-quests-btn::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-}
-.fd-quests-btn:active {
-  transform: scale(0.97);
-}
-/*
- * A short card (a small phone: your pawn beside your tag, the card's own rule above): the entry is its icon alone, 36 px, and the
- * card keeps its corner free for it, so a long name ellipsizes before it rather than running under it.
- */
-@container fd-hero (max-height: 189px) {
-  .fd-has-quests .fd-hero-in,
-  .fd-home:not(.queueing) .fd-has-quests .fd-hero-in {
-    padding-right: 52px;
-  }
-  .fd-quests-btn {
-    width: 36px;
-    padding: 0;
-    justify-content: center;
-  }
-  .fd-quests-btn span {
-    display: none;
-  }
-}
 /* (The key is drawn across the middle of its square: a little bigger, so it reads beside the crate.) */
 .qo-thing .key-art svg {
   transform: scale(1.3);

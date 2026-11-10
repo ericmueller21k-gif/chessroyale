@@ -426,12 +426,14 @@ test("a computer's game screens: the side menu is on each; icons only below 1800
   test.setTimeout(12 * 60_000);
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await ctx.newPage();
-  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Shop & crates", "Profile", "Settings"];
+  // (Daily Quests (Eric, Nov 10): its tooltip says "Sign in for quests" while quests aren't yours.)
+  const items = ["Play", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"];
   const check = async (at: string, labels: boolean) => {
     const side = page.locator(".gm-frame > .fd-side");
     await expect(side, `${at}: the side menu`).toBeVisible();
     await expect(side.locator(".fd-menu-item"), `${at}: its items`).toHaveCount(items.length);
-    for (const name of items) await expect(side.getByRole("button", { name, exact: true }), `${at}: ${name}`).toHaveAttribute("title", name);
+    for (const name of items)
+      await expect(side.getByRole("button", { name, exact: true }), `${at}: ${name}`).toHaveAttribute("title", name === "Daily Quests" ? /^(Daily Quests|Sign in for quests)$/ : name);
     const w = (await side.boundingBox())!.width;
     const label = (await side.locator(".fd-menu-item > span:last-child").first().boundingBox())!;
     expect(Math.abs(w - (labels ? 232 : 80)), `${at}: the menu ${w} px wide`).toBeLessThanOrEqual(1);

@@ -328,7 +328,7 @@ export function App() {
    * Open the home screen's boss menu or Play with friends: the computer's side menu, or the hidden /bosses (Eric's way
    * straight to the solo boss picker, unlisted, not admin-gated; Oct 16). Used once: a match started clears it.
    */
-  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
+  const [homeIntent, setHomeIntent] = useState<{ kind: "boss" | "friends" | "quests"; n: number } | null>(() => (location.pathname === "/bosses" ? { kind: "boss", n: 0 } : null));
   /** The Boss raid screen (the Solo Boss Mode card on home, the side menu's Solo Boss Mode, ?mode=raid). */
   const [raidOpen, setRaidOpen] = useState(() => raidInUrl() || !!bossPartyLinkCode);
   /** That screen is the full one (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form (Eric, Oct 26). */
@@ -1509,6 +1509,12 @@ export function App() {
       goHome();
       setHomeIntent({ kind: "friends", n: Date.now() });
     },
+    // (Daily Quests, the computer's side menu (Eric, Nov 10): home, its quests overlay open.)
+    quests: () => {
+      goHome();
+      setRaidOpen(false);
+      setHomeIntent({ kind: "quests", n: Date.now() });
+    },
     shop: () => {
       goHome();
       setShowShop("shop");
@@ -1543,7 +1549,7 @@ export function App() {
       }
       setSideAsk({ exit: { ...e, go: () => { setSideNext({ page: k, from }); e.go(); } }, then: k });
     };
-    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
+    return { home: page("home"), chessTown: page("chessTown"), soloBoss: page("soloBoss"), friends: page("friends"), quests: page("quests"), shop: page("shop"), profile: page("profile"), settings: page("settings"), friendsList: page("friendsList") };
   };
   // The town's side menu (and its panel, and the global chat's sign-in): each page asks first. Chess Town itself doesn't.
   const townNav: FrontNav = {
@@ -1551,6 +1557,7 @@ export function App() {
     home: () => askLeave("Play", nav.home),
     soloBoss: () => askLeave("Boss Battle", nav.soloBoss),
     friends: () => askLeave("Play with friends", nav.friends),
+    quests: () => askLeave("Daily Quests", nav.quests),
     shop: () => askLeave("the Shop", nav.shop),
     profile: () => askLeave("your profile", nav.profile),
     settings: () => askLeave("Settings", nav.settings),
@@ -1656,7 +1663,7 @@ export function App() {
     },
     profile: () => openProfile({ you: true, name: account().profile?.user.name ?? "" }),
     ...Object.fromEntries(
-      (["chessTown", "soloBoss", "friends", "shop", "settings", "friendsList"] as const).map((k) => [
+      (["chessTown", "soloBoss", "friends", "quests", "shop", "settings", "friendsList"] as const).map((k) => [
         k,
         () => {
           if (keepInQueue() && stepOutOfLobby()) {

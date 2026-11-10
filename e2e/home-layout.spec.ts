@@ -637,12 +637,12 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   }
 });
 
-test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry opens the overlay over home, 2 dailies and the weekly, one reroll a day per daily, Got it and × close it, the entry reopens it; a phone's entry is in the top bar, a computer's on the card; at 320 px the top bar holds it in one row, every button 40 px, and the card fits", async ({ page }) => {
+test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry opens the overlay over home, 2 dailies and the weekly, one reroll a day per daily, Got it and × close it, the entry reopens it; a phone's entry is in the top bar, a computer's in the side menu (Daily Quests); at 320 px the top bar holds it in one row, every button 40 px, and the card fits", async ({ page }) => {
   await named(page, "Christopher Wallace");
   await page.goto("/?quests=boss-hunter,squad-up,regular:3");
   const quests = page.getByRole("dialog", { name: "Daily Quests" });
   // (A guest's day doesn't open it by itself: the entry does, once the quests are set.)
-  const entry = page.getByRole("button", { name: "Quests", exact: true });
+  const entry = page.getByRole("button", { name: /^(Daily )?Quests$/ });
   await expect(entry).toBeEnabled({ timeout: 20_000 });
   await expect.poll(async () => ((await (await page.request.get("/api/quests")).json()) as { quests: { name: string }[] }).quests.map((q) => q.name), { timeout: 20_000 }).toEqual(["Boss Hunter", "Squad Up", "Regular"]);
   await entry.click();
@@ -665,10 +665,14 @@ test("quests (Nov 9, phase 3; real quests set by ?quests=): the Quests entry ope
   for (const r of await rerolls.all()) await expect(r).toBeDisabled();
   await quests.getByRole("button", { name: "Got it" }).click();
   await expect(quests).toHaveCount(0);
-  // The entry: in the top bar on a phone (1 px from the shop's row), on your card's top right on a computer (1024 px and up).
+  // The entry: in the top bar on a phone (1 px from the shop's row); on a computer (1024 px and up) "Daily Quests" in the side menu,
+  // between Play with friends and Shop & crates, and nothing on your card (Eric, Nov 10).
   const computer = await page.evaluate(() => innerWidth >= 1024);
-  await expect(page.locator(computer ? ".fd-hero .fd-quests-btn" : ".fd-top .fd-top-quests")).toHaveCount(1);
-  await expect(page.locator(computer ? ".fd-top .fd-top-quests" : ".fd-hero .fd-quests-btn")).toHaveCount(0);
+  await expect(page.locator(".fd-hero button.fd-quests-btn, .fd-hero [aria-label=Quests]")).toHaveCount(0);
+  if (computer) {
+    await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(0);
+    await expect(page.locator(".fd-side .fd-menu-item")).toHaveText(["Play", "Chess Town", "Boss Battle", "Play with friends", "Daily Quests", "Shop & crates", "Profile", "Settings"]);
+  } else await expect(page.locator(".fd-top .fd-top-quests")).toHaveCount(1);
   await entry.click();
   await expect(quests).toBeVisible();
   await quests.getByRole("button", { name: "Close" }).click();
