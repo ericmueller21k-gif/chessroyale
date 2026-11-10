@@ -4,6 +4,9 @@ Found by flaky batch 3 (PR #597's body, "colosseum:42"): every page load spends 
 boss art (`packages/app/src/characters/*.ts`, built when the main bundle loads), before `load`. A phone likely pays more,
 on every open, for bosses it won't see. Eric's rule: less lag and simpler code over all else.
 
+Earlier (Nov 6, branch claude/lazy-boss-art, merged in 573685f): the opening library became its own chunk, loaded on first
+use. The boss art is still built eagerly: start from what that commit did for the pattern.
+
 ## The change
 1. **Measure first:** a load on a 4x-slowed phone (Playwright CPU throttle) and on desktop: time to `load` and to home's
    first paint, and a profile naming which modules' top-level work costs what. Write the numbers down.
@@ -20,5 +23,5 @@ Lane: targeted (shared app modules; the characters area). Effort high. Tests: th
 the boss kit (`packages/chess/test/boss-kit.test.ts` if it covers art), any unit tests for characters, colosseum:42, and
 `npx playwright test --grep @perf --project phone` (frame budgets). No sims. One set of stills only if anything looks
 different (it shouldn't). Decision note docs/decisions/2026-11-10-lazy-boss-art.md (≤ 120 words); update
-docs/areas/ for characters/bosses. Push to claude/lazy-boss-art at each real step; when done write .pr-body.md and push.
+docs/areas/ for characters/bosses. Push to claude/lazy-boss-art-2 at each real step; when done write .pr-body.md and push.
 Don't open the PR. Read CLAUDE.md, .claude/LESSONS.md and notes/briefs/rules-common.md (branch claude/director-notes) first.
