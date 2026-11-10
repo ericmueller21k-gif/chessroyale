@@ -25,7 +25,7 @@ import { friendsBadge, useFriends } from "../friends.ts";
 import { FriendsBadge } from "../components/Friends.tsx";
 import { noteLinkCopied } from "./Lobby.tsx";
 import { testParams, testSwitchesAllowed } from "../test-switches.ts";
-import { QuestsBarIcon, QuestsIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
+import { QuestsBarIcon, QuestsOverlay } from "../components/QuestsOverlay.tsx";
 import { BotLevelBox } from "../components/BotLevelBox.tsx";
 import { FriendsOverlay } from "../components/FriendsOverlay.tsx";
 import { questCountdowns, questsForYou, useQuests } from "../quests.ts";
@@ -548,7 +548,7 @@ export function HomeScreen({
   /** In the queue: draw the computer's column (your card, the chat) beside it. A phone shows only the queue. */
   side?: boolean;
   /** The computer's side menu (or /bosses) asked for the boss menu or Play with friends. */
-  intent?: { kind: "boss" | "friends"; n: number } | null;
+  intent?: { kind: "boss" | "friends" | "quests"; n: number } | null;
   /** The Boss raid screen is open (the Solo Boss Mode card, the side menu's Solo Boss Mode, ?mode=raid). */
   raid?: boolean;
   /** With `raid`: the full Boss raid screen (?mode=raid, the test link: every raid choice), not the Solo Boss Mode form. */
@@ -815,11 +815,14 @@ export function HomeScreen({
   const questsOn = questsForYou();
   // (Never opening by itself over the queue or another notice: it waits for the next home visit. Review of #575, m3.)
   const quests = useQuests(questsOn === true, queueing);
-  // (A computer (1024 px and up, the top bar hidden there) keeps the entry on your card's top right; a phone's entry is in the top bar.)
+  // (A computer's entry is Daily Quests in its side menu (Eric, Nov 10: FrontMenu.tsx); a phone's is in the top bar.)
+  useEffect(() => {
+    if (intent?.kind === "quests") quests.show();
+  }, [intent?.n]);
   const computer = useMedia("(min-width: 1024px)");
   const questsLabel = questsOn === false ? "Sign in for quests" : "Quests";
   const hero = (
-    <section class={`fd-hero${!queueing && computer ? " fd-has-quests" : ""}`} aria-label="You">
+    <section class="fd-hero" aria-label="You">
       {/* (A phone sizes your pawn to the room the card has. Home shows your tag above the pawn's head, centered (styles.css, `order`); the
           pawn comes first here, as the queue's small card has it beside the pawn.) */}
       <div class="fd-hero-in">
@@ -846,14 +849,6 @@ export function HomeScreen({
         </div>
       </div>
       </div>
-      {/* (The Quests entry (Nov 9): always there (nothing hidden; greyed until quests are yours), in the card's top right corner, over
-          nothing, so nothing on home moves. A computer only: a phone's is in the top bar.) */}
-      {!queueing && computer && (
-        <button type="button" class="fd-quests-btn" aria-label="Quests" title={questsLabel} disabled={questsOn !== true} onClick={quests.show}>
-          <QuestsIcon />
-          <span>Quests</span>
-        </button>
-      )}
     </section>
   );
   // The sheets and menus either view can open (and chat moderation's notice).

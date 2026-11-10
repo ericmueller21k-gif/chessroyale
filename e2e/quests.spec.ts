@@ -22,7 +22,8 @@ async function homeWith(page: Page, quests: string, names: string[]) {
 }
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Daily Quests" });
-const entry = (page: Page) => page.getByRole("button", { name: "Quests", exact: true });
+// (A phone's top-bar "Quests"; a computer's side-menu "Daily Quests", Nov 10.)
+const entry = (page: Page) => page.getByRole("button", { name: /^(Daily )?Quests$/ });
 
 test("the Quests button opens the server's quests (names, goals, progress, rewards, the countdowns); the reroll swaps a daily once a day (each its own) and the server keeps it", async ({ page }, testInfo) => {
   await homeWith(page, "squad-up:1,fifty-fifty,regular:3", ["Squad Up", "Fifty-Fifty", "Regular"]);
@@ -130,7 +131,7 @@ test("a guest where sign-in is set up: the Quests entry is there, greyed, \"Sign
   await page.goto("/");
   await page.getByRole("button", { name: "Play vs 99 bots as a guest" }).click();
   await expect(entry(page)).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator(".fd-top-quests, .fd-quests-btn").first()).toHaveAttribute("title", "Sign in for quests");
+  await expect(page.locator(".fd-top-quests, .fd-side [data-tour=quests]").first()).toHaveAttribute("title", "Sign in for quests");
   await expect(entry(page)).toBeDisabled();
 });
 

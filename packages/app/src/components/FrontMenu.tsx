@@ -10,6 +10,7 @@ import { Pic } from "../home-art/Pic.tsx";
 import { ARENA_TOWN_BADGE } from "../home-art/arena-town-badge.ts";
 import { MOUSE_LAYOUT } from "./MatchMenu.tsx";
 import { useMedia } from "./QuickChat.tsx";
+import { questsForYou } from "../quests.ts";
 
 /** Where the computer's side menu can take you. */
 export interface FrontNav {
@@ -19,6 +20,8 @@ export interface FrontNav {
   /** Solo Boss Mode: the solo boss screen (the tiles, the stage, Boss alone; Eric, Oct 26). */
   soloBoss: () => void;
   friends: () => void;
+  /** Daily Quests: home with its quests overlay open (Eric, Nov 10). */
+  quests: () => void;
   shop: () => void;
   profile: () => void;
   settings: () => void;
@@ -43,9 +46,9 @@ const crown = () => (
   </Icon>
 );
 
-function Item({ label, icon, on, tip, tour, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; tour?: string; onClick: () => void }) {
+function Item({ label, icon, on, tip, tour, title, disabled, onClick }: { label: string; icon: ComponentChildren; on?: boolean; tip?: boolean; tour?: string; title?: string; disabled?: boolean; onClick: () => void }) {
   return (
-    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} data-tour={tour} aria-current={on ? "page" : undefined} title={tip ? label : undefined} onClick={onClick}>
+    <button type="button" class={`fd-menu-item${on ? " on" : ""}`} data-tour={tour} aria-current={on ? "page" : undefined} title={title ?? (tip ? label : undefined)} disabled={disabled} onClick={onClick}>
       <span class="fd-menu-icon">{icon}</span>
       <span>{label}</span>
     </button>
@@ -59,6 +62,7 @@ function Item({ label, icon, on, tip, tour, onClick }: { label: string; icon: Co
 export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: FrontNav; game?: boolean }) {
   const p = account().profile;
   const tip = game;
+  const questsOn = questsForYou();
   return (
     <nav class="fd-side" aria-label="Menu">
       <Logo onClick={nav.home} />
@@ -78,6 +82,22 @@ export function SideMenu({ page, nav, game = false }: { page?: FrontPage; nav: F
               <path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
               <circle cx="17" cy="9" r="2.6" />
               <path d="M16 13.6c2.8.2 5 2.2 5 5" />
+            </Icon>
+          }
+        />
+        {/* (Daily Quests (Eric, Nov 10): the quests overlay, over home. Greyed until quests are yours, as the phone's top-bar button.) */}
+        <Item
+          tip={tip}
+          tour="quests"
+          label="Daily Quests"
+          title={questsOn === false ? "Sign in for quests" : tip ? "Daily Quests" : undefined}
+          disabled={questsOn !== true}
+          onClick={nav.quests}
+          icon={
+            <Icon>
+              <path d="M8 4H6.5A2.5 2.5 0 0 0 4 6.5v13A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5v-13A2.5 2.5 0 0 0 17.5 4H16" />
+              <rect x="8" y="2" width="8" height="4" rx="1.2" />
+              <path d="M8.5 13.2l2.3 2.3 4.2-4.4" />
             </Icon>
           }
         />
