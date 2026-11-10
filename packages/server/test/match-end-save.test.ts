@@ -152,6 +152,8 @@ async function lobbyOn(db: D1Database, rec: LobbyRecord) {
 
 async function world(n: number) {
   const { core, rec, ids } = raidToTheEnd(n);
+  // (One device scored and played the boss in this raid (unvouched): taken as a checked match's, so fair play's rows are written.)
+  delete rec.unvouched;
   const { sql, d1, db } = memoryDb();
   await ensureSchema(sql);
   rec.accounts = {};
