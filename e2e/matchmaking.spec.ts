@@ -142,17 +142,17 @@ test("Boss raid: its screen has the three types too (and Boss alone); a Solo rai
   await openBossRaid(page);
   // Each way of being matched is a choice of its own, with its line.
   // (The public queues are always a random boss: the Boss raid screen's pick is for the rest. boss-select.spec.ts.)
-  await expect(page.getByRole("button", { name: /^Join a raid/ })).toContainText(/Random boss · up to 50 players · bots after \d+ s/);
+  await expect(page.getByRole("button", { name: /^Join a Boss Battle/ })).toContainText(/Random boss · up to 50 players · bots after \d+ s/);
   await expect(page.getByRole("button", { name: /^People only/ })).toContainText("Random boss · no bots · starts at 50, or 10 after 8 s");
-  await expect(page.getByRole("button", { name: /^Raid with bots/ })).toContainText("You and 49 bots · starts at once");
+  await expect(page.getByRole("button", { name: /^Play with bots/ })).toContainText("You and 49 bots · starts at once");
   // Boss alone is still here (you against a boss you pick).
   await expect(page.getByRole("main").getByRole("button", { name: /^Boss alone/ })).toBeVisible();
   // The full count is on screen for only MATCHMAKING.soloHoldMs (0.9 s) before the match begins: less than the gap
   // between two of Playwright's looks (1 s), so it's watched for from before PLAY (.claude/LESSONS.md, "A melt the test
   // blinked through").
   const full = await watchFor(page, { fifty: { selector: ".fd-count-n", text: /^50$/ } });
-  await page.getByRole("button", { name: /^Raid with bots/ }).click();
-  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Solo");
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss Battle · Solo");
   await expect.poll(async () => (await full.seen()).fifty, { timeout: 6_000 }).toBe(true);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 30_000 });
   expect(await page.evaluate(() => (window as any).match.runner.state.players.filter((p: any) => p.isBot).length)).toBe(49);

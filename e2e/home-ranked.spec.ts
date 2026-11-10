@@ -191,11 +191,11 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   const main = page.getByRole("main");
   // The choices, in order, every word.
   await expect(main.locator(".rd-option")).toHaveText([
-    /^Join a raidRandom boss · up to 50 players · bots after \d+ s$/,
+    /^Join a Boss BattleRandom boss · up to 50 players · bots after \d+ s$/,
     /^People onlyRandom boss · no bots · starts at 50, or 10 after \d+ s$/,
-    "Raid with botsYou and 49 bots · starts at once",
+    "Play with botsYou and 49 bots · starts at once",
     "Boss aloneJust you vs a random boss",
-    "Play with friendsMake a raid and share its code, or join one",
+    "Play with friendsMake a Boss Battle and share its code, or join one",
   ]);
   await expect(main.locator(".rd-about")).toHaveText("Up to 50 of you pick the crowd's moves together against a boss. The most popular pick is played.");
   await expect(main.locator(".bs-tile canvas.bs-art").first()).toBeVisible();
@@ -203,18 +203,18 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   expect(await sideways(page)).toBe(0);
 
   // Join a raid: the raid's queue (Default); Cancel comes back to this screen.
-  await main.getByRole("button", { name: /^Join a raid/ }).click();
-  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50");
+  await main.getByRole("button", { name: /^Join a Boss Battle/ }).click();
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss Battle");
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   // People only: the raid's queue without bots, still in this test's own pool after Cancel put the address back to "/"
   // (Nov 9: it went to the server's shared queue, meeting whatever other tests had left there).
   const peopleOnly = page.waitForRequest((r) => r.method() === "POST" && r.url().includes("/api/play?") && r.url().includes("type=botsoff"));
   await main.getByRole("button", { name: /^People only/ }).click();
   expect(new URL((await peopleOnly).url()).searchParams.get("pool")).toBe(`raidscreen-${test.info().project.name}-${run}`);
-  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss raid · up to 50 · Bots off");
+  await expect(page.locator(".fd-queue-mode")).toHaveText("Boss Battle · Bots off");
   await page.getByRole("button", { name: "Cancel" }).click();
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   // Boss alone: its menu, the difficulty and the boss picked on the tiles (here "?": a random one).
   await main.getByRole("button", { name: /^Boss alone/ }).click();
   const menu = page.getByRole("dialog", { name: "Boss alone" });
@@ -225,7 +225,7 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   // Play with friends: a raid's lobby (and joining one by code).
   await main.getByRole("button", { name: /^Play with friends/ }).click();
   const sheet = page.getByRole("dialog", { name: "Play with friends" });
-  await expect(sheet.getByRole("button", { name: "Create a raid" })).toBeVisible();
+  await expect(sheet.getByRole("button", { name: "Create a Boss Battle" })).toBeVisible();
   await expect(sheet.getByLabel("Lobby code")).toBeVisible();
   await sheet.getByRole("button", { name: "Close" }).click();
   // Back: home, the RANKED row.
@@ -234,8 +234,8 @@ test("the Boss raid screen (?mode=raid, every choice): each choice reaches its f
   // Raid with bots: you and 49 bots, in your browser (Solo), against a boss. (Its queue shows for a moment only:
   // watched for from before the tap.)
   await openBossRaid(page);
-  const solo = await watchFor(page, { queue: { selector: ".fd-queue-mode", text: /^Boss raid · up to 50 · Solo$/ } });
-  await main.getByRole("button", { name: /^Raid with bots/ }).click();
+  const solo = await watchFor(page, { queue: { selector: ".fd-queue-mode", text: /^Boss Battle · Solo$/ } });
+  await main.getByRole("button", { name: /^Play with bots/ }).click();
   await expect.poll(async () => (await solo.seen()).queue, { timeout: 30_000 }).toBe(true);
 });
 
@@ -250,7 +250,7 @@ test("the hidden /bosses opens the solo boss picker straight away (a player too)
   await menu.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await page.goto("/?mode=raid");
-  await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back", exact: true }).click();
   await expect(page.getByRole("radiogroup", { name: "RANKED" })).toBeVisible();
   expect(new URL(page.url()).search).toBe("");

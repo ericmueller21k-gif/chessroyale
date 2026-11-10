@@ -194,7 +194,7 @@ export function QueueScreen({
       : (filled || bots > 0) && !isRankedMatch(seats.length - bots, size)
         ? `Unranked: fewer than ${rankedMinHumans(size)} real players`
         : null;
-  const modeName = raid ? "Boss Battle · up to 50" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
+  const modeName = raid ? "Boss Battle" : match.settings.mode === "classic" ? `Classic · ${size} players` : "Crowd · 50 v 50";
   const exit = useQueueExit(onCancel, onAway, filled);
   return (
     <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
@@ -294,7 +294,7 @@ export function QueueLine({ raid, waitSeconds, onCancel, title, seats }: { raid:
     <div class={`fd-page fd-queue${raid ? " raid" : ""}`}>
       <header class="fd-page-head">
         <BackButton onClick={onCancel} label="Leave the queue" />
-        <h1 class="fd-queue-mode">{title ?? (raid ? "Boss Battle · up to 50" : "Crowd · 50 v 50")}</h1>
+        <h1 class="fd-queue-mode">{title ?? (raid ? "Boss Battle" : "Crowd · 50 v 50")}</h1>
         <span class="fd-queue-mute">
           <MuteButton />
         </span>
