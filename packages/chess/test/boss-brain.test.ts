@@ -235,6 +235,21 @@ describe("the boss's move with a Maia brain (bossMoveFrom)", () => {
     expect(await slip()).toBe(await slip());
   });
 
+  it("an online move at a strength with a seed (BOSS_CHECK, the review's m1): drawn from the top moves with it, never UCI_LimitStrength's own draw; two devices agree, and the guard still holds", async () => {
+    const seeded = (seed: number) => bossMoveFrom(scripted("a2a4"), START_FEN, 1400, 1000, "elo", mulberry32(seed), [5, 15], undefined, null, undefined, null, null, true);
+    const counts = new Map<string, number>();
+    for (let seed = 1; seed <= 200; seed++) {
+      const move = await seeded(seed);
+      expect(await seeded(seed)).toBe(move);
+      counts.set(move, (counts.get(move) ?? 0) + 1);
+    }
+    // (Stockfish's own pick at a strength, a2a4 here, is never asked for; a draw past the guard, 10 points, gives way to a slip.)
+    expect([...counts.keys()].sort()).toEqual(["c2c4", "d2d4", "e2e4", "g1f3"]);
+    expect(counts.get("e2e4")).toBeGreaterThan(counts.get("c2c4")!);
+    // (No seed: Stockfish at a strength, as before.)
+    expect(await bossMoveFrom(scripted("d2d4"), START_FEN, 1400, 1000, "elo", Math.random, [5, 15])).toBe("d2d4");
+  });
+
   it("the full guard turns Maia's blunder down for its next likely move", async () => {
     let note: BrainNote | null = null;
     const move = await bossMoveFrom(scripted(), START_FEN, 1400, 1000, "elo", Math.random, [5, 15], undefined, null, {
