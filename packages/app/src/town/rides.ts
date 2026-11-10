@@ -250,8 +250,24 @@ export class Rider {
     }
     return jobs;
   }
-  /** The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between). */
+  /**
+   * Composes its frames all at once, not one an animation frame: your own rider as the town opens, before its first frame (Eric, Nov
+   * 10: "your rider doesnt appear for a few seconds"; Town.tsx `readyYou`). Asked for as it's made, before its drawing has loaded.
+   */
+  hurry(): void {
+    this.fast = true;
+  }
+  private fast = false;
+  /**
+   * The jobs, one an animation frame: each puts down what the one before made, then makes its own (its images decode in between).
+   * Hurried (`hurry`): every job's pictures made and decoded together, then all put down in one go (about 0.1 to 0.3 s of work at once).
+   */
   private async compose(jobs: Job[]): Promise<void> {
+    if (this.fast) {
+      const all = await Promise.all(jobs.map((j) => Promise.all(j.make().map(svgImage))));
+      if (!this.dead) jobs.forEach((j, i) => j.done(all[i]!));
+      return;
+    }
     await nextFrame();
     if (this.dead || !jobs.length) return;
     let next = Promise.all(jobs[0]!.make().map(svgImage));
