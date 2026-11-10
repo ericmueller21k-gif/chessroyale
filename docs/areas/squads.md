@@ -365,7 +365,11 @@ plays, ties). The calls are in `DECISIONS.md`, "Squads, phase 2".
   row (mode "squads", placement 1, 2, 3 or 5 of 8 squads) if signed in, and `SQUADS_LOBBY.rewards` (coins into the
   wallet, crates of the newest series since Nov 9, each opened with a crate key) if still playing their seat. Nothing in
   a test lobby or after a test control. At least once (Nov 6): each stays in the record until written (retried every minute;
-  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`).
+  the lobby keeps its code up to 24 h for it), and pays once (ledger key `squads:<code>:<made>:<ledger id>`). **One party's word
+  (Nov 10):** a lobby of only one party and bots, or one where a party's devices answered bot work with no other party's up
+  (`SquadsRecord.unvouched`), pays no coins or crates and its XP as a solo game's; at most `SQUADS_LOBBY.rewardsPerDay` (5)
+  paying lobbies a UTC day per account (checked as it's written; past it the placement is sent again with nothing). The
+  placement says why (`placed.why`, `NO_REWARD` in Squads.tsx). docs/decisions/2026-11-10-boss-and-lone-devices.md.
 - **Test controls** (Eric). Admins (ADMIN_EMAILS), or anyone where the Worker variable SQUADS_TEST is "1" (local and
   e2e, never production), while `SQUADS_LOBBY.testControls` is on (`squadsTestAllowed`): `nextRound` in a lobby (the
   rules' `endByMaterial` on the earliest round's matches, the next round 3 s later; in the votes: they close), and a

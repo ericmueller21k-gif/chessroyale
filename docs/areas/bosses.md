@@ -81,6 +81,10 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `bossBrainFor`'s `alone`; Eric, Oct 18: Hardest was way too easy; docs/decisions/2026-10-18-boss-alone-difficulty.md).
   Before a battle a boss has one number on screen: Boss alone's level at your difficulty, in Boss alone's menu (`bossAloneElo` in `boss-difficulty.ts`; the raids show none:
   docs/decisions/2026-10-17-boss-sheet-fit.md). The Boss Battle screen's stage shows only the difficulty's name and five dots. **START there skips the old Boss alone confirm menu** (Oct 29), which showed your rating, the boss's level with "+N vs you", its skulls and its powers line; those are gone from that path (the full `?mode=raid` screen and `/bosses` still open the menu). START fetches Maia's files ahead as that menu did when it opened.
+- **Who plays the boss online** (Nov 10; `BOSS_CHECK`): his own move and the funhouse's are played by the host's device and a
+  second one with one seed, and played only when they match, or the engine server finds it the better of the two (a host can't
+  throw the battle); alone, the host's plays and the match pays as a solo game. His powers' picks are still the host's, checked
+  by their rules. [engine.md](engine.md), "Two devices play each online boss move".
 - **The brain (Oct 12: every boss on Maia; DECISIONS.md, "Every boss on Maia"):** every boss plays its normal moves
   with **Maia-3** (a human-like model, a separate AGPL program in its own worker: `packages/maia-worker/`), no guard,
   at a Maia rating for its level (its strength, plus a crowd's margin), clearly favored in plain chess (Eric, Oct 12:

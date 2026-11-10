@@ -239,6 +239,23 @@ describe("the boss's move, played by two devices with one seed (the review's lyi
     expect(L.core.record.unvouched).toMatch(/differently/);
   });
 
+  it("a junk answer (a move the turn can't play) gets its device a strike and is dropped: the other's stands alone, unvouched", () => {
+    const L = raid();
+    twoPeople(L);
+    untilBoss(L);
+    const key = L.core.record.bossKey!;
+    const r = L.last("p1", "bossRequest")!;
+    const move = honestMove(r.fen, r.allowed ?? legalMoves(r.fen));
+    L.core.record.unvouched = undefined;
+    L.core.message("p2", { t: "bossMove", key, move: "a1a8" });
+    expect(L.core.record.judges!.devices.p2!.strikes).toBe(1);
+    expect(L.core.record.bossCheck!.answers).toEqual({});
+    L.core.message("p1", { t: "bossMove", key, move });
+    L.advance(BOSS_CHECK.waitMs + 100);
+    expect(L.last("p2", "boss")!.boss.lastMove!.move).toBe(move);
+    expect(L.core.record.unvouched).toMatch(/no second device/);
+  });
+
   it("the checker silent: the host's move waits BOSS_CHECK.waitMs, then plays alone (unvouched); a stranger's answer counts for nothing", () => {
     const L = raid();
     twoPeople(L);

@@ -54,7 +54,8 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
   prefers a connected computer over a phone); its boards are checked for shape (`hostBoardOk`: legal moves, chances
   0 to 1, every pick and bot scored), and one that doesn't hold together scores every pick the same. The values of a
-  board that does are still the host's word (ROADMAP). A judge answering alone (its partner past the grace) is
+  board that does are still the host's word (ROADMAP), so a match where the host scored a round alone (or two judges' dispute
+  had no verdict) pays as a solo game and isn't ranked (`LobbyRecord.unvouched`, Nov 10). A judge answering alone (its partner past the grace) is
   spot-checked, not cross-checked. Knocked-out players'
   devices keep judging while their page is open.
 - **The Crowd's and Squads' bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md): Stockfish-style at the
@@ -119,6 +120,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     them), and the admins' debug line says "pick replaced (not allowed)"; the runner's `applyBossMove` (solo and the
     server) plays the first allowed move for anything else a host sends, and logs it. Every power × brain path is tested
     (`packages/chess/test/boss-power-legal.test.ts`).
+  - **Two devices play each online boss move** (Nov 10, `BOSS_CHECK`; docs/decisions/2026-11-10-boss-and-lone-devices.md): his own
+    move and the funhouse's go to the host and a checker (a judging device, computers first) with one seed (`bossRequest.draw`: the
+    random source and Maia's draw, the box's Seed option). The same move plays; two differ: the engine server scores both (one
+    search), the better for him plays, and a device 40 points or more worse gets a strike; nobody to ask, or no verdict: the
+    host's, and the match is unvouched (pays as a solo game). `packages/server/test/boss-check.test.ts`.
   - **The landing guard** (Oct 17; docs/decisions/2026-10-17-alfil-sees-the-landing.md; Eric: "can we make the engine
     think, the turn before the pieces land, that they're there?"): on Alfil's move just before his Mammoth Slam's pieces
     land (`landsAfterHisMove`), his moves still come from the board as it is, but `bossMoveFrom`'s `ahead` judges them

@@ -1744,10 +1744,30 @@ export class LobbyCore {
     return runner.boards.get(runner.state.boards[0]!)!.fen;
   }
 
-  /** A device's answer to a checked boss move: the host's or the checker's (anyone else's is ignored), once each. */
+  /** A move the boss's turn may play: one the turn allows (the funhouse's: the crowd's), or one his rules play as another (Wrangler's long pull). */
+  private bossMoveOk(move: string): boolean {
+    const runner = this.runner!;
+    const fen = this.bossFen();
+    if (this.r.bossKind === "funhouse") return (runner.crowdAllowed() ?? legalMoves(fen)).includes(move);
+    const legal = runner.bossAllowed() ?? legalMoves(fen);
+    if (legal.includes(move)) return true;
+    const boss = runner.state.boss;
+    const special = boss?.powers ? (bossRules(boss)?.specialMove?.(boss, fen, move) ?? null) : null;
+    return !!special && legal.includes(special.play);
+  }
+
+  /**
+   * A device's answer to a checked boss move: the host's or the checker's (anyone else's is ignored), once each. One the turn
+   * can't play is junk: its device gets a strike and the answer is dropped (the other's then stands alone, unvouched).
+   */
   private bossAnswer(playerId: string, move: string, extras: BossExtras) {
     const c = this.r.bossCheck!;
     if ((playerId !== this.r.hostId && playerId !== c.checker) || c.answers[playerId] || c.server) return;
+    // (With nobody to compare it with, it goes to the runner as ever: its first allowed move in place of one it can't play.)
+    if (c.checker && !this.bossMoveOk(move)) {
+      this.strike(playerId, `a boss move the turn can't play (${move.slice(0, 12)})`);
+      return;
+    }
     c.answers[playerId] = { move, extras };
     if (c.firstAt === undefined) {
       c.firstAt = this.io.now();
