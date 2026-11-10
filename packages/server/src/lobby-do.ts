@@ -192,8 +192,9 @@ export class Lobby extends DurableObject<Env> {
   /**
    * Writes the results waiting (MATCH_SAVE.perWake of them, oldest first: the next ones on a wake a second later), each taken out
    * of the record, and the record stored, only once it's written. Every write is keyed (writeResult), so a write the room stopped
-   * after, before storing that it did, writes nothing twice when it's tried again. A failure stops there: it and those after it
-   * wait for the next try (MATCH_SAVE.retrySeconds), and the ops page hears of it. One at a time. True: none failed.
+   * after, before storing that it did, writes nothing twice when it's tried again. One that fails goes to the back of the queue (so
+   * one that keeps failing never holds up the others), and the ops page hears of it; when none of a wake's went in (D1 down), the
+   * next try is MATCH_SAVE.retrySeconds on. One at a time. True: none failed.
    */
   private writeResults(): Promise<boolean> {
     if (!this.writing) this.writing = this.writeSome().finally(() => (this.writing = null));
@@ -204,7 +205,11 @@ export class Lobby extends DurableObject<Env> {
     const rec = this.record;
     if (!rec?.saveQueue?.length || !this.env.DB) return true;
     let written = 0;
-    let ok = true;
+    let failure: unknown = null;
+    const take = (p: PendingResult) => {
+      const i = rec.saveQueue!.indexOf(p);
+      if (i >= 0) rec.saveQueue!.splice(i, 1);
+    };
     try {
       const sql = d1Sql(this.env.DB);
       await ensureSchema(sql, this.env.DB);
@@ -213,25 +218,27 @@ export class Lobby extends DurableObject<Env> {
       for (const p of rec.saveQueue.slice(0, MATCH_SAVE.perWake)) {
         try {
           await writeResult(how, rec, p);
+          take(p);
+          written++;
         } catch (e) {
+          failure = e;
           p.tries = (p.tries ?? 0) + 1;
-          throw e;
+          take(p);
+          rec.saveQueue.push(p);
         }
-        const i = rec.saveQueue.indexOf(p);
-        if (i >= 0) rec.saveQueue.splice(i, 1);
-        written++;
       }
-      this.saveRetryAt = 0;
     } catch (e) {
-      ok = false;
-      this.saveRetryAt = Date.now() + MATCH_SAVE.retrySeconds * 1000;
-      countCall("lobby.saveFailed");
-      console.log(`lobby ${rec.code}: ${rec.saveQueue?.length ?? 0} results not written yet, kept to try again (${String(e)})`);
-      serverError(this.env, { kind: "Lobby.saveResults", route: "Lobby.saveResults", code: rec.code }, e, (p) => this.ctx.waitUntil(p));
+      failure = e;
     }
+    if (failure !== null) {
+      countCall("lobby.saveFailed");
+      console.log(`lobby ${rec.code}: ${rec.saveQueue?.length ?? 0} results not written yet, kept to try again (${String(failure)})`);
+      serverError(this.env, { kind: "Lobby.saveResults", route: "Lobby.saveResults", code: rec.code }, failure, (p) => this.ctx.waitUntil(p));
+    }
+    this.saveRetryAt = failure !== null && !written ? Date.now() + MATCH_SAVE.retrySeconds * 1000 : 0;
     // (Not once the lobby has closed, or a new one has its code. A store that fails: written again next time, writing nothing more.)
-    if ((written || !ok) && this.record === rec) await this.store(rec).catch(() => undefined);
-    return ok;
+    if ((written || failure !== null) && this.record === rec) await this.store(rec).catch(() => undefined);
+    return failure === null;
   }
 
   /** Anyone connected right now: an open socket that has said hello (leaving out one that's closing). */
@@ -695,7 +702,8 @@ export interface SaveContext {
  * them in review), then their XP, then the result row with its rating (one batch), the Welcome Crate and a boss battle's token.
  * Every write is keyed to this lobby (its code and creation), so writing it again (a retry, a restart) adds nothing: fair play's row
  * and the result once per lobby (`since`), XP and rewards by their ledger keys. A failure throws (the caller keeps it to try again),
- * except that XP, the Welcome Crate and the token stop holding the result up after MATCH_SAVE.strictTries tries (then logged).
+ * except that fair play, XP, the Welcome Crate and the token stop holding the result up after MATCH_SAVE.strictTries tries (then
+ * logged): a lasting bug in one of them never costs the result.
  */
 export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingResult): Promise<void> {
   const since = rec.createdAt;
@@ -708,7 +716,7 @@ export async function writeResult(c: SaveContext, rec: LobbyRecord, p: PendingRe
       return fallback;
     });
   const moves = rec.fair?.[p.playerId] ?? [];
-  if (moves.length) await recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail);
+  if (moves.length) await soft("fairPlay", recordFairPlay(c.sql, p.userId, { lobby: rec.code, mode: c.mode, moves, since }, p.at, c.mail), null);
   // (A player in review, or banned, has their results held off ranking until they're cleared.)
   const held = !(await eligibleForRanked(c.sql, p.userId));
   // XP (Nov 9): decided from this room's own count and clock, granted once (keyed by this match), kept on the result row for the result

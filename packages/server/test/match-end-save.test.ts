@@ -247,6 +247,30 @@ describe("a match's end: saved once, a few players a wake, a failure kept and re
     expect(w.count("results")).toBe(2);
   }, 60_000);
 
+  it("one result that keeps failing never holds up the others; after MATCH_SAVE.strictTries its fair play stops holding it up", async () => {
+    const w = await world(3);
+    const bad = w.rec.accounts!.p2!;
+    // Fair play's row always fails for one player (a lasting bug, say); everything else works.
+    const real = w.counting.db.prepare.bind(w.counting.db);
+    (w.counting.db as { prepare: unknown }).prepare = (q: string) => {
+      const st = real(q);
+      if (!/^\s*INSERT INTO fairplay_matches/.test(q)) return st;
+      return { ...st, bind: (...p: unknown[]) => (p[0] === bad ? { first: async () => Promise.reject(new Error("a lasting bug")) } : st.bind(...p)) };
+    };
+    w.lobby.queueResults(w.core, w.rec);
+    expect(await w.lobby.writeResults()).toBe(false);
+    // The other two went in; the failing one waits at the back.
+    expect(w.count("results")).toBe(2);
+    expect(w.rec.saveQueue!.map((p) => [p.userId, p.tries])).toEqual([[bad, 1]]);
+    for (let i = 1; i < MATCH_SAVE.strictTries; i++) expect(await w.lobby.writeResults()).toBe(false);
+    expect(w.count("results")).toBe(2);
+    // Tried MATCH_SAVE.strictTries times: its result goes in without its fair play row (logged).
+    expect(await w.lobby.writeResults()).toBe(true);
+    expect(w.rec.saveQueue).toEqual([]);
+    expect(w.count("results")).toBe(3);
+    expect(w.count("fairplay_matches")).toBe(2);
+  }, 60_000);
+
   it("a result written late (a retry, hours on) never puts an older rating back: the rating is the latest counting result's", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);

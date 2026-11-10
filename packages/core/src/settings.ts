@@ -2489,8 +2489,8 @@ export const LOBBY_LIFE = {
  * fair play, XP and rewards wait in the lobby's record (`saveQueue`) until written, each write keyed so a retry or a restart writes
  * nothing twice. At most `perWake` players are written per wake (about 20 D1 calls each: far under D1's 1,000 queries per
  * invocation), the next ones a second later. A failed write is tried again every `retrySeconds`, and the lobby waits to close for it
- * up to `retryHours` past its closing time (then it closes, and says so on the ops page). XP, the Welcome Crate and boss tokens
- * stop holding a result up after `strictTries` failed tries (logged): a lasting bug in one never blocks the result.
+ * up to `retryHours` past its closing time (then it closes, and says so on the ops page). Fair play, XP, the Welcome Crate and boss
+ * tokens stop holding a result up after `strictTries` failed tries (logged): a lasting bug in one never blocks the result.
  */
 export const MATCH_SAVE = {
   perWake: 20,
