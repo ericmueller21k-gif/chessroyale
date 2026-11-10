@@ -1,8 +1,8 @@
 # Delta review: PR #611's fix round (read-only)
 
-The first review is `review.md` on orphan branch `review/fable-b3`. The fixes are commits e6976a3..c87ce56 on claude/fable-b3
-(`git diff a64a605 c87ce56`), explained in `.review-fixes.md` at c87ce56 (`git show c87ce56:.review-fixes.md`); the branch head
-has since merged main. Read CLAUDE.md, the first review, and that diff.
+The first review is `review.md` on orphan branch `review/fable-b3`. The fixes are commits e6976a3..a5dcf2e on claude/fable-b3
+(`git diff a64a605 a5dcf2e`), explained in `.review-fixes.md` at f1fa9d8 (`git show f1fa9d8:.review-fixes.md`); the branch head
+has since merged main. (A first delta reviewer was stopped early; if `delta.md` already exists on review/fable-b3, replace it.) Read CLAUDE.md, the first review, and that diff.
 
 Check only: does each fix do what `.review-fixes.md` says, and does it introduce a new problem? In particular:
 - B1: can a liar now claim `by: "maia"` to get a bad move played unstruck (anything short of 0.8 a move, every move)? What does
