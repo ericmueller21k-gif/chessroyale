@@ -3455,9 +3455,9 @@ export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
    * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
-   * whatever this says; the automated reviewer bans only a case at the ban bar (`levels`). "review" since Nov 10 (the
-   * outside review, finding 3: its evidence is the judges' numbers, which devices send): automatic bans stay off until
-   * Eric turns them back on (docs/decisions/2026-11-10-rewards-and-records.md).
+   * whatever this says; the automated reviewer never bans. "review" since Nov 10 (the outside review, finding 3: its
+   * evidence is the judges' numbers, which devices send): automatic bans stay off until Eric turns them back on, after the
+   * deep re-check's own facts land (ROADMAP.md, fair play; docs/decisions/2026-11-10-rewards-and-records.md).
    */
   enforcement: "review" as "watch" | "review" | "ban",
   reports: {

@@ -1,9 +1,9 @@
 # Rewards and records (Nov 10)
 
-The outside review's batch 2. Calls made:
-- Fair play only flags (`enforcement: "review"`) until Eric turns bans back on; the deep re-check scores every legal move.
-- The reviewer's token bans only at the ban bar, and reads no email.
-- Engine routes: accounts only, 200 calls a day each (new D1 table `engine_calls`); solo at most 1000 of the 3000.
-- A match's end: queued, keyed, 20 players a wake, retried 24 h (1 v 1 too). Not one batch per player: XP must land
-  before the result row that stores it.
-- Welcome Crate: solo games count with 3 server-timed minutes; idle timers still count (items aren't traded).
+The outside review's batch 2, and its review's fixes. Calls made:
+- Bans stay off (`enforcement: "review"`) until the deep re-check keeps its own facts (ROADMAP.md, fair play). The reviewer's
+  token never bans or reads email; it can still put an account in review, out of ranked until a person clears it.
+- Deep re-check: every legal move; outside review, 8 moves a match.
+- Engine routes: accounts only, 200 calls a day; solo at most 1000 searches, never over a third of the day's.
+- A match's end: queued, keyed, written in the background, retried 24 h; rewards stop holding a result after 30 minutes.
+- Welcome Crate: a solo game counts with 10 moves and 60 server-timed seconds.

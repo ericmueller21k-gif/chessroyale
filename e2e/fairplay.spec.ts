@@ -16,10 +16,10 @@ test("a banned account: PLAY, a new lobby and an invite show the ban notice with
 
   // The reviewer's API: a decision needs a written reason.
   expect((await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban" } })).status()).toBe(400);
-  // The reviewer can't ban a case below the ban bar (the outside review's finding 6): a person can.
+  // The reviewer's token never bans (the outside review's finding 6; its review's M1): a person does.
   const refused = await page.request.post(`/api/admin/fairplay/cases/${id}/decision`, { headers: REVIEW, data: { decision: "ban", reason: "e2e: a banned account" } });
   expect(refused.status()).toBe(409);
-  expect(((await refused.json()) as { message: string }).message).toMatch(/^a ban needs the ban bar/);
+  expect(((await refused.json()) as { message: string }).message).toMatch(/^a ban is for a person/);
   const adminCtx = await browser.newContext();
   const adminPage = await adminCtx.newPage();
   await adminPage.goto("/?debug");

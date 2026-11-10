@@ -36,8 +36,9 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   fair play's), which checks first: not sent, "no answer", one log line. `/api/engine/score` answers 400 for one,
   before the day's budget; fair play's deep re-check passes one over. `/api/engine/score` and `/api/engine/ping` answer only an
   account (signed in where sign-in is set up; 401), `ENGINE_SERVER.perAccountDaily` (200) calls a UTC day each (D1 `engine_calls`,
-  `engine-calls.ts`; then 429), and solo's searches stop at `ENGINE_SERVER.soloDailySearches` (1000) of the day's 3000 (the row
-  `<day>:solo`), so matches keep the rest (Nov 10, the outside review's finding 4). Every refusal: the device re-checks itself. `engine/server.mjs` has no copy of the rules
+  `engine-calls.ts`; then 429), and solo's searches stop at `ENGINE_SERVER.soloDailySearches` (1000), never over `soloShare` (a third)
+  of the day's 3000 (the row `<day>:solo`), so matches keep the rest (Nov 10, the outside review's finding 4). Every refusal: the
+  device re-checks itself, and after a 401, 404 or 429 asks nothing more that game (`app/src/engine.ts`). `engine/server.mjs` has no copy of the rules
   (only the Worker can reach it). Its own Stockfish (17.1) is checked against the same rules in CI (DECISIONS.md, "The
   engine server's own Stockfish, checked in CI", Oct 15): `.github/workflows/engine-container.yml` builds the image
   and sends it every case in `packages/chess/test/stockfish-refuses-cases.ts` through `server.mjs`; each one

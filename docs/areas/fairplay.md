@@ -65,7 +65,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **A ban needs the deep re-check:** a flagged player's counted moves searched again on the engine server (its own
   instance, `fairplay-1`, its own daily budget, from the Worker's schedule: cases in review at once, the rest
   off-peak), over every legal move in groups of at most 8 (`moveGroups`, as 1 v 1's check), never the judges' list, which a device
-  sent (Nov 10). The judges' quick numbers can open a review, never a ban. **Detection only flags since Nov 10**
+  sent (Nov 10); a position's whole budget taken before its first search, and outside a review a match only as far as
+  `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection only flags since Nov 10**
   (`FAIRPLAY.enforcement: "review"`, the outside review's finding 3): no automatic bans until Eric turns them back on. A move in a position Stockfish refuses is
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
@@ -80,7 +81,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   only while their case is open (watch or review) or an appeal of a ban is waiting (purgeEvidence's rule).
 - **The review page** `/admin/fairplay` (admins only, `ADMIN_EMAILS`) and the reviewer's API `/api/admin/fairplay/*`
   (a bearer token, `FAIRPLAY_REVIEW_TOKEN`). Every decision goes in the case's log with who and why; the automated
-  reviewer never decides appeals nor changes a ban, bans only a case at the ban bar (`playerLevel` "ban"; 409 otherwise), and
+  reviewer never bans (409: a ban is a person's), decides appeals nor changes a ban, and
   reads no email: admins are "admin", typed addresses "[email]" (`forReviewer`; Nov 10). A player's page also has chat moderation's section (warn, chat
   ban, lift, reset the name and icon; admins only: [chat.md](chat.md), "Moderation"), and a box on the list opens any
   player's page by id or profile link.

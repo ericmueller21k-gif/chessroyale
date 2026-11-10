@@ -29,6 +29,9 @@ on Eric's account.
    `reports/fairplay.md`), appeals for a person, ban emails, the review page (`/admin/fairplay`) and an API for an
    automated reviewer (`docs/fairplay-reviewer.md`). Next: refit the evidence model from real cleared players; block
    disposable email domains and add Cloudflare Turnstile (free) on email sign-in against scripted sign-ups.
+   - **Before Eric turns bans back on** (`enforcement` "review" since Nov 10; the reviewer's token never bans): the deep re-check
+     keeps its own facts per move (second-best gap, best expected score, the crowd recounted against its scores), `skipReason` and
+     `matchSignals` prefer them, and the ban bar's strength comes from deep losses (the review of PR #610, M1 steps 1-3).
 7. **Coins, icons and emotes.** Coins for doing well (placement, surviving cuts, a good move streak, daily first match),
    spent on cosmetic things only: profile icons, emotes to send during a match, board and piece themes, name colors.
    Nothing that changes play: no power-ups, no hints, no extra time. Earned only, not bought, unless Eric decides
