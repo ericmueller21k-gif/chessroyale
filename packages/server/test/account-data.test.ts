@@ -151,7 +151,7 @@ const SCHEMA_COLUMNS: Record<string, string> = {
   quest_days: "user_id day week reroll_day nonce",
   quest_games: "user_id game attempt at",
   quest_progress: "quest_id user_id game at",
-  quests: "id user_id period kind target assigned_at slot done_at",
+  quests: "id user_id period kind target assigned_at slot done_at rerolled_day",
   queue_waits: "id mode at players wait_ms",
   ranked_1v1: "user_id rating rd games wins losses draws ladder last_game last_at coin_day coin_games peak streak",
   ranked_1v1_games: "id white_id black_id control result reason moves times started_at ended_at checked nonce white_points black_points",

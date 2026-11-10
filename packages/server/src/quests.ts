@@ -37,8 +37,11 @@ import { cond, leg, type Cond, type LedgerAccount, type Op } from "./ledger.ts";
  *   - **Completion** (op `quest:<kind>:<quest id>:<ledger id>`, reason "quest", in that same batch): its guard counts the progress in
  *     the same transaction, so the game that brings it to its target pays it, once; two games at once, two tabs or a replay can't pay
  *     it twice. Its legs (XP, crates of XP.rewardCrate, keys) name the game as their source, so that game's result answers it.
- *   - **The reroll** (POST /api/quests/reroll): one a day (`quest_days.reroll_day`), an unfinished daily only, swapped for a quest of
- *     the pool you don't hold, its progress gone; claimed with a nonce as the deal is, so two taps or two tabs reroll once.
+ *   - **The reroll** (POST /api/quests/reroll; Eric, Nov 10: one per daily, not one per day): each unfinished daily has its own free
+ *     reroll a day, swapped for a quest of the pool you don't hold, its progress gone. The replacement keeps the slot and is marked
+ *     with the day (`quests.rerolled_day`), so it can't be rerolled again that day; tomorrow it can. The swap goes in only while the
+ *     old quest is still there, so two taps or two tabs reroll a quest once. (`quest_days.reroll_day`, the shared reroll's day before
+ *     Nov 10, is no longer written.)
  */
 export const QUESTS_SCHEMA = [
   // An account's quests: dailies and the weekly, dealt (`assigned_at`: the XP day or week it was dealt), finished (`done_at`).
@@ -72,7 +75,8 @@ export const QUESTS_SCHEMA = [
     at INTEGER NOT NULL,
     PRIMARY KEY (user_id, game)
   )`,
-  // Per account: the XP day and week last dealt, the day of the last reroll, and the nonce of the attempt that last claimed either.
+  // Per account: the XP day and week last dealt, and the nonce of the attempt that last claimed one. (`reroll_day`: the day of the
+  // shared reroll, before Nov 10; no longer written.)
   `CREATE TABLE IF NOT EXISTS quest_days (
     user_id TEXT PRIMARY KEY,
     day INTEGER NOT NULL,
@@ -81,6 +85,12 @@ export const QUESTS_SCHEMA = [
     nonce TEXT NOT NULL
   )`,
 ];
+
+/**
+ * Columns added to the quest tables after they shipped (accounts.ts COLUMNS; Nov 10, 2026). `quests.rerolled_day`: the XP day a reroll
+ * dealt this quest (it can't be rerolled again that day); NULL: dealt by a day's deal, or before Nov 10.
+ */
+export const QUESTS_COLUMNS = [{ table: "quests", column: "rerolled_day", type: "INTEGER" }];
 
 const stmt = (sql: string, ...params: unknown[]): Stmt => ({ sql, params });
 const newId = (bytes = 9) => [...crypto.getRandomValues(new Uint8Array(bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -95,28 +105,30 @@ interface QuestRow {
   assigned_at: number;
   slot: number;
   done_at: number | null;
+  rerolled_day: number | null;
   n: number;
 }
 
 /** An account's quests with their progress, the dailies (oldest first) then the weekly. */
 const rowsOf = (sql: Sql, userId: string) =>
   sql.all<QuestRow>(
-    `SELECT q.id, q.period, q.kind, q.target, q.assigned_at, q.slot, q.done_at, (SELECT COUNT(*) FROM quest_progress p WHERE p.quest_id = q.id) AS n
+    `SELECT q.id, q.period, q.kind, q.target, q.assigned_at, q.slot, q.done_at, q.rerolled_day, (SELECT COUNT(*) FROM quest_progress p WHERE p.quest_id = q.id) AS n
      FROM quests q WHERE q.user_id = ? ORDER BY q.period = 'weekly', q.assigned_at, q.slot`,
     userId,
   );
 
-/** One dealt quest's row, if this attempt's claim holds (`ours`). */
-const insertQuest = (userId: string, period: "daily" | "weekly", def: QuestDef, at: number, slot: number, ours: Cond): Stmt =>
+/** One dealt quest's row, if this attempt's claim holds (`ours`). `rerolledDay`: a reroll's replacement, the day it was dealt. */
+const insertQuest = (userId: string, period: "daily" | "weekly", def: QuestDef, at: number, slot: number, ours: Cond, id = newId(), rerolledDay: number | null = null): Stmt =>
   stmt(
-    `INSERT INTO quests (id, user_id, period, kind, target, assigned_at, slot, done_at) SELECT ?, ?, ?, ?, ?, ?, ?, NULL WHERE ${ours.sql}`,
-    newId(),
+    `INSERT INTO quests (id, user_id, period, kind, target, assigned_at, slot, done_at, rerolled_day) SELECT ?, ?, ?, ?, ?, ?, ?, NULL, ? WHERE ${ours.sql}`,
+    id,
     userId,
     period,
     def.id,
     def.target,
     at,
     slot,
+    rerolledDay,
     ...ours.params,
   );
 
@@ -180,7 +192,10 @@ function iconOf(def: QuestDef, id: string): QuestIcon {
   return b ? { kind: "boss", boss: b.name } : { kind: "board", piece: "queen" };
 }
 
-const view = (q: QuestRow, def: QuestDef): QuestView => ({
+/** Whether a quest's free reroll is there today: an unfinished daily that no reroll dealt today. */
+const canReroll = (q: QuestRow, day: number) => q.period === "daily" && q.done_at === null && q.n < q.target && q.rerolled_day !== day;
+
+const view = (q: QuestRow, def: QuestDef, day: number): QuestView => ({
   id: q.id,
   period: q.period,
   name: def.name,
@@ -189,24 +204,23 @@ const view = (q: QuestRow, def: QuestDef): QuestView => ({
   target: q.target,
   icon: iconOf(def, q.id),
   reward: { xp: def.xp, ...(def.crates ? { crates: def.crates } : {}), ...(def.keys ? { keys: def.keys } : {}) },
+  canReroll: canReroll(q, day),
 });
 
-/** GET /api/quests: your quests (dealt first if it's a new day or week), the resets, and today's reroll. */
+/** GET /api/quests: your quests (dealt first if it's a new day or week; each daily says if its reroll is there today), the resets. */
 export async function questsAnswer(sql: Sql, userId: string, now: number, paused = false): Promise<QuestsAnswer> {
   await ensureQuests(sql, userId, now);
   const rows = await rowsOf(sql, userId);
   const day = xpDayStart(now);
-  const rerolled = (await sql.first<{ reroll_day: number | null }>("SELECT reroll_day FROM quest_days WHERE user_id = ?", userId))?.reroll_day ?? null;
   return {
     quests: rows.flatMap((q) => {
       const def = questDef(q.kind);
-      return def ? [view(q, def)] : [];
+      return def ? [view(q, def, day)] : [];
     }),
     day,
     dailyResetAt: day + 86_400_000,
     weeklyResetAt: questWeekStart(now) + 7 * 86_400_000,
     now,
-    rerollLeft: rerolled !== day,
     ...(paused ? { paused: true } : {}),
   };
 }
@@ -215,8 +229,10 @@ export async function questsAnswer(sql: Sql, userId: string, now: number, paused
 export const NO_REROLL = "That quest can't be swapped now.";
 
 /**
- * POST /api/quests/reroll {quest}: today's free reroll (QUESTS.rerollsPerDay), on an unfinished daily: a quest of the pool you don't
- * hold takes its place (its progress gone). One a day, claimed with a nonce in the same transaction (two taps or tabs: once).
+ * POST /api/quests/reroll {quest}: a daily's free reroll today (QUESTS.rerollsPerDaily), on an unfinished daily that no reroll dealt
+ * today: a quest of the pool you don't hold takes its slot (its progress gone), marked with the day. The other daily keeps its own.
+ * One batch (one transaction): the replacement goes in only while the old quest is still there and still rerollable, then the old
+ * one goes; so two taps or two tabs reroll it once (the second finds it gone), and the claim is the replacement's row.
  */
 export async function rerollQuest(sql: Sql, userId: string, questId: unknown, now: number): Promise<{ ok: true } | { ok: false; message: string }> {
   if (typeof questId !== "string" || !QUEST_ID.test(questId)) return { ok: false, message: NO_REROLL };
@@ -224,27 +240,23 @@ export async function rerollQuest(sql: Sql, userId: string, questId: unknown, no
   const day = xpDayStart(now);
   const rows = await rowsOf(sql, userId);
   const q = rows.find((r) => r.id === questId);
-  if (!q || q.period !== "daily" || q.done_at !== null) return { ok: false, message: NO_REROLL };
-  const [def] = pickQuests(QUESTS.daily, rows.map((r) => r.kind), 1, `${userId}:${day}:reroll`);
+  if (!q || !canReroll(q, day)) return { ok: false, message: NO_REROLL };
+  const [def] = pickQuests(QUESTS.daily, rows.map((r) => r.kind), 1, `${userId}:${day}:reroll:${q.id}`);
   if (!def) return { ok: false, message: NO_REROLL };
-  const nonce = newId();
-  const ours = cond("EXISTS (SELECT 1 FROM quest_days WHERE user_id = ? AND nonce = ? AND reroll_day = ?)", userId, nonce, day);
+  const id = newId();
+  const old = cond(
+    "EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND period = 'daily' AND done_at IS NULL AND (rerolled_day IS NULL OR rerolled_day <> ?))",
+    questId,
+    userId,
+    day,
+  );
+  const ours = cond("EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ?)", id, userId);
   await sql.batch([
-    stmt(
-      `UPDATE quest_days SET reroll_day = ?, nonce = ? WHERE user_id = ? AND (reroll_day IS NULL OR reroll_day <> ?)
-       AND EXISTS (SELECT 1 FROM quests WHERE id = ? AND user_id = ? AND period = 'daily' AND done_at IS NULL)`,
-      day,
-      nonce,
-      userId,
-      day,
-      questId,
-      userId,
-    ),
+    insertQuest(userId, "daily", def, q.assigned_at, q.slot, old, id, day),
     stmt(`DELETE FROM quest_progress WHERE quest_id = ? AND ${ours.sql}`, questId, ...ours.params),
-    insertQuest(userId, "daily", def, q.assigned_at, q.slot, ours),
     stmt(`DELETE FROM quests WHERE id = ? AND user_id = ? AND ${ours.sql}`, questId, userId, ...ours.params),
   ]);
-  const won = await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM quest_days WHERE user_id = ? AND nonce = ?", userId, nonce);
+  const won = await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM quests WHERE id = ? AND user_id = ?", id, userId);
   return won?.n ? { ok: true } : { ok: false, message: NO_REROLL };
 }
 
@@ -331,7 +343,7 @@ export async function questsPaidBy(sql: Sql, me: LedgerAccount, game: string): P
 
 /**
  * The test switch `?quests=<kind>[:<progress>],…` (POST /api/quests/test; test servers only): your quests replaced by these (dailies
- * as listed, then a weekly), with that much progress, today's reroll unused. Answers false for an unknown kind.
+ * as listed, then a weekly), with that much progress, every reroll unused. Answers false for an unknown kind.
  */
 export async function setTestQuests(sql: Sql, userId: string, list: unknown, now: number): Promise<boolean> {
   if (!Array.isArray(list) || list.length > 6) return false;
@@ -375,10 +387,13 @@ export async function setTestQuests(sql: Sql, userId: string, list: unknown, now
 /** An account's quest rows, gone (deleting the account; a guest's merge into the account it signs in to: the account keeps its own). */
 export const questDeletes = (userId: string): Stmt[] => ["quest_progress", "quests", "quest_days", "quest_games"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, userId));
 
-/** The account's part of "Download my data": its quests (each one's kind, when dealt and finished, its progress) and its reroll's day. */
+/**
+ * The account's part of "Download my data": its quests (each one's kind, when dealt and finished, the day a reroll dealt it, its
+ * progress) and the days last dealt (and the shared reroll's day from before Nov 10).
+ */
 export const questsDownload = async (sql: Sql, userId: string) => ({
   quests: await sql.all(
-    `SELECT q.period, q.kind, q.target, q.assigned_at, q.done_at, (SELECT COUNT(*) FROM quest_progress p WHERE p.quest_id = q.id) AS progress
+    `SELECT q.period, q.kind, q.target, q.assigned_at, q.done_at, q.rerolled_day, (SELECT COUNT(*) FROM quest_progress p WHERE p.quest_id = q.id) AS progress
      FROM quests q WHERE q.user_id = ? ORDER BY q.assigned_at, q.slot`,
     userId,
   ),
