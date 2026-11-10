@@ -1,3 +1,4 @@
+- Nov 10 16:25 UTC: #611 delta2: no blocker; N1 major (host Maia not loaded -> liar compounds 0.25), N2 major (liar picks extras via better move), N3-N5 minor. Fix round 3 (fix3-fable-b3.md).
 - Nov 10 16:20 UTC: #611 head a6ddc0c CI GREEN (full suite). Flaky squads-replay:237 [desktop] TypeError reading from: move() helper finds no quiet move (captures only); fix = fall back to a non-promotion capture -> batch 7. Waiting on delta2 review to merge #611.
 - Nov 10 16:10 UTC: #604 LIVE 8f42757. Main run 42847929954: shards passed; flaky squads-watch:167 [phone], home-layout:207 [desktop], matchmaking:22 [desktop] -> flaky batch 7 (now tiger:305, recluse:824, search-home:61 + these 3; home-layout/matchmaking may be #607 queue changes).
 - Nov 10 16:05 UTC: #611 fix round 2 done (e576a8e); helper missed Eric's lone-party change, I made it (a6ddc0c). Delta review 2 started; CI running.
