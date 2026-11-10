@@ -1,3 +1,4 @@
+- Nov 10 09:10 UTC: #607 search-on-home MERGED eec7200 (full suite green on PR, no flaky). Watching deploy + main run.
 - Nov 10 08:55 UTC: search build done (45 min). PR #607 open (draft), CI running (every spec). Merge when green: Eric said "build it and push it live". Then flaky batch 6 (squads-replay:230, global-chat:241, boss-challenge:155, desktop-board:260).
 - Nov 10 08:23 UTC: #605 (Banana Suit, outfit) merged 539ce42; #606 (quick fixes + bot xpChanceFull 0.7) merged 6e3caeb. Watching deploy + main run.
 - Nov 10 08:20 UTC: quick fixes PR #606 opened (light lane), CI running.
