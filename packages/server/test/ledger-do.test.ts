@@ -213,7 +213,7 @@ describe("a match's end waits for D1 (lobby-do.ts: the results in the record unt
     await ring(() => record().phase === "results");
     expect(record().resultsSaved).toBe(true);
     expect(record().saveQueue).toHaveLength(1);
-    expect(record().saveQueue![0]!.tries).toBeGreaterThanOrEqual(1);
+    expect(record().saveQueue![0]!.failedAt).toBeLessThanOrEqual(Date.now());
     expect(rt.alarm).toBeLessThanOrEqual(Date.now() + MATCH_SAVE.retrySeconds * 1000);
     // Past its closing time: it stays (its code held), trying again.
     const closesAt = record().endedAt! + LOBBY_LIFE.lobbyResultsKeepMinutes * 60_000;

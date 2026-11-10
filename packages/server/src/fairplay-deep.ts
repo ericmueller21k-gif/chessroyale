@@ -50,12 +50,43 @@ function legalOf(fen: string): string[] {
 /** One deep search over some moves: each one's expected score (the mover's), or null when the server can't answer. */
 export type DeepSearch = (fen: string, moves: readonly string[]) => Promise<{ move: string; expected: number }[] | null>;
 
-/** Takes one search from today's budget; false once it's spent (the 1 v 1 check shares it: fairplay-duel.ts). */
-export async function takeBudget(sql: Sql, now: number): Promise<boolean> {
+/** Takes `n` searches from today's budget, all or none; false when fewer are left (the 1 v 1 check shares it: fairplay-duel.ts). */
+export async function takeBudget(sql: Sql, now: number, n = 1): Promise<boolean> {
   const day = new Date(now).toISOString().slice(0, 10);
-  await sql.run("INSERT INTO fairplay_budget (day, searches) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET searches = searches + 1", day);
-  const used = (await sql.first<{ searches: number }>("SELECT searches FROM fairplay_budget WHERE day = ?", day))?.searches ?? 0;
-  return used <= FAIRPLAY.deep.dailySearches;
+  await sql.run("INSERT INTO fairplay_budget (day, searches) VALUES (?, 0) ON CONFLICT (day) DO NOTHING", day);
+  const took = await sql.first<{ searches: number }>(
+    "UPDATE fairplay_budget SET searches = searches + ? WHERE day = ? AND searches + ? <= ? RETURNING searches",
+    n,
+    day,
+    n,
+    FAIRPLAY.deep.dailySearches,
+  );
+  return !!took;
+}
+
+/**
+ * Every legal move of a position scored, one search a group (moveGroups), the whole position's budget taken before the first search:
+ * a day's budget never runs out halfway through a position, its searches thrown away (the review of #610, m4). `scores` null when the
+ * budget is short or the server doesn't answer (the searches it never made go back to the budget); `made`: the searches sent.
+ */
+export async function searchPosition(
+  sql: Sql,
+  search: DeepSearch,
+  fen: string,
+  groups: readonly string[][],
+  now: number,
+): Promise<{ scores: { move: string; expected: number }[] | null; made: number }> {
+  if (!(await takeBudget(sql, now, groups.length))) return { scores: null, made: 0 };
+  const scores: { move: string; expected: number }[] = [];
+  for (let i = 0; i < groups.length; i++) {
+    const got = await search(fen, groups[i]!);
+    if (!got) {
+      if (i + 1 < groups.length) await sql.run("UPDATE fairplay_budget SET searches = MAX(0, searches - ?) WHERE day = ?", groups.length - i - 1, new Date(now).toISOString().slice(0, 10));
+      return { scores: null, made: i + 1 };
+    }
+    scores.push(...got);
+  }
+  return { scores, made: groups.length };
 }
 
 /** Whether `now` is off-peak (FAIRPLAY.deep.offPeakUtc). */
@@ -89,8 +120,9 @@ interface QueueRow {
 /**
  * One scheduled run: matches waiting for the deep re-check (queueDeep: every match still kept of a player with a
  * flagged match or an open case), cases in review first and the rest only off-peak (`all` ignores the hours: an admin asking). Each counted
- * move is searched once; a match is done when all of them are (or can't be). The player's level is worked out again
- * afterwards, which is where a ban can come from. Returns how many searches it made.
+ * move is searched once; a match is done when all of them are (or can't be). Outside a review a match is checked only as far as a
+ * ban could need (FAIRPLAY.levels.banMatchChecked counted moves), then leaves the queue undone: a review queues the rest again
+ * (setCase). The player's level is worked out again afterwards. Returns how many searches it made (a position's whole budget).
  */
 export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, opts: { mail?: CaseMailer; all?: boolean; userId?: string; perRun?: number } = {}): Promise<{ searches: number; matches: number }> {
   const dp = FAIRPLAY.deep;
@@ -117,6 +149,10 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
     }
     let complete = true;
     let changed = false;
+    // (Outside a review, as far as a ban could need and no further: the day's budget goes round more players. The review of #610, m4.)
+    const cap = row.status === "review" ? Infinity : FAIRPLAY.levels.banMatchChecked;
+    let checked = moves.filter((m) => m.deep && skipReason(m) === null).length;
+    let capped = false;
     for (const m of moves) {
       // (A position Stockfish refuses is never sent, so it never gets an answer: passed over rather than waited on, or
       // the queue would stop at it every run. No game makes one: engine.ts, containerScore.)
@@ -124,28 +160,19 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
       // Every legal move, the pick's group first: the engine's own candidates (a pick that isn't legal here gets no result).
       const groups = moveGroups(legalOf(m.fen), m.move);
       if (!groups.length) continue;
+      if (checked >= cap) {
+        capped = true;
+        break;
+      }
       // (All of a position's groups within this run's share, or it waits for the next run: half a position is never kept.)
       if (searches + groups.length > perRun) {
         complete = false;
         break;
       }
-      const scores: { move: string; expected: number }[] = [];
-      let ok = true;
-      for (const group of groups) {
-        if (!(await takeBudget(sql, now))) {
-          ok = false;
-          break;
-        }
-        searches++;
-        const got = await search(m.fen, group);
-        if (!got) {
-          // The server didn't answer: try again on a later run.
-          ok = false;
-          break;
-        }
-        scores.push(...got);
-      }
-      if (!ok) {
+      const { scores, made } = await searchPosition(sql, search, m.fen, groups, now);
+      searches += made;
+      if (!scores) {
+        // The day's budget is short, or the server didn't answer: try again on a later run.
         complete = false;
         break;
       }
@@ -153,9 +180,10 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
       if (d) {
         m.deep = d;
         changed = true;
+        checked++;
       }
     }
-    if (changed || complete) await saveDeep(sql, row, moves, complete);
+    if (changed || complete) await saveDeep(sql, row, moves, complete ? (capped ? "capped" : "done") : "waiting");
     if (changed) touched.add(row.user_id);
     if (complete) matches++;
     if (!complete) break;
@@ -164,8 +192,11 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
   return { searches, matches };
 }
 
-/** Stores a match's moves with their deep results, and its summary and score worked out again. */
-async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], complete: boolean): Promise<void> {
+/**
+ * Stores a match's moves with their deep results, and its summary and score worked out again: "done" (every counted move), "capped"
+ * (out of the queue, not done: a review queues it again) or "waiting" (still queued).
+ */
+async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], state: "done" | "capped" | "waiting"): Promise<void> {
   // (Measured against the player's strength as it was before that match, as when it was first scored.)
   const before = await sql.all<{ perf: number | null }>(
     "SELECT perf FROM fairplay_matches WHERE user_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT 10",
@@ -180,8 +211,8 @@ async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], complete: bo
     JSON.stringify(summary),
     summary.score,
     summary.perf,
-    complete ? 1 : 0,
-    complete ? 0 : 1,
+    state === "done" ? 1 : 0,
+    state === "waiting" ? 1 : 0,
     row.id,
   );
 }

@@ -15,7 +15,7 @@
 import { FAIRPLAY, ratingForLoss } from "@chessroyale/core";
 import { START_FEN, applyMove, legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import type { Sql } from "./accounts.ts";
-import { ENGINE_MOVES_MAX, deepResult, moveGroups, takeBudget, type DeepSearch } from "./fairplay-deep.ts";
+import { ENGINE_MOVES_MAX, deepResult, moveGroups, searchPosition, type DeepSearch } from "./fairplay-deep.ts";
 
 export { ENGINE_MOVES_MAX, moveGroups };
 
@@ -93,22 +93,9 @@ export async function checkDuelGames(sql: Sql, search: DeepSearch, userId: strin
             complete = false;
             break;
           }
-          const scores: { move: string; expected: number }[] = [];
-          let ok = true;
-          for (const group of groups) {
-            if (!(await takeBudget(sql, now))) {
-              ok = false;
-              break;
-            }
-            searches++;
-            const got = await search(fen, group);
-            if (!got) {
-              ok = false;
-              break;
-            }
-            scores.push(...got);
-          }
-          if (!ok) {
+          const { scores, made } = await searchPosition(sql, search, fen, groups, now);
+          searches += made;
+          if (!scores) {
             complete = false;
             break;
           }

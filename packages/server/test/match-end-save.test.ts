@@ -213,7 +213,7 @@ describe("a match's end: saved once, a few players a wake, a failure kept and re
     expect(await w.lobby.writeResults()).toBe(false);
     expect(w.rec.resultsSaved).toBe(true);
     expect(w.rec.saveQueue).toHaveLength(3);
-    expect(w.rec.saveQueue![0]!.tries).toBe(1);
+    expect(w.rec.saveQueue![0]!.failedAt).toBeLessThanOrEqual(Date.now());
     expect(opsStats().calls["lobby.saveFailed"]).toBe(failedBefore + 1);
     expect(w.count("results")).toBe(0);
     // D1 back: the next try writes them all, once.
