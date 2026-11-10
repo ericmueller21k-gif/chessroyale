@@ -12,7 +12,7 @@ import { SELECT_LINES, SELECT_SOUND } from "../src/characters/boss-select.ts";
 import { bossKit } from "../src/characters/kits.ts";
 import { EFFECTS, animLength, cueAt } from "../src/characters/power-art.ts";
 import { HOP_TRIP_MS, PUMP_BAR_SHARE, PUMP_FIT, PUMP_OVER, PUMP_OVER_MAX, TIGER_UI, blockCell, pumpScale, sidePump, tripMove } from "../src/components/Tiger.tsx";
-import { POOF_AT, balloonFen, landBeats, noteTiger, pumpShows, resetTiger, ringShows, ringState, type TigerShow } from "../src/tiger-show.ts";
+import { POOF_AT, PUT_MS, balloonFen, landBeats, noteTiger, pumpShows, resetTiger, ringShows, ringState, type TigerShow } from "../src/tiger-show.ts";
 import { REFUSED } from "../src/refused.ts";
 
 /**
@@ -183,6 +183,19 @@ describe("the pump on the battle's clock", () => {
     expect(pumpShows(rec, balloon, 0, 500, true)).toMatchObject({ anim: "bare", wake: 1000 });
     expect(pumpShows(rec, balloon, 0, 1050, true)).toMatchObject({ anim: "putKnight", then: "stage1", quiet: true });
     expect(pumpShows(rec, balloon, 100, 1300, true)).toMatchObject({ anim: "stage1" });
+    // (First drawn late, the page busy as its time came: the put plays from then, not skipped; hidden, it's done.)
+    resetTiger();
+    noteTiger(boss([]), 0);
+    const late = noteTiger(boss([{ kind: "place", turn: 1, shape: "n", color: 2 }]), 100)!;
+    late.place!.putAt = 1000;
+    expect(pumpShows(late, balloon, 0, 500, true)).toMatchObject({ anim: "bare", wake: 1000 });
+    expect(pumpShows(late, balloon, stage + 100, 1400, true)).toMatchObject({ anim: "putKnight", since: 1400, wake: 1400 + PUT_MS });
+    expect(pumpShows(late, balloon, stage + 300, 1600, true)).toMatchObject({ anim: "grow2Knight", since: 1600 });
+    resetTiger();
+    noteTiger(boss([]), 0);
+    const hidden = noteTiger(boss([{ kind: "place", turn: 1, shape: "n", color: 2 }]), 100)!;
+    hidden.place!.putAt = 1000;
+    expect(pumpShows(hidden, balloon, stage + 100, 1400, false)).toMatchObject({ anim: "stage2Knight" });
     const land = noteTiger(boss([{ kind: "balloonLand", turn: 2, square: "e4", shape: "n", color: 2 }]), 5000, [{ kind: "balloonLand", key: "tiger:balloonLand:2", at: 5500 }])!;
     expect(pumpShows(land, null, 0, 5200, true)).toMatchObject({ anim: "readyKnight", wake: 5500 });
     expect(pumpShows(land, null, 0, 5600, true)).toMatchObject({ anim: "releaseKnight", since: 5500, then: "bare" });

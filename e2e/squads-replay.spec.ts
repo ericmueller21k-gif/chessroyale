@@ -69,9 +69,10 @@ async function tapSquare(page: Page, sq: string) {
   await page.mouse.click(box.x + (x + 0.5) * (box.width / 8), box.y + (y + 0.5) * (box.height / 8));
 }
 
-/** Your Relay move, tap, tap: the first quiet legal move. */
+/** Your Relay move, tap, tap: the first quiet legal move, else (only captures legal, run 42849806128) the first non-promotion. */
 async function move(page: Page, fen: string) {
-  const mv = new Chess(fen).moves({ verbose: true }).find((m) => !m.captured && !m.promotion)!;
+  const legal = new Chess(fen).moves({ verbose: true }).filter((m) => !m.promotion);
+  const mv = legal.find((m) => !m.captured) ?? legal[0];
   await tapSquare(page, mv.from);
   await tapSquare(page, mv.to);
   await expect.poll(async () => (await seen(page)).mine, { timeout: 5_000 }).toBe(mv.from + mv.to);
