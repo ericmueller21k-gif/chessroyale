@@ -10074,6 +10074,8 @@ button.fd-logo {
 /* (Oct 24: centered over the three buttons.) */
 .fd-ranked .fd-label {
   font-size: 12px;
+  /* (Archivo's own line, fixed: the fallback font's is 1 to 3 px taller, and your card took the difference when Archivo landed.) */
+  line-height: 14px;
   text-align: center;
 }
 /*
