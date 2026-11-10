@@ -14,4 +14,9 @@ test("installable: manifest, icons and a service worker that precaches the engin
   const files = JSON.parse(/const FILES = (\[.*?\]);/s.exec(sw)![1]!) as string[];
   expect(files.filter((f) => /\.(png|jpe?g|webp|gif|mp4|webm)$/.test(f))).toEqual([]);
   await expect.poll(() => page.evaluate(async () => !!(await navigator.serviceWorker.getRegistration())), { timeout: 10_000 }).toBe(true);
+  // The precache waits for the page to load (Nov 10, a slow first load after a deploy), and the page says when it has (install.ts):
+  // every file is in, two at a time, well before the worker's own 8 s fallback would have started it.
+  await expect
+    .poll(() => page.evaluate(async () => Math.max(0, ...(await Promise.all((await caches.keys()).map(async (k) => (await (await caches.open(k)).keys()).length))))), { timeout: 6_000 })
+    .toBe(files.length);
 });
