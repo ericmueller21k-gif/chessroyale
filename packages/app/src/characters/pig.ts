@@ -1021,5 +1021,5 @@ export const PIG_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [PIG.foot[0] + ATTACK_REACH, PIG.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(1000, {})] })), kingAttack },
 };

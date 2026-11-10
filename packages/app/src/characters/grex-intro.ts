@@ -95,5 +95,5 @@ export const BOSS_GREX_INTRO: Character = {
   ...GREX,
   id: "grex-intro",
   name: "Jefferson (his intro)",
-  anims: { call, waveOver, brag, idle: { loop: true, frames: [GREX.anims.idle!.frames[0]!] } },
+  anims: { call, waveOver, brag, idle: lazyAnim(() => ({ loop: true, frames: [GREX.anims.idle!.frames[0]!] })) },
 };

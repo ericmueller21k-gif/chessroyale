@@ -358,5 +358,5 @@ export const BOSS_BEAVER_INTRO: Character = {
   foot: IFOOT,
   palette: { ...PALETTE, p: "#fff0c8", "-": "#0d0e1280", "+": "#0d0e1244" },
   parts: joinParts(LOG_PARTS, PARTS),
-  anims: { idle: { loop: true, frames: [intro(1000, {})] }, walk, lift, carry, setDown, gnaw: gnawAnim, done },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [intro(1000, {})] })), walk, lift, carry, setDown, gnaw: gnawAnim, done },
 };

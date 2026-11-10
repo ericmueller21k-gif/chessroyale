@@ -1276,7 +1276,7 @@ export const SMUDGY_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [SMUDGY.foot[0] + ATTACK_REACH, SMUDGY.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(F(1000))] })), kingAttack },
 };
 
 /**

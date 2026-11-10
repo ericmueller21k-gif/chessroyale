@@ -328,5 +328,5 @@ export const BOSS_BLITZ_INTRO: Character = {
   h: IH,
   foot: IFOOT,
   palette: IPAL,
-  anims: { idle: { loop: true, frames: [ix(1000, {})] }, bolt, arrive, dashBy, brag },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [ix(1000, {})] })), bolt, arrive, dashBy, brag },
 };

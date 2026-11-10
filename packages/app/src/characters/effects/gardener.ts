@@ -825,5 +825,5 @@ export const GARDEN_PLANT: Character = {
   foot: [16, 28],
   palette: GARDEN_PALETTE,
   parts,
-  anims: { sprout, grow: plainGrow, green, toFall, fall, toDrop, drop, gone, kill, bud: budAnim(false), budQueen: budAnim(true), wilt },
+  anims: { sprout, grow: plainGrow, green, toFall, fall, toDrop, drop, gone, kill, bud: lazyAnim(() => budAnim(false)), budQueen: lazyAnim(() => budAnim(true)), wilt },
 };

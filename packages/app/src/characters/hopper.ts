@@ -1259,5 +1259,5 @@ export const HOPPER_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [HOPPER.foot[0] + ATTACK_REACH, HOPPER.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(f(1000))] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(f(1000))] })), kingAttack },
 };

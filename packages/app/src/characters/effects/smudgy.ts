@@ -22,6 +22,7 @@
 import { canvas, edge, ellipse, inEllipse, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const PAINT_PALETTE: Record<string, string> = {
   k: "#2a1c06", // outline: a dark brown that reads on every square
@@ -171,7 +172,7 @@ export const PAINT_DRIP: Character = {
   palette: PAINT_PALETTE,
   parts: { d1: dripPart(0.2), d2: dripPart(0.45), d3: dripPart(0.7), d4: dripPart(1), d5: dripPart(1, true) },
   anims: {
-    drip: {
+    drip: lazyAnim(() => ({
       loop: false,
       frames: [
         frame(70, [L("d1")], { cue: "drip" }),
@@ -182,7 +183,7 @@ export const PAINT_DRIP: Character = {
         frame(40, [], { specks: drops(2) }),
         frame(20),
       ],
-    },
+    })),
   },
 };
 
@@ -290,7 +291,7 @@ export const PAINT_FLY: Character = {
       cv[12]![15] = "w";
     }),
   },
-  anims: { fly: { loop: true, frames: [frame(70, [L("a")]), frame(70, [L("b")])] } },
+  anims: { fly: lazyAnim(() => ({ loop: true, frames: [frame(70, [L("a")]), frame(70, [L("b")])] })) },
 };
 
 // ---- A blob splatting on a king (his attack on a king).

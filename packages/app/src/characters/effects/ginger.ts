@@ -2,6 +2,7 @@
 import { canvas, ellipse, inEllipse, line, roundLight, shade, toGrid } from "../paint.ts";
 import type { Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { BOARD, hitAnims, sparkle, SQUARE, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 // ---- The ice over a frozen piece.
 
@@ -183,7 +184,7 @@ export const ICE_OVERLAY: Character = {
   parts: ICE_PARTS,
   anims: {
     /** The piece freezes: frost creeps in from the edges, the ice closes over it and flashes. */
-    freeze: {
+    freeze: lazyAnim(() => ({
       loop: false,
       frames: [
         ice("frost2", { cue: "crackle", specks: corners(false) }, 70),
@@ -192,9 +193,9 @@ export const ICE_OVERLAY: Character = {
         ice("block", { pal: { i: "#ffffff", I: "#d6f6ff" }, specks: [...glint(0.35), ...corners(true)] }, 90),
         ice("block", {}, 140),
       ],
-    },
+    })),
     /** Frozen, while it lasts: still, with a glint sweeping across now and then and the corners twinkling. */
-    frozen: {
+    frozen: lazyAnim(() => ({
       loop: true,
       frames: [
         ...Array.from({ length: 6 }, (_, i) => ice("block", { specks: i % 3 === 1 ? corners(false) : undefined }, 220)),
@@ -203,12 +204,12 @@ export const ICE_OVERLAY: Character = {
         ice("block", { specks: glint(0.6) }, 70),
         ice("block", { specks: glint(0.9) }, 70),
       ],
-    },
+    })),
     /**
      * The ice weakens (the blizzard's pieces due to thaw next turn): it cracks, chips fly, and it thins to nearly clear
      * (into `thinning`).
      */
-    crack: {
+    crack: lazyAnim(() => ({
       loop: false,
       frames: [
         ice("crack1", { cue: "crackle", shake: [1, 0] }, 90),
@@ -216,12 +217,12 @@ export const ICE_OVERLAY: Character = {
         ice("crack3", { specks: chips(1), pal: { a: "#c4ecff30", A: "#7fcfff40", I: "#7fd3ff99", k: "#3a77ad" } }, 100),
         thin({ specks: [...chips(2), ...drop(15, 0)] }, 120),
       ],
-    },
+    })),
     /**
      * Thin ice, due to thaw as the next turn begins: the block still flush with its square, nearly clear, cracked right
      * across, meltwater running down it and dripping off its bottom edge. Loops while it lasts.
      */
-    thinning: {
+    thinning: lazyAnim(() => ({
       loop: true,
       frames: [
         thin({ specks: drop(15, 0) }, 220),
@@ -233,12 +234,12 @@ export const ICE_OVERLAY: Character = {
         thin({ specks: drop(8, 2) }, 150),
         thin({}, 260),
       ],
-    },
+    })),
     /**
      * The ice thaws (from thin ice: the blizzard's pieces as they're freed): it splits, chips fly, it melts down to a
      * puddle and dries up. The last frame is empty.
      */
-    thaw: {
+    thaw: lazyAnim(() => ({
       loop: false,
       frames: [
         thin({ cue: "crackle", specks: chips(0), shake: [1, 0] }, 90),
@@ -249,7 +250,7 @@ export const ICE_OVERLAY: Character = {
         { ms: 110, layers: [{ part: "puddle16", x: 8, y: 26 }], pal: fadeIce("80") },
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 
@@ -288,7 +289,7 @@ export const ICE_BOLT: Character = {
   parts: { bolt: boltPart, glow: boltGlow },
   anims: {
     /** In flight: shimmering, sparkles trailing. Loops while it flies. */
-    fly: {
+    fly: lazyAnim(() => ({
       loop: true,
       frames: [0, 1, 2, 3].map((i) => ({
         ms: 60,
@@ -299,7 +300,7 @@ export const ICE_BOLT: Character = {
         pal: i % 2 ? { F: "#e8fbff", i: "#ffffff" } : undefined,
         specks: trail(i),
       })),
-    },
+    })),
   },
 };
 
@@ -369,7 +370,7 @@ export const BLIZZARD_SWEEP: Character = {
   parts: { cloudBank, haze },
   anims: {
     /** The storm crosses the board, left to right, in about 1.3 s: snow ahead, the cloud front, haze behind. The last frame is empty. */
-    sweep: {
+    sweep: lazyAnim(() => ({
       loop: false,
       frames: [
         ...Array.from({ length: SWEEP_FRAMES }, (_, i): Frame => {
@@ -382,7 +383,7 @@ export const BLIZZARD_SWEEP: Character = {
         }),
         { ms: 60, layers: [] },
       ],
-    },
+    })),
   },
 };
 

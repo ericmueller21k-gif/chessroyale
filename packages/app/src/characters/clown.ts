@@ -774,4 +774,4 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
  * Boingo for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame
  * `ATTACK_REACH` wider on the right for his pies' flight. Its `idle`, one still, is for the preview.
  */
-export const CLOWN_ATTACK: Character = { ...CLOWN, id: "clown-attack", name: "Boingo (his attack)", w: AW, h: AH, anims: { idle: { loop: true, frames: [fa(f(1000, {}))] }, kingAttack } };
+export const CLOWN_ATTACK: Character = { ...CLOWN, id: "clown-attack", name: "Boingo (his attack)", w: AW, h: AH, anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(f(1000, {}))] })), kingAttack } };

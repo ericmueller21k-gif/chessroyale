@@ -35,6 +35,7 @@
 import { canvas, ellipse, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims, sparkle } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 export const MOON_PALETTE: Record<string, string> = {
   k: "#232d6b", // outline: a deep blue that reads on every square
@@ -220,7 +221,7 @@ const landing = (t: number): Speck[] => {
 };
 
 const beamAnims: Record<string, Anim> = {
-  fall: {
+  fall: lazyAnim(() => ({
     loop: false,
     frames: [
       frame(55, [L("fall0")], { cue: "beam", specks: motes(0, 3) }),
@@ -228,20 +229,20 @@ const beamAnims: Record<string, Anim> = {
       frame(55, [L("fall2")], { specks: motes(2, 5) }),
       frame(55, [L("fall3")], { specks: motes(3, 5) }),
     ],
-  },
-  hit: {
+  })),
+  hit: lazyAnim(() => ({
     loop: false,
     frames: [
       frame(70, [L("hit0")], { cue: "hit", specks: landing(0) }),
       frame(80, [L("hit1")], { specks: landing(1) }),
       frame(90, [L("hit2")], { specks: landing(2) }),
     ],
-  },
-  hold: { loop: true, frames: [frame(240, [L("hold0")], { specks: motes(4, 2) }), frame(220, [L("hold1")], { specks: motes(5, 2) }), frame(220, [L("hold2")], { specks: motes(6, 2) })] },
-  fade: {
+  })),
+  hold: lazyAnim(() => ({ loop: true, frames: [frame(240, [L("hold0")], { specks: motes(4, 2) }), frame(220, [L("hold1")], { specks: motes(5, 2) }), frame(220, [L("hold2")], { specks: motes(6, 2) })] })),
+  fade: lazyAnim(() => ({
     loop: false,
     frames: [0.75, 0.5, 0.28, 0.12].map((f, i) => frame(75, [L(`hold${i % 3}`)], { pal: faded(f) })).concat([frame(20)]),
-  },
+  })),
 };
 
 export const MOONBEAM: Character = {
@@ -336,16 +337,16 @@ export const MOON_SCORCH: Character = {
   palette: SCORCH_PALETTE,
   parts: scorchParts,
   anims: {
-    burn: {
+    burn: lazyAnim(() => ({
       loop: false,
       frames: [
         { ms: 60, layers: [sc("s3")], cue: "burn", specks: embers(1) },
         { ms: 70, layers: [sc("s2")], specks: embers(2) },
         { ms: 90, layers: [sc("s1")], specks: embers(3) },
       ],
-    },
-    hold: { loop: true, frames: [{ ms: 500, layers: [sc("s0")], specks: embers(4) }, { ms: 500, layers: [sc("s0")], specks: embers(5) }] },
-    fade: { loop: false, frames: [...[0.7, 0.45, 0.22].map((f): Frame => ({ ms: 80, layers: [sc("s0")], pal: faded(f, SCORCH_PALETTE) })), { ms: 80, layers: [] }] },
+    })),
+    hold: lazyAnim(() => ({ loop: true, frames: [{ ms: 500, layers: [sc("s0")], specks: embers(4) }, { ms: 500, layers: [sc("s0")], specks: embers(5) }] })),
+    fade: lazyAnim(() => ({ loop: false, frames: [...[0.7, 0.45, 0.22].map((f): Frame => ({ ms: 80, layers: [sc("s0")], pal: faded(f, SCORCH_PALETTE) })), { ms: 80, layers: [] }] })),
   },
 };
 

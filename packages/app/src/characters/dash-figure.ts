@@ -73,10 +73,10 @@ export const DASH_FIGURE: Character = {
     thinking,
     rattled,
     capture,
-    fit3: fit(3, BOSS_POWERS.dashClockFit.smackMs),
-    fit4: fit(4, BOSS_POWERS.dashClockFit.smackMs),
-    fit5: fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs),
-    fit10: fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs),
+    fit3: lazyAnim(() => fit(3, BOSS_POWERS.dashClockFit.smackMs)),
+    fit4: lazyAnim(() => fit(4, BOSS_POWERS.dashClockFit.smackMs)),
+    fit5: lazyAnim(() => fit(BOSS_POWERS.dashClockFit.smacks, BOSS_POWERS.dashClockFit.smackMs)),
+    fit10: lazyAnim(() => fit(BOSS_POWERS.dashPopOff.hits, BOSS_POWERS.dashPopOff.hitMs)),
   },
 };
 

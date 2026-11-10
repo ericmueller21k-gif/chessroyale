@@ -1008,8 +1008,8 @@ const planting = (n: number, ms: readonly number[]): Anim => ({
     F(ms[6]!, { fist: [16.5, 33], nozzle: 8, spray: 0, eyes: "joy", head: [0, 0] }),
   ],
 });
-const plant = planting(3, [90, 90, 100, 110, 100, 120, 130]);
-const plantMany = planting(5, [110, 100, 120, 110, 100, 120, 140]);
+const plant = lazyAnim(() => planting(3, [90, 90, 100, 110, 100, 120, 130]));
+const plantMany = lazyAnim(() => planting(5, [110, 100, 120, 110, 100, 120, 140]));
 
 /**
  * Watering (the ultimate's cast): he takes the hose in his other hand at his hip and hauls it out hand over hand (cue `tug`: the spare
@@ -1197,7 +1197,7 @@ export const GARDENER_ATTACK: Character = {
   name: "Gardener (his attack)",
   w: AW,
   foot: [GARDENER.foot[0] + ATTACK_REACH, GARDENER.foot[1]],
-  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(F(1000))] })), kingAttack },
 };
 
 /** The part of him a portrait shows (his head, muzzle and ears, and a bit of his shoulders), in frame pixels. */

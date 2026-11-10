@@ -148,5 +148,5 @@ export const BOSS_GINGER_INTRO: Character = {
   ...GINGERBREAD,
   id: "ginger-intro",
   name: "Ginger (his intro)",
-  anims: { charge, blast, cast, brag, idle: { loop: true, frames: [GINGERBREAD.anims.idle!.frames[0]!] } },
+  anims: { charge, blast, cast, brag, idle: lazyAnim(() => ({ loop: true, frames: [GINGERBREAD.anims.idle!.frames[0]!] })) },
 };

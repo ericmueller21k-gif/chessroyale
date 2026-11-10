@@ -760,5 +760,5 @@ export const SAWYER_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [SAWYER.foot[0] + ATTACK_REACH, SAWYER.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(1000, {})] })), kingAttack },
 };

@@ -1213,5 +1213,5 @@ export const TIGER_ATTACK: Character = {
   name: "Tiger (his attack)",
   w: AW,
   foot: [TIGER.foot[0] + ATTACK_REACH, TIGER.foot[1]],
-  anims: { idle: { loop: true, frames: [fa(F(1000))] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(F(1000))] })), kingAttack },
 };

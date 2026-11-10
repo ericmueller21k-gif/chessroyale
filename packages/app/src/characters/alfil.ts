@@ -1022,7 +1022,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
  * turned to face our right in a frame `ATTACK_REACH` wider, so the ankus he jabs at the king fits in it. (Its `idle`, one
  * still, is for the preview, which starts every character's reel from one.)
  */
-export const ALFIL_ATTACK: Character = { ...ALFIL, id: "alfil-attack", name: "Alfil (his attack)", w: AW, foot: [AW - (OX + 44 + ATTACK_REACH), OY + GROUND], anims: { idle: { loop: true, frames: [facingRight(f(1000))] }, kingAttack } };
+export const ALFIL_ATTACK: Character = { ...ALFIL, id: "alfil-attack", name: "Alfil (his attack)", w: AW, foot: [AW - (OX + 44 + ATTACK_REACH), OY + GROUND], anims: { idle: lazyAnim(() => ({ loop: true, frames: [facingRight(f(1000))] })), kingAttack } };
 
 /** The part of him a portrait shows (his head, headpiece and tusks), in frame pixels. */
 export const ALFIL_PORTRAIT = { x: OX, y: OY - 3, w: 50, h: 38 } as const;

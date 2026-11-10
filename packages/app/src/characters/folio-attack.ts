@@ -90,7 +90,7 @@ export const FOLIO_ATTACK: Character = {
   w: FOLIO.w + REACH,
   h: FOLIO.h + TOP,
   foot: [FOLIO.foot[0] + REACH, FOLIO.foot[1] + TOP],
-  anims: { idle: { loop: true, frames: [F(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [F(1000, {})] })), kingAttack },
 };
 
 /** The part of it a portrait shows (its head and beak, the top of its neck and its near wing's root), in frame pixels. */

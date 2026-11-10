@@ -18,6 +18,7 @@
 import { canvas, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, type Pt } from "./common.ts";
+import { lazyAnim } from "../sprite.ts";
 
 const CARROT_PALETTE: Record<string, string> = {
   k: "#21160c", // outline
@@ -186,7 +187,7 @@ const anims: Record<string, Anim> = {
    * Planted: the flying carrot comes down point first into the square (the board flies it there, carrotFly); the soil
    * heaps up round it as it sinks in (`thunk`), crumbs flying, it springs up a pixel and settles.
    */
-  plant: {
+  plant: lazyAnim(() => ({
     loop: false,
     frames: [
       { ms: 50, cue: "thunk", layers: [L(`planted:6`, 0, 2), L("mound", 0, 2)], specks: crumbs(0) },
@@ -194,12 +195,12 @@ const anims: Record<string, Anim> = {
       { ms: 70, layers: [L(`planted:6`), L("mound")], specks: crumbs(2) },
       { ms: 90, layers: planted(0) },
     ],
-  },
+  })),
   /** Planted, while it waits: its leaves sway, a glint now and then on its shoulder. */
-  planted: {
+  planted: lazyAnim(() => ({
     loop: true,
     frames: Array.from({ length: 8 }, (_, i): Frame => ({ ms: 160, layers: planted([0, 0, 6, 6, 0, 0, -6, -6][i]!), specks: i === 2 ? sparkle([13, 19]) : [] })),
-  },
+  })),
 };
 for (const side of ["W", "B"] as const) {
   /**
@@ -242,7 +243,7 @@ export const CARROT_FLY: Character = {
   foot: [16, 16],
   palette: CARROT_PALETTE,
   parts: { fly: part(SQUARE, SQUARE, (cv) => paintCarrot(cv, [19, 12], 45, 10, 5, 6)) },
-  anims: { fly: { loop: true, frames: ([0, 1, 2, 3] as const).map((rot): Frame => ({ ms: 70, layers: [{ part: "fly", x: 0, y: 0, rot }] })) } },
+  anims: { fly: lazyAnim(() => ({ loop: true, frames: ([0, 1, 2, 3] as const).map((rot): Frame => ({ ms: 70, layers: [{ part: "fly", x: 0, y: 0, rot }] })) })) },
 };
 
 // ---- His attack on a king: a carrot bonking the king.
@@ -312,7 +313,7 @@ export const CARROT_ICON: Character = {
     slot: part(ICON, ICON, (cv) => paintCarrot(cv, [8.6, 5.4], 45, 8.5, 4.6, 4.6, 0, true), false),
   },
   anims: {
-    icon: { loop: true, frames: [{ ms: 1000, layers: [L("icon")] }] },
-    slot: { loop: true, frames: [{ ms: 1000, layers: [L("slot")] }] },
+    icon: lazyAnim(() => ({ loop: true, frames: [{ ms: 1000, layers: [L("icon")] }] })),
+    slot: lazyAnim(() => ({ loop: true, frames: [{ ms: 1000, layers: [L("slot")] }] })),
   },
 };

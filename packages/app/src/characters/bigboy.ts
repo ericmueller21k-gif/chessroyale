@@ -1003,5 +1003,5 @@ export const BIGBOY_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [BIGBOY.foot[0] + ATTACK_REACH, BIGBOY.foot[1] + ATTACK_TOP],
-  anims: { idle: { loop: true, frames: [fa(1000, {})] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [fa(1000, {})] })), kingAttack },
 };

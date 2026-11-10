@@ -1325,5 +1325,5 @@ export const BOSS_BEAVER_ATTACK: Character = {
   w: AW,
   h: AH,
   foot: [BOSS_BEAVER.foot[0] + A_REACH, BOSS_BEAVER.foot[1] + A_TOP],
-  anims: { idle: { loop: true, frames: [toAttack(f(1000, {}))] }, kingAttack },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [toAttack(f(1000, {}))] })), kingAttack },
 };

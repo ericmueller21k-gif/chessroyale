@@ -593,7 +593,7 @@ export const COLISEUM_CHIP: Character = {
   foot: [12, 23],
   palette: PALETTE,
   parts: { crown: chipCrown.part },
-  anims: { idle: { loop: true, frames: [{ ms: 1000, layers: [{ part: "crown", x: chipCrown.at[0], y: chipCrown.at[1] }] }] } },
+  anims: { idle: lazyAnim(() => ({ loop: true, frames: [{ ms: 1000, layers: [{ part: "crown", x: chipCrown.at[0], y: chipCrown.at[1] }] }] })) },
 };
 
 // ---- (The street town, the north edge round, Nov 5) What its 3D Colosseum (coliseum-ring.ts) reuses of this picture: the palette, the
