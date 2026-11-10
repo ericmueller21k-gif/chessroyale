@@ -122,9 +122,11 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     (`packages/chess/test/boss-power-legal.test.ts`).
   - **Two devices play each online boss move** (Nov 10, `BOSS_CHECK`; 2026-11-10-boss-and-lone-devices.md): his move and the funhouse's go
     to the host and a checker (an up-to-date app, `seeded` at hello; Maia's moves: `maiaReady`) with one seed (`bossRequest.draw`: the
-    rng, Maia's Seed, and `eloDraw` for Stockfish at a strength); the checker's request skips his powers' extras. Same move: it plays;
-    two differ (`bossMove.by`): Maia's against a fallback unless a throw (`throwLoss` 0.8), else the better; a throw or a junk move: a
-    strike; a missed window: replaced, `missStrikes` a strike, one more asked once; none or no verdict: unvouched. `boss-check.test.ts`.
+    rng, Maia's Seed, and `eloDraw` for Stockfish at a strength, its T scaled by `eloDrawScale` to match UCI_LimitStrength,
+    `reports/elo-draw.md`); the checker's request skips his powers' extras on turns that have none. Same move: it plays; two differ:
+    the better, but Maia's against a fallback within `maiaGap` (0.25; `bossMove.by` heard on Maia moves only, the server draws the
+    bridge share: `bossRequest.share`); a throw (`throwLoss` 0.8) or a junk move: a strike; a missed window: replaced, `missStrikes`
+    a strike, one more asked once; a new host: its whole window; none: unvouched; no verdict: the host's, unvouched. `boss-check.test.ts`.
   - **The landing guard** (Oct 17; docs/decisions/2026-10-17-alfil-sees-the-landing.md; Eric: "can we make the engine
     think, the turn before the pieces land, that they're there?"): on Alfil's move just before his Mammoth Slam's pieces
     land (`landsAfterHisMove`), his moves still come from the board as it is, but `bossMoveFrom`'s `ahead` judges them
