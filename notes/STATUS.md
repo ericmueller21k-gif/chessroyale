@@ -1,3 +1,4 @@
+- Nov 10 18:25 UTC: #616 LIVE 96ec1ed; main full run 42870247964 GREEN, no flaky.
 - Nov 10 18:10 UTC: #616 flaky batch 7 MERGED 96ec1ed. QUEUE EMPTY (Eric's four done). #611 parked. Next only on Eric's word: new boss, settings menu, auto chess landing page.
 - Nov 10 17:45 UTC: #615 LIVE e00b037. Main run red: xp-rewards x3 = REAL (solo boss quests from #614 added Quest +300 to its counts) -> fixed in flaky batch 7 PR (set test quests). All 4 coded; flaky batch 7 PR CI running. Then tell Eric (one message).
 - Nov 10 17:25 UTC: #615 quest progress MERGED e00b037 (PR flaky: shop.spec:1480 [desktop], boss-bar:204 [phone]; watch on main). Waiting on flaky batch 7, then tell Eric.
