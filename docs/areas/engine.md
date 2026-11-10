@@ -40,15 +40,19 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
   `stockfishRefuses` lets through must be searched with the server answering on (`engine-container.test.ts`). It
   runs when `engine/`, `uci.ts` or the check change, or by hand, in about a minute.
 - **Who scores, online: many judges.** Each board's scoring job (position, picks, bots; no names) goes to **two
-  devices** drawn by the lobby, weighted by the speed each reported on joining. A device sends the engine's raw output;
+  devices** drawn by the lobby, weighted by the speed each reported on joining (capped at `JUDGES.maxNps`, weight linear:
+  `speedWeight` 1), never two of one account. A device sends the engine's raw output;
   the lobby works out the board with the same code (`judge.ts`: `runJudgeJob`, `judgedBoard`). Two honest answers are
   identical (`JUDGES.tolerance` 0). A disagreement asks a third device and the engine server at once; strikes bench a
   device. Fewer than two capable devices (or `JUDGES.on` false): the lobby's **host** scores every round (`pickHost`
-  prefers a connected computer over a phone). Knocked-out players' devices keep judging while their page is open.
+  prefers a connected computer over a phone); its boards are checked as a judge's are (`hostBoardOk`: legal moves, chances
+  0 to 1, every pick and bot scored), and one that doesn't hold together scores every pick the same. Knocked-out players'
+  devices keep judging while their page is open.
 - **The Crowd's and Squads' bots** (Nov 1; docs/decisions/2026-11-01-bot-lobby.md): Stockfish-style at the
   temperature each bot's rating plays like (no extra engine work: the judge's top moves). Not Maia (too slow for a
   team turn on a phone). [crowd.md](crowd.md), "The bots".
-- **Squads' bots** get their engine's top moves from players' devices the same way (the page's one speed check,
+- **Squads' bots** get their engine's top moves from players' devices the same way (never two of one party; only the
+  engine server's answers are shared between lobbies, `TOP_CACHE`; the page's one speed check,
   `engineSpeed()`, then `botWork` jobs on the engine pool; [squads.md](squads.md), "The server" and "The screens").
 - **Close calls are re-checked deeper** before a cut (`recheckCloseCalls()` in `runner.ts`: `recheckLoss`,
   `recheckMax`, `recheckNodes` 700k), only for groups with a human pick, in one search with the best move (the anchor),

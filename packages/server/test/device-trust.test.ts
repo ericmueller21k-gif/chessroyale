@@ -183,7 +183,10 @@ describe("message fields", () => {
     }
     expect(L.core.record.phase).toBe("boss");
     const key = L.core.record.bossKey!;
+    const sent = L.inbox.get("p2")!.length;
     for (const move of [42, {}, null, ["e7e5"], "x".repeat(500)]) L.core.message("p1", { t: "bossMove", key, move } as never);
+    // (Nothing reached his turn: nobody was told anything.)
+    expect(L.inbox.get("p2")!.length).toBe(sent);
     expect(L.core.record.phase).toBe("boss");
     expect(L.core.record.bossKey).toBe(key);
   });

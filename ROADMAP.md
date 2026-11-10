@@ -97,7 +97,11 @@ decisions. In this order:
    - the engine container's Stockfish 17.1 against the browsers' 19;
    - chat moderation (report and mute);
    - the privacy policy and terms (Eric's sign-off);
-   - loot-box rules before any real-money crates.
+   - loot-box rules before any real-money crates;
+   - judges drawn by a device's *measured* speed (each one's first job timed), not its claim; until then the claim is
+     capped at `JUDGES.maxNps` and weighs linearly (docs/decisions/2026-11-10-device-trust.md);
+   - a lone device's word where a reward rides on it (Squads' bots with one human; the main lobby's host under two
+     judges): a server sample, or no extra reward (outside review, finding 5).
 
 **Only Eric can do:**
 
