@@ -1,9 +1,14 @@
 # Deletes branches that are already merged (Eric, Nov 10: "you have permission to bulk delete the branches that are already
-# merged"). Run by hand from the Actions tab or the API; a dry run (the default) only lists them. Merged means: the branch's
+# merged"). Runs every day (and by hand from the Actions tab, a dry run by default); a pull request that changes this file
+# gets a dry run, listing what it would delete (the session can't start a workflow by hand). Merged means: the branch's
 # tip is in main's history, or is exactly the head a merged pull request merged. Never touched: main, claude/director-notes,
 # stills/*, any branch with an open pull request, and any branch whose tip is under 2 days old (a helper's fresh branch).
 name: branch-cleanup
 on:
+  schedule:
+    - cron: "23 10 * * *"
+  pull_request:
+    paths: [.github/workflows/branch-cleanup.yml]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -24,7 +29,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
-          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN: ${{ github.event_name == 'pull_request' || inputs.dry_run == true }}
         run: |
           set -euo pipefail
           git fetch -q origin '+refs/heads/*:refs/remotes/origin/*'
