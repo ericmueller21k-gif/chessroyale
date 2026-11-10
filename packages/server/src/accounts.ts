@@ -41,7 +41,7 @@ import { CLAW_SCHEMA } from "./claw.ts";
 import { WELCOME_SCHEMA, grantWelcomeCrate } from "./welcome.ts";
 import { LEDGER_SCHEMA, LEDGER_TRIGGERS, applyOp, cond, keyFor, leg, ledgerAccount, mergeMoves, type Cond, type OpKey, type Outcome } from "./ledger.ts";
 import { LIVE_SCHEMA } from "./live.ts";
-import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, fairPlayMoves } from "./fairplay-schema.ts";
+import { FAIRPLAY_SCHEMA, IDENTITIES_REKEY, NOT_POOLED, fairPlayMoves } from "./fairplay-schema.ts";
 import { FRIENDS_COLUMNS, FRIENDS_SCHEMA, socialDeletes } from "./friends.ts";
 import type { RankedLeaves } from "@chessroyale/core";
 import { RANKED_COLUMNS, RANKED_SCHEMA, rankedLeaves, rankedMoves, rankedSummary, type RankedSummary } from "./ranked-schema.ts";
@@ -1040,9 +1040,12 @@ export async function publicProfile(sql: Sql, userId: string, now: number, admin
   const rating = u.rating ?? rows.find((r) => r.rating !== null && countsForRanking(r))?.rating ?? null;
   let top: number | null = null;
   if (rating !== null) {
-    const total = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL"))?.n ?? 0;
+    // (The engine pool is left out of everyone's "Top N%": a pooled player's own is worked out among the rest and them, so it looks
+    // as ever: fairplay.ts, NOT_POOLED.)
+    const pooled = (await sql.first<{ status: string }>("SELECT status FROM fairplay_cases WHERE user_id = ?", userId))?.status === "pool" ? 1 : 0;
+    const total = ((await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating IS NOT NULL AND ${NOT_POOLED("id")}`))?.n ?? 0) + pooled;
     if (total >= FRONT_DOOR.percentileMinPlayers) {
-      const above = (await sql.first<{ n: number }>("SELECT COUNT(*) AS n FROM users WHERE rating > ?", rating))?.n ?? 0;
+      const above = (await sql.first<{ n: number }>(`SELECT COUNT(*) AS n FROM users WHERE rating > ? AND ${NOT_POOLED("id")}`, rating))?.n ?? 0;
       top = topPercent(above + 1, total);
     }
   }

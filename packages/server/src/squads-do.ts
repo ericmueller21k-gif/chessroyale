@@ -13,7 +13,7 @@ import { cond, opKeys, type Cond, type Outcome } from "./ledger.ts";
 import { grantXp } from "./xp.ts";
 import { rankOf } from "./ranked-schema.ts";
 import { grantWelcomeCrate } from "./welcome.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { BANNED_MESSAGE, anyPooled, banCheck } from "./fairplay.ts";
 import { isAdmin } from "./admin.ts";
 import { serverScoreAt } from "./engine.ts";
 import { countCall } from "./ops.ts";
@@ -396,7 +396,7 @@ export class SquadsLobby extends DurableObject<Env> {
  * are busy) and tells everyone the lobby and its pass. It closes after a while with nobody in it.
  */
 export class SquadsParty extends DurableObject<Env> {
-  private record: (PartyRecord & { queueName: string; fillMs: number }) | null = null;
+  private record: (PartyRecord & { queueName: string; fillMs: number; poolName?: string }) | null = null;
   private asking = false;
   /** A Boss Battle party's START is making its battle (one at a time: makeBattle). */
   private making = false;
@@ -404,7 +404,7 @@ export class SquadsParty extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     void ctx.blockConcurrencyWhile(async () => {
-      this.record = (await ctx.storage.get<PartyRecord & { queueName: string; fillMs: number }>("party")) ?? null;
+      this.record = (await ctx.storage.get<PartyRecord & { queueName: string; fillMs: number; poolName?: string }>("party")) ?? null;
     });
   }
 
@@ -471,12 +471,13 @@ export class SquadsParty extends DurableObject<Env> {
   }
 
   /**
-   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`). A
-   * Boss Battle party (`kind` "boss", boss-party.ts) has no queue: its START makes the battle.
+   * A new party under this code (false: the code is in use), queueing on `queueName` (lobbies fill after `fillMs`), or on
+   * `poolName` when a member is in fair play's engine pool (read from their accounts as it queues). A Boss Battle party (`kind`
+   * "boss", boss-party.ts) has no queue: its START makes the battle.
    */
-  async create(code: string, queueName: string, fillMs: number, kind?: "boss"): Promise<boolean> {
+  async create(code: string, queueName: string, fillMs: number, kind?: "boss", poolName?: string): Promise<boolean> {
     if (this.record && !(await this.closeIfDue())) return false;
-    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs };
+    this.record = { ...newPartyRecord(code, Date.now(), kind), queueName, fillMs, ...(poolName ? { poolName } : {}) };
     await this.persist(this.core());
     return true;
   }
@@ -615,11 +616,16 @@ export class SquadsParty extends DurableObject<Env> {
     this.asking = true;
     try {
       await this.persist(asking);
+      // A member in fair play's engine pool: the whole party queues in the pool's own queue (the server's record, never a browser's).
+      const ids = this.record.members.flatMap((m) => (m.userId ? [m.userId] : []));
+      const pooled = !!this.record.poolName && !!this.env.DB && (await anyPooled(d1Sql(this.env.DB), ids).catch(() => false));
+      if (!this.record) return;
+      const queue = pooled ? this.record.poolName! : this.record.queueName;
       // Squads resting (a kill switch): the party waits in line with its line, asking again each minute, and goes in
       // once it's back.
       const answer = isPaused(this.env, "squads")
         ? { busy: true as const, ticket: want.ticket ?? "", position: 0, waitSeconds: 60, retryMs: 60_000, message: pausedLine("squads") }
-        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(this.record.queueName))
+        : await this.env.MATCHMAKER.get(this.env.MATCHMAKER.idFromName(queue))
             .next({}, this.record.fillMs, { squads: true }, want.ticket, { size: want.size, pass: want.pass })
             .catch(() => null);
       if (!this.record) return;

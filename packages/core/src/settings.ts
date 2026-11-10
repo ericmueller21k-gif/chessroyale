@@ -3507,12 +3507,22 @@ export const CLAW = {
 export const FAIRPLAY = {
   /**
    * What detection may do on its own: "watch" records levels but acts on none of them (until the simulation's numbers
-   * are in DECISIONS), "review" also opens reviews, "ban" also bans on overwhelming evidence. Reports and admins act
-   * whatever this says; the automated reviewer never bans. "review" since Nov 10 (the outside review, finding 3: its
-   * evidence is the judges' numbers, which devices send): automatic bans stay off until Eric turns them back on, after the
-   * deep re-check's own facts land (ROADMAP.md, fair play; docs/decisions/2026-11-10-rewards-and-records.md).
+   * are in DECISIONS), "review" also opens reviews, "pool" also sends a level that used to ban to the engine pool (`pool`
+   * below), "ban" bans it instead. Reports and admins act whatever this says; the automated reviewer never bans. Automatic
+   * bans stay off (the outside review of Nov 10, finding 3: the ban bar's evidence is the judges' numbers, which devices
+   * send); "pool" since Nov 10 (Eric: "we just keep them in hell basically"), reversible by a person's Release.
    */
-  enforcement: "review" as "watch" | "review" | "ban",
+  enforcement: "pool" as "watch" | "review" | "pool" | "ban",
+  /**
+   * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): an account detection puts here only ever meets other
+   * pooled accounts (or bots) in every queue, and nothing on its screen differs. In: a level that used to ban (`enforcement` "pool"),
+   * or a new account with `newHits` of its first `newGames` fair-play matches at the one-match ban bar (`levels.banOne*`), with no
+   * review. Out: a person's Release on the review page. Its evidence is kept while it's pooled.
+   */
+  pool: {
+    newGames: 10,
+    newHits: 2,
+  },
   reports: {
     /** What a report can be about (the sheet's buttons, in order). Only "cheating" counts toward an automatic review. */
     reasons: ["Cheating", "Offensive name or icon", "Something else"] as const,

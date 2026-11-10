@@ -13,7 +13,7 @@ import { purgeTokenDrops } from "./boss-tokens.ts";
 import { ledgerCheck, ledgerCheckDue } from "./ledger.ts";
 import { duelEntrant, purgeConduct, purgeDuelGames, rankedLeaves } from "./ranked.ts";
 import { DEVICE_COOKIE, SESSION_COOKIE, SIGN_IN_TO_PLAY, accountOf, handleAccountApi, isSignedIn, readCookie, signInRequired, withSecrets, type AccountEnv, type WaitUntil } from "./api.ts";
-import { BANNED_MESSAGE, banCheck } from "./fairplay.ts";
+import { BANNED_MESSAGE, banCheck, caseOf } from "./fairplay.ts";
 import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
@@ -228,15 +228,16 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       const raid = url.searchParams.get("mode") === "raid";
       // (A mode resting, a kill switch: no new matches. The bosses resting are never met: the lobby's object sees to it.)
       if (isPaused(rawEnv, raid ? "raid" : "crowd")) return pausedResponse(raid ? "raid" : "crowd");
-      const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      const may = await mayPlay(request, env, waitUntil);
+      if (may instanceof Response) return may;
       const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
       const type = url.searchParams.get("type") === "botsoff" ? "botsoff" : "default";
       // ?pool=NAME: a queue of its own (a test switch: tests run several queues at once without meeting). Split by
-      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place).
+      // region when that's on (queue.ts). ?ticket=ID: a player in line asking again (they keep their place). An account in
+      // the engine pool: the pool's own queue (from the account, never the browser: mayPlay).
       const region = regionOf(request.cf as { continent?: unknown } | undefined);
       const pool = await testPool(request, env, url, waitUntil);
-      const name = queueName(raid ? "raid" : "crowd", type, pool, region);
+      const name = queueName(raid ? "raid" : "crowd", type, pool, region, may.pooled);
       // (With a test's pool, ?afk=0: its 50 v 50 misses as before Nov 4, CrowdMisses off, for a test that idles on purpose.)
       const overrides = raid ? RAID_SETTINGS : { ...modeSettings("crowd", { augments: true }), ...(pool && url.searchParams.get("afk") === "0" ? { crowdMisses: null, tested: true } : {}) };
       const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(name), region ? { locationHint: REGION_HINT[region] } : undefined);
@@ -266,7 +267,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
       if (isPaused(rawEnv, part)) return pausedResponse(part);
       if (picked && isPaused(rawEnv, `boss:${picked}`)) return pausedResponse(`boss:${picked}`);
       const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      if (refused instanceof Response) return refused;
       const test = asksTestSwitches(url.searchParams) && (await testSwitches(request, env, waitUntil));
       const { overrides, keepMs } = lobbyOptions(url.searchParams, test, env.TEST_SWITCHES === "1");
       const code = await openLobbyCode(async (c) => (await env.LOBBIES.get(env.LOBBIES.idFromName(c)).create(c, overrides, undefined, keepMs)) !== false);
@@ -278,7 +279,7 @@ async function route(request: Request, rawEnv: Env, url: URL, waitUntil: WaitUnt
     if (url.pathname === "/api/boss/party" && request.method === "POST") {
       if (isPaused(rawEnv, "raid")) return pausedResponse("raid");
       const refused = await mayPlay(request, env, waitUntil);
-      if (refused) return refused;
+      if (refused instanceof Response) return refused;
       const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, "", 0, "boss"));
       return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
     }
@@ -335,13 +336,13 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   if (!url.pathname.startsWith("/api/squads/")) return null;
   const fill = Math.max(3, Math.min(600, Number(env.MATCH_FILL_SECONDS ?? 60) || 60));
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = async () => queueName("squads", "default", await testPool(request, env, url, waitUntil), region);
+  const queue = async (engine = false) => queueName("squads", "default", await testPool(request, env, url, waitUntil), region, engine);
   // (Squads resting, a kill switch: no new queue or party. Its test lobbies, admins only, still open.)
   if ((url.pathname === "/api/squads/play" || url.pathname === "/api/squads/party") && request.method === "POST" && isPaused(env, "squads")) return pausedResponse("squads");
   if (url.pathname === "/api/squads/play" && request.method === "POST") {
-    const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
-    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue()), region ? { locationHint: REGION_HINT[region] } : undefined);
+    const may = await mayPlay(request, env, waitUntil);
+    if (may instanceof Response) return may;
+    const mm = env.MATCHMAKER.get(env.MATCHMAKER.idFromName(await queue(may.pooled)), region ? { locationHint: REGION_HINT[region] } : undefined);
     const ticket = url.searchParams.get("ticket");
     try {
       return json(await mm.next({}, fill * 1000, { squads: true }, ticket && /^[\w-]{8,64}$/.test(ticket) ? ticket : null, { size: 1, pass: "" }));
@@ -351,9 +352,10 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
   }
   if (url.pathname === "/api/squads/party" && request.method === "POST") {
     const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
-    const name = await queue();
-    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000));
+    if (refused instanceof Response) return refused;
+    // (The party queues in the engine pool's own queue when any member is pooled, read from their accounts as it queues: squads-do.ts.)
+    const [name, pooled] = [await queue(), await queue(true)];
+    const code = await openLobbyCode(async (c) => env.PARTIES.get(env.PARTIES.idFromName(c)).create(c, name, fill * 1000, undefined, pooled));
     return code ? json({ code }) : json({ message: "Couldn't make a party. Try again." }, 500);
   }
   if (url.pathname === "/api/squads/lobby" && request.method === "POST") {
@@ -399,12 +401,15 @@ async function squadsRoute(request: Request, env: Env, url: URL, waitUntil: Wait
 async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUntil): Promise<Response | null> {
   if (!url.pathname.startsWith("/api/1v1/")) return null;
   const region = regionOf(request.cf as { continent?: unknown } | undefined);
-  const queue = async () => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region)), region ? { locationHint: REGION_HINT[region] } : undefined);
+  // (An account in the engine pool: the pool's own queue, read from the account on every ask: mayPlay.)
+  let pooled = false;
+  const queue = async () => env.MATCHMAKER.get(env.MATCHMAKER.idFromName(queueName("ranked1v1", "default", await testPool(request, env, url, waitUntil), region, pooled)), region ? { locationHint: REGION_HINT[region] } : undefined);
   const ticket = ((t) => (t && /^[\w-]{8,64}$/.test(t) ? t : null))(url.searchParams.get("ticket"));
   if (url.pathname === "/api/1v1/play" && request.method === "POST") {
     if (isPaused(env, "ranked1v1")) return pausedResponse("ranked1v1");
-    const refused = await mayPlay(request, env, waitUntil);
-    if (refused) return refused;
+    const may = await mayPlay(request, env, waitUntil);
+    if (may instanceof Response) return may;
+    pooled = may.pooled;
     if (!env.DB) return json({ message: "Ranked 1 v 1 isn't available here." }, 503);
     try {
       if (ticket) {
@@ -447,6 +452,8 @@ async function duelRoute(request: Request, env: Env, url: URL, waitUntil: WaitUn
   }
   if (url.pathname === "/api/1v1/cancel" && request.method === "POST") {
     if (!ticket) return json({});
+    // (A pooled account's ticket is in the pool's queue.)
+    pooled = await inPool(request, env, waitUntil);
     const placed: { code?: string } = await (await queue()).cancel(ticket).catch(() => ({}));
     if (placed.code) {
       const me = await accountOf(request, env, waitUntil).catch(() => null);
@@ -496,14 +503,22 @@ async function engineCaller(request: Request, env: Env, waitUntil: WaitUntil): P
   return null;
 }
 
+/** Whether the asking account is in fair play's engine pool (its queues are the pool's own). */
+async function inPool(request: Request, env: Env, waitUntil: WaitUntil): Promise<boolean> {
+  if (!env.DB) return false;
+  const me = await accountOf(request, env, waitUntil).catch(() => null);
+  return !!me && (await caseOf(d1Sql(env.DB), me.id).catch(() => null))?.status === "pool";
+}
+
 /**
  * Whether this request may start online play (PLAY, a new lobby): signed in where sign-in is set up (401 otherwise),
- * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Null: go ahead.
+ * and not banned for fair play (403, with `banned` so the app shows the ban notice and its appeal). Else go ahead, with
+ * whether the account is in fair play's engine pool (its queues are the pool's own; nothing in the answer says so).
  */
-async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | null> {
-  if (!env.DB) return null;
+async function mayPlay(request: Request, env: Env, waitUntil: WaitUntil): Promise<Response | { pooled: boolean }> {
+  if (!env.DB) return { pooled: false };
   const me: User | null = await accountOf(request, env, waitUntil);
   if (signInRequired(env) && !isSignedIn(me)) return json({ message: SIGN_IN_TO_PLAY }, 401);
-  const ban = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
-  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : null;
+  const ban: { banned: boolean; pooled?: boolean } = await banCheck(d1Sql(env.DB), me, readCookie(request, DEVICE_COOKIE), Date.now()).catch(() => ({ banned: false }));
+  return ban.banned ? json({ message: BANNED_MESSAGE, banned: true }, 403) : { pooled: !!ban.pooled };
 }

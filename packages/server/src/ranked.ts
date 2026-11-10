@@ -348,14 +348,14 @@ export async function purgeConduct(sql: Sql, now: number): Promise<void> {
 }
 
 /**
- * Deletes games older than RANKED_1V1.gamesKeepDays, except while a player in one has a fair-play case open (watch or
- * review) or an appeal of a ban waiting: fair play's own rule for evidence (fairplay.ts, purgeEvidence). A banned
+ * Deletes games older than RANKED_1V1.gamesKeepDays, except while a player in one has a fair-play case open (watch,
+ * review or the engine pool) or an appeal of a ban waiting: fair play's own rule for evidence (fairplay.ts, purgeEvidence). A banned
  * player's games go like anyone's once no appeal is open. On the Worker's 15-minute schedule.
  */
 export async function purgeDuelGames(sql: Sql, now: number): Promise<void> {
   await sql.run(
     `DELETE FROM ranked_1v1_games WHERE ended_at < ?
-       AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND c.status IN ('watch', 'review'))
+       AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND c.status IN ('watch', 'review', 'pool'))
        AND NOT EXISTS (SELECT 1 FROM fairplay_appeals a WHERE a.user_id IN (ranked_1v1_games.white_id, ranked_1v1_games.black_id) AND a.status = 'open')`,
     now - RANKED_1V1.gamesKeepDays * DAY,
   );

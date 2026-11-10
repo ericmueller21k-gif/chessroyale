@@ -15,9 +15,9 @@
  *     with only the day they were played, so the game's own numbers (how often each boss wins, typical placements)
  *     stay right while no row names anyone (its place among its match's rows still shows a gap: the decision file);
  *   - the ledger (ledger.ts): its rows stay, under the account's random ledger id, which goes, so they name nobody;
- *   - fair play's file on an account that's banned or in review: the case, its log, the hashed email and Google id
- *     (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
- *     around fair play (a new account with the same identity is banned again, or goes back to review). Everything
+ *   - fair play's file on an account that's banned, in review or in the engine pool: the case, its log, the hashed email and Google
+ *     id (fairplay_identities) and the device markers, under the deleted account's random id, so deleting never gets
+ *     around fair play (a new account with the same identity is banned again, or goes back to review or the pool). Everything
  *     else of fair play goes (judged moves, match summaries, appeals, reports).
  * It all happens in one batch (one transaction), so it's never half done. After it, a lobby's results, a reward and
  * fair play's recording find no account and write nothing; a few other actions in flight at that very moment (a
@@ -34,7 +34,7 @@ import { questDeletes, questsDownload } from "./quests.ts";
 /** What a store's erase needs to know, worked out before the batch. */
 export interface EraseContext {
   now: number;
-  /** The account is banned or in review: fair play's file on it stays (with these hashed identities). */
+  /** The account is banned, in review or in the engine pool: fair play's file on it stays (with these hashed identities). */
   keepFairPlay: boolean;
   identities: [kind: string, hash: string][];
 }
@@ -265,7 +265,7 @@ export const ACCOUNT_STORES: AccountStore[] = [
     erase: (u, { now, keepFairPlay, identities }) => {
       const gone = [stmt("DELETE FROM fairplay_matches WHERE user_id = ?", u.id), stmt("DELETE FROM fairplay_appeals WHERE user_id = ?", u.id)];
       if (!keepFairPlay) return [...gone, ...["fairplay_cases", "fairplay_log", "fairplay_identities", "fairplay_devices"].map((t) => stmt(`DELETE FROM ${t} WHERE user_id = ?`, u.id))];
-      // Banned or in review: the file outlives the account, with its identities as they are now (each in its own row;
+      // Banned, in review or pooled: the file outlives the account, with its identities as they are now (each in its own row;
       // a ban's are already there), so a new account made with one is caught (banCheck).
       return [
         ...gone,
@@ -325,7 +325,7 @@ export async function accountDownload(sql: Sql, user: User, now: number, extra: 
  */
 export async function deleteAccount(sql: Sql, user: User, now: number): Promise<{ keptFairPlay: boolean }> {
   const status = (await caseOf(sql, user.id))?.status;
-  const keepFairPlay = status === "banned" || status === "review";
+  const keepFairPlay = status === "banned" || status === "review" || status === "pool";
   const ctx: EraseContext = { now, keepFairPlay, identities: keepFairPlay ? await identityHashes(user) : [] };
   await sql.batch([
     ...ACCOUNT_STORES.flatMap((s) => s.erase(user, ctx)),

@@ -292,12 +292,13 @@ export class QueueCore {
 
 /**
  * Which matchmaker a PLAY press goes to: one per mode and matchmaking type ("crowd-default", "raid-botsoff"), so
- * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); and, with CAPACITY.queue.byRegion on, one
- * per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default": parties and solo
- * players, squads-lobby.ts), and so does ranked 1 v 1 ("ranked1v1-default": PAIR_BY_RATING, duel-room.ts).
+ * Default and Bots off never share a lobby; a test's own pool (?pool=NAME); the engine pool's own (`engine`: an account fair play
+ * pooled, set by the server from the account, never the browser: "crowd-default.engine", a name no test's pool can make); and, with
+ * CAPACITY.queue.byRegion on, one per continent ("crowd-default@EU"), created near its players. Squads has its own ("squads-default":
+ * parties and solo players, squads-lobby.ts), and so does ranked 1 v 1 ("ranked1v1-default": PAIR_BY_RATING, duel-room.ts).
  */
-export function queueName(mode: "crowd" | "raid" | "squads" | "ranked1v1", type: "default" | "botsoff", pool?: string | null, region?: string | null): string {
-  const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}`;
+export function queueName(mode: "crowd" | "raid" | "squads" | "ranked1v1", type: "default" | "botsoff", pool?: string | null, region?: string | null, engine = false): string {
+  const base = `${mode}-${type}${pool && /^[a-z0-9-]{1,24}$/.test(pool) ? `-${pool}` : ""}${engine ? ".engine" : ""}`;
   return region ? `${base}@${region}` : base;
 }
 
