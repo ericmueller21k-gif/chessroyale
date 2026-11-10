@@ -70,7 +70,7 @@ import {
   type NetBossBrain,
 } from "@chessroyale/chess";
 import { seatName } from "./text-filter.ts";
-import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
+import { assignJudges, cutBubble, drawJudges, emptyStats, seedFor, type JudgeCandidate, type JudgeDevice, type JudgeHow, type JudgeStats, type JudgeTask } from "./judges.ts";
 
 /**
  * One lobby's logic, independent of Cloudflare: players and tokens, the round
@@ -448,6 +448,28 @@ export interface JudgesRecord {
 
 /** What someone is told when they open a match that's over (results still up, or long gone). */
 export const MATCH_ENDED = "That match has ended.";
+
+const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const isChance = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1;
+
+/**
+ * Whether a host's scores for a board hold together, as a judge's must (judgedBoard in @chessroyale/chess): a legal best
+ * move, every number a chance from 0 to 1, a legal pick for every bot, and every pick scored. A board that doesn't is
+ * scored as when nobody could score it: every pick the same (2026-11-10-device-trust.md).
+ */
+export function hostBoardOk(job: ScoreJob, b: unknown): b is BoardScore {
+  if (!isRecord(b) || !isRecord(b.expectedAfter) || !isRecord(b.botPicks)) return false;
+  const legal = new Set(job.allowed ?? legalMoves(job.fen).filter((m) => m !== job.barred));
+  const after = b.expectedAfter;
+  if (typeof b.bestMove !== "string" || !legal.has(b.bestMove) || !isChance(b.bestExpected)) return false;
+  const scores = Object.values(after);
+  if (scores.length > 256 || !scores.every(isChance)) return false;
+  const scored = (m: unknown) => typeof m === "string" && Object.hasOwn(after, m);
+  const bots = job.bots.map((x) => (b.botPicks as Record<string, unknown>)[x.id]);
+  if (!bots.every((m) => typeof m === "string" && legal.has(m) && scored(m))) return false;
+  if (b.botPowerUps !== undefined && !(Array.isArray(b.botPowerUps) && b.botPowerUps.every((x) => typeof x === "string"))) return false;
+  return Object.values(job.humanPicks).every((m) => m === null || scored(m));
+}
 /** Someone not in the party at a party's battle (a guessed code). */
 export const PARTY_ONLY = "This battle is for its party.";
 
@@ -792,10 +814,13 @@ export class LobbyCore {
     party: { pass?: unknown; seat?: unknown } = {},
   ) {
     this.r.activeAt = this.io.now();
-    const existing = token ? this.r.humans.find((h) => h.token === token) : undefined;
+    const byToken = token ? this.r.humans.find((h) => h.token === token) : undefined;
     // A seat keeps the account it was taken on: its rating set the raid's boss, and its result goes to that account.
     // Back on another one (or on one when it had none), they're refused (docs/decisions/2026-10-16-server-side-rating.md).
-    if (existing && userId && userId !== this.r.accounts?.[existing.id]) return { ok: false as const, message: OTHER_ACCOUNT };
+    if (byToken && userId && userId !== this.r.accounts?.[byToken.id]) return { ok: false as const, message: OTHER_ACCOUNT };
+    // One seat per account (a guest's too: its guest account): a second tab or device of an account that already sits
+    // here takes over that seat, as a reconnect does, never a seat of its own (docs/decisions/2026-11-10-device-trust.md).
+    const existing = byToken ?? (userId ? this.r.humans.find((h) => this.r.accounts?.[h.id] === userId) : undefined);
     // (Bots off: seats of people long gone are freed first, so the count and "full" are real. Not the arriving one's.)
     this.freeGoneSeats(existing?.id);
     if (existing) {
@@ -1284,14 +1309,14 @@ export class LobbyCore {
       case "scores":
         return this.scores(playerId, msg.key, msg.boards);
       case "crossCheck":
-        if (!msg.ok) {
-          this.r.mismatches++;
-          console.log(`cross-check mismatch in ${this.r.code} (${msg.key}, board ${msg.boardId}): ${msg.detail ?? ""}`);
+        // (Anyone can send one: counted, and only the first few logged, short, so nobody can fill the log.)
+        if (msg.ok !== true && this.r.mismatches++ < 20) {
+          console.log(`cross-check mismatch in ${this.r.code} (${String(msg.key).slice(0, 40)}, board ${Number(msg.boardId)}): ${String(msg.detail ?? "").slice(0, 200)}`);
         }
         return;
       case "botPlan":
         if (this.planner(playerId, msg.key) && this.r.round?.key === msg.key && this.r.phase === "play" && !this.r.round.botPlan) {
-          this.r.round.botPlan = { picks: msg.picks, powerUps: msg.powerUps, ...(this.r.judges?.plan?.key === msg.key ? { by: playerId } : {}) };
+          this.r.round.botPlan = { ...this.cleanBotPlan(msg.picks, msg.powerUps), ...(this.r.judges?.plan?.key === msg.key ? { by: playerId } : {}) };
           this.sendTally();
         }
         return;
@@ -1322,7 +1347,7 @@ export class LobbyCore {
         return;
       }
       case "bossMove":
-        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key)
+        if (playerId === this.r.hostId && this.r.phase === "boss" && this.r.bossKey === msg.key && typeof msg.move === "string" && msg.move.length <= 8)
           this.playBoss(msg.move, { ...(typeof msg.drag === "string" ? { drag: msg.drag } : {}), ...(typeof msg.showdown === "string" ? { showdown: msg.showdown } : {}), ...(msg.outside === true ? { outside: true } : {}), ...(Array.isArray(msg.beam) ? { beam: msg.beam.filter((x): x is string => typeof x === "string").slice(0, 32) } : {}), ...(typeof msg.balloon === "string" ? { balloon: msg.balloon.slice(0, 2) } : {}), ...(typeof msg.hoops === "string" ? { hoops: msg.hoops.slice(0, 32) } : {}), ...(typeof msg.crease === "string" ? { crease: msg.crease.slice(0, 8) } : {}) });
         return;
       case "leave":
@@ -2272,6 +2297,22 @@ export class LobbyCore {
     if (this.roundDone()) this.lock();
   }
 
+  /**
+   * The Crowd bots' early picks as sent (everyone sees them as the bots' live votes): only this round's picking bots, each
+   * a move allowed on the board; anything else is dropped (that bot picks with the scoring, as without a plan).
+   */
+  private cleanBotPlan(picks: unknown, powerUps: unknown): { picks: Record<string, string>; powerUps: string[] } {
+    const runner = this.runner!;
+    const [boardId, ids] = [...runner.groups.entries()][0] ?? [0, []];
+    const bots = new Set(ids.filter((id) => this.r.bots.some((b) => b.id === id)));
+    const fen = runner.boards.get(boardId)?.fen;
+    const barred = runner.boss?.barred;
+    const legal = new Set(fen ? ((runner.boss && runner.crowdAllowed(boardId)) || legalMoves(fen).filter((m) => m !== barred)) : []);
+    const clean = Object.entries(isRecord(picks) ? picks : {}).filter((e): e is [string, string] => bots.has(e[0]) && typeof e[1] === "string" && legal.has(e[1]));
+    const used = Array.isArray(powerUps) ? powerUps.filter((id): id is string => typeof id === "string" && bots.has(id)) : [];
+    return { picks: Object.fromEntries(clean), powerUps: [...new Set(used)] };
+  }
+
   private sendTally() {
     const round = this.r.round;
     const runner = this.runner;
@@ -2382,7 +2423,10 @@ export class LobbyCore {
     // (Fair play: the move before each position, for recaptures; the boards move on in finishRound.)
     const lastMoves = new Map(this.r.scoreRequest!.jobs.map((j) => [j.boardId, runner.boards.get(j.boardId)?.lastMove ?? null]));
     const results = this.r.scoreRequest!.jobs.map((job) => {
-      const s = byBoard.get(job.boardId);
+      // (The host's: checked as a judge's are. A board that doesn't hold together is scored as nobody could: all the same.)
+      const sent = byBoard.get(job.boardId);
+      const s = judged || hostBoardOk(job, sent) ? sent : undefined;
+      if (sent && !s) console.log(`host scores for board ${job.boardId} in ${this.r.code} don't hold together: every pick scored the same`);
       const ids = runner.groups.get(job.boardId)!;
       const picks: Record<string, string | null> = { ...job.humanPicks };
       // (Boss battle: no bot plays a move that isn't allowed, nor the move the God King took back.)
@@ -2394,12 +2438,12 @@ export class LobbyCore {
       }
       const bestExpected = s?.bestExpected ?? 0.5;
       const expectedAfter: Record<string, number> = { ...(s?.expectedAfter ?? {}) };
-      // A pick the host didn't score counts as the best (no loss) rather than failing the round.
+      // (No scores for the board, the host's not holding together: every pick counts the same.)
       for (const m of Object.values(picks)) if (m && expectedAfter[m] === undefined) expectedAfter[m] = bestExpected;
       const bestMove = s?.bestMove && legal.includes(s.bestMove) ? s.bestMove : legal[0]!;
       if (expectedAfter[bestMove] === undefined) expectedAfter[bestMove] = bestExpected;
       // (The host's replies and mates from the same searches: what a blunder loses, for the God King's Last Stand.)
-      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(s?.replies ? { replies: s.replies } : {}), ...(s?.mates ? { mates: s.mates } : {}) });
+      return runner.resolveBoard(job.boardId, ids, picks, { bestMove, bestExpected, expectedAfter, ...(isRecord(s?.replies) ? { replies: s.replies } : {}), ...(isRecord(s?.mates) ? { mates: s.mates } : {}) });
     });
     const think = Object.fromEntries(Object.entries(round.picks).map(([id, p]) => [id, p.thinkMs]));
     // A miss uses the whole of the player's time for the move (out of tries in Hollow's dark: the time until then).
@@ -2557,9 +2601,12 @@ export class LobbyCore {
   }
 
   /** Devices that can judge now: connected, speed known (an up-to-date app), not benched. */
-  private judgeDevices(): { id: string; nps: number }[] {
+  private judgeDevices(): JudgeCandidate[] {
     const devices = this.r.judges?.devices ?? {};
-    return this.r.humans.filter((h) => h.connected && devices[h.id] && !this.benched(h.id)).map((h) => ({ id: h.id, nps: devices[h.id]!.nps }));
+    // (`owner`: the account, so no two judges of a job are one person's; one seat per account makes it so already.)
+    return this.r.humans
+      .filter((h) => h.connected && devices[h.id] && !this.benched(h.id))
+      .map((h) => ({ id: h.id, nps: devices[h.id]!.nps, owner: this.r.accounts?.[h.id] ?? h.id }));
   }
 
   /** Two judges per job when two devices can judge (else the host, as before). */
@@ -2581,7 +2628,7 @@ export class LobbyCore {
   }
 
   /** The devices a round's judges are drawn from: the capable ones in deep mode, else all that can judge. */
-  private judgePool(): { id: string; nps: number }[] {
+  private judgePool(): JudgeCandidate[] {
     const all = this.judgeDevices();
     return this.deepMode() ? all.filter((d) => this.capable(d.id)) : all;
   }
@@ -2602,7 +2649,7 @@ export class LobbyCore {
   private speed(playerId: string, nps: unknown) {
     if (!this.human(playerId) || typeof nps !== "number" || !Number.isFinite(nps) || nps <= 0) return;
     const d = (this.jr.devices[playerId] ??= { nps: 0, strikes: 0, jobs: 0, answered: 0 });
-    d.nps = Math.round(Math.max(10_000, Math.min(50_000_000, nps)));
+    d.nps = Math.round(Math.max(10_000, Math.min(this.jcfg.maxNps ?? JUDGES.maxNps, nps)));
   }
 
   /** Who may send the Crowd bots' early picks this round: the host, or (many judges) a judge of the board. */

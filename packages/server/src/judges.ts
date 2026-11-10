@@ -118,16 +118,29 @@ export function judgeWeight(nps: number, load: number, cfg: Pick<JudgeConfig, "s
   return Math.pow(Math.max(1, nps) / 100_000, cfg.speedWeight) / (1 + load);
 }
 
-/** Draws `count` different judges at random by weight, leaving out `exclude`. */
+/** A device that can judge: its seat, its speed, and whose it is (`owner`: the account; none: the seat's own). */
+export interface JudgeCandidate {
+  id: string;
+  nps: number;
+  owner?: string;
+}
+
+const ownerOf = (d: JudgeCandidate) => d.owner ?? d.id;
+
+/**
+ * Draws `count` different judges at random by weight, leaving out `exclude`. Never two of one owner, nor one whose owner
+ * is excluded: two judges that agree are accepted unchecked, so they must be two people (2026-11-10-device-trust.md).
+ */
 export function drawJudges(
   rng: () => number,
-  devices: readonly { id: string; nps: number }[],
+  devices: readonly JudgeCandidate[],
   count: number,
   cfg: Pick<JudgeConfig, "speedWeight">,
   load: Map<string, number> = new Map(),
   exclude: ReadonlySet<string> = new Set(),
 ): string[] {
-  const pool = devices.filter((d) => !exclude.has(d.id));
+  const owners = new Set(devices.filter((d) => exclude.has(d.id)).map(ownerOf));
+  let pool = devices.filter((d) => !exclude.has(d.id) && !owners.has(ownerOf(d)));
   const out: string[] = [];
   while (out.length < count && pool.length) {
     const weights = pool.map((d) => judgeWeight(d.nps, load.get(d.id) ?? 0, cfg));
@@ -135,8 +148,9 @@ export function drawJudges(
     let x = rng() * total;
     let i = 0;
     while (i < pool.length - 1 && x >= weights[i]!) x -= weights[i++]!;
-    out.push(pool[i]!.id);
-    pool.splice(i, 1);
+    const chosen = pool[i]!;
+    out.push(chosen.id);
+    pool = pool.filter((d) => ownerOf(d) !== ownerOf(chosen));
   }
   return out;
 }
@@ -148,7 +162,7 @@ export function drawJudges(
 export function assignJudges(
   rng: () => number,
   boards: readonly { boardId: number; cost: number }[],
-  devices: readonly { id: string; nps: number }[],
+  devices: readonly JudgeCandidate[],
   perJob: number,
   cfg: Pick<JudgeConfig, "speedWeight">,
 ): Map<number, string[]> {
