@@ -3,10 +3,12 @@ import { RANKED_1V1 } from "@chessroyale/core";
 import { named, test, watchSpans } from "./helpers.ts";
 
 /**
- * Browsing while queued for 1 v 1 (docs/areas/ranked.md, "Browsing while queued"; Eric, Oct 16): Home from the search
- * stage keeps the search going, with a bar on every screen ("Searching 1 v 1 · 0:42 ›", Cancel); the bar goes back to
- * the stage; an opponent found while you browse buzzes and goes straight to the stage; another mode asks "Leave the
- * 1 v 1 queue?" first; a reload carries on with the search. Each test queues in a pool of its own (`?pool=`).
+ * Browsing while queued for 1 v 1 (docs/areas/ranked.md, "Browsing while queued"; Eric, Oct 16; home's rows since Nov 10,
+ * search-home.spec.ts for 50 v 50 and Squads): Home from the search stage keeps the search going, shown in home's own mode
+ * rows ("Searching · 1 v 1", Cancel, Lobby, Start with bots) and a bar on every other page ("Searching 1 v 1 · 0:42 ›",
+ * Cancel); the bar and Lobby go back to the stage; an opponent found while you browse buzzes and goes straight to the stage;
+ * another mode asks "Leave the 1 v 1 queue?" first; a reload carries on with the search. Each test queues in a pool of its
+ * own (`?pool=`).
  */
 
 const isComputer = () => test.info().project.name === "desktop";
@@ -57,28 +59,36 @@ async function underBar(page: Page) {
   });
 }
 
-test("Home from the search keeps you queued: the bar on home and in the shop, back to the stage from it, Cancel from it", { tag: "@phone-only" }, async ({ browser }) => {
+test("Home from the search keeps you queued: home's rows show it (no bar there), the bar in the shop, back to the stage from it and from Lobby, Cancel from the rows", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Browse");
   const seen = asks(a);
   await a.goto(`/1v1?nolanding&pool=${poolName()}`);
   await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
-  // Home: home's screen, the search's bar at the top, nothing under it; no confirm.
+  // Home: home's screen, the search in its mode rows (Nov 10), no bar there; no confirm.
   await goHome(a);
   const bar = a.locator(".dq-bar");
-  await expect(bar).toBeVisible();
-  await expect(bar.locator(".dq-go")).toHaveText(/^Searching 1 v 1· \d:\d\d›$/);
-  await expect(bar.getByRole("button", { name: "Cancel" })).toBeVisible();
+  const rows = a.locator(".fd-search");
+  await expect(rows.locator(".fd-search-title")).toHaveText("Searching · 1 v 1");
+  await expect(rows.locator(".fd-search-detail")).toHaveText("Ranked · near your level");
+  await expect(a.locator(".fd-search-acts").getByRole("button")).toHaveText(["Cancelstop searching", "Lobbyback to search", "Start with botsplay now"]);
+  await expect(bar).toHaveCount(0);
   await expect(a.locator(".dv-stage")).toHaveCount(0);
-  await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
   expect(new URL(a.url()).pathname).toBe("/");
-  expect(await underBar(a)).toBeGreaterThanOrEqual(-0.5);
   // Still in the queue: it keeps asking, and the wait keeps counting.
   const before = seen.play;
   await expect.poll(() => seen.play, { timeout: 15_000 }).toBeGreaterThan(before);
-  // The shop: the bar there too, over nothing.
+  // Lobby: the stage, the same search; Home again.
+  await a.locator(".fd-search-acts").getByRole("button", { name: /^Lobby/ }).click();
+  await expect(a.locator(".dv-search")).toContainText("Finding opponent…");
+  expect(new URL(a.url()).pathname).toBe("/1v1");
+  await goHome(a);
+  // The shop: the bar there, over nothing.
   await openShop(a);
   await expect(bar).toBeVisible();
+  await expect(bar.locator(".dq-go")).toHaveText(/^Searching 1 v 1· \d:\d\d›$/);
+  await expect(bar.getByRole("button", { name: "Cancel" })).toBeVisible();
   expect(await underBar(a)).toBeGreaterThanOrEqual(-0.5);
   await a.waitForTimeout(1_200);
   // The bar's words: back to the stage, the same search (its wait not started again).
@@ -88,9 +98,11 @@ test("Home from the search keeps you queued: the bar on home and in the shop, ba
   await expect(bar).toHaveCount(0);
   expect(new URL(a.url()).pathname).toBe("/1v1");
   expect(seconds(await a.locator(".dv-search .dv-wait").textContent())).toBeGreaterThanOrEqual(waited);
-  // Home again, then the bar's Cancel: out of the queue (the server told), the page stays, no more asks.
+  // Home again, then the rows' Cancel and Yes: out of the queue (the server told), home as it was, no more asks.
   await goHome(a);
-  await bar.getByRole("button", { name: "Cancel" }).click();
+  await a.locator(".fd-search-acts").getByRole("button", { name: /^Cancel/ }).click();
+  await a.locator(".fd-search-acts").getByRole("button", { name: /^Yes/ }).click();
+  await expect(rows).toHaveCount(0);
   await expect(bar).toHaveCount(0);
   await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect.poll(() => seen.cancel).toBe(1);
@@ -131,44 +143,42 @@ test("an opponent found while you browse: a sound and a buzz, straight to the st
   await expect(b.locator(".dv-vote")).toBeVisible({ timeout: 10_000 });
 });
 
-test("another mode while queued asks first (Stay keeps the search; Leave queue ends it and starts that mode); 1 v 1's PLAY goes back to the stage", { tag: "@phone-only" }, async ({ browser }) => {
+test("another mode while queued asks first (Stay keeps the search; Leave queue ends it and starts that mode): a private lobby from Friends; home's PLAY greys while searching", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Modes");
   const seen = asks(a);
   await a.goto(`/1v1?nolanding&pool=${poolName()}`);
   await expect(a.locator(".dv-search")).toBeVisible();
   await goHome(a);
-  const bar = a.locator(".dq-bar");
-  const ranked = a.getByRole("radiogroup", { name: "RANKED" });
-  const play = a.getByRole("button", { name: "PLAY", exact: true });
-  // 1 v 1's PLAY while searching: the stage again, the same search, no confirm.
-  await ranked.getByRole("radio", { name: /^1 v 1/ }).click();
-  await play.click();
-  await expect(a.locator(".dv-search")).toBeVisible();
-  await expect(a.getByRole("alertdialog")).toHaveCount(0);
-  await goHome(a);
-  // 50 v 50's PLAY: "Leave the 1 v 1 queue?"; Stay: still searching.
-  await ranked.getByRole("radio", { name: /^50 v 50/ }).click();
-  await play.click();
+  const rows = a.locator(".fd-search");
+  // (Home's PLAY is greyed while searching, Nov 10: the search is in the rows above it.)
+  await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeDisabled();
+  // A private lobby (Friends, Private lobby, Get friend code): "Leave the 1 v 1 queue?"; Stay: still searching.
+  const create = async () => {
+    await a.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+    await a.getByRole("button", { name: /^Private lobby/ }).click();
+    await a.getByRole("button", { name: "Get friend code" }).click();
+  };
+  await create();
   const ask = a.getByRole("alertdialog", { name: "Leave the 1 v 1 queue?" });
   await expect(ask).toContainText("Starting this ends your 1 v 1 search.");
   await expect(ask.getByRole("button")).toHaveText(["Stay", "Leave queue"]);
   await ask.getByRole("button", { name: "Stay" }).click();
   await expect(ask).toHaveCount(0);
-  await expect(bar).toBeVisible();
+  await expect(rows).toBeVisible();
   expect(seen.cancel).toBe(0);
-  // Again, Leave queue: the search ends (the server told) and 50 v 50's queue starts.
-  await play.click();
+  // Again, Leave queue: the search ends (the server told) and the lobby opens.
+  await a.getByRole("button", { name: "Close" }).click();
+  await create();
   await ask.getByRole("button", { name: "Leave queue" }).click();
-  await expect(bar).toHaveCount(0);
   await expect.poll(() => seen.cancel).toBe(1);
-  await expect(a.getByRole("button", { name: "Cancel" })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => new URL(a.url()).pathname, { timeout: 15_000 }).toMatch(/^\/lobby\/[A-Z2-9]{5}$/);
+  await expect(rows).toHaveCount(0);
+  await expect(a.locator(".dq-bar")).toHaveCount(0);
   await expect(a.locator(".dv-stage")).toHaveCount(0);
-  await a.getByRole("button", { name: "Cancel" }).click();
-  await expect(play).toBeVisible();
 });
 
-test("a reload while queued carries on with the search: on the stage from /1v1, with the bar from home; found after it, and no buzz with sound off", { tag: "@phone-only" }, async ({ browser }) => {
+test("a reload while queued carries on with the search: on the stage from /1v1, in home's rows from home; found after it, and no buzz with sound off", { tag: "@phone-only" }, async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Reload");
   const b = await player(browser, "Bo Reload");
@@ -185,13 +195,15 @@ test("a reload while queued carries on with the search: on the stage from /1v1, 
   await a.reload();
   await expect(a.locator(".dv-search")).toBeVisible();
   expect(seconds(await a.locator(".dv-search .dv-wait").textContent())).toBeGreaterThanOrEqual(2);
-  // From home: home again, with the bar (no ghost: it's the same search, still asking).
+  // From home: home again, with the search in its rows (no ghost: it's the same search, still asking).
   await goHome(a);
   await a.reload();
   const bar = a.locator(".dq-bar");
-  await expect(bar).toBeVisible();
+  const rows = a.locator(".fd-search");
+  await expect(rows).toBeVisible();
+  await expect(bar).toHaveCount(0);
   await expect(a.locator(".dv-stage")).toHaveCount(0);
-  expect(seconds(await bar.locator(".dq-time").textContent())).toBeGreaterThanOrEqual(2);
+  expect(seconds(await rows.locator(".fd-search-time").textContent())).toBeGreaterThanOrEqual(2);
   // And it finds: Bo queues, Ann goes to the stage (sound off: no buzz).
   await b.goto(`/1v1?nolanding&pool=${pool}`);
   await expect(a.locator(".dv-versus .dv-st-them .dv-st-name")).toHaveText("Bo Reload", { timeout: 20_000 });
@@ -202,14 +214,18 @@ test("a reload while queued carries on with the search: on the stage from /1v1, 
   await expect(a.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await a.waitForTimeout(1_000);
   await expect(bar).toHaveCount(0);
+  await expect(rows).toHaveCount(0);
 });
 
-test("the bar fits (320, 360, 390 px; 1280 on a computer), and at Few players online it says so and takes you to the choices", async ({ browser }) => {
+test("the bar fits (320, 360, 390 px; 1280 on a computer), and at Few players online it says so (home's rows too) and takes you to the choices", async ({ browser }) => {
   test.setTimeout(2 * 60_000);
   const a = await player(browser, "Ann Fits");
   await a.goto(`/1v1?nolanding&pool=${poolName()}&fewAfter=1`);
   await expect(a.locator(".dv-search")).toBeVisible();
   await goHome(a);
+  // (Home's rows say it; the bar is on every other page: the shop.)
+  await expect(a.locator(".fd-search-detail")).toHaveText("Few players online", { timeout: 10_000 });
+  await openShop(a);
   const bar = a.locator(".dq-bar");
   await expect(bar).toHaveClass(/\bfew\b/, { timeout: 10_000 });
   await expect(bar.locator(".dq-text")).toHaveText("Few players online");
@@ -239,6 +255,7 @@ test("the bar fits (320, 360, 390 px; 1280 on a computer), and at Few players on
   await expect(a.locator(".dv-few")).toContainText("Few players online right now");
   await a.locator(".dv-few").getByRole("button", { name: "Keep waiting" }).click();
   await goHome(a);
+  await openShop(a);
   await expect(bar).not.toHaveClass(/\bfew\b/);
   await expect(bar.locator(".dq-text")).toHaveText("Searching 1 v 1");
   await bar.getByRole("button", { name: "Cancel" }).click();

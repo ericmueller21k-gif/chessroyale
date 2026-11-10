@@ -535,7 +535,7 @@
         "packages/app/src/components/FrontMenu.tsx",
         "packages/app/src/home-art/**"
       ],
-      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts", "e2e/walkthrough.spec.ts", "e2e/home-card.spec.ts"]
+      "specs": ["e2e/age-gate.spec.ts", "e2e/boss-select.spec.ts", "e2e/busy.spec.ts", "e2e/faq.spec.ts", "e2e/home-layout.spec.ts", "e2e/home-polish.spec.ts", "e2e/home-ranked.spec.ts", "e2e/kill-switches.spec.ts", "e2e/landing.spec.ts", "e2e/legal.spec.ts", "e2e/live-window.spec.ts", "e2e/matchmaking.spec.ts", "e2e/profile.spec.ts", "e2e/town-desktop.spec.ts", "e2e/walkthrough.spec.ts", "e2e/home-card.spec.ts", "e2e/search-home.spec.ts"]
     },
     "the stylesheet (one file for every screen: the specs that measure layouts)": {
       "paths": ["packages/app/src/styles.css"],
@@ -584,7 +584,7 @@
         "e2e/matchmaking.spec.ts",
         "e2e/multiplayer.spec.ts",
         "e2e/ranked-1v1.spec.ts",
-        "e2e/squads.spec.ts"
+        "e2e/squads.spec.ts", "e2e/search-home.spec.ts"
       ]
     },
     "live counts and the live window": {
@@ -766,7 +766,7 @@
         "e2e/squads-three-boards.spec.ts",
         "e2e/squads-v2.spec.ts",
         "e2e/squads-watch.spec.ts",
-        "e2e/vote-hint.spec.ts"
+        "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts"
       ]
     },
     "Ranked 1 v 1": {
@@ -775,7 +775,8 @@
         "packages/app/src/duel.ts",
         "packages/app/src/ranked.ts",
         "packages/app/src/screens/Duel.tsx",
-        "packages/app/src/components/DuelQueueBar.tsx",
+        "packages/app/src/components/SearchBar.tsx",
+        "packages/app/src/search.ts",
         "packages/app/src/components/DuelRankPill.tsx",
         "packages/app/src/components/DuelStage.tsx",
         "packages/app/src/components/DuelVote.tsx",
@@ -786,7 +787,7 @@
         "packages/server/src/duel-do.ts",
         "packages/server/src/duel-room.ts"
       ],
-      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/ranked-tiers.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts"]
+      "specs": ["e2e/board-tools.spec.ts", "e2e/home-ranked.spec.ts", "e2e/ranked-1v1.spec.ts", "e2e/ranked-1v1-browse.spec.ts", "e2e/ranked-tiers.spec.ts", "e2e/town.spec.ts", "e2e/vote-hint.spec.ts", "e2e/search-home.spec.ts"]
     },
     "errors, reports, kill switches and capacity": {
       "paths": [
