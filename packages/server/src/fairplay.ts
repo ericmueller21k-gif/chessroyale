@@ -270,12 +270,12 @@ export async function decide(
   if (!user && !before) return { ok: false, status: 404, message: "no such player" };
   if (release && before?.status !== "pool") return { ok: false, status: 409, message: "this player isn't in the engine pool" };
   if (by === "reviewer") {
-    // (The pool is for a person to judge, from how the player does in it: docs/decisions/2026-11-10-engine-pool.md.)
-    if (before?.status === "pool" || release) return { ok: false, status: 409, message: "engine pool cases are for a person" };
     // (A ban is a person's, always: the ban bar's evidence still comes from the judges' numbers, which devices send, so a leaked token
     // or a steered reviewer could ban an honest player at it. The outside review of Nov 10, finding 6, and its review's M1.)
     if (status === "banned") return { ok: false, status: 409, message: "a ban is for a person: choose review or watch, or leave it for one" };
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
+    // (The pool is for a person to judge, from how the player does in it: docs/decisions/2026-11-10-engine-pool.md.)
+    if (before?.status === "pool" || release) return { ok: false, status: 409, message: "engine pool cases are for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
