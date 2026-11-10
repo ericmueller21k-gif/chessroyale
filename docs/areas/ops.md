@@ -105,7 +105,8 @@ Lane: `ops`. Step-by-step setup is in `DEPLOY.md`.
     limit on jobs at once (20 on GitHub Free) queues the rest.
   - **Not a required check yet;** if it becomes one, require `result` (one name, whatever the shard count).
 - **Schema at runtime:** D1 tables are made by the Worker (`CREATE TABLE IF NOT EXISTS`, then `ALTER TABLE` migrations
-  that tolerate re-runs), so a deploy needs no migration step.
+  that tolerate re-runs), so a deploy needs no migration step: once per instance, 4 round trips after a schema change
+  (134 a statement at a time before Nov 10), 1 on a current database ([accounts.md](accounts.md), "The database").
 - **Built for surges** (measured with simulated players on staging):
   - **The matchmaker:** PLAY presses are tickets in memory, seated in batches (one seat reservation per lobby per
     batch), admitted at `CAPACITY.queue` rates; past `CAPACITY.overload` the answer is "Servers are busy, you're in

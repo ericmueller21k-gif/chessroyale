@@ -31,7 +31,15 @@ function memoryDb() {
     first: async () => db.prepare(q).get(...(params as never[])) ?? null,
     all: async () => ({ results: db.prepare(q).all(...(params as never[])) }),
   });
-  const d1 = { prepare: (q: string) => stmt(q) } as unknown as D1Database;
+  const d1 = {
+    prepare: (q: string) => stmt(q),
+    // (In order. The schema run sends its statements in batches.)
+    batch: async (stmts: { run(): Promise<unknown> }[]) => {
+      const out = [];
+      for (const s of stmts) out.push(await s.run());
+      return out;
+    },
+  } as unknown as D1Database;
   return { db, sql, d1 };
 }
 

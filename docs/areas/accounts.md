@@ -44,7 +44,10 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   `GOOGLE_CLIENT_SECRET` for Google, `RESEND_API_KEY` for email. They live in the account's Secrets Store (bound in
   `wrangler.jsonc`, `secrets_store_secrets`); `withSecrets()` reads them from the store or as Worker secrets.
 - **The database** is Cloudflare D1. The schema is made at runtime (`CREATE TABLE IF NOT EXISTS`, once per Worker
-  instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step.
+  instance; later columns by `ALTER TABLE` migrations that tolerate re-runs), so a deploy needs no migration step. One
+  run per instance (requests meanwhile wait for it), in 4 round trips after a schema change, 1 on a current database
+  (`ensureSchema`; `schema-fast.test.ts`; [2026-11-10-schema-fast.md](../decisions/2026-11-10-schema-fast.md)). Check
+  new SQL on the local D1 too: it refuses some that node:sqlite takes (more than 5 UNION terms, `pragma_table_info(col)`).
 - **Results.** The server records online matches when a lobby reaches results, for every connected player with an
   account (`results.ranked` says whether it counts for ranking). The browser posts solo matches (`online = 0`): the
   browser's word, so they never count for ranking (even the ones from before Oct 7, stored with `ranked` NULL) nor
