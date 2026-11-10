@@ -356,31 +356,34 @@ export function lazyAnim(make: () => Anim): Anim {
 
 /**
  * lazyAnim for a file whose frames share what they make (a part cached by a rounded pose, a counter), so the frame made first
- * decides it: there, the first read makes every animation the file wraps, in the file's order, as the load did before. The art
- * then comes out the same whichever the page shows first. `const lazyAnim = lazyAnimsTogether();` in that file. Its `first()`
- * makes them now (once): a pose builder another file uses calls it, so that file's frames come after the boss's own, as before.
+ * decides it. There, reading an animation makes the file's animations up to it, in the file's order, as the load did before (the
+ * ones after it were made after it, so can't have changed it): the art comes out the same whichever the page shows first, and a
+ * warm-up can still make them one at a time. `const lazyAnim = lazyAnimsTogether();` in that file. Its `first()` makes them
+ * all: a pose builder another file uses calls it, so that file's frames come after the boss's own, as before.
  */
 export function lazyAnimsTogether(): ((make: () => Anim) => Anim) & { first: () => void } {
-  const all: (() => Anim)[] = [];
-  let started = false;
-  const first = () => {
-    if (started) return;
-    started = true;
-    for (const m of all) m();
+  const makers: (() => Anim)[] = [];
+  const made: Anim[] = [];
+  let making = 0;
+  const upTo = (i: number): Anim => {
+    making++;
+    try {
+      while (made.length <= i) made.push(makers[made.length]!());
+    } finally {
+      making--;
+    }
+    return made[i]!;
   };
+  // (Not while one of the file's own is being made: its pose builder is calling, and the rest come after.)
+  const first = () => void (making === 0 && makers.length > made.length && upTo(makers.length - 1));
   const wrap = (make: () => Anim): Anim => {
-    let made: Anim | undefined;
-    const get = (): Anim => {
-      first();
-      return (made ??= make());
-    };
-    all.push(get);
+    const i = makers.push(make) - 1;
     return {
       get loop() {
-        return get().loop;
+        return upTo(i).loop;
       },
       get frames() {
-        return get().frames;
+        return upTo(i).frames;
       },
     };
   };
