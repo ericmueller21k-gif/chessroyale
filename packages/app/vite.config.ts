@@ -64,7 +64,10 @@ function listFiles(dir: string): string[] {
   });
 }
 
-/** Writes dist/sw.js with every built file (engine included) precached, versioned by their contents. */
+/** Pictures: not precached, kept by the service worker when first shown (its LAZY, the same test). */
+const LAZY_FILES = /\.(png|jpe?g|webp|gif|avif)$/;
+
+/** Writes dist/sw.js with every built file (engine included) precached but pictures, versioned by their contents. */
 function serviceWorker(): Plugin {
   let outDir = "dist";
   return {
@@ -82,6 +85,9 @@ function serviceWorker(): Plugin {
         // ambience, about 18 MB, streamed by an <audio> element only while it plays: see STREAMED in sw-template.js. (The rides'
         // baked sheets were left out here until Nov 1; the town now draws its riders from the rides' own drawings: town/rides.ts.)
         .filter((f) => f !== "/sw.js" && f !== "/version.json" && !f.endsWith(".webmanifest") && !f.endsWith(".txt") && !f.endsWith(".tar.gz") && !f.startsWith("/replays/") && !f.startsWith("/engine/maia/") && f !== "/sounds/colosseum/ambient.mp3")
+        // Nor pictures and video (Nov 10, phone load): the service worker keeps a picture the first time it's shown (LAZY in
+        // sw-template.js), and the landing page's demo video (one format, MP4) streams like the ambience.
+        .filter((f) => !LAZY_FILES.test(f) && !f.startsWith("/media/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();

@@ -9,6 +9,9 @@ const MAIA = "__MAIA__";
 // Media streamed by an <audio> element (the Colosseum's hour of ambience): never precached nor answered here, so the
 // browser's own Range requests go straight to the network (Safari won't stream media through a service worker's reply).
 const STREAMED = ["/sounds/colosseum/ambient.mp3"];
+// Pictures (not precached: vite.config.ts's LAZY_FILES, the same test): kept in this version's cache the first time they're
+// shown, then answered from it. The landing page's demo video (/media/) streams from the network like the ambience.
+const LAZY = /\.(png|jpe?g|webp|gif|avif)$/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -31,7 +34,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || STREAMED.includes(url.pathname)) return;
+  if (request.method !== "GET" || url.origin !== location.origin || url.pathname.startsWith("/api/") || STREAMED.includes(url.pathname) || url.pathname.startsWith("/media/")) return;
 
   // Every page (including /lobby/CODE invite links) is the single-page app. Fetch it fresh so an
   // update shows up on the next open; fall back to the cached copy only when offline.
@@ -59,5 +62,17 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(caches.match(request).then((cached) => cached || fetch(request)));
+  event.respondWith(
+    caches.match(request).then(
+      (cached) =>
+        cached ||
+        fetch(request).then((res) => {
+          if (LAZY.test(url.pathname) && res.ok && res.status === 200) {
+            const copy = res.clone();
+            void caches.open(VERSION).then((cache) => cache.put(request, copy));
+          }
+          return res;
+        }),
+    ),
+  );
 });
