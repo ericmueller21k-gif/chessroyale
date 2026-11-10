@@ -1,3 +1,4 @@
+- Nov 10 22:15 UTC: cheater demo PR #622 (full-e2e; users.test column; admin test-accounts route). Local: Eddie pooled, Sam clean. Review (one round). Live run after deploy.
 - Nov 10 22:05 UTC: Eric: loading bar after ~2 s (plain steps, real progress) -> claude/loading-bar; desktop: Quests pill off the card, "Daily Quests" in the left menu -> claude/desktop-quests. He may suggest desktop polish later (empty space).
 - Nov 10 21:55 UTC: Eric: after the white page, "HunChess" splash 8 s = ensureSchema after #618 (96 sequential stmts per request in flight) + splash waits for /api/me unbounded. Helper claude/schema-fast (full lane, one review).
 - Nov 10 21:05 UTC: ERIC: live load 30 s white then 6 s (DCL 5 s); measured /api/me 1.1-1.7 s every load. Town: own rider pops in seconds late. Two helpers: claude/load-regress, claude/town-rider (high).
