@@ -29,7 +29,7 @@ const screen = () =>
 // A boss raid of one, two crowd moves; its results stay up 25 s.
 await p.goto(base + "/?debug&pace=quick&mode=raid&boss=1600&bossMoves=2&clock=20&keep=25");
 await p.getByRole("main").getByRole("button", { name: "Play with friends" }).click();
-await p.getByRole("button", { name: "Create a raid" }).click();
+await p.getByRole("button", { name: "Create a Boss Battle" }).click();
 await p.getByRole("button", { name: /^Start with 1 player$/ }).click();
 const code = await p.evaluate(() => window.match.code);
 for (let i = 0; i < 1200 && (await phase()) !== "results"; i++) {

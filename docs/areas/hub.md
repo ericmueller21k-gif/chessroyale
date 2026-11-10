@@ -140,9 +140,9 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     ([docs/decisions/2026-10-17-boss-sheet-fit.md](../decisions/2026-10-17-boss-sheet-fit.md)). A tap drops the boss on,
     plays its sound once and says one of its lines (the boss section, [bosses.md](bosses.md)). Under the stage the ways
     to play. **Boss Battle** (Oct 26 as Solo Boss Mode; the home card and the side menu's item) shows **START** (Oct 29; it was the Boss alone button); the full
-    screen (`?mode=raid`, the test link, titled "Boss raid") shows every choice below, as before, until the raids move to
-    Chess Town's Colosseum. Each choice goes through its flow: **Join a raid** and **People only** (the raid's queues, always a random boss:
-    "Random boss · …"), **Raid with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
+    screen (`?mode=raid`, the test link, titled "Boss Battle" too since Nov 10) shows every choice below, as before, until the raids move to
+    Chess Town's Colosseum. Each choice goes through its flow: **Join a Boss Battle** and **People only** (the raid's queues, always a random boss:
+    "Random boss · …"), **Play with bots** (a Solo raid against the boss picked), **Boss alone** (its menu: the
     difficulty and the boss picked; a phone's sheet at the foot under 600 px wide, a dialog in the middle with room all
     round from 600 px at any height, its rows scrolling inside so it always fits) and **Play with friends** (a raid made
     for the boss picked: the lobby's `bossPicked`; or join one by code). With the Hidden Boss picked every choice is

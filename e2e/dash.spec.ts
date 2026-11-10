@@ -82,7 +82,7 @@ test.describe("Dash", () => {
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toHaveCount(0);
     await asAdmin(page);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Boss raid", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
     await expect(tiles.getByRole("radio", { name: "Dash", exact: true })).toBeVisible();
   });
 

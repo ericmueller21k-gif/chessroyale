@@ -24,7 +24,7 @@ describe("the global chat's lines (presets only)", () => {
   });
 
   it("never takes free text, unknown ids or anything but a string id", () => {
-    for (const x of ["hello there", "GG", "Anyone up for a raid?", "", "l-nope", 42, null, undefined, { say: "gg" }, ["gg"]]) expect(canSayHome(x, [])).toBe(false);
+    for (const x of ["hello there", "GG", "Anyone up for a Boss Battle?", "", "l-nope", 42, null, undefined, { say: "gg" }, ["gg"]]) expect(canSayHome(x, [])).toBe(false);
   });
 
   it("leaves out plans: they're for a team in a match", () => {

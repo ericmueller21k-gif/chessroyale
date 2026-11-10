@@ -170,7 +170,7 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
   // A Solo raid (you and 49 bots: a reveal after each crowd move, as in a raid or the Crowd's boss battle).
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
   await openBossRaid(page);
-  await page.getByRole("button", { name: /^Raid with bots/ }).click();
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
   // Every line of yours the dock shows, every frame from before it can appear, with what the reveal says: your move,
   // its loss and score, the best move (docs/decisions/2026-10-16-the-best-move-is-the-highest-scored.md).
   await page.evaluate(() => {
@@ -226,7 +226,7 @@ test("your pick the best move: the dock's line says so (\"Best move · You: …\
 async function intoFrozenReveal(page: Page) {
   await page.goto("/?debug&pace=quick&clock=30&bossMoves=6&laststand=0");
   await openBossRaid(page);
-  await page.getByRole("button", { name: /^Raid with bots/ }).click();
+  await page.getByRole("button", { name: /^Play with bots/ }).click();
   // Watched from before it can appear: the first frame of a reveal whose dock line has your pick, then halted.
   await page.evaluate(() => {
     const w = window as any;

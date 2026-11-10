@@ -13,6 +13,16 @@ describe("quests' rules", () => {
     expect(questCounts("any", g("solo", false, QUESTS.soloMinMinutes * 60_000 - 1))).toBe(false);
   });
 
+  it("a solo Boss Battle moves the boss quests (Eric, Nov 10), won 'bossWin' too, under the same minimum as any solo game", () => {
+    const g = (won: boolean, ms: number): QuestGame => ({ mode: "soloBoss", won, ms });
+    const all = ["any", "win", "boss", "bossWin", "squads", "crowd"];
+    const min = QUESTS.soloMinMinutes * 60_000;
+    expect(all.filter((c) => questCounts(c as never, g(true, min)))).toEqual(["any", "boss", "bossWin"]);
+    expect(all.filter((c) => questCounts(c as never, g(false, min)))).toEqual(["any", "boss"]);
+    expect(all.filter((c) => questCounts(c as never, g(true, min - 1)))).toEqual([]);
+    expect(all.filter((c) => questCounts(c as never, g(false, min - 1)))).toEqual([]);
+  });
+
   it("the pool: only modes always playable (no auto chess, no ranked, no one boss); every quest pays XP; the weekly a crate and a key", () => {
     for (const q of [...QUESTS.daily, ...QUESTS.weekly]) {
       expect(q.xp).toBeGreaterThan(0);

@@ -196,7 +196,7 @@ export const HOME_CHAT_PACK: ChatPack = {
     { id: "l-evening", text: "Evening all!", group: "hello" },
     { id: "l-welcome", text: "Welcome!", group: "hello" },
     { id: "l-back", text: "Hello again!", group: "hello" },
-    { id: "l-raid", text: "Anyone up for a raid?", group: "plans" },
+    { id: "l-raid", text: "Anyone up for a Boss Battle?", group: "plans" },
     { id: "l-crowd", text: "Anyone for 50 v 50?", group: "plans" },
     { id: "l-queue", text: "Queueing now, join me!", group: "plans" },
     { id: "l-one-more", text: "One more game?", group: "plans" },
