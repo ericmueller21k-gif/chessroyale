@@ -6,23 +6,16 @@ import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
 import { RaceTower } from "./components/RaceTower.tsx";
 import { resetBoardsStrip } from "./components/TinyBoard.tsx";
-import { enginePool } from "./engine.ts";
+import { enginePool, warmEngine } from "./engine.ts";
 import { bossAlone, cutLabel, elimination, isCrowd, roundLive, scoreDp, towerView, type GameView } from "./game.ts";
 import { NetMatch, forgetSeat, hasSeat, lobbyStatus, type LobbyGone, type LobbyResult } from "./net.ts";
 import { exitFor, exitMatch, onExitMatch, setExitTo } from "./match-exit.ts";
 import { useRecluseTalk } from "./recluse-talk.ts";
 import { ConfirmExit, MatchMenu, type MatchExit } from "./components/MatchMenu.tsx";
 import type { LeftHow } from "@chessroyale/chess";
-import { loadOpenings, SoloMatch } from "./solo.ts";
-import { FinalScreen } from "./screens/Final.tsx";
+import type { SoloMatch } from "./solo.ts";
 import { HomeScreen } from "./screens/Home.tsx";
-import { LobbyScreen } from "./screens/Lobby.tsx";
 import { QueueLine, QueueScreen } from "./screens/Queue.tsx";
-import { OpeningGrid } from "./screens/OpeningGrid.tsx";
-import { PlayScreen } from "./screens/Play.tsx";
-import { PhaseChangeScreen, SimulScreen } from "./screens/Recluse2.tsx";
-import { ResultsScreen } from "./screens/Results.tsx";
-import { RevealScreen } from "./screens/Reveal.tsx";
 import { PlayerProfileScreen } from "./screens/PlayerProfile.tsx";
 import { showBanNotice } from "./components/FairPlay.tsx";
 import { closeProfile, openProfile, useProfileTarget, type ProfileTarget } from "./profile-nav.ts";
@@ -35,32 +28,25 @@ import { setLiveBusy, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
-import { AutoChessScreen } from "./screens/AutoChess.tsx";
 import { TownPage, type BotGameAsk, type Stand } from "./town/TownPage.tsx";
 import { LeaveTownConfirm, TOWN_BACK_TO } from "./town/LeaveTown.tsx";
 import { setGoodbyeFrom } from "./town/goodbye.ts";
 import { ColosseumPage } from "./colosseum/ColosseumPage.tsx";
-import { FaqScreen } from "./screens/Faq.tsx";
 import { Logo } from "./components/FrontDoor.tsx";
 import { FrontFrame, GameFrame, type FrontNav } from "./components/FrontMenu.tsx";
 import { showAwayNote } from "./components/AwayNote.tsx";
 import { useAccount } from "./screens/Profile.tsx";
 import { LandingScreen } from "./screens/Landing.tsx";
-import { LegalScreen, leaveLegal, legalPageOf, type LegalPage } from "./screens/Legal.tsx";
-import { CrowdCut, CrowdReveal, WatchScreen } from "./screens/Crowd.tsx";
-import { VoteScreen } from "./screens/Vote.tsx";
-import { BossScreen } from "./screens/Boss.tsx";
-import { SpectateScreen } from "./screens/Spectate.tsx";
-import { StageBreakScreen } from "./screens/StageBreak.tsx";
+import { leaveLegal, legalPageOf, type LegalPage } from "./screens/legal-page.ts";
 import { useMedia } from "./components/QuickChat.tsx";
 import { LobbyChat } from "./components/LobbyChat.tsx";
 import { queuedSquads } from "./move-replay.ts";
 import { PartyClient, SquadsClient, createParty, currentParty, currentSquads, forgetSquads, partyStatus, squadsQueue, squadsSeat, squadsStatus, squadsTestLobby } from "./squads.ts";
-import { SquadsQueue, SquadsScreen, squadsExit, squadsWaiting } from "./screens/Squads.tsx";
+import { squadsExit, squadsWaiting } from "./screens/squads-exit.ts";
+import { lazyGroup } from "./lazy.tsx";
 import { PartySheet } from "./screens/SquadsParty.tsx";
 import { BotDuel, DuelQueue, NetDuel, savedDuelQueue, setRanked1v1Starter, startRanked1v1, type DuelSession } from "./duel.ts";
 import { confirmLeaveDuelQueue, duelFoundAlert, setAwaySearch } from "./components/DuelQueueBar.tsx";
-import { DuelFront } from "./screens/Duel.tsx";
 import { measureSound } from "./sound.ts";
 import { noteWhere } from "./problems.ts";
 import { queuePool, testParams } from "./test-switches.ts";
@@ -68,6 +54,35 @@ import { evalBarOn, practiceOn } from "./prefs.ts";
 import { noteSoloBattle } from "./boss-tokens.ts";
 import { noteSoloGame, settleSoloXp, soloGameId, soloTestGame } from "./xp.ts";
 import { isPaused, pausedBosses } from "./status.ts";
+
+// Off the first load (Nov 10, phone load: home starts fast), each its own chunk: a match's screens (preloaded when play is
+// near), solo play with its runner and the boss rules, the FAQ, the legal pages and Auto chess (loaded on entry).
+const game = lazyGroup(() => import("./screens/game-screens.ts"));
+const FinalScreen = game.screen("FinalScreen");
+const LobbyScreen = game.screen("LobbyScreen");
+const OpeningGrid = game.screen("OpeningGrid");
+const PlayScreen = game.screen("PlayScreen");
+const PhaseChangeScreen = game.screen("PhaseChangeScreen");
+const SimulScreen = game.screen("SimulScreen");
+const ResultsScreen = game.screen("ResultsScreen");
+const RevealScreen = game.screen("RevealScreen");
+const CrowdCut = game.screen("CrowdCut");
+const CrowdReveal = game.screen("CrowdReveal");
+const WatchScreen = game.screen("WatchScreen");
+const VoteScreen = game.screen("VoteScreen");
+const BossScreen = game.screen("BossScreen");
+const SpectateScreen = game.screen("SpectateScreen");
+const StageBreakScreen = game.screen("StageBreakScreen");
+const SquadsQueue = game.screen("SquadsQueue");
+const SquadsScreen = game.screen("SquadsScreen");
+const DuelFront = game.screen("DuelFront");
+/** Solo play (solo.ts: the match runner, chess.js's whole game, the boss rules): loaded as play is near, or as it starts. */
+const solo = lazyGroup(() => import("./solo.ts"));
+const FaqScreen = lazyGroup(() => import("./screens/Faq.tsx")).screen("FaqScreen");
+const LegalScreen = lazyGroup(() => import("./screens/Legal.tsx")).screen("LegalScreen");
+const AutoChessScreen = lazyGroup(() => import("./screens/AutoChess.tsx")).screen("AutoChessScreen");
+/** A solo match (SoloMatch, solo.ts), told apart without loading its chunk. */
+const isSolo = (m: unknown): m is SoloMatch => !!(m as { isSolo?: boolean } | null)?.isSolo;
 
 /**
  * A match's settings: the mode and the choices made on the home screen, plus playtest overrides from the URL, e.g.
@@ -387,11 +402,6 @@ export function App() {
   useEffect(() => {
     if (config?.accounts && profile) startLive();
   }, [config?.accounts, !!profile]);
-  // The opening library, off the first load: fetched once the page has settled, so a solo match finds it there (solo.ts).
-  useEffect(() => {
-    const id = setTimeout(() => void loadOpenings().catch(() => {}), 2000);
-    return () => clearTimeout(id);
-  }, []);
   // Your account (a guest one the first time).
   useEffect(() => {
     let name: string | undefined;
@@ -409,7 +419,7 @@ export function App() {
   }, []);
   // A solo match's result goes on your profile (online results are saved by the server).
   useEffect(() => {
-    if (!(match instanceof SoloMatch) || match.phase.kind !== "results" || savedResult.current === match) return;
+    if (!(isSolo(match)) || match.phase.kind !== "results" || savedResult.current === match) return;
     savedResult.current = match;
     const me = match.standings().find((s) => s.isYou);
     const runner = match.runner;
@@ -525,10 +535,11 @@ export function App() {
     });
   }, [config, profile]);
 
-  // Warm the engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
+  // Warm one engine up in the background so play starts instantly (not on Auto chess, whose fights use the HunChess engine:
   // Stockfish isn't loaded there; it warms when you leave it). Not in the town square either: nothing there plays chess yet.
+  // Only one on home (Nov 10, phone load): the rest of the pool starts when play is near (below, by the queue's state).
   useEffect(() => {
-    if (!showAutoChess && !showTown && !showColosseum) void enginePool();
+    if (!showAutoChess && !showTown && !showColosseum) void warmEngine();
   }, [showAutoChess, showTown, showColosseum]);
 
   // Back on a lobby link this device already has a seat in (a reload, the app reopened, a dropped connection):
@@ -998,7 +1009,13 @@ export function App() {
     }
     unlockAudio();
     setLoading(true);
-    const [engines] = await Promise.all([enginePool(), loadOpenings()]);
+    // (Solo's code, its opening library and the match's screens, each fetched once: usually here already, play was near.)
+    const [engines, soloCode] = await Promise.all([enginePool(), solo.preload().then(async (m) => (await m?.loadOpenings(), m)), game.preload()]);
+    if (!soloCode) {
+      setLoading(false);
+      return setError("Couldn't load the game. Check your connection and try again.");
+    }
+    const { SoloMatch } = soloCode;
     setLoading(false);
     const fill = !!opts.fill;
     // (`botLevel`: home's Bot level box, the bots' average rating: Settings.botLevel.)
@@ -1143,6 +1160,15 @@ export function App() {
     }
   };
   /** Whether PLAY run `run` is already waiting in line (a 429 then means "ask later", not an error). */
+  // Once play is near (a match, the queue, the Boss raid screen, Squads, 1 v 1): the whole engine pool, the match's screens,
+  // solo's code and its opening library (Nov 10, phone load: none of it on home), so entering a match doesn't wait for them.
+  const playNear = !!match || !!inLine || raidOpen || !!squads || !!duelQueue || !!duel;
+  useEffect(() => {
+    if (!playNear) return;
+    void enginePool();
+    void game.preload();
+    void solo.preload().then((m) => m?.loadOpenings().catch(() => {}));
+  }, [playNear]);
   const lineState = useRef(inLine);
   lineState.current = inLine;
   const inLineNow = (run: number) => run === lineRun.current && !!lineState.current;
@@ -1883,7 +1909,7 @@ export function App() {
       leave();
     },
     // (Solo again as it was: through the queue screen, or Boss alone straight in.)
-    again: () => (match instanceof SoloMatch ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0, ...(match.settings.botLevel !== undefined ? { botLevel: match.settings.botLevel } : {}) }) : leave()),
+    again: () => (isSolo(match) ? void startSolo(match.settings.raid ? "raid" : match.settings.mode, { fill: match.players.length > 0, ...(match.settings.botLevel !== undefined ? { botLevel: match.settings.botLevel } : {}) }) : leave()),
     homeText: townReturn.current ? "Back to town" : undefined,
   });
   // Computers get the leaderboard as a permanent sidebar during the knockout stages (and the pre-game votes, so the
@@ -1943,7 +1969,7 @@ export function App() {
   function inQueue(match: AnyMatch): boolean {
     if (resumingSplash(match)) return false;
     const k = match.phase.kind;
-    if (match instanceof SoloMatch) return k === "lobby";
+    if (isSolo(match)) return k === "lobby";
     return match instanceof NetMatch && match.auto && (k === "loading" || k === "lobby");
   }
 

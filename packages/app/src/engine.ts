@@ -40,18 +40,31 @@ function workerTransport(): UciTransport {
   };
 }
 
+function makeEngine(): Promise<UciEngine> {
+  return (async () => {
+    const engine = new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb });
+    await engine.init();
+    return engine;
+  })();
+}
+
+let first: Promise<UciEngine> | null = null;
 let pool: Promise<UciEngine[]> | null = null;
 
-/** Several engines in separate workers so boards are scored in parallel. */
+/**
+ * The pool's first engine alone, warmed on home so play starts at once (Nov 10, phone load: one Stockfish on home, not
+ * three or four, about 56 MB each). The rest start with `enginePool`, when play is near (a match, the queue, the boss menu).
+ */
+export function warmEngine(): Promise<UciEngine> {
+  first ??= makeEngine();
+  return first;
+}
+
+/** Several engines in separate workers so boards are scored in parallel (the first is `warmEngine`'s). */
 export function enginePool(): Promise<UciEngine[]> {
   pool ??= (async () => {
     const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
-    const engines = Array.from(
-      { length: n },
-      () => new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb }),
-    );
-    await Promise.all(engines.map((e) => e.init()));
-    return engines;
+    return Promise.all([warmEngine(), ...Array.from({ length: n - 1 }, makeEngine)]);
   })();
   return pool;
 }
@@ -63,11 +76,7 @@ let own: Promise<UciEngine> | null = null;
  * pool does for a lobby. Made the first time it's asked for.
  */
 export function ownEngine(): Promise<UciEngine> {
-  own ??= (async () => {
-    const engine = new UciEngine(workerTransport(), { nodes: DEFAULT_SETTINGS.engineNodes, hashMb: DEFAULT_SETTINGS.engineHashMb });
-    await engine.init();
-    return engine;
-  })();
+  own ??= makeEngine();
   return own;
 }
 
@@ -78,7 +87,7 @@ export function ownEngine(): Promise<UciEngine> {
  * within `reviveMs` (to free memory for it: Maia closed), before it's started once more.
  */
 export async function pauseEngines(until: Promise<unknown>, revive?: () => void, reviveMs?: number): Promise<void> {
-  const engines = [...(pool ? await pool : []), ...(own ? [await own] : [])];
+  const engines = [...(pool ? await pool : first ? [await first] : []), ...(own ? [await own] : [])];
   let revived = false;
   const once = () => {
     if (revived) return;

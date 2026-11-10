@@ -688,11 +688,10 @@ function Copyright() {
   );
 }
 
-export type LegalPage = "privacy" | "terms" | "copyright";
+import type { LegalPage } from "./legal-page.ts";
+export { leaveLegal, legalPageOf, type LegalPage } from "./legal-page.ts";
 const TITLES: Record<LegalPage, string> = { privacy: "Privacy policy", terms: "Terms of service", copyright: "Copyright" };
 
-/** Which legal page an address shows (null: none). */
-export const legalPageOf = (path: string): LegalPage | null => (path === "/privacy" || path === "/terms" || path === "/copyright" ? (path.slice(1) as LegalPage) : null);
 
 /** A legal page: the draft notice first, then the page, then links to the other two. */
 export function LegalScreen({ page, onBack }: { page: LegalPage; onBack: () => void }) {
@@ -718,21 +717,3 @@ export function LegalScreen({ page, onBack }: { page: LegalPage; onBack: () => v
   );
 }
 
-/**
- * Back from a legal page. Every link here is a plain link (a page load), from the landing page, Settings, the FAQ or
- * the other legal page, so back is the browser's back to it; opened any other way (typed, or from another site), home.
- */
-export function leaveLegal(close: () => void) {
-  let fromHere = false;
-  try {
-    fromHere = history.length > 1 && !!document.referrer && new URL(document.referrer).origin === location.origin;
-  } catch {
-    // No referrer to read.
-  }
-  if (fromHere) {
-    history.back();
-    return;
-  }
-  close();
-  history.replaceState(null, "", "/");
-}
