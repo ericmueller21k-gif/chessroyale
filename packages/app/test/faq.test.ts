@@ -489,7 +489,7 @@ describe("the FAQ's numbers come from the settings", () => {
     expect(t).toContain("you get 2 daily quests each day and 1 weekly quest each week");
     expect(t).toContain("a daily quest gives +300 XP (some also a crate); the weekly quest gives +1,500 XP, 1 crate and 1 crate key");
     expect(t).toContain("Unfinished dailies stay, up to 3 waiting");
-    expect(t).toContain("One free reroll a day");
+    expect(t).toContain("One free reroll a day for each daily");
     const q = section("xp", { ...FAQ_DEFAULTS, quests: { ...FAQ_DEFAULTS.quests, dailyPerDay: 3, maxDailies: 5, weekly: [{ ...FAQ_DEFAULTS.quests.weekly[0]!, xp: 2000, keys: 2 }] } });
     expect(q).toContain("you get 3 daily quests each day");
     expect(q).toContain("up to 5 waiting");

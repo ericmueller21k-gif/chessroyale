@@ -11,11 +11,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 
 - **The daily quests overlay (Nov 9; the mockup [2026-11-09-quests-mock.md](../decisions/2026-11-09-quests-mock.md), on real quests since
   phase 3: [2026-11-09-quests-screens.md](../decisions/2026-11-09-quests-screens.md); the rules and server: [accounts.md](accounts.md), "Quests"):**
-  `components/QuestsOverlay.tsx` (props: the quests, the two countdowns, today's reroll, paused, callbacks), fed by `quests.ts` (`useQuests`:
+  `components/QuestsOverlay.tsx` (props: the quests, each with its `canReroll`, the two countdowns, paused, callbacks), fed by `quests.ts` (`useQuests`:
   GET /api/quests as home shows; the reroll's POST). A gold-framed card over home (a plain dark dim, no blur): the app icon in a crest, "Daily Quests",
   "New quests in 12h" ("Quests are paused for a moment." under PAUSE_REWARDS), two or three daily rows (one carried over) and the weekly under its own
   label ("Resets in 4d"), each with its picture (a live boss's portrait, Squads' pawns, the board's pieces), goal, bar and count ("Done!"), and its
-  reward in the shop's art (the Winter crate, the key); a reroll on each daily (one a day: greyed once used or on a done quest); "Got it", ×, Escape
+  reward in the shop's art (the Winter crate, the key); a reroll on each daily (each its own, once a day: only that one greys once used, or on a done quest; Nov 10); "Got it", ×, Escape
   or a tap outside close it. **By itself** on the XP day's first home visit, signed in, on this device (`hunchess.quests.seenDay`), never over the
   walkthrough, the queue or another notice (chat's, the Welcome Crate's): then it stays due, and the day counts as seen only when it shows
   (review of #575, m3). The **Quests entry** is a phone's top bar button (beside your pawn, before the shop; below 344 px the logo becomes the app's icon so

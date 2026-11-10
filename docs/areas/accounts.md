@@ -68,7 +68,7 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
 - **Quests** (Nov 9, phase 3; `server/quests.ts`, the rules in core's `quests.ts`, the numbers and pool `QUESTS` in settings.ts; decisions
   `2026-11-09-quests-*.md`): 2 dailies a day and a weekly a week, dealt lazily on the day's first read (GET /api/quests or a game's XP grant)
   from a seed of the account and the day, once (`quest_days`' nonce claim). Unfinished dailies carry over, topped up to 3 at most; the weekly
-  resets on Mondays (08:00 UTC). One free reroll a day (POST /api/quests/reroll). Progress (`quest_progress`, one row per quest per game, only from the attempt that first counted the game:
+  resets on Mondays (08:00 UTC). One free reroll a day per daily (POST /api/quests/reroll; Nov 10): the replacement keeps the slot and is marked `quests.rerolled_day`, so it can't be rerolled again that day; two tabs reroll a quest once. Progress (`quest_progress`, one row per quest per game, only from the attempt that first counted the game:
   `quest_games`) and
   completion (op `quest:<kind>:<quest id>:<ledger id>`: 300 XP a daily, some a Winter Crate; the weekly 1,500 XP, a crate and a key) go in the
   game's own XP batch, only for a counted game (online by the room's facts; solo only "finish games" quests, with 3 of the server's minutes and only while its time XP is paid (not past the day's solo minutes); a
