@@ -746,7 +746,7 @@ const reload = (i: number): Frame => {
  * a pie already in his hand, then pies the king nonstop: ten pies, one on each hit (cues `splat` and `squeak` in turn,
  * so the repeats don't pile up), bouncing between; he laughs, arms up, and bounces off. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(4) },
@@ -768,7 +768,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Boingo for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame

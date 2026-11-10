@@ -27,7 +27,11 @@
 import { canvas, flame, inEllipse, line, poly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { lazyAnim, frameKeys, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnimsTogether, frameKeys, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+
+// Its frames share parts cached by rounded poses (and Moo's powered frames count across his moves), so the first frame made
+// decides them: his animations are made all together, in this file's order (sprite.ts lazyAnimsTogether).
+const lazyAnim = lazyAnimsTogether();
 
 export const MOO_PALETTE: Record<string, string> = {
   k: "#25140d", // outline
@@ -1429,7 +1433,7 @@ const powerIdle: Anim = lazyAnim(() => ({
  * blazing); then they all stand together a moment (the last frame before the board fades them) and the moon comes
  * back down into his arms.
  */
-const flurry: Anim = lazyAnim(() => ((() => {
+const flurry: Anim = lazyAnim(() => (() => {
   const rise = (dy: number, glowL: 0 | 1 | 2 | 3, extra: MooPose = {}): MooPose => ({ moonT: 0, moon: [0, dy], moonBack: dy < -30, handN: [12, 38], handF: [18, 36], moonEyes: "happy", moonMouth: "smile", moonGlow: glowL, ...extra });
   const shot = (i: number): Frame =>
     FP(120, rise(-46 + (i % 2 ? 1 : 0), 3, { aura: (i % 3) as 0 | 1 | 2, moonMouth: "o", mouth: "open", head: [0, 1], earN: -58, earF: -58, tail: 14 + (i % 2) * 8, bob: i % 2, dy: i % 2 ? 0 : -1 }), {
@@ -1452,7 +1456,7 @@ const flurry: Anim = lazyAnim(() => ((() => {
       FP(100, { aura: 2, moonGlow: 0 }),
     ],
   };
-})()));
+})());
 
 /**
  * Dazed, after his five powered moves: the aura fizzles and he flickers back to himself (`calm`: the colors swap back), a

@@ -1223,7 +1223,7 @@ const reload = (i: number): Frame => fa(f(80, { ...IN_SATCHEL, mood: "aim", nod:
  * (cues `toss` and `bonk` in turn, so the repeats don't pile up), each landing on the king's head (the board's carrot
  * bonk), his eye on the king throughout; he cheers, a carrot held up, and they hop off. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1245,7 +1245,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Chub & Chirp for their attack on a king: the same drawing, parts and palette, facing our left as always (as Sawyer),

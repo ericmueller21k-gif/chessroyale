@@ -19,7 +19,7 @@ import { canvas, ellipse, flame as flameGrid, inEllipse, inPoly, roundLight, sha
 import type { Beat } from "./boss-beats.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { moved } from "./attack-frame.ts";
-import { lazyAnim, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnim, lazyParts, lieDown, partSize, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 
 export const GREX_PALETTE = {
   k: "#1e0e05", // outline
@@ -366,7 +366,11 @@ function mane(seed: number, big = false): Part {
 
 // ---- Parts.
 
-const PARTS: Record<string, Part> = { shadow, hoofL: hoof(-1), hoofR: hoof(1) };
+// (Made the first time a frame draws them: sprite.ts lazyParts.)
+const { parts: PARTS, add } = lazyParts();
+add("shadow", () => shadow);
+add("hoofL", () => hoof(-1));
+add("hoofR", () => hoof(1));
 
 /**
  * His torso and neck as one part (one outline round both, no seam where the neck meets the shoulders), the neck's
@@ -388,19 +392,19 @@ function bodyPart(nx: number, ny: number): { name: string; at: Pt } {
     stamp(cv, tg, TORSO_AT[0] - x0, TORSO_AT[1] - y0, true);
     l = { part: { grid: toGrid(cv) }, at: [x0, y0] };
     BODIES.set(name, l);
-    PARTS[name] = l.part;
+    add(name, () => l!.part);
   }
   return { name, at: l.at };
 }
 const MOODS: readonly Mood[] = ["grin", "laugh", "roar", "shout", "hurt", "smug", "rattled", "think", "out"];
-for (const m of MOODS) PARTS[`head:${m}`] = head(m);
+for (const m of MOODS) add(`head:${m}`, () => head(m));
 for (const s of [0, 1, 2]) {
-  PARTS[`mane:${s}`] = mane(s);
-  PARTS[`maneBig:${s}`] = mane(s, true);
-  PARTS[`horn:${s}`] = flame(6, 9, s * 1.9 + 0.4, s === 1 ? 1 : -1);
-  PARTS[`hornBig:${s}`] = flame(8, 13, s * 1.9 + 0.4, s === 1 ? 1.5 : -1.5);
-  PARTS[`tail:${s}`] = flameTuft(10, 13, s, -1.5 + s, 3);
-  PARTS[`tailBig:${s}`] = flameTuft(12, 17, s, -1.5 + s, 4);
+  add(`mane:${s}`, () => mane(s));
+  add(`maneBig:${s}`, () => mane(s, true));
+  add(`horn:${s}`, () => flame(6, 9, s * 1.9 + 0.4, s === 1 ? 1 : -1));
+  add(`hornBig:${s}`, () => flame(8, 13, s * 1.9 + 0.4, s === 1 ? 1.5 : -1.5));
+  add(`tail:${s}`, () => flameTuft(10, 13, s, -1.5 + s, 3));
+  add(`tailBig:${s}`, () => flameTuft(12, 17, s, -1.5 + s, 4));
 }
 
 /** A puff of smoke (his flames gone out), `seed` its shape. */
@@ -410,10 +414,10 @@ function puff(seed: number): Part {
   ellipse(cv, 2.4 + (seed % 3) * 0.3, 2, 1.5, 1.3, "g");
   return { grid: toGrid(cv), outline: false };
 }
-for (const s of [0, 1, 2]) PARTS[`puff:${s}`] = puff(s);
+for (const s of [0, 1, 2]) add(`puff:${s}`, () => puff(s));
 /** A wall of flame round his feet as he lands in it (entrance, the Roman candle), roaring then dying down. */
-PARTS["burst:0"] = flameTuft(50, 16, 3, 0, 9);
-PARTS["burst:1"] = flameTuft(46, 9, 5, 0, 8);
+add("burst:0", () => flameTuft(50, 16, 3, 0, 9));
+add("burst:1", () => flameTuft(46, 9, 5, 0, 8));
 
 /**
  * The Roman candle, big (Eric, Oct 9: much larger and longer, about his own height to the shoulder): a cardboard tube
@@ -458,6 +462,7 @@ function tubePart(deg: number): Part {
   TUBE_PIVOT.set(deg, [-x0, -y0]);
   return { grid: toGrid(cv) };
 }
+// (Painted now: painting a tube also records its pivot, which the poses read.)
 for (const deg of CANDLE_TILTS) PARTS[`tube:${deg}`] = tubePart(deg);
 /** The nearest tilt it's drawn at. */
 const tiltOf = (deg: number) => CANDLE_TILTS.reduce((a, b) => (Math.abs(b - deg) < Math.abs(a - deg) ? b : a));
@@ -477,7 +482,7 @@ function limb(kind: LimbKind, pts: readonly Pt[]): { name: string; at: Pt } {
           ? paintLimb(pts, 2.7, { spotEvery: 5.4 })
           : paintLimb(pts, 1.1, { spotEvery: 99 });
     LIMBS.set(name, l);
-    PARTS[name] = l.part;
+    add(name, () => l!.part);
   }
   return { name, at: l.at };
 }
@@ -510,7 +515,7 @@ function wire(from: Pt, to: Pt): { name: string; at: Pt } {
     path.forEach(([px, py], i) => (cv[py]![px] = i >= path.length - 2 ? "f" : i % 3 === 2 ? "W" : "w"));
     l = { part: { grid: toGrid(cv) }, at: [x0, y0] };
     WIRES.set(name, l);
-    PARTS[name] = l.part;
+    add(name, () => l!.part);
   }
   return { name, at: l.at };
 }

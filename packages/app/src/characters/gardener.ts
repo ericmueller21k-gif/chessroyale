@@ -30,7 +30,11 @@
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
-import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnimsTogether, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+
+// Its frames share parts cached by rounded poses (and Moo's powered frames count across his moves), so the first frame made
+// decides them: his animations are made all together, in this file's order (sprite.ts lazyAnimsTogether).
+const lazyAnim = lazyAnimsTogether();
 
 export const GARDENER_PALETTE: Record<string, string> = {
   k: "#1d1019", // outline
@@ -1163,7 +1167,7 @@ const easeBeat = (i: number): Frame => {
  * ten of them, cues `jet` and `spurt` in turn (the cue frame is where the board splashes the king's square), staring at him, relentless; he
  * grunts once, satisfied (`grunt`), and drops out of the frame. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1185,7 +1189,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * The hippo for his attack on a king: the same drawing, parts and palette, facing our left as always (as Moo), in a frame

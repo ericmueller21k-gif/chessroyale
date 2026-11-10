@@ -494,8 +494,9 @@ const PALM = ["..kkkk.", ".kdeddk", ".kdcdck", ".kdcdck", "kkdcdck", "kdbdddk", 
 
 const { parts: PARTS, add } = lazyParts();
 const STANCES: readonly Stance[] = ["stand", "wide", "rise", "bend", "low", "kneel"];
-const LEGS = Object.fromEntries(STANCES.map((s) => [s, legs(s)])) as Record<Stance, { part: Part; at: Pt }>;
-for (const s of STANCES) add(`legs:${s}`, () => LEGS[s].part);
+const LEGS = new Map<Stance, { part: Part; at: Pt }>();
+const legsOf = (s: Stance) => LEGS.get(s) ?? LEGS.set(s, legs(s)).get(s)!;
+for (const s of STANCES) add(`legs:${s}`, () => legsOf(s).part);
 add("torso", torso);
 add("shoe", shoe);
 add("heels", heels);
@@ -623,7 +624,7 @@ export function recluseLayers(p: ReclusePose, bust = false): Layer[] {
   if (!bust) {
     if (!p.air) layers.push(at("shadow", 26, GROUND - 2));
     if (stance === "kneel") layers.push(at("heels", 27, GROUND - 4), at("heels", 59, GROUND - 4, true));
-    layers.push(at(`legs:${stance}`, LEGS[stance].at[0], LEGS[stance].at[1]));
+    layers.push(at(`legs:${stance}`, legsOf(stance).at[0], legsOf(stance).at[1]));
     if (stance !== "kneel") {
       const [l, r] = STANCE_LEGS[stance];
       layers.push(at("shoe", l![2]![0] - 10, GROUND - 6), at("shoe", r![2]![0] - 2, GROUND - 6, true));

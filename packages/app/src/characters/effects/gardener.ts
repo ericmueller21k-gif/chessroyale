@@ -33,7 +33,7 @@
 import { canvas, inPoly, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims } from "./common.ts";
-import { lazyAnim } from "../sprite.ts";
+import { lazyAnim, lazyParts } from "../sprite.ts";
 
 export const GARDEN_PALETTE: Record<string, string> = {
   k: "#10261a", // outline: a near-black green (the plants' and the soil's)
@@ -240,15 +240,16 @@ function plant(cv: Canvas, o: PlantLook): void {
 
 /** A part from a canvas. */
 const asPart = (cv: Canvas): Part => ({ grid: toGrid(cv), outline: false });
-const parts: Record<string, Part> = {};
+const { parts, add } = lazyParts();
 const L0 = (name: string): Layer => ({ part: name, x: 0, y: 0 });
 const fr = (ms: number, name: string | null, extra: Partial<Frame> = {}): Frame => ({ ms, layers: name ? [L0(name)] : [], ...extra });
 /** Makes a frame's part from a painter, once, under `name`. */
 function draw(name: string, painter: (cv: Canvas) => void): string {
-  const cv = canvas(SQUARE, SQUARE);
-  painter(cv);
-  parts[name] = asPart(cv);
-  return name;
+  return add(name, () => {
+    const cv = canvas(SQUARE, SQUARE);
+    painter(cv);
+    return asPart(cv);
+  });
 }
 
 // ---- The seedling: the shared start of every outcome.
@@ -739,15 +740,15 @@ function sheenPart(i: number): Part {
 }
 
 const WATER_SWEEP: Character = (() => {
-  const ps: Record<string, Part> = {};
+  const { parts: ps, add: addPart } = lazyParts();
   const fronts = [-24, 26, 76, 126, 176, 226, 276];
   const sweepFrames = fronts.map((f, i): Frame => {
-    ps[`w${i}`] = sweepPart(f, 100 + i * 3, true);
+    addPart(`w${i}`, () => sweepPart(f, 100 + i * 3, true));
     return { ms: 60, layers: [L0(`w${i}`)], ...(i === 0 ? { cue: "spray" } : {}) };
   });
   const SHEEN_ALPHA = ["1a", "17", "12", "0d", "08", "04"] as const;
   const sheenFrames = SHEEN_ALPHA.map((a, i): Frame => {
-    ps[`h${i}`] = sheenPart(i);
+    addPart(`h${i}`, () => sheenPart(i));
     // Everything in it thins away together: the tint and the glints.
     const fadeTo = [1, 0.95, 0.8, 0.6, 0.38, 0.18][i]!;
     const al = Math.round(255 * fadeTo).toString(16).padStart(2, "0");

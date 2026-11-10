@@ -207,8 +207,6 @@ function headPart(mood: Mood): Painted {
   if (f.blush) dots(cv, [[31, 31], [32, 31]], "q");
   return crop(cv);
 }
-const MOODS: readonly Mood[] = ["calm", "blink", "half", "happy", "cheer", "focus", "think", "thinkBlink", "smug", "rattled", "hurt", "out", "bold"];
-for (const m of MOODS) painted(`head:${m}`, () => headPart(m));
 
 /** The red crest at the back of the head, poking out from under the hat. */
 type Crest = "rest" | "flare" | "flat";
@@ -217,13 +215,13 @@ const CREST_PTS: Record<Crest, readonly Pt[]> = {
   flare: [[27, 20], [24, 11], [21.5, 17.5], [16.5, 11.5], [19.5, 20], [13, 16.5], [18.5, 23], [14, 24.5], [22, 26.5], [26.5, 26]],
   flat: [[27, 20], [20, 20], [13.5, 22.5], [19, 23], [14.5, 26.5], [20, 26], [17.5, 29], [23, 27.5], [26.5, 26]],
 };
-for (const c of ["rest", "flare", "flat"] as const)
-  painted(`crest:${c}`, () => {
-    const cv = canvas(W, H);
-    const L = roundL(22, 20, 7, 7);
-    paint(cv, inPoly(CREST_PTS[c]), (x, y) => redT(L(x, y)));
-    return crop(cv);
-  });
+// (Painted the first time a pose shows it, like the heads.)
+function crestPart(c: Crest): Painted {
+  const cv = canvas(W, H);
+  const L = roundL(22, 20, 7, 7);
+  paint(cv, inPoly(CREST_PTS[c]), (x, y) => redT(L(x, y)));
+  return crop(cv);
+}
 
 /** The tiny hard hat, painted per tilt (degrees, clockwise) about the middle of its brim. */
 function hatPart(tilt: number): Painted & { name: string } {
@@ -483,7 +481,7 @@ function build(p: Pose): Layer[] {
   // Crest, head, hat.
   const hx = (p.hx ?? 0) + dx;
   const hy = (p.hy ?? 0) + by;
-  add(painted(`crest:${p.crest ?? "rest"}`, () => ({ part: { grid: ["."] }, at: [0, 0] })), hx, hy);
+  add(painted(`crest:${p.crest ?? "rest"}`, () => crestPart(p.crest ?? "rest")), hx, hy);
   add(painted(`head:${p.mood ?? "calm"}`, () => headPart(p.mood ?? "calm")), hx, hy);
   const ht = p.hat ?? {};
   add(hatPart(ht.tilt ?? 0), hx + (ht.dx ?? 0), hy + (ht.dy ?? 0));

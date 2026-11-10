@@ -572,7 +572,7 @@ const tipOf = (p: SawyerPose): Pt => {
 };
 
 /** Rev: he squeezes the trigger, the saw shakes in his hands and screams, sawdust flies; a wild grin. */
-const rev: Anim = lazyAnim(() => ((() => {
+const rev: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [f(120, { mood: "smirk", bob: 1, saw: { tilt: 12 } })];
   for (let i = 0; i < 12; i++) {
     const p: SawyerPose = { mood: "glee", saw: { tilt: 17 + (i % 2), stroke: i % 2 ? 2 : 0 }, hatDrop: i % 2, swish: i % 4 < 2 ? 0 : -1 };
@@ -581,7 +581,7 @@ const rev: Anim = lazyAnim(() => ((() => {
   frames.push(f(120, { mood: "glee", saw: { tilt: 15, stroke: 1 } }, { specks: spray({ saw: { tilt: 15, stroke: 1 } }, 13, 5) }));
   frames.push(f(200, { mood: "smirk" }));
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Saw down: he lifts the saw, leans in and drives it straight down in front of him (`swing`), the blade biting at the
@@ -716,7 +716,7 @@ const sawAt = (i: number, bite: boolean): SawyerPose =>
  * then saws at the king nonstop: ten bites, one on each hit (cues `cut` and `swing` in turn, so the repeats don't pile
  * up), sawdust bursting out of the cut each time; a gleeful rev of the arms, and he leaps off. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const tuck = { l: [2, -5] as Pt, r: [-2, -5] as Pt };
   const frames: Frame[] = [
@@ -746,7 +746,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Sawyer for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, facing our left as

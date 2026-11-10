@@ -2,7 +2,7 @@
 import { canvas, ellipse, inEllipse, line, roundLight, shade, toGrid } from "../paint.ts";
 import type { Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { BOARD, hitAnims, sparkle, SQUARE, type Pt } from "./common.ts";
-import { lazyAnim } from "../sprite.ts";
+import { lazyParts, lazyAnim } from "../sprite.ts";
 
 // ---- The ice over a frozen piece.
 
@@ -121,19 +121,18 @@ const puddle = (w: number): Part => {
   return { grid: toGrid(cv), outline: false };
 };
 
-const ICE_PARTS: Record<string, Part> = {
-  block: iceBlock(28),
-  crack1: iceBlock(28, 1),
-  crack2: iceBlock(28, 2),
-  crack3: iceBlock(28, 3),
-  melt20: iceBlock(20, 3),
-  melt12: iceBlock(12, 2),
-  thin: thinBlock(),
-  frost2: frostEdge(2),
-  frost4: frostEdge(4),
-  puddle24: puddle(24),
-  puddle16: puddle(16),
-};
+const { parts: ICE_PARTS, add: addIcePart } = lazyParts();
+addIcePart("block", () => iceBlock(28));
+addIcePart("crack1", () => iceBlock(28, 1));
+addIcePart("crack2", () => iceBlock(28, 2));
+addIcePart("crack3", () => iceBlock(28, 3));
+addIcePart("melt20", () => iceBlock(20, 3));
+addIcePart("melt12", () => iceBlock(12, 2));
+addIcePart("thin", () => thinBlock());
+addIcePart("frost2", () => frostEdge(2));
+addIcePart("frost4", () => frostEdge(4));
+addIcePart("puddle24", () => puddle(24));
+addIcePart("puddle16", () => puddle(16));
 const ice = (part: string, extra: Partial<Frame> = {}, ms = 100): Frame => ({ ms, layers: [{ part, x: 2, y: 2 }], ...extra });
 
 const corners = (big: boolean): Speck[] => [...sparkle(4, 4, "F", "i", big), ...sparkle(27, 27, "F", "i", big)];

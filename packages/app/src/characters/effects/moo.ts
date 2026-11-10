@@ -35,7 +35,7 @@
 import { canvas, ellipse, toGrid, type Canvas } from "../paint.ts";
 import type { Anim, Character, Frame, Layer, Part, Speck } from "../sprite.ts";
 import { SQUARE, hitAnims, sparkle } from "./common.ts";
-import { lazyAnim } from "../sprite.ts";
+import { lazyParts, lazyAnim } from "../sprite.ts";
 
 export const MOON_PALETTE: Record<string, string> = {
   k: "#232d6b", // outline: a deep blue that reads on every square
@@ -171,33 +171,33 @@ function held(cv: Canvas, shimmer: number): void {
     }
 }
 
-const beamParts: Record<string, Part> = {};
+const { parts: beamParts, add: addBeamParts } = lazyParts();
 const fallFronts = [48, 120, 190, 245] as const;
 fallFronts.forEach((f, i) => {
-  beamParts[`fall${i}`] = part((cv) => {
+  addBeamParts(`fall${i}`, () => part((cv) => {
     shaft(cv, { front: f, core: 2.2, half: 5.6, glow: 6, wave: i * 1.7 });
     pool(cv, [0, 0.25, 0.5, 0.8][i]!);
-  });
+  }));
 });
-beamParts.hit0 = part((cv) => {
+addBeamParts("hit0", () => part((cv) => {
   shaft(cv, { front: TALL, core: 3, half: 6.6, glow: 7, wave: 0.4 });
   pool(cv, 1, true);
   flash(cv, 1);
-});
-beamParts.hit1 = part((cv) => {
+}));
+addBeamParts("hit1", () => part((cv) => {
   shaft(cv, { front: TALL, core: 2.8, half: 6.2, glow: 6, wave: 1.3 });
   pool(cv, 1, true);
   flash(cv, 0.62);
-});
-beamParts.hit2 = part((cv) => {
+}));
+addBeamParts("hit2", () => part((cv) => {
   shaft(cv, { front: TALL, core: 1.8, half: 4.8, glow: 5, wave: 2.2, faint: false });
   pool(cv, 0.9);
-});
+}));
 for (const [i, w] of [0, 2.1, 4.2].entries())
-  beamParts[`hold${i}`] = part((cv) => {
+  addBeamParts(`hold${i}`, () => part((cv) => {
     shaft(cv, { front: TALL, core: 0, half: 3.2 + (i % 2) * 0.6, glow: 5, wave: w, faint: true, fadeTo: SQ0 + 1 });
     held(cv, i);
-  });
+  }));
 
 /** Sparkles drifting down the shaft (scene: the column's own pixels), `i` which frame. */
 const motes = (i: number, n: number): Speck[] =>
@@ -326,7 +326,11 @@ const embers = (i: number): Speck[] => {
   return spots.slice(0, 4).map(([x, y]): Speck => [x, y, i % 2 ? "g" : "f"]);
 };
 
-const scorchParts: Record<string, Part> = { s3: scorch(3), s2: scorch(2), s1: scorch(1), s0: scorch(0) };
+const { parts: scorchParts, add: addScorchParts } = lazyParts();
+addScorchParts("s3", () => scorch(3));
+addScorchParts("s2", () => scorch(2));
+addScorchParts("s1", () => scorch(1));
+addScorchParts("s0", () => scorch(0));
 const sc = (name: string): Layer => ({ part: name, x: 0, y: 0 });
 export const MOON_SCORCH: Character = {
   id: "moon-scorch",

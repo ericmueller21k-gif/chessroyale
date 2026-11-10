@@ -1235,7 +1235,7 @@ const RESTED: Pose = { noPlank: true, held: { top: [84, 28], bot: [34, 47] }, ar
  * His attack on a king, on the shared beats (KING_ATTACK, boss-timing.ts), every frame's time worked out from them so
  * they add up exactly; the king to our left (his hammer paw's side; the board mirrors him when it's to his right).
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [];
   let t = 0;
@@ -1312,7 +1312,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
   to(A.ms - 20, empty(10));
   to(A.ms, empty(0));
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Timber for his attack on a king (his kit's `kingAttack`): his own parts and palette, in a frame `A_REACH` wider on the

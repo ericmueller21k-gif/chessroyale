@@ -354,6 +354,39 @@ export function lazyAnim(make: () => Anim): Anim {
   };
 }
 
+/**
+ * lazyAnim for a file whose frames share what they make (a part cached by a rounded pose, a counter), so the frame made first
+ * decides it: there, the first read makes every animation the file wraps, in the file's order, as the load did before. The art
+ * then comes out the same whichever the page shows first. `const lazyAnim = lazyAnimsTogether();` in that file. Its `first()`
+ * makes them now (once): a pose builder another file uses calls it, so that file's frames come after the boss's own, as before.
+ */
+export function lazyAnimsTogether(): ((make: () => Anim) => Anim) & { first: () => void } {
+  const all: (() => Anim)[] = [];
+  let started = false;
+  const first = () => {
+    if (started) return;
+    started = true;
+    for (const m of all) m();
+  };
+  const wrap = (make: () => Anim): Anim => {
+    let made: Anim | undefined;
+    const get = (): Anim => {
+      first();
+      return (made ??= make());
+    };
+    all.push(get);
+    return {
+      get loop() {
+        return get().loop;
+      },
+      get frames() {
+        return get().frames;
+      },
+    };
+  };
+  return Object.assign(wrap, { first });
+}
+
 /** A character's animations with every frame changed by `fn` (moved, cropped, a layer left out): each made when first read. */
 export function mapFrames(anims: Readonly<Record<string, Anim>>, fn: (f: Frame) => Frame): Record<string, Anim> {
   return Object.fromEntries(Object.entries(anims).map(([k, a]) => [k, lazyAnim(() => ({ loop: a.loop, frames: a.frames.map(fn) }))]));
@@ -376,7 +409,8 @@ export function joinParts(a: Readonly<Record<string, Part>>, b: Readonly<Record<
 /**
  * Parts made the first time they're drawn: a boss's dozens of poses (each limb painted from its points), or a hundred
  * night tiles, cost nothing when the app loads, only when a frame that uses them first shows. `add` registers a part's
- * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all).
+ * maker by name (and returns the name, for a layer); `parts` reads like any parts record (listing it makes them all), and a
+ * part set on it by hand is kept as set.
  */
 export function lazyParts(): { parts: Record<string, Part>; add: (name: string, make: () => Part) => string } {
   const makers = new Map<string, () => Part>();
@@ -396,6 +430,13 @@ export function lazyParts(): { parts: Record<string, Part>; add: (name: string, 
     ownKeys: () => [...makers.keys()],
     // (An accessor, so listing the parts doesn't make them; reading one does.)
     getOwnPropertyDescriptor: (_, k) => (typeof k === "string" && makers.has(k) ? { enumerable: true, configurable: true, get: () => get(k) } : undefined),
+    // A part set by hand (one already made, on first use) is kept as it is.
+    set: (_, k, p: Part) => {
+      if (typeof k !== "string") return false;
+      made.set(k, p);
+      makers.set(k, () => p);
+      return true;
+    },
   });
   return {
     parts,

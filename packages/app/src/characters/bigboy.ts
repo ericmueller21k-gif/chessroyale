@@ -967,7 +967,7 @@ const windUp = (i: number): Frame => {
  * overhead and sideways in turn (cues `bonk` and `swing`), glaring at it, winding up between; then a giggle behind his
  * hand (`giggle`), a crouch and a spring off (`boing`). The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(5) },
@@ -989,7 +989,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Big Boy for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, in a frame

@@ -986,7 +986,7 @@ const jab = (low: boolean, out: boolean): AlfilPose => {
  * high and low (a `jab` cue each: the board's hit on the king's square), drawing it back between; he trumpets and
  * leaps off; the last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: groundShadow(8), cue: "rumble" },
@@ -1015,7 +1015,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames: frames.map((fr) => (fr.layers.length ? facingRight(fr) : { ...fr, specks: (fr.specks ?? []).map(([x, y, k]): Speck => [AW - 1 - (x + ATTACK_REACH), y, k]) })) };
-})()));
+})());
 
 /**
  * Alfil for his attack on a king (his kit's `kingAttack`, once he's wired in): the same drawing, parts and palette,

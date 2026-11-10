@@ -1114,7 +1114,7 @@ const tipSparks = (p: HollowPose, big: boolean): Speck[] => {
   const tips = [b[0], b[BULBS - 1]].filter((x): x is Pt => !!x);
   return [...tips.flatMap(([x, y], n) => sparkle(x + 1 + n, y + 2, big)), ...bulbGlint(p, 0, true), ...bulbGlint(p, BULBS - 1, true)];
 };
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     // His shadow grows where he'll land; he drops in (he has left his corner) and lands, crouched.
@@ -1145,7 +1145,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 export const HOLLOW: Character = {
   id: "hollow",

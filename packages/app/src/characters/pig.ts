@@ -18,9 +18,13 @@
  * painted the first time a frame that uses it shows (sprite.ts lazyParts).
  */
 import { canvas, inEllipse, inPoly, roundLight, toGrid, type Canvas } from "./paint.ts";
-import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnimsTogether, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
+
+// Its frames share parts cached by rounded poses (and Moo's powered frames count across his moves), so the first frame made
+// decides them: his animations are made all together, in this file's order (sprite.ts lazyAnimsTogether).
+const lazyAnim = lazyAnimsTogether();
 
 export const PIG_PALETTE: Record<string, string> = {
   k: "#2b1411", // outline
@@ -586,6 +590,7 @@ const SPIN_FIST_R: Pt = [62, 32];
 const SPIN_ELBOW_R: Pt = [57, 40.5];
 
 export function pigLayers(p: PigPose): Layer[] {
+  lazyAnim.first(); // (Pig's own frames first, as at load before: his intro's share his cached slack.)
   const bob = p.bob ?? 0;
   const lean = p.lean ?? 0;
   const spin = p.spin ?? 0;
@@ -733,7 +738,7 @@ export const CATCH: Pt = [96, 66];
 const THROW_ARM = { fistL: [24, 27] as Pt, elbowL: [22, 36] as Pt };
 const CAST_ARM = { fistL: [37, 44] as Pt, elbowL: [31, 46.5] as Pt };
 const HAUL_ARM = { fistL: [18, 48] as Pt, elbowL: [22, 49.5] as Pt };
-const lasso: Anim = lazyAnim(() => ((() => {
+const lasso: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
   // Wind-up: two quick turns, the loop widening, a lean back.
   [0, 2, 4, 6, 0, 2, 4, 6].forEach((s, i) => frames.push(f(55, { mood: i < 4 ? "sneer" : "fierce", spin: s, grow: Math.min(2, i * 0.5), lean: i > 3 ? -1 : 0 }, i === 0 ? { cue: "whirl" } : {})));
@@ -758,14 +763,14 @@ const lasso: Anim = lazyAnim(() => ((() => {
   frames.push(f(75, { mood: "sneer", fistL: [16, 31], loop: { c: [24, 9], rx: 12, ry: 5, tilt: -10 } }));
   frames.push(...settle(4));
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * The taunt: a nod that tips his hat down over his eyes, then he throws his head back, the hat hopping up, and laughs:
  * snorting (cues `laugh`, `snort`), belly shaking; then a spur stomp (cue `stomp`) with a glint off the spur. The loop
  * spins on the whole time.
  */
-const taunt: Anim = lazyAnim(() => ((() => {
+const taunt: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
   let s = 0;
   const F = (ms: number, p: PigPose, extra: Partial<Frame> = {}) => frames.push(f(ms, { spin: s++ % 8, ...p }, extra));
@@ -789,7 +794,7 @@ const taunt: Anim = lazyAnim(() => ((() => {
   F(90, { mood: "smug" }, { specks: stompDust(2) });
   while (s % 8) F(85, { mood: "smug" });
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * The ultimate's wind-up (his ultimate isn't designed yet: a generic big double lasso). He shakes the coil out into a
@@ -797,7 +802,7 @@ const taunt: Anim = lazyAnim(() => ((() => {
  * `throw`), they drop (cue `catch`) and he hauls both in with a mighty yank (cue `tug`); then gathers up and spins on.
  */
 export const CATCH2: Pt = [80, 66];
-const windup: Anim = lazyAnim(() => ((() => {
+const windup: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
   let s = 0;
   const F = (ms: number, p: PigPose, extra: Partial<Frame> = {}) => frames.push(f(ms, { spin: s % 8, ...p }, extra));
@@ -835,7 +840,7 @@ const windup: Anim = lazyAnim(() => ((() => {
   F(80, { mood: "sneer", fistL: [18, 29], loop: { c: [36, 9], rx: 11, ry: 4.5, tilt: -8 }, coil: 1 });
   frames.push(...settle(s % 8, { mood: "laugh" }));
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Ready (Eric, Oct 13: his meter full, until he fires his showdown): the wind-up's spin, looped: both loops whirling
@@ -851,13 +856,13 @@ const ready: Anim = lazyAnim(() => ({
  * boots tucked up and the loop spinning, down at PIG_LEAP.landAt (cue `hop`, dust off his boots), then he steadies.
  */
 export const PIG_LEAP = { upAt: 100, landAt: 600 } as const;
-const leap: Anim = lazyAnim(() => ((() => {
+const leap: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [f(100, { mood: "fierce", bob: 2, spin: 0 })];
   for (let i = 0; i < 4; i++) frames.push(f(125, { mood: i < 2 ? "wild" : "fierce", feet: { l: [1, -4], r: [-1, -4] }, spin: (i * 2 + 1) % 8, coil: i % 2 ? 1 : -1 }));
   frames.push(f(90, { mood: "grit", bob: 2, spin: 1 }, { cue: "hop", shake: [0, 1], specks: stompDust(0) }));
   frames.push(f(110, { mood: "smug", bob: 1, spin: 2 }, { specks: stompDust(1) }));
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Hauling his showdown's pairs in (the board draws the ropes, from his fists to the pieces): both fists low and pulling,
@@ -868,7 +873,7 @@ export const HAUL_FISTS: readonly Pt[] = [
   [18 + OX, 48 + OY],
   [52 + OX, 50 + OY],
 ];
-const haul: Anim = lazyAnim(() => ((() => {
+const haul: Anim = lazyAnim(() => (() => {
   const frames: Frame[] = [];
   const pose = (lean: number, bob: number, mood: Mood): PigPose => ({ mood, lean, bob, ...HAUL_ARM, fistR: [52, 50], elbowR: [55, 47], loop: null, loop2: null, coil: null });
   for (let i = 0; i < 2; i++) {
@@ -878,7 +883,7 @@ const haul: Anim = lazyAnim(() => ((() => {
     frames.push(f(140, pose(-1, 0, "fierce")));
   }
   return { loop: true, frames };
-})()));
+})());
 
 /** Where his lasso's loop lands (CATCH) in his frame (frame pixels, as `foot` is): the board puts it on the piece he drags. */
 export const CATCH_AT: Pt = [CATCH[0] + OX, CATCH[1] + OY];
@@ -980,7 +985,7 @@ const whipBack = (i: number): PigPose => ({ mood: i % 4 === 3 ? "laugh" : "fierc
  * turn and whipping back overhead between (cues `crack` and `lash` in turn, so the repeats don't pile up); he snorts
  * with laughter and leaps off. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(6) },
@@ -1006,7 +1011,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * Wrangler for his attack on a king (his kit's `kingAttack`): his own drawing, parts and palette, facing our left as

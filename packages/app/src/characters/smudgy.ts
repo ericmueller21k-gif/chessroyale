@@ -1228,7 +1228,7 @@ const windUp = (i: number): Frame =>
  * `splat` in turn (the cue frame is where the blob reaches the king's head: the board splats it there), his eyes and
  * his face on the king throughout; he laughs, the brush up, and they bound off. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1250,7 +1250,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 export const SMUDGY: Character = {
   id: "smudgy",

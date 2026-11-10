@@ -29,8 +29,12 @@ import { canvas, inEllipse, inPoly, toGrid, type Canvas } from "./paint.ts";
 import { KING_ATTACK } from "@chessroyale/chess";
 import { groundShadow, moved } from "./attack-frame.ts";
 import { sparkle } from "./effects/common.ts";
-import { lazyAnim, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
+import { lazyAnimsTogether, lazyParts, type Anim, type Character, type Frame, type Layer, type Part, type Speck } from "./sprite.ts";
 import { BALLOON_COLORS, BALLOON_COLOR_NAMES, BALLOON_PIECES, BALLOON_SHAPES, balloonPartOf, knotX, type BalloonColor, type BalloonPiece, type Stage } from "./tiger-bar.ts";
+
+// Its frames share parts cached by rounded poses (and Moo's powered frames count across his moves), so the first frame made
+// decides them: his animations are made all together, in this file's order (sprite.ts lazyAnimsTogether).
+const lazyAnim = lazyAnimsTogether();
 
 export const TIGER_PALETTE: Record<string, string> = {
   k: "#1f1210", // outline
@@ -1179,7 +1183,7 @@ const popBeat = (i: number): Frame => {
  * ten times: each lands on a hit's own time (`bonk`: the cue frame is where the board marks the king's square) and pops there (`pop`)
  * as the next one comes up in his paw; a bored huff (`huff`), and he hops out of the frame. The last frame is empty.
  */
-const kingAttack: Anim = lazyAnim(() => ((() => {
+const kingAttack: Anim = lazyAnim(() => (() => {
   const A = KING_ATTACK;
   const frames: Frame[] = [
     { ms: 100, layers: [], specks: landShadow(8) },
@@ -1201,7 +1205,7 @@ const kingAttack: Anim = lazyAnim(() => ((() => {
     { ms: 60, layers: [] },
   );
   return { loop: false, frames };
-})()));
+})());
 
 /**
  * The tiger for his attack on a king: the same drawing, parts and palette, facing our left as always, in a frame `ATTACK_REACH`
