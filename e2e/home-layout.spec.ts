@@ -420,24 +420,20 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
   }
 });
 
-test("the shell (index.html: what shows before the app's script has run) has the logo, the hero's panel and PLAY's outline where home draws them, so the swap can't be seen", async ({ page }) => {
-  // (Nov 10, phone load: nothing shifts. Home once, which marks this device for home's shell, then a load with the app's
-  // scripts held back: only the shell shows. Each box the same to the pixel, on a phone and a computer.)
-  const boxes = (root: string) =>
-    page.evaluate(async (root) => {
-      await document.fonts.ready;
-      const box = (c: string) => [...document.querySelectorAll(`${root} .${c}`)].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0).map((r) => [r.x, r.y, r.width, r.height].map(Math.round))[0] ?? null;
-      return { logo: box("fd-logo"), hero: box("fd-hero"), play: box("fd-play") };
-    }, root);
+test("the shell (index.html: what shows before the app's script has run) is the splash: the HunChess logo centered, on a phone and a computer, even on a device that has seen home", async ({ page }) => {
+  // (Eric, Nov 10: "You load the game, hun chess in the middle ... it doesn't start putting in the containers until everything is
+  // able to load at once." Home's outline in the shell was dropped.)
   await page.goto("/");
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
   await expect(page.locator("#shell")).toHaveCount(0);
-  const home = await boxes("#app");
-  expect(home.play).not.toBeNull();
   await page.route(/\/assets\/.*\.js$/, (r) => r.abort());
   await page.reload();
-  await expect(page.locator("#shell .fd-root")).toHaveCount(1);
-  expect(await boxes("#shell")).toEqual(home);
+  await expect(page.locator("#shell .fd-splash")).toHaveCount(1);
+  await expect(page.locator("#shell .fd-root, #shell .fd-hero, #shell .fd-play")).toHaveCount(0);
+  const logo = await page.locator("#shell .fd-logo").boundingBox();
+  const vp = page.viewportSize()!;
+  expect(Math.abs(logo!.x + logo!.width / 2 - vp.width / 2)).toBeLessThan(3);
+  expect(Math.abs(logo!.y + logo!.height / 2 - vp.height / 2)).toBeLessThan(vp.height * 0.1);
 });
 
 test("the loading bar (Eric, Nov 10): only past a 2-second hang; then a bar and what's loading, under the logo, and nothing else moves", async ({ page }) => {
