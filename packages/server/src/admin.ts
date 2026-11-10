@@ -315,12 +315,13 @@ export async function handleAdmin(
     if (url.pathname === "/api/admin/fairplay/cases" && request.method === "GET") {
       const status = url.searchParams.get("status") ?? "open";
       if (!["open", "review", "watch", "banned", "all"].includes(status)) return json({ message: "status must be open, review, watch, banned or all" }, 400);
-      return json({ cases: await openCases(sql, now, status as "open"), policy: policy() });
+      const cases = await openCases(sql, now, status as "open");
+      return json({ cases: reviewer ? cases.map((c) => ({ ...c, reason: noEmails(c.reason) })) : cases, policy: policy() });
     }
     const m = url.pathname.match(/^\/api\/admin\/fairplay\/cases\/([A-Za-z0-9_-]{1,64})(\/decision)?$/);
     if (m && !m[2] && request.method === "GET") {
       const d = await caseDetail(sql, m[1]!, { email: admin, lines: admin });
-      return d ? json(d) : json({ message: "no such player" }, 404);
+      return d ? json(reviewer ? forReviewer(d) : d) : json({ message: "no such player" }, 404);
     }
     // POST /api/admin/fairplay/cases/ID/decision {decision: ban|clear|watch|review, reason, notice?}
     if (m && m[2] && request.method === "POST") {
@@ -391,6 +392,26 @@ export async function handleAdmin(
     return adminPage("Fair play", listPage(cases, appeals, log, status, by));
   }
   return notFound();
+}
+
+/** Any email address in a text, hidden ("[email]"): what the automated reviewer reads carries none. */
+export const noEmails = <T extends string | null>(s: T): T => (s === null ? s : (s.replace(/[^\s@<>"'(),;:]+@[^\s@<>"'(),;:]+\.[^\s@<>"'(),;:]+/g, "[email]") as T));
+/** Who decided, as the reviewer reads it: an admin is "admin", never their email. */
+const byForReviewer = <T extends string | null>(by: T): T => (by !== null && by.startsWith("admin:") ? ("admin" as T) : noEmails(by));
+
+/**
+ * A case as the automated reviewer's token reads it (the outside review of Nov 10, finding 6): no email anywhere, the admins' in the
+ * log and decisions included ("admin"), nor any typed in a reason, an appeal or a reply. (caseDetail already leaves out the player's
+ * email and the reported chat lines for it.)
+ */
+export function forReviewer(d: CaseDetail): CaseDetail {
+  return {
+    ...d,
+    player: { ...d.player, email: null },
+    case: d.case ? { ...d.case, reason: noEmails(d.case.reason), decided_by: byForReviewer(d.case.decided_by) } : null,
+    log: d.log.map((l) => ({ ...l, by: byForReviewer(l.by), reason: noEmails(l.reason) })),
+    appeals: d.appeals.map((a) => ({ ...a, text: noEmails(a.text), reply: noEmails(a.reply), decided_by: byForReviewer(a.decided_by) })),
+  };
 }
 
 /** The decision policy the page and the API state (the reviewer follows the same rules: docs/fairplay-reviewer.md). */

@@ -225,7 +225,8 @@ export type CaseMailer = (user: User, kind: "banned" | "cleared" | "upheld", not
 /**
  * A decision on a case by `by` ("admin:<email>" or "reviewer"), with a written reason for the log, and optionally a
  * note for the player (`notice`, in the email). A ban, or clearing someone who was in review or banned, emails them.
- * The automated reviewer never decides appeals: it can't change a banned case or one with an open appeal.
+ * The automated reviewer never decides appeals: it can't change a banned case or one with an open appeal, and it bans only a
+ * case at the ban bar (FAIRPLAY.levels, as detection's own).
  */
 export async function decide(
   sql: Sql,
@@ -246,6 +247,10 @@ export async function decide(
   if (!user && !before) return { ok: false, status: 404, message: "no such player" };
   if (by === "reviewer") {
     if (before?.status === "banned") return { ok: false, status: 409, message: "banned cases and their appeals are for a person" };
+    // (A ban only at the ban bar, as detection's own (FAIRPLAY.levels, playerLevel): never on the reviewer's word alone, so a leaked
+    // token or a steered reviewer can't ban an honest player. The outside review of Nov 10, finding 6.)
+    if (status === "banned" && (await levelNow(sql, userId, before, now)).level !== "ban")
+      return { ok: false, status: 409, message: "a ban needs the ban bar (policy.levels), which this case doesn't meet: choose review or watch, or leave it for a person" };
     // (A deleted account's kept case has no evidence left to weigh: account-data.ts.)
     if (!user) return { ok: false, status: 409, message: "the account was deleted; its case is for a person" };
     if ((await latestAppeal(sql, userId))?.status === "open") return { ok: false, status: 409, message: "this player has an open appeal: a person decides" };
@@ -470,12 +475,17 @@ function levelInputs(history: readonly HistoryRow[], c: Case | null): LevelInput
  * does about it. The deep re-check's entry point (fairplay-deep.ts).
  */
 export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: FairLevel }> {
+  const verdict = await levelNow(sql, userId, await caseOf(sql, userId), now);
+  return { verdict, acted: await actOn(sql, userId, verdict, now, mail) };
+}
+
+/** A player's level from their stored matches now (since the case's last decision), acting on nothing. */
+async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): Promise<LevelVerdict> {
   const history = await sql.all<HistoryRow>(
     "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
     userId,
   );
-  const verdict = playerLevel(levelInputs(history, await caseOf(sql, userId)), now, FAIRPLAY.levels);
-  return { verdict, acted: await actOn(sql, userId, verdict, now, mail) };
+  return playerLevel(levelInputs(history, c), now, FAIRPLAY.levels);
 }
 
 /**
