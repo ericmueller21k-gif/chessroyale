@@ -108,7 +108,7 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     and the Durable Object's `saveResults` counts the battle (`countBossBattle`) as it saves their result (once). A **solo** battle runs on
     the device, so the server can't see its moves: it counts by **the server's clock alone**: `POST /api/boss/solo/start` as the battle
     begins (App.tsx's `startSolo`, `noteSoloBattle`: the server notes the time in `solo_battles`, one open per account, a new start
-    replacing it), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
+    replacing it; each of the two asked once more a second later when it fails on the way or on the server: `askTwice`, account.ts), `POST /api/boss/solo/finish {battle}` from its result screen (taken off in one statement, so it's finished once): it
     counts when 5 minutes or more passed between the two. Its 10-moves path isn't there (the device's word). The drop itself is one
     transaction: the drop row goes in only while the window (counted in the same statement) has room, and the token with it.
   - **The result screen** (`components/TokenBox.tsx`, on `ResultsScreen` for any boss battle): when the server says the battle dropped
