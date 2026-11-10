@@ -1,3 +1,4 @@
+- Nov 10 12:40 UTC: #610 delta review: no blocker/major. I fixed m4-a (banned = full deep check), m1-a (retry acts only below verdict; updated_at MAX), nit lobby IS; ROADMAP m4-b. Kept m6-a 60 s (crate once per account; sign-in is the limit). Head 01d3dd6, CI running; merge when green.
 - Nov 10 12:10 UTC: #610 fix round done (2d689d8; head 93d4896 merged main). Delta review started. CI running.
 - Nov 10 11:45 UTC: #610 review: B1 (fixed by me, 2970b78), M1 (reviewer can still ban on forged evidence -> reviewer never bans), m1-m7. Fix helper on claude/fable-b2 (fix-fable-b2.md).
 - Nov 10 11:22 UTC: Fable b2 PR #610 open (full-e2e). NEW D1 table engine_calls (ensureSchema). Review helper on review/fable-b2.
