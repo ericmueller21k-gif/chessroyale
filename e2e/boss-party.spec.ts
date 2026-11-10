@@ -79,8 +79,8 @@ test("the stage with a party: invite by link, READY and its check, the leader's 
   await expect(e.locator(".bs-start")).toBeEnabled();
   await e.locator(".bs-start").click();
   for (const p of [e, m]) {
-    await expect.poll(() => p.evaluate(() => (window as any).match?.party?.seats ?? null), { timeout: 60_000 }).not.toBeNull();
-    expect(await p.evaluate(() => Object.values((window as any).match.party.seats as Record<string, number>).sort())).toEqual([0, 1]);
+    // (Both seats, waited for: the party's seats can reach a page one member at a time. Main run 42765799277.)
+    await expect.poll(() => p.evaluate(() => Object.values(((window as any).match?.party?.seats ?? {}) as Record<string, number>).sort()), { timeout: 60_000 }).toEqual([0, 1]);
     expect(await p.evaluate(() => (window as any).match.settings.drawRuleByStage)).toEqual(["party"]);
   }
   await eric.ctx.close();
