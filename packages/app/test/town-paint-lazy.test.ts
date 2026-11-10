@@ -35,6 +35,9 @@ const isPart = (o: object): o is { grid: readonly string[] } => "grid" in o && "
 
 async function build(atOnce: boolean) {
   vi.resetModules();
+  // (The same choices each build: home's town scene picks its picture at random and its sky by the clock.)
+  vi.spyOn(Math, "random").mockReturnValue(0.25);
+  vi.useFakeTimers({ toFake: ["Date"], now: new Date(2026, 10, 10, 12) });
   const kit = await import("../src/town/houses/kit.ts");
   kit.paintAtOnce(atOnce);
   const roots: unknown[] = [];
@@ -56,6 +59,8 @@ async function build(atOnce: boolean) {
   for (let v = 0; v < 3; v++) roots.push(d.hedgeFront(v), d.hedgeTop(v), d.bush(v), d.bed(v), d.shed(v));
   for (const s of STATUES) roots.push(statueArt(s.id, 1), statueArt(s.id, CLOSE));
   kit.paintAtOnce(false);
+  vi.restoreAllMocks();
+  vi.useRealTimers();
   return { objs: reach(roots), failed };
 }
 
