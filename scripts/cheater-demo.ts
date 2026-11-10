@@ -5,7 +5,7 @@
  * Four test accounts (server/src/test-accounts.ts: dummy emails at test.hunchess, marked test, off public rankings) play real
  * Crowd 50 v 50 matches through PLAY, as four people on four computers would: the real queue, the lobby's WebSocket, bots in the
  * other seats.
- *   - Engine Eddie: Stockfish's top move every pick (the full-network build, about a million nodes): the cheater.
+ *   - Engine Eddie: Stockfish's top move every pick (the full-network build, up to the deep re-check's 2M nodes): the cheater.
  *   - Strong Sam:   Maia-3 at its strongest (2500, its likeliest move): a strong human-like player who shouldn't be pooled.
  *   - Judge Jo, Judge Jay: everyday players (Maia at 1500, drawn as people play), so each match has devices of four accounts.
  * Every one of them answers the lobby's judge work as an honest device does (the app's own code, net.ts: judge, planBots,
@@ -34,7 +34,7 @@
  * whole match unvouched, its fair play unrecorded).
  */
 import WebSocket from "ws";
-import { DEFAULT_SETTINGS, JUDGES, PREGAME_VOTES, botChoose, botLeanFor, botThinkMs, modeSettings, type Settings } from "@chessroyale/core";
+import { DEFAULT_SETTINGS, FAIRPLAY, JUDGES, PREGAME_VOTES, botChoose, botLeanFor, botThinkMs, modeSettings, type Settings } from "@chessroyale/core";
 import {
   HumanUciEngine,
   TopMovesCache,
@@ -312,6 +312,10 @@ class Seat {
         return this.finish("results", { placement: this.playerId ? m.placements[this.playerId] : undefined, ranked: m.ranked, unvouched: !!m.unvouched });
       case "vote":
         return this.vote(m.vote);
+      case "stageBreak":
+        // (Knocked out: the page stays open, watching, and its device keeps judging, as most people's do.)
+        if (this.playerId && m.knockedOut.includes(this.playerId)) log(`${this.persona.name}: knocked out after stage ${m.stage} (watching and judging on)`);
+        return;
       case "boss":
         // (The boss final: everyone here leaves as it begins; see the header.)
         if (!this.resigning) {
@@ -359,7 +363,8 @@ class Seat {
     const think = this.persona.style === "engine" ? rand(2500, 6000) : this.persona.style === "strong" ? rand(4000, 10_000) : rand(3000, 11_000);
     // (When to send it, on this machine's clock: after the think time, or as soon as the move is found if that takes longer.)
     const target = Date.now() + startIn + Math.min(think, latest);
-    const move = await this.choose(fen, clockMs).catch(() => null);
+    // (A search still going near the deadline: the prefetched top move instead, so the turn is never missed.)
+    const move = await Promise.race([this.choose(fen, clockMs).catch(() => null), sleep(startIn + latest - 1000).then(() => null)]);
     const fallback = legalMoves(fen)[0];
     const chosen = move ?? (await this.top.get(this.engine, fen).catch(() => []))[0]?.move ?? fallback;
     if (!chosen) return;
@@ -372,8 +377,8 @@ class Seat {
 
   private async choose(fen: string, clockMs: number): Promise<string | null> {
     if (this.persona.style === "engine" && eddieEngine) {
-      // Stockfish's top move: as deep as about half the move's clock allows (a million nodes or so on a computer).
-      const nodes = Math.round(Math.max(300_000, Math.min(1_500_000, eddieNps * Math.min(6, (clockMs / 1000) * 0.45))));
+      // Stockfish's top move: as deep as about a third of the move's clock allows, up to the deep re-check's own node count.
+      const nodes = Math.round(Math.max(300_000, Math.min(FAIRPLAY.deep.nodes, eddieNps * (clockMs / 1000) * 0.35)));
       const [best] = await eddieEngine.topMovesAt(fen, 1, nodes);
       return best?.move ?? null;
     }
@@ -515,7 +520,7 @@ interface ReportAccount {
   email: string;
   case: { status: string; reason: string | null; opened_at: number; decided_at: number | null } | null;
   log: { at: number; action: string; by: string; reason: string | null }[];
-  matches: { lobby: string | null; playedAt: number; moves: number | null; counted: number; perf: number | null; found: number | null; evidence: number | null; deepChecked: number; deepMatch: number; deepDone: boolean; score: number; level: string }[];
+  matches: { lobby: string | null; playedAt: number; moves: number | null; counted: number; perf: number | null; found: number | null; evidence: number | null; deepChecked: number; deepMatch: number; deepQueued: boolean; score: number; level: string }[];
   results: { played_at: number; placement: number; players: number }[];
 }
 
@@ -534,11 +539,14 @@ function reportText(accounts: ReportAccount[]): string {
   for (const a of accounts) {
     lines.push(`| ${a.name} | ${a.matches.length} | ${a.case?.status ?? "none"} | ${(a.case?.reason ?? "").replace(/\|/g, "/").slice(0, 160)} |`);
   }
-  lines.push("", "| Account | Lobby | Played | Counted | Found | Strength | Evidence | Deep best / checked | Score | Level |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  // (Deep: the deep re-check's best among the moves it has checked; "queued": more to check on its schedule; "–": none checked, as
+  // for a match that never needed it.)
+  lines.push("", "| Account | Lobby | Ended | Counted / picks | Found | Strength | Evidence | Deep best / checked | Score | Level |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const a of accounts) {
     for (const m of a.matches) {
+      const deep = m.deepChecked ? `${m.deepMatch}/${m.deepChecked}` : "–";
       lines.push(
-        `| ${a.name} | ${m.lobby ?? "–"} | ${utc(m.playedAt)} | ${m.counted}/${m.moves ?? "?"} | ${m.found ?? "–"} | ${m.perf ?? "–"} | ${r1(m.evidence)} | ${m.deepMatch}/${m.deepChecked}${m.deepDone ? "" : " (in progress)"} | ${r1(m.score)} | ${m.level} |`,
+        `| ${a.name} | ${m.lobby ?? "–"} | ${utc(m.playedAt)} | ${m.counted}/${m.moves ?? "?"} | ${m.found ?? "–"} | ${m.perf ?? "–"} | ${r1(m.evidence)} | ${deep}${m.deepQueued ? " (queued)" : ""} | ${r1(m.score)} | ${m.level} |`,
       );
     }
   }
@@ -578,8 +586,10 @@ if (!arg("report") && matches > 0) {
 
   for (let n = 1; n <= matches; n++) {
     log(`match ${n} of ${matches}: PLAY`);
+    const started = Date.now();
     const seats = playing.map((p) => new Seat(p, accounts.get(p.key)!.cookie, engines.get(p.key)!.engine, engines.get(p.key)!.nps));
     const outcomes = await Promise.all(seats.map((s) => s.play()));
+    log(`match ${n} over after ${Math.round((Date.now() - started) / 60_000)} min`);
     for (const [i, o] of outcomes.entries()) {
       log(
         `  ${o.persona.name}: ${o.how}${o.code ? ` in ${o.code}` : ""}${o.placement ? `, placed ${o.placement}` : ""}, ${o.picks} picks, ${seats[i]!.jobsJudged} jobs judged${o.unvouched ? ", UNVOUCHED (no fair play recorded)" : ""}${o.ranked !== undefined ? `, ranked ${o.ranked}` : ""}${o.note ? ` (${o.note})` : ""}`,

@@ -42,7 +42,8 @@ describe("test accounts: who may use the route", () => {
     const { sql, call } = await world();
     const guest = await createGuest(sql, T0, "Guest");
     const player = await signedIn(sql, "player@example.com");
-    for (const headers of [{}, { cookie: `hc_session=${guest.token}` }, { cookie: player.cookie }, { authorization: "Bearer anything" }]) {
+    const asks: Record<string, string>[] = [{}, { cookie: `hc_session=${guest.token}` }, { cookie: player.cookie }, { authorization: "Bearer anything" }];
+    for (const headers of asks) {
       for (const method of ["GET", "POST", "DELETE"]) {
         const res = (await call(method, headers, method === "POST" ? { name: "Engine Eddie" } : undefined))!;
         expect(res.status).toBe(404);

@@ -103,6 +103,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 | The review page and API | `packages/server/src/admin.ts` |
 | The report sheet, ban notice and appeal form, look-away counter | `packages/app/src/screens/PlayerProfile.tsx`, `components/FairPlay.tsx`, `lookaway.ts`, `net.ts` |
 | Simulations | `packages/sim/scripts/fairplay-bank.ts` (the position bank in `packages/sim/data/`), `fairplay-sim.ts` → `reports/fairplay.md` |
+| The cheater demo on a real server (test accounts: Engine Eddie, Strong Sam, two judges) | `scripts/cheater-demo.ts`; accounts `test-accounts.ts` ([accounts.md](accounts.md)) |
 
 ## Settings
 

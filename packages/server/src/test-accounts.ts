@@ -78,8 +78,8 @@ export async function testAccountsReport(sql: Sql) {
       u.id,
     );
     const log = await sql.all<{ at: number; action: string; by: string; reason: string | null }>("SELECT at, action, by, reason FROM fairplay_log WHERE user_id = ? ORDER BY at, id", u.id);
-    const rows = await sql.all<{ lobby: string | null; mode: string; played_at: number; counted: number; perf: number | null; score: number; level: string; summary: string; deep_done: number | null }>(
-      "SELECT lobby, mode, played_at, counted, perf, score, level, summary, deep_done FROM fairplay_matches WHERE user_id = ? ORDER BY played_at, id",
+    const rows = await sql.all<{ lobby: string | null; mode: string; played_at: number; counted: number; perf: number | null; score: number; level: string; summary: string; deep_done: number | null; deep_queued: number | null }>(
+      "SELECT lobby, mode, played_at, counted, perf, score, level, summary, deep_done, deep_queued FROM fairplay_matches WHERE user_id = ? ORDER BY played_at, id",
       u.id,
     );
     const matches = rows.map((r) => {
@@ -102,6 +102,7 @@ export async function testAccountsReport(sql: Sql) {
         deepChecked: pick("deepChecked") ?? 0,
         deepMatch: pick("deepMatch") ?? 0,
         deepDone: r.deep_done === 1,
+        deepQueued: r.deep_queued === 1,
         score: r.score,
         level: r.level,
       };
