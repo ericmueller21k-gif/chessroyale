@@ -1,5 +1,5 @@
 import { expect, type Page } from "@playwright/test";
-import { HUNCHESS_RIDES, WELCOME_CRATE_ID } from "@chessroyale/core";
+import { HUNCHESS_RIDES, WELCOME_CRATE_ID, WELCOME_GIFT } from "@chessroyale/core";
 import { asSignedIn, named, test } from "./helpers.ts";
 
 /**
@@ -19,9 +19,17 @@ const shot = async (page: Page, name: string) => {
 
 type LockerNow = { items: { id: string; def: string; blemish: number }[]; welcome: { games: number; next: number | null; unopened: number; status: string; notice: boolean; item?: string } };
 const lockerNow = (page: Page) => page.evaluate(async () => (await (await fetch("/api/locker")).json()) as LockerNow);
-/** One finished game, saved as a solo result screen saves it (the app's own path). */
+/**
+ * One finished game, saved as a solo game saves it (the app's own path): the server times it from its start (the test switch
+ * ?xpgame counts it as WELCOME_GIFT.soloMinMinutes long), then its result. Since Nov 10 a result the server never timed, or timed
+ * shorter, doesn't count toward a Welcome Crate.
+ */
 const finishGame = (page: Page) =>
-  page.evaluate(async () => (await fetch("/api/results", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true }) })).ok);
+  page.evaluate(async (minutes) => {
+    const json = { "content-type": "application/json" };
+    const { game } = (await (await fetch("/api/xp/solo/start", { method: "POST", headers: json, body: JSON.stringify({ xpgame: minutes }) })).json()) as { game: string };
+    return (await fetch("/api/results", { method: "POST", headers: json, body: JSON.stringify({ mode: "classic", placement: 2, players: 8, evalBar: true, game }) })).ok;
+  }, WELCOME_GIFT.soloMinMinutes);
 
 test("the Welcome Crates: 5 finished games earn the first once; its notice, opening it to a HunChess ride, riding it in the town, never tradeable; a sixth game grants nothing; 25 earn the second, a different ride", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
@@ -49,6 +57,10 @@ test("the Welcome Crates: 5 finished games earn the first once; its notice, open
   await expect(row1).toContainText("Finish 5 games to unlock");
   await expect(row2).toContainText("0/25");
   await expect(row2).toContainText("Finish 25 games to unlock");
+
+  // A result the server never timed (an empty post, the outside review's Nov 10 finding): saved, but not counted.
+  expect(await page.evaluate(async () => (await fetch("/api/results", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "classic", placement: 1, players: 8 }) })).ok)).toBe(true);
+  expect((await lockerNow(page)).welcome).toMatchObject({ status: "locked", games: 0 });
 
   // Three games: each meter counts them.
   for (let i = 0; i < 3; i++) expect(await finishGame(page)).toBe(true);

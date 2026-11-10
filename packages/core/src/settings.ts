@@ -3276,6 +3276,12 @@ export const OUTFIT = {
  */
 export const WELCOME_GIFT = {
   milestones: [5, 25],
+  /**
+   * A solo game counts toward them only when the server timed it (POST /api/xp/solo/start, then its result) for at least this long:
+   * its result is the device's word, and empty posts earned crates (the outside review of Nov 10, finding 10). Online games count as
+   * their rooms recorded them.
+   */
+  soloMinMinutes: 3,
 } as const;
 
 /**
