@@ -208,8 +208,11 @@ export class SquadsLobby extends DurableObject<Env> {
         const i = rec.rewardQueue.indexOf(r);
         if (i >= 0) rec.rewardQueue.splice(i, 1);
         written++;
-        // (The daily cap took it: they're told, in place of the coins they were shown.)
-        if (out === "refused" && this.record === rec) this.core().rewardCapped(r.playerId);
+        // (The daily cap took it: kept with the lobby, so a reconnect is told too (m7), and they're told now, in place of the coins.)
+        if (out === "refused") {
+          (rec.capped ??= {})[r.playerId] = true;
+          if (this.record === rec) this.core().rewardCapped(r.playerId);
+        }
       }
     } catch (e) {
       ok = false;

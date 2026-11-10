@@ -2767,9 +2767,10 @@ export const SQUADS_LOBBY = {
   /**
    * Squad bots' engine work (the bot engine's top moves for a board), done on players' devices first (Eric's computing
    * priorities): `perJob` devices each (computers before phones, devices outside the match before those in it), their
-   * answers compared. The lobby waits `graceMs` after the first answer for the second, `answerMs` for any; two that
-   * disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a third device, and
-   * the device that was wrong gets a strike (`strikes` and it gets no more work). A bot whose candidates aren't in
+   * answers compared. The lobby waits `graceMs` after the first answer for the second (or `graceFactor` of the first's time),
+   * `answerMs` for any; two that disagree go to the engine server (a restricted search of their moves, at `serverNodes`) or a
+   * third device, and the device that was wrong gets a strike (`strikes` and it gets no more work). A second answer after the
+   * grace is compared when it comes: disagreeing, the engine server's verdict strikes the one further from it. A bot whose candidates aren't in
    * `fallbackMarginMs` before its deadline (no devices, none answering) plays from the server's own quick look
    * (material two moves deep and mate in one: no engine), `fallbackScale` turning its pawns into expected score. A
    * device holds at most `maxInFlight` unanswered jobs at once (a phone fewer: its battery), so a slow one is never

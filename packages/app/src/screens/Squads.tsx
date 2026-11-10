@@ -192,11 +192,11 @@ function SquadsVote({ client, vote, onLeave, exit }: { client: SquadsClient; vot
 }
 
 /**
- * Why a placement that pays had no coins or crates (the outside review of Nov 10): a lobby of only your party and bots (nobody else's
- * device checked the bots' moves), or the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay).
+ * Why a placement that pays had no coins or crates (the outside review of Nov 10): your squad's matches had only your party's devices
+ * to move their bots (nobody else's checked them), or the day's paying lobbies used (SQUADS_LOBBY.rewardsPerDay).
  */
 export const NO_REWARD: Record<"alone" | "daily", string> = {
-  alone: "No coins or crates: a lobby of only your party and bots doesn't pay them.",
+  alone: "No coins or crates: nobody outside your party checked the bots' moves.",
   daily: `No coins or crates: today's ${SQUADS_LOBBY.rewardsPerDay} paying lobbies are used. More tomorrow.`,
 };
 
