@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useLayoutEffect, useRef } from "preact/hooks";
 
 /**
  * "Leave Chess Town?" (Eric: "a little pop-up that just says you are about to leave Chess Town, click yes and no … you should
@@ -18,8 +18,10 @@ export function LeaveTownConfirm({ dest, onStay, onLeave }: { dest: string; onSt
   const stay = useRef<HTMLButtonElement>(null);
   const stayRef = useRef(onStay);
   stayRef.current = onStay;
-  useEffect(() => stay.current?.focus(), []);
-  useEffect(() => {
+  // (Layout effects: focus and the keys are in place as the sheet is drawn. A plain effect waits for a frame, and an Escape or
+  // Enter in that frame, under load, went to the town or nowhere: main run 42760919996's sheet that stayed.)
+  useLayoutEffect(() => stay.current?.focus(), []);
+  useLayoutEffect(() => {
     // (No key reaches the town under the sheet: the arrow keys would walk you on. Escape is Stay.)
     const keys = (e: KeyboardEvent) => {
       if (e.key === "Escape") stayRef.current();

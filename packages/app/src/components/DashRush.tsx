@@ -229,7 +229,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
   const t = now - view.at;
   const stage = rush ? rushStage(rush, view, now) : "done";
   const [sel, setSelShown] = useState<string | null>(null);
-  const [drag, setDragShown] = useState<{ from: string; x: number; y: number; moved: boolean; id: number } | null>(null);
+  const [drag, setDragShown] = useState<{ from: string; x: number; y: number; x0: number; y0: number; moved: boolean; id: number } | null>(null);
   // (The pointer's handlers read these refs, not the state: the next pointer event can come before the re-render that hands the
   // handlers a new state, so a drag's moves once all read "no drag" and its drop was lost. The state draws; the refs decide.)
   const selNow = useRef<string | null>(null);
@@ -340,7 +340,7 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
             }
             if (o) {
               setSel(o);
-              setDrag({ from: o, x: e.clientX, y: e.clientY, moved: false, id: e.pointerId });
+              setDrag({ from: o, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, moved: false, id: e.pointerId });
               (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
               return;
             }
@@ -352,7 +352,9 @@ export function RushLayer({ boss, view, now, orientation, onPlace }: { boss: Bos
           onPointerMove={(e) => {
             const drag = dragNow.current;
             if (!drag || drag.id !== e.pointerId) return;
-            const far = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8;
+            // (From where it was picked up, not from the last move: a slow drag's moves are each a few pixels, so it never counted
+            // and its drop was lost, main run 42760919996's 3 of 4.)
+            const far = drag.moved || Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > 8;
             setDrag({ ...drag, x: e.clientX, y: e.clientY, moved: far });
           }}
           onPointerUp={(e) => {

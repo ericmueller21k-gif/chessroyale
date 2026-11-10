@@ -96,9 +96,8 @@ test("the town's back button asks 'Leave Chess Town?' first: Stay keeps you on y
   await still(page, "back-button");
   await sheet.getByRole("button", { name: "Stay" }).click();
   await expectStayed(page, square);
-  // Escape is Stay.
+  // Escape is Stay, at once: the sheet takes keys as it's drawn, not a frame later (an Escape in that frame was lost under load).
   await page.getByRole("button", { name: "Back", exact: true }).click();
-  await expect(leaveDialog(page)).toBeVisible();
   await page.keyboard.press("Escape");
   await expectStayed(page, square);
   // Leave: the front door, and the address back to /.

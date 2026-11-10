@@ -300,10 +300,11 @@ for (const [right, held] of [
       const a = at(m.to);
       const b = at(m.from);
       if (i === 0) {
-        // (A drag: the piece picked up and dropped on its square.)
+        // (A drag: the piece picked up and dropped on its square, slowly, as a finger: each move 4 px at most. It counts from where
+        // it was picked up; counted from each last move, a slow drag never did and its drop was lost.)
         await page.mouse.move(a.x, a.y);
         await page.mouse.down();
-        await page.mouse.move(b.x, b.y, { steps: 8 });
+        await page.mouse.move(b.x, b.y, { steps: Math.max(8, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4)) });
         await page.mouse.up();
       } else {
         await page.mouse.click(a.x, a.y);
