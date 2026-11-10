@@ -1,3 +1,4 @@
+- Nov 10 15:05 UTC: #611 delta review: D1 BLOCKER (a liar claiming by:maia gets moves played unstruck <0.8), D2 major (extras lost), D3-D7 minor. CI green on 08e5f52. Fix round 2 (fix2-fable-b3.md), .done marker last.
 - Nov 10 14:50 UTC: #611 fix helper done (a5dcf2e; head 08e5f52). Delta review restarted (fresh helper); CI running.
 - Nov 10 14:36 UTC: #611 fix helper still pushing after its report (a5dcf2e); I stopped+archived the delta reviewer (two xhigh at once). Waiting for `.done` on claude/fable-b3, then restart delta review on the final head.
 - Nov 10 14:35 UTC: #611 fix round done (c87ce56; head 2af2bd0). Delta review started; CI running.
