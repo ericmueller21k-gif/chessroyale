@@ -149,8 +149,9 @@ export function GlobalChat({ onSignIn }: { onSignIn?: () => void }) {
     const t = setTimeout(() => globalChat.clearError(), 4000);
     return () => clearTimeout(t);
   }, [note]);
-  // (Escape or a press elsewhere closes the gear's menu.)
-  useEffect(() => {
+  // (Escape or a press elsewhere closes the gear's menu. A layout effect, as every pop-up's: an effect waits for a paint, and an
+  // Escape pressed as it opened was lost: LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     if (!gear) return;
     const close = (e: Event) => (e instanceof KeyboardEvent ? e.key === "Escape" : !(e.target as Element | null)?.closest?.(".gchat-head")) && setGear(false);
     addEventListener("keydown", close);

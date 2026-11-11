@@ -51,6 +51,31 @@ const boxes = (page: Page) =>
     return { board: r(`.board-area .board-row > .board-wrap ${sel}`), row: r(".boss-dock-main"), status: r(".boss-dock-status"), clock: r(".dk-clock"), king: r(".gk-unit-btn") };
   }, BOARD_SEL.container);
 
+/**
+ * Resolves once the board's, the row's and the God King's boxes have been the same for three painted frames in a row (or after
+ * 2 s, if something there keeps moving: the checks that follow then decide).
+ */
+const settled = (page: Page) =>
+  page.evaluate((sel) => {
+    const key = () =>
+      [`.board-area .board-row > .board-wrap ${sel}`, ".boss-dock-main", ".gk-unit-btn"]
+        .map((s) => JSON.stringify(document.querySelector(s)?.getBoundingClientRect() ?? null))
+        .join();
+    return new Promise<void>((done) => {
+      let last = "";
+      let same = 0;
+      const until = performance.now() + 2000;
+      const look = () => {
+        const k = key();
+        same = k === last ? same + 1 : 0;
+        last = k;
+        if (same >= 3 || performance.now() > until) done();
+        else requestAnimationFrame(look);
+      };
+      requestAnimationFrame(look);
+    });
+  }, BOARD_SEL.container);
+
 test("the row is exactly the board's width under its edges at every width; the God King under it (phone, tablet upright), beside it with room (a phone on its side), by the board's corner (computer)", async ({ browser }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough: it opens its own screens");
   test.setTimeout(6 * 60_000);
@@ -69,7 +94,13 @@ test("the row is exactly the board's width under its edges at every width; the G
     const ctx = await browser.newContext(s.phone ? { ...devices["iPhone 13"], viewport: upright } : { viewport: s.viewport });
     const page = await ctx.newPage();
     await intoBattle(page);
-    if (upright !== s.viewport) await page.setViewportSize(s.viewport);
+    if (upright !== s.viewport) {
+      await page.setViewportSize(s.viewport);
+      // (The row is lined up with the board by a ResizeObserver, which runs before the turned screen's first paint, and the God
+      // King stepping beside the row shrinks the board a frame later. Measured straight after the resize, a forced layout read the
+      // row where it stood upright, 122 px off (main's run 43016010621, and 2 of 3 locally): measure once the frames stop changing.)
+      await settled(page);
+    }
     const b = await boxes(page);
     expect(b.board && b.row && b.status && b.clock && b.king, s.name).toBeTruthy();
     // The row's edges are the board's, within a pixel.

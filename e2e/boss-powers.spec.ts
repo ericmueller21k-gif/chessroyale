@@ -141,6 +141,12 @@ async function watchSquares(page: Page, selector: string) {
 /** The squares this turn's thaw names (its moment's: the pieces it frees). */
 const thawSquares = async (p: Page): Promise<string[]> => [...(((await powers(p))?.events.find((e: { kind: string }) => e.kind === "thaw")?.squares ?? []) as string[])].sort();
 
+/**
+ * The crowd's moves this turn: `allowed` is null when the powers take no legal move away (the iced pieces had none: main's run
+ * 43014654406, after the first thaw), and then every legal move may be played.
+ */
+const mayPlay = (p: { allowed: string[] | null }, fen: string): string[] => p.allowed ?? new Chess(fen).moves({ verbose: true }).map((m) => m.lan);
+
 test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the blizzard: one random piece moves, then it thaws", async ({ page }) => {
   test.setTimeout(6 * 60_000);
   await page.goto("/?debug&clock=40&bossMoves=7&boss=gingerbread&power=blizzard");
@@ -176,7 +182,7 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(p2.frozen).toBeTruthy();
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(1);
   expect((await iceOffSquares(page)).worst).toBeLessThanOrEqual(1);
-  expect(p2.allowed.some((m: string) => m.startsWith(p2.frozen.square))).toBe(false);
+  expect(mayPlay(p2, await page.evaluate(() => (window as any).match.phase.board.fen)).some((m: string) => m.startsWith(p2.frozen.square))).toBe(false);
   // (A move of the iced piece from the engine's unfiltered search, if it has one there: refused.)
   const all = (await engineTop(page, "raw")).top;
   const tried = all.find((x) => x.move.startsWith(p2.frozen.square))?.move ?? null;
@@ -208,10 +214,11 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
     }
     return null;
   };
-  expect(p3.allowed.length).toBeGreaterThan(0);
+  const allowed3 = mayPlay(p3, fen3);
+  expect(allowed3.length).toBeGreaterThan(0);
   const free = p3.events.find((e: { kind: string }) => e.kind === "blizzard").square as string;
   expect(pieceOn(fen3, free)).toMatch(/[PNBRQK]/);
-  expect(p3.allowed.every((m: string) => m.slice(0, 2) === free)).toBe(true);
+  expect(allowed3.every((m: string) => m.slice(0, 2) === free)).toBe(true);
   expect(p3.iced).not.toContain(free);
   expect(p3.iced.length).toBeGreaterThan(5);
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(p3.iced.length);
@@ -248,8 +255,9 @@ test("the gingerbread man (Freeze): a frozen piece, the rage warning, then the b
   expect(free4.length).toBeGreaterThanOrEqual(4);
   expect(free4.length).toBeLessThanOrEqual(6);
   for (const sq of p3.thaw) if (/[PNBRQK]/.test(pieceOn(fen4, sq) ?? "")) expect(free4).toContain(sq);
-  expect(p4.allowed.length).toBeGreaterThan(0);
-  for (const m of p4.allowed) expect(p4.iced).not.toContain(m.slice(0, 2));
+  const allowed4 = mayPlay(p4, fen4);
+  expect(allowed4.length).toBeGreaterThan(0);
+  for (const m of allowed4) expect(p4.iced).not.toContain(m.slice(0, 2));
   expect(p4.thaw).toEqual(p4.iced);
   await expect(page.locator(".power-board .pw-ice")).toHaveCount(p4.iced.length);
   await expect(page.locator(".power-board .pw-ice.thawing")).toHaveCount(p4.iced.length);

@@ -2302,6 +2302,11 @@ export const FRONT_DOOR = {
   livePollMs: 5_000,
   /** …and the app says "still here" this often everywhere else (a match), so players in matches count as online. */
   heartbeatMs: 30_000,
+  /**
+   * A live request with no answer by now is given up (and the next one goes at its time): one that never answered kept the next from
+   * ever going, and the town's and the home page's chats, which ride on it, stopped until a reload (Nov 11).
+   */
+  liveTimeoutMs: 10_000,
   /** A running match counts while its lobby has reported within this long (it reports at least once a minute). */
   matchStaleMs: 3 * 60_000,
   /** The queue: after the fill time, bots pop into the empty seats for this long before the match begins. */
