@@ -96,6 +96,18 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await expect.poll(() => homeAt(page), { message: "the bakery comes into view" }).not.toBeNull();
   await page.waitForTimeout(1500);
   await shot(page, "outside");
+  if (SHOTS) {
+    // (From above: the town's map, the bakery on South Street, clear of its neighbors.)
+    const small = page.getByRole("button", { name: "Open the map" });
+    if (await small.count()) {
+      await small.click();
+      await expect(page.getByRole("dialog", { name: "Map of the town" })).toBeVisible();
+      await page.waitForTimeout(600);
+      await shot(page, "map");
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog", { name: "Map of the town" })).toHaveCount(0);
+    }
+  }
   const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;

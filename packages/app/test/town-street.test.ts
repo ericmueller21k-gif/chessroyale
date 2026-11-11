@@ -247,3 +247,18 @@ describe("the bosses and the bots (Nov 5)", () => {
     for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) expect(inSquare(c, r), at(c, r)).toBe(groundAt[r * N + c]! <= GRASS && !HOMES.some((h) => inWander(h, c, r)));
   });
 });
+
+describe("Rolling Dough stands clear of the other homes (Eric, Nov 11: \"make sure his building is not right next to another one\")", () => {
+  it("its lot is at least 4 squares from every other home's lot (look-alike fronts between, never a shared wall), the most open of its row", () => {
+    const N0 = N;
+    const homes = STREET_LOTS.filter((l) => l.kind === "home");
+    const zebra = homes.find((l) => l.id === "zebra")!;
+    // (The gap between two lots: across (round the east-west wrap) or along, whichever is wider; 0 when they touch.)
+    const gap = (a: typeof zebra, b: typeof zebra) => {
+      const dc = Math.min(...[0, N0, -N0].map((k) => Math.max(0, Math.max(a.c0, b.c0 + k) - Math.min(a.c0 + a.w, b.c0 + k + b.w))));
+      const dr = Math.max(0, Math.max(a.r0, b.r0) - Math.min(a.r0 + a.d, b.r0 + b.d));
+      return Math.max(dc, dr);
+    };
+    for (const h of homes) if (h !== zebra) expect(gap(zebra, h), h.id).toBeGreaterThanOrEqual(4);
+  });
+});
