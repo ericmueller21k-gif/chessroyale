@@ -1,3 +1,4 @@
+- Nov 11 23:20: Eric: Babur mating showed Hollow's dark matter on the tile (bug). Helper (Opus high) on claude/babur-mate-vibration: that bug + grey Vibration on iPhone ("Not available on iPhone", Eric OK).
 - Nov 11 23:15: Eric: iPhone haptics still nothing in Safari, "it's fine". Follow-up (small): on iPhone grey the Vibration setting with "Not available on iPhone" (the switch trick does nothing on iOS 27). Future: a native wrapper (App Store) would allow haptics.
 - Nov 11 23:20: #645 engine loading copy MERGED (2d6471f). No open PRs. Running: music chat (Fable, Eric-driven, Sawyer/beaver themes). Open: flaky leftovers (boss-challenge:155, town-afk:87, global-chat:46, older list), 320 px result row, trailer edits, burst detection, FAQ 40 MB question.
 - Nov 11 23:10: #644 haptics LIVE (4dbac9a). #645 engine loading copy opened (a5b6796; watcher bom563d60); still sent. FAQ still says ~40 MB (Eric call).
