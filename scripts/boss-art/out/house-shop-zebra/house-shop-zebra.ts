@@ -1220,16 +1220,16 @@ export const SHOP_ZEBRA_BACK_SEAT_H = 11;
   // The green card-table lamp, hanging low over the table on a long cord. Not solid.
   const c = cv(T + 20, 150);
   const cx = 28;
-  line(c, cx, 0, cx, 60, "Z");
-  for (let y = 60; y < 74; y++) {
-    const half = 6 + (y - 60) * 1.4;
-    for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) put(c, x, y, y === 73 ? "?" : x < cx - half * 0.5 ? "?" : x > cx + half * 0.55 ? ">" : "/");
+  line(c, cx, 0, cx, 12, "Z");
+  for (let y = 12; y < 26; y++) {
+    const half = 6 + (y - 12) * 1.4;
+    for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) put(c, x, y, y === 25 ? "?" : x < cx - half * 0.5 ? "?" : x > cx + half * 0.55 ? ">" : "/");
   }
-  rect(c, cx - 4, 57, 9, 4, "y");
-  blob(c, cx, 75, 6, 2.5, () => "L");
+  rect(c, cx - 4, 9, 9, 4, "y");
+  blob(c, cx, 27, 6, 2.5, () => "L");
   still("lamp-green", [1, 1], c, [cx, 149], false);
 }
-const GLAMP_Y = 75;
+const GLAMP_Y = 27;
 {
   // The filing cabinet of openings: four drawers labelled A, B, C, D, E (the openings' index letters), one drawer ajar, papers.
   const c = cv(T, 76);
@@ -1344,7 +1344,13 @@ export const SHOP_ZEBRA_BACK_SEATS = {
  * The challenge's marks (squares): the boss seated at the head (west), you standing at the foot (east), the board on the table between
  * you (the table's middle). Boss on the left, you on the right, as every home.
  */
-export const SHOP_ZEBRA_BACK_MARKS = { boss: [4.15, 6.75], you: [8.45, 6.75], table: [6, 6.5] } as const;
+export const SHOP_ZEBRA_BACK_MARKS = { boss: [4.3, 6.82], you: [8.45, 6.75], table: [6, 6.5] } as const;
+/**
+ * The back room's camera through the challenge (its own, as Ginger's: `BossIntro.cam`, from the table's middle): CHALLENGE_FEEL's
+ * usual (south 0.8, west 0.75) is made for a 20-square room and leaves this small room's lower half empty and you at the phone's edge;
+ * this one centers the kingpin and you (west -0.35: a little east of the table) and comes north (south 0.1). Zoom 1 (the town's).
+ */
+export const SHOP_ZEBRA_BACK_CAM = { south: 0.1, west: -0.35, zoom: 1 } as const;
 /** The doors: the way back to the front room (row 10), its squares, the squares just inside it, and where you arrive. */
 export const SHOP_ZEBRA_BACK_DOORS = {
   front: { squares: [{ c: 3, r: 10 }, { c: 4, r: 10 }], inside: [{ c: 3, r: 9 }, { c: 4, r: 9 }], arrive: [3.5, 9], to: "front" },

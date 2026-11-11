@@ -1,0 +1,30 @@
+PASS najdorf: legal (10 plies); book: "Sicilian Defense: Najdorf Variation" (11 plies) has "Najdorf"
+PASS poisoned-pawn: legal (16 plies); book: "Sicilian Defense: Najdorf Variation" (13 plies) has "Najdorf"; eval ok: 0.52 for the side to move (a1b1) in [0.3, 0.7]: after 8...Qxb2 the game is balanced (White to move): Black's pawn grab holds
+PASS catalan: legal (8 plies); book: "Catalan Opening" (7 plies) has "Catalan"
+PASS mar-del-plata: legal (24 plies); book: "King's Indian Defense: Orthodox Variation, Aronin-Taimanov Defense" (17 plies) has "King's Indian"
+PASS grunfeld-exchange: legal (14 plies); book: "Grünfeld Defense: Exchange Variation" (11 plies) has "Grünfeld"
+PASS grunfeld-rb1: legal (23 plies); book: "Grünfeld Defense: Exchange Variation" (11 plies); eval ok: 0.49 for the side to move (c8g4) in [0.3, 0.7]: after 12.O-O (Black to move) it's balanced: White's play for the pawn
+PASS berlin: legal (16 plies); book: "Ruy Lopez: Berlin Defense, l'Hermet Variation, Berlin Wall Defense" (17 plies) has "Berlin"
+PASS marshall: legal (22 plies); book: "Ruy Lopez: Marshall Attack" (21 plies) has "Marshall"; eval ok: 0.51 for the side to move (e5e1) in [0.38, 0.68]: after 11...c6, a pawn up, White is no better than slightly: Black's attack pays for it
+PASS anti-marshall-h3: legal (15 plies); book: "Ruy Lopez: Closed" (13 plies)
+PASS anti-marshall-a4: legal (15 plies); book: "Ruy Lopez: Closed" (13 plies) has "Ruy Lopez"
+PASS sveshnikov: legal (20 plies); book: "Sicilian Defense: Lasker-Pelikan Variation, Sveshnikov Variation" (19 plies) has "Sveshnikov"
+PASS qga: legal (5 plies); book: "Queen's Gambit Accepted" (5 plies) has "Queen's Gambit Accepted"
+PASS qga-hold: legal (11 plies); book: "Queen's Gambit Accepted" (5 plies); eval ok: 0.00 for the side to move (d8c7) in [0, 0.3]: holding c4 with ...b5 loses to a4 and Qf3 (the rook on a8): Black to move is losing
+PASS yugoslav-rxc3: legal (29 plies); book: "Sicilian Defense: Dragon Variation, Yugoslav Attack, Main Line" (19 plies) has "Dragon"
+PASS caro-advance: legal (6 plies); book: "Caro-Kann Defense" (5 plies) has "Caro-Kann"
+PASS french-trade: legal (14 plies); book: "French Defense: Winawer Variation" (7 plies) has "French"
+PASS french-breaks: legal (10 plies); book: "French Defense: Advance Variation" (9 plies) has "French"
+PASS exchange-ruy: legal (12 plies); book: "Ruy Lopez: Morphy Defense" (7 plies); eval ok: 0.46 for the side to move (d1e2) in [0.3, 0.7]: after 6...Qxe4+ (White to move) it's level: the pawn is back
+PASS exchange-ruy-name: legal (9 plies); book: "Ruy Lopez: Exchange Variation" (9 plies) has "Exchange Variation"
+PASS two-knights: legal (9 plies); book: "Italian Game: Two Knights Defense, Knight Attack, Normal Variation" (9 plies) has "Two Knights"; compare ok: Na5 0.49 vs Nxd5 0.37 for the mover: 5...Na5 scores better for Black than 5...Nxd5 (the Fried Liver's door)
+PASS fried-liver: legal (13 plies); book: "Italian Game: Two Knights Defense, Fried Liver Attack" (21 plies) has "Fried Liver"
+PASS london-qb6: legal (10 plies); book: "Queen's Pawn Game: London System" (7 plies) has "London"; hangs ok: b2 (the side to move's) attacked, defended by nobody
+PASS evans: legal (9 plies); book: "Italian Game: Evans Gambit Accepted" (9 plies) has "Evans"
+PASS nimzo-name: legal (6 plies); book: "Nimzo-Indian Defense" (7 plies) has "Nimzo-Indian"
+PASS nimzo-samisch: legal (9 plies); book: "Indian Defense: Normal Variation" (5 plies)
+PASS lucena: legal (3 plies); eval ok: 1.00 for the side to move (c1d1) in [0.9, 1]: the Lucena position wins for White (to move); eval ok: 0.00 for the side to move (e7e6) in [0, 0.1]: after Rd4 (the bridge's rook on the fourth), Black to move is lost
+PASS philidor: legal (1 plies); eval ok: 0.50 for the side to move (e8e7) in [0.35, 0.65]: rook on the third rank (the sixth from his side), king in front: a draw
+PASS philidor-behind: legal (1 plies); eval ok: 0.50 for the side to move (a2f2) in [0.35, 0.65]: once the pawn steps to the sixth, the rook goes behind and checks from the back: still a draw
+PASS opposition: legal (1 plies); eval ok: 1.00 for the side to move (e1f2) in [0.9, 1]: king and pawn (Ke1, e2 against Ke8): White to move wins; compare ok: Kd2 1.00 vs e4 0.50 for the mover: the king first (Kd2) wins; the pawn first (e4) lets Black take the opposition: a draw
+all passed

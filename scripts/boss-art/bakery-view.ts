@@ -117,7 +117,7 @@ function shoot(W: number, H: number, cam: readonly [number, number], room: Room 
       for (let c = -8; c <= 8; c++) {
         const cs4 = [P(c - 0.5, r - 0.5), P(c + 0.5, r - 0.5), P(c + 0.5, r + 0.5), P(c - 0.5, r + 0.5)];
         if (cs4.some((q) => !q)) continue;
-        const key = Math.abs(c) <= 3 && r >= -1 && r <= 4 ? ((c + r) & 1 ? "town-cobble-b" : "town-cobble") : (c * 3 + r) % 4 ? "town-grass" : "town-grass-b";
+        const key = Math.abs(c) <= 3 && r >= -2 && r <= 3 ? ((c + r) & 1 ? "town-cobble-b" : "town-cobble") : (c * 3 + r) % 4 ? "town-grass" : "town-grass-b";
         floor.push({ t: "tile", key, q: cs4.flatMap((q) => [q!.x, q!.y]) });
       }
     const ch = Z.HOUSE_ZEBRA;
@@ -487,8 +487,8 @@ function backFigs(ms: number, beat?: { crew: string; crewMs: number; crewFlip: b
 
 // ---- The cameras.
 
-/** A room's camera follows you; the challenge's (CHALLENGE_FEEL.cam.across: south 0.8, west 0.75 of the table) frames the table. */
-const CHALLENGE_CAM: readonly [number, number] = [Z.SHOP_ZEBRA_BACK_MARKS.table[0] - 0.75, Z.SHOP_ZEBRA_BACK_MARKS.table[1] + 0.8];
+/** A room's camera follows you; the back room's challenge camera (SHOP_ZEBRA_BACK_CAM, from the table) frames the table. */
+const CHALLENGE_CAM: readonly [number, number] = [Z.SHOP_ZEBRA_BACK_MARKS.table[0] - Z.SHOP_ZEBRA_BACK_CAM.west, Z.SHOP_ZEBRA_BACK_MARKS.table[1] + Z.SHOP_ZEBRA_BACK_CAM.south];
 
 const PHONE = { W: 390, H: 844 };
 const COMPUTER = { W: 1440, H: 900, boxX: 232, boxW: 1440 - 232 - 320 };
@@ -497,10 +497,10 @@ if (cmd === "stills") {
   mkdirSync(out, { recursive: true });
   const page = await openPage(COMPUTER.W, COMPUTER.H, 2);
   const shots: [string, (W: number, H: number) => Shot][] = [
-    ["outside", (W, H) => shoot(W, H, [0, 2.2], "town", 1300, [], [0.4, 3.2])],
+    ["outside", (W, H) => shoot(W, H, [0, 1.5], "town", 1300, [], [0.4, 2.6])],
     ["front", (W, H) => shoot(W, H, [9.5, 15.5], FRONT, 400, frontFigs(400, [9.5, 15.5]), [9.5, 15.5])],
     ["front-counter", (W, H) => shoot(W, H, [11, 10], FRONT, 900, frontFigs(900, [11, 10]), [11, 10])],
-    ["back", (W, H) => shoot(W, H, CHALLENGE_CAM, BACK, 1200, backFigs(1200), [8.45, 8.6])],
+    ["back", (W, H) => shoot(W, H, CHALLENGE_CAM, BACK, 1200, backFigs(1200), [9.2, 8.4])],
   ];
   for (const [name, mk] of shots) {
     const s = mk(PHONE.W, PHONE.H);
