@@ -7,7 +7,7 @@
  */
 
 /**
- * The trailer's captions, in the order they're drawn (c1.png … c8.png; scripts/encode-demo.sh says which scene gets which). The
+ * The trailer's captions, in the order they're drawn (c1.png … c8.png; scripts/reel/encode-trailer.py says which scene gets which). The
  * Hidden Boss has none (Eric, Nov 11: "no caption, just the darkness").
  */
 export const REEL_CAPTIONS = [

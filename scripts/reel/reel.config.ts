@@ -7,7 +7,7 @@ import base from "../../playwright.config.ts";
  * with the run, on E2E_PORT). Only the recorder runs; one worker, no retries.
  *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|hidden|captions]
  * (PW_CHROMIUM=/path/to/chrome where Playwright's own browser isn't installed.)
- * then scripts/encode-demo.sh joins the scenes into packages/app/public/media/hunchess-reel.{mp4,webm,jpg}.
+ * then scripts/reel/encode-trailer.py joins the scenes into packages/app/public/media/hunchess-reel.{mp4,webm,jpg}.
  */
 const launchOptions = process.env.PW_CHROMIUM
   ? { executablePath: process.env.PW_CHROMIUM }
