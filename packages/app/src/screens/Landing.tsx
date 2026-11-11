@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { tooYoung } from "../account.ts";
 import { SignIn } from "../components/SignIn.tsx";
 import { MuteButton } from "../components/MuteButton.tsx";
@@ -28,8 +28,24 @@ const FAQ: [string, string][] = [
   ["Can I play on my phone?", "It's made for phones. Add it to your home screen and it opens like an app."],
 ];
 
-/** The 50 v 50 loop. Muted is set on the element itself, as phones only autoplay muted video. */
+/** Where the computer's reel and layout start (styles.css' `.landing` at 1024 px and up). */
+const WIDE_REEL = "(min-width: 1024px)";
+const wideNow = () => typeof matchMedia === "function" && matchMedia(WIDE_REEL).matches;
+
+/**
+ * The demo reel (Nov 11): 50 v 50, the town and a boss, ranked 1 v 1 and the ranks, the Hidden Boss, 25 s on a loop
+ * (scripts/reel/record-reel.ts, scripts/encode-demo.sh). Two cuts of it: a phone's portrait one and a computer's 16:9 one (Eric:
+ * "a wide rectangle on the computer… like a cinema"); only the one for this window's width loads, chosen as the page first draws so
+ * its box is the right shape from the start. Muted is set on the element itself, as phones only autoplay muted video.
+ */
 function DemoVideo() {
+  const [wide, setWide] = useState(wideNow);
+  useEffect(() => {
+    const mq = matchMedia(WIDE_REEL);
+    const on = () => setWide(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const v = ref.current;
@@ -37,12 +53,24 @@ function DemoVideo() {
     v.muted = true;
     v.setAttribute("muted", "");
     void v.play().catch(() => undefined);
-  }, []);
+  }, [wide]);
+  const name = wide ? "hunchess-reel-wide" : "hunchess-reel";
   return (
-    <video ref={ref} class="demo-video" poster="/media/crowd-demo.jpg" autoplay muted loop playsInline preload="auto" aria-label="A 50 v 50 match being played">
-      <source src="/media/crowd-demo.mp4" type="video/mp4" />
+    <video
+      key={name}
+      ref={ref}
+      class={wide ? "demo-video wide" : "demo-video"}
+      poster={`/media/${name}.jpg`}
+      autoplay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      aria-label="A short reel: a 50 v 50 match, the town and a boss battle, a ranked 1 v 1 and its ranks, and the Hidden Boss"
+    >
+      <source src={`/media/${name}.mp4`} type="video/mp4" />
       {/* (WebM too, for browsers without H.264, e.g. open-source Chromium; neither is precached: vite.config.ts.) */}
-      <source src="/media/crowd-demo.webm" type="video/webm" />
+      <source src={`/media/${name}.webm`} type="video/webm" />
     </video>
   );
 }
@@ -66,23 +94,27 @@ export function LandingScreen({
 }) {
   return (
     <div class="screen landing">
-      <header class="landing-head">
-        <h1 class="logo">
-          <span class="logo-crown" aria-hidden="true">
-            ♚
-          </span>
-          HunChess
-          <MuteButton />
-        </h1>
-        <p class="landing-tag">
-          <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
-        </p>
-      </header>
-      <div class="landing-main">
+      {/* Two panes on a computer (Eric, Nov 11): the title and the reel stay put on the left, the sign-in and the questions scroll on the
+          right. Below 1024 px both wrappers are display: contents, so a phone's column is as before. */}
+      <div class="landing-stage">
+        <header class="landing-head">
+          <h1 class="logo">
+            <span class="logo-crown" aria-hidden="true">
+              ♚
+            </span>
+            HunChess
+            <MuteButton />
+          </h1>
+          <p class="landing-tag">
+            <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
+          </p>
+        </header>
         <figure class="demo-frame">
           <DemoVideo />
-          <figcaption class="muted small">A 50 v 50 match</figcaption>
+          <figcaption class="muted small">A look inside HunChess</figcaption>
         </figure>
+      </div>
+      <div class="landing-side">
         <div class="landing-actions">
           {notice && (
             <p class="landing-notice" role="status">
@@ -104,19 +136,19 @@ export function LandingScreen({
           </button>
           <p class="muted small landing-note">Guests play solo against bots. Online matches need an account.</p>
         </div>
+        <section class="faq">
+          <h2>Questions</h2>
+          {FAQ.map(([q, a]) => (
+            <details key={q}>
+              <summary>{q}</summary>
+              <p>{a}</p>
+            </details>
+          ))}
+        </section>
+        <footer class="landing-foot muted small">
+          <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
+        </footer>
       </div>
-      <section class="faq">
-        <h2>Questions</h2>
-        {FAQ.map(([q, a]) => (
-          <details key={q}>
-            <summary>{q}</summary>
-            <p>{a}</p>
-          </details>
-        ))}
-      </section>
-      <footer class="landing-foot muted small">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
-      </footer>
     </div>
   );
 }

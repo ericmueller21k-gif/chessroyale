@@ -44,6 +44,11 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
+  Its **demo reel**, 25 s on a loop, a pixel-font caption each (50 v 50; the park, Big Boy's challenge; ranked, the ranks up to
+  Transcendent; the Hidden Boss), cut twice: a phone's portrait one (`/media/hunchess-reel.*`, 860 × 1544, the screen's whole width)
+  and a computer's 16:9 one from 1024 px (`hunchess-reel-wide.*`, 1920 × 1080). Only one loads. From 1024 px the page fills the
+  window and never scrolls: left, the title and the reel, as big as fits; right, a 380 px column (sign-in, then Questions), the
+  only part that scrolls (`.landing-stage` / `.landing-side`, display: contents below 1024 px). Remake: `scripts/reel/` then `scripts/encode-demo.sh`. [2026-11-11-landing-reel.md](../decisions/2026-11-11-landing-reel.md).
 - **Home** (built from the approved mockups in `docs/mockups/front-door/`; the RANKED row and the Boss raid card, Eric,
   Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
   - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**
