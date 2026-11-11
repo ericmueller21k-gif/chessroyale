@@ -3738,6 +3738,16 @@ export const FAIRPLAY = {
     banOneDeepChecked: 12,
     banOneDeep: 0.9,
     banOnePerf: 2400,
+    /**
+     * Sustained strength (Eric, Nov 11: "People easily get around that by playing the second or third best move ... by 4 or 5 games,
+     * if their Elo is just ridiculous like that, put them in the cheater queue"): the newest `poolStrengthMatches` matches in the
+     * window with `poolStrengthCounted` counted moves or more each, their match strengths averaging `poolStrength` or more, pool the
+     * player whatever their top-move share (a ban-level verdict, as the bars above; never a ban: `enforcement`). Each match is its own
+     * lobby, so no one lobby's judges carry it. reports/fairplay.md, "Sustained strength".
+     */
+    poolStrengthMatches: 5,
+    poolStrengthCounted: 8,
+    poolStrength: 3000,
   },
 } as const;
 

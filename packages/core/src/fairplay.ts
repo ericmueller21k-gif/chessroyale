@@ -379,7 +379,8 @@ export type LevelInput = Pick<FairSummary, "score" | "perf" | "counted"> & Parti
 /**
  * A player's level from their recent match summaries (any order; only `at` within the window counts, at most
  * windowMatches of the newest). Ban needs overwhelming evidence confirmed by the deep re-check: super-GM strength
- * and engine-like moves over two matches with high scores, or one match past every bar.
+ * and engine-like moves over two matches with high scores, or one match past every bar; or a strength no honest player keeps
+ * up over several matches (sustainedStrength).
  */
 export function playerLevel(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): LevelVerdict {
   const recent = matches
@@ -405,10 +406,25 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
   }
   const one = checked.find((m) => atBanBar(m, lv));
   if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves near the engine's best, strength ${one.perf}`] };
+  const strong = sustainedStrength(recent, lv);
+  if (strong !== null) return { level: "ban", reasons: [`strength: ${strong.toLocaleString("en-US")} average over ${lv.poolStrengthMatches} matches`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };
   return { level: "none", reasons: [] };
+}
+
+/**
+ * Sustained strength (Eric, Nov 11): the average match strength of the newest `poolStrengthMatches` matches with `poolStrengthCounted`
+ * counted moves or more each (`matches` newest first, already in the window), when there are that many and it reaches `poolStrength`;
+ * else null. Catches an engine user who plays its second or third choice, whose top-move share stays low.
+ */
+export function sustainedStrength(matches: readonly Pick<LevelInput, "perf" | "counted">[], lv: Levels = FAIRPLAY.levels): number | null {
+  const n = lv.poolStrengthMatches;
+  const enough = matches.filter((m) => m.counted >= lv.poolStrengthCounted && m.perf !== null).slice(0, n);
+  if (n < 1 || enough.length < n) return null;
+  const avg = Math.round(enough.reduce((t, m) => t + m.perf!, 0) / n);
+  return avg >= lv.poolStrength ? avg : null;
 }
 
 /**

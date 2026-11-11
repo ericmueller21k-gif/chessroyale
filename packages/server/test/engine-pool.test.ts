@@ -139,6 +139,20 @@ describe("into the pool", () => {
     expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", p.id)).map((l) => l.action)).toEqual(["pool", "note", "note", "note"]);
   });
 
+  it("sustained strength (Eric, Nov 11): five matches averaging past poolStrength pool with no deep re-check, whatever the top-move share; the pool list says which path", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Pat");
+    // Every pick 0 points off by the judges (strength 3400), never deep-checked: no share to read, only the strength.
+    const strong = engineMatch(false);
+    expect(matchSignals(strong, 1500)).toMatchObject({ counted: 20, perf: 3400, deepChecked: 0 });
+    for (let i = 0; i < FAIRPLAY.levels.poolStrengthMatches - 1; i++) await recordFairPlay(sql, p.id, { lobby: `S${i}SSS`, mode: "crowd", moves: strong }, T0 + i * 1000);
+    expect((await caseOf(sql, p.id))?.status).not.toBe("pool");
+    const fifth = await recordFairPlay(sql, p.id, { lobby: "S9SSS", mode: "crowd", moves: strong }, T0 + 9000);
+    expect(fifth).toMatchObject({ verdict: { level: "ban", reasons: ["strength: 3,400 average over 5 matches"] }, acted: "pool" });
+    expect((await poolPlayers(sql)).find((r) => r.userId === p.id)).toMatchObject({ why: "level ban: strength: 3,400 average over 5 matches" });
+  });
+
   it("public rankings leave the pool out: others' Top N% don't count a pooled player; theirs looks as ever", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);

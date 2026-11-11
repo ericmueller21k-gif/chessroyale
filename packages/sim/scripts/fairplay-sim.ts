@@ -172,6 +172,8 @@ const CHEATERS: Kind[] = [
   // Engine Eddie (the live demo, Nov 11): every pick another engine's top move, here the judges' own quick search (the browser engine,
   // 250k nodes), which is our deep re-check's exact best about as often as the live demo's Stockfish 19 was our 17.1's (74%).
   { name: "Another engine's top move every move (Eddie-like)", elo: 1500, cheat: (p) => p.best },
+  // (Eric, Nov 11: "People easily get around that by playing the second or third best move.")
+  { name: "The engine's 2nd or 3rd choice every move", elo: 1500, cheat: (p) => p.cheat[rng() < 0.5 ? 1 : 2] ?? p.cheat[1] ?? p.cheat[0]! },
 ];
 
 /** Strong people (Maia-3, fairplay-maia.ts): its likeliest move ("raw", as the demo's Strong Sam), or drawn as people vary. */
@@ -638,6 +640,24 @@ if (process.env.FAIRPLAY_DIAG4) {
           }
       console.log(`${kind.elo} | ${acc.map((a) => (a.n ? `${(a.hit / a.n).toFixed(2)} (${(a.model / a.n).toFixed(2)}) [${a.n}]` : "-")).join(" | ")}`);
     }
+  }
+  process.exit(0);
+}
+
+if (process.env.FAIRPLAY_STRENGTH) {
+  // Per kind: the average match strength over the matches with poolStrengthCounted counted moves or more (the newest
+  // poolStrengthMatches, as sustainedStrength reads them), for every subject with that many: quantiles, and the share past poolStrength.
+  const lv = SETS[SETS.length - 1]!.st.levels;
+  console.log(`kind | players with ${lv.poolStrengthMatches} matches of ${lv.poolStrengthCounted}+ counted | average strength p50 / p90 / p99 / p99.9 / max | at ${lv.poolStrength}+`);
+  for (const kind of [...HONEST, ...MAIA, ...CHEATERS]) {
+    const subs = [...honest, ...maiaHonest, ...cheaters].filter((x) => x.kind === kind);
+    const avgs: number[] = [];
+    for (const sub of subs) {
+      const ms = sub.movesByMatch.map((raw) => matchSignals(raw, null)).filter((x) => x.counted >= lv.poolStrengthCounted && x.perf !== null);
+      if (ms.length >= lv.poolStrengthMatches) avgs.push(ms.slice(0, lv.poolStrengthMatches).reduce((t, x) => t + x.perf!, 0) / lv.poolStrengthMatches);
+    }
+    const q = [0.5, 0.9, 0.99, 0.999].map((f) => Math.round(quant(avgs, f))).join(" / ");
+    console.log(`${kind.name} | ${avgs.length} of ${subs.length} | ${q} / ${Math.round(Math.max(...avgs))} | ${pct(avgs.filter((a) => a >= lv.poolStrength).length / Math.max(1, avgs.length))}`);
   }
   process.exit(0);
 }

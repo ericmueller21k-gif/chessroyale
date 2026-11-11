@@ -9,6 +9,7 @@ import {
   nearBest,
   playerLevel,
   ratingForLoss,
+  sustainedStrength,
   referenceStrength,
   skipReason,
   spearman,
@@ -248,5 +249,19 @@ describe("levels", () => {
     expect(playerLevel([{ ...strong, perf: L.banPerf - 1 }, { ...strong, perf: L.banPerf - 1 }], now).level).not.toBe("ban");
     const one = { ...m(L.banOneEvidence, L.banOnePerf), evidence: L.banOneEvidence, deepChecked: L.banOneDeepChecked, deepMatch: Math.ceil(L.banOneDeep * L.banOneDeepChecked) };
     expect(playerLevel([one], now)).toMatchObject({ level: "ban", reasons: [expect.stringMatching(/one match/)] });
+  });
+
+  it("sustained strength (Eric, Nov 11): the newest poolStrengthMatches matches of poolStrengthCounted+ counted moves averaging poolStrength pool, whatever the top-move share", () => {
+    expect([L.poolStrengthMatches, L.poolStrengthCounted, L.poolStrength]).toEqual([5, 8, 3000]);
+    const at = (perf: number, counted = L.poolStrengthCounted, daysAgo = 1) => ({ score: 6, perf, counted, deepChecked: 0, deepMatch: 0, evidence: 0, at: now - daysAgo * day });
+    const five = [3400, 3130, 2657, 3400, 3100].map((p) => at(p));
+    expect(sustainedStrength(five)).toBe(3137);
+    expect(playerLevel(five, now)).toEqual({ level: "ban", reasons: ["strength: 3,137 average over 5 matches"] });
+    // Four aren't enough; a short match doesn't count (nor stand in for one); below the bar, a review at most.
+    expect(playerLevel(five.slice(0, 4), now).level).not.toBe("ban");
+    expect(playerLevel([...five.slice(0, 4), at(3400, L.poolStrengthCounted - 1)], now).level).not.toBe("ban");
+    expect(playerLevel([2900, 2900, 3100, 3000, 3000].map((p) => at(p)), now).level).not.toBe("ban");
+    // The newest five count: an old strong run with weaker matches since doesn't.
+    expect(sustainedStrength([2400, 2400, 2400, 2400, 2400, 3400, 3400, 3400, 3400, 3400].map((p, i) => at(p, 12, i + 1)))).toBeNull();
   });
 });
