@@ -296,6 +296,11 @@ export interface IntroData {
   props: Readonly<Record<string, Prop>>;
   /** The boss's own moves' sheet (at its town figure's pixels, facing east as drawn: `flip` faces it west), if it plays any. */
   mover?: Character;
+  /**
+   * Its figure, for a boss with none in the town (Don Dough, Nov 11: he stays in his bakery's back room, so render.ts BOSS_ART has no
+   * picture of him): its idle stands in for the town figure's. None: BOSS_ART's.
+   */
+  figure?: Character;
   /** Its table's picture (three squares across: a stool, the leg, a stool; default the park table) and its slab's and board's colors. */
   table?: Character;
   palette?: Readonly<Record<string, string>>;

@@ -24,6 +24,8 @@
  *   pig        Wrangler's Stall             a plank counter round, a striped canvas awning roof, posts at the back
  *   moo        Moo & Moon Meadow            a rail fence round a grass paddock, the back fence
  *   hollow     Hollow Peak                  dark crystal rock rising to its peak (no walls)
+ *   zebra      Rolling Dough                cream plaster with a brick string course, a flat tar roof behind its parapet and a
+ *                                           chimney (Nov 11: the bakery's front is the art's; its box is the director's helper's)
  */
 import type { Character } from "../characters/sprite.ts";
 import type { LightSpot } from "./houses/kit.ts";
@@ -33,7 +35,7 @@ import {
   type Face, type SideSpec, type TownBox,
 } from "./town-kit.ts";
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "blitz" | "zebra";
 
 /** A home's box: its sides (null: its roof runs to the ground there), roof, palette, and where its door is on its front. */
 interface HomeSpec {
@@ -154,6 +156,13 @@ export const HOME_SPECS: Record<HomeId, HomeSpec> = {
     back: { h: 22, side: { mat: "log", corner: false } },
     roof: flatRoof(10, 134, 12, "grass").map((f) => ({ ...f, rim: false })),
     pal: { ...ramp("#5e3b22", "#8a5a33", "#b07a48") },
+  },
+  // (Rolling Dough, Nov 11: its parapet stands 121 px over its foot from x 9 to 134; the walls run 12 to 132; its door's middle at 91.)
+  zebra: {
+    body: [12, 132], eave: [118, 118], door: 91,
+    side: { mat: "plaster", rows: [{ y: 40, h: 22 }, { y: 76, h: 22 }], every: 34, trim: [0, 14] },
+    roof: [...flatRoof(12, 132, 118), ...blockF(98, 114, 0.2, 0.42, 118, 134, "clay", "tar")],
+    pal: { ...ramp("#c9b38c", "#efe2c4", "#fbf3df"), g: "#a8483a", G: "#7a2e26" },
   },
   hollow: {
     body: [28, 124], eave: null, door: 81, taper: 0.55,
