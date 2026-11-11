@@ -259,7 +259,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     sheet), **Online** (each with what they're doing: the app's live line says `?doing=`, core's `ACTIVITIES`,
     kept in the live hub's memory beside "in a match"; Invite) and **Offline** ("Last online 2h ago", Invite greyed), then invites and friend
     requests when any (under the lists, so nothing above them moves when they arrive: fix round, Nov 11), then "Requests sent and blocked ›"
-    (Cancel, Unblock) and Settings. The query and hash stay on the address in and out of `/friends` (test switches, links). The search reads
+    (Cancel, Unblock) and Settings. The query and hash stay on the address in and out of `/friends` and a profile opened from it (test switches, links). The page watches the live line (`watchLive`) while open: its inbox count is how a new request or invite reaches the list. The search reads
     `users_name`, or `users_name_signed` (partial: signed-in accounts only, its WHERE the search's own text) where sign-in is set up, ordered by
     the name alone so LIMIT stops after six rows (never every guest named "Player").
   - **Known staleness (accepted):** `doing` can be a moment stale across Worker instances: two instances' batches can reach the hub out of order
