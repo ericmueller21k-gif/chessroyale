@@ -41,3 +41,6 @@ Wait for green CI.
 
 ## Eric, Nov 11: the size
 "Make it much bigger, on mobile it's as wide as we can go, on desktop it's also quite large, at least half the height or about half the screen height." (Phone: full width; computer: about 50vh tall.)
+
+## Eric, Nov 11 (later): computer layout
+"A wide rectangle on the computer, like a cinema ... a much larger size of the entire screen on desktop. It should be captivating. If that means we need to shrink the sign in ... the desktop is probably going to be a different ratio than the phone ... somebody sitting back 3 feet." (Director: a 16:9 computer reel recorded on the desktop layouts, ~70% of the width / ≤62% of the height, sign-in a compact panel beside or under it, above the fold at 1280×800.)
