@@ -579,7 +579,7 @@ export const EFFECTS: Record<EffectName, Effect> = {
   zebraDough: { ch: EFFECT_SPRITES.zebraDough, covers: "square", start: "land", loop: "p", sounds: { plop: "zebraPlop", rise: "zebraRise", pop: "zebraOvenPop", squash: "zebraSquash" } },
   // Gold Plate on his piece's square: the gilding (its chimes are his brush's `gild` cue: quiet here), the shine, the idle glint (no
   // sound: it repeats), a pawn's clink off it.
-  goldFx: { ch: EFFECT_SPRITES.goldFx, covers: "square", start: "gild", loop: "glint", sounds: { shine: "zebraShine", clink: "zebraClink" } },
+  goldFx: { ch: EFFECT_SPRITES.goldFx, covers: "square", start: "gild", loop: "glint", sounds: { gild: "zebraGild", shine: "zebraShine", glint: "zebraShine", clink: "zebraClink" } },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },

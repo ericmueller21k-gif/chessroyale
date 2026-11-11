@@ -72,7 +72,7 @@ export const ZEBRA_FX = {
   openingTalk: 0,
 } as const;
 
-type DoughSettings = Pick<BossPowerSettings, "doughTimers" | "doughOdds" | "doughDrops" | "doughFirst" | "doughGap" | "doughLast" | "doughLive" | "doughReach" | "doughLeadMax">;
+type DoughSettings = Pick<BossPowerSettings, "doughTimers" | "doughOdds" | "doughDrops" | "doughFirst" | "doughGap" | "doughLast" | "doughLive" | "doughReach" | "doughLeadMax" | "doughQueenFree">;
 
 /** His state (a fresh one before his battle has set it up). */
 export const zebraOf = (p: Pick<BossPowerState, "zebra"> | null | undefined): ZebraState =>
@@ -95,10 +95,11 @@ const rollIn = (seed: number, range: readonly [number, number], ...parts: (strin
  * The kind of his `n`-th lump (`fen`: any position; `his`: his side): doughOdds over the kinds he can have now (landRefused:
  * never a ninth pawn, never more pieces than promotions could make), from the seed. Null: none he can have.
  */
-export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax"> = BOSS_POWERS): DoughPiece | null {
+export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax" | "doughQueenFree"> = BOSS_POWERS): DoughPiece | null {
   // (Never one that would put him more than doughLeadMax pawns ahead of you on material.)
   const room = materialOf(fen, other(his)) + s.doughLeadMax - materialOf(fen, his);
-  const open = DOUGH_PIECES.filter((k) => s.doughOdds[k] > 0 && VALUE[k]! <= room && !landRefused(fen, k, his));
+  // (A queen's, rare, whatever the lead: doughQueenFree.)
+  const open = DOUGH_PIECES.filter((k) => s.doughOdds[k] > 0 && (VALUE[k]! <= room || (k === "q" && s.doughQueenFree)) && !landRefused(fen, k, his));
   const total = open.reduce((t, k) => t + s.doughOdds[k], 0);
   if (!total) return null;
   let x = powerRoll(seed, "doughKind", n) * total;

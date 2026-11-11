@@ -11,6 +11,7 @@ import { TIGER_UI } from "../src/components/Tiger.tsx";
 import { FOLIO_BEATS, FOLIO_UI } from "../src/components/Folio.tsx";
 import { TIMBER_UI } from "../src/components/Timber.tsx";
 import { DASH_UI } from "../src/components/Dash.tsx";
+import { ZEBRA_BEATS, ZEBRA_UI } from "../src/components/Zebra.tsx";
 import { BIGBOY_UI } from "../src/components/BigBoy.tsx";
 import { BOINGO_UI, FUNHOUSE, PIE, SPIN, funhouseFlipAt } from "../src/components/Boingo.tsx";
 import { BLIZZARD, FREEZE, GINGER_UI, THAW } from "../src/components/Ginger.tsx";
@@ -38,7 +39,7 @@ const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
 
 /** Every power moment's view, by kind (the rage warning and each boss's). */
 const VIEWS: Partial<Record<PowerEventKind, { ui: MomentUi; boss: string; name: string }>> = {};
-for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"]] as const) {
+for (const [ui, name] of [[GINGER_UI, "Ginger"], [BOINGO_UI, "Boingo"], [GREX_UI, "Jefferson"], [HOLLOW_UI, "Hollow"], [BIGBOY_UI, "Big Boy"], [SAWYER_UI, "Sawyer"], [PIG_UI, "Wrangler"], [RECLUSE_UI, "Hidden Boss"], [ALFIL_UI, "Alfil"], [HOPPER_UI, "Chub & Chirp"], [SMUDGY_UI, "Smudgy"], [MOO_UI, "Moo & Moon"], [GARDENER_UI, "Puddles"], [TIGER_UI, "Babur"], [FOLIO_UI, "Folio"], [TIMBER_UI, "Timber"], [DASH_UI, "Dash"], [ZEBRA_UI, "Don Dough"]] as const) {
   for (const [kind, m] of Object.entries(ui.moments)) VIEWS[kind as PowerEventKind] = { ui: m as MomentUi, boss: ui.id, name };
 }
 VIEWS.warn = { ui: WARN, boss: "bigboy", name: "Big Boy" };
@@ -94,6 +95,8 @@ const POWER_AT: Partial<Record<PowerEventKind, number>> = {
   fold: FOLIO_BEATS.fold.foldAt,
   crease: FOLIO_BEATS.crease.pressAt,
   revision: FOLIO_BEATS.revision.strikeAt[0],
+  // (Don Dough's Gold Plate: his first stroke gilds the piece.)
+  goldPlate: ZEBRA_BEATS.gold.gildAt,
 };
 
 /** Each power's banner on screen on Oct 15, ms (its window, at most the 2.5 s it slid off by then). */

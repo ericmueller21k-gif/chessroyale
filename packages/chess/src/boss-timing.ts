@@ -137,9 +137,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   // (His extra move after a failed Scramble Rush: "TWICE!", as Hollow's. His clock fit has none. The Rush's warning: the warning's.)
   rushExtra: [[0, 1500]],
   rushWarn: [[0, 1500]],
-  // (Don Dough's GOLD PLATE!, Nov 11: over his cast's stirring, off the board as his first stroke gilds the piece; his 10 s
-  // moment holds no longer for it. His dough has none.)
-  goldPlate: [[0, 2480]],
+  // (Don Dough's GOLD PLATE!, Nov 11: over his cast's stirring, off the board before his first stroke gilds the piece. His dough has
+  // none.)
+  goldPlate: [[0, 1500]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */

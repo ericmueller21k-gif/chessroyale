@@ -88,6 +88,10 @@ function onPosition(r: MatchRunner, fen: string, crowd: "w" | "b", zebra: Partia
   };
 }
 
+/** The placement and kinds with no lead guard, and out of reach of every move of yours (the switches the sim tried). */
+const ANY_LEAD = { ...S, doughLeadMax: 99 };
+const OUT = { ...S, doughReach: "out" as const };
+
 /** A quiet middlegame, the crowd (White) to move, a pawn of each side gone: a lump of any kind can rise. */
 const QUIET_W = "r1bqkb1r/pp3ppp/2n1pn2/3p4/3P4/2N1PN2/PP3PPP/R1BQKB1R w KQkq - 0 7";
 
@@ -126,11 +130,11 @@ describe("Rising Dough: what and where", () => {
     const start = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1";
     for (let n = 0; n < 20; n++) expect(doughKind(start, "b", 3, n)).toBeNull();
     const kinds = new Set<string>();
-    for (let n = 0; n < 400; n++) kinds.add(doughKind(QUIET_W, "b", 5, n)!);
+    for (let n = 0; n < 400; n++) kinds.add(doughKind(QUIET_W, "b", 5, n, ANY_LEAD)!);
     expect([...kinds].sort()).toEqual(["b", "n", "p", "q", "r"]);
     // (Rook and queen rare: about S.doughOdds of them.)
     let rq = 0;
-    for (let n = 0; n < 2000; n++) if (["r", "q"].includes(doughKind(QUIET_W, "b", 11, n)!)) rq++;
+    for (let n = 0; n < 2000; n++) if (["r", "q"].includes(doughKind(QUIET_W, "b", 11, n, ANY_LEAD)!)) rq++;
     expect(rq / 2000).toBeLessThan(0.2);
   });
 
@@ -139,14 +143,14 @@ describe("Rising Dough: what and where", () => {
     const reach = new Set(legalMoves(QUIET_W).map((m) => m.slice(2, 4)));
     for (let n = 0; n < 60; n++) {
       for (const piece of ["p", "n", "b"] as const) {
-        const sq = doughSquare(QUIET_W, piece, 9, n)!;
+        const sq = doughSquare(QUIET_W, piece, 9, n, [], OUT)!;
         expect(sq, `${piece} #${n}`).toBeTruthy();
         expect(["5", "6"]).toContain(sq[1]);
         expect(pieceAt(QUIET_W, sq)).toBeNull();
         expect(reach.has(sq)).toBe(false);
       }
       for (const piece of ["r", "q"] as const) {
-        const sq = doughSquare(QUIET_W, piece, 9, n);
+        const sq = doughSquare(QUIET_W, piece, 9, n, [], OUT);
         if (!sq) continue;
         expect(["6", "7"]).toContain(sq[1]);
         expect(reach.has(sq)).toBe(false);
@@ -158,6 +162,17 @@ describe("Rising Dough: what and where", () => {
     // (Never on a lump.)
     const first = doughSquare(QUIET_W, "p", 9, 0)!;
     expect(doughSquare(QUIET_W, "p", 9, 0, [{ square: first }])).not.toBe(first);
+  });
+
+  it("never a lump that would put him more than doughLeadMax pawns ahead (but a queen's, rare); with doughReach \"any\" a square your move reaches is fine", () => {
+    // (Level on material: a pawn's at most, or a queen's.)
+    const kinds = new Set<string>();
+    for (let n = 0; n < 400; n++) kinds.add(doughKind(QUIET_W, "b", 5, n)!);
+    expect([...kinds].sort()).toEqual(S.doughQueenFree ? ["p", "q"] : ["p"]);
+    const reach = new Set(legalMoves(QUIET_W).map((m) => m.slice(2, 4)));
+    let reached = 0;
+    for (let n = 0; n < 60; n++) if (reach.has(doughSquare(QUIET_W, "p", 9, n, [], { ...S, doughReach: "any" })!)) reached++;
+    expect(reached).toBeGreaterThan(0);
   });
 
   it("rises only where the guards allow: no pawn on a last rank, no ninth pawn, no check either way, a position Stockfish plays", () => {

@@ -26500,8 +26500,8 @@ button.sq-tiny {
   pointer-events: none;
 }
 /* His oven timers, in the boss bar's prop slot (right of his bars, under the status): a slot for each lump the rules allow at once,
-   side by side, each a kitchen timer at 2x on a phone (76 x 44) and 3x on a computer; an empty slot a faint outline of the same
-   size. Absolute, never taking a tap: nothing in the bar moves for them. */
+   side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot a
+   faint outline of the same size. Absolute, never taking a tap: nothing in the bar moves for them. */
 .dd-timers {
   --dd-w: 76px;
   --dd-h: 44px;
@@ -26536,16 +26536,16 @@ button.sq-tiny {
     --dd-h: 33px;
   }
 }
-/* A computer's boss bar is one short row (his figure stands by the board): the timers at 3x, centered on the bar's height, in the
-   free room's left part, between his bars and "Move 2". */
+/* A computer's boss bar is one short row (his figure stands by the board): the timers centered on the bar's height, in the free
+   room's left part, between his bars and "Move 2". */
 @media (min-width: 900px) and (min-height: 600px) {
   .boss-bar .boss-prop:has(> .dd-timers) {
     grid-column: 2;
     grid-row: 1 / 3;
   }
   .boss-bar .dd-timers {
-    --dd-w: 114px;
-    --dd-h: 66px;
+    --dd-w: 76px;
+    --dd-h: 44px;
     top: 50%;
     right: auto;
     left: 4px;

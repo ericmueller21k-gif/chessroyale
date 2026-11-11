@@ -1807,8 +1807,10 @@ export const BOSS_POWERS = {
    * empty square of the ranks above. And a lump drops only while its piece leaves him at most doughLeadMax pawns ahead of you on
    * material (pawn 1, knight and bishop 3, rook 5, queen 9), as Timber's workshop: he rebuilds rather than runs away with it.
    */
-  doughReach: "out" as "out" | "any",
-  doughLeadMax: 99,
+  doughReach: "any" as "out" | "any",
+  doughLeadMax: 2,
+  /** A queen's lump (rare: doughOdds) comes whatever the lead (Eric: "on occasion, he may throw out a queen"). */
+  doughQueenFree: true,
 } as const;
 
 /**

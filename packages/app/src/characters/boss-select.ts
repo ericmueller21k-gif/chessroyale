@@ -89,7 +89,7 @@ export const SELECT_LINES: Readonly<Record<string, readonly string[]>> = {
   folio: ["Every game's a draft. Write one?"],
   timber: ["Hard hats on. We're building today.", "Measure twice, checkmate once.", "Got wood? I've got plenty."],
   dash: ["Yo yo yo! Dash in the building, cuz!", "Sup, cuz. Ready to get cooked?", "Bet. Let's run it, broski."],
-  zebra: ["Welcome to the bakery. Nothing here but bread.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
+  zebra: ["Nothing here but a bakery.", "You want a game? Sit down, kid.", "Pop! Ha! Relax, it's just a roll."],
   // The Hidden Boss (Eric's own first line; never named on screen): the two in turn.
   recluse: ["Team up on me. It wouldn't be the first time anyone did that.", "You're not ready to fight me yet."],
 };
@@ -220,5 +220,6 @@ export const GOODBYE_LINES: Readonly<Record<string, string>> = {
   folio: "That was a good read. Come back for another draft.",
   timber: "That was fun! Come back anytime, the sawdust is fresh.",
   dash: "That was fun, bro. Come back anytime. No cap.",
+  zebra: "Good game, kid. Come back for fresh bread anytime.",
   recluse: "Good game. Come back and bring a better opening.",
 };

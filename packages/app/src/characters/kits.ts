@@ -983,9 +983,9 @@ export const BOSS_KITS: Record<string, BossKit> = {
     portrait: { ...BOSS_ZEBRA_PORTRAIT, anim: "idle", frame: 0 },
     // His attack on a king (Eric, Nov 10: "it looks like he's just firing off a bunch of shots with this loaf of bread"): he drops in,
     // aims his roll and fires ten shots (his volley), a puff of flour off its square each one, laughs and hops off (zebra-figure.ts:
-    // ZEBRA_ATTACK). Facing our right, as drawn; 37 frame pixels a square (the art's room scale), his roll's end about 1.4 squares
-    // ahead of his feet.
-    kingAttack: { ch: ZEBRA_ATTACK, anim: "kingAttack", perSquare: 37, stand: 1.6, hit: flourItem },
+    // ZEBRA_ATTACK). Facing our right, as drawn; 37 frame pixels a square (the art's room scale), 1.1 off (his roll's end and its
+    // puff reach past the king's middle).
+    kingAttack: { ch: ZEBRA_ATTACK, anim: "kingAttack", perSquare: 37, stand: 1.1, hit: flourItem },
   },
   "Hidden Boss": {
     barScale: 1,

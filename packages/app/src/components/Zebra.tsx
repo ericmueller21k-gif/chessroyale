@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef } from "preact/hooks";
 import { BOSS_POWERS, type DoughLump, type DoughPiece } from "@chessroyale/core";
-import { POWER_FX, ZEBRA_ANIM, withoutPiece, zebraStop } from "@chessroyale/chess";
+import { ZEBRA_ANIM, bannerLeadMs, powerFxMs, withoutPiece, zebraStop } from "@chessroyale/chess";
 import { pickLine } from "../characters/boss-beats.ts";
 import { bossKit } from "../characters/kits.ts";
 import { frameImage } from "./BossEffect.tsx";
 import { ZEBRA_TIMER } from "../characters/zebra-dough.ts";
-import { goldFor, openingLine } from "../characters/zebra-lines.ts";
+import { goldClose, goldFor, openingLine } from "../characters/zebra-lines.ts";
 import type { BossView } from "../game.ts";
 import { play } from "../sound.ts";
 import { bossVoice, CRITICAL } from "../speech.tsx";
@@ -96,7 +96,8 @@ export function zebraItems(boss: BossView, moments: readonly Moment[], now: numb
     if (gild?.square === sq && now < gild.at + B.gold.gildAt) continue;
     if (gild?.square === sq && now < gild.at + B.gold.shineAt) out.push({ square: sq, name: "goldFx", anim: "gild", since: gild.at + B.gold.gildAt, quiet: true });
     else if (gild?.square === sq && now < gild.at + B.gold.glintAt) out.push({ square: sq, name: "goldFx", anim: "shine", since: gild.at + B.gold.shineAt });
-    else out.push({ square: sq, name: "goldFx", anim: "glint", since: 0 });
+    // (Quiet: it glints every 2.6 s for the rest of the battle.)
+    else out.push({ square: sq, name: "goldFx", anim: "glint", since: 0, quiet: true });
   }
   const c = clinkNow(boss, now);
   if (c) out.push({ square: c.square, name: "goldFx", anim: "clink", since: c.at });
@@ -259,7 +260,7 @@ function squashMoment({ moment }: MomentProps) {
 function goldMoment({ moment, banner, cast }: MomentProps) {
   return (
     <div class="power-moment pm-gold" data-square={moment.square ?? ""}>
-      {banner("GOLD PLATE!", moment.square ? ZEBRA_WORDS.gold : ZEBRA_WORDS.goldNone, "zebra", B.gold.gildAt)}
+      {banner("GOLD PLATE!", moment.square ? ZEBRA_WORDS.gold : ZEBRA_WORDS.goldNone, "zebra")}
       {cast("gild", B.gold.gildAt)}
     </div>
   );
@@ -271,10 +272,7 @@ const MOMENTS: Record<"doughDrop" | "doughRise" | "doughSquash" | "goldPlate" | 
     kit: "ultimate",
     // (Eric, Nov 11: his line at the end, how your pawns are worthless against it; "her" for his queen, "it" for any other.)
     lineAt: B.gold.lineAt,
-    line: (kit, m) => {
-      const close = kit ? pickLine(kit, "goldClose", m.key) : null;
-      return close ? goldFor(close, (m as Moment).shape === "q") : null;
-    },
+    line: (_, m) => goldClose(m.key, (m as Moment).shape === "q"),
     view: goldMoment,
   },
   doughSquash: { order: 3, kit: "power", line: (kit, m) => (kit ? pickLine(kit, "squashed", m.key) : null), view: squashMoment },
@@ -315,8 +313,10 @@ export function zebraTurnMoments(boss: BossView, now = Date.now()): Moment[] {
   return [...list]
     .sort((a, b) => order(a.kind) - order(b.kind))
     .map((e) => {
-      const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}:crowd`, at: t, ms: POWER_FX[e.kind as keyof typeof POWER_FX] ?? 0, ...(e.square ? { square: e.square } : {}), ...(e.shape ? { shape: e.shape } : {}) };
-      t += m.ms;
+      // (Its banner's hold first, as momentsOf's: GOLD PLATE!.)
+      const lead = bannerLeadMs(e.kind);
+      const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}:crowd`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.shape ? { shape: e.shape } : {}) };
+      t += lead + m.ms;
       return m;
     });
 }

@@ -53,7 +53,7 @@ describe("the kit's kingAttack", () => {
       .filter(([, k]) => k.kingAttack)
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
-    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash"]);
+    expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash", "zebra"]);
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -450,6 +450,8 @@ const FACES: Record<string, { keys: string; front?: boolean; head?: string; gaze
   Timber: { keys: "xX" },
   // (Dash's face is turned to our left, toward the board, as all his art is: his nose.)
   Dash: { keys: "n" },
+  // (Don Dough's face is turned to our right, toward the board, as all his art is: his nose at his muzzle's end.)
+  "Don Dough": { keys: "nN", head: "zk:head" },
 };
 /** Where his eyes look in a frame (the mean of his two pupils' x, in eye pixels; - toward our left), from the eye layers' own poses. */
 function gazeTurn(f: Anim["frames"][number]): number {
