@@ -8,7 +8,7 @@ import { ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES } from "../packages/app/src/town/
  * guards' `watch` follows you; a tapped guard and the counter zebra's Talk say he's in the back; through the door at the back left into
  * the back room (its own room) and out again; the chatter at the back table; Don's card, his Challenge alone. Then his challenge: the
  * beat (the crew stand, draw and aim at you with Fedora's line, following you as you move; Don waves them down, they lower, his
- * challenge line), the walk-out (four goons pick up the set kept by the door and carry it out of the back door, Don and you following),
+ * challenge line), the walk-out (four goons pick up the set kept in the back room and carry it out of the back door, Don and you following),
  * the front room's set-up (they come through the door) and the battle. ZEBRA_SHOTS=<dir>: the stills for the PR (and a frame every
  * 250 ms of the walk-out, `out-NN`).
  * Test hooks: the room's canvas (`data-room`, `data-part`, `data-you`, `data-ready`), `__shopAt("keeper" | "pass" | "square")`,
@@ -174,10 +174,13 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await shot(page, "front");
 
   // A guard you tap tells you he's in the back (Eric, Nov 11), in a bubble; you stay where you are.
-  await expect.poll(() => shopAt(page, "guard-b"), { message: "the guard is drawn" }).not.toBeNull();
-  const gb = (await shopAt(page, "guard-b"))!;
-  await page.mouse.click(gb.x, gb.y);
-  await expect.poll(async () => (await zebra(page))?.say, { message: "the guard says he's in the back" }).toMatchObject({ who: "guard-b" });
+  // (Where he's drawn is read and tapped in one go, again until he speaks: the camera can still be settling after your walk.)
+  await expect(async () => {
+    const gb = await shopAt(page, "guard-b");
+    expect(gb, "the guard is drawn").not.toBeNull();
+    await page.mouse.click(gb!.x, gb!.y);
+    await expect.poll(async () => (await zebra(page))?.say?.who, { message: "the guard says he's in the back", timeout: 3000 }).toBe("guard-b");
+  }).toPass({ timeout: 20_000 });
   expect(ZEBRA_BACK_LINES).toContain((await zebra(page))!.say!.text);
   await expect(room(page)).toHaveAttribute("data-you", "10,13");
   await shot(page, "guard-line");
@@ -331,7 +334,7 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   // The beat, in order: they stand, draw and aim with Fedora's line, Don's "Relax", they lower, his challenge line.
   expect(zb.steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);
   expect(zb.lines).toEqual([ZEBRA_LINES.draw, ZEBRA_LINES.relax, ZEBRA_LINES.challenge]);
-  // The walk-out: all four kept by the door, picked up one by one, each carried, every goon and Don fading out through the door.
+  // The walk-out: all four kept in the back room, picked up one by one, each carried, every goon and Don fading out through the door.
   expect(zb.outOn).toBe(true);
   expect(zb.kept[0]).toBe(4);
   expect(zb.kept[zb.kept.length - 1]).toBe(0);

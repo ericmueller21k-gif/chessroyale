@@ -232,7 +232,7 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
           "crew-c": { ch: c.NPC_ZEBRA_CREW_C, anims: CREW },
           "crew-d": { ch: c.NPC_ZEBRA_CREW_D, anims: CREW },
           "crew-e": { ch: c.NPC_ZEBRA_CREW_E, anims: CREW },
-          // (The flat-cap door guard, in for your chair; the set kept by the door, the park table his front room's pad sets up.)
+          // (The flat-cap door guard, in for your chair; the set kept before his table, the park table his front room's pad sets up.)
           "guard-a": { ch: c.NPC_ZEBRA_GUARD_A, anims: ["walk", "carry"] },
           set: { ch: PARK_TABLE, anims: ["idle"] },
         },
@@ -1974,11 +1974,11 @@ function startRoom(
   let youOut = false;
   let youWay: Sq[] | null = null;
   let walkedOut = false;
-  /** The set's things still kept by the back room's door (the walk-out's `kept`; all of them until it starts). */
+  /** The set's things still kept in the back room (the walk-out's `kept`; all of them until it starts). */
   const keptNow: SetupItem[] = backScene ? ["youChair", "bossChair", "table", "board"] : [];
   /**
    * The set as drawn (the park table cut in thirds: a stool, the leg; the slab's colors): the challenge's own in the front room, the back
-   * room's kept by its door (its people's `set`). Null: neither.
+   * room's kept before his table (its people's `set`). Null: neither.
    */
   const setImg = pf?.set?.idle?.frames[0];
   const setArt = ci ? ci.table : setImg ? { ch: PARK_TABLE, img: setImg, leg: third(setImg, 1), stool: third(setImg, 0), palette: PARK_TABLE.palette } : null;
@@ -2051,7 +2051,7 @@ function startRoom(
       Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: img.height, fx: ch.foot[0], fy: ch.foot[1], k: 1, c: p.c, r: p.r, z: p.r, flip: p.flip, up: p.up ?? 0, a: p.a ?? 1 });
     }
     if (!setArt) return;
-    // (The back room's set, kept by its door until it's picked up: the stools and the table on the floor, the board on the table.)
+    // (The back room's set, kept before his table until it's picked up: the stools and the table on the floor, the board on the table.)
     for (const it of keptNow) {
       if (crewN >= CREW_MAX) return;
       const at = ZEBRA_BACK_SET[it];
@@ -4180,7 +4180,7 @@ function startRoom(
       beat,
       chatter: backScene?.where() ?? null,
       you: [pose.x, pose.y],
-      // (The walk-out: whether it's on, the set's things still kept by the door, and what's carried where, how solid.)
+      // (The walk-out: whether it's on, the set's things still kept, and what's carried where, how solid.)
       out: walkOut ? { kept: keptNow.slice(), carried: carriedNow.map((q) => ({ item: q.item, at: [q.c, q.r], a: q.a ?? 1 })) } : null,
       alpha: Object.fromEntries(sceneFigs.map((p) => [p.name, p.a ?? 1])),
     };

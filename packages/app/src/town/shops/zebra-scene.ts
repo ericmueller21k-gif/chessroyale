@@ -14,8 +14,8 @@
  *   it just goes through the talk animation no matter what"): his card's Challenge starts it. The crew stand up and draw, aim at you
  *   with Fedora's line (each turned to your side and his roll at the angle nearest you, following you as you move: `aimAt`), Don waves
  *   them down with his, they lower, his challenge line. The chatter stops for good. Then **the walk-out** (`WalkOut`; Eric: "watch all
- *   of them walk out, like pick up the stuff in the back and walk out"): four goons each pick up one thing of the set kept by the
- *   door (`ZEBRA_BACK_SET`) and carry it out through the back door, Don and you following; the front room's `SetupScene` goes on.
+ *   of them walk out, like pick up the stuff in the back and walk out"): four goons each pick up one thing of the set kept in the
+ *   room (`ZEBRA_BACK_SET`) and carry it out through the back door, Don and you following; the front room's `SetupScene` goes on.
  */
 import { SHOP_FEEL } from "../feel.ts";
 import { ZEBRA_AIM_ANGLES, ZEBRA_AIM_LOOP, ZEBRA_WATCH_FRAME } from "./zebra-crew.ts";
@@ -297,49 +297,49 @@ export class BackScene {
 const swingMs = (c: SceneClip | undefined): number => (c ? sum(c.ms.slice(0, 3)) : 0);
 
 /**
- * The set kept in the back room by its door (Eric, Nov 11: "the board and chairs are in the back room but brought into the front"): your
- * chair nearest the door, Don's, then the table with the board lying on it, on row 9 between the door and the rug (squares: each one's
- * foot). Its squares are solid. Who carries which, in the order they set off: ZEBRA_OUT.
+ * The set kept in the back room (Eric, Nov 11: "the board and chairs are in the back room but brought into the front"): your chair
+ * nearest the door, Don's, then the table with the board lying on it, along the rug's front before the big table (squares: each one's
+ * foot; row 8, as a computer's view of the room ends at row 9). Its squares are solid. Who carries which, in the order: ZEBRA_OUT.
  */
 export const ZEBRA_BACK_SET: Readonly<Record<SetupItem, readonly [number, number]>> = {
-  youChair: [5.3, 9.15],
-  bossChair: [6.2, 9.15],
-  table: [7.1, 9.15],
-  board: [7.1, 9.15],
+  youChair: [5.3, 8.3],
+  bossChair: [6.2, 8.3],
+  table: [7.1, 8.3],
+  board: [7.1, 8.3],
 };
 /** The set's squares (solid: nobody walks through it). */
 export const ZEBRA_BACK_SET_SQUARES = [
-  { c: 5, r: 9 },
-  { c: 6, r: 9 },
-  { c: 7, r: 9 },
+  { c: 5, r: 8 },
+  { c: 6, r: 8 },
+  { c: 7, r: 8 },
 ] as const;
 type P2 = readonly [number, number];
 /**
  * The walk-out's goons (their art's names), what each carries and his way (squares, a figure's foot): from where he stands to just above
- * his thing (row 8.2, the free row between the rug's front and the set), then west along it and out of the door (columns 3-4, row 10).
+ * his thing (row 9, the free row between the set and the room's front wall), then west along it and out of the door (columns 3-4, row 10).
  * The crew file off the bench east (the table blocks the way south), down past the table's east end (column 9, clear of you at its foot)
  * and back west; the flat-cap door guard comes in through the door for your chair. The board before the table: it lies on it.
  */
 const EXIT: readonly P2[] = [
-  [4.4, 8.2],
-  [4.1, 9.2],
+  [4.4, 9],
+  [4.1, 9.6],
   [4.1, 11],
 ];
 const LANE: readonly P2[] = [
   [9.1, 5.1],
-  [9.1, 8.2],
+  [9.1, 9],
 ];
 export const ZEBRA_OUT: readonly { name: string; item: SetupItem; start: number; to: readonly P2[] }[] = [
-  { name: "guard-a", item: "youChair", start: 0, to: [[4.1, 11], [4.1, 9.2], [5.3, 8.2]] },
-  { name: "crew-e", item: "bossChair", start: 0, to: [[7.15, 5.06], ...LANE, [6.2, 8.2]] },
-  { name: "crew-d", item: "board", start: 1, to: [[6.15, 5.06], ...LANE, [7.1, 8.2]] },
-  { name: "crew-c", item: "table", start: 2, to: [[5.15, 5.06], ...LANE, [7.1, 8.2]] },
+  { name: "guard-a", item: "youChair", start: 0, to: [[4.1, 11], [4.1, 9.6], [5.3, 9]] },
+  { name: "crew-e", item: "bossChair", start: 0, to: [[7.15, 5.06], ...LANE, [6.2, 9]] },
+  { name: "crew-d", item: "board", start: 1, to: [[6.15, 5.06], ...LANE, [7.1, 9]] },
+  { name: "crew-c", item: "table", start: 2, to: [[5.15, 5.06], ...LANE, [7.1, 9]] },
 ];
 /**
  * Don's way out: up out of his wingback and forward off it, down to the door and through. (The door's east half, as everyone's: its
  * west half is at a phone's edge.)
  */
-const DON_OUT: readonly P2[] = [ZEBRA_DON.at, [4.2, 7.9], [4.1, 9.2], [4.1, 11]];
+const DON_OUT: readonly P2[] = [ZEBRA_DON.at, [4.2, 7.9], [4.1, 9.6], [4.1, 11]];
 const lenOfPts = (pts: readonly P2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]), 0);
 /** `u` squares along a polyline: where, and its leg's east-west way. Into `o`. */
 function along(pts: readonly P2[], u: number, o: { c: number; r: number; dc: number }): void {

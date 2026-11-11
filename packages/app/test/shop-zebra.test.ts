@@ -202,7 +202,7 @@ const FRONT_ANIMS: Record<string, string[]> = { "guard-a": ["watch", "guard", "w
 
 describe("the walk-out (Eric, Nov 11: \"watch all of them walk out, like pick up the stuff in the back and walk out\")", () => {
   const solid = (c: number, r: number) => !walkable(backRoom, c, r) && !backRoom.pass!.squares.some((q) => q.c === c && q.r === r);
-  it("the set is kept by the back door, on solid squares clear of the way in and his card's spots", () => {
+  it("the set is kept before his table, on solid squares clear of the way in and his card's spots", () => {
     for (const q of ZEBRA_BACK_SET_SQUARES) expect(backRoom.blocked[q.r * SHOP_ZEBRA_BACK_N + q.c], `${q.c},${q.r}`).toBe(0);
     for (const k of Object.keys(ZEBRA_BACK_SET) as SetupItem[]) {
       const [c, r] = ZEBRA_BACK_SET[k];
