@@ -172,7 +172,11 @@ export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.
     const count = (x: string) => (m.picks ? (m.picks[x] ?? 0) : x === m.best ? m.crowdFound : 0);
     const share = (moves: readonly string[]) => Math.min(m.crowd, moves.reduce((t, x) => t + count(x), 0));
     const p1 = clampP(honestChance(m.crowd, share(top.slice(0, 1)), rating, s.findDeep, s.soloDeep, s));
-    const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(top.slice(0, 3)), rating, s.findDeep3, s.soloDeep3, s)));
+    // (Outcome 1 is "its next two or near its best": a near-best pick outside its top 3 adds the crowd on that pick, else a move most of
+    // the crowd played reads as engine evidence. The review of #629, M1.)
+    const top3 = top.slice(0, 3);
+    const second = outcome === 1 && !top3.includes(m.move) ? [...top3, m.move] : top3;
+    const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(second), rating, s.findDeep3, s.soloDeep3, s)));
     const honest = [p1, p3 - p1, Math.max(0.01, 1 - p3)];
     // An engine user finds our best at least as often as an honest player would; its other chances keep their shape.
     const q0 = Math.max(s.cheatDeep[0], p1);

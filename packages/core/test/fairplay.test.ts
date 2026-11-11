@@ -98,6 +98,19 @@ describe("signals", () => {
     expect(moveEvidence(mv({ loss: 9, crowdFound: 30 }), 2000).evidence).toBeLessThan(0);
   });
 
+  it("evidence, a near-best pick ranked 4th or lower (the review of #629, M1): the crowd on that move counts, as for a 2nd or 3rd choice", () => {
+    const top = ["e2e4", "d2d4", "g1f3"];
+    // A 2400 player's pick 0.8 off the deep search's best and 4th in its order, with `on` of 40 others on the same move.
+    const pick = (on: number, rank = 4) => mv({ move: "c2c4", loss: 0.8, crowdFound: 3, picks: { c2c4: on, e2e4: 3, d2d4: 2 }, deep: { best: "e2e4", rank, loss: 0.8, top: rank > 3 ? top : ["e2e4", "d2d4", "c2c4"] } });
+    const crowded = moveEvidence(pick(30), 2400);
+    expect(crowded.outcome).toBe(1);
+    // (Was +0.47 at 30 and at 5 alike: the honest chance came from the top 3's share alone, the crowd on the move changing nothing.)
+    expect(crowded.evidence).toBeLessThan(-0.75);
+    expect(moveEvidence(pick(5), 2400).evidence).toBeGreaterThan(crowded.evidence + 0.5);
+    // The same as the same move ranked 3rd (no one on the 3rd choice it displaces), where the crowd on it always counted.
+    expect(crowded.evidence).toBeCloseTo(moveEvidence(pick(30, 3), 2400).evidence, 5);
+  });
+
   it("spearman: rank correlation, null without enough or without spread", () => {
     expect(spearman([1, 2, 3, 4], [10, 20, 30, 40])).toBeCloseTo(1);
     expect(spearman([1, 2, 3, 4], [4, 3, 2, 1])).toBeCloseTo(-1);
