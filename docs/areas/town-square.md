@@ -1026,7 +1026,9 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
     canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
     stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
-    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
+    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. A tap on a boss's portrait or its home's
+    block (within 2 squares of its middle, the nearest) also walks you to that home as a tap on it in the town would, by its door, with
+    no card (Nov 11, `walkHome`; [2026-11-11-map-walk.md](../decisions/2026-11-11-map-walk.md)). The chips and `pick` keep off its box
     (`MAP_BOX`).
   - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).
   - **Tests:** `packages/app/test/town-controls.test.ts`, `e2e/town-controls.spec.ts`.

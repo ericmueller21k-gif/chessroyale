@@ -436,7 +436,7 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   // (Eric, Nov 11.) A tap on a boss's portrait closes it and walks you to that home: you end by it, where a tap on it takes you.
   await small.click();
   await expect(big).toBeVisible();
-  const sq = (await page.locator(".tm-big canvas").boundingBox())!.width / 54;
+  const sq = (await page.locator(".tm-big > canvas").boundingBox())!.width / 54;
   const me0 = await dot(page, ".tm-big .tm-you");
   // (The nearest portrait at least 5 squares away, and where its home is, in squares, from your dot.)
   const pick = await faces.evaluateAll(
