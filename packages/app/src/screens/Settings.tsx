@@ -16,6 +16,7 @@ import { clearAllPremoves } from "../board/yours.ts";
 import { hapticWay } from "../haptics.ts";
 import { REEL_VOICES, getReelVoice, isMuted, onMuteChange, previewPieceSound, previewReel, setMuted, setReelVoice, soundReport, unlockAudio, type ReelVoice } from "../sound.ts";
 import { PIECE_SOUNDS, pieceSound, setPieceSound } from "../piece-sounds.ts";
+import { musicOn, onMusicChange, setMusicOn } from "../music.ts";
 import { useAccount } from "./Profile.tsx";
 import { setThemePref, useTheme, type ThemePref } from "../theme.ts";
 
@@ -211,6 +212,7 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
   const { config, profile } = useAccount();
   const [, rerender] = useState(0);
   useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
+  useEffect(() => onMusicChange(() => rerender((n) => n + 1)), []);
   // (Testing's switches read as they are now: who's a tester is known once the account loads.)
   useEffect(() => onPrefsChange(() => rerender((n) => n + 1)), []);
   const [anim, setAnim] = useState(crowdAnimations);
@@ -252,6 +254,9 @@ export function SettingsScreen({ onBack, onFaq, onAutoChess }: { onBack: () => v
           }}
         >
           Piece sounds, ticks, the reveal, and the queue's pops.
+        </Toggle>
+        <Toggle title="Music" checked={!isMuted() && musicOn()} disabled={isMuted()} onChange={setMusicOn}>
+          {isMuted() ? "Off with the sound. Switch Sound on to hear it." : "Each boss's theme, through the battle."}
         </Toggle>
         <Toggle title="Vibration" checked={canVibrate && vibrationOn()} disabled={!canVibrate} onChange={setVibrationOn}>
           {canVibrate ? "A light tick as you pick up a piece and as you move, and a buzz at a few boss moments." : "Not available on this device."}

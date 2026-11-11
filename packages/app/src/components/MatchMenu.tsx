@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { isMuted, onMuteChange, setMuted, unlockAudio } from "../sound.ts";
+import { musicOn, onMusicChange, setMusicOn } from "../music.ts";
 import { crowdAnimations, crowdTrail, onPrefsChange, setCrowdAnimations, setCrowdTrail } from "../prefs.ts";
 import { setThemePref, useTheme } from "../theme.ts";
 import { openReport } from "./Problems.tsx";
@@ -180,6 +181,15 @@ function SoundRow() {
   );
 }
 
+/** Music on or off (Settings → Sound's switch): greyed while the sound is off, which silences it too. */
+function MusicRow() {
+  const [, rerender] = useState(0);
+  useEffect(() => onMuteChange(() => rerender((n) => n + 1)), []);
+  useEffect(() => onMusicChange(() => rerender((n) => n + 1)), []);
+  const m = isMuted();
+  return <SwitchRow icon="🎵" label="Music" on={!m && musicOn()} disabled={m} onClick={() => setMusicOn(!musicOn())} />;
+}
+
 /**
  * Animations (every mode) and, in a crowd match, Motion trail (Settings → Board, the same prefs, the same rule: the trail
  * is off, and can't be switched, while the animations are off). Kept in step with Settings through onPrefsChange.
@@ -285,6 +295,7 @@ export function MatchMenu({ exit, crowd = false, extra, animations }: { exit: Ma
               </div>
               <div class="mm-list">
                 <SoundRow />
+                <MusicRow />
                 <AnimationRows crowd={crowd} own={animations} />
                 <ThemeRow />
                 {extra}
