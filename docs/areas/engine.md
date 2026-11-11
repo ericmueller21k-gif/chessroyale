@@ -168,7 +168,7 @@ Lane: `engine`. The bosses' strength is here; their powers are on [bosses.md](bo
     the battle's Stockfish): before the intro of a solo battle on Maia (Boss alone, a Solo raid, the Crowd's boss
     battle), the boss screen holds the intro's first frame under a card, "Loading the boss…", with the download's bar
     (bytes of the three files, their sizes written in by the build since live the worker and the WebAssembly come
-    compressed; a sliding bar when unknown; "First time only: about 40 MB, then it's saved on this device."), then
+    compressed; a sliding bar when unknown; the note "Loading the HunChess engine…", no size shown (Nov 11, Eric), then
     "Starting…" while Maia starts (at once when its files are kept), and Leave (before move 1). Meanwhile this device's
     **Stockfish is paused**: its workers end once the work asked for is done (their WebAssembly memory freed), work
     asked for meanwhile waits, and fresh workers start once the step ends (`UciEngine.pause`, `pauseEngines`); Maia's

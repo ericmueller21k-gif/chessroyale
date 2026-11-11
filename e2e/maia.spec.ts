@@ -245,7 +245,7 @@ test("the loading step: Stockfish's workers end, Maia loads alone behind \"Loadi
   expect(lines.filter((l) => /Maia \d+ · no guard · Maia's #\d+ · \d+ ms/.test(l)).length, lines.join(" | ")).toBeGreaterThanOrEqual(1);
   // The next battle on this device: its files are saved, so it's straight to "Starting…", with no word of a download.
   await page.goto("/?debug&clock=40&bossMoves=4&laststand=0&boss=gingerbread");
-  const again = await watchFor(page, { first: { selector: ".boss-loading-first" }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
+  const again = await watchFor(page, { first: { selector: ".boss-loading", text: /Loading the HunChess engine…/ }, download: { selector: '.boss-loading[data-stage="download"]' }, starting: { selector: ".boss-loading", text: /Starting…/ } });
   await bossAloneFromHome(page);
   await expect(page.locator(".boss-intro")).toBeVisible({ timeout: 60_000 });
   expect(await again.seen()).toEqual({ first: false, download: false, starting: true });
