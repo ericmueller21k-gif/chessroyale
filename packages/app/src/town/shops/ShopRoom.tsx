@@ -26,7 +26,7 @@
  * One requestAnimationFrame loop draws everything on one canvas (Canvas 2D); it stops when you go out or the tab is hidden. Every
  * frame of every piece is drawn into a canvas of its own as the room loads (behind the black fade), never in the loop.
  * Test hooks (test switches on): the canvas's `data-room` (its home), `data-you="c,r"`, `data-ready="1"`; `window.__shopAt("keeper"
- * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw; `__shopStill()` the back kept while the view rests (frames drawn from it, copies made).
+ * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw; `__shopStill()` the back kept while the view rests (frames drawn from it, copies made) and how it was drawn (WebGL, the 2D floor's triangles); `__shopBackDiff()` the back drawn both ways, compared.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { onAccountChange } from "../../account.ts";
@@ -66,6 +66,7 @@ import { paintTable, playCue, slabFrontY, third, type Emis, type LoadedIntro } f
 import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
 import { PARK_TABLE, TABLE_BOARD } from "../houses/park.ts";
+import { backGl, type BackGl, type XY } from "./back-gl.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
 import { drawZzz } from "../zzz.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
@@ -1134,7 +1135,8 @@ function startRoom(
   const drawRoof = () => {
     roof.width = Math.round(W * DPR);
     roof.height = Math.round(H * DPR);
-    const rg = roof.getContext("2d")!;
+    // (Kept in memory: WebGL uploads it (back-gl.ts) as a plain copy, without waiting on the GPU.)
+    const rg = roof.getContext("2d", { willReadFrequently: true })!;
     rg.scale(DPR, DPR);
     if (def.roof === "glass") {
       const sky = rg.createLinearGradient(0, 0, 0, H * 0.45);
@@ -1477,14 +1479,18 @@ function startRoom(
     cv.style.width = `${W}px`;
     cv.style.height = `${H}px`;
     drawRoof();
+    gb?.roofChanged();
     bgStill[0] = NaN;
     return true;
   };
 
+  /** Triangles laid by `tri` so far (tests: the floor's in the last back, `backTris`). */
+  let triN = 0;
   /** A source triangle of `img` (u, v pixels) onto a screen triangle, clipped to it (a hair wider, so no seam shows). */
   const tri = (img: CanvasImageSource, sx: number, sy: number, sw: number, sh: number, u0: number, v0: number, u1: number, v1: number, u2: number, v2: number, x0: number, y0: number, x1: number, y1: number, x2: number, y2: number) => {
     const cx = (x0 + x1 + x2) / 3;
     const cy = (y0 + y1 + y2) / 3;
+    triN++;
     g.save();
     g.beginPath();
     g.moveTo(x0 + Math.sign(x0 - cx) * 0.6, y0 + Math.sign(y0 - cy) * 0.6);
@@ -3550,8 +3556,95 @@ function startRoom(
   /** The plans that come first and have one frame (they never change): drawn with the floor, so kept with it. */
   let backFlats = 0;
   while (backFlats < flats.length && frames[flats[backFlats]!.name]!.frames.length === 1) backFlats++;
+  /**
+   * The room's back through WebGL (Nov 11, back-gl.ts; Eric: inside a building it was "just like capped"): the ceiling, past the walls
+   * and the floor drawn by the GPU into one picture, copied onto the canvas in one go. Made as the first frame is drawn (behind the
+   * black); null where there's no WebGL, and while it's lost the back is drawn the 2D way (`drawBack2d`).
+   */
+  let gb: BackGl | null | undefined;
+  const makeBackGl = (): BackGl | null => {
+    // (Tests: `__shopNoGl` set before going in draws the back the 2D way, to compare.)
+    if (testSwitchesAllowed() && (window as unknown as { __shopNoGl?: boolean }).__shopNoGl) return null;
+    // (The floor's picture with the plans that lie flat on it and never change, as the 2D way lays them over it.)
+    const pic = document.createElement("canvas");
+    pic.width = pic.height = n * SQ;
+    const pg = pic.getContext("2d", { willReadFrequently: true })!;
+    pg.imageSmoothingEnabled = false;
+    pg.drawImage(floor, 0, 0);
+    for (let i = 0; i < backFlats; i++) {
+      const p = flats[i]!;
+      const img = frameAt(p.name, 0);
+      const d = p.d ?? 1;
+      const w = p.w ?? 1;
+      pg.drawImage(img, 0, img.height - d * SQ, w * SQ, d * SQ, p.col * SQ, (p.row - d + 1) * SQ, w * SQ, d * SQ);
+    }
+    try {
+      return backGl(pic, roof);
+    } catch {
+      return null;
+    }
+  };
+  /** A floor square's corner on screen (back-gl.ts): the corner north-west of square (c, r). */
+  const cornerAt = (c: number, r: number, out: XY): boolean => {
+    const ok = P(c - 0.5, r - 0.5);
+    out.x = pt.x;
+    out.y = pt.y;
+    return ok;
+  };
+  /** Scratch for WebGL's flat polygons: a cave's rock (from the screen's foot up along the horizon and down again), the day outside. */
+  let polyX = new Float32Array(64);
+  let polyY = new Float32Array(64);
+  /** (Tests, `__shopStill`) The floor's triangles laid on the 2D canvas in the last back drawn (none when WebGL draws it). */
+  let backTris = 0;
+  /** What's past the low front wall (the bright day the door opens onto) into `q`; false: not in view. */
+  const outsideQuad = (q: [typeof pt, typeof pt, typeof pt, typeof pt]): boolean => {
+    const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
+    return near > n - 0.5 && P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, near, q[2]) && P(-6, near, q[3]);
+  };
+  // (A warehouse's roll-up door opens onto the night lot: dark asphalt. An igloo's doorway onto the snowy night, as a cave's.)
+  const outsideColor = art.outside ?? (cave || def.roof === "igloo" ? CAVE_SNOW : def.roof === "warehouse" ? "#3a3d4a" : "#e6dfcf");
   /** The room's back as the view sees it now (the ceiling, past the walls, the floor, the still plans); kept the second frame the view is the same. */
   const drawBack = (rc: typeof REC) => {
+    if (gb === undefined) gb = makeBackGl();
+    if (gb && !gb.lost) drawBackGl(gb, rc);
+    else drawBack2d(rc);
+    keepBack();
+  };
+  /** The back through WebGL (back-gl.ts), copied onto the canvas: one copy, however the view moves. */
+  const drawBackGl = (b: BackGl, rc: typeof REC) => {
+    b.begin(W, H, DPR);
+    if (cave && v.rimN > 1) {
+      // A cave: past its squares the rock goes on (as drawBack2d's).
+      const k = v.rimN + 2;
+      if (polyX.length < k) ((polyX = new Float32Array(k)), (polyY = new Float32Array(k)));
+      polyX[0] = v.rimPx[0]!;
+      polyY[0] = H;
+      for (let i = 0; i < v.rimN; i++) ((polyX[i + 1] = v.rimPx[i]!), (polyY[i + 1] = v.rimPy[i]!));
+      polyX[k - 1] = v.rimPx[v.rimN - 1]!;
+      polyY[k - 1] = H;
+      b.fan(cave, polyX, polyY, k, (polyX[0]! + polyX[k - 1]!) / 2, H);
+    }
+    const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
+    if (outsideQuad(q)) {
+      for (let i = 1; i < 4; i++) ((polyX[i - 1] = q[i]!.x), (polyY[i - 1] = q[i]!.y));
+      b.fan(outsideColor, polyX, polyY, 3, q[0].x, q[0].y);
+    }
+    rc?.mark(RP.sky);
+    b.floor(n, cornerAt);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.drawImage(b.canvas, 0, 0);
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
+    g.imageSmoothingEnabled = false;
+    // (A store's ceiling panels: in the ceiling, above every piece's top, so nothing of the back is over them.)
+    if (def.roof === "store") drawPanels();
+    backTris = 0;
+    rc?.mark(RP.ground);
+  };
+  /**
+   * The back the 2D way (no WebGL, or it's lost): the ceiling, a store's panels, a cave's rock, the day outside, then the floor laid as
+   * clipped, stretched triangles (`flat`) and the still plans on it.
+   */
+  const drawBack2d = (rc: typeof REC) => {
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
@@ -3569,20 +3662,22 @@ function startRoom(
     // Outside, past the low front wall: the bright day the door opens onto (a flat pale ground); a cave's mouth opens onto the snowy
     // night.
     const q = pq as [typeof pt, typeof pt, typeof pt, typeof pt];
-    const near = Math.min(n + 6, camY + v.back - 0.6); // (up to just in front of the camera)
-    if (near > n - 0.5 && P(-6, n - 0.5, q[0]) && P(n + 5, n - 0.5, q[1]) && P(n + 5, near, q[2]) && P(-6, near, q[3])) {
-      // (A warehouse's roll-up door opens onto the night lot: dark asphalt.)
-      // (An igloo's doorway onto the snowy night, as a cave's.)
-      g.fillStyle = art.outside ?? (cave || def.roof === "igloo" ? CAVE_SNOW : def.roof === "warehouse" ? "#3a3d4a" : "#e6dfcf");
+    if (outsideQuad(q)) {
+      g.fillStyle = outsideColor;
       g.beginPath();
       g.moveTo(q[0].x, q[0].y);
       for (let i = 1; i < 4; i++) g.lineTo(q[i]!.x, q[i]!.y);
       g.fill();
     }
     rc?.mark(RP.sky);
+    const t0 = triN;
     flat(floor, 0, 0, 0, 0, n, n, S.floorBlock);
     for (let i = 0; i < backFlats; i++) drawFlat(flats[i]!, 0);
+    backTris = triN - t0;
     rc?.mark(RP.ground);
+  };
+  /** The view the same as the last frame's: the back as drawn kept (`still`), drawn from it while the view stays. */
+  const keepBack = () => {
     if (sameBg(bgNow, bgLast)) {
       if (!still) still = document.createElement("canvas");
       if (still.width !== cv.width || still.height !== cv.height) {
@@ -4248,16 +4343,49 @@ function startRoom(
     if (clear) youTrailN = 0;
     return out;
   };
-  const hookBench = (k: number) => {
+  const hookBench = (k: number, move = false) => {
     if (!testSwitchesAllowed()) return null;
     const now = performance.now();
     draw(now);
+    const x = camX;
     const t0 = performance.now();
-    for (let i = 0; i < k; i++) draw(now);
-    return (performance.now() - t0) / k;
+    // (`move`: the view a hair either way each draw, as while you walk: nothing kept, the back drawn every time.)
+    for (let i = 0; i < k; i++) {
+      if (move) camX = x + (i & 1 ? 1e-3 : -1e-3);
+      draw(now);
+    }
+    const ms = (performance.now() - t0) / k;
+    camX = x;
+    return ms;
   };
-  /** (Tests) The room's back kept while the view rests: frames that drew it from the kept copy, and copies made. */
-  const hookStill = () => (testSwitchesAllowed() ? { drawn: stillDrawn, made: stillMade } : null);
+  /**
+   * (Tests) The room's back kept while the view rests: frames that drew it from the kept copy, and copies made; whether WebGL draws it
+   * (back-gl.ts), the floor's triangles the 2D canvas laid in the last back drawn (none with WebGL) and WebGL's.
+   */
+  const hookStill = () => (testSwitchesAllowed() ? { drawn: stillDrawn, made: stillMade, gl: !!gb && !gb.lost, backTris, glTris: gb?.tris ?? 0 } : null);
+  /**
+   * (Tests) The back drawn both ways at the view now, WebGL's and the 2D way's (Nov 11, "same pixels as now"): the share of the canvas's
+   * pixels that differ by more than 8 and more than 48 in a channel, and the mean difference. Null without WebGL. The next frame draws as
+   * usual.
+   */
+  const hookBackDiff = () => {
+    if (!testSwitchesAllowed() || !gb || gb.lost) return null;
+    drawBack2d(null);
+    const a = g.getImageData(0, 0, cv.width, cv.height).data;
+    drawBackGl(gb, null);
+    const b = g.getImageData(0, 0, cv.width, cv.height).data;
+    let over8 = 0;
+    let over48 = 0;
+    let sum = 0;
+    for (let i = 0; i < a.length; i += 4) {
+      const d = Math.max(Math.abs(a[i]! - b[i]!), Math.abs(a[i + 1]! - b[i + 1]!), Math.abs(a[i + 2]! - b[i + 2]!));
+      sum += d;
+      if (d > 8) over8++;
+      if (d > 48) over48++;
+    }
+    const px = a.length / 4;
+    return { px, over8: over8 / px, over48: over48 / px, mean: sum / px };
+  };
   /** (Tests) The view brought to the door, as a drag there would (a computer has no back button since Nov 7: e2e leaves by the door). */
   const hookLook = (kind: "door" | "pass") => {
     if (!testSwitchesAllowed() || (kind === "door" ? !room.doors.length : !room.pass)) return false;
@@ -4288,7 +4416,7 @@ function startRoom(
       alpha: Object.fromEntries(sceneFigs.map((p) => [p.name, p.a ?? 1])),
     };
   };
-  const hooks = window as unknown as { __shopStill?: typeof hookStill; __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook; __shopZebra?: typeof hookZebra };
+  const hooks = window as unknown as { __shopStill?: typeof hookStill; __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook; __shopZebra?: typeof hookZebra; __shopBackDiff?: typeof hookBackDiff };
   hooks.__shopZebra = hookZebra;
   hooks.__shopLook = hookLook;
   hooks.__shopElves = hookElves;
@@ -4299,6 +4427,7 @@ function startRoom(
   hooks.__shopCam = hookCam;
   hooks.__shopBench = hookBench;
   hooks.__shopStill = hookStill;
+  hooks.__shopBackDiff = hookBackDiff;
 
   run();
   draw(performance.now()); // the first frame, before the fade lifts
@@ -4339,6 +4468,9 @@ function startRoom(
       delete hooks.__shopLook;
       delete hooks.__shopBench;
       delete hooks.__shopStill;
+      delete hooks.__shopBackDiff;
+      gb?.dispose();
+      gb = null;
       delete hooks.__shopRide;
       delete hooks.__shopIntro;
       delete hooks.__shopCrew;
