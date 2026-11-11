@@ -47,6 +47,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
+import { ZEBRA_BACK_LINES, pickLine } from "./zebra-lines.ts";
 import { BackScene, FrontScene, SetupScene, ZEBRA_GUARDS, type BeatStep, type CarriedNow, type SceneClips, type SceneFig, type SceneSay } from "./zebra-scene.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
 import type { BlitzNow } from "./challenge.ts";
@@ -1967,7 +1968,7 @@ function startRoom(
   let beat: BeatStep | null = null;
   let told = false;
   /** The counter zebra's next line (his Talk says them in turn). */
-  let saysI = 0;
+  let saidLast: string | null = null;
   const stepScene = (now: number) => {
     if (front) {
       const h = you.here();
@@ -3773,8 +3774,18 @@ function startRoom(
   const squareAt = (x: number, y: number): Sq | null => squareUnder(room, v, camX, camY, SQ, x, y, pq);
   /** (x, y) is on the Shopkeeper's picture. */
   const onKid = (x: number, y: number): boolean => kidBox.on && x >= kidBox.x0 && x <= kidBox.x1 && y >= kidBox.y0 && y <= kidBox.y1;
+  /** Rolling Dough's front room: the guard whose picture (x, y) is on (as drawn this frame, a finger's 44 px across at least), or null. */
+  const guardAt = (x: number, y: number): "guard-a" | "guard-b" | null => {
+    if (!front || ci) return null;
+    for (const g of ZEBRA_GUARDS) {
+      if (!headOf(g.name)) continue;
+      const hw = Math.max(22, sayHead.px * 0.3);
+      if (Math.abs(x - sayHead.x) <= hw && y >= sayHead.y && y <= sayHead.y + sayHead.px) return g.who;
+    }
+    return null;
+  };
   /** What a press or its release at (x, y) is on (tap.ts `pressKey`): the same at both walks you, as in the town. */
-  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
+  const keyAt = (x: number, y: number): string => (onSlot(x, y) ? "claw-slot" : guardAt(x, y) ? `zebra-${guardAt(x, y)}` : onKid(x, y) ? pressKey(room, true, null) : pressKey(room, false, squareAt(x, y)));
   /** What a tap at (x, y) means: the Shopkeeper (its picture), the way out (its picture), or the square under it. */
   const plan = (x: number, y: number) => {
     const here = you.here();
@@ -3840,6 +3851,12 @@ function startRoom(
     }
     const xy = local(e);
     if (press.up(keyAt(xy.x, xy.y)) !== "walk") return;
+    // (Rolling Dough's front room: a tapped guard tells you he's in the back. You stay where you are.)
+    const gd = guardAt(xy.x, xy.y);
+    if (gd) {
+      front!.guard(performance.now(), gd, (saidLast = pickLine(ZEBRA_BACK_LINES, saidLast)));
+      return;
+    }
     if (onSlot(xy.x, xy.y)) {
       openClawMachine();
       return;
@@ -3887,8 +3904,14 @@ function startRoom(
   cv.dataset.room = def.home;
   // (Rolling Dough: which of its rooms.)
   if (def.part) cv.dataset.part = def.part;
-  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot", sq?: readonly [number, number]) => {
+  const hookAt = (kind: "keeper" | "door" | "pass" | "square" | "slot" | "guard-a" | "guard-b", sq?: readonly [number, number]) => {
     if (!testSwitchesAllowed()) return null;
+    // (Rolling Dough's front room: a guard's middle, as drawn this frame.)
+    if (kind === "guard-a" || kind === "guard-b") {
+      if (!front || !headOf(kind)) return null;
+      const y = sayHead.y + sayHead.px * 0.5;
+      return sayHead.x > 0 && sayHead.x < W && y > 0 && y < H ? { x: sayHead.x, y } : null;
+    }
     // (Boingo's claw machine's coin slot, as drawn this frame: null unless you're zoomed in at it.)
     if (kind === "slot") {
       const b = cabHits.slot;
@@ -4130,7 +4153,7 @@ function startRoom(
      */
     talk: () => {
       const now = performance.now();
-      if (front && def.says?.length) front.keeper(now, def.says[saysI++ % def.says.length]!);
+      if (front && def.says?.length) front.keeper(now, (saidLast = pickLine(def.says, saidLast)));
       // (Don Dough's talk beat: his card steps aside so the crew and he show; it comes back as the beat ends.)
       if (backScene && !backScene.talking()) {
         backScene.talk(now);

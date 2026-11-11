@@ -43,6 +43,7 @@ import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
+import { ZEBRA_OUTSIDE_LINES, pickLine } from "./shops/zebra-lines.ts";
 import { canChallengeInside, shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { CHALLENGE_FEEL, introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
@@ -66,7 +67,7 @@ import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import { sameWeights, skyOverride, skyWeights, type SkyWeights } from "./sky.ts";
-import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
+import { TOWN_BOTS, COLISEUM_PLACE, CROWD_MAX, HOMES, addCrowd, figureName, hasTownBoss, walkYou, addTestPlayer, fillTables, homeDoor, inSquare, stayOut, START, STATUES, TABLES, anyTableFree, botLabel, cancelMeet, comeOut, createTown, destFor, holdBot, isSprite, spotNear, meet, meetReady, meetSeat, onColiseum, playAtTableText, plotAt, ratingLine, ratingText, seated, sidekickText, spriteAnim, statueAt, stoolAt, tableAt, tableFor, tableStates, taken, tdist, tick, townLine, walkable, waitingBot, walkWalker, type HomeId, seatOf, seatText, standOf, type Person, type Place, type Seat, type Sq, type Stand, type StatueId, type Target } from "./world.ts";
 import { NO_WEBGL_STREET, STREET_TOWN } from "./admin-town.ts";
 import { guestLimitMs, watchAway, watchGuest } from "./here-net.ts";
 import { FdButton } from "../components/FrontDoor.tsx";
@@ -392,7 +393,7 @@ export function TownScreen({
   // The right column's top slot (a computer's frame): where the town's tools go.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => setSlot(framed ? document.getElementById(RIGHT_SLOT_TOOLS) : null), [framed]);
-  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? home.boss : home.name) : undefined;
+  const label = card?.kind === "coliseum" ? COLISEUM_PLACE.name : card?.kind === "table" ? "Chess table" : person ? (bot ? botLabel(bot) : person.name) : home ? (card!.confirm ? (introOf(home.id) ? `Challenge ${home.boss}?` : "Leave the town square?") : card!.kind === "boss" ? figureName(home) : home.name) : undefined;
   /** A boss with an intro: "Fight" on its confirm. You and the boss walk to its door and in (once: a challenge already going is left alone). */
   const fight = (i: number) => {
     if (flow.current !== "town" || doorBusy.current) return;
@@ -482,7 +483,18 @@ export function TownScreen({
                 </button>
               </>
             )}
-            {card && home && !card.confirm && card.kind === "boss" && (
+            {/* A stand-in (Rolling Dough's guard out front, Nov 11): his name, his line's row (kept, empty until he talks, so nothing moves),
+                and Talk: the boss is inside. */}
+            {card && home && !card.confirm && card.kind === "boss" && !hasTownBoss(home) && (
+              <>
+                <h2>{figureName(home)}</h2>
+                <p class="town-card-text town-card-line town-stand-in">{card.line ?? "\u00a0"}</p>
+                <button type="button" class="town-btn primary" onClick={() => ctl.current?.talk()}>
+                  Talk
+                </button>
+              </>
+            )}
+            {card && home && !card.confirm && card.kind === "boss" && hasTownBoss(home) && (
               <>
                 <h2>{home.boss}</h2>
                 {card.line && <p class="town-card-text town-card-line">{card.line}</p>}
@@ -1317,7 +1329,7 @@ function startTown(
   const heldBy = (c: Card | null): Person | null => (c?.kind === "person" ? town.people[c.i]! : c?.kind === "table" && c.bot !== undefined ? town.people[c.bot]! : null);
   function setCard(c: Card | null) {
     // A boss's card opening: it says something (Eric, Oct 27), once a tap (its confirm opening is the same card).
-    if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i)) {
+    if (c?.kind === "boss" && !(card?.kind === "boss" && card.i === c.i) && hasTownBoss(HOMES[c.i]!)) {
       const id = HOMES[c.i]!.id;
       const n = taps.get(id) ?? 0;
       taps.set(id, n + 1);
@@ -1330,7 +1342,7 @@ function startTown(
       const n = opens.get(id) ?? 0;
       const line = townLine(id, n);
       if (line) ((c = { ...c, line }), opens.set(id, n + 1));
-    } else if (c && card && c.kind === card.kind && c.i === card.i && card.line) c = { ...c, line: card.line };
+    } else if (c && card && c.kind === card.kind && c.i === card.i && card.line && c.line === undefined) c = { ...c, line: card.line };
     // A person's card opening: a sidekick waves, once (Oct 28), and its picture is made, once (kept while the card stays: `full` changing
     // sets the card again).
     if (c?.kind === "person" && !(card?.kind === "person" && card.i === c.i)) {
@@ -2007,6 +2019,8 @@ function startTown(
       meet(town, { bot, table, yours, theirs: bot.walker.here() });
     },
     confirm: () => card && setCard({ ...card, confirm: true }),
+    /** A stand-in's Talk (Rolling Dough's guard out front): his card says the boss is inside, a line at random, never the same twice running. */
+    talk: () => card?.kind === "boss" && setCard({ ...card, line: pickLine(ZEBRA_OUTSIDE_LINES, card.line ?? null) }),
     /** A home's "Go in" (a shop's: shops/shops.ts): you walk to the square in front of its door, and go in once there. */
     goIn: (i: number) => {
       const h = HOMES[i]!;

@@ -1,10 +1,11 @@
 import { expect, type Page } from "@playwright/test";
 import { asAdmin, test, townReady } from "./helpers.ts";
+import { ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES } from "../packages/app/src/town/shops/zebra-lines.ts";
 
 /**
  * Rolling Dough, Don Dough's bakery (Nov 11; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer, as an admin (Don
- * Dough is in the game for admins first): walk in from the town; the two guards' `watch` follows you; the counter zebra's Talk has him
- * say a line; through the door at the back left into the back room (its own room) and out again; the chatter at the back table; and
+ * Dough is in the game for admins first): the guard out front and his Talk ("the boss is inside"); walk in from the town; the two
+ * guards' `watch` follows you; a tapped guard and the counter zebra's Talk say he's in the back; through the door at the back left into the back room (its own room) and out again; the chatter at the back table; and
  * the talk beat (the crew stand, draw and aim with Fedora's line, Don waves them down, they lower, his challenge line), his Challenge
  * open now his boss is in the game (admins first). ZEBRA_SHOTS=<dir>: the stills for the PR.
  * Test hooks: the room's canvas (`data-room`, `data-part`, `data-you`, `data-ready`), `__shopAt("keeper" | "pass" | "square")`,
@@ -35,14 +36,14 @@ type Hooks = {
   __shopZebra?: () => Zebra | null;
 };
 const zebra = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopZebra?.() ?? null);
-async function shopAt(p: Page, kind: "keeper" | "pass" | "square", sq?: readonly [number, number]) {
+async function shopAt(p: Page, kind: "keeper" | "pass" | "square" | "guard-a" | "guard-b", sq?: readonly [number, number]) {
   const xy = await p.evaluate(([k, s]) => (window as unknown as Hooks).__shopAt?.(k as string, s as [number, number] | undefined) ?? null, [kind, sq] as const);
   if (!xy) return null;
   const cv = (await room(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
-async function homeAt(p: Page) {
-  const xy = await p.evaluate(() => (window as unknown as Hooks).__townAt?.("home", "zebra") ?? null);
+async function homeAt(p: Page, kind: "home" | "boss" = "home") {
+  const xy = await p.evaluate((k) => (window as unknown as Hooks).__townAt?.(k, "zebra") ?? null, kind);
   if (!xy) return null;
   const cv = (await p.locator("canvas.town-canvas").boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
@@ -108,6 +109,26 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
       await expect(page.getByRole("dialog", { name: "Map of the town" })).toHaveCount(0);
     }
   }
+  // The guard out front (Eric, Nov 11), where the other homes' bosses stand: his card, Talk, "the boss is inside" (a line at random).
+  const guard = page.getByRole("dialog", { name: "Bakery guard", exact: true });
+  await expect(async () => {
+    if (await guard.isVisible()) return;
+    const at = await homeAt(page, "boss");
+    expect(at, "the guard out front on screen").not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(guard).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  await expect(guard.getByRole("button")).toHaveText(["Talk"]);
+  const box0 = (await guard.boundingBox())!;
+  await guard.getByRole("button", { name: "Talk" }).click();
+  await expect.poll(async () => ZEBRA_OUTSIDE_LINES.includes((await guard.locator(".town-card-line").textContent()) ?? ""), { message: "he says the boss is inside" }).toBe(true);
+  // (His line's row was there before he spoke: the card keeps its size.)
+  const box1 = (await guard.boundingBox())!;
+  expect([box1.width, box1.height].map(Math.round)).toEqual([box0.width, box0.height].map(Math.round));
+  await page.waitForTimeout(400);
+  await shot(page, "guard-out-front");
+  await page.keyboard.press("Escape");
+  await expect(guard).toBeHidden();
   const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
@@ -147,7 +168,16 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   expect(seen.size, "their look changed as you walked past them").toBeGreaterThan(1);
   await shot(page, "front");
 
-  // The counter zebra: Talk has him say one of his lines (no crate yet).
+  // A guard you tap tells you he's in the back (Eric, Nov 11), in a bubble; you stay where you are.
+  await expect.poll(() => shopAt(page, "guard-b"), { message: "the guard is drawn" }).not.toBeNull();
+  const gb = (await shopAt(page, "guard-b"))!;
+  await page.mouse.click(gb.x, gb.y);
+  await expect.poll(async () => (await zebra(page))?.say, { message: "the guard says he's in the back" }).toMatchObject({ who: "guard-b" });
+  expect(ZEBRA_BACK_LINES).toContain((await zebra(page))!.say!.text);
+  await expect(room(page)).toHaveAttribute("data-you", "10,13");
+  await shot(page, "guard-line");
+
+  // The counter zebra: Talk has him say he's in the back too (no crate yet).
   await expect.poll(() => shopAt(page, "keeper"), { message: "the counter zebra is drawn" }).not.toBeNull();
   const k = (await shopAt(page, "keeper"))!;
   await page.mouse.click(k.x, k.y);
@@ -155,7 +185,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await expect(keeper).toBeVisible({ timeout: 15_000 });
   await keeper.getByRole("button", { name: "Talk" }).click();
   await expect.poll(async () => (await zebra(page))?.say, { message: "he says a line" }).toMatchObject({ who: "keeper" });
-  expect(["Rye, sourdough, or... the special box?", "Fresh today. Fresh every day. No questions."]).toContain((await zebra(page))!.say!.text);
+  expect(ZEBRA_BACK_LINES).toContain((await zebra(page))!.say!.text);
   await page.keyboard.press("Escape");
 
   // Through the door at the back left: the back room, its own room (dim: the night tone).
