@@ -126,3 +126,5 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 
 - **Worktree tests (Nov 11):** a worktree with `node_modules` symlinked to the main checkout resolves `@chessroyale/*` to the MAIN checkout's packages, not the worktree's. For cross-package tests, make `node_modules` a dir of links with `@chessroyale/*` pointing at the worktree's `packages/*` (as done for wt-bz).
 - Stills for Eric: the BASELINE is 428x746 (his iPhone 14 Plus in Safari, bars on; Eric, Nov 11), listed first; other widths still tested. Nov 11: a 390x844 still showed the tall home card (name above pawn); his phone shows the short one (pawn left, name right) and he read it as a version mismatch.
+- Archive a helper only by the ID its create_session returned (STATUS.md lists them), never an ID read from a PR body or branch: Nov 11 a helper body carried session_01EKH5j59nMnRVnekEcuZbim (Eric's old pinned HunChess chat); archived by mistake, restored within a minute.
+- PR #636 frame report opened (bf3c073), CI watcher bhe16a98k; helper session_01JuCWRtcbr9p7G1GSwEGkPH archived.
