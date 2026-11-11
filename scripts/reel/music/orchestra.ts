@@ -29,7 +29,7 @@ const CH: { prog: number; bank?: number; vol: number; pan: number; rev: number; 
   { prog: 43, vol: 104, pan: 56, rev: 50, name: "contrabasses" },
   { prog: 42, vol: 92, pan: 50, rev: 55, name: "cellos" },
   { prog: 8, vol: 96, pan: 74, rev: 75, name: "celesta" },
-  { prog: 71, vol: 84, pan: 40, rev: 60, name: "clarinet" },
+  { prog: 119, vol: 90, pan: 64, rev: 60, name: "reverse cymbal" },
 ];
 
 /** Who plays what: [channel, transpose, velocity ×, length ×]. */
@@ -37,7 +37,7 @@ type Part = [ch: number, tr?: number, vel?: number, len?: number];
 const ARRANGE: Partial<Record<Role, Partial<Record<Section | "*", Part[]>>>> = {
   lead: {
     crowd: [[2, 0, 1.08], [0, -12, 0.85], [3, -12, 0.7]],
-    town: [[10, 0, 1.1], [15, -12, 0.9]],
+    town: [[10, 0, 1.1], [8, 0, 0.45]],
     card: [[10], [2, 0, 0.75]],
     rise: [[3, -12], [2, -12, 0.6]],
     hit: [[2], [3, -12]],
@@ -70,7 +70,23 @@ const ARRANGE: Partial<Record<Role, Partial<Record<Section | "*", Part[]>>>> = {
   timp: { "*": [[5]] },
 };
 /** Velocity × per section: the tutti hits come down and the busy sections up, so the loudness evens out under the master. */
-const SECTION_GAIN: Partial<Record<Section, number>> = { hit: 0.84, top: 0.84, crowd: 1.1, ranked: 1.12, rise: 1.06, town: 1.08, crib: 1.05 };
+const SECTION_GAIN: Partial<Record<Section, number>> = { hit: 0.84, top: 0.84, hidden: 0.74, crowd: 1.1, ranked: 1.12, rise: 1.06, town: 1.08, crib: 1.05 };
+/** FluidR3's reverse cymbal: when its swell peaks (s) by key, measured by rendering each key alone. */
+const SWELL_PEAK: [key: number, s: number][] = [[36, 1.95], [40, 1.84], [44, 1.73], [48, 1.64], [60, 1.37], [72, 1.16], [78, 1.06], [84, 0.97], [90, 0.89]];
+function swellPeak(key: number): number {
+  for (let i = 1; i < SWELL_PEAK.length; i++) {
+    const [k0, s0] = SWELL_PEAK[i - 1]!;
+    const [k1, s1] = SWELL_PEAK[i]!;
+    if (key <= k1) return s0 + ((s1 - s0) * (key - k0)) / (k1 - k0);
+  }
+  return SWELL_PEAK[SWELL_PEAK.length - 1]![1];
+}
+/** The key whose swell peaks closest to `d` seconds in. */
+function swellKey(d: number): number {
+  let best = 36;
+  for (let k = 36; k <= 90; k++) if (Math.abs(swellPeak(k) - d) < Math.abs(swellPeak(best) - d)) best = k;
+  return best;
+}
 /** The orchestra kit's keys (GM drum map). */
 const DRUM: Partial<Record<Role, number[]>> = { kick: [36], snare: [38], roll: [38], crash: [49], boom: [36, 35] };
 
@@ -111,11 +127,10 @@ function arrange(notes: Note[], endS: number): Ev[] {
       continue;
     }
     if (n.role === "swell") {
-      // A suspended-cymbal roll: soft strokes every 55 ms, growing to the peak.
-      for (let t = n.t; t < n.t + n.d; t += 0.055) {
-        const k = (t - n.t) / n.d;
-        on(t, 9, 49, vel(8 + (n.v - 8) * k * k)), off(t + 0.05, 9, 49);
-      }
+      // The reverse cymbal, keyed so its peak lands on the swell's end (a higher key plays the sample faster).
+      const key = swellKey(n.d);
+      const start = n.t + n.d - swellPeak(key);
+      on(start, 15, key, vel(n.v)), off(start + swellPeak(key) + 0.6, 15, key);
       continue;
     }
     const parts = ARRANGE[n.role]?.[n.sec] ?? ARRANGE[n.role]?.["*"] ?? [];

@@ -86,7 +86,8 @@ echo.R = new Float32Array(total);
 const chords = new Map<string, Note[]>();
 let seed = 7;
 for (const n of notes) {
-  const vel = n.v / 127;
+  const vel = (n.v / 127) * (n.sec === "hit" || n.sec === "top" ? 0.82 : 1); // the stingers a touch under, so the rest sits up
+
   switch (n.role) {
     case "lead": {
       const duty = n.sec === "town" || n.sec === "card" ? 0.25 : n.sec === "ranked" || n.sec === "rise" ? 0.5 : 0.125;
@@ -110,7 +111,7 @@ for (const n of notes) {
       const p = n.p < 33 ? n.p + 12 : n.p;
       const rel = 0.03;
       const buf = tone(p, n.d, tri4, adsr(0.002, 0.4, n.sec === "hidden" ? 0.5 : 0.85, rel, n.d), rel);
-      place(buf, n.t, (n.sec === "hidden" ? 0.3 : 0.42) * vel, 0);
+      place(buf, n.t, (n.sec === "hidden" ? 0.2 : 0.42) * vel, 0);
       break;
     }
     case "ost": {
@@ -162,7 +163,7 @@ for (const n of notes) {
     }
     case "timp": {
       const p = n.p < 40 ? n.p + 12 : n.p;
-      const v = osc(RATE, (t) => hz(p) * (1 + 0.06 * Math.exp(-t * 30)), tri4);
+      const v = osc(RATE, (t) => hz(p) * (1 + 0.015 * Math.exp(-t * 40)), tri4);
       const len = Math.min(n.d, 0.6) + 0.1;
       place(render(RATE, len, (t) => v(t) * Math.exp(-t * 7)), n.t, 0.3 * vel, -0.15);
       break;
@@ -178,7 +179,7 @@ for (const group of chords.values()) {
     for (const g of group) {
       const v = lowpass(RATE, 700, osc(RATE, () => hz(g.p) * 1.002, pulse(0.3)));
       const buf = render(RATE, g.d + 0.4, (t) => v(t) * Math.min(1, t / 0.8) * (t > g.d ? Math.max(0, 1 - (t - g.d) / 0.4) : 1));
-      place(buf, g.t, 0.07 * (g.v / 127), g.p % 2 ? -0.4 : 0.4);
+      place(buf, g.t, 0.05 * (g.v / 127), g.p % 2 ? -0.4 : 0.4);
     }
     continue;
   }
