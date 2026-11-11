@@ -1,6 +1,6 @@
 // The room's back, WebGL's against the 2D way's (Nov 11, docs/decisions/2026-11-11-room-smooth.md): for each room, at rest and with the
 // view part way through a walk, `__shopBackDiff()` (the back drawn both ways at that view, compared pixel for pixel) and a still of
-// the whole screen each way (`back=2d` draws as before Nov 11).
+// the whole screen each way (`?back=2d` draws as before Nov 11).
 //
 //   node scripts/stills-room.mjs [base=http://localhost:8790] [rooms=smudgy,zebra,clown] [out=dir]
 import { chromium } from "playwright";
@@ -10,7 +10,8 @@ const arg = (k, d) => process.argv.find((a) => a.startsWith(`${k}=`))?.slice(k.l
 const BASE = arg("base", "http://localhost:8790");
 const ROOMS = arg("rooms", "smudgy,zebra,clown").split(",");
 const OUT = arg("out", "stills");
-const NAMES = { smudgy: "Smudgy's Art Gallery", zebra: "Rolling Dough", clown: "Boingo's Funhouse", gardener: "Puddles' Botanical Garden", hollow: "Hollow Peak" };
+const NAMES = { smudgy: "Smudgy's Art Gallery", zebra: "Rolling Dough", clown: "Boingo's Funhouse", gardener: "Puddles' Botanical Garden", hollow: "Hollow Peak", gingerbread: "Ginger Igloo", folio: "Folio's Folded House" };
+const ONLY = arg("sizes", "phone,computer").split(",");
 const SIZES = {
   phone: { viewport: { width: 428, height: 746 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
   computer: { viewport: { width: 1536, height: 864 }, deviceScaleFactor: 2 },
@@ -38,12 +39,11 @@ async function enter(page, id) {
 
 // (The repo pins its own Playwright: a pre-installed Chromium is taken from PW_CHROMIUM when it is set.)
 const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
-for (const [size, opts] of Object.entries(SIZES))
+for (const [size, opts] of Object.entries(SIZES).filter(([k]) => ONLY.includes(k)))
   for (const id of ROOMS)
     for (const mode of ["gl", "2d"]) {
       const ctx = await browser.newContext(opts);
       const page = await ctx.newPage();
-      if (mode === "2d") await page.addInitScript(() => (window.__shopNoGl = true));
       if (id === "zebra")
         await page.route("**/api/me*", async (route) => {
           if (route.request().method() !== "GET") return route.continue();
@@ -51,7 +51,7 @@ for (const [size, opts] of Object.entries(SIZES))
           const body = await res.json().catch(() => null);
           await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
         });
-      await page.goto(`${BASE}/town?sky=day`);
+      await page.goto(`${BASE}/town?sky=day${mode === "2d" ? "&back=2d" : ""}`);
       await enter(page, id);
       const still = await page.evaluate(() => window.__shopStill?.());
       const rest = mode === "gl" ? await page.evaluate(() => window.__shopBackDiff?.()) : null;

@@ -1084,7 +1084,7 @@ function startTown(
     rec.onDone = () => {
       recPill?.set("Report ready", false);
       setRec(null);
-      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: BACKEND_LABEL[painter.kind], timer };
+      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: `${BACKEND_LABEL[painter.kind]}${TOWN_ASKED.back2d ? " (rooms 2D)" : ""}`, timer };
       recPanel = reportPanel(
         host,
         summarize(rec.run),

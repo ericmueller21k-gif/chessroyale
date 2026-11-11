@@ -33,7 +33,7 @@ import { onAccountChange } from "../../account.ts";
 import { renderFrame, type Character } from "../../characters/sprite.ts";
 import { mirrorFor } from "../../characters/sprite-kit.ts";
 import { artFacing } from "../../characters/sprites.ts";
-import { testSwitchesAllowed } from "../../test-switches.ts";
+import { TOWN_ASKED, testSwitchesAllowed } from "../../test-switches.ts";
 import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
 import { F as RF, FPS, P as RP, REC } from "../frame-report.ts";
@@ -3563,8 +3563,8 @@ function startRoom(
    */
   let gb: BackGl | null | undefined;
   const makeBackGl = (): BackGl | null => {
-    // (Tests: `__shopNoGl` set before going in draws the back the 2D way, to compare.)
-    if (testSwitchesAllowed() && (window as unknown as { __shopNoGl?: boolean }).__shopNoGl) return null;
+    // (`?back=2d`, anyone's: the back the 2D way, as before, to compare on a phone with `?report`.)
+    if (TOWN_ASKED.back2d) return null;
     // (The floor's picture with the plans that lie flat on it and never change, as the 2D way lays them over it.)
     const pic = document.createElement("canvas");
     pic.width = pic.height = n * SQ;

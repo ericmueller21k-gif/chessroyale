@@ -83,7 +83,9 @@ async function walk(page, ms) {
 }
 
 // (The repo pins its own Playwright: a pre-installed Chromium is taken from PW_CHROMIUM when it is set.)
-const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {});
+// (`cpu2d=1`: the 2D canvas drawn on the CPU, as Safari's is (CoreGraphics), rather than headless Chromium's emulated GPU.)
+const ARGS = arg("cpu2d", "") ? ["--disable-accelerated-2d-canvas"] : [];
+const browser = await chromium.launch({ ...(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}), args: ARGS });
 const results = [];
 for (const [size, opts] of Object.entries(SIZES))
   for (const id of ROOMS)
@@ -99,8 +101,7 @@ for (const [size, opts] of Object.entries(SIZES))
             const body = await res.json().catch(() => null);
             await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
           });
-        if (FLOORX === "2d") await page.addInitScript(() => (window.__shopNoGl = true));
-        await page.goto(`${BASE}/town?sky=day&report`);
+        await page.goto(`${BASE}/town?sky=day&report${FLOORX === "2d" ? "&back=2d" : ""}`);
         await enter(page, id);
         const cdp = await ctx.newCDPSession(page);
         await cdp.send("Emulation.setCPUThrottlingRate", { rate: slow });

@@ -944,3 +944,14 @@ picture.
 **The fix:** the town's pictures are painted and uploaded once, on a loading screen, onto an atlas sized for them. Only 2 spare pages
 start again. The town's 2D pictures are made in memory (`art2d`). docs/decisions/2026-11-11-town-loading.md.
 
+
+## A report that looked paused in every room (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone "is pausing when I run into the building, so I don't know how to capture it", the day
+#638 made the report record rooms.
+
+**The cause:** the rooms' frames were recorded, but the pill's "● Recording N s" was set in the town's frame loop, which stops while
+you're in a room. Inside, the pill stood still. #638's tests checked the recorded frames and the `?fps` pill, not the report's pill.
+
+**The fix:** the recorder tells the pill each new second (`FrameRec.onSec`), whichever loop records. The e2e check walks in a room and
+reads the pill's texts. docs/decisions/2026-11-11-room-smooth.md.
