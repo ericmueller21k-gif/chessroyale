@@ -5,8 +5,9 @@ woodshop."
 The tunes were first on tuned wood (a marimba and a xylophone, my reading of "no tone sounds"); Eric: "whatever the
 heck is playing it I don't like it sounds really basic", and of seven others tried, "Fiddle, gritty, both great,
 square too, add them all in somehow ... and replace the instruments in both you used". So the tunes are on a fiddle,
-a gritty driven synth and the old console's square lead (synth.py's `fiddle`, `gritty`, `chip`), all three in both
-songs, in different seats.
+a gritty driven synth and the old console's square lead (synth.py's `fiddle`, `gritty`, `chip`), in different seats in
+each song. Then, on Sawyer's: "swap that lead instrument out" for the overdriven lead built from a reference he sent
+(synth.py's `drive`); the beaver's keeps the fiddle.
 176 beats a minute, a drum-and-bass break: 352 beats = 88 bars = 120.0 s. E Dorian (E F# G A B C# D), the tunes mostly on
 its five-note scale (E G A B D); the bass moves the root (E, G, A, D, B, and C in the calm).
 The kit: kick, snare (and ghost strokes), hats, three toms, a rim click, a crash. The bass: a deep note driven so small
@@ -15,8 +16,8 @@ The woodshop: an axe chopping (a crack, a thock, the split), a hand saw's stroke
 a hammer on a nail (three taps rising as the nail goes in), wood knocks, planks tumbling, a drill, a table saw
 spinning up and biting into a board, wood creaking under strain, and a tree coming down.
 The fast pattern under it all: logs in 16ths, zigzagging up the scale like a saw's teeth.
-Sawyer's: the fiddle leads; the gritty synth takes the low calls and the drop's tune, the square the third tune and
-the harmonies. The beaver's: the square leads, high and chattering (his woodpecker foreman); the fiddle takes the
+Sawyer's: the overdriven lead leads; the gritty synth takes the low calls and the drop's tune, the square the third
+tune and the harmonies. The beaver's: the square leads, high and chattering (his woodpecker foreman); the fiddle takes the
 drop's tune and the harmonies, the gritty synth the low answers and the third tune. `compose(who)` makes either.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
   python3 song_p.py <out.wav>      (Sawyer's)      python3 song_q.py <out.wav>      (the beaver's)
@@ -392,6 +393,10 @@ def compose(who: str) -> np.ndarray:
     def square(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
         put(bus, b, x.chip(m, d * 0.9, 0.15 * vol), pan)
 
+    def driven(b, m, vol=1.0, pan=0.0, bus="drive", d=0.5):
+        """The overdriven lead built from Eric's reference (synth.py's `drive`), on its own bus for its echo."""
+        put("drive", b, x.drive(m, d * 0.96, 0.152 * vol), pan)
+
     def third(m):
         """The note two steps up the key."""
         pc = m % 12
@@ -587,26 +592,28 @@ def compose(who: str) -> np.ndarray:
     power_saw(348, 3.6, 380, 45, 0.12, up=False)
     hammer(350.5, 0, 0.14), hammer(351, 2, 0.16), knock(351.5, 420, 0.16, -0.3)
 
-    # ======== the tunes: the fiddle, the gritty synth and the square, all three in both songs ========
+    # ======== the tunes ========
     tunes = TUNES[who]
     first, second = "|".join(tunes["tune"].split("|")[:8]), "|".join(tunes["tune"].split("|")[8:])
     last_two = "|".join(tunes["third"].split("|")[6:])
     if who == "sawyer":  # his tunes are written low (E4 to A5)
-        sing(fiddle, "lead", 32, tunes["tune"], up=12)  # bars 9-24: the fiddle
-        sing(gritty, "lead", 96, tunes["call"][0])  # bars 25-32: the gritty synth calls, low; the fiddle answers, high
-        sing(fiddle, "answer", 96, tunes["call"][1], pan=0.3)
+        # His lead is the overdriven one (Eric, on its sample: "swap that instrument with the one that's currently in
+        # his actual completed one"); it took the fiddle's seats, at the pitch the tunes are written.
+        sing(driven, "drive", 32, tunes["tune"])  # bars 9-24: the overdriven lead
+        sing(gritty, "lead", 96, tunes["call"][0])  # bars 25-32: the gritty synth calls, low; the lead answers, high
+        sing(driven, "drive", 96, tunes["call"][1], vol=1.5, pan=0.3)
         sing(gritty, "lead", 144, tunes["second"])  # bars 37-44, the drop: the gritty synth, the square an octave over it
         sing(square, "answer", 144, tunes["second"], vol=0.5, up=12, pan=0.3)
-        sing(fiddle, "lead", 208, tunes["calm"], vol=0.85, up=12)  # bars 53-60: the fiddle alone, long notes
-        sing(fiddle, "lead", 240, first, up=12)  # bars 61-68: the fiddle, the square in harmony
+        sing(driven, "drive", 208, tunes["calm"], vol=0.85)  # bars 53-60: the lead alone, long notes
+        sing(driven, "drive", 240, first)  # bars 61-68: the lead, the square in harmony above
         sing(square, "answer", 240, first, vol=0.45, up=12, pan=0.3, harmony=True)
         sing(square, "lead", 272, tunes["third"])  # bars 69-76: the square; the gritty synth joins its last two bars
         sing(gritty, "answer", 296, last_two, vol=0.5, pan=0.3)
-        sing(fiddle, "lead", 304, second, up=12)  # bars 77-84: the fiddle, the gritty synth an octave under, the square in harmony
-        sing(gritty, "answer", 304, second, vol=0.5, pan=-0.3)
+        sing(driven, "drive", 304, second)  # bars 77-84: the lead, the gritty synth an octave under, the square in harmony
+        sing(gritty, "answer", 304, second, vol=0.5, up=-12, pan=-0.3)
         sing(square, "answer", 304, second, vol=0.4, up=12, pan=0.3, harmony=True)
-        sing(fiddle, "lead", 336, tunes["end"], up=12)  # bars 85-87
-        sing(gritty, "answer", 336, tunes["end"], vol=0.5, pan=0.3)
+        sing(driven, "drive", 336, tunes["end"])  # bars 85-87
+        sing(gritty, "answer", 336, tunes["end"], vol=0.5, up=-12, pan=0.3)
     else:  # the beaver's are written high (B4 to B6)
         sing(square, "lead", 32, tunes["tune"])  # bars 9-24: the square, chattering
         sing(square, "lead", 96, tunes["call"][0], up=-12)  # bars 25-32: the square calls; the gritty synth answers, low
@@ -632,7 +639,9 @@ def compose(who: str) -> np.ndarray:
     x.buses["bass"] *= gain
     x.buses["logs"] *= 0.6 + 0.4 * gain
 
-    levels = {"snare": 1.7, "hats": 2.3, "toms": 0.9, "drum": 1.5, "bass": 0.58, "logs": 1.9, "sawing": 1.15, "taps": 2.2, "fx": 1.2, "lead": 0.85, "answer": 0.85}
+    if "drive" in x.buses:
+        x.echo("drive", 0.75, 0.14, 0.06)  # the old console's echo on its lead
+    levels = {"drive": 0.85, "snare": 1.7, "hats": 2.3, "toms": 0.9, "drum": 1.5, "bass": 0.58, "logs": 1.9, "sawing": 1.15, "taps": 2.2, "fx": 1.2, "lead": 0.85, "answer": 0.85}
     return x.mixdown(levels, lowpass=8500, room=0.12)
 
 

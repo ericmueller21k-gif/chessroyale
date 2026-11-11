@@ -18,10 +18,9 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | Toy blocks, xylophone and toy piano | song_k.py | "Perfect literally" |
 | A music box, heartbeat, creeping bass with the kit out ("lights out") | song_l.py, bars 29-34 | "so fucking good" |
 | Rockets, booms, crackle, sparkles; hand drums; a low chant | song_m.py | "It's perfect" |
+| An overdriven lead (the 16-bit consoles' lead guitar), built from measurements of a reference he sent | `Mix.drive` | of the reference: "a really badass instrument"; of the build's sample: "swap that instrument with the one that's currently in his actual completed one" (it is Sawyer's lead) |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
-
-Not yet judged: `Mix.drive`, an overdriven lead built from measurements of a reference he sent (Nov 11).
 
 ## Not liked: avoid, or ask first
 
