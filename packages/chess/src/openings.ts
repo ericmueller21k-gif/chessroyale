@@ -67,3 +67,25 @@ export function pickOpenings(
   }
   return chosen;
 }
+
+/**
+ * The library's name for a game's moves (UCI, from the starting position): of the lines those moves start the same way as,
+ * the name at the longest length a line names (`names`), the first line in the library on a tie. Null: none names any of
+ * them (no moves, or a start no line shares). Don Dough's opening comment reads it (bosses/zebra.ts).
+ */
+export function openingNameFor(moves: readonly string[], library: readonly Opening[]): string | null {
+  let best: { k: number; name: string } | null = null;
+  for (const o of library) {
+    if (!o.names) continue;
+    let k = 0;
+    while (k < o.moves.length && k < moves.length && o.moves[k] === moves[k]) k++;
+    for (let j = k; j > (best?.k ?? 0); j--) {
+      const name = o.names[j];
+      if (name && name !== "Starting position") {
+        best = { k: j, name };
+        break;
+      }
+    }
+  }
+  return best?.name ?? null;
+}

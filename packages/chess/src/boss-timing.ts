@@ -17,6 +17,7 @@ import { HOOPS_BEATS, TIGER_FX } from "./bosses/tiger.ts";
 import { FOLIO_FX } from "./bosses/folio.ts";
 import { TIMBER_FX } from "./bosses/timber.ts";
 import { DASH_FX } from "./bosses/dash.ts";
+import { ZEBRA_FX } from "./bosses/zebra.ts";
 
 /**
  * Boss battle timing shared by the lobby server and the solo game, so a screen
@@ -71,7 +72,7 @@ export function bossShowMs(lastMove: { captured?: string } | null | undefined, a
  * step, `spin`: its banner, then the board turns again); the Roman candle: G-REX drops onto the board, slams the candle down and fires
  * its 24 shots (see the app's PowerMoment for the beats).
  */
-export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX } as const;
+export const POWER_FX = { warn: 1700, rushWarn: 1700, ...GINGER_FX, ...BOINGO_FX, ...GREX_FX, ...HOLLOW_FX, ...BIGBOY_FX, ...SAWYER_FX, ...PIG_FX, ...RECLUSE_FX, ...ALFIL_FX, ...HOPPER_FX, ...SMUDGY_FX, ...MOO_FX, ...GARDENER_FX, ...TIGER_FX, ...FOLIO_FX, ...TIMBER_FX, ...DASH_FX, ...ZEBRA_FX } as const;
 
 /** What a moment's length reads of its event: its kind, Hollow's first cover, the hippo gardener's watering's outcomes. */
 type FxEvent = { kind: keyof typeof POWER_FX; first?: boolean; growth?: readonly { kind: string }[] };
@@ -136,6 +137,9 @@ export const POWER_BANNERS: Partial<Record<keyof typeof POWER_FX, readonly (read
   // (His extra move after a failed Scramble Rush: "TWICE!", as Hollow's. His clock fit has none. The Rush's warning: the warning's.)
   rushExtra: [[0, 1500]],
   rushWarn: [[0, 1500]],
+  // (Don Dough's GOLD PLATE!, Nov 11: over his cast's stirring, off the board as his first stroke gilds the piece; his 10 s
+  // moment holds no longer for it. His dough has none.)
+  goldPlate: [[0, 2480]],
 };
 
 /** How long a moment's own clock holds at its start while its banner shows longer (ms; 0 without one from its start). */
@@ -287,6 +291,13 @@ export function bossThinkMs(boss: QueenSlainView, burnt = false, afterMs = 0): n
  */
 export const fullMoonMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
   boss?.powers?.events?.some((e) => e.kind === "fullMoon") ? POWER_FX.fullMoon : 0;
+
+/**
+ * Don Dough's moments at the start of his turn (as the crowd's move just played landed: a `doughRise`, a `doughSquash` or his
+ * `goldPlate` among this turn's events): they play while he thinks, so his thinking lasts at least as long (the ms; 0: none).
+ */
+export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
+  powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "doughRise" | "doughSquash" | "goldPlate" } => e.kind === "doughRise" || e.kind === "doughSquash" || e.kind === "goldPlate"));
 
 /**
  * Folio's moments at the start of its turn (as the crowd's move just played landed: a `fold` or a `revision` among this

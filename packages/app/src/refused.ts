@@ -26,6 +26,9 @@ export const REFUSED: Record<StopReason | "frozen" | "folded" | "stunned" | "bar
   hoop: "A burning hoop is in the way.",
   // (Folio's crease stops only your pieces: its own cross it.)
   crease: "The crease stops your pieces.",
+  gold: "Pawns can't take a gold piece.",
+  // (Never said: dough only stops his pieces; yours squash it.)
+  dough: "That square holds his dough.",
   frozen: "That piece is frozen.",
   folded: "That piece is folded.",
   stunned: "Moonlight holds that piece.",
@@ -47,6 +50,9 @@ export const THROUGH: Record<StopReason, string> = {
   hoop: "His only move: through the hoop.",
   // (Never said: the crease never stops Folio's own pieces, so its move is never "through" it.)
   crease: "Its pieces cross the crease.",
+  // (Never said: gold only ever stops a pawn of yours.)
+  gold: "His pawn takes the gold.",
+  dough: "His only move: onto his dough.",
 };
 
 /** The boss as the screens see it, as far as these words need. */
