@@ -27,6 +27,11 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   await expect(video).toBeVisible();
   expect((await page.request.get("/media/hunchess-reel.mp4")).status()).toBe(200);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.2);
+  // It's big (Eric, Nov 11): the phone's whole width, edge to edge, and no sideways scroll.
+  const vp = page.viewportSize()!;
+  const reel = (await video.boundingBox())!;
+  expect([Math.round(reel.x), Math.round(reel.width)]).toEqual([0, vp.width]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(vp.width);
   await oldEnough(page);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
   await expect(page.getByLabel("Email")).toBeVisible();

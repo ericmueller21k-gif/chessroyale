@@ -4094,22 +4094,21 @@ button.history-label {
   display: grid;
   gap: 18px;
 }
+/* The demo reel (Eric, Nov 11: "Make it much bigger"): on a phone, the screen's whole width, edge to edge (the frame reaches out
+   over the screen's side padding; at most 480 px wide on a tablet); its box keeps its size while it loads (aspect-ratio). */
 .demo-frame {
-  margin: 0;
+  margin: 0 calc(-1 * (var(--gutter) + env(safe-area-inset-right))) 0 calc(-1 * (var(--gutter) + env(safe-area-inset-left)));
   display: grid;
   justify-items: center;
   gap: 6px;
 }
 .demo-video {
   display: block;
-  width: min(100%, 300px);
+  width: min(100%, 480px);
   aspect-ratio: 390 / 700;
   object-fit: cover;
   object-position: top;
-  border-radius: 22px;
-  border: 6px solid var(--surface-2);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 .landing-actions {
   display: grid;
@@ -4291,8 +4290,16 @@ button.history-label {
   .landing-head {
     text-align: left;
   }
+  /* A computer: about two thirds of the window's height (never smaller than before, 574 px, and leaving room for the title above). */
+  .demo-frame {
+    margin: 0;
+  }
   .demo-video {
-    width: 320px;
+    width: auto;
+    height: clamp(574px, 65vh, calc(100vh - 160px));
+    border-radius: 22px;
+    border: 6px solid var(--surface-2);
+    box-shadow: var(--shadow);
   }
   .faq {
     max-width: 720px;

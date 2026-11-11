@@ -44,10 +44,10 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
 - **The landing page** shows where online play needs signing in (`onlineNeedsSignIn` from `/api/auth/config`) and
   you aren't signed in: sign in, or play against bots as a guest (remembered on the device). An invite link shows it
   even to a guest. `?nolanding` skips it (tests). Guests play Solo, a Solo raid and Boss alone.
-  Its **demo reel** (`/media/hunchess-reel.{mp4,webm,jpg}`, Nov 11): about 20 s on a loop, four scenes from the real game with a caption
-  each in the pixel font (50 v 50; the town's park, then Big Boy's challenge into his battle; a ranked 1 v 1; the Hidden Boss, pixel art
-  drawn for it). Remake it: `npx playwright test -c scripts/reel/reel.config.ts`, then `scripts/encode-demo.sh` (its cuts and captions).
-  [2026-11-11-landing-reel.md](../decisions/2026-11-11-landing-reel.md).
+  Its **demo reel** (`/media/hunchess-reel.{mp4,webm,jpg}`, 860 × 1544, Nov 11): 25 s on a loop, a caption each in the pixel font: 50 v 50;
+  the park, then Big Boy's challenge into his battle; ranked 1 v 1, then every rank's emblem up to Transcendent; the Hidden Boss (pixel art).
+  A phone's whole width (at most 480 px); a computer's `clamp(574px, 65vh, 100vh - 160px)` high. Remake: `npx playwright test -c
+  scripts/reel/reel.config.ts`, then `scripts/encode-demo.sh`. [2026-11-11-landing-reel.md](../decisions/2026-11-11-landing-reel.md).
 - **Home** (built from the approved mockups in `docs/mockups/front-door/`; the RANKED row and the Boss raid card, Eric,
   Oct 16, [docs/decisions/2026-10-16-home-ranked-row-and-boss-raid.md](../decisions/2026-10-16-home-ranked-row-and-boss-raid.md)):
   - **The RANKED row:** a small "RANKED" label over three buttons, a radio group: **50 v 50** ("Crowd chess"), **1 v 1**

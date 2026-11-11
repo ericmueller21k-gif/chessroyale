@@ -17,5 +17,5 @@ export default defineConfig({
   workers: 1,
   timeout: 600_000,
   webServer: { ...(base.webServer as object), cwd: resolve(import.meta.dirname, "../..") } as typeof base.webServer,
-  projects: [{ name: "reel", use: { browserName: "chromium", viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: "light", launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {} } }],
+  projects: [{ name: "reel", use: { browserName: "chromium", viewport: { width: 390, height: 844 }, deviceScaleFactor: 2.5, isMobile: true, hasTouch: true, colorScheme: "light", launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {} } }],
 });

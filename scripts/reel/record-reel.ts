@@ -1,17 +1,18 @@
 /**
  * Records the landing page's demo reel (Eric, Nov 11; docs/decisions/2026-11-11-landing-reel.md), scene by scene, from the real
- * game on a phone screen (390 × 844 at 2x) under the e2e's local server. Each scene's frames go to
- * reports/demo/<scene>/frames/ (2x screenshots, back to back), with an ffconcat list (frames.txt) and a timeline of its moments
+ * game on a phone screen (390 × 844 at 2.5x: the reel is 860 px wide, a phone's full width at 2x) under the e2e's local server. Each scene's frames go to
+ * reports/demo/<scene>/frames/ (sharp screenshots, back to back), with an ffconcat list (frames.txt) and a timeline of its moments
  * (marks.json, seconds from its first
  * frame), which scripts/encode-demo.sh cuts and joins. The Hidden Boss (scene 4) is pixel art drawn here, not a game screen; the
  * captions are drawn in the game's pixel font as see-through pictures (reports/demo/captions/).
- *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|hidden|captions]
+ *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|ranks|hidden|captions]
  */
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { expect, type Browser, type Page } from "@playwright/test";
 // (The e2e's own `test`: every context starts with the first-time walkthrough and the quests overlay marked seen.)
 import { BOARD_SEL, test } from "../../e2e/helpers.ts";
-import { HIDDEN_BOSS_CAPTION, REEL_CAPTIONS, drawHiddenBoss } from "./hidden-boss.ts";
+import { HIDDEN_BOSS_CAPTION, RANKS_CAPTION, REEL_CAPTIONS, drawHiddenBoss } from "./hidden-boss.ts";
+import { drawRankShuffle, shuffleSteps } from "./rank-shuffle.ts";
 
 const OUT = "reports/demo";
 
@@ -24,14 +25,15 @@ async function recorder(page: Page, scene: string) {
   const cdp = await page.context().newCDPSession(page);
   const frames: { file: string; t: number }[] = [];
   const marks: Record<string, number> = {};
-  // Back-to-back sharp (2x) screenshots of the part the reel shows (the top 700 CSS px), each stamped with its time. (Chrome's
+  // Back-to-back sharp screenshots (at the page's pixel ratio) of the part the reel shows (the top 700 CSS px), each stamped with its time. (Chrome's
   // screencast would give every painted frame, but only at 1x in a headless browser.)
+  const scale = await page.evaluate(() => devicePixelRatio);
   let capturing = true;
   const loop = (async () => {
     while (capturing) {
       const t = Date.now() / 1000;
       const shot = await cdp
-        .send("Page.captureScreenshot", { format: "jpeg", quality: 90, optimizeForSpeed: true, clip: { x: 0, y: 0, width: 390, height: 700, scale: 2 } })
+        .send("Page.captureScreenshot", { format: "jpeg", quality: Number(process.env.REEL_JPEG ?? 90), optimizeForSpeed: true, clip: { x: 0, y: 0, width: 390, height: 700, scale } })
         .catch(() => null);
       if (!shot) continue;
       const file = `f${String(frames.length).padStart(5, "0")}.jpg`;
@@ -160,6 +162,23 @@ test("town", async ({ page }) => {
       document.head.append(s);
     });
   });
+  // A slow clock for the park run (`__reelWarp(0.5)`: the page's performance.now and its animation frames at half speed), so the
+  // screenshots catch twice the frames of it; scripts/encode-demo.sh plays it back at twice the speed. Back to 1 for the rest.
+  await page.addInitScript(() => {
+    const real = performance.now.bind(performance);
+    let base = real();
+    let virt = base;
+    let k = 1;
+    const map = (t: number) => virt + (t - base) * k;
+    performance.now = () => map(real());
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => raf((ts) => cb(map(ts)));
+    (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp = (n: number) => {
+      virt = map(real());
+      base = real();
+      k = n;
+    };
+  });
   await page.goto("/town?debug&nolanding&sky=day");
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await page.waitForTimeout(2500);
@@ -171,10 +190,13 @@ test("town", async ({ page }) => {
   };
   console.log("you start at", await you());
   const route = (process.env.REEL_PARK ?? "17,17 28,17 28,12 18,12 18,16").split(" ").map((p) => p.split(",").map(Number) as [number, number]);
+  const warp = (n: number) => page.evaluate((x) => (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp(x), n);
+  await warp(0.5);
   const rec = await recorder(page, "town");
   rec.mark("park");
   for (const sq of route) await walk(sq);
   rec.mark("parkEnd");
+  await warp(1);
   // Big Boy: the camera glides to his Crib (as his chip would), a tap on him, Challenge alone, Fight.
   await page.evaluate(() => (window as unknown as TownHooks).__townGlide?.("bigboy"));
   await page.waitForTimeout(1800);
@@ -298,13 +320,25 @@ test("hidden", async ({ page }) => {
   await rec.stop();
 });
 
-test("captions", async ({ page }) => {
-  // The captions: one see-through picture each, 600 px wide (the reel's width), in the game's pixel font.
-  mkdirSync(`${OUT}/captions`, { recursive: true });
-  await page.setViewportSize({ width: 300, height: 538 });
+test("ranks", async ({ page }) => {
+  // Scene 3's end: the run up the ranks (rank-shuffle.ts), from the game's own emblems and colors.
   await page.goto("/?nolanding");
   await page.waitForTimeout(800);
-  for (const [i, text] of [...REEL_CAPTIONS, HIDDEN_BOSS_CAPTION].entries()) {
+  const rec = await recorder(page, "ranks");
+  rec.mark("start");
+  await page.evaluate(drawRankShuffle, shuffleSteps());
+  await page.waitForTimeout(5500);
+  rec.mark("end");
+  await rec.stop();
+});
+
+test("captions", async ({ page }) => {
+  // The captions: one see-through picture each, 860 px wide (the reel's width: 344 CSS px at 2.5x), in the game's pixel font.
+  mkdirSync(`${OUT}/captions`, { recursive: true });
+  await page.setViewportSize({ width: 344, height: 600 });
+  await page.goto("/?nolanding");
+  await page.waitForTimeout(800);
+  for (const [i, text] of [...REEL_CAPTIONS, HIDDEN_BOSS_CAPTION, RANKS_CAPTION].entries()) {
     await page.evaluate((t) => {
       document.body.innerHTML = "";
       document.documentElement.style.background = "transparent";
@@ -312,7 +346,7 @@ test("captions", async ({ page }) => {
       const d = document.createElement("div");
       d.id = "cap";
       d.style.cssText =
-        "position:absolute;left:0;right:0;top:0;padding:10px 12px;font:12px/1.7 'Press Start 2P',monospace;text-align:center;color:#f4b740;" +
+        "position:absolute;left:0;right:0;top:0;padding:10px 12px;font:14px/1.7 'Press Start 2P',monospace;text-align:center;color:#f4b740;" +
         "text-shadow:2px 0 0 #1a1406,-2px 0 0 #1a1406,0 2px 0 #1a1406,0 -2px 0 #1a1406,2px 2px 0 #1a1406;" +
         "background:rgba(14,15,19,0.78);border-top:2px solid #f4b740;border-bottom:2px solid #f4b740;white-space:pre-line";
       d.textContent = t;
@@ -320,5 +354,34 @@ test("captions", async ({ page }) => {
     }, text);
     await page.evaluate(() => document.fonts.ready);
     await page.locator("#cap").screenshot({ path: `${OUT}/captions/c${i + 1}.png`, omitBackground: true });
+  }
+});
+
+test("landing", async ({ browser }) => {
+  // The landing page with the reel at its new size: phones 320, 390 and 430 wide, computers 1280 × 800, 1440 × 900 and 1920 × 1080.
+  // Stills to reports/demo/landing/, and the video's box and any sideways scroll, logged.
+  mkdirSync(`${OUT}/landing`, { recursive: true });
+  const sizes = [
+    { w: 320, h: 640, phone: true },
+    { w: 390, h: 844, phone: true },
+    { w: 430, h: 932, phone: true },
+    { w: 1280, h: 800, phone: false },
+    { w: 1440, h: 900, phone: false },
+    { w: 1920, h: 1080, phone: false },
+  ];
+  for (const s of sizes) {
+    const ctx = await browser.newContext({ viewport: { width: s.w, height: s.h }, deviceScaleFactor: s.phone ? 2 : 1, isMobile: s.phone, hasTouch: s.phone, colorScheme: "light" });
+    const page = await ctx.newPage();
+    // (The landing shows only where sign-in is set up: faked, as e2e/landing.spec.ts does.)
+    await page.route("**/api/auth/config", (r) => r.fulfill({ json: { accounts: true, google: true, email: true, onlineNeedsSignIn: true } }));
+    await page.goto("/");
+    const video = page.locator("video.demo-video");
+    await expect(video).toBeVisible();
+    await page.waitForTimeout(1500);
+    const box = (await video.boundingBox())!;
+    const scroll = await page.evaluate(() => document.documentElement.scrollWidth);
+    console.log(`${s.w}x${s.h}: video ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)} × ${Math.round(box.height)} (${Math.round((box.height / s.h) * 100)}% of the height); page ${scroll} wide`);
+    await page.screenshot({ path: `${OUT}/landing/landing-${s.w}x${s.h}.png` });
+    await ctx.close();
   }
 });

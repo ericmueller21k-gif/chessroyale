@@ -2,25 +2,28 @@
  * The landing reel's captions and its last scene: the Hidden Boss as pixel art (Eric, Nov 11: "an ominous figure aka hidden boss in
  * all black sitting on a stool in the iconic [brooding chess] pose"). A hooded silhouette, no face and no likeness of anyone: hunched
  * on a stool at a little table and its board, elbow on his knee, chin on his fist, under one bare bulb in the dark. Its loop: a breath
- * (his shoulders rise one pixel) and a glint of his eye. Drawn on a 156 × 280 grid, each pixel 5 × 5 on screen (the phone's top 700
- * CSS px at 2x, the part the reel shows).
+ * (his shoulders rise one pixel) and a glint of his eye. Drawn on a 156 × 280 grid, scaled to the phone's top 700 CSS px (the part the
+ * reel shows).
  */
 
 /** Scenes 1 to 3's captions (scene 2 has two: the park, then Big Boy). */
 export const REEL_CAPTIONS = ["50 players.\nOne board.", "Explore the town.", "Challenge bosses.\nUnlock gear.", "Climb the\nranked ladder."] as const;
 export const HIDDEN_BOSS_CAPTION = "…and the most powerful\nof them all.";
+/** Scene 3's second caption, over the run up the ranks (its top rank). */
+export const RANKS_CAPTION = "Become\nTranscendent.";
 
 /** Runs in the page (page.evaluate): self-contained, no imports. Replaces the page with the scene, animating until the page closes. */
 export function drawHiddenBoss() {
   const W = 156;
   const H = 280;
-  const PX = 5;
+  // Each art pixel on screen: the phone's top 700 CSS px at the page's pixel ratio.
+  const PX = (390 * devicePixelRatio) / W;
   document.body.innerHTML = "";
   document.body.style.cssText = "margin:0;background:#050507;overflow:hidden";
   const view = document.createElement("canvas");
-  view.width = W * PX;
-  view.height = H * PX;
-  view.style.cssText = `position:fixed;left:0;top:0;width:${(W * PX) / 2}px;height:${(H * PX) / 2}px;image-rendering:pixelated`;
+  view.width = Math.round(W * PX);
+  view.height = Math.round(H * PX);
+  view.style.cssText = `position:fixed;left:0;top:0;width:390px;height:700px;image-rendering:pixelated`;
   document.body.append(view);
   const out = view.getContext("2d")!;
   out.imageSmoothingEnabled = false;
@@ -218,7 +221,7 @@ export function drawHiddenBoss() {
       put(93, ey, GLOW);
     }
     ctx.putImageData(img, 0, 0);
-    out.drawImage(art, 0, 0, W * PX, H * PX);
+    out.drawImage(art, 0, 0, view.width, view.height);
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
