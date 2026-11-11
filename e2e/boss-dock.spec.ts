@@ -63,9 +63,13 @@ test("the row is exactly the board's width under its edges at every width; the G
     { name: "1280", viewport: { width: 1280, height: 800 }, phone: false, king: "corner" },
   ] as const;
   for (const s of sizes) {
-    const ctx = await browser.newContext(s.phone ? { ...devices["iPhone 13"], viewport: s.viewport } : { viewport: s.viewport });
+    // (A phone on its side is covered by the "turn upright" panel since Nov 11, so the battle is entered upright and the phone is
+    // turned after; the layout is measured the same.)
+    const upright = s.phone && s.viewport.width > s.viewport.height ? { width: 390, height: 664 } : s.viewport;
+    const ctx = await browser.newContext(s.phone ? { ...devices["iPhone 13"], viewport: upright } : { viewport: s.viewport });
     const page = await ctx.newPage();
     await intoBattle(page);
+    if (upright !== s.viewport) await page.setViewportSize(s.viewport);
     const b = await boxes(page);
     expect(b.board && b.row && b.status && b.clock && b.king, s.name).toBeTruthy();
     // The row's edges are the board's, within a pixel.

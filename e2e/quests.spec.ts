@@ -233,13 +233,13 @@ test.describe("quest progress back on home (Nov 10)", () => {
   });
 });
 
-test("a 320 px phone's top bar: the logo, your pawn, Quests, the shop, Friends and the gear in one row, every button 40 px", { tag: "@phone-only" }, async ({ page }, testInfo) => {
+test("a 320 px phone's top bar: the logo, the chat, Quests, the shop, Friends and the gear in one row, every button 40 px", { tag: "@phone-only" }, async ({ page }, testInfo) => {
   test.skip(testInfo.project.name === "desktop", "the phone's top bar");
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto("/");
   await expect(entry(page)).toBeEnabled({ timeout: 20_000 });
   const bar = page.locator(".fd-top");
-  for (const name of ["Your profile", "Quests", "Shop & crates", "Friends", "Settings"]) {
+  for (const name of ["Chat", "Quests", "Shop & crates", "Friends", "Settings"]) {
     const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
     expect(Math.min(b.width, b.height), name).toBeGreaterThanOrEqual(40);
   }

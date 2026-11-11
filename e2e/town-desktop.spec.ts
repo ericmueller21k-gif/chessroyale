@@ -75,7 +75,7 @@ for (const [w, h] of [[1280, 800], [1440, 900], [1920, 1080]] as const) {
     expect(Math.abs(mid((await box(page, ".rc-slot .rc-h"))!) - mid(slot)), "TOWN centered").toBeLessThanOrEqual(1);
     expect(t.chatBtn[0] + t.chatBtn[2], "the chat icon, then the gear").toBeLessThanOrEqual(t.gear[0] + 1);
     nearBox(t.canvas, t.screen, 1, "the world fills the whole box");
-    expect(await page.getByRole("button", { name: "Your profile", exact: true }).isVisible(), "no profile button on the town page").toBe(false);
+    expect(await page.getByRole("button", { name: "View profile", exact: true }).isVisible(), "no profile button on the town page").toBe(false);
     // The buttons keep their corner of the box; the chat box keeps the world's top left corner.
     expect(Math.abs(t.screen[0] + t.screen[2] - 14 - (t.focus[0] + t.focus[2])), "the focus button 14 px from the box's right").toBeLessThanOrEqual(1);
     expect(Math.abs(t.screen[1] + t.screen[3] - 14 - (t.focus[1] + t.focus[3])), "and 14 px from its foot").toBeLessThanOrEqual(1);

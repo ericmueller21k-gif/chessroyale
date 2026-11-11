@@ -40,6 +40,13 @@ watchErrors();
 // A chunk of an older version gone after a deploy (opening the town square): the page loads again (stale.ts).
 watchStaleChunks();
 setUpInstall();
+// A phone is upright (Eric, Nov 11): where the browser allows a lock (an installed app, or full screen) it is locked to portrait. Elsewhere
+// index.html's panel covers a phone held sideways. Refused or unsupported (a computer): nothing happens.
+try {
+  (screen.orientation as ScreenOrientation & { lock?: (o: "portrait") => Promise<void> }).lock?.("portrait")?.catch(() => {});
+} catch {
+  /* Not supported here. */
+}
 // Light or dark: the page already shows the right one (index.html's script); from here on it follows the device
 // while nothing is picked.
 watchTheme();

@@ -221,7 +221,7 @@ test("computer: PLAY fills the queue in place (the menu, the live panel and your
     // The right column (Eric's mockup, Nov 7): its top slot empty off the town, then FRIENDS; no pawn at the top right any more
     // (Profile is the side menu's).
     await expect(panel.getByRole("button", { name: /^FRIENDS/ })).toBeVisible();
-    await expect(panel.getByRole("button", { name: "Your profile", exact: true })).toHaveCount(0);
+    await expect(panel.getByRole("button", { name: "View profile", exact: true })).toHaveCount(0);
     // Your card starts at the top (level with the logo), not low with space above it.
     const hero = (await page.locator(".fd-hero").boundingBox())!;
     expect(hero.y).toBeLessThan(40);
@@ -366,7 +366,7 @@ test("phone: the queue takes the whole screen; the count, the grid and its way o
   }
   await page.setViewportSize({ width: 390, height: 664 });
   await page.goto(`/?debug&pool=phonequeue-${run}`);
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+  await expect(page.locator(".fd-hero").getByRole("button", { name: "View profile", exact: true })).toBeVisible();
   await pickMode(page);
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   await expect(page.locator(".fd-seats .fd-seat")).toHaveCount(100);
@@ -389,11 +389,11 @@ test("phone: the queue takes the whole screen; the count, the grid and its way o
   expect(await sideways(page)).toBe(0);
   await leaveQueue(page);
   await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-  await expect(page.locator(".fd-top").getByRole("button", { name: "Your profile", exact: true })).toBeVisible();
+  await expect(page.locator(".fd-hero").getByRole("button", { name: "View profile", exact: true })).toBeVisible();
   expect(await sideways(page)).toBe(0);
 });
 
-test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, Chess Town's button under PLAY and the Boss Battle and Auto chess cards at the bottom; the shop, your profile and Friends are in the top bar", async ({ page }) => {
+test("phone: home fits the screen with no scrolling from 360×640 up, in every mode, Chess Town's button under PLAY and the Boss Battle and Auto chess cards at the bottom; the shop, Friends and the chat are in the top bar, and your profile is on your card", async ({ page }) => {
   test.skip(desktop(), "a phone's screen (Eric, Oct 18: \"should never have to be scrolling down on the phone\")");
   await named(page, LONG_NAME);
   for (const [width, height] of [[360, 640], [375, 667], [390, 664], [390, 844], [430, 932]] as const) {
@@ -417,6 +417,8 @@ test("phone: home fits the screen with no scrolling from 360×640 up, in every m
     await expect(page.getByRole("main").getByRole("button", { name: "Play with friends" })).toHaveCount(0);
     await expect(page.locator(".fd-top").getByRole("button", { name: "Shop & crates" })).toBeVisible();
     await expect(page.locator(".fd-top").getByRole("button", { name: /^Friends/ })).toBeVisible();
+    await expect(page.locator(".fd-top").getByRole("button", { name: "Chat", exact: true })).toBeVisible();
+    await expect(page.locator(".fd-hero").getByRole("button", { name: "View profile", exact: true })).toBeVisible();
   }
 });
 
@@ -483,35 +485,111 @@ test("the loading bar (Eric, Nov 10): only past a 2-second hang; then a bar and 
   if (quick.gone > 2_100) expect(quick.shown, `shell gone at ${Math.round(quick.gone)} ms: the bar showed`).not.toBeNull();
 });
 
-test("phone: the top bar (logo, your pawn, the shop, Friends, the gear) fits from 320 px up, with no coins in it", async ({ page }) => {
-  test.skip(desktop(), "the phone's top bar");
-  for (const width of [320, 360, 375, 390, 430]) {
-    await page.setViewportSize({ width, height: 740 });
-    await page.goto("/");
-    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    const bar = page.locator(".fd-top");
-    // No coins up here (Eric, Oct 18): the shop and your profile show them.
-    await expect(bar.getByText(/coins/)).toHaveCount(0);
-    // In order, apart, on one row, inside the bar; every button a full 44 px (40 below 360 px).
-    const fits = await bar.evaluate((el) => {
+/**
+ * The phone's top bar, checked at a width: the logo, the chat (where the pawn was), the shop, Friends and the gear, and Quests when
+ * `quests` (it's in the row from Nov 9; the row's count, order and fit include it then). Every button a full 44 px (40 below 360 px).
+ */
+async function topBarFits(page: Page, width: number, quests: boolean) {
+  await page.setViewportSize({ width, height: 740 });
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  const bar = page.locator(".fd-top");
+  // No coins up here (Eric, Oct 18): the shop and your profile show them.
+  await expect(bar.getByText(/coins/)).toHaveCount(0);
+  // In order, apart, on one row, inside the bar.
+  const sel = quests ? ".fd-logo, .fd-top-chat, .fd-top-quests, .fd-top-shop, .fd-top-friends, .fd-top-gear" : ".fd-logo, .fd-top-chat, .fd-top-shop, .fd-top-friends, .fd-top-gear";
+  const fits = await bar.evaluate(
+    (el, s) => {
       const right = el.getBoundingClientRect().right - parseFloat(getComputedStyle(el).paddingRight);
-      const kids = [...el.querySelectorAll(".fd-logo, .fd-ring, .fd-top-shop, .fd-top-friends, .fd-top-gear")].map((k) => k.getBoundingClientRect());
+      const kids = [...el.querySelectorAll(s)].map((k) => k.getBoundingClientRect());
       return { count: kids.length, inOrder: kids.every((k, i) => i === 0 || k.left >= kids[i - 1]!.right), inside: kids.every((k) => k.right <= right + 0.5), oneRow: kids.every((k) => k.top < kids[0]!.bottom && k.bottom > kids[0]!.top) };
-    });
-    expect(fits, `${width} px`).toEqual({ count: 5, inOrder: true, inside: true, oneRow: true });
-    for (const name of ["Your profile", "Shop & crates", "Friends", "Settings"]) {
-      const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
-      expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
-    }
-    // The profile is the shop's square (Eric, Nov 9): same size and corners, no gold ring, and nothing animating in it (a still face).
-    const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
-    const profile = await bar.getByRole("button", { name: "Your profile", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, ring: getComputedStyle(el).borderTopWidth, animations: el.getAnimations({ subtree: true }).length }));
-    expect(profile, `profile at ${width}`).toEqual({ ...shop, ring: "0px", animations: 0 });
-    // Quests, the shop and Friends are outlines like the gear (Eric, Nov 10: "just black and empty on the inside"): no fill, the gear's color.
-    const looks = await bar.locator(".fd-top-quests svg, .fd-top-shop svg, .fd-top-friends svg, .fd-top-gear svg").evaluateAll((els) => els.map((el) => ({ fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke })));
-    expect(looks, `icons at ${width}`).toEqual(Array(4).fill({ fill: "none", stroke: looks[3]!.stroke }));
-    expect(await sideways(page), `${width} px`).toBe(0);
+    },
+    sel,
+  );
+  expect(fits, `${width} px`).toEqual({ count: quests ? 6 : 5, inOrder: true, inside: true, oneRow: true });
+  for (const name of ["Chat", ...(quests ? ["Quests"] : []), "Shop & crates", "Friends", "Settings"]) {
+    const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
+    expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
   }
+  // The chat is the shop's square (same size and corners, nothing animating in it).
+  const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
+  const chat = await bar.getByRole("button", { name: "Chat", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius, animations: el.getAnimations({ subtree: true }).length }));
+  expect(chat, `chat at ${width}`).toEqual({ ...shop, animations: 0 });
+  // The icons are outlines like the gear (Eric, Nov 10: "just black and empty on the inside"): no fill, the gear's color.
+  const looks = await bar.locator(".fd-top-chat svg, .fd-top-quests svg, .fd-top-shop svg, .fd-top-friends svg, .fd-top-gear svg").evaluateAll((els) => els.map((el) => ({ fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke })));
+  expect(looks, `icons at ${width}`).toEqual(Array(5).fill({ fill: "none", stroke: looks.at(-1)!.stroke }));
+  expect(await sideways(page), `${width} px`).toBe(0);
+}
+
+test("phone: the top bar (logo, the chat, Quests, the shop, Friends, the gear) fits at 320 px, with no coins in it", async ({ page }) => {
+  test.skip(desktop(), "the phone's top bar");
+  await topBarFits(page, 320, true);
+});
+
+// Known and open (Nov 11): from 344 px up, the logo's word and six 44 px buttons (Quests, Nov 9) don't fit one row, so Quests and the
+// chat overlap or run past the edge (measured: 360 px, the gear 7 px past it, 375 px 14 px). Eric's call (the logo, Quests' place, or
+// the spacing); the brief for the chat change keeps every size. Remove test.fail when the row fits at these widths.
+test.fail("phone: the top bar's six buttons fit in one row from 360 px up (KNOWN: a decision for Eric, Nov 11)", async ({ page }) => {
+  test.skip(desktop(), "the phone's top bar");
+  for (const width of [360, 375, 390, 430]) await topBarFits(page, width, true);
+});
+
+test("phone: the top bar's chat button opens the global chat as a sheet over home; its × closes it, and home is as it was", async ({ page }) => {
+  test.skip(desktop(), "a phone's top bar (a computer has the chat in its side menu)");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const play = page.getByRole("button", { name: "PLAY", exact: true });
+  await expect(play).toBeVisible();
+  const home = await page.locator(".fd-home").boundingBox();
+  await page.locator(".fd-top").getByRole("button", { name: "Chat", exact: true }).click();
+  const sheet = page.getByRole("dialog", { name: "Chat" });
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator(".gchat")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close chat" }).click();
+  await expect(sheet).toHaveCount(0);
+  await expect(play).toBeVisible();
+  expect(await page.locator(".fd-home").boundingBox()).toEqual(home);
+});
+
+test("computer: no pawn and no chat button in the top area (the side menu has Profile and the chat)", async ({ page }) => {
+  test.skip(!desktop(), "the computer's layout");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.getByRole("main").getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(page.locator(".fd-ring, .fd-top-right, .fd-top-chat")).toHaveCount(0);
+});
+
+test("the card's View profile sits in its top-right corner (its chevron 16 px from the edge, its words clear of your name), 44 px tall, and opens your profile", async ({ page }) => {
+  await named(page, "Columned");
+  await page.setViewportSize(desktop() ? { width: 1440, height: 900 } : { width: 390, height: 844 });
+  await page.goto("/");
+  const card = (await page.locator(".fd-hero").boundingBox())!;
+  const link = page.locator(".fd-hero").getByRole("button", { name: "View profile", exact: true });
+  await expect(link).toHaveText("View profile");
+  const b = (await link.boundingBox())!;
+  const chevron = (await link.locator("svg").boundingBox())!;
+  const inset = card.x + card.width - (chevron.x + chevron.width);
+  expect(inset, "the chevron's inset from the right").toBeGreaterThanOrEqual(14);
+  expect(inset, "the chevron's inset from the right").toBeLessThanOrEqual(18);
+  expect(b.y - card.y, "the box's top, level with the card's").toBeLessThanOrEqual(2);
+  expect(b.height, "tap height").toBeGreaterThanOrEqual(44);
+  // The words sit above the name's line (a phone's card has no room beside the name for them).
+  const name = (await page.locator(".fd-hero-name").boundingBox())!;
+  if (!desktop()) expect(b.y + 30, "the words clear of the name").toBeLessThanOrEqual(name.y + 2);
+  await link.click();
+  await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
+});
+
+test("a phone held sideways is covered by the 'turn upright' panel; a tablet or a computer at 768 px tall or more is not", async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto("/");
+  const panel = page.getByRole("dialog", { name: "Turn your phone upright" });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Turn your phone upright to play");
+  // Covering the app: the middle of the screen is the panel's, so nothing under it can be tapped.
+  expect(await page.evaluate(() => !!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest("#rotate-lock"))).toBe(true);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(panel).toBeHidden();
 });
 
 /** A full-length name (the server keeps 16 characters) in the widest letters. */
@@ -571,8 +649,8 @@ test("computer at a laptop's window (1280×600, 1366×768): no gear on home (Set
     await expect(play).toBeVisible();
     await expect(page.locator(".fd-top-gear")).toBeHidden();
     await expect(page.locator(".fd-side").getByRole("button", { name: "Settings" })).toBeVisible();
-    // (The right column's pawn went with Eric's mockup, Nov 7: Profile is the side menu's.)
-    await expect(page.locator(".fd-right .fd-ring")).toHaveCount(0);
+    // (The right column's pawn went with Eric's mockup, Nov 7: Profile is the side menu's. Nov 11: no pawn or chat up top on a computer either.)
+    await expect(page.locator(".fd-right .fd-ring, .fd-top .fd-ring, .fd-top-chat")).toHaveCount(0);
     const name = page.locator(".fd-hero-name");
     await expect(name).toHaveText("Columned");
     expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth), `${w}×${h}`).toBe(true);

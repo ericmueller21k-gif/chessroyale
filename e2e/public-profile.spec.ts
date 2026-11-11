@@ -662,8 +662,8 @@ test("your own page: from your pawn, today's profile with View public profile at
   await page.goto("/");
   await expect(page.locator(".fd-hero-name")).toHaveText("Eric");
   const id = await page.evaluate(() => fetch("/api/me").then((r) => r.json()).then((p) => p.user.id as string));
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   // Today's profile, unchanged but for one line at its top.
   await expect(page.getByRole("heading", { name: "Eric", level: 1 })).toBeVisible();
   const view = page.getByRole("button", { name: "View public profile" });
@@ -705,7 +705,7 @@ test("an admin's ?rank= shows on their own public page, as on their profile", { 
   await named(page, "Rank Admin");
   await page.goto("/?rank=gold-3");
   await expect(page.locator(".fd-hero-name")).toHaveText("Rank Admin");
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "View public profile" }).click();
   await expect(page.locator(".pp-tier")).toHaveText("Gold 3");
   await expect(page.locator('.pp-ranked [data-emblem="gold-d3"]')).toHaveCount(1);
