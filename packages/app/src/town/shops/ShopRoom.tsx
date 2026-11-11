@@ -224,6 +224,8 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
           "crew-e": { ch: c.NPC_ZEBRA_CREW_E, anims: CREW },
         },
         scene: "zebra-back" as const,
+        // (Don Dough's challenge, at his table: he at its head, you at its foot.)
+        marks: { boss: m.SHOP_ZEBRA_BACK_MARKS.boss, you: m.SHOP_ZEBRA_BACK_MARKS.you },
         dim: SHOP_FEEL.zebra.dim,
         outside: "#2a1d14",
         fixCam: { x: m.SHOP_ZEBRA_BACK_MARKS.table[0] - m.SHOP_ZEBRA_BACK_CAM.west, y: m.SHOP_ZEBRA_BACK_MARKS.table[1] + m.SHOP_ZEBRA_BACK_CAM.south },
@@ -1953,7 +1955,8 @@ function startRoom(
   const clips: SceneClips = pf ? Object.fromEntries(Object.entries(pf).map(([k, a]) => [k, Object.fromEntries(Object.entries(a).map(([n, x]) => [n, { ms: x.ms, loop: x.loop }]))])) : {};
   const sceneT0 = performance.now();
   const front = art.scene === "zebra-front" ? new FrontScene(clips, Math.random, sceneT0) : null;
-  const backScene = art.scene === "zebra-back" ? new BackScene(clips, sceneT0) : null;
+  // (In his challenge the crew stand easy, as after the talk beat, and he's the intro's: drawn from its cast, not here.)
+  const backScene = art.scene === "zebra-back" ? new BackScene(clips, sceneT0, 0, !!ci) : null;
   const sceneFigs: SceneFig[] = [];
   let say: SceneSay | null = null;
   let beat: BeatStep | null = null;
@@ -1967,7 +1970,7 @@ function startRoom(
       const near = ZEBRA_GUARDS.some((q) => Math.abs(h.c - q.at[0]) <= 2 && Math.abs(h.r - q.at[1]) <= 2) || onPass(room, h.c, h.r);
       front.step(now, near);
       say = front.saying();
-    } else if (backScene) {
+    } else if (backScene && !ci) {
       const was = beat;
       beat = backScene.step(now);
       if (!told && (beat === "challenge" || beat === "done")) {
@@ -1988,7 +1991,7 @@ function startRoom(
     if (front) {
       you.pose(now, pose);
       front.figs(now, pose.x, pose.y, sceneFigs);
-    } else if (backScene) backScene.figs(now, sceneFigs);
+    } else if (backScene) backScene.figs(now, sceneFigs, !ci);
     for (const p of sceneFigs) {
       if (crewN >= CREW_MAX) return;
       const an = pf[p.name]?.[p.anim];

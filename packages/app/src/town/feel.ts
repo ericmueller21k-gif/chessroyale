@@ -487,7 +487,8 @@ export const TOWN_FEEL = {
    * Some bosses smaller than that in the town square, by their home's id (Eric, Oct 26: "Sawyer the raccoon and the pig
    * are massive. And the chameleon … about 65% or three-fourths"; Puddles and Jefferson are the right size).
    */
-  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7 } as Readonly<Record<string, number>>,
+  // (Don Dough has no town figure: his intro draws his art 1:1 at the room's 37 px a square, 104 / 37 / 3 of bossSquares.)
+  bossScale: { sawyer: 0.7, pig: 0.7, smudgy: 0.7, zebra: 0.94 } as Readonly<Record<string, number>>,
   /** A bot's pawn. */
   botSquares: 1.25,
   /**

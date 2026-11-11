@@ -20,7 +20,7 @@ const others = ALL_HOMES.filter((h) => h.id !== "dash");
 describe("an admin's town: Dash's Kicks (Nov 3)", () => {
   it("has every home, the store among them, beside Timber's lodge in the west", () => {
     expect(HOMES).toEqual(ALL_HOMES);
-    expect(HOMES).toHaveLength(16);
+    expect(HOMES).toHaveLength(17);
     expect(kicks).toMatchObject({ boss: "Dash", name: "Dash's Kicks", cx: 4, cy: 34, half: 1.5, foot: 0.5 });
   });
 

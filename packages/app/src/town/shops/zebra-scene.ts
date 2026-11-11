@@ -136,8 +136,8 @@ export class BackScene {
   private ex = 0;
   private li = 0;
   private lineAt: number;
-  /** When the talk beat began (-1: not yet). */
-  private beatAt = -1;
+  /** When the talk beat began (null: not yet). */
+  private beatAt: number | null = null;
   /** Its moments (ms from its start), from the art's frames. */
   private readonly T: { up: number; drawn: number; line: number; relax: number; lower: number; lowered: number; challenge: number; end: number };
   constructor(
@@ -145,6 +145,8 @@ export class BackScene {
     now = 0,
     /** Where the chatter starts (an exchange's index): a test plays one from the top. */
     start = 0,
+    /** As after the talk beat from the start (his challenge: the crew standing easy, no chatter). */
+    after = false,
   ) {
     this.ex = start % ZEBRA_CHATTER.length;
     this.lineAt = now + SHOP_FEEL.zebra.firstMs;
@@ -159,18 +161,19 @@ export class BackScene {
     const challenge = Math.max(relax + lineMs(ZEBRA_TALK.relax.text), lowered) + Z.gapMs;
     const end = challenge + lineMs(ZEBRA_TALK.challenge.text);
     this.T = { up, drawn, line, relax, lower, lowered, challenge, end };
+    if (after) this.beatAt = now - end;
   }
   /** The talk beat has started (and the chatter stopped for good). */
   talking(): boolean {
-    return this.beatAt >= 0;
+    return this.beatAt !== null;
   }
   /** Talk to him: the beat starts now (once a visit). */
   talk(now: number): void {
-    if (this.beatAt < 0) this.beatAt = now;
+    if (this.beatAt === null) this.beatAt = now;
   }
   /** Where the beat is `now`, or null: not started. */
   step(now: number): BeatStep | null {
-    if (this.beatAt < 0) {
+    if (this.beatAt === null) {
       this.stepChatter(now);
       return null;
     }
@@ -203,7 +206,7 @@ export class BackScene {
   }
   /** Who's saying what now: a chatter line while it's up, the beat's lines in it; null between lines. */
   saying(now: number): SceneSay | null {
-    if (this.beatAt >= 0) {
+    if (this.beatAt !== null) {
       const t = now - this.beatAt;
       const T = this.T;
       const on = (at: number, text: string) => t >= at && t < at + lineMs(text);
@@ -215,13 +218,13 @@ export class BackScene {
     const l = ZEBRA_CHATTER[this.ex]![this.li]!;
     return now >= this.lineAt && now < this.lineAt + lineMs(l.text) ? { who: l.who, text: l.text } : null;
   }
-  /** Don and the crew this frame. Into `out` (cleared). */
-  figs(now: number, out: SceneFig[]): SceneFig[] {
+  /** Don (unless `don` is false: his challenge draws him) and the crew this frame. Into `out` (cleared). */
+  figs(now: number, out: SceneFig[], don = true): SceneFig[] {
     out.length = 0;
     const say = this.saying(now);
     const fig = (p: { readonly name: string; readonly at: readonly [number, number] }, anim: string, t: number, flip: boolean) =>
-      out.push({ name: p.name, anim, frame: clipFrame(this.clips[p.name]?.[anim], t), c: p.at[0], r: p.at[1], flip });
-    if (this.beatAt < 0) {
+      (don || p.name !== "don") && out.push({ name: p.name, anim, frame: clipFrame(this.clips[p.name]?.[anim], t), c: p.at[0], r: p.at[1], flip });
+    if (this.beatAt === null) {
       // The chatter: the speaker on his loop (a crew member arguing or talking; Don scoffing or talking), the rest listening.
       const l = ZEBRA_CHATTER[this.ex]![this.li]!;
       const t = now - this.lineAt;
