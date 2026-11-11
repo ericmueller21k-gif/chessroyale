@@ -15,6 +15,18 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   `e2e/formats.spec.ts` (after a Last Stand); frames: `node scripts/frames-boss-result.mjs <dir> <boss> <win|loss|draw|resign> [width]`.
   XP's rules and storage: [accounts.md](accounts.md), "XP and levels".
 
+- **Music** (Eric, Nov 11; [2026-11-11-boss-music.md](../decisions/2026-11-11-boss-music.md); `packages/app/src/music.ts`): a boss with a
+  theme in `packages/app/public/music/themes.json` (Jefferson, `grex`, so far) has it played from the battle's start (the intro's end,
+  "START!" done) until it's decided (`boss.result`; then a 1.5 s fade, `MUSIC.endFadeMs`, and nothing on the result screen); solo,
+  raids, online and the Crowd's boss final alike, one check in `App.tsx` (`musicBattle` → `bossMusic`). The intro once at t0, the
+  loop from t0 + `introSeconds`, from `pad`, looping between `pad` and `pad + loopSeconds` (`musicPlan`), Web Audio only, on its own
+  gain into sound.ts's master (`musicBus`) at `MUSIC.volume` (0.25: about 7 dB under the boss sounds). Fetched (MP3 only) when the battle
+  is picked, never at app start, not precached, kept for the visit; late, it starts when it arrives. **Music** in Settings → Sound and
+  the match's options (on by default, per device, `brc.music`; greyed while Sound is off, which silences it too): off, or the page
+  hidden, fades it out in 0.3 s (`MUSIC.fadeMs`) with the loop running on, so on again picks it up where it is. A boss with no theme
+  plays nothing. **Adding a boss's theme:** its `.mp3` pieces from the handoff (`boss-music/` on `stills/trailer-v2`) into
+  `public/music/`, its entry into `themes.json` (lengths from there, never from code); no code change (`public/music/README.md`).
+  Tests: `packages/app/test/music.test.ts`, `e2e/grex.spec.ts` ("Jefferson's music").
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
   lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo
@@ -863,7 +875,7 @@ sheet's words in `PROMOTION_OPT_OUT` (`boss-kit-lib.ts`), with the decision file
 `BOSS_POWERS` in `packages/core/src/settings.ts` (every power's numbers, Alfil's `tusks*` and `slam*`, Chub & Chirp's `hopMax`, `hopNodes` and `carrot*`, Smudgy's `camo*` and `repaint*`, Moo & Moon's `moonbeam*` (`moonbeamTarget` among them), `fullMoonMoves` and `flurryBeams`, the circus tiger's `balloon*` (`balloonStages`, `balloonStageSec`, `balloonOdds`, `balloonPops`, `balloonLandsInRow`, `balloonColors`, `balloonBands`, `balloonLooks`, `balloonNodes`) and `hoops*` (`hoopsCount`, `hoopsCrowdMoves`, `hoopsBand`, `hoopsTarget`, `hoopsLooks`, `hoopsNodes`, `hoopsTimeMs`), the hippo gardener's `seed*`, `waterOdds`, `plantTurns`, `waterBand`, `waterTarget`, `jackpotMax`, `waterLooks`, `waterNodes`, `waterBudget` and `waterTimeMs` among them, Folio's `draft*`, `foldTurns`, `crease*` and `revision*`; the meter: `rageFull`, `ragePerMove`,
 `rageAheadMax`, `rageAheadFull`, `ragePerMaterial`, `rageStrike`, `rageSpeed` by boss), `SAWYER_LOOKS` (how his split
 looks), the `boss*` keys of `Settings`,
-`BOSS_DIFFICULTY`, `HAPTICS` (the boss moments' buzzes: `patterns` and `cues`), `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
+`BOSS_DIFFICULTY`, `HAPTICS` (the boss moments' buzzes: `patterns` and `cues`), `MUSIC` (the battle music's volume and fades), `BOSS_BRAIN` (every boss's brain, Maia's rating and the crowd's margin, the bridge band, its
 sampling, the guards, `forPlayers`), `BOSS_TIERS` and each boss's `offset` in `boss.ts`.
 
 ## Tests and tools
