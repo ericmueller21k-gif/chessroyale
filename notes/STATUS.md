@@ -1,3 +1,4 @@
+- #635 CI run 42974022516 done, red: phone lobby tests lobby-chat:238, votes:322, crowd:136, chat-mod:18, opening-vote:149 (all window.match missing after the private lobby); desktop shop:1480 (known flake). Waiting on reviewer, then one xhigh fix helper.
 - Nov 11 07:00: Eric: trailer notes in notes/trailer.md (not now). Laptop (Dell, Chrome) has the same town fps issues (loading in, turning): run ?report there too once #636 is live; fixes should be shared.
 - #635 CI red (real): chat-mod.spec:18 and opening-vote.spec:149 -> window.match never set after createLobbyFromHome on phones (Friends top-bar -> Private lobby). Likely the new /friends page navigation drops the ?debug... query (main kept it: overlay, no URL change; see search.ts awaySearch). Fix round after the reviewer reports (fix is xhigh: wait, Opus count).
 - main red x2 (05:22 0aaef64, 04:54 20bf928) from retry-pass flakes: shop.spec:1480, timber.spec:79 (new), panel.spec:82 (new). Add to flaky batch.
