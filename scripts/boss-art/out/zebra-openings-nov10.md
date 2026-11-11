@@ -56,6 +56,7 @@ worse") is checked with chess.js or Stockfish 19 (3,000,000 nodes). Lines with n
 | --- | --- |
 | The warning (the beat before) | Time to get fancy. |
 | The cast | Gold plated. Pawns, hooves off the lady. |
+| The close (Eric: the moment ends on how your pawns are worthless against her; one of these at random) | Your pawns? Worthless now. Cute, but worthless. / Go ahead, throw a pawn at her. I'll wait. / Pawns versus gold? That's not a trade, that's a joke. / Every pawn you've got, and not one can touch her. / Your pawns just became decoration, kid. / Solid gold. Your pawns can look, not touch. |
 | A pawn bounces off her | Ha! Pawns can't touch gold. / Boing. Try a bigger piece, kid. / That's real gold, pal. Not for pawns. |
 
 (Only the rule is claimed: pawns can't capture her. If the director's calls hold (no queen: his strongest piece; a second cast gilds the
