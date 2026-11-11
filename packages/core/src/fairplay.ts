@@ -154,22 +154,28 @@ export function honestChance(crowd: number, found: number, rating: number, model
 /**
  * One counted pick's evidence: the log-likelihood that an engine user made it rather than an honest player of strength
  * `rating`.
- *   - Checked by the deep re-check: was the pick its best, one of its next two, or neither? An honest player's chances
- *     come from the crowd in that position (how many of them picked its best, its top 3: honestChance), an engine
- *     user's are cheatDeep (its own engine can differ from ours, so its pick is sometimes our second or third).
+ *   - Checked by the deep re-check: was the pick at or near its best (nearBest, within `near` points: Nov 11), one of its top 3,
+ *     or neither? An honest player's chances come from the crowd in that position (how many of them picked the near-best moves
+ *     known, its top 3: honestChance), an engine user's are cheatDeep (its own engine can differ from ours, so its pick is
+ *     sometimes our second or third).
  *   - Not checked: was the pick within foundLoss of the judges' best? An engine user does that at least cheatFind of
  *     the time.
- * A best move the crowd missed is strong evidence; a pick outside the engine's top 3 counts strongly the other way.
+ * A best move the crowd missed is strong evidence; a pick outside the engine's top 3 and not near its best counts strongly the
+ * other way.
  */
-export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.signals): { outcome: number; honest: number[]; evidence: number } {
+export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.signals, near: number = FAIRPLAY.deep.nearBestLoss): { outcome: number; honest: number[]; evidence: number } {
   const clampP = (p: number) => Math.min(0.98, Math.max(0.02, p));
   if (m.deep) {
     const top = m.deep.top ?? [m.deep.best];
-    const outcome = m.deep.rank === 1 ? 0 : m.deep.rank <= 3 ? 1 : 2;
+    const hit = nearBest(m.deep, near);
+    const outcome = hit ? 0 : m.deep.rank <= 3 ? 1 : 2;
     // (Older records without the crowd's picks: its count for the judges' best stands in for that move.)
     const count = (x: string) => (m.picks ? (m.picks[x] ?? 0) : x === m.best ? m.crowdFound : 0);
     const share = (moves: readonly string[]) => Math.min(m.crowd, moves.reduce((t, x) => t + count(x), 0));
-    const p1 = clampP(honestChance(m.crowd, share(top.slice(0, 1)), rating, s.findDeep, s.soloDeep, s));
+    // The near-best moves known: the search's best, and the pick when it's near it (the other moves' losses aren't kept). An honest
+    // player's chance of a near-best pick is read from the crowd's picks of those.
+    const best = hit && m.move !== top[0] ? [top[0]!, m.move] : top.slice(0, 1);
+    const p1 = clampP(honestChance(m.crowd, share(best), rating, s.findDeep, s.soloDeep, s));
     const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(top.slice(0, 3)), rating, s.findDeep3, s.soloDeep3, s)));
     const honest = [p1, p3 - p1, Math.max(0.01, 1 - p3)];
     // An engine user finds our best at least as often as an honest player would; its other chances keep their shape.
@@ -294,7 +300,7 @@ export function matchSignals(
       awayMoves++;
       if (f) awayFound++;
     }
-    evidence += moveEvidence(m, strength, s).evidence;
+    evidence += moveEvidence(m, strength, s, near).evidence;
     const rate = crowdRate(m, s);
     if (rate === null) continue;
     // (A premove's time measures no thinking: it's left out of timing, and counts for everything else.)

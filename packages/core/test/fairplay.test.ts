@@ -6,6 +6,7 @@ import {
   moveEvidence,
   matchPerf,
   matchSignals,
+  nearBest,
   playerLevel,
   ratingForLoss,
   referenceStrength,
@@ -193,6 +194,22 @@ describe("signals", () => {
     // Like a strong player (the engine's best a third of the time, often outside its top 3): evidence the other way.
     const human = moves.map((x, i) => ({ ...x, deep: { ...x.deep!, rank: i % 3 === 0 ? 1 : 5, loss: i % 3 === 0 ? 0 : 6 } }));
     expect(matchSignals(human, null).evidence).toBeLessThan(-5);
+  });
+
+  it("near the engine's best (Eric, Nov 11): a deep match is rank 1 or within nearBestLoss by the deep search's numbers; deepExact counts rank 1 alone", () => {
+    const near = FAIRPLAY.deep.nearBestLoss;
+    expect(near).toBe(1);
+    expect(nearBest({ rank: 1, loss: 0 })).toBe(true);
+    expect(nearBest({ rank: 3, loss: near })).toBe(true);
+    expect(nearBest({ rank: 2, loss: near + 0.01 })).toBe(false);
+    const top = ["e2e4", "d2d4", "g1f3"];
+    const moves = Array.from({ length: 12 }, (_, i) =>
+      mv({ ply: 14 + 2 * i, loss: 0.5, crowdFound: 12, picks: { e2e4: 12, d2d4: 15 }, deep: i < 6 ? { best: "e2e4", rank: 1, loss: 0, top } : { best: "e2e4", rank: 2, loss: i < 10 ? near : near + 1, top } }),
+    );
+    const s = matchSignals(moves, null);
+    expect([s.deepChecked, s.deepMatch, s.deepExact]).toEqual([12, 10, 6]);
+    // (At 0, the exact count, as before Nov 11.)
+    expect(matchSignals(moves, null, FAIRPLAY.signals, FAIRPLAY.score, 0).deepMatch).toBe(6);
   });
 
   it("reference strength: the median of 3+ recent match strengths, else the rating", () => {

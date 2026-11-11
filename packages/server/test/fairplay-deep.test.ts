@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { legalMoves, stockfishRefuses } from "@chessroyale/chess";
-import { FAIRPLAY, type FairMove } from "@chessroyale/core";
+import { FAIRPLAY, matchSignals, type FairMove } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { caseOf, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
-import { deepCheckRun, deepResult, offPeak, type DeepSearch } from "../src/fairplay-deep.ts";
+import { deepCheckRun, deepResult, offPeak, recountDeep, type DeepSearch } from "../src/fairplay-deep.ts";
 import { memoryDb } from "./memory-db.ts";
 
 const HOUR = 3_600_000;
@@ -108,6 +108,41 @@ describe("the deep re-check", () => {
     expect(JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches ORDER BY id LIMIT 1"))!.summary)).toMatchObject({ deepChecked: 20, deepMatch: 20 });
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
     expect(sent).toEqual([]);
+  });
+
+  it("the near-best catch-up (Nov 11): an open case's matches stored before the count are worked out again from their stored deep results, no searches; an engine user pools with no new match; a second run changes nothing", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const p = await player(sql, "Eddie");
+    // Another engine's top move every pick: our deep re-check's exact best on 15 of 20, the rest half a point off (Stockfish 19 against
+    // our 17.1, the live demo). As the deep re-check stored it before Nov 11: deepMatch the exact count, no deepExact.
+    const top = ["a1a2", "a1b1", "a1b2"];
+    const eddie = engineMatch().map((m, i) => ({ ...m, deep: i % 4 === 1 ? { best: "a1b1", rank: 2, loss: 0.5, top: ["a1b1", "a1a2", "a1b2"] } : { best: "a1a2", rank: 1, loss: 0, top } }));
+    const old = (moves: FairMove[]) => {
+      const { deepExact, ...rest } = matchSignals(moves, null);
+      return JSON.stringify({ ...rest, deepMatch: deepExact });
+    };
+    for (const [lobby, at] of [["AAAAA", QUIET - 2 * HOUR], ["BBBBB", QUIET - HOUR]] as const) {
+      await recordFairPlay(sql, p.id, { lobby, mode: "crowd", moves: engineMatch() }, at);
+      await sql.run("UPDATE fairplay_matches SET moves = ?, summary = ?, deep_done = 1, deep_queued = 0 WHERE user_id = ? AND lobby = ?", JSON.stringify(eddie), old(eddie), p.id, lobby);
+    }
+    await setCase(sql, p.id, "review", "detection", "a match scored 14", QUIET - HOUR);
+    // Someone with no open case: left alone.
+    const q = await player(sql, "Quiet");
+    await recordFairPlay(sql, q.id, { lobby: "CCCCC", mode: "crowd", moves: engineMatch() }, QUIET - HOUR);
+    await sql.run("UPDATE fairplay_matches SET moves = ?, summary = ? WHERE user_id = ?", JSON.stringify(eddie), old(eddie), q.id);
+    await sql.run("DELETE FROM fairplay_cases WHERE user_id = ?", q.id);
+    expect(await recountDeep(sql, QUIET)).toBe(2);
+    const rows = await sql.all<{ summary: string }>("SELECT summary FROM fairplay_matches WHERE user_id = ?", p.id);
+    for (const r of rows) expect(JSON.parse(r.summary)).toMatchObject({ deepChecked: 20, deepMatch: 20, deepExact: 15 });
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: .*moves near the engine's best/) });
+    expect(JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches WHERE user_id = ?", q.id))!.summary).deepExact).toBeUndefined();
+    // Idempotent: nothing left to catch up, so no new log line either.
+    const log = async () => (await sql.all("SELECT id FROM fairplay_log WHERE user_id = ?", p.id)).length;
+    const lines = await log();
+    expect(await recountDeep(sql, QUIET + HOUR)).toBe(0);
+    expect(await log()).toBe(lines);
+    expect((await caseOf(sql, p.id))?.status).toBe("pool");
   });
 
   it("a strong player whose picks often aren't the engine's: no ban", async () => {
