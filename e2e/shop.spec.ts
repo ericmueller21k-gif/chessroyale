@@ -247,6 +247,36 @@ test("Puddles' greenhouse: Go in, Drizzle's crate with Puddles's Mower; the back
   expect(errors).toEqual([]);
 });
 
+test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going out): the pill reads the room's frames, never spans the visit going out; standing still, the room's back is drawn from its kept copy", { tag: "@phone-only" }, async ({ page }) => {
+  await page.goto("/town?sky=day&fps");
+  await townReady(page);
+  await goIn(page, "gardener", "Puddles' Botanical Garden");
+  type Seen = { __pill: string[]; __shopStill?: () => { drawn: number; made: number } | null };
+  // Every reading the pill is given from here (before: none inside a room, its town reading stood still).
+  await page.evaluate(() => {
+    const el = document.querySelector(".town-fps")!;
+    const w = window as unknown as Seen;
+    w.__pill = [];
+    new MutationObserver(() => w.__pill.push(el.textContent ?? "")).observe(el, { childList: true, characterData: true, subtree: true });
+  });
+  await page.waitForTimeout(2500);
+  const inside = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
+  expect(inside.length, `the pill reads the room twice a second: ${inside.join(" | ")}`).toBeGreaterThanOrEqual(3);
+  // Standing still: the ceiling and floor come from the copy kept as the view came to rest (one copy, drawn every frame since).
+  const still = await page.evaluate(() => (window as unknown as Seen).__shopStill?.() ?? null);
+  expect(still!.made, "kept once the view rests").toBeGreaterThanOrEqual(1);
+  expect(still!.drawn, "drawn from the copy while you stand").toBeGreaterThan(30);
+  // Out: every reading is the frames of its last second (before: the frames before you went in over the whole visit, "1 fps").
+  const room = Number.parseInt(inside[inside.length - 1]!);
+  await page.evaluate(() => ((window as unknown as Seen).__pill.length = 0));
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await expect(page.locator("canvas.town-shop-canvas")).toHaveCount(0);
+  await page.waitForTimeout(1500);
+  const out = await page.evaluate(() => [...(window as unknown as Seen).__pill]);
+  expect(out.length).toBeGreaterThanOrEqual(2);
+  expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(room / 5);
+});
+
 test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

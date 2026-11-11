@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { F, FrameRec, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, quantile, refreshOf, summarize, timerStep, whatOf, type RunData } from "../src/town/frame-report.ts";
+import { F, FpsCount, FrameRec, NP, P, PART_NAMES, PART_SHORT, RUN_MS, browserOf, newRun, quantile, refreshOf, summarize, timerStep, whatOf, type RunData } from "../src/town/frame-report.ts";
 
 /** A run of frames: each [ms, flags, parts as { part: ms }, turn deg/s, uploads, pictures painted]. */
 function runOf(frames: [number, number, Partial<Record<number, number>>?, number?, number?, number?][]): RunData {
@@ -57,7 +57,7 @@ describe("the frame report's summary (/town?report, Nov 11)", () => {
     ]);
     const s = summarize(r);
     const [all, walk, turn, load] = s.segs;
-    expect(s.segs.map((g) => [g.name, g.frames])).toEqual([["All", 4], ["Walk", 2], ["Turn", 2], ["Load", 1]]);
+    expect(s.segs.map((g) => [g.name, g.frames])).toEqual([["All", 4], ["Walk", 2], ["Turn", 2], ["Load", 1], ["Room", 0], ["In/out", 0]]);
     expect(all!.avg[P.buildings]).toBe(3.5);
     expect(all!.max[P.paint]).toBe(12);
     expect(walk!.avg[P.buildings]).toBe(5);
@@ -175,7 +175,7 @@ describe("the recorder", () => {
     expect(rec.run.flags[2]! & F.gap).toBeTruthy();
   });
 
-  it("a pause (a shop, a hidden tab) isn't a frame: the first frame after it isn't recorded", () => {
+  it("a pause (a hidden tab, a test's hold) isn't a frame: the first frame after it isn't recorded", () => {
     const { rec, at } = rig();
     for (const t of [0, 16.7, 33.4]) {
       at(t);
@@ -213,6 +213,66 @@ describe("the recorder", () => {
     rec.finish();
     rec.finish();
     expect(done).toBe(2);
+  });
+});
+
+describe("rooms, and going in and out (Nov 11: Eric's iPhone, inside shop rooms and out of them)", () => {
+  it("a room's frames go into the run marked; the frames going in and out are marked; the town's columns leave them out", () => {
+    let t = 0;
+    const rec = new FrameRec(() => t);
+    const frame = (dt: number, walking: boolean, heading: number, zoom: number, more = 0) => {
+      t += dt;
+      rec.begin(t);
+      rec.end(walking, heading, zoom, more);
+    };
+    frame(0, true, 90, 2); // starts
+    frame(16.7, true, 90, 2); // the town, walking
+    rec.door = F.goIn;
+    frame(16.7, false, 90, 2); // the town zooms in on the door
+    // The room's first frame: after the black (its wait is seen, not a pause); no heading or zoom in a room, so no turn from the town's 90°.
+    frame(400, false, NaN, NaN, F.room);
+    rec.door = 0;
+    frame(16.7, false, NaN, NaN, F.room);
+    frame(16.7, true, NaN, NaN, F.room);
+    rec.door = F.goOut;
+    frame(16.7, false, NaN, NaN, F.room); // the room fades out
+    frame(20, false, 0, 2); // the town again, north
+    rec.door = 0;
+    frame(16.7, true, 0, 2);
+    const r = rec.run;
+    expect(r.n).toBe(8);
+    expect(Array.from(r.flags.subarray(0, r.n)).map((f) => f & ~(F.gap | F.walk))).toEqual([0, F.goIn, F.goIn | F.room, F.room, F.room, F.goOut | F.room, F.goOut, 0]);
+    expect(Array.from(r.flags.subarray(0, r.n)).some((f) => f & (F.turn | F.zoom))).toBe(false);
+    expect(r.total[2]).toBeCloseTo(400, 3);
+    expect(whatOf(r, 2)).toContain("in a room · going in");
+    const s = summarize(r);
+    expect(s.segs.map((g) => [g.name, g.frames])).toEqual([
+      ["All", 8],
+      ["Walk", 2],
+      ["Turn", 0],
+      ["Load", 0],
+      ["Room", 2],
+      ["In/out", 4],
+    ]);
+  });
+
+  it("the ?fps pill counts every frame it's given (the town's and a room's), twice a second; a restart never spans the pause", () => {
+    const el = { textContent: "" as string | null, dataset: {} as DOMStringMap };
+    const fps = new FpsCount(el);
+    let t = 0;
+    for (let i = 0; i <= 60; i++) fps.tick((t = i * 16.7));
+    expect(el.textContent).toMatch(/^\d+ fps · \d+\.\d ms$/);
+    expect(Math.abs(Number(el.dataset.fps) - 60)).toBeLessThanOrEqual(4);
+    // A hidden tab for 9 s: restarted, so the next readings are the frames since, not 60 frames over 9 s.
+    fps.restart();
+    t += 9000;
+    for (let i = 0; i <= 60; i++) fps.tick(t + i * 16.7);
+    expect(Math.abs(Number(el.dataset.fps) - 60)).toBeLessThanOrEqual(4);
+    // (Without the restart, as before Nov 11 when the town's frames stopped inside a room: "2 fps", for two readings.)
+    const old = new FpsCount(el);
+    for (let i = 0; i <= 60; i++) old.tick(i * 16.7);
+    old.tick(10_000);
+    expect(Number(el.dataset.fps)).toBeLessThan(10);
   });
 });
 

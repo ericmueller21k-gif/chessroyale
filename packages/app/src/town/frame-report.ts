@@ -7,6 +7,13 @@
  *
  * Plain typed arrays made once as the page opens with `?report`; nothing allocated per frame. Without `?report` there's no recorder
  * (`REC` stays null) and the draw's marks are a null check each.
+ *
+ * Inside a building (Nov 11, Eric's iPhone: "inside shop rooms … 42-44 fps … never climbs"; "exiting ANY building drops to 2-4 fps"):
+ * the room's own loop (shops/ShopRoom.tsx) records into the same run, its parts under the town's names (its ceiling as the sky, its
+ * floor as the ground, its pieces as props, the Shopkeeper and its people as other players), each frame marked "in a room"; the frames
+ * from a home's "Go in" until the room's black lifts are "going in", from "Go out" until the town's zoom out ends "going out". The
+ * `?fps` pill (FpsCount below) counts the room's frames too: before, it stood still on the town's last reading inside a room, and its
+ * first readings out spanned the whole visit.
  */
 
 /** The parts of a frame, in the order the frame does them (their names on the panel: PART_NAMES). */
@@ -78,7 +85,7 @@ export const PART_NAMES: readonly string[] = [
 export const PART_SHORT: readonly string[] = ["Logic", "Camera", "Sky", "Ground", "Placing", "Buildings", "Props", "Bosses", "You", "Others", "Lights", "Labels", "Submit", "Chips", "Minimap", "Painting", "Sight", "Uploads", "Outside"];
 
 /** What was happening in a frame (bits). */
-export const F = { walk: 1, turn: 2, zoom: 4, load: 8, upload: 16, gap: 32, reset: 64, sight: 128 } as const;
+export const F = { walk: 1, turn: 2, zoom: 4, load: 8, upload: 16, gap: 32, reset: 64, sight: 128, room: 256, goIn: 512, goOut: 1024 } as const;
 
 /** Frames held: 30 s at up to 120 Hz, and room to spare. */
 export const MAX_FRAMES = 4096;
@@ -94,7 +101,7 @@ export interface RunData {
   total: Float32Array;
   /** Each frame's parts (ms), NP a frame. */
   part: Float32Array;
-  flags: Uint8Array;
+  flags: Uint16Array;
   /** How fast the camera turned (degrees a second, unsigned). */
   turn: Float32Array;
   /** Pictures uploaded, pictures painted (counts). */
@@ -103,7 +110,7 @@ export interface RunData {
 }
 
 export function newRun(max = MAX_FRAMES): RunData {
-  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint8Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max) };
+  return { n: 0, total: new Float32Array(max), part: new Float32Array(max * NP), flags: new Uint16Array(max), turn: new Float32Array(max), ups: new Uint16Array(max), bakes: new Uint16Array(max) };
 }
 
 /**
@@ -127,6 +134,8 @@ export class FrameRec {
   private zoom = NaN;
   /** The run ended (30 s, or Done): the panel's to show. */
   onDone: (() => void) | null = null;
+  /** Going in or out of a building (F.goIn, F.goOut; 0: neither): Town.tsx sets it, every frame meanwhile carries it. */
+  door = 0;
   constructor(private readonly clock: () => number = () => performance.now()) {}
 
   begin(now: number): void {
@@ -167,8 +176,11 @@ export class FrameRec {
     this.flags |= F.reset | F.load;
   }
 
-  /** The frame ends: `walking` (you're moving), the camera's heading (degrees) and zoom now. */
-  end(walking: boolean, heading: number, zoom: number): void {
+  /**
+   * The frame ends: `walking` (you're moving), the camera's heading (degrees) and zoom now (NaN: neither counted, a room's), and what
+   * else marks it (F.room).
+   */
+  end(walking: boolean, heading: number, zoom: number, more = 0): void {
     const now = this.frameNow;
     const dt = this.prevNow < 0 ? 0 : now - this.prevNow;
     this.prevNow = now;
@@ -179,11 +191,11 @@ export class FrameRec {
       return;
     }
     const work = this.clock() - this.t0;
-    const turnRate = dt > 0 && !Number.isNaN(this.heading) ? (Math.abs(((((heading - this.heading) % 360) + 540) % 360) - 180) * 1000) / dt : 0;
+    const turnRate = dt > 0 && !Number.isNaN(this.heading) && !Number.isNaN(heading) ? (Math.abs(((((heading - this.heading) % 360) + 540) % 360) - 180) * 1000) / dt : 0;
     const zoomed = !Number.isNaN(this.zoom) && Math.abs(zoom - this.zoom) > 1e-4;
     this.heading = heading;
     this.zoom = zoom;
-    let fl = this.flags;
+    let fl = this.flags | more | this.door;
     if (walking) fl |= F.walk;
     if (turnRate > TURN_DEG_S) fl |= F.turn;
     if (zoomed) fl |= F.zoom;
@@ -214,7 +226,7 @@ export class FrameRec {
     this.state = "done";
     this.onDone?.();
   }
-  /** The frames stop (a shop, a hidden tab): the next one starts afresh. */
+  /** The frames stop (a hidden tab, a test's hold): the next one starts afresh. (Not between the town and a room: that wait is seen.) */
   pause(): void {
     this.prevNow = -1;
   }
@@ -231,6 +243,42 @@ export class FrameRec {
 export let REC: FrameRec | null = null;
 export function setRec(r: FrameRec | null): void {
   REC = r;
+}
+
+/**
+ * The `?fps` pill's count ("60 fps · 16.7 ms": the frames of the last two half seconds and their mean time, the text set twice a
+ * second). The town's frames and a room's both tick it, so inside a building it reads the room (Nov 11: it stood still on the
+ * town's last reading there). A hidden tab or a test's hold restarts it, so no reading spans a pause; the black between the town and
+ * a room doesn't (the wait as a room loads is real). Plain counters, nothing per frame but the text twice a second.
+ */
+export class FpsCount {
+  private n = 0;
+  private prev = 0;
+  private at = 0;
+  private prevAt = 0;
+  constructor(private readonly el: { textContent: string | null; dataset: DOMStringMap }) {}
+  tick(now: number): void {
+    this.n++;
+    if (!this.at) this.at = this.prevAt = now;
+    else if (now - this.at >= 500) {
+      const n = this.n + this.prev;
+      const ms = now - this.prevAt;
+      this.el.textContent = `${Math.round((n * 1000) / ms)} fps · ${(ms / n).toFixed(1)} ms`;
+      this.el.dataset.fps = String(Math.round((n * 1000) / ms));
+      this.prev = this.n;
+      this.n = 0;
+      this.prevAt = this.at;
+      this.at = now;
+    }
+  }
+  restart(): void {
+    this.n = this.prev = this.at = this.prevAt = 0;
+  }
+}
+/** The page's `?fps` count, or null: what Town.tsx's and a room's frames tick. */
+export let FPS: FpsCount | null = null;
+export function setFps(c: FpsCount | null): void {
+  FPS = c;
 }
 
 // ---- The summary (pure: the panel's numbers, unit-tested).
@@ -288,7 +336,7 @@ export interface Summary {
   over20: number;
   over33: number;
   refresh: number;
-  /** All, walking, turning, loading. */
+  /** All, walking, turning, loading (the town's), in a room, going in or out. */
   segs: Segment[];
   worst: Worst[];
   /** Where the most time went: overall, and while turning (−1: no turning recorded); and of our own parts (the outside part left out). */
@@ -315,6 +363,9 @@ export function whatOf(r: RunData, i: number): string {
   if (r.bakes[i]) out.push(`${r.bakes[i]} painted`);
   if (f & F.sight) out.push("sight lines");
   if (r.ups[i]) out.push(`${r.ups[i]} upload${r.ups[i] === 1 ? "" : "s"}`);
+  if (f & F.room) out.push("in a room");
+  if (f & F.goIn) out.push("going in");
+  if (f & F.goOut) out.push("going out");
   if (f & F.reset) out.push("atlas reset");
   if (f & F.gap) out.push("gap");
   return out.length ? out.join(" · ") : "standing";
@@ -360,11 +411,14 @@ export function summarize(r: RunData): Summary {
   }
   // (Loading: pictures painted, sight lines, an atlas reset. Not a plain upload: a name tag or a board drawn again uploads most frames.)
   const load = F.load;
+  const town = (i: number) => !(r.flags[i]! & (F.room | F.goIn | F.goOut));
   const segs = [
     segment(r, "All", () => true),
-    segment(r, "Walk", (i) => !!(r.flags[i]! & F.walk) && !(r.flags[i]! & F.turn)),
-    segment(r, "Turn", (i) => !!(r.flags[i]! & F.turn)),
-    segment(r, "Load", (i) => !!(r.flags[i]! & load)),
+    segment(r, "Walk", (i) => town(i) && !!(r.flags[i]! & F.walk) && !(r.flags[i]! & F.turn)),
+    segment(r, "Turn", (i) => town(i) && !!(r.flags[i]! & F.turn)),
+    segment(r, "Load", (i) => town(i) && !!(r.flags[i]! & load)),
+    segment(r, "Room", (i) => (r.flags[i]! & (F.room | F.goIn | F.goOut)) === F.room),
+    segment(r, "In/out", (i) => !!(r.flags[i]! & (F.goIn | F.goOut))),
   ];
   const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => r.total[b]! - r.total[a]! || a - b);
   const worst: Worst[] = [];
