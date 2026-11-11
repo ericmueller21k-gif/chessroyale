@@ -59,13 +59,17 @@ export function hapticWay(): HapticWay {
 export const pulses = (p: HapticPattern): number => (typeof p === "number" ? 1 : Math.ceil(p.length / 2));
 
 let label: HTMLLabelElement | null = null;
-/** One iPhone tick: the hidden switch toggled through its label. */
-function iosTick() {
+let input: HTMLInputElement | null = null;
+/**
+ * The hidden switch, made once: a label wrapping an `<input type="checkbox" switch>`. It stays rendered but invisible
+ * (opacity 0, 1 px, no taps), not display:none: a switch with no box may play nothing (Nov 11).
+ */
+function switchLabel(): HTMLLabelElement {
   if (!label) {
     label = document.createElement("label");
     label.setAttribute("aria-hidden", "true");
-    label.style.display = "none";
-    const input = document.createElement("input");
+    Object.assign(label.style, { position: "fixed", left: "0", top: "0", width: "1px", height: "1px", overflow: "hidden", opacity: "0", pointerEvents: "none" });
+    input = document.createElement("input");
     input.type = "checkbox";
     input.setAttribute("switch", "");
     input.tabIndex = -1;
@@ -74,25 +78,74 @@ function iosTick() {
     label.addEventListener("click", (e) => e.stopPropagation());
     document.body.append(label);
   }
-  label.click();
+  return label;
+}
+
+/** One iPhone tick: the hidden switch toggled through its label. */
+function iosTick() {
+  switchLabel().click();
+  debugLog(`tick: label clicked in ${eventType()}, switch now ${input?.checked ? "on" : "off"}`);
+}
+
+/** The event being handled now (window.event), if any. */
+function eventType(): string {
+  try {
+    return (globalThis as { event?: Event }).event?.type ?? "no event";
+  } catch {
+    return "no event";
+  }
+}
+
+/**
+ * The events WebKit surely counts as a tap (a gesture): an iPhone's tick plays inside them. In a pointer event (a
+ * board's press or lift) it waits for the touch's own `touchend` (or the `click`), which follows within the same tap.
+ */
+const GESTURES = new Set(["touchend", "click", "mouseup", "keydown", "keyup"]);
+const WAIT_MS = 600;
+let waiting: { n: number; at: number } | null = null;
+let listening = false;
+function flush() {
+  const w = waiting;
+  waiting = null;
+  if (!w || Date.now() - w.at > WAIT_MS) return;
+  debugLog(`flush ${w.n} in ${eventType()}`);
+  iosTicks(w.n);
+}
+function listen() {
+  if (listening) return;
+  listening = true;
+  for (const t of ["touchend", "click"]) document.addEventListener(t, flush, { capture: true, passive: true } as AddEventListenerOptions);
+}
+
+/** n ticks: now, then the rest by timers (a tap's gesture carries into short timers). */
+function iosTicks(n: number) {
+  iosTick();
+  for (let i = 1; i < n; i++) setTimeout(() => void tryTick(), i * HAPTICS.iosTickGapMs);
 }
 
 /** Plays a kind's pattern, if Vibration is on and the device can. */
 export function haptic(kind: HapticKind): void {
   try {
-    if (!vibrationOn() || globalThis.document?.hidden) return;
     const w = hapticWay();
-    if (!w) return;
+    if (!vibrationOn() || globalThis.document?.hidden) return void debugLog(`${kind}: off (Vibration ${vibrationOn() ? "on" : "off"}, way ${w})`);
+    if (!w) return void debugLog(`${kind}: no way on this device`);
     const p = HAPTICS.patterns[kind] as HapticPattern;
     if (w === "vibrate") {
       navigator.vibrate(typeof p === "number" ? p : [...p]);
-      return;
+      return void debugLog(`${kind}: vibrate`);
     }
     const n = Math.min(pulses(p), HAPTICS.iosTicks);
-    iosTick();
-    for (let i = 1; i < n; i++) setTimeout(() => void tryTick(), i * HAPTICS.iosTickGapMs);
-  } catch {
-    // No vibration here.
+    const ev = eventType();
+    if (ev.startsWith("pointer") || ev.startsWith("touchstart")) {
+      // (Not a gesture yet: the tap's touchend or click plays it.)
+      listen();
+      waiting = { n: Math.max(n, waiting?.n ?? 0), at: Date.now() };
+      return void debugLog(`${kind}: waits for touchend (in ${ev})`);
+    }
+    debugLog(`${kind}: ios now (in ${ev})`);
+    iosTicks(n);
+  } catch (err) {
+    debugLog(`${kind}: error ${String(err)}`);
   }
 }
 
@@ -128,6 +181,43 @@ export function hapticAtPress(kind: HapticKind, pointer: number, square: string,
 /** A finger lifted (pointerup): a tick kept for it plays if it's the same finger, on the same square, within HAPTICS.holdMs. */
 export function hapticAtLift(t: LiftTick | null, pointer: number, square: string | null, at: number = Date.now()): void {
   if (t && t.pointer === pointer && t.square === square && at - t.at < HAPTICS.holdMs) haptic(t.kind);
+}
+
+/**
+ * `?haptics=debug` (kept on this device until `?haptics=off`): a small on-screen log of every tick tried (the way,
+ * the event it came in, whether the label was clicked), for Eric's iPhone to tell us what it does.
+ */
+let debugEl: HTMLElement | null | undefined;
+function debugOn(): HTMLElement | null {
+  if (debugEl !== undefined) return debugEl;
+  debugEl = null;
+  try {
+    const q = new URLSearchParams(globalThis.location?.search ?? "").get("haptics");
+    if (q === "debug") localStorage.setItem("brc.hapticsDebug", "1");
+    if (q === "off") localStorage.removeItem("brc.hapticsDebug");
+    if (localStorage.getItem("brc.hapticsDebug") !== "1" || !document.body) return null;
+    const el = document.createElement("div");
+    Object.assign(el.style, { position: "fixed", left: "4px", bottom: "4px", zIndex: "2147483647", maxWidth: "70vw", maxHeight: "30vh", overflow: "hidden", font: "11px/1.3 monospace", background: "rgba(0,0,0,.75)", color: "#fff", padding: "4px 6px", borderRadius: "6px", pointerEvents: "none", whiteSpace: "pre-wrap" });
+    document.body.append(el);
+    debugEl = el;
+    const d = deviceHaptics();
+    debugLog(`way ${hapticWay()} · vibrate ${d.vibrate} touch ${d.touch} ios ${d.ios} switch ${d.switchInput} · Vibration ${vibrationOn() ? "on" : "off"}`);
+  } catch {
+    debugEl = null;
+  }
+  return debugEl;
+}
+const debugLines: string[] = [];
+function debugLog(line: string) {
+  const el = debugOn();
+  if (!el) return;
+  debugLines.push(`${new Date().toISOString().slice(17, 23)} ${line}`);
+  if (debugLines.length > 12) debugLines.shift();
+  el.textContent = debugLines.join("\n");
+}
+/** Shows the debug log at once (main.tsx), if it's on. */
+export function hapticsDebug(): void {
+  debugOn();
 }
 
 const done = new Set<string>();

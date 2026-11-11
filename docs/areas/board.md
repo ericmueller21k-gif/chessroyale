@@ -127,7 +127,9 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   available on this device" where there's no way: a computer, an old iPhone). An iPhone has no Vibration API: its ticks
   are the hidden-switch trick, inside the tap only. A touch's press-down isn't a gesture there, so a tick a press-down
   makes (a tap-tap move, a premove or a Hollow try placed by tap) plays as that finger lifts on the same square, within
-  `holdMs` (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md); Android ticks at once. The
+  `holdMs` (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md); Android ticks at once. An
+  iPhone tick asked for in a pointer event plays in the tap's `touchend` (or `click`); the switch stays rendered,
+  invisible. `?haptics=debug` shows an on-screen log of each tick tried (`?haptics=off` ends it). The
   iPhone's Settings → Sounds & Haptics → System Haptics must be on.
 - **Chess960's castling** (DECISIONS.md, "Chess960's rules"), only for a Chess960 position (its FEN names castling
   rooks by file): the move is written as the king taking its own rook (e1h1), so the king dragged or tapped onto its

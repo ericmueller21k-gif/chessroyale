@@ -24,3 +24,19 @@ press, unchanged. A promotion's pick is a button `click` (after the lift: a gest
   (17.4+) and says "iPhone", so it shows on. (If Eric's showed greyed, that's a different bug: tell us.)
 - The iPhone itself: the switch tick needs Settings → Sounds & Haptics → System Haptics on. Only Eric's iPhone can
   confirm the fix.
+
+## Update: no tick at all (same day)
+
+Eric: the pick-up tick (already on the lift) is silent too, with System Haptics on. So the trick itself played
+nothing. We can't test an iPhone here, so three changes against the likeliest causes, plus a log for his phone:
+- **The switch is rendered now**, invisible (opacity 0, 1 px, no taps), not `display:none`: a switch with no box may
+  not play its haptic. The label still wraps the input; the `switch` attribute is set before it's attached.
+- **An iPhone tick asked for in a pointer event waits for the tap's own `touchend`** (or `click`), within 600 ms, and
+  plays inside it. `pointerup` from a touch may not count as a gesture in WebKit; `touchend` and `click` surely do
+  (the same rule as starting audio). Pointer events come before the touch's own touch events, so it's the same tap.
+  A tick asked for inside a click (the promotion pick) plays at once. The lift rule above stays.
+- **`?haptics=debug`** (kept on that device until `?haptics=off`, since an installed app can't easily take a URL):
+  a small log, bottom left, of the way picked and what the device reports, and for each tick: wait or play, the event
+  it ran in, the label clicked and the switch's state after. If the log shows "label clicked in touchend" and still no
+  tick, iOS 27 no longer plays it for a script's click, and there's no other way into the iPhone's haptics from a web
+  page.

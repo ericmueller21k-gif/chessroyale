@@ -11,8 +11,14 @@ function device(opts: { vibrate?: boolean; touches?: number; ua?: string; switch
   vi.stubGlobal("HTMLInputElement", { prototype: opts.switchInput ? { switch: false } : {} });
   const ticks = { n: 0 };
   const el = () => ({ style: {}, setAttribute: () => undefined, append: () => undefined, addEventListener: () => undefined, click: () => void ticks.n++ });
-  vi.stubGlobal("document", { hidden: false, createElement: el, body: { append: () => undefined } });
-  return { vibrate, ticks, stored: m };
+  const on = new Map<string, () => void>();
+  vi.stubGlobal("document", { hidden: false, createElement: el, body: { append: () => undefined }, addEventListener: (t: string, f: () => void) => void on.set(t, f) });
+  /** The page handling an event of this type (window.event), and its listeners hearing it. */
+  const fire = (type: string) => {
+    vi.stubGlobal("event", { type });
+    on.get(type)?.();
+  };
+  return { vibrate, ticks, stored: m, fire };
 }
 const load = async () => {
   vi.resetModules();
@@ -110,6 +116,22 @@ describe("haptics (Eric, Nov 9): a tick on a tap and a move, a few boss moments"
     hapticAtLift(t, 7, "e4", 1000 + HAPTICS.holdMs);
     hapticAtLift(null, 7, "e4", 1080);
     expect(ticks.n).toBe(1);
+  });
+
+  it("an iPhone: a tick asked for in a pointer event waits for the tap's touchend (a gesture to WebKit); in a click, at once", async () => {
+    const { ticks, fire } = device({ vibrate: false, ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X)", switchInput: true });
+    const { haptic } = await load();
+    vi.stubGlobal("event", { type: "pointerup" });
+    haptic("select");
+    expect(ticks.n).toBe(0);
+    fire("touchend");
+    expect(ticks.n).toBe(1);
+    // (Played once: a later touchend plays nothing more.)
+    fire("touchend");
+    expect(ticks.n).toBe(1);
+    vi.stubGlobal("event", { type: "click" });
+    haptic("move");
+    expect(ticks.n).toBe(2);
   });
 
   it("Android: a press-down's tick plays at once, nothing kept for the lift", async () => {
