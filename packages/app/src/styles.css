@@ -10740,6 +10740,10 @@ button.fd-logo {
   max-width: none;
   image-rendering: pixelated;
 }
+/* (Its height from its width, in the sprite's own proportions: .fx-sprite's 100% of the box would stretch the figure. Eric, Nov 11.) */
+.bs-spot .bs-sprite {
+  height: auto;
+}
 .bs-q-big {
   font-size: 90px;
   color: var(--fd-sub);
