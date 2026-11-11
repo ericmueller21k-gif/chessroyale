@@ -23,8 +23,8 @@ const SLIDES: [title: string, desktop: number, phone: number][] = [
   ["Boss Battle", 2, 1],
   ["Play with friends", 1, 1],
   ["Shop & crates", 1, 1],
-  // (One on a computer since Nov 7: the right column's pawn went with Eric's mockup; the side menu's Profile.)
-  ["Profile", 1, 1],
+  // (Two on a computer since Nov 11: the side menu's Profile and the card's "View profile", Eric's bottom-right link.)
+  ["Profile", 2, 1],
   ["Settings", 1, 1],
   ["HunChess Handbook", 0, 0],
   ["Play anywhere", 0, 0],

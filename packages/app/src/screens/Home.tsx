@@ -8,7 +8,8 @@ import { BossDifficulty } from "../components/BossDifficulty.tsx";
 import { isAdmin, maiaAllowed, maiaLikely } from "../boss-brain.ts";
 import { prefetchMaia } from "../maia.ts";
 import type { ComponentChildren } from "preact";
-import { AccountBar, BackButton, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
+import { BackButton, ChatIcon, DressedPawn, FdButton, FriendsIcon, GearIcon, LevelRing, LiveLine, Logo, RankLine, ShopIcon } from "../components/FrontDoor.tsx";
+import { ChatSheet } from "../components/ChatSheet.tsx";
 import { useLive } from "../live.ts";
 import { BossCardFace, BossSelect, RANDOM, selectBosses } from "../components/BossSelect.tsx";
 import { BossInviteSheet } from "../components/BossParty.tsx";
@@ -640,6 +641,8 @@ export function HomeScreen({
   // Squads: Solo queue (false) or Party (true), the panel's pick; PLAY then queues alone or opens the party.
   const [party, setParty] = useState(false);
   const [friends, setFriends] = useState(!!joinCode);
+  // (A phone's chat: the top bar's chat button opens it as a sheet over home, Nov 11.)
+  const [chatSheet, setChatSheet] = useState(false);
   // Play with friends: a lobby in the row's pick (1 v 1 has none: 50 v 50's), or a raid from the Boss raid screen.
   const lobbyMode: ModeChoiceId = raid ? "raid" : lobbyModeOf(mode ?? "crowd");
   // The Boss raid screen's pick (its tiles): a boss you can meet, "" for a random one, or the Hidden Boss (dark and
@@ -846,6 +849,14 @@ export function HomeScreen({
         </div>
       </div>
       </div>
+      {/* (Eric, Nov 11: "View profile" in the card's top right, a normal blue, a chevron and a light sweep; the same screen the pawn opened.
+          Out of the flow (styles.css, `.fd-hero-profile`): nothing else on the card moves.) */}
+      <button type="button" class="fd-hero-profile" data-tour="profile" onClick={onProfile}>
+        <span class="fd-hero-profile-text">View profile</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M9 6l6 6-6 6" />
+        </svg>
+      </button>
     </section>
   );
   // The sheets and menus either view can open (and chat moderation's notice).
@@ -892,6 +903,7 @@ export function HomeScreen({
       <ChatNotice />
       {/* (The Welcome Crate earned, Nov 6: its one-time notice; WelcomeNotice.tsx.) */}
       <WelcomeNotice />
+      {chatSheet && !computer && <ChatSheet onSignIn={onSignIn} onClose={() => setChatSheet(false)} />}
       {quests.open && quests.answer && !queueing && (
         <QuestsOverlay
           quests={quests.answer.quests}
@@ -1192,7 +1204,12 @@ export function HomeScreen({
       <header class="fd-top">
         <Logo />
         <div class="fd-top-end">
-          <AccountBar onProfile={onProfile} tourId="profile" face={!computer} />
+          {!computer && (
+            // (Eric, Nov 11: a phone's top bar has the chat where the pawn was, the same square; a computer has neither (its side menu has Profile and the chat).)
+            <button type="button" class="fd-icon-btn fd-top-chat" aria-label="Chat" onClick={() => setChatSheet(true)}>
+              <ChatIcon />
+            </button>
+          )}
           {!computer && (
             // (The Quests entry (Nov 9): one more square button in a phone's top bar, the quests icon, as the shop's; greyed until quests
             // are yours.)

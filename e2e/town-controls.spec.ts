@@ -10,7 +10,8 @@ import { asAdmin, test, lookDrag, quickTap } from "./helpers.ts";
  * - locking a new view: a look round let go snaps to the nearest quarter (split at 45°, Nov 6: "about like 45 degrees"); a tap, a run or
  *   an arrow next makes it the base heading, which the arrows follow; a building's in and out resets it to north;
  * - the minimap: on by default, top right, your dot moving with you; its button hides it (remembered); a tap opens it large with the
- *   boss portraits, the Colosseum and the park; a tap closes it; it never covers the arrows, the zoom pair or the chat.
+ *   boss portraits, the Colosseum and the park; a tap closes it, and on a portrait walks you to that home (Nov 11); it never covers
+ *   the arrows, the zoom pair or the chat.
  * Phone (touch, through the browser's touch events) and computer (the mouse's left button), on WebGL (the street town's only drawing).
  * `STILLS=docs/street-controls-map` writes the stills and GIFs.
  */
@@ -431,6 +432,36 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   await expect(big).toHaveCount(0);
   await page.waitForTimeout(500);
   expect(await you(page)).toEqual(at);
+
+  // (Eric, Nov 11.) A tap on a boss's portrait closes it and walks you to that home: you end by it, where a tap on it takes you.
+  await small.click();
+  await expect(big).toBeVisible();
+  const sq = (await page.locator(".tm-big > canvas").boundingBox())!.width / 54;
+  const me0 = await dot(page, ".tm-big .tm-you");
+  // (The nearest portrait at least 5 squares away, and where its home is, in squares, from your dot.)
+  const pick = await faces.evaluateAll(
+    (els, [x, y, s]) =>
+      els
+        .map((e) => {
+          const r = e.getBoundingClientRect();
+          return { id: (e as HTMLElement).dataset.home!, x: r.left + r.width / 2, y: r.top + r.height / 2, dc: (r.left + r.width / 2 - x!) / s!, dr: -(r.top + r.height / 2 - y!) / s! };
+        })
+        .filter((f) => Math.hypot(f.dc, f.dr) >= 5)
+        .sort((a, b) => Math.hypot(a.dc, a.dr) - Math.hypot(b.dc, b.dr))[0]!,
+    [me0.x, me0.y, sq],
+  );
+  const from = await you(page);
+  const home = [Math.round(from[0] + pick.dc), Math.round(from[1] + pick.dr)];
+  if (STILLS) await page.screenshot({ path: `${STILLS}/map-walk-1-tap-${test.info().project.name}.png` });
+  await page.mouse.click(pick.x, pick.y);
+  await expect(big, "the map closes").toHaveCount(0);
+  await expect.poll(async () => (await me(page)).moving, { message: "you set off", timeout: 3000 }).toBe(true);
+  await settle(page);
+  const end = await you(page);
+  const off = (a: number, b: number) => Math.abs((((a - b) % 54) + 81) % 54 - 27);
+  expect(off(end[0], home[0]!), `by ${pick.id} across (${end} vs ${home})`).toBeLessThanOrEqual(3);
+  expect(off(end[1], home[1]!), `by ${pick.id} along (${end} vs ${home})`).toBeLessThanOrEqual(3);
+  if (STILLS) await page.screenshot({ path: `${STILLS}/map-walk-2-arrived-${test.info().project.name}.png` });
 });
 
 test("the minimap never covers the arrows, the zoom pair, the focus button or the chat, at every phone size and on computers", async ({ browser }) => {

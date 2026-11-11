@@ -1097,8 +1097,8 @@ for (const ride of [false, true])
     page.on("pageerror", (e) => errors.push(String(e)));
     if (ride) {
       await page.goto("/");
-      // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-      await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+      // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+      await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
       // (No crate holds a ride yet: given straight, as only admins have them.)
       const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
       await wearItem(page, "ride", chirp!);
@@ -1125,7 +1125,7 @@ test("on a ride (Eric, Nov 2: \"your rider goes in with you\"): inside you're on
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first()).toBeVisible();
   // (No crate holds a ride yet: given straight, as only admins have them.)
   const [chirp] = await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 0 }]);
   await wearItem(page, "ride", chirp!);
