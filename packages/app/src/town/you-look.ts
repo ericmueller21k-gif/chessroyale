@@ -10,6 +10,7 @@ import { h, render } from "preact";
 import type { ItemLook } from "@chessroyale/core";
 import { Avatar } from "../components/Items.tsx";
 import type { YouArt } from "./render.ts";
+import { art2d } from "./paint.ts";
 
 /** Room round the pawn's box for items that rise or reach past it (`Avatar` lets them go 12% past it at most). */
 const PAD = 0.15;
@@ -65,7 +66,7 @@ export async function dressedPawn(look: ItemLook | null | undefined, pawn: HTMLC
     );
     const c = document.createElement("canvas");
     c.width = c.height = S;
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     const inset = Math.round(PAD * px);
     for (const l of layers) {
       if (l === pawn) g.drawImage(pawn, inset, inset, S - 2 * inset, S - 2 * inset);

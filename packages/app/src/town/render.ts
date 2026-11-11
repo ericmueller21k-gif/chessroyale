@@ -40,6 +40,7 @@ import { CAP, LEADING, layout, lineWidth, renderLines } from "./sign-font.ts";
 import { look, mixLights, mixMist, mixRGB, mixTint, type SkyWeights } from "./sky.ts";
 import { SkyPainter } from "./sky-draw.ts";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
+import { art2d } from "./paint.ts";
 import type { LightPool, LightSpot } from "./houses/kit.ts";
 import { PARK_BENCH, PARK_FOUNTAIN, PARK_LAMP, PARK_LAMP_HEAD, PARK_LAMP_LIGHTS, PARK_LAMP_POOLS, PARK_TABLE, PARK_TREES, TABLE_BACK_RANK, TABLE_BOARD, TABLE_CLOCK_INK, TABLE_DIGITS, TABLE_INK, TABLE_PIECES, TABLE_RING, TABLE_TOP } from "./houses/park.ts";
 import type { SidekickSheet } from "./sidekick-sheets.ts";
@@ -235,7 +236,7 @@ export function pawnImage(side: "light" | "dark", tint: string | null): HTMLCanv
   if (c) return c;
   c = document.createElement("canvas");
   c.width = c.height = PAWN_PX;
-  const g = c.getContext("2d")!;
+  const g = art2d(c);
   g.scale(PAWN_PX / 45, PAWN_PX / 45);
   const p = new Path2D(PAWN_PATH);
   g.fillStyle = tint ?? (side === "light" ? "#ffffff" : "#000000");
@@ -285,7 +286,7 @@ class FrameCache {
     c = document.createElement("canvas");
     c.width = w;
     c.height = h;
-    c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+    art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     this.frames[i] = c;
     frameOf.set(c, { fc: this, i });
     if (REC) REC.paint(performance.now() - t0);
@@ -326,8 +327,13 @@ class SpriteFrames {
     this.top = { idle, walk: idle, wave: idle, sit: sheet.top.sit / sheet.h };
     this.squares = TOWN_FEEL.sidekickSquares / (sheet.foot[1] / sheet.h - idle);
     const img = new Image();
-    img.onload = () => void (this.img = img);
     img.src = SHEET_URL[sheet.id.replace(/^sidekick-/, "")]!;
+    // (Decoded off the main thread as it loads (Nov 11): cutting its frames, on the town's loading screen, is then quick. A browser
+    // that can't decode ahead: as it loads, as before.)
+    // (One that fails to load is never drawn, as before.)
+    const got = () => void (img.naturalWidth && (this.img = img));
+    if (img.decode) img.decode().then(got, () => (img.complete ? got() : (img.onload = got)));
+    else img.onload = got;
   }
   /** Its frames cut from its sheet, once, the first time it's drawn (or its face asked for) after the sheet has loaded. */
   cut(): void {
@@ -339,7 +345,7 @@ class SpriteFrames {
         const c = document.createElement("canvas");
         c.width = sheet.w;
         c.height = sheet.h;
-        c.getContext("2d")!.drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
+        art2d(c).drawImage(img, col * sheet.w, row * sheet.h, sheet.w, sheet.h, 0, 0, sheet.w, sheet.h);
         return c;
       });
     });
@@ -426,7 +432,7 @@ function canvasOf(ch: Character, mask?: Uint8Array[]): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
+  art2d(c).putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
   if (mask) {
     const m = new Uint8Array(w * h);
     for (let i = 0; i < m.length; i++) m[i] = data[i * 4 + 3]! > 0 ? 1 : 0;
@@ -468,7 +474,7 @@ function quoteArt(id: StatueId, lines: string[], s: number, e: number, lead: num
   const cv = document.createElement("canvas");
   cv.width = lw * s + e;
   cv.height = lh * s + e;
-  const g = cv.getContext("2d")!;
+  const g = art2d(cv);
   g.drawImage(renderLines(lines, lw, lh, s, ink.edge, lead), e, e);
   g.drawImage(renderLines(lines, lw, lh, s, ink.ink, lead), 0, 0);
   return { cv, s, n: lines.length, pitch: (CAP + lead) * s, lineH: CAP * s + e };
@@ -540,7 +546,7 @@ function bakeGlow(ch: Character, spots: readonly LightSpot[], pools: readonly Li
     const cv = document.createElement("canvas");
     cv.width = w;
     cv.height = h;
-    cv.getContext("2d")!.putImageData(img, 0, 0);
+    art2d(cv).putImageData(img, 0, 0);
     pieces.push({ cv, x: x0, y: y0, flicker });
   };
   for (const s of spots) {
@@ -1808,6 +1814,73 @@ export class Renderer {
       if (performance.now() - t0 > budget) break;
     }
   }
+  /**
+   * The town's loading screen (Nov 11, Eric: "I have no issue with doing a loading screen for the town… loads it all in at once and
+   * then it stays there"): every picture the street town can show, painted and handed to `keep` (the painter's: uploaded now and
+   * kept for good), a slice at a time: each box's sides, back and front frames (and each a step darker), its roof for each of the
+   * four quarters, every home's, boss's, prop's and statue's frames, the hedges' tops, the sidekicks' frames. Spends up to `budgetMs` and says how much is
+   * done (0 to 1). (Measured Nov 11: nothing else is painted as you then walk and turn; the figures, tags and boards are drawn as
+   * before, on the atlas's spare pages.)
+   */
+  warm(budgetMs: number, keep: (src: CanvasImageSource) => void): number {
+    const jobs = (this.warmJobs ??= this.warmPlan(keep));
+    const t0 = performance.now();
+    while (this.warmAt0 < jobs.length) {
+      // (A job that can't be done yet (a sidekick's sheet still loading) waits for the next slice, up to `loadSheetWaitMs` all told.)
+      let done: boolean | void = true;
+      try {
+        done = jobs[this.warmAt0]!();
+      } catch (e) {
+        console.warn("town warm:", e); // (that one picture is made as it shows instead, as before)
+      }
+      if (done === false && t0 - (this.warmWait ||= t0) < TOWN_FEEL.loadSheetWaitMs) break;
+      this.warmAt0++;
+      if (performance.now() - t0 > budgetMs) break;
+    }
+    return jobs.length ? this.warmAt0 / jobs.length : 1;
+  }
+  private warmJobs: (() => boolean | void)[] | null = null;
+  private warmAt0 = 0;
+  private warmWait = 0;
+  /** The loading screen's jobs (`warm`): one picture (or one roof) each. */
+  private warmPlan(keep: (src: CanvasImageSource) => void): (() => boolean | void)[] {
+    const jobs: (() => boolean | void)[] = [];
+    const fcs = new Set<FrameCache>();
+    const frames = (fc: FrameCache) => {
+      if (fcs.has(fc)) return;
+      fcs.add(fc);
+      for (let k = 0; k < fc.frames.length; k++) jobs.push(() => keep(fc.get(k)));
+    };
+    const roof = (a: RoofArt) => {
+      for (const f of a.faces) {
+        keep(f.whole.cv);
+        for (const t of f.tris) keep(t.cv);
+      }
+    };
+    if (STREET_TOWN) {
+      for (const b of this.boxes) {
+        for (const list of [0, 1]) for (const w of this.warmList(b, list)) jobs.push(() => keep(w.dark ? w.fc.dark(w.k) : w.fc.get(w.k)));
+        for (let q = 0; q < 4; q++) jobs.push(() => roof(this.roofArt(b, q)));
+      }
+      for (const fc of this.hedgeTops) frames(fc);
+    }
+    for (const fc of this.propFrames) frames(fc);
+    for (const fc of this.houseFrames) frames(fc);
+    for (const fc of this.bossFrames) frames(fc);
+    for (let i = 0; i < STATUES.length; i++) jobs.push(() => keep(this.statueAt(i)));
+    // (The sidekicks' frames: cut from their sheets once they've loaded, as the town opens.)
+    for (const sp of this.spriteArt.values())
+      jobs.push(() => {
+        sp.cut();
+        if (!sp.ready) return false;
+        for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) keep(c);
+      });
+    // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
+    jobs.push(() => {
+      for (const at of this.warmAt) at.fill(-1);
+    });
+    return jobs;
+  }
   /** The quarters in the order they're painted ahead (planBoxes). */
   private readonly warmQ = new Int32Array(4);
   /** Each box's next picture to paint ahead in each of its two lists (warmList); -1: all painted. */
@@ -2556,7 +2629,7 @@ export class Renderer {
     c = document.createElement("canvas");
     c.width = w;
     c.height = h;
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     const ink = TABLE_INK;
     const fill = (x: number, y: number) => rows[y - 1]?.[x - 1] === "#";
     const inside = (x: number, y: number) => fill(x, y) || rows[y - 1]?.[x - 1] === "x";
@@ -2582,7 +2655,7 @@ export class Renderer {
     c = document.createElement("canvas");
     c.width = glyphs.reduce((n, gl) => n + gl[0]!.length + 1, 0) + 1;
     c.height = 7;
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     const ink = TABLE_CLOCK_INK;
     // The side first (a pixel under each lit one), then the face over it.
     for (const side of [true, false]) {
@@ -2741,7 +2814,7 @@ export class Renderer {
       cv.width = w;
       cv.height = hh;
     }
-    const g = cv.getContext("2d")!;
+    const g = art2d(cv);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, w, hh);
     g.setTransform(DPR, 0, 0, DPR, -x0 * DPR, -y0 * DPR);
@@ -3395,7 +3468,7 @@ export class Renderer {
     const { DPR } = this;
     const { cv, s } = a;
     a.fonts = fontsLoaded;
-    const g = cv.getContext("2d")!;
+    const g = art2d(cv);
     g.font = TAG_FONT[s]!;
     const w = (a.w = g.measureText(text).width + s * 1.25);
     const h = (a.h = s + (8 * s) / 11);

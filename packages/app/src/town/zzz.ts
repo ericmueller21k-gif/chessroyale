@@ -4,6 +4,8 @@
  * another. The Z is drawn once (a 5 × 5 pixel Z in a dark rim, made twice as big); a frame only places
  * three copies of it, so it costs nothing per frame but three image draws for each away pawn on screen (none when nobody's away).
  */
+import { art2d } from "./paint.ts";
+
 
 /** The Z's pixels (its dark rim is the pixels round them). */
 const Z = ["ooooo", "...o.", "..o..", ".o...", "ooooo"];
@@ -20,7 +22,7 @@ function glyph(): HTMLCanvasElement {
   if (art) return art;
   const c = document.createElement("canvas");
   c.width = c.height = SIDE * PX;
-  const g = c.getContext("2d")!;
+  const g = art2d(c);
   const on = (x: number, y: number) => Z[y - 1]?.[x - 1] === "o";
   for (let y = 0; y < SIDE; y++)
     for (let x = 0; x < SIDE; x++) {

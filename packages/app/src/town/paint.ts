@@ -71,6 +71,22 @@ export interface PaintLayer {
 
 export type Backend = "2d" | "webgl";
 
+/**
+ * The 2D context of a picture the town makes (a frame, a tag, a sign, text, a cloud, the bubble). Once the street town's WebGL is
+ * drawing (`artInMemory`, Nov 11), kept in memory rather than on the GPU (`willReadFrequently`): WebGL uploading a picture drawn on
+ * the GPU first waits for the GPU to finish what it's drawing (measured: 30 to 120 ms an upload, headless; on Eric's iPhone, the
+ * frame report's "Outside our code" and gaps), while one in memory is a plain copy. Today's town (Canvas 2D) draws its pictures on its
+ * own canvas: as before.
+ */
+export function art2d(c: HTMLCanvasElement): CanvasRenderingContext2D {
+  return c.getContext("2d", ART)!;
+}
+const ART: CanvasRenderingContext2DSettings = {};
+/** (paint-gl.ts, as the street town's WebGL starts) The town's pictures are made in memory from now on (`art2d`). */
+export function artInMemory(): void {
+  ART.willReadFrequently = true;
+}
+
 export interface Painter {
   readonly kind: Backend;
   readonly ctx: Ctx;
@@ -79,6 +95,13 @@ export interface Painter {
   done(): void;
   /** A new light layer (one canvas's size, sized by the caller). */
   layer(): PaintLayer;
+  /**
+   * (The street town's loading screen, Nov 11) `src` uploaded now and kept for good (WebGL: never let go, its atlas page never
+   * started again). Canvas 2D has nothing to upload: none.
+   */
+  keep?(src: CanvasImageSource): void;
+  /** (With `keep`) Uploads what it was handed, a slice of up to `budgetMs` at a time; says how much is done (0 to 1). */
+  kept?(budgetMs: number): number;
   /** `src`, drawn before, has been drawn on again: the next draw shows its new pixels (the WebGL backend uploads it again). */
   changed(src: CanvasImageSource): void;
   /**

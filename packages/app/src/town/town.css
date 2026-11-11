@@ -946,3 +946,10 @@ button.town-pic.player {
     font-size: 12px;
   }
 }
+
+/* The street town's loading screen (Nov 11; Town.tsx `loadTown`): the boss's loading card (.boss-loading, styles.css), over the whole
+   world and opaque, so the views the load draws behind it never show. */
+.town-loading {
+  z-index: 30;
+  background: #1b1830;
+}
