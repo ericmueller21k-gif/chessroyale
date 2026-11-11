@@ -514,7 +514,8 @@ export const zebraBattle = {
         ],
       });
     }
-    setZebra(b, z, next);
+    // (The whole state as worked out here: the trigger, spent, mustn't come back from the state before.)
+    b.state = { ...b.state, boss: { ...b.state.boss!, powers: { ...next, zebra: z } } };
     return { squashed, risen, gild };
   },
 

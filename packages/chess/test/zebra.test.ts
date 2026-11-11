@@ -361,6 +361,24 @@ describe("Gold Plate", () => {
     expect(zebraEvents(r.boss!.powers!.events).map((e) => e.kind)).toContain("goldPlate");
   });
 
+  it("the admins' trigger brings one Gold Plate at the start of his next turn, spent with it (never again from the same pull)", async () => {
+    const r = battle(24, { test: "dough" });
+    await crowdMove(r);
+    await r.playBoss(fakeEngine());
+    r.triggerUltimate();
+    expect(r.boss!.powers!.ultNext).toBe(true);
+    const gilds: number[] = [];
+    for (let i = 0; i < 5 && !r.isOver(); i++) {
+      await crowdMove(r);
+      gilds.push(zOf(r).gilds.length);
+      expect(r.boss!.powers!.ultNext).toBeFalsy();
+      if (r.isOver() || !r.bossToMove()) break;
+      await r.playBoss(fakeEngine());
+    }
+    expect(gilds[0]).toBe(1);
+    expect(gilds.at(-1)).toBe(1);
+  });
+
   it("your pawns can't take a gold piece (the allowed moves, the judge's too); your other pieces can; the rule lifts on a turn it would leave no move", () => {
     const r = battle(22);
     // (His queen on d5, gold; your pawns on c4 and e4 and your knight on c3 attack it.)
