@@ -24,7 +24,7 @@ PAD = 0.5
 TAIL = 4.0
 HEADROOM = 0.86  # the pieces' summed peak before encoding: -1.3 dBFS
 # boss id (packages/core's), the song's module, the intro's length in beats (0: the whole song loops).
-SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow")]
+SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio")]
 
 
 def render(module: str, intro_beats: float, part: str) -> np.ndarray:

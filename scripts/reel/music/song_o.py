@@ -1,4 +1,5 @@
-"""Song O (Eric, Nov 11): the hippo gardener's theme, a two-minute loop. His direction: a violin in "long violin kind
+"""Song O (Eric, Nov 11): Folio's theme, a two-minute loop (written for the hippo gardener; Eric, on the finished
+song: "it fits better for Folio not the hippo"). His direction: a violin in "long violin kind
 of pulls"; a "garden sort of greenhouse comfy" feeling with "simple little wind chiming"; and "once every minute sort
 of a big drop" with 808s, "dueling strings" and "almost like orchestra level symphony", then back to the chimes.
 A waltz, the only one of the boss themes in three: 132 beats a minute, 264 beats = 88 bars of three = 120.0 s.
@@ -15,7 +16,7 @@ Every melody, riff and chord progression here is original: none of it is any son
   bars 15-18   the hush: everything falls away, the violin hums low
   bars 19-44   the first drop (0:24.5 to 1:00): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the
                violins duel a bar each, share a riff in octaves, play together, then duel at once under a brass tune
-  bars 45-50   a small calm: the thump thins and fades, long pulls, soft chimes
+  bars 45-50   a small calm: the thump thins and fades, long pulls, water
   bar  51      near silence
   bars 52-88   the second drop (1:09.5 to the end), crazier: an octobass leads in slow pulls, the violins dueling
                under it; glitches and trance (a gated chord, runs, stutters, zaps); it ends on one hit and a stutter
@@ -310,8 +311,7 @@ def main(out: str) -> None:
         b = first * 3
         storm(first, 6, fade=(0.8, 0.62, 0.45, 0.3, 0.18, 0.08))
         bow(b, pulls, 0.13)
-        chimes(b + 6, b + 18, 12, 0.05)
-        drips(b + 9, b + 18, 4)
+        drips(b + 9, b + 18, 4)  # no chimes here (Eric: "the chimes at 1:04 mark and a few seconds after remove those")
         bird(b + 14, 0.04)
         garden(first + 4, harp=0.4, pizz=False), garden(first + 5, harp=0.8, pizz=False)
 
@@ -387,7 +387,7 @@ def main(out: str) -> None:
     trade(40, simultaneous=True, bars_=4)
     boom(78, 0.5), boom(102, 0.5), boom(120, 0.5)
 
-    # Bars 45-50: a small calm (1:00): the thump thins, the wobble slows and fades, long pulls, soft chimes.
+    # Bars 45-50: a small calm (1:00): the thump thins, the wobble slows and fades, long pulls, water.
     way_back(44, "A5:6 | F5:3 | D5:3 | E5:6")
 
     # Bar 51: near silence. The violin's last breath for a beat, then nothing.
