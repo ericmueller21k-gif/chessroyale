@@ -1,7 +1,8 @@
 /**
  * Records the landing page's demo reel (Eric, Nov 11; docs/decisions/2026-11-11-landing-reel.md), scene by scene, from the real
  * game on a phone screen (390 × 844 at 2x) under the e2e's local server. Each scene's frames go to
- * reports/demo/<scene>/frames/ (2x screenshots, back to back), with an ffconcat list (frames.txt) and a timeline of its moments (marks.json, seconds from its first
+ * reports/demo/<scene>/frames/ (2x screenshots, back to back), with an ffconcat list (frames.txt) and a timeline of its moments
+ * (marks.json, seconds from its first
  * frame), which scripts/encode-demo.sh cuts and joins. The Hidden Boss (scene 4) is pixel art drawn here, not a game screen; the
  * captions are drawn in the game's pixel font as see-through pictures (reports/demo/captions/).
  *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|hidden|captions]
@@ -14,7 +15,7 @@ import { HIDDEN_BOSS_CAPTION, REEL_CAPTIONS, drawHiddenBoss } from "./hidden-bos
 
 const OUT = "reports/demo";
 
-/** Every painted frame of `page` from now until `stop()`, written as JPEGs with their times; `mark(name)` notes a moment. */
+/** Frames of `page` from now until `stop()`, written as JPEGs with their times; `mark(name)` notes a moment. */
 async function recorder(page: Page, scene: string) {
   const dir = `${OUT}/${scene}`;
   let dropped = false;
