@@ -119,6 +119,13 @@ interface RoomArt {
    */
   people?: Readonly<Record<string, { readonly ch: Character; readonly anims: readonly string[] }>>;
   scene?: "zebra-front" | "zebra-back";
+  /**
+   * Only these pieces go see-through over you (its near wall and its door), though it has a floor's shape (Rolling Dough's rooms: the
+   * table and its board, the counter and the lamps stay solid; Eric, Nov 11, saw the table and its board ghosted as "artifacts"). Without
+   * it, a room with a floor's shape ghosts any piece nearer than you and over you (SHOP_FEEL.seeThrough: a cave's rock, the warehouse's
+   * door, the igloo's walls).
+   */
+  seeThru?: readonly string[];
   /** The squares its people stand on: nobody walks through them. */
   standing?: readonly Sq[];
   /** A dark wash over the whole room, its lights added over it (Rolling Dough's dim back room: SHOP_FEEL.zebra.dim). */
@@ -213,6 +220,7 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
         "crew-e": { ch: c.NPC_ZEBRA_CREW_E, anims: ["carry", "walk", "puff"] },
       },
       scene: "zebra-front" as const,
+      seeThru: ["entrance", "hem", "hem-bread"],
       standing: m.SHOP_ZEBRA_GUARDS.map((g) => g.square),
       // (The Big Mix's thump, the TV's click and the table's murmur are off: Eric, Nov 11, "it just sounds like pounding, it's really
       // distracting ... disable that for now". The sounds stay in zebra-sounds.ts for a later, gentler pass.)
@@ -241,6 +249,7 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
         },
         standing: ZEBRA_BACK_SET_SQUARES,
         scene: "zebra-back" as const,
+        seeThru: ["bdoor", "bhem", "bhem-post"],
         dim: SHOP_FEEL.zebra.dim,
         outside: "#2a1d14",
         fixCam: { x: m.SHOP_ZEBRA_BACK_MARKS.table[0] - m.SHOP_ZEBRA_BACK_CAM.west, y: m.SHOP_ZEBRA_BACK_MARKS.table[1] + m.SHOP_ZEBRA_BACK_CAM.south },
@@ -2201,7 +2210,8 @@ function startRoom(
     // (Jefferson's warehouse too: its tall roll-up door, nearer the camera than you just inside it.)
     // (Ginger's igloo too: its near walls, the tunnel's and its doorway's arch, nearer the camera than you; there only over your
     // figure's middle, so the candy wall beside a stair's foot, a row nearer, isn't ghosted for covering your edge.)
-    const thru = !!cave || !!art.floor;
+    // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`.)
+    const thru = !!cave || (!!art.floor && (!art.seeThru || art.seeThru.includes(u.name)));
     const over = lv ? overlaps(youMid(), x, y, x + w, y + h * s) : overlaps(youFig, x, y, x + w, y + h * s);
     g.globalAlpha = upAlpha(pt.depth, thru && youFig.on && u.z > youFig.z && over, thru);
     if (pieceEmis && darkNow && darkNow.level > 0) addEmis(pieceEmis, x, y, s, img.width, u.flip, g.globalAlpha * (1 - darkNow.black));
