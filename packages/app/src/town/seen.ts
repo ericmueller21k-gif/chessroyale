@@ -15,6 +15,9 @@ export const SEEN_REACH = 20;
 const L = STREET_GROUND_KEY.L;
 const cache = new Map<number, Uint8Array>();
 const CACHE_MAX = 400;
+/** How many views worked out and joined so far (the frame report's "sight lines": frame-report.ts). */
+let work = 0;
+export const seenWorked = (): number => work;
 
 /** Rays cast round a square: half a degree apart, so at the reach two neighbours are under a fifth of a square apart. */
 const RAYS = 720;
@@ -34,6 +37,7 @@ export function seenFrom(c0: number, r0: number): Uint8Array {
   const key = rr * N + cc;
   const hit = cache.get(key);
   if (hit) return hit;
+  work++;
   const out = new Uint8Array(N * N);
   out[key] = 1;
   for (let i = 0; i < RAYS; i++) {
@@ -76,6 +80,7 @@ const EMPTY = new Uint8Array(N * N);
 
 /** The squares seen from either of two squares (where you stand and where the camera stands), into `out`. */
 export function seenEither(a: Uint8Array, b: Uint8Array, out: Uint8Array): Uint8Array {
+  work++;
   for (let k = 0; k < out.length; k++) out[k] = a[k]! | b[k]!;
   return out;
 }

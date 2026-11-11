@@ -71,9 +71,9 @@ const TIMING_ASKED = (() => {
 export const TOWN_ASKED = (() => {
   try {
     const q = new URLSearchParams(globalThis.location?.search ?? "");
-    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), streetOff: q.get("street") === "off" };
+    return { crowd: Number(q.get("crowd")), fps: q.has("fps"), report: q.has("report"), streetOff: q.get("street") === "off" };
   } catch {
-    return { crowd: 0, fps: false, streetOff: false };
+    return { crowd: 0, fps: false, report: false, streetOff: false };
   }
 })();
 let gameOnDevice = true;

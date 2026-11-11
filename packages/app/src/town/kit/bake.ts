@@ -159,14 +159,15 @@ export function bakeFace(p: Poly, texel: (X: number, Y: number) => string | null
         if (dist[k - 1] === d - 1 || dist[k + 1] === d - 1 || dist[k - w] === d - 1 || dist[k + w] === d - 1) ((dist[k] = d), (deep = true));
       }
   const ink = o.soft || o.ink === null || !deep || p.tw < 4 || p.th < 4 ? null : (o.ink ?? "k");
-  const px = new Map<string, readonly number[]>();
+  // (Each key's color at each step, looked up by step then key: no string made a pixel. Nov 11: a roof's painting took 3 to 10 ms.)
+  const px = [new Map<string, readonly number[]>(), new Map<string, readonly number[]>(), new Map<string, readonly number[]>()];
   const color = (key: string, st: Step): readonly number[] => {
-    const id = `${key}${st}`;
-    let c = px.get(id);
+    const m = px[st + 1]!;
+    let c = m.get(key);
     if (!c) {
       const r = ramps[key];
       if (!r) throw new Error(`kit: no color for "${key}"`);
-      px.set(id, (c = rgba(r[st + 1]!)));
+      m.set(key, (c = rgba(r[st + 1]!)));
     }
     return c;
   };
@@ -238,7 +239,13 @@ export function triPixels(p: Poly, whole: Baked, a: number, b: number, c: number
       const k = wj * whole.w + wi;
       if (!whole.mask[k]) continue;
       if (!inside(e, p.tx0 - 1 + wi + 0.5, p.ty0 - 1 + wj + 0.5, 1.2)) continue;
-      data.set(whole.data.subarray(k * 4, k * 4 + 4), (j * w + i) * 4);
+      // (Byte by byte: a view a pixel, `subarray`, cost more than the copy.)
+      const q = (j * w + i) * 4;
+      const s = k * 4;
+      data[q] = whole.data[s]!;
+      data[q + 1] = whole.data[s + 1]!;
+      data[q + 2] = whole.data[s + 2]!;
+      data[q + 3] = whole.data[s + 3]!;
     }
   // (Its texture (0, 0) at its pixel (1 - tx0 - X0, 1 - ty0 - Y0).)
   return { w, h, data, ox: 1 - p.tx0 - X0, oy: 1 - p.ty0 - Y0 };

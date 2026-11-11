@@ -1031,7 +1031,9 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
     `mapMaxPx`), `mapOpacity` 0.7, rounded; under the chat where the chat takes the whole top (a narrow frame). Drawn once a size to its
     canvas; each frame only your dot's transform moves (`MapDot`, `mapFrame`). The map button (`TownChatTools`) turns it off and on,
     stored per device (`brc.townMap`, on by default), grayed inside a building. A tap opens it large in the middle (every boss home's
-    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. The chips and `pick` keep off its box
+    chip portrait, the park and Colosseum icons, your dot; no names); a tap anywhere closes it. A tap on a boss's portrait or its home's
+    block (within 2 squares of its middle, the nearest) also walks you to that home as a tap on it in the town would, by its door, with
+    no card (Nov 11, `walkHome`; [2026-11-11-map-walk.md](../decisions/2026-11-11-map-walk.md)). The chips and `pick` keep off its box
     (`MAP_BOX`).
   - **Test hooks:** `__townCam()`'s `base`, `snapped`, `gesture`, `run` and `you` (your pawn's drawn box).
   - **Tests:** `packages/app/test/town-controls.test.ts`, `e2e/town-controls.spec.ts`.
@@ -1040,7 +1042,11 @@ and Seam Avenue's camera turn, is done; then the switch goes). Eric approved its
 
 ## Frame-rate pill (`?fps`)
 `/town?fps` shows anyone (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access) a pill in the world's top-right corner, "60 fps · 16.7 ms · 2D": frames over the last second and their mean time, text set twice a second from plain counters in the frame loop, then the drawing's backend ("· WebGL" in the street town; added by town.css from `data-backend`, so the pill's text stays the numbers). Without `?fps` there is none. `?crowd=N` is anyone's too (only that device draws the pawns).
-`?fps`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+`?fps`, `?report`, `?crowd=N` and `?street=off` are read once as the page opens (`TOWN_ASKED`, test-switches.ts), so a later replaceState can't lose them; they apply as the town opens.
+
+## Frame report (`?report`, Nov 11)
+`/town?report`, anyone's: from your first move, every frame for 30 s (or until **Done** on the pill at the top) is recorded in typed arrays made once (`town/frame-report.ts`; `REC` null without it, so the marks in `Town.tsx`, `render.ts` and `paint-gl.ts` are null checks): its time, the time of each part (logic, camera, sky, ground, placing and sorting, buildings, props, bosses, you, other players, lights, labels, WebGL submit, chips, minimap, and wherever they happen new pictures painted, sight lines and texture uploads; the rest is "outside our code": the browser, the GPU, garbage collection), and what was happening (walking, turning and how fast, zoom, pictures painted, uploads, an atlas reset, a long gap). Then one panel the size of the box to screenshot (`frame-report-panel.ts`): device, fps median / 5th / 1st percentile, the mean and worst ms a part, all and split by walk / turn / load, where the most time went, the worst 10 frames. The chat does no per-frame work. Hook `__townReport()`; tests `packages/app/test/town-frame-report.test.ts`, `e2e/town-street.spec.ts`.
+**Painting ahead (Nov 11):** each frame `planBoxes` paints, nearest first, the pictures of the boxes in reach: always the faced quarter's roofs and the sides' and backs' pictures (and shaded steps), mid-turn the next quarter's roofs (`boxBakeMs`, 1.5 ms); standing still, also the fronts' shaded frames and the other quarters' roofs (`boxBakeStillMs`, 4 ms, while the view is at rest). Before, a first look round painted hundreds of them as they showed. [Decision](../decisions/2026-11-11-town-frame-report.md).
 
 ## The feel: `town/feel.ts`
 
