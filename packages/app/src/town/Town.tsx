@@ -43,7 +43,7 @@ import { play, warmSounds } from "../sound.ts";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
 import { SHOP_FEEL, TOWN_FEEL } from "./feel.ts";
-import { shopOf } from "./shops/shops.ts";
+import { canChallengeInside, shopOf } from "./shops/shops.ts";
 import type { LoadedRoom, RoomIntro, ShopCtl, ShopRoom } from "./shops/ShopRoom.tsx";
 import { CHALLENGE_FEEL, introOf, nextFlow, type ChallengeEvent, type ChallengeFlow } from "./shops/challenge.ts";
 import { BarsIcon, SwordsIcon } from "./CardIcons.tsx";
@@ -163,7 +163,11 @@ export function TownScreen({
   const [card, setCard] = useState<Card | null>(null);
   // Inside a shop (Nov 2, round 1; shops/ShopRoom.tsx, loaded when you go in): the room, and its zoom (− / + switch Close and the
   // town's zoomed-in camera there). `fade` is the black the town zooms into and the room fades in from.
-  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null } | null>(null);
+  // (Rolling Dough, Nov 11: a home with two rooms; `arrived` you came through the door between them, `n` the room's mount, a new one each
+  // time through it.)
+  const [inside, setInside] = useState<{ room: LoadedRoom; View: typeof ShopRoom; intro: RoomIntro | null; arrived?: boolean; n?: number } | null>(null);
+  const insideNow = useRef(inside);
+  insideNow.current = inside;
   /** The shop you're in (its home's id), for the away rule's beats; null in the town square. */
   const shopIn = useRef<string | null>(null);
   shopIn.current = inside?.room.def.home ?? null;
@@ -254,6 +258,60 @@ export function TownScreen({
       await storm.out();
       step("stormGone");
     }
+  };
+  /**
+   * Through the door to the home's other room (Rolling Dough's back room, Nov 11): the same fade as going in (to black, the other room
+   * loads, from black), no zoom; you arrive just inside its door. Each room keeps its own camera and clock: it starts again each time.
+   */
+  const goThrough = async () => {
+    const at = insideNow.current;
+    if (doorBusy.current || !at || flow.current !== "town") return;
+    doorBusy.current = true;
+    const F = SHOP_FEEL;
+    const to = at.room.def.part === "back" ? "front" : "back";
+    play("zebraDoor");
+    const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    const room = await load.catch(() => null);
+    if (!room || !box.current) {
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      return;
+    }
+    setShopOut(F.startZoom === 1);
+    setInside({ room, View: at.View, intro: null, arrived: true, n: (at.n ?? 0) + 1 });
+  };
+  /**
+   * A challenge started inside (Don Dough's, from his card in his back room after his talk beat; Nov 11): his intro and the front room
+   * load, the back room fades to black and the front room fades in in challenge mode (Eric: "The main room is still where you fight"):
+   * you and he come out of the back door to the pad, his goons carrying the set-up after you, then his transition and the battle.
+   * "Back to town" puts you at his door in the town, where you stood to go in.
+   */
+  const challengeHere = async () => {
+    const at = insideNow.current;
+    if (doorBusy.current || !at || flow.current !== "town") return;
+    const id = at.room.def.home;
+    doorBusy.current = true;
+    step("fight");
+    step("atDoor");
+    const F = SHOP_FEEL;
+    // (Eric, Nov 11: "The main room is still where you fight": his intro plays in the front room, you both coming out of the back door.)
+    const intro = import("./shops/intro.ts").then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
+    const front = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id, "front"));
+    fadeTo(1, F.fadeMs);
+    await later(F.fadeMs);
+    const fight = await intro.catch(() => null);
+    const room = await front.catch(() => null);
+    if (!fight?.intro || !room || !box.current) {
+      step("cancel");
+      fadeTo(0, F.fadeMs);
+      doorBusy.current = false;
+      return;
+    }
+    ctl.current?.standHere();
+    step("inside");
+    setInside({ room, View: at.View, intro: { intro: fight.intro, onMarks: () => step("onMarks"), onDone: () => void stormIn(id, fight.m, fight.intro) }, arrived: true, n: (at.n ?? 0) + 1 });
   };
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
@@ -376,6 +434,7 @@ export function TownScreen({
         {/* Inside a shop: the room over the town (the town waits, as you left it). */}
         {inside && (
           <inside.View
+            key={inside.n ?? 0}
             room={inside.room}
             youArt={() => ctl.current?.youArt() ?? null}
             youRider={() => ctl.current?.youRider() ?? null}
@@ -386,6 +445,10 @@ export function TownScreen({
             ctl={shopCtl}
             intro={inside.intro}
             zzz={() => !!ctl.current?.town.you.zzz}
+            arrived={!!inside.arrived}
+            onPass={() => void goThrough()}
+            onChallenge={() => void challengeHere()}
+            canChallenge={canChallengeInside(inside.room.def.home)}
           />
         )}
         <div class="town-overlay">
@@ -1986,6 +2049,8 @@ function startTown(
     },
     /** Where you stood as you challenged a boss (null: no challenge). */
     challengeStand: () => challengeStand,
+    /** A challenge started inside a home (Don Dough's): you come back to where you stand in the town now, at its door. */
+    standHere: () => void (challengeStand = standOf(town.you.walker)),
     endChallenge,
     /** Inside a shop the town waits (`away`: no frames); coming out, it goes on. */
     pause: () => {

@@ -20,7 +20,7 @@ describe("an admin's town: Timber's Lumber Lodge (Nov 3)", () => {
   it("has every home, the lodge among them, west of the Colosseum", () => {
     expect(HOMES).toEqual(ALL_HOMES);
     // (Sixteen since Dash's Kicks, Nov 3: town-dash.test.ts.)
-    expect(HOMES).toHaveLength(16);
+    expect(HOMES).toHaveLength(17);
     expect(lodge).toMatchObject({ boss: "Timber", name: "Timber's Lumber Lodge", cx: 11, cy: 32, half: 1.5, foot: 0.5 });
   });
 

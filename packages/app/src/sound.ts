@@ -26,6 +26,7 @@ import { tigerSound, type TigerSound } from "./characters/tiger-sounds.ts";
 import { folioSound, type FolioSound } from "./characters/folio-sounds.ts";
 import { timberSound, type TimberSound } from "./characters/timber-sounds.ts";
 import { dashSound, type DashSound } from "./characters/dash-sounds.ts";
+import { zebraSound, type ZebraSound } from "./characters/zebra-sounds.ts";
 import { clawSound, type ClawSound } from "./claw/sounds.ts";
 import { godKingSound } from "./characters/god-king-sounds.ts";
 import { captureWorkerError } from "./problems.ts";
@@ -484,6 +485,7 @@ const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, c
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
 const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
 const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
+const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
 /** The God King tapped with no charges left: his soft "can't" (god-king-sounds.ts). */
@@ -1062,6 +1064,11 @@ export type SoundName =
   | "dashHello"
   | "dashDing"
   | "dashChomp"
+  // Rolling Dough, Don Dough's bakery (Nov 11): its room sounds, synthesized and quiet, see characters/zebra-sounds.ts.
+  | "zebraDoor"
+  | "zebraThump"
+  | "zebraClick"
+  | "zebraMurmur"
   | "dashStep"
   // (His intro's, Nov 5: the shoe boxes landing, his jacket dusted off.)
   | "dashThud"
@@ -1423,6 +1430,10 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   dashHello: dashBoss("hello"),
   dashDing: dashBoss("ding"),
   dashChomp: dashBoss("chomp"),
+  zebraDoor: zebraRoom("door"),
+  zebraThump: zebraRoom("thump"),
+  zebraClick: zebraRoom("click"),
+  zebraMurmur: zebraRoom("murmur"),
   dashStep: dashBoss("step"),
   dashThud: dashBoss("thud"),
   dashBrush: dashBoss("brush"),
@@ -1718,6 +1729,10 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashHello: [["dash", "hello"]],
   dashDing: [["dash", "ding"]],
   dashChomp: [["dash", "chomp"]],
+  zebraDoor: [["zebra", "door"]],
+  zebraThump: [["zebra", "thump"]],
+  zebraClick: [["zebra", "click"]],
+  zebraMurmur: [["zebra", "murmur"]],
   dashStep: [["dash", "step"]],
   dashThud: [["dash", "thud"]],
   dashBrush: [["dash", "brush"]],

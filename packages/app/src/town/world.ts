@@ -263,7 +263,15 @@ export const tableAt = (c: number, r: number): Table | null => TABLES.find((t) =
  */
 export const START: Sq = STREET_TOWN ? STREET_START : { c: PARK.c0 + 9, r: PARK.r1 - 3 };
 
-export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash";
+export type HomeId = "tiger" | "gingerbread" | "grex" | "hollow" | "moo" | "clown" | "bigboy" | "sawyer" | "pig" | "smudgy" | "hopper" | "gardener" | "alfil" | "folio" | "timber" | "dash" | "zebra";
+/**
+ * The homes whose boss isn't out in the town: Rolling Dough (Nov 11, Eric's design: Don Dough is the kingpin "in the back room (not
+ * out in the town)"; you meet him in his bakery's back room). They're last in ALL_HOMES, so the town's bosses keep the homes' order.
+ */
+export type IndoorId = "zebra";
+/** A home whose boss roams the town round it. */
+export type TownBossId = Exclude<HomeId, IndoorId>;
+export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra";
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -349,6 +357,13 @@ export const ALL_HOMES: readonly Home[] = (
     // hanging sneakers' pole on its right stays on its plot, four open columns from the lodge's. Its ring his jacket's teal. In an
     // admin's town only while he's in the game for admins first: ADMIN_TOWN. docs/decisions/2026-11-03-dash-home.md.)
     { id: "dash", boss: "Dash", name: "Dash's Kicks", color: "#137a7a", cx: 4, cy: 34 },
+    // (Nov 11: Rolling Dough, Don Dough's bakery, Big Boy's size (Eric: "the total size will be like the other ones"). Today's town:
+    // (9, 1), in the north-west between Puddles' Garden, Moo & Moon Meadow (across the wrap) and Chub & Chirp's, 7.1 to 7.6 squares
+    // from each, the best open ground left, as Dash's. The street town: its lot on South Street between Puddles' Garden and Smudgy's
+    // Gallery (street-plan.json). No boss roams it: Don stays in his back room (hasTownBoss). Last of the homes, so the town's bosses
+    // keep the homes' order. Its ring the awning's burgundy. In an admin's town only while he's in the game for admins first.
+    // docs/decisions/2026-11-11-zebra-home.md.)
+    { id: "zebra", boss: "Don Dough", name: "Rolling Dough", color: "#8e2b3a", cx: 9, cy: 1 },
   ] satisfies Omit<Home, "half" | "foot" | "hw" | "hd" | "door" | "entry" | "rest" | "wander">[]
 ).map((h) => (STREET_TOWN ? streetHome(h) : { ...h, half: 1.5, foot: 0.5, hw: 1, hd: 1, door: { c: h.cx, r: wrapI(h.cy - 2) }, entry: { c: h.cx, r: wrapI(h.cy - 1) }, rest: { c: h.cx, r: wrapI(h.cy - 2) }, wander: null }));
 /**
@@ -858,7 +873,7 @@ export function tableStates(people: readonly Person[]): TableState[] {
 }
 
 export interface Boss {
-  home: Home;
+  home: Home & { id: TownBossId };
   walker: Walker;
   /** When it next walks (null: pick a pause). */
   nextAt: number | null;
@@ -944,7 +959,7 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     you.walker.view = stand.view;
   }
   // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square.
-  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker(home.rest, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
+  const bosses: Boss[] = HOMES.filter(hasTownBoss).map((home) => ({ home, walker: new Walker(home.rest, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
   const order = TOWN_BOTS.map((_, i) => i);
