@@ -483,8 +483,9 @@ function LineMenu({ box, log }: { box: { current: HTMLDivElement | null }; log: 
     log.hold(true);
     return () => log.hold(false);
   }, [!!open]);
-  // A tap anywhere else, or Escape, closes it; so does a report's answer, after a moment.
-  useEffect(() => {
+  // A tap anywhere else, or Escape, closes it; so does a report's answer, after a moment. (A layout effect: an effect waits for a
+  // paint, and an Escape or a tap straight after the open was lost: town-chat.spec.ts, CI, Nov 11.)
+  useLayoutEffect(() => {
     if (!open) return;
     const away = (e: PointerEvent) => {
       if (!menu.current?.contains(e.target as Node)) setOpen(null);
