@@ -162,6 +162,35 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   // Signed in (the town's chat is for signed-in players: the server's lines too).
   // (A name of its own: the town's chat is shared with the other project's run.)
   const me = `Ch${project[0]}${Math.random().toString(36).slice(2, 6)}`;
+  // (What the town's chat asked the server and heard, each /api/live: printed if the server's lines don't show. On CI the log once
+  // stayed empty for 15 s after Back to town while the server held both lines, and two batches couldn't reproduce it locally:
+  // docs/decisions/2026-11-11-flaky-batch.md. A request with no answer shows as "asked" alone.)
+  const live: string[] = [];
+  const t0 = Date.now();
+  const note = (s: string) => {
+    live.push(`${((Date.now() - t0) / 1000).toFixed(1)}s ${s}`);
+    if (live.length > 60) live.shift();
+  };
+  const liveUrl = (u: string) => (u.includes("/api/live") ? u.slice(u.indexOf("/api/live")) : null);
+  page.on("request", (r) => liveUrl(r.url()) && note(`asked ${liveUrl(r.url())}`));
+  page.on("requestfailed", (r) => liveUrl(r.url()) && note(`failed ${liveUrl(r.url())}: ${r.failure()?.errorText}`));
+  page.on("response", (r) => {
+    const u = liveUrl(r.url());
+    if (!u) return;
+    void r.json().then(
+      (b: { town?: { room?: string; n?: number; lines?: { text: string }[]; reset?: boolean; paused?: boolean } }) =>
+        note(`${r.status()} ${u} town=${b.town ? JSON.stringify({ ...b.town, lines: b.town.lines?.map((l) => l.text) }) : "none"}`),
+      () => note(`${r.status()} ${u} (no body)`),
+    );
+  });
+  const linesAre = (want: unknown[]) =>
+    expect
+      .poll(() => serverLines(page, me), { timeout: 15_000 })
+      .toEqual(want)
+      .catch(async (e: Error) => {
+        const log = await page.locator(".tc-line").allTextContents().catch(() => []);
+        throw new Error(`${e.message}\n\nThe chat log's lines: ${JSON.stringify(log)}\nThe town's /api/live:\n${live.join("\n")}`);
+      });
   await named(page, me);
   // (Once the page has its account: signing in a request's own new account would race the page's.)
   await page.goto("/town");
@@ -185,7 +214,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
     if (how === "Resign") await page.getByRole("button", { name: "Back to town" }).click();
     await backAt(page, stood);
     // Its start line, and no outcome.
-    await expect.poll(() => serverLines(page, me), { timeout: 15_000 }).toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`))]);
+    await linesAre([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`))]);
   }
 
   // ---- A second challenge, finished (?mate=1: the boss mates you at once, so the battle ends by itself and its result shows).
@@ -265,9 +294,7 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await expect.poll(() => page.evaluate(() => (window as any).__townCam().speechLine as string), { timeout: 3_000, intervals: [100] }).toBe("Good game! The Pyramid door stays open for you.");
   // The server's lines: still the one start line (the quit left it open: no second), and this battle's outcome (?mate=1 plays
   // your moves for you, none of them yours: no count; the counts are packages/server/test/town-chat.test.ts's).
-  await expect
-    .poll(() => serverLines(page, me), { timeout: 15_000 })
-    .toEqual([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`)), expect.stringMatching(new RegExp(`\\] Alfil beat ${me}( in \\d+ moves?)?\\.$`))]);
+  await linesAre([expect.stringMatching(new RegExp(`\\] ${me} challenged Alfil!$`)), expect.stringMatching(new RegExp(`\\] Alfil beat ${me}( in \\d+ moves?)?\\.$`))]);
   await shot("08-back-in-town");
   expect(errors).toEqual([]);
 });
