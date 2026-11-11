@@ -115,6 +115,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     the atlas for the next reset.
   - Measure on a device: a headless frame report can miss what costs a phone (Eric's iPhone run found both).
 
+- **Floor tiles that stood up** (Nov 11, [story](../docs/history/lessons.md#floor-tiles-that-stood-up-nov-11-2026)):
+  - A room's floor tiles' names start `floor-` (room.ts `isFloor`), or they stand up as pieces every frame. A new room's test
+    checks every square has a floor tile baked in (`shop-zebra.test.ts`).
+  - A rule made for one kind of room (a cave's see-through) is opted into by what it's for, not by a field another room also
+    has. Walk round every piece in a new room mid-walk, not only at rest.
+
 - **Lag that grows with the match** (Oct 9, [story](../docs/history/lessons.md#lag-that-grows-with-the-match-oct-9-2026)):
   - Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
     looks like a field gets read dozens of times a frame, so it must never rebuild anything.

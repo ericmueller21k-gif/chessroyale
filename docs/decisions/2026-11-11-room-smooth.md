@@ -65,3 +65,21 @@ longer slowed 4x. The zoom's worst frame barely changed: on a first visit it is 
 can't be split), not the painting. The zoom and the fade are the browser's own transitions, so they keep moving through it; only the
 town's figures pause. Second visits skip the code and art. If the black is too long on Eric's phone, his boss-in-the-black fallback
 (above) is the next step.
+
+## Fix round: ghosts and dark patches in Rolling Dough (Nov 11)
+
+**Eric (iPhone 14 Plus, on main):** "floor shading bug when running around, these artifacts keep appearing, and the same in the main
+bakery": in the back room, the table and its board ghosted, and dark squares on the floor beside and under him.
+
+- **On main and on this PR alike; not the kept back (#638) nor WebGL (#641).** Reproduced headless on both, and with `?back=2d`.
+- **The cause:** the back room's floor tiles were named `bfloor-*` and `rug-*`; room.ts `isFloor` knows `floor-`. So none was baked
+  into the floor: all 196 stood up as pieces every frame (130 on screen), and each went see-through (0.35) when you walked behind it,
+  showing the bare floor under it: the dark squares. The front room's two door mats likewise. And the see-through rule (a cave's)
+  reaches every room with a floor's shape, so at the table's end (his Challenge spot) the whole table and board ghosted.
+- **The fix:** the tiles are `floor-back-*`, `floor-rug-*`, `floor-mat-*`. A room can list the only pieces that go see-through
+  (`seeThru`): Rolling Dough's doors and near walls, so you're never hidden at a door and the table stays solid. Its rug now lies in
+  the floor's perspective (it was stepped). The back room draws 23 pieces a frame where it drew 130 (those on screen).
+- **`?report` starting in a room:** works on this PR (Again inside a room, then a walk: "Recording 2 s"); on main it stayed on "walk
+  or turn to start", Eric's "won't turn on when I go in".
+- **Eric's main report (the before for his phone):** rooms 620 frames, 45 fps median, "Outside our code" 21 ms a frame against ours
+  about 0.4: the 2D floor this PR moves to WebGL.
