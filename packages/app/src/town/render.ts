@@ -316,6 +316,8 @@ class SpriteFrames {
   readonly top: Record<SpriteAnim, number>;
   readonly squares: number;
   ready = false;
+  /** Its sheet didn't load. */
+  failed = false;
   private img: HTMLImageElement | null = null;
   constructor(readonly sheet: SidekickSheet) {
     for (const a of SPRITE_ANIMS) {
@@ -330,10 +332,10 @@ class SpriteFrames {
     img.src = SHEET_URL[sheet.id.replace(/^sidekick-/, "")]!;
     // (Decoded off the main thread as it loads (Nov 11): cutting its frames, on the town's loading screen, is then quick. A browser
     // that can't decode ahead: as it loads, as before.)
-    // (One that fails to load is never drawn, as before.)
-    const got = () => void (img.naturalWidth && (this.img = img));
-    if (img.decode) img.decode().then(got, () => (img.complete ? got() : (img.onload = got)));
-    else img.onload = got;
+    // (One that fails to load is never drawn, as before; the loading screen doesn't wait for it.)
+    const got = () => void (img.naturalWidth ? (this.img = img) : (this.failed = true));
+    if (img.decode) img.decode().then(got, () => (img.complete ? got() : ((img.onload = got), (img.onerror = got))));
+    else ((img.onload = got), (img.onerror = got));
   }
   /** Its frames cut from its sheet, once, the first time it's drawn (or its face asked for) after the sheet has loaded. */
   cut(): void {
@@ -1872,7 +1874,7 @@ export class Renderer {
     for (const sp of this.spriteArt.values())
       jobs.push(() => {
         sp.cut();
-        if (!sp.ready) return false;
+        if (!sp.ready) return sp.failed ? undefined : false;
         for (const a of SPRITE_ANIMS) for (const c of sp.frames[a]) keep(c);
       });
     // (Painted ahead by planBoxes from here on: nothing left to paint. Marked done so it doesn't walk them again.)
