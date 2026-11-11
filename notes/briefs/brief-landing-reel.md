@@ -44,3 +44,6 @@ Wait for green CI.
 
 ## Eric, Nov 11 (later): computer layout
 "A wide rectangle on the computer, like a cinema ... a much larger size of the entire screen on desktop. It should be captivating. If that means we need to shrink the sign in ... the desktop is probably going to be a different ratio than the phone ... somebody sitting back 3 feet." (Director: a 16:9 computer reel recorded on the desktop layouts, ~70% of the width / ≤62% of the height, sign-in a compact panel beside or under it, above the fold at 1280×800.)
+
+## Eric, Nov 11: two panes on a computer
+"Get rid of that questions thing and put it to the side. Move the whole screen to the left, fill it up mostly ... the questions can just be a scrollable thing underneath the sign-in ... the right side is scrollable, but the left, where the video plays, is not." (Helper on claude/landing-reel, Opus medium.)
