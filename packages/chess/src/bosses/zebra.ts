@@ -11,10 +11,11 @@
  * - **The drop:** at the end of a few of his turns early in the battle (after crowd move `next`: the first drawn from
  *   doughFirst, each next one doughGap of the crowd's moves later, none after doughLast; at most doughDrops a battle and
  *   doughLive on the board at once), a lump of dough on an empty square of his half. Everyone sees what it will rise as
- *   (doughOdds among the kinds he can have now: never a ninth pawn or more pieces than promotions could make) and its oven
+ *   (doughOdds, stepping down to a kind he can have now: never a ninth pawn, more pieces than promotions could make, or past
+ *   doughLeadMax pawns ahead of you on material, a queen's excepted) and its oven
  *   timer, starting at doughTimers[kind] minutes (Eric's: pawn 4, knight and bishop 7, rook 10, queen 15).
- * - **Where** (doughSquare): never his back rank, the en passant square, a lump's square, or a square one of the crowd's moves
- *   reaches now (a free squash isn't a fight); a pawn, knight or bishop on the two ranks of his half nearest the middle, a rook
+ * - **Where** (doughSquare): never his back rank, the en passant square or a lump's square (doughReach "out": nor a square one
+ *   of the crowd's moves reaches now; the sim ships "any", so it can be squashed); a pawn, knight or bishop on the two ranks of his half nearest the middle, a rook
  *   or queen on the two ranks behind them, on a file where a pawn of the crowd's stands below it (Eric: "near his side somewhere,
  *   but somewhere that's gettable for the pawn"). In a seeded order; none fits: it waits for his next turn's end.
  * - **The timer:** one minute off for every move, the crowd's and his (afterCrowdMove, afterBossMove). At 00:00 his piece

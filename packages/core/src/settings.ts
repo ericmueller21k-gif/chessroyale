@@ -1789,11 +1789,13 @@ export const BOSS_POWERS = {
    * yours landing on it squashes it. The rest is the sim's (reports/zebra-sim.md):
    * - doughDrops a battle at most; the first after crowd move doughFirst (from the seed, in the range), each next one
    *   doughGap of the crowd's moves later (from the seed), none after crowd move doughLast; at most doughLive on the board at once.
-   * - What it is: doughOdds (rook and queen rare, Eric), among the kinds he can have now (never a ninth pawn or more pieces than
-   *   promotions could make).
-   * - Where: an empty square of his half off his back rank that none of your moves reaches now; a pawn, knight or bishop on the
-   *   two ranks nearest the middle, a rook or queen nearer his side on a file where a pawn of yours stands below it (Eric:
-   *   "somewhere that's gettable for the pawn"); in a seeded order.
+   * - What it is: doughOdds (rook and queen rare, Eric), stepping down to a kind he can have now (never a ninth pawn or more pieces
+   *   than promotions could make, never past doughLeadMax pawns ahead: below).
+   * - Where: an empty square of his half off his back rank; a pawn, knight or bishop on the two ranks nearest the middle, a rook or
+   *   queen nearer his side on a file where a pawn of yours stands below it (Eric: "somewhere that's gettable for the pawn"); in a
+   *   seeded order.
+   * The sim's (reports/zebra-sim.md): with these, 2.1 pawns risen a battle (a queen in 1 in 10), the crowd 0.05 against the plain
+   * boss's 0.10.
    */
   doughTimers: { p: 4, n: 7, b: 7, r: 10, q: 15 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
   doughOdds: { p: 0.5, n: 0.2, b: 0.2, r: 0.06, q: 0.04 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
