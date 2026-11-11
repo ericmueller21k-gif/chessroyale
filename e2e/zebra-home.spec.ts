@@ -12,6 +12,7 @@ import { asAdmin, test, townReady } from "./helpers.ts";
  */
 test.use({ actionTimeout: 15_000 });
 const SHOTS = process.env.ZEBRA_SHOTS;
+const ZEBRA_LINES = { draw: "Hey! Who let HIM back here?!", relax: "Relax, relax. Put the bread down." };
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -122,6 +123,8 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
       return f.anim === "watch" && f.frame === watchOf(g, z.you[0], z.you[1]) ? f.frame : `${f.anim} ${f.frame} (want ${watchOf(g, z.you[0], z.you[1])})`;
     });
   };
+  await page.waitForTimeout(600);
+  await shot(page, "front-door");
   const seen = new Set<string>();
   const first = await guardsWatch();
   first.forEach((f) => expect(typeof f, String(f)).toBe("number"));
@@ -169,6 +172,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   const steps: string[] = [];
   const lines: string[] = [];
   const anims = new Set<string>();
+  const shotsTaken = new Set<string>();
   await expect
     .poll(
       async () => {
@@ -176,9 +180,11 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
         if (z.beat && steps[steps.length - 1] !== z.beat) steps.push(z.beat);
         if (z.say && lines[lines.length - 1] !== z.say.text) lines.push(z.say.text);
         for (const f of z.figs) if (f.name !== "don") anims.add(f.anim);
-        if (z.beat === "aim" && !(await page.evaluate(() => (window as unknown as { __zebraShot?: boolean }).__zebraShot))) {
-          await page.evaluate(() => ((window as unknown as { __zebraShot?: boolean }).__zebraShot = true));
-          await shot(page, "talk-aim");
+        // (The stills: the crew aiming with Fedora's line; Don waving them down with his.)
+        const still = z.say?.text === ZEBRA_LINES.draw ? "talk-aim" : z.say?.text === ZEBRA_LINES.relax ? "talk-relax" : null;
+        if (SHOTS && still && !shotsTaken.has(still)) {
+          shotsTaken.add(still);
+          await shot(page, still);
         }
         return z.beat;
       },
