@@ -10253,6 +10253,13 @@ button.fd-logo {
     .fd-hero .fd-pawn-hero {
       height: clamp(40px, calc(100cqh - 22px), 130px);
     }
+    /* The link (the director, Nov 11): its box at the card's bottom edge and 13 px words, so the words clear the name's words. */
+    .fd-hero-profile {
+      bottom: 0;
+    }
+    .fd-hero-profile-text {
+      font-size: 13px;
+    }
   }
 }
 /* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over

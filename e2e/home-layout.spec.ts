@@ -551,7 +551,7 @@ test("computer: no pawn and no chat button in the top area (the side menu has Pr
   await expect(page.locator(".fd-ring, .fd-top-right, .fd-top-chat")).toHaveCount(0);
 });
 
-test("the card's View profile is a row above your name, its chevron 16 px from the card's right edge, 44 px tall, and it opens your profile", async ({ page }) => {
+test("the card's View profile sits in its bottom-right corner, its chevron 16 px from the edge, 44 px tall, and opens your profile", async ({ page }) => {
   await named(page, "Columned");
   await page.setViewportSize(desktop() ? { width: 1440, height: 900 } : { width: 390, height: 844 });
   await page.goto("/");
@@ -563,25 +563,59 @@ test("the card's View profile is a row above your name, its chevron 16 px from t
   const inset = card.x + card.width - (chevron.x + chevron.width);
   expect(inset, "the chevron's inset from the right").toBeGreaterThanOrEqual(14);
   expect(inset, "the chevron's inset from the right").toBeLessThanOrEqual(18);
+  expect(card.y + card.height - (b.y + b.height), "the box's bottom, near the card's").toBeLessThanOrEqual(14);
   expect(b.height, "tap height").toBeGreaterThanOrEqual(44);
-  // Its own row above your name's line (the director, Nov 11), so the words never sit on the name.
-  const name = (await page.locator(".fd-hero-name").boundingBox())!;
-  expect(b.y + b.height, "the row above the name").toBeLessThanOrEqual(name.y + 1);
   await link.click();
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
 });
 
-test("phone: View profile's box never touches your name's box, at 360×640, 390×664 and 390×844", async ({ page }) => {
+/**
+ * Nov 11 (the director's calls): on a card under 110 px (a 360 × 640 phone) the link's words never touch the name's words, and its
+ * 44 px box may overlap the name's box by up to 14 px (the link on top). Every other card: the link's box touches no part of the
+ * name, icon or level. A phone's pawn is checked by pixels (the link sits over the empty part of its box, not its drawing).
+ */
+test("phone: View profile never covers your name, its icon or its level (small cards: its words never touch the name's words)", async ({ page }) => {
   test.skip(desktop(), "a phone's card");
   await named(page, "Columned");
-  for (const [w, h] of [[360, 640], [390, 664], [390, 844]] as const) {
+  for (const [w, h] of [[360, 640], [390, 664], [390, 844], [428, 746]] as const) {
     await page.setViewportSize({ width: w, height: h });
     await page.goto("/");
     await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
-    const link = (await page.locator(".fd-hero-profile").boundingBox())!;
-    const name = (await page.locator(".fd-hero-name").boundingBox())!;
-    const overlap = link.x < name.x + name.width && name.x < link.x + link.width && link.y < name.y + name.height && name.y < link.y + link.height;
-    expect(overlap, `${w}×${h}: View profile over your name`).toBe(false);
+    const r = await page.evaluate(() => {
+      type R = { x: number; y: number; r: number; b: number };
+      const B = (e: Element | null) => { if (!e) return null; const b = e.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom } as R; };
+      const T = (e: Element) => { const g = document.createRange(); g.selectNodeContents(e); const b = g.getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom } as R; };
+      const hit = (p: R, q: R) => p.x < q.r && q.x < p.r && p.y < q.b && q.y < p.b;
+      const link = B(document.querySelector(".fd-hero-profile"))!;
+      const words = T(document.querySelector(".fd-hero-profile-text")!);
+      const card = B(document.querySelector(".fd-hero"))!;
+      const others = { name: B(document.querySelector(".fd-hero-name")), icon: B(document.querySelector(".fd-hero-icon")), level: B(document.querySelector(".fd-level")) };
+      return { small: card.b - card.y < 110, link, words, nameWords: T(document.querySelector(".fd-hero-name")!), others, boxHits: Object.entries(others).filter(([, o]) => o && hit(link, o)).map(([k]) => k), wordHit: hit(words, T(document.querySelector(".fd-hero-name")!)) };
+    });
+    const label = `${w}×${h}`;
+    expect(r.wordHit, `${label}: the words over your name's words`).toBe(false);
+    if (r.small) {
+      // (A small card's box may reach the name's box by up to 14 px, the link on top.)
+      for (const k of r.boxHits) {
+        const o = (r.others as any)[k] as { y: number; b: number };
+        expect(Math.min(r.link.b, o.b) - Math.max(r.link.y, o.y), `${label}: ${k} overlap`).toBeLessThanOrEqual(14);
+      }
+    } else expect(r.boxHits, `${label}: the link's box over your name, icon or level`).toEqual(expect.not.arrayContaining(["name", "icon", "level"]));
+  }
+});
+
+test("computer: View profile moves nothing else on home (the same boxes with and without it)", async ({ page }) => {
+  test.skip(!desktop(), "the computer's layout");
+  await named(page, "Columned");
+  for (const [w, h] of [[1440, 900], [1536, 864]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await expect(page.getByRole("main").getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    const boxes = () => page.evaluate(() => ["main .fd-hero", ".fd-hero-id", ".fd-hero-name", ".fd-hero .fd-pawn-hero", ".fd-play-col", ".fd-right", ".fd-side"].map((s) => { const e = document.querySelector(s); if (!e) return null; const b = e.getBoundingClientRect(); return [s, Math.round(b.x), Math.round(b.y), Math.round(b.width), Math.round(b.height)]; }));
+    const shown = await boxes();
+    await page.addStyleTag({ content: ".fd-hero-profile{display:none !important}" });
+    const hidden = await boxes();
+    expect(shown, `${w}×${h}: home's boxes with View profile, and without`).toEqual(hidden);
   }
 });
 
