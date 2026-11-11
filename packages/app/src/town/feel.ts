@@ -763,6 +763,15 @@ export const SHOP_FEEL = {
   doorZoomMs: 600,
   fadeMs: 260,
   /**
+   * (Nov 11, Eric: "when you go into a building, just make it take an extra second... and just load the whole inside.") While the
+   * town zooms on the door, the room's pictures are painted at most this many ms a frame (shops/load-slice.ts); the rest behind the
+   * black. Inside, the black lifts once the room has drawn `warmFrames` frames (their first-time costs, WebGL's set-up among them,
+   * under the black), or after `warmMaxMs` at the most.
+   */
+  loadSliceMs: 4,
+  warmFrames: 3,
+  warmMaxMs: 1000,
+  /**
    * The floor is drawn flat on its squares in blocks of this many squares a side (each block two triangles of one baked picture of
    * the whole floor): 1 is exactly the mockup's (a tile a draw), 2 a quarter of the draws, the room's gentle curve barely bent.
    */

@@ -67,6 +67,7 @@ import { folioTimes, isFolio, type FoldNow } from "./challenge.ts";
 import { prepareCrumple } from "./crumple-gl.ts";
 import { PARK_TABLE, TABLE_BOARD } from "../houses/park.ts";
 import { backGl, type BackGl, type XY } from "./back-gl.ts";
+import { nextFrame, roomSliceMs } from "./load-slice.ts";
 import { CAB_H, cabinetOf, drawCabinet, newHits } from "./claw-cabinet.ts";
 import { drawZzz } from "../zzz.ts";
 import { CLAW_PLAY, clawPose, newPose as newClawPose } from "../../claw/view.ts";
@@ -339,13 +340,20 @@ export function loadRoom(home: HomeId, part: "front" | "back" = "front"): Promis
   });
   // (Jefferson's warehouse: his crew's nine sheets too.)
   const crew = home === "grex" ? Promise.all((Object.keys(CREW_SHEETS) as CrewName[]).map((k) => picture(CREW_URL[k]!, `the ${k} sheet`).then((img) => [k, img] as const))).then((l) => Object.fromEntries(l) as Record<CrewName, HTMLImageElement>) : Promise.resolve(null);
-  p = Promise.all([ART[key]!(), kid, crew]).then(([art, , crewImgs]) => {
+  p = Promise.all([ART[key]!(), kid, crew]).then(async ([art, , crewImgs]) => {
     const frames: Record<string, Frames> = {};
+    // (While the town zooms on the door: a slice a frame, load-slice.ts; behind the black, all at once.)
+    let t0 = performance.now();
     for (const [name, ch] of Object.entries(art.pieces)) {
       const idle = ch.anims.idle!;
       let t = 0;
       const ends = idle.frames.map((f) => (t += Math.max(16, f.ms)));
       frames[name] = { ch, frames: idle.frames.map((_, i) => toCanvas(ch, i)), ends, loop: t };
+      const slice = roomSliceMs();
+      if (slice && performance.now() - t0 > slice) {
+        await nextFrame();
+        t0 = performance.now();
+      }
     }
     // (Ginger's elves: every frame of every animation of theirs.)
     const elves = art.elves
@@ -412,9 +420,9 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro, zzz, arrived, () => onChallenge?.()));
+    }, intro, zzz, arrived, () => onChallenge?.(), onReady));
     ctl.current = r;
-    onReady();
+
     return () => {
       ctl.current = null;
       r.stop();
@@ -581,6 +589,8 @@ function startRoom(
   arrived = false,
   /** Don Dough's walk-out is through the back door: his challenge goes on in the front room. */
   onWalkedOut: () => void = () => {},
+  /** The room has drawn its first `warmFrames` frames (or `warmMaxMs` went by): the black may lift. */
+  onWarm: () => void = () => {},
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -3983,6 +3993,7 @@ function startRoom(
     draw(now);
     REC?.end(you.moving(), NaN, NaN, RF.room);
     FPS?.tick(now);
+    if (warmLeft > 0 && --warmLeft === 0) warmed();
     // (Folio's: once its intro hands over to the crumple, the room is under the crumple's cover, its last frame what the crumple
     // took: it stops drawing, so the crumple has the page's thread to itself.)
     if (fo && introDone) {
@@ -3991,6 +4002,18 @@ function startRoom(
     }
     raf = requestAnimationFrame(frame);
   };
+  // (Nov 11, Eric: "just make it take an extra second... and just load the whole inside": the black lifts once the room has drawn a
+  // few frames, their first-time costs under it.)
+  let warmLeft: number = S.warmFrames;
+  let warmTimer = 0;
+  const warmed = () => {
+    warmLeft = 0;
+    if (warmTimer < 0) return;
+    clearTimeout(warmTimer);
+    warmTimer = -1;
+    onWarm();
+  };
+  warmTimer = window.setTimeout(warmed, S.warmMaxMs);
   const run = () => {
     if (raf || !alive || document.hidden) return;
     last = performance.now();
@@ -4452,6 +4475,8 @@ function startRoom(
     busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;
+      if (warmTimer > 0) clearTimeout(warmTimer);
+      warmTimer = -1;
       // (Out of the Funhouse: its claw machine's controls close; any play is already done on the server.)
       if (cab) closeClawMachine();
       halt();

@@ -33,3 +33,35 @@ as standing still already did. No WebGL, or a lost context: the 2D way, unchange
   To settle it on Eric's phone, same build: `/town?report` and `/town?report&back=2d` (the 2D way, anyone's; the report's device line
   says "(rooms 2D)"). Compare the Room column. If WebGL isn't faster there, `back=2d`'s path is one line away from being the default
   again.
+
+## Going in: the whole inside ready behind the black (Nov 11)
+
+**Eric:** "when you go into a building, just make it take an extra second. We probably don't even need to show a loading bar, and just
+load the whole inside." And: "when it's zooming in... the screen's not interactable anyway, that's actually like part of the true
+loading." Not to build now: if a room's load is ever well over a second of black, show the room's boss animating in the middle of the
+black. "I assume it'll be literally about a second or less... probably not necessary at the moment, but we'll fall back to it if it's
+too slow."
+
+**What changed**
+- The room's code and art already started loading at the door's tap (during the zoom). Now its pictures are painted at most 4 ms a frame
+  while the town zooms (`shops/load-slice.ts`, `SHOP_FEEL.loadSliceMs`), and the rest all at once once it's black.
+- The black lifts only once the room has drawn 3 frames (`warmFrames`), at most 1 s (`warmMaxMs`). So the first-time costs (WebGL's
+  set-up and uploads, each picture's first draw) are paid under the black. Before, the room was drawn once and the black lifted at once,
+  often before the screen had gone fully black.
+- After that, walking in a room paints and uploads nothing (the report's counts in the room's frames: 0, before and after).
+
+**Measured** (headless phone 428×746, drawn 2, a first visit, 2 runs each; from the zoom's start to the black lifting, 600 ms at the
+least by design):
+
+| | before | after |
+|---|---|---|
+| 1x: Smudgy / bakery / Boingo | 590 / 923 / 590 ms | 757 / 1140 / 873 ms |
+| slowed 4x | 2023 / 590* / 2057 ms | 2390 / 2090 / 2507 ms |
+| the screen fully black before the room shows | sometimes not | always |
+| the zoom's worst frame | 100–300 ms | 150–283 ms |
+
+(*One run's room lifted before the screen was black.) So the black lasts 0.2 to 0.5 s longer than the zoom at 1x, and 1.5 to 1.9 s
+longer slowed 4x. The zoom's worst frame barely changed: on a first visit it is the room's code itself loading and running (one task that
+can't be split), not the painting. The zoom and the fade are the browser's own transitions, so they keep moving through it; only the
+town's figures pause. Second visits skip the code and art. If the black is too long on Eric's phone, his boss-in-the-black fallback
+(above) is the next step.

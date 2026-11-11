@@ -32,6 +32,7 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
+import { roomLoadSlice } from "./shops/load-slice.ts";
 import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -224,6 +225,8 @@ export function TownScreen({
     doorBusy.current = true;
     doorPhase(RF.goIn);
     const F = SHOP_FEEL;
+    // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
+    roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
@@ -237,6 +240,7 @@ export function TownScreen({
     }
     fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
     await later(F.doorZoomMs);
+    roomLoadSlice(0);
     const got = await load.catch(() => null);
     const fight = intro ? await intro.catch(() => null) : null;
     if (!got || !box.current || (challenge && !fight)) {
