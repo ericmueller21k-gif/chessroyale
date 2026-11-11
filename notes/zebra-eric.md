@@ -58,3 +58,10 @@ suggestions"). Start on the artwork now.
     where it looks like all of a sudden a minute passed. And then when he plays, it drops again." (So one minute per move, yours and his.)
   - Not a real-time timer ("we already kind of do that with Babur").
 - **Ultimate:** not decided: "something with the black and white cookie ... I'll think on that while I'm away."
+
+## Eric, Nov 11 (later): opening comments and the ultimate
+- "Since he's a chess enthusiast he throws out a comment on whatever opening you do, say 3-4 moves in or whatever."
+- **Ultimate:** "He makes his queen gold plated and it becomes shiny gold, and can no longer be captured by pawns for the rest of the
+  game." (Director: buildable the way Big Boy's blocks and Babur's hoops are: the crowd's pawn captures of it are filtered out
+  (`crowdFilter`), the engines search only the moves left (searchmoves); calls to confirm with Eric: no queen → his strongest piece;
+  a second Gold Plate gilds the next piece; if the filter would leave no legal move, it lifts for that turn, as the hoops do.)
