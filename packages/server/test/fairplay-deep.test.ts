@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { legalMoves, stockfishRefuses } from "@chessroyale/chess";
 import { FAIRPLAY, matchSignals, type FairMove } from "@chessroyale/core";
 import { createGuest, ensureSchema, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
-import { caseOf, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
-import { deepCheckRun, deepResult, offPeak, recountDeep, type DeepSearch } from "../src/fairplay-deep.ts";
+import { caseOf, decide, recordFairPlay, setCase, type CaseMailer } from "../src/fairplay.ts";
+import { RECOUNT_BEFORE, deepCheckRun, deepResult, offPeak, recountDeep, type DeepSearch } from "../src/fairplay-deep.ts";
 import { memoryDb } from "./memory-db.ts";
 
 const HOUR = 3_600_000;
@@ -143,6 +143,42 @@ describe("the deep re-check", () => {
     expect(await recountDeep(sql, QUIET + HOUR)).toBe(0);
     expect(await log()).toBe(lines);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
+  });
+
+  it("the catch-up's bounds (the review of #629, m3 and m5): a cleared case (a Release) and any match played from RECOUNT_BEFORE on are left as they are", async () => {
+    const { sql } = memoryDb();
+    await ensureSchema(sql);
+    const top = ["a1a2", "a1b1", "a1b2"];
+    const eddie = engineMatch().map((m, i) => ({ ...m, deep: i % 4 === 1 ? { best: "a1b1", rank: 2, loss: 0.5, top: ["a1b1", "a1a2", "a1b2"] } : { best: "a1a2", rank: 1, loss: 0, top } }));
+    const { deepExact, ...rest } = matchSignals(eddie, null);
+    // (As the deep re-check stored it before Nov 11: deepMatch the exact count, no deepExact.)
+    const old = JSON.stringify({ ...rest, deepMatch: deepExact });
+    const store = async (userId: string, lobby: string, at: number) => {
+      await recordFairPlay(sql, userId, { lobby, mode: "crowd", moves: engineMatch() }, at);
+      await sql.run("UPDATE fairplay_matches SET moves = ?, summary = ?, deep_done = 1, deep_queued = 0 WHERE user_id = ? AND lobby = ?", JSON.stringify(eddie), old, userId, lobby);
+    };
+    const row = async (userId: string, lobby: string) => {
+      const r = (await sql.first<{ summary: string; moves: string | null }>("SELECT summary, moves FROM fairplay_matches WHERE user_id = ? AND lobby = ?", userId, lobby))!;
+      return { deepExact: (JSON.parse(r.summary) as { deepExact?: number }).deepExact, kept: r.moves !== null };
+    };
+    const lines = async (userId: string) => (await sql.all("SELECT id FROM fairplay_log WHERE user_id = ?", userId)).length;
+    // Released from the pool (a clearing): a person weighed these matches, so they stay as they are, moves and all.
+    const r = await player(sql, "Released");
+    await store(r.id, "AAAAA", RECOUNT_BEFORE - 3 * HOUR);
+    await setCase(sql, r.id, "pool", "detection", "level ban: one match", RECOUNT_BEFORE - 3 * HOUR);
+    expect(await decide(sql, r.id, "release", "admin:eric@example.com", "", RECOUNT_BEFORE - 2 * HOUR)).toEqual({ ok: true, status: "cleared" });
+    // In review: a match from before the cutoff, and one from it on.
+    const l = await player(sql, "Late");
+    await store(l.id, "BBBBB", RECOUNT_BEFORE - HOUR);
+    await store(l.id, "CCCCC", RECOUNT_BEFORE);
+    expect((await caseOf(sql, l.id))?.status).toBe("review");
+    const released = await lines(r.id);
+    expect(await recountDeep(sql, RECOUNT_BEFORE + HOUR)).toBe(1);
+    expect(await row(r.id, "AAAAA")).toEqual({ deepExact: undefined, kept: true });
+    expect((await caseOf(sql, r.id))?.status).toBe("cleared");
+    expect(await lines(r.id)).toBe(released);
+    expect(await row(l.id, "BBBBB")).toEqual({ deepExact: 15, kept: true });
+    expect(await row(l.id, "CCCCC")).toEqual({ deepExact: undefined, kept: true });
   });
 
   it("a strong player whose picks often aren't the engine's: no ban", async () => {

@@ -224,18 +224,28 @@ async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], state: "done
 }
 
 /**
- * The near-best count's catch-up (Nov 11; docs/decisions/2026-11-11-near-best.md): an open case's matches whose stored summary predates
- * it (no `deepExact`) and still keep their moves get their summary worked out again from the deep results already stored (each move's
- * rank and loss: no searches), then the player's level again (relevel), as after a deep re-check. A summary worked out again carries
- * `deepExact`, so a match is caught up once and the next run finds nothing: safe to run every time (the Worker's schedule, before the
- * re-check). At most `limit` matches a run; the rest on the next. Returns the matches caught up.
+ * The catch-up's bound (the review of #629, m3): only matches played before this can hold a summary from before the near-best count (a
+ * deep re-check since the deploy writes `deepExact`), so the scan reads those alone, by `fairplay_matches_user` (user_id, played_at),
+ * and never grows with the pool. It must fall after this PR's deploy (Nov 2026; move it later if the deploy is). Remove it, with
+ * recountDeep and its call in index.ts, once the schedule's "fairplay-recount" has caught up nothing for a week.
+ */
+export const RECOUNT_BEFORE = Date.UTC(2026, 10, 15);
+
+/**
+ * The near-best count's catch-up (Nov 11; docs/decisions/2026-11-11-near-best.md): an open case's matches played before RECOUNT_BEFORE
+ * whose stored summary predates the count (no `deepExact`) and still keep their moves get their summary worked out again from the deep
+ * results already stored (each move's rank and loss: no searches), then the player's level again (relevel), as after a deep re-check. A
+ * summary worked out again carries `deepExact`, so a match is caught up once and the next run finds nothing: safe to run every time (the
+ * Worker's schedule, before the re-check). Closed, cleared (a Release too) and banned cases are left as they are. At most `limit`
+ * matches a run; the rest on the next. Returns the matches caught up.
  */
 export async function recountDeep(sql: Sql, now: number, opts: { mail?: CaseMailer; limit?: number } = {}): Promise<number> {
   const rows = await sql.all<{ id: number; user_id: string; played_at: number; moves: string }>(
-    `SELECT m.id, m.user_id, m.played_at, m.moves FROM fairplay_cases c JOIN fairplay_matches m ON m.user_id = c.user_id
+    `SELECT m.id, m.user_id, m.played_at, m.moves FROM fairplay_cases c JOIN fairplay_matches m ON m.user_id = c.user_id AND m.played_at < ?
      WHERE c.status IN ('watch', 'review', 'pool') AND m.moves IS NOT NULL AND json_valid(m.summary)
        AND json_extract(m.summary, '$.deepChecked') > 0 AND json_extract(m.summary, '$.deepExact') IS NULL
      ORDER BY m.played_at LIMIT ?`,
+    RECOUNT_BEFORE,
     opts.limit ?? 100,
   );
   const touched = new Set<string>();

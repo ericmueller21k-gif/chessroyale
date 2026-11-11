@@ -150,10 +150,11 @@ describe("the review of #618: its findings, fixed", () => {
     const checked = async (status: "pool" | "review") => {
       const u = await player(sql, `U${status}`);
       await setCase(sql, u.id, status, "detection", "test", QUIET - 3 * HOUR);
-      await recordFairPlay(sql, u.id, { lobby: status === "pool" ? "PPPPP" : "RRRRR", mode: "crowd", moves: engineMatch(false) }, QUIET - HOUR);
+      // (The review's player: half the picks 5 points off the engine's best, far from the one-match bar, so the case stays a review and
+      // shows a review's matches checked in full: the review of #629, m5.)
+      await recordFairPlay(sql, u.id, { lobby: status === "pool" ? "PPPPP" : "RRRRR", mode: "crowd", moves: status === "pool" ? engineMatch(false) : plain }, QUIET - HOUR);
       for (let i = 0; i < 3; i++) await deepCheckRun(sql, search, QUIET, { userId: u.id, perRun: 500 });
-      // (Every move the engine's: the review's player is at the one-match bar, so pooled too since Nov 11.)
-      expect((await caseOf(sql, u.id))?.status).toBe("pool");
+      expect((await caseOf(sql, u.id))?.status).toBe(status);
       const s = JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches WHERE user_id = ?", u.id))!.summary) as { deepChecked: number };
       return s.deepChecked;
     };
