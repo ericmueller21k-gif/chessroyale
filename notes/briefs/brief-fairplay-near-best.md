@@ -34,3 +34,6 @@ Full lane: add nothing to the review loop beyond one review and one fix round (E
 ## Deliver
 Push; PR title "Fair play: near-best moves count, and one clear match pools"; body (≤40 lines: what changed for players and admins, the
 sim's numbers, changed checks) to `.pr-body.md`; `.done` LAST. Wait for green CI.
+
+## Eric, Nov 11 (added): sustained strength
+"It's not always about playing the best move. People easily get around that by playing the second or third best move ... if it's not clear by game 2 ... by 4 or 5 games, if their Elo is just ridiculous like that, put them in the cheater queue." (A sustained-strength path: average match strength over the last 4-5 matches pools; a 2nd/3rd-best cheater in the sim.)
