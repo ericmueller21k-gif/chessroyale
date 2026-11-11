@@ -53,9 +53,14 @@ export function FriendsScreen({
       </header>
       <PlayerSearch on={on} signIn={status === "signIn"} />
       {/* (The private lobby: Play with friends' sheet, signed out too, as the pop-up's was.) */}
-      <button type="button" class="fp-private" onClick={onPrivateLobby}>
-        <span class="fp-private-text">Private lobby: make one or join with a code</span>
-        <span aria-hidden="true">›</span>
+      <button type="button" class="fp-private" aria-label="Private lobby: make one or join with a code" onClick={onPrivateLobby}>
+        <span class="fr-row-text">
+          <strong class="fp-name">Private lobby</strong>
+          <span class="fr-status">Make one or join with a code</span>
+        </span>
+        <span class="fp-chev" aria-hidden="true">
+          ›
+        </span>
       </button>
       {note && (
         <p class={note.error ? "fd-error" : "fd-note fr-note"} role={note.error ? "alert" : "status"}>

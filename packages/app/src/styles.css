@@ -26452,16 +26452,15 @@ button.sq-tiny {
   border: 2px solid var(--fd-gold);
   background: var(--fd-panel);
   color: var(--fd-text);
-  font: 800 15px Archivo, system-ui, sans-serif;
+  font: inherit;
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.fp-private-text {
-  flex: 1 1 auto;
+.fp-private .fp-name {
+  font-size: 15px;
 }
-.fp-private > span[aria-hidden] {
-  font-size: 22px;
+.fp-private .fp-chev {
   color: var(--fd-gold-text);
 }
 .fp-empty {
