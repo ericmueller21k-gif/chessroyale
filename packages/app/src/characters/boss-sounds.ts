@@ -46,7 +46,6 @@ const MAKERS = {
   folio: folioSound,
   timber: timberSound,
   dash: dashSound,
-  // (Rolling Dough's room sounds, Nov 11: the door, the mixer, the TV, the table's murmur.)
   zebra: zebraSound,
   // (Boingo's claw machine's, not a boss's: the same cache, worker and ahead-of-time making.)
   claw: clawSound,

@@ -485,6 +485,7 @@ const folioBoss = (name: FolioSound) => (t: number) => buffer(folioSound(name, c
 const timberBoss = (name: TimberSound) => (t: number) => buffer(timberSound(name, ctx!.sampleRate), t);
 const clawPlay = (name: ClawSound) => (t: number) => buffer(clawSound(name, ctx!.sampleRate), t);
 const dashBoss = (name: DashSound) => (t: number) => buffer(dashSound(name, ctx!.sampleRate), t);
+const zebraBoss = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 const zebraRoom = (name: ZebraSound) => (t: number) => buffer(zebraSound(name, ctx!.sampleRate), t);
 /** Timber's build sound picks one of these each time (Eric, Nov 2: "interchangeable between the tap, the whack, and the knock"). */
 export const TIMBER_BUILD = ["timberTap", "timberWhack", "timberKnock"] as const satisfies readonly SoundName[];
@@ -1073,6 +1074,35 @@ export type SoundName =
   // (His intro's, Nov 5: the shoe boxes landing, his jacket dusted off.)
   | "dashThud"
   | "dashBrush"
+  // Don Dough, the zebra kingpin (a raid boss): synthesized, a bread rifle and a bakery, see characters/zebra-sounds.ts.
+  | "zebraPop"
+  | "zebraVolley"
+  | "zebraLaugh"
+  | "zebraChuckle"
+  | "zebraDraw"
+  | "zebraCock"
+  | "zebraRelax"
+  | "zebraTsk"
+  | "zebraTap"
+  | "zebraThud"
+  | "zebraTip"
+  | "zebraHm"
+  | "zebraOof"
+  | "zebraSnap"
+  | "zebraLob"
+  | "zebraPlop"
+  | "zebraRoll"
+  | "zebraDing"
+  | "zebraRise"
+  | "zebraOvenPop"
+  | "zebraSquash"
+  | "zebraStir"
+  | "zebraGild"
+  | "zebraWhoosh"
+  | "zebraTumble"
+  | "zebraShine"
+  | "zebraKiss"
+  | "zebraClink"
   | "kingCant"
   // Squads: a short tick in the last seconds of your free time, and the sting as a squad enters sudden death.
   | "sqTick"
@@ -1437,6 +1467,34 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   dashStep: dashBoss("step"),
   dashThud: dashBoss("thud"),
   dashBrush: dashBoss("brush"),
+  zebraPop: zebraBoss("pop"),
+  zebraVolley: zebraBoss("volley"),
+  zebraLaugh: zebraBoss("laugh"),
+  zebraChuckle: zebraBoss("chuckle"),
+  zebraDraw: zebraBoss("draw"),
+  zebraCock: zebraBoss("cock"),
+  zebraRelax: zebraBoss("relax"),
+  zebraTsk: zebraBoss("tsk"),
+  zebraTap: zebraBoss("tap"),
+  zebraThud: zebraBoss("thud"),
+  zebraTip: zebraBoss("tip"),
+  zebraHm: zebraBoss("hm"),
+  zebraOof: zebraBoss("oof"),
+  zebraSnap: zebraBoss("snap"),
+  zebraLob: zebraBoss("lob"),
+  zebraPlop: zebraBoss("plop"),
+  zebraRoll: zebraBoss("roll"),
+  zebraDing: zebraBoss("ding"),
+  zebraRise: zebraBoss("rise"),
+  zebraOvenPop: zebraBoss("ovenPop"),
+  zebraSquash: zebraBoss("squash"),
+  zebraStir: zebraBoss("stir"),
+  zebraGild: zebraBoss("gild"),
+  zebraWhoosh: zebraBoss("whoosh"),
+  zebraTumble: zebraBoss("tumble"),
+  zebraShine: zebraBoss("shine"),
+  zebraKiss: zebraBoss("kiss"),
+  zebraClink: zebraBoss("clink"),
   kingCant,
   sqTick: (t) => clockTick(t, 0.22),
   sqSting,
@@ -1736,6 +1794,34 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   dashStep: [["dash", "step"]],
   dashThud: [["dash", "thud"]],
   dashBrush: [["dash", "brush"]],
+  zebraPop: [["zebra", "pop"]],
+  zebraVolley: [["zebra", "volley"]],
+  zebraLaugh: [["zebra", "laugh"]],
+  zebraChuckle: [["zebra", "chuckle"]],
+  zebraDraw: [["zebra", "draw"]],
+  zebraCock: [["zebra", "cock"]],
+  zebraRelax: [["zebra", "relax"]],
+  zebraTsk: [["zebra", "tsk"]],
+  zebraWhoosh: [["zebra", "whoosh"]],
+  zebraTumble: [["zebra", "tumble"]],
+  zebraTap: [["zebra", "tap"]],
+  zebraThud: [["zebra", "thud"]],
+  zebraTip: [["zebra", "tip"]],
+  zebraHm: [["zebra", "hm"]],
+  zebraOof: [["zebra", "oof"]],
+  zebraSnap: [["zebra", "snap"]],
+  zebraLob: [["zebra", "lob"]],
+  zebraPlop: [["zebra", "plop"]],
+  zebraRoll: [["zebra", "roll"]],
+  zebraDing: [["zebra", "ding"]],
+  zebraRise: [["zebra", "rise"]],
+  zebraOvenPop: [["zebra", "ovenPop"]],
+  zebraSquash: [["zebra", "squash"]],
+  zebraStir: [["zebra", "stir"]],
+  zebraGild: [["zebra", "gild"]],
+  zebraShine: [["zebra", "shine"]],
+  zebraKiss: [["zebra", "kiss"]],
+  zebraClink: [["zebra", "clink"]],
   kingCant: [["godKing", "cant"]],
   clawCoin: [["claw", "coin"]],
   clawWhir: [["claw", "whir"]],

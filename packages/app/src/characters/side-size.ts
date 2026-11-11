@@ -74,6 +74,7 @@ export const SIDE_REACH: Readonly<Record<string, readonly [left: number, up: num
   folio: [46, 80, 41, 2],
   timber: [38, 84, 46, 4],
   dash: [39, 95, 28, 2],
+  zebra: [33, 96, 51, 2],
   recluse: [30, 135, 30, 2],
 };
 /** The God King's the same (characters/god-king.ts: his frame 108 × 104, his feet at 64, 99), measured by the same test. */

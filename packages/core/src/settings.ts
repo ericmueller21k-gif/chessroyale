@@ -1098,7 +1098,7 @@ export const BOSS_POWERS = {
    * the raid sim (reports/folio-sim.md). Dash 1 (Nov 3): about 1.9 Time Scrambles a battle of 46 moves in the
    * raid sim with the player's clock, the crowd 0.15 (reports/dash-sim.md).
    */
-  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1 } as Readonly<Record<string, number>>,
+  rageSpeed: { gingerbread: 1.2, clown: 1.8, grex: 1.2, hollow: 1, bigboy: 1, sawyer: 1.3, alfil: 1.2, smudgy: 1, moo: 1, gardener: 1.2, tiger: 1.3, folio: 1.3, timber: 0.7, dash: 1, zebra: 1 } as Readonly<Record<string, number>>,
   /**
    * The Hidden Boss's ultimate, the bullet clock (Eric, Oct 14: "Meter builds starting turn 1, about 7 turns in he says
    * something about how you're thinking too much and to just play pure chess etc, true to him, then for the rest of phase 1
@@ -1708,7 +1708,7 @@ export const BOSS_POWERS = {
    * (Smudgy's Repaint keeps its own cap, repaintMax.) docs/decisions/2026-11-02-nov2-fixes.md. Dash's Time Scramble at most twice
    * (Eric, Nov 6: "about twice a game"; his Scramble Rush is his once-a-battle power besides).
    */
-  maxUltimates: { timber: 2, dash: 2 } as Readonly<Record<string, number>>,
+  maxUltimates: { timber: 2, dash: 2, zebra: 2 } as Readonly<Record<string, number>>,
   /**
    * Dash's Clock Slap (his passive; Eric's design, Nov 1; bosses/dash.ts; docs/decisions/2026-11-03-dash.md): each capture of
    * his steals time from your clock. On a time bank (Boss alone and a Boss Battle party: BOSS_CLOCK's 10 + 10, the team's one
@@ -1781,6 +1781,38 @@ export const BOSS_POWERS = {
     botHit: 0.6,
     movesPerPiece: 2,
   },
+  /**
+   * Don Dough's Rising Dough (his passive; Eric, Nov 11; bosses/zebra.ts; docs/decisions/2026-11-11-don-dough.md). Early in the
+   * battle, at the end of a few of his turns, a lump of dough on an empty square of his half that shows what it will rise as.
+   * Its oven timer starts at doughTimers[kind] minutes (Eric's: pawn 4, knight and bishop 7, rook 10, queen 15), one off for
+   * every move, yours and his; at 00:00 his piece rises there (when the guards allow; else after the next move). A piece of
+   * yours landing on it squashes it. The rest is the sim's (reports/zebra-sim.md):
+   * - doughDrops a battle at most; the first after crowd move doughFirst (from the seed, in the range), each next one
+   *   doughGap of the crowd's moves later (from the seed), none after crowd move doughLast; at most doughLive on the board at once.
+   * - What it is: doughOdds (rook and queen rare, Eric), stepping down to a kind he can have now (never a ninth pawn or more pieces
+   *   than promotions could make, never past doughLeadMax pawns ahead: below).
+   * - Where: an empty square of his half off his back rank; a pawn, knight or bishop on the two ranks nearest the middle, a rook or
+   *   queen nearer his side on a file where a pawn of yours stands below it (Eric: "somewhere that's gettable for the pawn"); in a
+   *   seeded order.
+   * The sim's (reports/zebra-sim.md): with these, 2.1 pawns risen a battle (a queen in 1 in 10), the crowd 0.05 against the plain
+   * boss's 0.10.
+   */
+  doughTimers: { p: 4, n: 7, b: 7, r: 10, q: 15 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
+  doughOdds: { p: 0.5, n: 0.2, b: 0.2, r: 0.06, q: 0.04 } as Readonly<Record<"p" | "n" | "b" | "r" | "q", number>>,
+  doughDrops: 3,
+  doughFirst: [1, 3] as readonly [number, number],
+  doughGap: [3, 5] as readonly [number, number],
+  doughLast: 16,
+  doughLive: 2,
+  /**
+   * Where a lump may go besides (the sim's): "out" of reach of every move the crowd has now (a free squash is no fight), or "any"
+   * empty square of the ranks above. And a lump drops only while its piece leaves him at most doughLeadMax pawns ahead of you on
+   * material (pawn 1, knight and bishop 3, rook 5, queen 9), as Timber's workshop: he rebuilds rather than runs away with it.
+   */
+  doughReach: "any" as "out" | "any",
+  doughLeadMax: 2,
+  /** A queen's lump (rare: doughOdds) comes whatever the lead (Eric: "on occasion, he may throw out a queen"). */
+  doughQueenFree: true,
 } as const;
 
 /**
@@ -1788,7 +1820,6 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-// (Nov 11: "zebra", Don Dough, before his boss is in the roster: his home, Rolling Dough, is in an admin's town only meanwhile.)
 export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
 
 /**

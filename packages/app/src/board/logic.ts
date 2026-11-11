@@ -647,6 +647,7 @@ export function boardInputs(p: Omit<BoardProps, "children" | "silent" | "onMove"
     !!p.onDarkTry,
     p.turn ?? 0,
     p.elephants?.length ? p.elephants.join() : null,
+    p.gold?.length ? p.gold.join() : null,
     p.decor?.key ?? null,
     p.premove ? `${p.premove.key}:${p.premove.side}${p.premove.watch ? ":watch" : ""}` : null,
   ];

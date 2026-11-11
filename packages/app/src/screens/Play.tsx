@@ -20,6 +20,7 @@ import { BossFace, BossSide } from "../components/BossCharacter.tsx";
 import { KingCommand, KingSummon, kingSquare } from "../components/GodKing.tsx";
 import { LiveGhosts } from "./Crowd.tsx";
 import { DarkCost, PowerBoard, crowdView } from "../components/BossPowers.tsx";
+import { goldClink, zebraGold } from "../components/Zebra.tsx";
 import { DarkForced, HOLLOW_BULB_LINES, HollowBlackout, hollowTaunt } from "../components/Hollow.tsx";
 import { bossKit } from "../characters/kits.ts";
 import { CRITICAL, NORMAL, bossVoice } from "../speech.tsx";
@@ -284,7 +285,7 @@ export function PlayScreen({
         <div class="board-row">
           {match.boss && <BossSide match={match} />}
           <EvalBar fen={history.fen ?? board.fen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants}>
+          <Board fen={fen} unmasked={drawnTrue} orientation={orientation} turn={view.turn} lastMove={lastMove} interactive={canMove} moves={offeredMoves} stopped={stoppedMove} onMove={(m, how) => match.submit(m, how?.premove)} premove={premove} onRefused={match.boss ? (m) => (setRefused({ line: refusedLine(match.boss!, board.fen, m), fen: board.fen, at: Date.now() }), goldClink(match.boss, board.fen, m)) : undefined} arrows={arrows} dark={dark} onDarkTry={(m) => match.darkTry(m)} elephants={history.browsing ? undefined : match.boss?.powers?.elephants} gold={history.browsing ? undefined : zebraGold(match.boss)}>
             {/* (Stepping back through the game keeps the dark on its squares: it belongs to the square.) */}
             {match.boss?.powers && (!history.browsing || dark.length > 0) && <PowerBoard boss={match.boss} orientation={orientation} fen={fen} />}
             {note && !note.pending && <DarkCost square={note.move.slice(2, 4)} since={note.at} now={now} orientation={orientation} points={!strand} />}

@@ -26483,3 +26483,72 @@ button.sq-tiny {
   cursor: default;
 }
 /* ===== end Home modes ===== */
+/* Don Dough (components/Zebra.tsx). His banner: gold on a crust brown. */
+.fight-banner.power-cut.zebra .fb-band {
+  background: repeating-linear-gradient(180deg, #7a3f12 0 3.2cqw, #ab5f1d 3.2cqw 3.6cqw);
+  border-color: #f6cf55;
+}
+/* His dough under the pieces (your piece stands on a squashed pancake): a canvas of its own under the pieces (z-index 1, the
+   pieces 2), as the Roman candle's shadows. */
+.board-wrap > .zb-under {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+/* His oven timers, in the boss bar's prop slot (right of his bars, under the status): a slot for each lump the rules allow at once,
+   side by side, each a kitchen timer at 2x (76 x 44: a computer's bar is one short row, so not the art's 3x there); an empty slot a
+   faint outline of the same size. Absolute, never taking a tap: nothing in the bar moves for them. */
+.dd-timers {
+  --dd-w: 76px;
+  --dd-h: 44px;
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+}
+.dd-slot {
+  position: relative;
+  display: block;
+  width: var(--dd-w);
+  height: var(--dd-h);
+}
+.dd-slot.empty {
+  box-sizing: border-box;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+}
+.dd-timer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+}
+/* A 320 px phone: the timers a little smaller (1.5x). */
+@media (max-width: 340px) {
+  .dd-timers {
+    --dd-w: 57px;
+    --dd-h: 33px;
+  }
+}
+/* A computer's boss bar is one short row (his figure stands by the board): the timers centered on the bar's height, in the free
+   room's left part, between his bars and "Move 2". */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .dd-timers) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .dd-timers {
+    --dd-w: 76px;
+    --dd-h: 44px;
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
+}

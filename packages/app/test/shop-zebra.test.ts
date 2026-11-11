@@ -10,11 +10,12 @@ import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_
 import { NPC_ZEBRA_CREW_C, NPC_ZEBRA_CREW_D, NPC_ZEBRA_CREW_E, NPC_ZEBRA_GUARD_A, ZEBRA_WATCH_FRAME } from "../src/town/shops/zebra-crew.ts";
 import { BOSS_ZEBRA } from "../src/town/shops/zebra-don.ts";
 import { BackScene, FrontScene, SetupScene, ZEBRA_GUARDS, lineMs, watchFrame, type CarriedNow, type SceneClips, type SceneFig } from "../src/town/shops/zebra-scene.ts";
-import { ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_KEEPER_LINES, ZEBRA_TALK } from "../src/town/shops/zebra-lines.ts";
-import { clipsOf, timelineBeats, timelineCues } from "../src/town/shops/timeline.ts";
+import { ZEBRA_BATTLE_START, ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_KEEPER_LINES, ZEBRA_TALK } from "../src/town/shops/zebra-lines.ts";
+import { clipsOf, timelineAt, timelineBeats, timelineCues } from "../src/town/shops/timeline.ts";
+import { INTRO_ZEBRA_FRONT, INTRO_ZEBRA_STORM } from "../src/town/shops/zebra-intro-art.ts";
 import { ZEBRA_INTRO } from "../src/town/shops/intros/zebra.ts";
 import { CHALLENGE_FEEL, introOf, marksFeel, marksOf, seatedMarks } from "../src/town/shops/challenge.ts";
-import { ZEBRA_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
+import { ZEBRA_ROOM_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
 import { MOVE_PEAK } from "../src/characters/synth.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
 
@@ -59,11 +60,11 @@ describe("the two rooms and the door between them (Nov 11)", () => {
       expect(["8,6", "8,7"]).toContain(sq(t.dest!));
     }
   });
-  it("the counter zebra has no crate yet: his Talk says his lines; Don's Challenge waits for his boss (not in the game yet)", () => {
+  it("the counter zebra has no crate yet: his Talk says his lines; Don's Challenge is open (his boss is in the game, admins first)", () => {
     expect(front).toMatchObject({ crate: null, kid: "zebrakeeper", roof: "bakery", chatTone: "day" });
     expect(front.says).toEqual(ZEBRA_KEEPER_LINES);
     expect(back).toMatchObject({ part: "back", name: "Don Dough", hideKid: true, chatTone: "night" });
-    expect(canChallengeInside("zebra")).toBe(false);
+    expect(canChallengeInside("zebra")).toBe(true);
     expect(introOf("zebra")).toMatchObject({ name: "Don Dough", fromDoor: true, seated: true, custom: true });
   });
 });
@@ -221,11 +222,24 @@ describe("his challenge, in the front room (Eric, Nov 11: \"The main room is sti
 });
 
 describe("his intro, as data", () => {
-  it("on the marks, a hold for the set-up, his line, his breadPop (its pop cued), a beat; no God King attack; his own figure", () => {
-    expect(timelineBeats(ZEBRA_INTRO.timeline).map((b) => b.step)).toEqual(["face", "setup", "line", "pop", "laugh", "done"]);
+  it("on the marks, a hold for the set-up, his line, his breadPop (its pop cued), Beanie's line, a beat; no God King attack; his own figure", () => {
+    expect(timelineBeats(ZEBRA_INTRO.timeline).map((b) => b.step)).toEqual(["face", "setup", "line", "pop", "crew", "laugh", "done"]);
     expect(timelineCues(ZEBRA_INTRO.timeline).map((c) => c.cue)).toContain("pop");
     expect(ZEBRA_INTRO).toMatchObject({ noAttack: true, figure: BOSS_ZEBRA, mover: BOSS_ZEBRA });
     expect(Object.keys(introOf("zebra")!.cues)).toContain("pop");
+    // (His line and Beanie's: the art's battle-start pair; Beanie's bubble up through the crew beat only.)
+    expect(introOf("zebra")).toMatchObject({ line: ZEBRA_BATTLE_START.don, crewLine: ZEBRA_BATTLE_START.crew });
+    const crew = timelineBeats(ZEBRA_INTRO.timeline).find((b) => b.step === "crew")!;
+    const pop = timelineBeats(ZEBRA_INTRO.timeline).find((b) => b.step === "pop")!;
+    expect(timelineAt(ZEBRA_INTRO.timeline, pop.at + 10).cast.crewLine?.on).toBeFalsy();
+    expect(timelineAt(ZEBRA_INTRO.timeline, crew.at + 10).cast.crewLine?.on).toBe(true);
+  });
+
+  it("his wipe is his bread splash (Eric: \"loaves of bread as the splash screen\"), its whoosh and tumble his own sounds", () => {
+    expect(ZEBRA_INTRO.storm).toEqual({ tile: INTRO_ZEBRA_STORM, front: INTRO_ZEBRA_FRONT });
+    expect(INTRO_ZEBRA_STORM.anims.idle!.frames[0]!.cue).toBe("tumble");
+    expect(introOf("zebra")!.cues).toMatchObject({ storm: "zebraWhoosh", tumble: "zebraTumble", pop: "zebraPop" });
+    expect(introOf("zebra")!.cues.wipe).toBeUndefined();
   });
 });
 
@@ -243,7 +257,8 @@ describe("the words", () => {
 
 describe("the room's sounds (quiet)", () => {
   it("each is numbers only and well under a piece's move", () => {
-    for (const name of ZEBRA_SOUNDS) {
+    // (The room's four; Don Dough's own sounds share the module, zebra-sounds.ts, and their test is zebra.test.ts.)
+    for (const name of ZEBRA_ROOM_SOUNDS) {
       const d = zebraSound(name, 48000);
       let peak = 0;
       for (const v of d) {

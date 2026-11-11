@@ -68,3 +68,29 @@
 :is(.hb, .hb-pieces, .promo-piece) piece.king.black {
   background-image: url("./pieces/cburnett/Chess_kdt45.svg");
 }
+/* Don Dough's gold pieces (Gold Plate: board/pieces/SOURCES.md, "Don Dough's gold pieces"): a piece the board marks gold
+   (BoardProps.gold), or one drawn over the board as gold; the board's own pieces recolored, the same shapes. */
+:is(.hb, .hb-pieces) piece.queen.gold.white {
+  background-image: url("./pieces/zebra/gold-ql.svg");
+}
+:is(.hb, .hb-pieces) piece.queen.gold.black {
+  background-image: url("./pieces/zebra/gold-qd.svg");
+}
+:is(.hb, .hb-pieces) piece.rook.gold.white {
+  background-image: url("./pieces/zebra/gold-rl.svg");
+}
+:is(.hb, .hb-pieces) piece.rook.gold.black {
+  background-image: url("./pieces/zebra/gold-rd.svg");
+}
+:is(.hb, .hb-pieces) piece.bishop.gold.white {
+  background-image: url("./pieces/zebra/gold-bl.svg");
+}
+:is(.hb, .hb-pieces) piece.bishop.gold.black {
+  background-image: url("./pieces/zebra/gold-bd.svg");
+}
+:is(.hb, .hb-pieces) piece.knight.gold.white {
+  background-image: url("./pieces/zebra/gold-nl.svg");
+}
+:is(.hb, .hb-pieces) piece.knight.gold.black {
+  background-image: url("./pieces/zebra/gold-nd.svg");
+}

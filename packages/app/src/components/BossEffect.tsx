@@ -66,7 +66,7 @@ export function spriteFrameAt(ch: Character, anim: string, then: string | undefi
  * `ch.swap`); a new battle's lights replace the last one's.
  */
 const images = new WeakMap<Frame, Map<string, ImageData>>();
-function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
+export function frameImage(ch: Character, frame: Frame, look = ""): ImageData {
   const swap = ch.swap?.() ?? null;
   let byLook = images.get(frame);
   if (!byLook) images.set(frame, (byLook = new Map()));
