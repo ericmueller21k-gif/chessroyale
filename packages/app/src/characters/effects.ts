@@ -22,6 +22,9 @@ import { GARDEN_PLANT, SEED_FLY, SEED_PLOP, WATER_HIT, WATER_SWEEP } from "./eff
 import { BALLOON_FLY, BALLOON_HIT, BALLOON_LAND, HOOP_FLY, HOOP_RING } from "./effects/tiger.ts";
 import { CREASE_EDGE, CREASE_PENCIL, FOLD_PAPER, INK_HIT, INK_LINE, INK_MARK, INK_STRIKE } from "./effects/folio.ts";
 import { CHIP_HIT } from "./effects/timber.ts";
+import { FLOUR_HIT } from "./effects/zebra.ts";
+import { ZEBRA_DOUGH } from "./zebra-dough.ts";
+import { GOLD_FX } from "./zebra-gold.ts";
 
 // Each boss's effects are drawn in its own file (effects/<boss>.ts); what they share is in effects/common.ts.
 export { BOARD_CELL, SQUARE } from "./effects/common.ts";
@@ -62,6 +65,9 @@ export const EFFECT_SPRITES = {
   ankusHit: ANKUS_HIT,
   sawHit: SAW_HIT,
   chipHit: CHIP_HIT,
+  flourHit: FLOUR_HIT,
+  zebraDough: ZEBRA_DOUGH,
+  goldFx: GOLD_FX,
   lassoHit: LASSO_HIT,
   pieHit: PIE_HIT,
   bonkHit: BONK_HIT,

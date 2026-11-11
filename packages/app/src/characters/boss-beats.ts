@@ -87,6 +87,11 @@ export type Beat =
   | "gnawNone"
   // Dash's: your time ran out (a random move played for you), his jab (his Clock Slap is `power`, Time Scramble `ultimate`).
   | "flag"
+  // Don Dough's: your piece squashed his dough, Gold Plate's closing line, a pawn of yours bouncing off gold (his drop is `power`, a
+  // rise `cheer` or `bigCheer`, Gold Plate `ultimate`).
+  | "squashed"
+  | "goldClose"
+  | "clink"
   // A boss's attack on a king (its kit's `kingAttack`): the God King in his Last Stand, the crowd's king at its mate.
   | "kingAttack";
 /** The loops it rests in between moments (`ready`: Wrangler's, his meter full). */

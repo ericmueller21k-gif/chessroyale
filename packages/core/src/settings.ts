@@ -1802,6 +1802,13 @@ export const BOSS_POWERS = {
   doughGap: [3, 5] as readonly [number, number],
   doughLast: 16,
   doughLive: 2,
+  /**
+   * Where a lump may go besides (the sim's): "out" of reach of every move the crowd has now (a free squash is no fight), or "any"
+   * empty square of the ranks above. And a lump drops only while its piece leaves him at most doughLeadMax pawns ahead of you on
+   * material (pawn 1, knight and bishop 3, rook 5, queen 9), as Timber's workshop: he rebuilds rather than runs away with it.
+   */
+  doughReach: "out" as "out" | "any",
+  doughLeadMax: 99,
 } as const;
 
 /**

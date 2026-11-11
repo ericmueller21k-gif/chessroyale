@@ -23,6 +23,7 @@ import { TIGER_UI } from "./Tiger.tsx";
 import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
+import { ZEBRA_UI } from "./Zebra.tsx";
 import { Cast, PowerBanner, kitLine, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
@@ -50,7 +51,7 @@ export { DARK, DarkCost, HOLLOW_CASTER, hollowCastFrom } from "./Hollow.tsx";
 export { PowerBanner, type Moment } from "./PowerParts.tsx";
 
 /** Every boss with powers on screen, by its BOSS_ROSTER id. */
-const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI] as BossUi[]).map((u) => [u.id, u]));
+const BOSS_UI: ReadonlyMap<string, BossUi> = new Map(([GINGER_UI, BOINGO_UI, GREX_UI, HOLLOW_UI, BIGBOY_UI, SAWYER_UI, PIG_UI, RECLUSE_UI, ALFIL_UI, HOPPER_UI, SMUDGY_UI, MOO_UI, GARDENER_UI, TIGER_UI, FOLIO_UI, TIMBER_UI, DASH_UI, ZEBRA_UI] as BossUi[]).map((u) => [u.id, u]));
 const bossUi = (boss: Pick<BossView, "id"> | null | undefined): BossUi | null => (boss?.id ? (BOSS_UI.get(boss.id) ?? null) : null);
 
 /** The rage warning, the same for every boss: the meter full, its ultimate coming. */
@@ -84,6 +85,7 @@ const MOMENT_UI: Record<PowerEventKind, MomentUi> = {
   ...FOLIO_UI.moments,
   ...TIMBER_UI.moments,
   ...DASH_UI.moments,
+  ...ZEBRA_UI.moments,
 };
 
 /** The moments that play on a screen of their own, in the order they're looked for. */
@@ -106,7 +108,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}) };
+    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}) };
     t += lead + m.ms;
     return m;
   });
@@ -179,7 +181,7 @@ export function BossBarExtra({ boss, until = 0, part = "bar" }: { boss: BossView
 // ---------------- The moments ----------------
 
 /** The boss's line for a power's moment (its kit's), the same on every screen; null without one. */
-export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier">): string | null {
+export function powerLine(kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening">): string | null {
   const ui = MOMENT_UI[m.kind];
   return ui.line ? ui.line(kit, m) : kitLine(kit, ui.kit, m.key);
 }

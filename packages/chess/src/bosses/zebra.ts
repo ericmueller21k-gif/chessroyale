@@ -43,7 +43,7 @@ import { BOSS_POWERS, DOUGH_PIECES, type BossPowerSettings, type BossPowerState,
 import { BOSS_OPENING, newBoard } from "../boards.ts";
 import { openingNameFor } from "../openings.ts";
 import { fenAtPly, legalMoves, moveNumber, pieceAt, positionOver, sideToMove, withPiece } from "../rules.ts";
-import { VALUE, from, meterFull, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side, type StopFields } from "./base.ts";
+import { VALUE, from, materialOf, meterFull, other, powerRoll, testSwitch, to, turnOf, unleashed, type Battle, type BossRules, type Side, type StopFields } from "./base.ts";
 import { BALLOON_TEST_MOVES, hoopsGuard, landRefused } from "./tiger.ts";
 import { tidyEnPassant } from "./timber.ts";
 
@@ -51,12 +51,13 @@ import { tidyEnPassant } from "./timber.ts";
 
 /**
  * His animations' and props' lengths (ms; the art's, scripts/boss-art/out/boss-zebra and zebra-props on claude/boss-art,
- * copied into packages/app/src/characters/zebra.ts and zebra-dough.ts): his `drop` (the lob leaves his hoof at `dropAt`), the
- * dough's `land` on its square, the timer's `ding` at 00:00 and the dough's `rise` (his piece shows from `riseAt`), the
+ * copied into packages/app/src/characters/zebra.ts and zebra-dough.ts): his `drop` (the lump lands on its square at `landAt`: the
+ * dough's `land`), the timer's `ding` at 00:00 and the dough's `rise` (his piece shows from `riseAt`), the
  * `squash`, the timer's roll, and Gold Plate's whole moment (Eric, Nov 11: "like 10 total": his cast, the gilding and shine,
- * his line, back to idle).
+ * his line, back to idle: `gildAt` his first stroke and the gilding, `swapAt` the gold piece in, `shineAt` its shine, `glintAt` its
+ * glint for good, `bragAt` his brag, `lineAt` his line).
  */
-export const ZEBRA_ANIM = { drop: 1200, dropAt: 680, land: 300, ding: 800, rise: 900, riseAt: 440, squash: 600, roll: 250, goldPlate: 10000 } as const;
+export const ZEBRA_ANIM = { drop: 1200, landAt: 940, land: 300, ding: 800, rise: 890, riseAt: 470, squash: 600, roll: 250, goldPlate: 10000, gildAt: 2480, swapAt: 2720, shineAt: 3300, glintAt: 4780, bragAt: 4300, lineAt: 5200 } as const;
 
 /**
  * How long each of his moments holds the screen (ms; POWER_FX in boss-timing.ts, so the server waits for them): a drop (his
@@ -64,17 +65,26 @@ export const ZEBRA_ANIM = { drop: 1200, dropAt: 680, land: 300, ding: 800, rise:
  * turn: his move waits for it, zebraTurnMs). His opening comment is a line: it holds nothing.
  */
 export const ZEBRA_FX = {
-  doughDrop: ZEBRA_ANIM.drop + ZEBRA_ANIM.land,
+  doughDrop: ZEBRA_ANIM.landAt + ZEBRA_ANIM.land,
   doughRise: ZEBRA_ANIM.ding + ZEBRA_ANIM.rise,
   doughSquash: ZEBRA_ANIM.squash,
   goldPlate: ZEBRA_ANIM.goldPlate,
   openingTalk: 0,
 } as const;
 
-type DoughSettings = Pick<BossPowerSettings, "doughTimers" | "doughOdds" | "doughDrops" | "doughFirst" | "doughGap" | "doughLast" | "doughLive">;
+type DoughSettings = Pick<BossPowerSettings, "doughTimers" | "doughOdds" | "doughDrops" | "doughFirst" | "doughGap" | "doughLast" | "doughLive" | "doughReach" | "doughLeadMax">;
 
 /** His state (a fresh one before his battle has set it up). */
-export const zebraOf = (p: Pick<BossPowerState, "zebra"> | null | undefined): ZebraState => p?.zebra ?? { lumps: [], drops: 0, next: Infinity, rises: [], squashes: [], gold: [], gilds: [] };
+export const zebraOf = (p: Pick<BossPowerState, "zebra"> | null | undefined): ZebraState =>
+  p?.zebra ?? {
+    lumps: [],
+    drops: 0,
+    next: Infinity,
+    rises: [],
+    squashes: [],
+    gold: [],
+    gilds: [],
+  };
 
 /** A whole number from the seed in [lo, hi]. */
 const rollIn = (seed: number, range: readonly [number, number], ...parts: (string | number)[]): number => range[0] + Math.floor(powerRoll(seed, ...parts) * (range[1] - range[0] + 1));
@@ -85,8 +95,10 @@ const rollIn = (seed: number, range: readonly [number, number], ...parts: (strin
  * The kind of his `n`-th lump (`fen`: any position; `his`: his side): doughOdds over the kinds he can have now (landRefused:
  * never a ninth pawn, never more pieces than promotions could make), from the seed. Null: none he can have.
  */
-export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds"> = BOSS_POWERS): DoughPiece | null {
-  const open = DOUGH_PIECES.filter((k) => s.doughOdds[k] > 0 && !landRefused(fen, k, his));
+export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax"> = BOSS_POWERS): DoughPiece | null {
+  // (Never one that would put him more than doughLeadMax pawns ahead of you on material.)
+  const room = materialOf(fen, other(his)) + s.doughLeadMax - materialOf(fen, his);
+  const open = DOUGH_PIECES.filter((k) => s.doughOdds[k] > 0 && VALUE[k]! <= room && !landRefused(fen, k, his));
   const total = open.reduce((t, k) => t + s.doughOdds[k], 0);
   if (!total) return null;
   let x = powerRoll(seed, "doughKind", n) * total;
@@ -117,11 +129,11 @@ function crowdPawnBelow(fen: string, sq: string, crowd: Side): boolean {
  * a pawn, knight or bishop on the two ranks of his half nearest the middle; a rook or queen on the two behind them, on a file
  * where a pawn of the crowd's stands below it. The first of a seeded order, or null: none fits.
  */
-export function doughSquare(fen: string, piece: DoughPiece, seed: number, n: number, lumps: readonly Pick<DoughLump, "square">[] = []): string | null {
+export function doughSquare(fen: string, piece: DoughPiece, seed: number, n: number, lumps: readonly Pick<DoughLump, "square">[] = [], s: Pick<BossPowerSettings, "doughReach"> = BOSS_POWERS): string | null {
   const crowd = sideToMove(fen);
   const his = other(crowd);
   const ep = fen.split(" ")[3];
-  const reach = new Set(legalMoves(fen).map(to));
+  const reach = new Set(s.doughReach === "out" ? legalMoves(fen).map(to) : []);
   const deep = piece === "r" || piece === "q";
   const out: { sq: string; k: number }[] = [];
   for (const f of "abcdefgh") {
@@ -181,7 +193,11 @@ export function gildPick(fen: string, his: Side, gold: readonly string[], seed: 
       const sq = `${f}${r}`;
       const pc = pieceAt(fen, sq);
       if (!pc || pc.color !== his || pc.type === "k" || pc.type === "p" || gold.includes(sq)) continue;
-      out.push({ square: sq, piece: pc.type, k: -VALUE[pc.type]! + powerRoll(seed, "gild", n, sq) * 0.5 });
+      out.push({
+        square: sq,
+        piece: pc.type,
+        k: -VALUE[pc.type]! + powerRoll(seed, "gild", n, sq) * 0.5,
+      });
     }
   }
   out.sort((a, b) => a.k - b.k);
@@ -238,10 +254,34 @@ export const ZEBRA: BossRules = {
   everyTurn(next, t) {
     const z = next.zebra;
     if (!z) return;
-    for (const m of hisMarks(z.rises, t.turn)) t.events.push({ kind: "doughRise", turn: t.turn, square: m.square, shape: m.piece });
-    for (const m of hisMarks(z.squashes, t.turn)) t.events.push({ kind: "doughSquash", turn: t.turn, square: m.square, shape: m.piece });
-    if (z.drop && z.drop.at + 1 === t.turn) t.events.push({ kind: "doughDrop", turn: t.turn, square: z.drop.square, shape: z.drop.piece });
-    if (z.talk && z.talk.at + 1 === t.turn) t.events.push({ kind: "openingTalk", turn: t.turn, pick: z.talk.pick, ...(z.talk.name ? { opening: z.talk.name } : {}) });
+    for (const m of hisMarks(z.rises, t.turn))
+      t.events.push({
+        kind: "doughRise",
+        turn: t.turn,
+        square: m.square,
+        shape: m.piece,
+      });
+    for (const m of hisMarks(z.squashes, t.turn))
+      t.events.push({
+        kind: "doughSquash",
+        turn: t.turn,
+        square: m.square,
+        shape: m.piece,
+      });
+    if (z.drop && z.drop.at + 1 === t.turn)
+      t.events.push({
+        kind: "doughDrop",
+        turn: t.turn,
+        square: z.drop.square,
+        shape: z.drop.piece,
+      });
+    if (z.talk && z.talk.at + 1 === t.turn)
+      t.events.push({
+        kind: "openingTalk",
+        turn: t.turn,
+        pick: z.talk.pick,
+        ...(z.talk.name ? { opening: z.talk.name } : {}),
+      });
     const pawnCan = z.gold.length > 0 && legalMoves(t.fen).some((m) => pawnOnGold(t.fen, m, z.gold));
     if (pawnCan) next.zebra = { ...z, goldTurn: t.turn };
   },
@@ -270,7 +310,18 @@ export const ZEBRA: BossRules = {
       const test = b.settings.bossPowerTest === "dough";
       if (test) b.boards.set(at.boardId, newBoard(at.boardId, { ...BOSS_OPENING, moves: [...BALLOON_TEST_MOVES] }, BALLOON_TEST_MOVES.length, at.generation));
       const s = BOSS_POWERS;
-      return { zebra: { lumps: [], drops: 0, next: test ? 0 : rollIn(at.seed, s.doughFirst, "doughFirst"), rises: [], squashes: [], gold: [], gilds: [], his: other(at.crowdSide) } as ZebraState };
+      return {
+        zebra: {
+          lumps: [],
+          drops: 0,
+          next: test ? 0 : rollIn(at.seed, s.doughFirst, "doughFirst"),
+          rises: [],
+          squashes: [],
+          gold: [],
+          gilds: [],
+          his: other(at.crowdSide),
+        } as ZebraState,
+      };
     },
   },
   afterCrowdMove(b, move) {
@@ -339,12 +390,19 @@ function setBoard(b: Battle, fen: string): void {
   const id = b.state.boards[0]!;
   const board = boardOf(b);
   const ply = board.history.length;
-  b.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }] });
+  b.boards.set(id, {
+    ...board,
+    fen,
+    bases: [...(board.bases ?? []).filter((x) => x.ply !== ply), { ply, fen }],
+  });
 }
 
 const setZebra = (b: Battle, z: ZebraState, extra: Partial<BossPowerState> = {}): void => {
   const boss = b.state.boss!;
-  b.state = { ...b.state, boss: { ...boss, powers: { ...boss.powers!, ...extra, zebra: z } } };
+  b.state = {
+    ...b.state,
+    boss: { ...boss, powers: { ...boss.powers!, ...extra, zebra: z } },
+  };
 };
 
 /**
@@ -354,7 +412,13 @@ const setZebra = (b: Battle, z: ZebraState, extra: Partial<BossPowerState> = {})
  */
 function doughAfterMove(b: Battle, z: ZebraState, move: string | null, side: "crowd" | "boss", at: number): { z: ZebraState; squashed: DoughMark[]; risen: DoughMark[] } {
   const his = z.his ?? other(b.state.boss!.crowdSide);
-  const mark = (l: DoughLump): DoughMark => ({ at, side, n: l.n, piece: l.piece, square: l.square });
+  const mark = (l: DoughLump): DoughMark => ({
+    at,
+    side,
+    n: l.n,
+    piece: l.piece,
+    square: l.square,
+  });
   const squashed = move ? z.lumps.filter((l) => l.square === to(move)).map(mark) : [];
   let lumps = z.lumps.filter((l) => !squashed.some((m) => m.n === l.n)).map((l) => ({ ...l, left: Math.max(0, l.left - 1) }));
   const risen: DoughMark[] = [];
@@ -371,7 +435,16 @@ function doughAfterMove(b: Battle, z: ZebraState, move: string | null, side: "cr
       lumps = lumps.filter((x) => x.n !== l.n);
     }
   }
-  return { z: { ...z, lumps, rises: [...z.rises, ...risen], squashes: [...z.squashes, ...squashed] }, squashed, risen };
+  return {
+    z: {
+      ...z,
+      lumps,
+      rises: [...z.rises, ...risen],
+      squashes: [...z.squashes, ...squashed],
+    },
+    squashed,
+    risen,
+  };
 }
 
 export const zebraBattle = {
@@ -386,7 +459,14 @@ export const zebraBattle = {
    * a minute and a lump at 00:00 rises; then Gold Plate, if it's due (the meter spent; his move waits for its moment). Each is
    * one of this turn's events, as it happens. Returns what happened, for the tests and the sims.
    */
-  afterCrowdMove(b: Battle, move: string | null): { squashed: DoughMark[]; risen: DoughMark[]; gild: ZebraState["gilds"][number] | null } | null {
+  afterCrowdMove(
+    b: Battle,
+    move: string | null,
+  ): {
+    squashed: DoughMark[];
+    risen: DoughMark[];
+    gild: ZebraState["gilds"][number] | null;
+  } | null {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p?.zebra || boss.id !== "zebra") return null;
@@ -396,8 +476,9 @@ export const zebraBattle = {
     const { z: z1, squashed, risen } = doughAfterMove(b, z, move, "crowd", at);
     z = z1;
     const events: PowerEvent[] = [...p.events];
-    for (const m of squashed) events.push({ kind: "doughSquash", turn: p.turn, square: m.square, shape: m.piece });
-    for (const m of risen) events.push({ kind: "doughRise", turn: p.turn, square: m.square, shape: m.piece });
+    // (Marked `by` the crowd: they come at the start of his turn, after the turn's own moments, and his move waits for them.)
+    for (const m of squashed) events.push({ kind: "doughSquash", turn: p.turn, square: m.square, shape: m.piece, by: "crowd" });
+    for (const m of risen) events.push({ kind: "doughRise", turn: p.turn, square: m.square, shape: m.piece, by: "crowd" });
     let next: BossPowerState = { ...b.state.boss!.powers!, events };
     let gild: ZebraState["gilds"][number] | null = null;
     // (Not once the battle is over: a result, a mate or stalemate, the move cap.)
@@ -405,9 +486,24 @@ export const zebraBattle = {
     if (zebraBattle.goldDue(next, at) && !boss.result && b.bossToMove() && !positionOver(fen) && at < b.settings.bossMaxMoves) {
       const pick = gildPick(fen, other(boss.crowdSide), z.gold, next.seed, z.gilds.length);
       gild = { at, square: pick?.square ?? null, piece: pick?.piece ?? null };
-      z = { ...z, gold: pick ? [...z.gold, pick.square] : z.gold, gilds: [...z.gilds, gild] };
+      z = {
+        ...z,
+        gold: pick ? [...z.gold, pick.square] : z.gold,
+        gilds: [...z.gilds, gild],
+      };
       const { ultNext: _trigger, ...rest } = next;
-      next = unleashed({ ...rest, ultAt: at, events: [...events, { kind: "goldPlate", turn: p.turn, ...(pick ? { square: pick.square, shape: pick.piece } : {}) }] });
+      next = unleashed({
+        ...rest,
+        ultAt: at,
+        events: [
+          ...events,
+          {
+            kind: "goldPlate",
+            turn: p.turn,
+            ...(pick ? { square: pick.square, shape: pick.piece } : {}),
+          },
+        ],
+      });
     }
     setZebra(b, z, next);
     return { squashed, risen, gild };
@@ -419,7 +515,15 @@ export const zebraBattle = {
    * (on the crowd's second turn at the earliest). All shown as the crowd's next turn begins (everyTurn). Not once the battle is
    * over on the board.
    */
-  afterHisMove(b: Battle, move: string, s: DoughSettings = BOSS_POWERS): { squashed: DoughMark[]; risen: DoughMark[]; drop: DoughMark | null } | null {
+  afterHisMove(
+    b: Battle,
+    move: string,
+    s: DoughSettings = BOSS_POWERS,
+  ): {
+    squashed: DoughMark[];
+    risen: DoughMark[];
+    drop: DoughMark | null;
+  } | null {
     const boss = b.state.boss;
     const p = boss?.powers;
     if (!boss || !p?.zebra || boss.id !== "zebra" || boss.result) return null;
@@ -427,7 +531,10 @@ export const zebraBattle = {
     const board = boardOf(b);
     // (The position before his move: the board's newest move is his.)
     const fenBefore = board.history.length ? fenAtPly(board.history, board.history.length - 1, board.bases) : null;
-    let z: ZebraState = { ...p.zebra, gold: fenBefore ? goldAfter(fenBefore, move, p.zebra.gold) : p.zebra.gold };
+    let z: ZebraState = {
+      ...p.zebra,
+      gold: fenBefore ? goldAfter(fenBefore, move, p.zebra.gold) : p.zebra.gold,
+    };
     const { z: z1, squashed, risen } = doughAfterMove(b, z, move, "boss", at);
     z = z1;
     let drop: DoughMark | null = null;
@@ -438,11 +545,20 @@ export const zebraBattle = {
       const n = z.drops;
       // (The test switch: his first lump a pawn's.)
       const piece = b.settings.bossPowerTest === "dough" && n === 0 && !landRefused(fen, "p", his) ? "p" : doughKind(fen, his, p.seed, n, s);
-      const square = piece ? doughSquare(fen, piece, p.seed, n, z.lumps) : null;
+      const square = piece ? doughSquare(fen, piece, p.seed, n, z.lumps, s) : null;
       if (piece && square) {
-        const lump: DoughLump = { n, piece, square, left: s.doughTimers[piece], at };
+        // (Its timer's place: the lowest one free.)
+        let slot = 0;
+        while (z.lumps.some((l) => l.slot === slot)) slot++;
+        const lump: DoughLump = { n, slot, piece, square, left: s.doughTimers[piece], at };
         drop = { at, side: "boss", n, piece, square };
-        z = { ...z, lumps: [...z.lumps, lump], drops: n + 1, next: at + rollIn(p.seed, s.doughGap, "doughGap", n), drop };
+        z = {
+          ...z,
+          lumps: [...z.lumps, lump],
+          drops: n + 1,
+          next: at + rollIn(p.seed, s.doughGap, "doughGap", n),
+          drop,
+        };
       }
     }
     if (!over && !z.talk && at + 1 >= 2 && moveNumber(fen) >= 4) {
@@ -450,7 +566,10 @@ export const zebraBattle = {
       const firstBase = (hist.bases ?? []).reduce((lo, x) => Math.min(lo, x.ply), Infinity);
       const moves = hist.history.slice(0, Number.isFinite(firstBase) ? firstBase : hist.history.length);
       const name = b.library ? openingNameFor(moves, b.library) : null;
-      z = { ...z, talk: { at, name, pick: Math.floor(powerRoll(p.seed, "talk") * 4096) } };
+      z = {
+        ...z,
+        talk: { at, name, pick: Math.floor(powerRoll(p.seed, "talk") * 4096) },
+      };
     }
     setZebra(b, z);
     return { squashed, risen, drop };
@@ -458,4 +577,5 @@ export const zebraBattle = {
 };
 
 /** His events for a turn (the sims and tests read them). */
-export const zebraEvents = (events: readonly PowerEvent[]) => events.filter((e) => e.kind === "doughDrop" || e.kind === "doughRise" || e.kind === "doughSquash" || e.kind === "goldPlate" || e.kind === "openingTalk");
+export const zebraEvents = (events: readonly PowerEvent[]) =>
+  events.filter((e) => e.kind === "doughDrop" || e.kind === "doughRise" || e.kind === "doughSquash" || e.kind === "goldPlate" || e.kind === "openingTalk");

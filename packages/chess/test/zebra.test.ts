@@ -35,8 +35,19 @@ import { KIT_OPENING, crowdPick, fakeEngine, kitSettings } from "./boss-kit-lib.
 const S = BOSS_POWERS;
 
 function battle(seed: number, opts: { test?: string; side?: "w" | "b"; library?: Opening[] } = {}): MatchRunner {
-  const settings = kitSettings({ boss: "zebra", test: opts.test ?? "", maxMoves: 60 });
-  return new MatchRunner({ settings, rng: mulberry32(seed), engines: [fakeEngine()], library: opts.library ?? [KIT_OPENING], entrants: [{ id: "h0", name: "H", isBot: false }], raidSide: opts.side ?? "w" });
+  const settings = kitSettings({
+    boss: "zebra",
+    test: opts.test ?? "",
+    maxMoves: 60,
+  });
+  return new MatchRunner({
+    settings,
+    rng: mulberry32(seed),
+    engines: [fakeEngine()],
+    library: opts.library ?? [KIT_OPENING],
+    entrants: [{ id: "h0", name: "H", isBot: false }],
+    raidSide: opts.side ?? "w",
+  });
 }
 const fenOf = (r: MatchRunner) => r.boards.get(r.state.boards[0]!)!.fen;
 const zOf = (r: MatchRunner): ZebraState => r.boss!.powers!.zebra!;
@@ -53,9 +64,28 @@ async function crowdMove(r: MatchRunner, pick?: (fen: string, allowed: string[])
 function onPosition(r: MatchRunner, fen: string, crowd: "w" | "b", zebra: Partial<ZebraState> = {}, patch: Partial<BossPowerState> = {}) {
   const id = r.state.boards[0]!;
   const board = r.boards.get(id)!;
-  r.boards.set(id, { ...board, fen, bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }] });
+  r.boards.set(id, {
+    ...board,
+    fen,
+    bases: [...(board.bases ?? []).filter((x) => x.ply !== board.history.length), { ply: board.history.length, fen }],
+  });
   const boss = r.state.boss!;
-  r.state = { ...r.state, boss: { ...boss, crowdSide: crowd, powers: { ...boss.powers!, ...patch, zebra: { ...boss.powers!.zebra!, his: crowd === "w" ? "b" : "w", ...zebra } } } };
+  r.state = {
+    ...r.state,
+    boss: {
+      ...boss,
+      crowdSide: crowd,
+      powers: {
+        ...boss.powers!,
+        ...patch,
+        zebra: {
+          ...boss.powers!.zebra!,
+          his: crowd === "w" ? "b" : "w",
+          ...zebra,
+        },
+      },
+    },
+  };
 }
 
 /** A quiet middlegame, the crowd (White) to move, a pawn of each side gone: a lump of any kind can rise. */
@@ -64,7 +94,11 @@ const QUIET_W = "r1bqkb1r/pp3ppp/2n1pn2/3p4/3P4/2N1PN2/PP3PPP/R1BQKB1R w KQkq - 
 describe("Don Dough's sheet", () => {
   it("is on the roster with Rising Dough and Gold Plate, admins first", () => {
     const def = BOSS_ROSTER.find((d) => d.id === "zebra")!;
-    expect(def).toMatchObject({ name: "Don Dough", kit: "Don Dough", powers: { passive: "dough", ultimate: "goldplate" } });
+    expect(def).toMatchObject({
+      name: "Don Dough",
+      kit: "Don Dough",
+      powers: { passive: "dough", ultimate: "goldplate" },
+    });
     expect(BOSS_ADMIN_FIRST).toContain("zebra");
     expect(adminFirst(def)).toBe(true);
     expect(isPlayable(def)).toBe(false);
@@ -157,7 +191,7 @@ describe("Rising Dough in a battle", () => {
       const z = zOf(r);
       expect(z.drops).toBe(1);
       const lump = z.lumps[0]!;
-      expect(lump).toMatchObject({ n: 0, piece: "p", left: 4, at: 1 });
+      expect(lump).toMatchObject({ n: 0, slot: 0, piece: "p", left: 4, at: 1 });
       expect(r.boss!.powers!.events.find((e) => e.kind === "doughDrop")).toMatchObject({ square: lump.square, shape: "p" });
       // (Your move: 3; his: 2; yours: 1; his: 0, and it rises after his move unless a guard holds it.)
       const lefts: number[] = [];
@@ -172,8 +206,15 @@ describe("Rising Dough in a battle", () => {
       if (up) {
         rose++;
         expect(lefts).toEqual([3, 2, 1, -1]);
-        expect(up).toMatchObject({ side: "boss", piece: "p", square: lump.square });
-        expect(pieceAt(fenOf(r), lump.square)).toEqual({ color: "b", type: "p" });
+        expect(up).toMatchObject({
+          side: "boss",
+          piece: "p",
+          square: lump.square,
+        });
+        expect(pieceAt(fenOf(r), lump.square)).toEqual({
+          color: "b",
+          type: "p",
+        });
         expect(r.boss!.powers!.events.some((e) => e.kind === "doughRise" && e.square === lump.square)).toBe(true);
         expect(powerTurn(r.boss)).toBe(true);
       } else expect(lefts.slice(0, 3)).toEqual([3, 2, 1]);
@@ -184,35 +225,71 @@ describe("Rising Dough in a battle", () => {
   it("your piece landing on a lump squashes it (gone, a moment as your move lands); his pieces never move onto one", async () => {
     const r = battle(7);
     // (A lump on e5, a knight of yours on f3 can land on it.)
-    onPosition(r, QUIET_W, "w", { lumps: [{ n: 0, piece: "n", square: "e5", left: 6, at: 0 }], drops: 1 });
+    onPosition(r, QUIET_W, "w", {
+      lumps: [{ n: 0, slot: 0, piece: "n", square: "e5", left: 6, at: 0 }],
+      drops: 1,
+    });
     expect(stopReason(r.boss, QUIET_W, "f3e5")).toBeNull();
     await crowdMove(r, () => "f3e5");
     expect(zOf(r).lumps).toEqual([]);
-    expect(zOf(r).squashes.at(-1)).toMatchObject({ side: "crowd", square: "e5", piece: "n" });
-    expect(r.boss!.powers!.events.at(-1)).toMatchObject({ kind: "doughSquash", square: "e5", shape: "n" });
+    expect(zOf(r).squashes.at(-1)).toMatchObject({
+      side: "crowd",
+      square: "e5",
+      piece: "n",
+    });
+    expect(r.boss!.powers!.events.at(-1)).toMatchObject({
+      kind: "doughSquash",
+      square: "e5",
+      shape: "n",
+    });
     expect(zebraTurnMs(r.boss)).toBe(ZEBRA_FX.doughSquash);
     // (His move onto a lump: never, unless it's his only one.)
     const his = "r1bqkb1r/pp3ppp/2n1pn2/3p4/3P4/2N1PN2/PP3PPP/R1BQKB1R b KQkq - 0 7";
-    onPosition(r, his, "w", { lumps: [{ n: 1, piece: "p", square: "e5", left: 3, at: 1 }] });
+    onPosition(r, his, "w", {
+      lumps: [{ n: 1, slot: 0, piece: "p", square: "e5", left: 3, at: 1 }],
+    });
     expect(legalMoves(his)).toContain("f6e4");
     const allowed = bossAllowed(r.boss, his)!;
     expect(allowed.some((m) => m.slice(2, 4) === "e5")).toBe(false);
     expect(legalMoves(his).some((m) => m.slice(2, 4) === "e5")).toBe(true);
-    expect(stopReason({ id: "zebra", powers: { zebra: { his: "b", lumps: [{ square: "e5" }], gold: [] } } }, his, "c6e5")).toBe("dough");
+    expect(
+      stopReason(
+        {
+          id: "zebra",
+          powers: { zebra: { his: "b", lumps: [{ square: "e5" }], gold: [] } },
+        },
+        his,
+        "c6e5",
+      ),
+    ).toBe("dough");
   });
 
   it("a lump at 00:00 after your move rises before his move (he can play it); one a guard holds waits, then rises after the next move", async () => {
     const r = battle(8);
-    onPosition(r, QUIET_W, "w", { lumps: [{ n: 0, piece: "b", square: "a6", left: 1, at: 0 }], drops: 1 });
+    onPosition(r, QUIET_W, "w", {
+      lumps: [{ n: 0, slot: 0, piece: "b", square: "a6", left: 1, at: 0 }],
+      drops: 1,
+    });
     await crowdMove(r, (_, allowed) => allowed.find((m) => m === "a2a3") ?? allowed[0]!);
-    expect(zOf(r).rises.at(-1)).toMatchObject({ side: "crowd", square: "a6", piece: "b" });
+    expect(zOf(r).rises.at(-1)).toMatchObject({
+      side: "crowd",
+      square: "a6",
+      piece: "b",
+    });
     expect(pieceAt(fenOf(r), "a6")).toEqual({ color: "b", type: "b" });
     expect(sideToMove(fenOf(r))).toBe("b");
-    expect(r.boss!.powers!.events.at(-1)).toMatchObject({ kind: "doughRise", square: "a6", shape: "b" });
+    expect(r.boss!.powers!.events.at(-1)).toMatchObject({
+      kind: "doughRise",
+      square: "a6",
+      shape: "b",
+    });
     expect(zebraTurnMs(r.boss)).toBe(ZEBRA_FX.doughRise);
     // (A knight that would rise on d3 with your king on e1 would check it: it waits at 00:00.)
     const r2 = battle(9);
-    onPosition(r2, QUIET_W, "w", { lumps: [{ n: 0, piece: "n", square: "d3", left: 1, at: 0 }], drops: 1 });
+    onPosition(r2, QUIET_W, "w", {
+      lumps: [{ n: 0, slot: 0, piece: "n", square: "d3", left: 1, at: 0 }],
+      drops: 1,
+    });
     await crowdMove(r2, (_, allowed) => allowed.find((m) => m === "a2a3")!);
     expect(zOf(r2).lumps).toMatchObject([{ n: 0, left: 0, square: "d3" }]);
     expect(pieceAt(fenOf(r2), "d3")).toBeNull();
@@ -254,7 +331,11 @@ describe("Gold Plate", () => {
     expect(g.piece).toBe("q");
     expect(pieceAt(fenOf(r), g.square!)).toEqual({ color: "b", type: "q" });
     expect(z.gold).toEqual([g.square]);
-    expect(r.boss!.powers!.events.at(-1)).toMatchObject({ kind: "goldPlate", square: g.square, shape: "q" });
+    expect(r.boss!.powers!.events.at(-1)).toMatchObject({
+      kind: "goldPlate",
+      square: g.square,
+      shape: "q",
+    });
     expect(zebraTurnMs(r.boss)).toBeGreaterThanOrEqual(ZEBRA_FX.goldPlate);
     expect(r.bossToMove()).toBe(true);
     expect(r.boss!.powers!.ults).toBe(1);
@@ -307,8 +388,33 @@ describe("Gold Plate", () => {
 
 describe("his opening comment", () => {
   const lib: Opening[] = [
-    { id: "x", eco: "C50", name: "Italian Game", names: { 0: "Starting position", 1: "King's Pawn Game", 3: "King's Knight Opening", 5: "Italian Game" }, family: "Italian Game", unusual: false, moves: ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"], namedPlies: 5, expected: { 0: 0.5 } },
-    { id: "y", eco: "B20", name: "Sicilian Defense", names: { 0: "Starting position", 2: "Sicilian Defense" }, family: "Sicilian Defense", unusual: false, moves: ["e2e4", "c7c5", "g1f3"], namedPlies: 2, expected: { 0: 0.5 } },
+    {
+      id: "x",
+      eco: "C50",
+      name: "Italian Game",
+      names: {
+        0: "Starting position",
+        1: "King's Pawn Game",
+        3: "King's Knight Opening",
+        5: "Italian Game",
+      },
+      family: "Italian Game",
+      unusual: false,
+      moves: ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "f8c5"],
+      namedPlies: 5,
+      expected: { 0: 0.5 },
+    },
+    {
+      id: "y",
+      eco: "B20",
+      name: "Sicilian Defense",
+      names: { 0: "Starting position", 2: "Sicilian Defense" },
+      family: "Sicilian Defense",
+      unusual: false,
+      moves: ["e2e4", "c7c5", "g1f3"],
+      namedPlies: 2,
+      expected: { 0: 0.5 },
+    },
   ];
 
   it("names the moves by the library: the longest named line they start with; none: null", () => {
@@ -326,7 +432,13 @@ describe("his opening comment", () => {
       await crowdMove(r);
       if (r.isOver() || !r.bossToMove()) break;
       await r.playBoss(fakeEngine());
-      for (const e of r.boss!.powers!.events) if (e.kind === "openingTalk") talks.push({ turn: e.turn, ...(e.opening ? { opening: e.opening } : {}), move: Number(fenOf(r).split(" ")[5]) });
+      for (const e of r.boss!.powers!.events)
+        if (e.kind === "openingTalk")
+          talks.push({
+            turn: e.turn,
+            ...(e.opening ? { opening: e.opening } : {}),
+            move: Number(fenOf(r).split(" ")[5]),
+          });
     }
     expect(talks).toHaveLength(1);
     expect(talks[0]!.turn).toBeGreaterThanOrEqual(2);

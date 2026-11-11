@@ -896,6 +896,8 @@ export const DOUGH_PIECES: readonly DoughPiece[] = ["p", "n", "b", "r", "q"];
  */
 export interface DoughLump {
   n: number;
+  /** Its oven timer's place on his side (the lowest free when it dropped): it keeps it until it rises or is squashed. */
+  slot: number;
   piece: DoughPiece;
   square: string;
   left: number;

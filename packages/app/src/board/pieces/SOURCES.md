@@ -48,3 +48,22 @@ head in profile: its base ribbon and collar are the cburnett bishop's own (Colin
 above: `LICENSE.txt`), so it stands like the bishop it moves like; the head, ear, trunk and tusk are new, drawn for
 HunChess (not traced from any other icon). Checked Oct 17, 2026: no scripts or outside references (plain paths and
 groups).
+
+## Don Dough's gold pieces (Nov 11, 2026)
+
+Don Dough's gold pieces (Gold Plate: `piece.<kind>.gold`, see `pieces.css`) are the cburnett queen, rook, bishop and knight above,
+**recolored gold** for HunChess (the art branch `claude/boss-art`, scripts/boss-art/out/zebra-gold/pieces/, Nov 11): the same
+paths and shapes, the fills and details in gold (white's set bright gold with a dark brown outline, black's antique gold with its
+black outline kept), so they stay under the same BSD license (`LICENSE.txt`) and the same credit. Checked Nov 11, 2026: no
+scripts or outside references (plain paths, groups and one gradient each).
+
+| File | Piece | Recolored from | SHA-1 |
+| --- | --- | --- | --- |
+| `zebra/gold-ql.svg` | gold queen, white | `cburnett/Chess_qlt45.svg` | 56d6aba3b774853718747f42cc18dcc2e258467d |
+| `zebra/gold-qd.svg` | gold queen, black | `cburnett/Chess_qdt45.svg` | 9c766cd43334d2fe6dabe9d724a69ce1b751ccca |
+| `zebra/gold-rl.svg` | gold rook, white | `cburnett/Chess_rlt45.svg` | acdef940fd7f2a9fed8f3eb8f883b3c0b5586a2d |
+| `zebra/gold-rd.svg` | gold rook, black | `cburnett/Chess_rdt45.svg` | 46def95f328a29388cbc0a7519efca6fec52d282 |
+| `zebra/gold-bl.svg` | gold bishop, white | `cburnett/Chess_blt45.svg` | 3ad5adc72aff324c9c7ba9003ace24f21f5d5913 |
+| `zebra/gold-bd.svg` | gold bishop, black | `cburnett/Chess_bdt45.svg` | b53ec94d94c4c0d9c95d9031886df264cb2aef89 |
+| `zebra/gold-nl.svg` | gold knight, white | `cburnett/Chess_nlt45.svg` | 9506e937221af19bdc9719597b95bfded2dcdeb6 |
+| `zebra/gold-nd.svg` | gold knight, black | `cburnett/Chess_ndt45.svg` | f9bde47b1a86b77333c79d1718bbc8fb8cfd286c |

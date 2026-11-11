@@ -573,6 +573,13 @@ export const EFFECTS: Record<EffectName, Effect> = {
   ankusHit: { ch: EFFECT_SPRITES.ankusHit, covers: "square", start: "hitHL", sounds: {} },
   sawHit: { ch: EFFECT_SPRITES.sawHit, covers: "square", start: "hitAL", sounds: {} },
   chipHit: { ch: EFFECT_SPRITES.chipHit, covers: "square", start: "hitUL", sounds: {} },
+  flourHit: { ch: EFFECT_SPRITES.flourHit, covers: "square", start: "hitHL", sounds: {} },
+  // Don Dough's dough on its square (components/Zebra.tsx): it lands (`land`), proofs as its kind (`p` … `q`, loops), rises into his
+  // piece (`<k>Rise`) or is squashed (`<k>Squash`). Its sounds: the plop, the swell and the oven's pop, the splat.
+  zebraDough: { ch: EFFECT_SPRITES.zebraDough, covers: "square", start: "land", loop: "p", sounds: { plop: "zebraPlop", rise: "zebraRise", pop: "zebraOvenPop", squash: "zebraSquash" } },
+  // Gold Plate on his piece's square: the gilding (its chimes are his brush's `gild` cue: quiet here), the shine, the idle glint (no
+  // sound: it repeats), a pawn's clink off it.
+  goldFx: { ch: EFFECT_SPRITES.goldFx, covers: "square", start: "gild", loop: "glint", sounds: { shine: "zebraShine", clink: "zebraClink" } },
   lassoHit: { ch: EFFECT_SPRITES.lassoHit, covers: "square", start: "hitHL", sounds: {} },
   pieHit: { ch: EFFECT_SPRITES.pieHit, covers: "square", start: "hitHL", sounds: {} },
   bonkHit: { ch: EFFECT_SPRITES.bonkHit, covers: "square", start: "hitHL", sounds: {} },
@@ -791,6 +798,11 @@ export function sawItem(square: string, i: number, from: "L" | "R", since: numbe
 export function chipItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
   const kind = i >= 9 ? "X" : i === 8 || i % 2 ? "S" : "U";
   return { square, name: "chipHit", anim: `hit${kind}${from}`, since };
+}
+
+/** Don Dough's i-th shot of his bread rifle on the king's square (at its head, then its chest, in turn), from his side. */
+export function flourItem(square: string, i: number, from: "L" | "R", since: number): SquareItem {
+  return { square, name: "flourHit", anim: `hit${i % 2 ? "L" : "H"}${from}`, since };
 }
 
 /** Wrangler's i-th crack of his lasso on the king's square (high, then low, in turn), from his side. */

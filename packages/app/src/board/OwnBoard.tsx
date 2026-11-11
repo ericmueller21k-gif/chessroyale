@@ -50,6 +50,8 @@ interface Track {
   turn: QuarterTurn;
   /** Alfil's elephants among them (or fading), by piece id: drawn with their own art. */
   elephants: Set<number>;
+  /** Don Dough's gold pieces among them (or fading), by piece id: drawn gold. */
+  gold: Set<number>;
 }
 
 /**
@@ -90,7 +92,7 @@ interface BoardActs {
  * when what it shows changes (`boardInputs` in logic.ts), or by itself (a tap, a drag, a slide or a fade ending).
  */
 export function OwnBoard(props: BoardProps) {
-  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, decor, premove } = props;
+  const { fen, orientation, lastMove, interactive, moves, onMove, arrows, small, animate = true, children, marks, dark, onDarkTry, turn = 0, elephants, gold, decor, premove } = props;
   const onMoveRef = useRef(onMove);
   onMoveRef.current = onMove;
   const onDarkRef = useRef(onDarkTry);
@@ -123,7 +125,7 @@ export function OwnBoard(props: BoardProps) {
   const acts = useMemo<BoardActs>(() => ({ move: (uci, how) => onMoveRef.current?.(uci, how), darkTry: (uci) => onDarkRef.current?.(uci), refused: onRefusedRef, stopped: stoppedRef, promote: setPromotion, selectDark: setDarkSel, local }), []);
   // (The same element while nothing it shows has changed: Preact leaves it, and everything in it, alone.)
   const layer = useMemo(
-    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} decor={decor} premove={premove} acts={acts} />,
+    () => <BoardLayer fen={fen} orientation={orientation} lastMove={lastMove} interactive={interactive} moves={moves} arrows={arrows} small={small} animate={animate} marks={marks} dark={dark} darkOn={darkOn} darkSel={darkSel} turn={turn} elephants={elephants} gold={gold} decor={decor} premove={premove} acts={acts} />,
     [...boardInputs(props), darkOn, darkSel, cleared.current],
   );
   const promoWhite = promotion?.premove ? promotion.premove.side === "w" : sideToMove(fen) === "w";
@@ -168,7 +170,7 @@ type LayerProps = Omit<BoardProps, "children" | "silent" | "onMove" | "onDarkTry
  * The board's drawing: the squares and their highlights, the pieces (sliding, fading, following a drag), the arrows and
  * the coordinates, and the taps and drags on them. Drawn again only when what it shows changes (see OwnBoard).
  */
-function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, decor, premove, acts }: LayerProps) {
+function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, small, animate = true, marks, dark, darkOn, darkSel, turn = 0, elephants, gold, decor, premove, acts }: LayerProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -207,7 +209,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const dests = useMemo(() => (interactive && !small ? destsFor(fen, moves, darkList) : new Map<string, string[]>()), [fen, interactive, small, moves?.join(), darkList.join()]);
 
   // ---------------- Which piece is which ----------------
-  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn, elephants: new Set() });
+  const track = useRef<Track>({ key: null, pieces: [], fading: [], sliding: new Map(), orientation, turn, elephants: new Set(), gold: new Set() });
   const tr = track.current;
   // (A new way up or a new turn of the board: every piece jumps to its new square, never flies there.)
   const turned = tr.orientation !== orientation || tr.turn !== turn;
@@ -246,7 +248,14 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     else tr.elephants.delete(p.id);
     for (const id of tr.elephants) if (!tr.pieces.some((p) => p.id === id) && !fading.some((f) => f.piece.id === id)) tr.elephants.delete(id);
   }
-  const look = (p: BoardPiece) => `${pieceClass(p.code)}${tr.elephants.has(p.id) ? " elephant" : ""}`;
+  // Don Dough's gold pieces: his pieces on their squares now; one taken keeps its gold as it fades.
+  if (gold?.length || tr.gold.size) {
+    const on = new Set(gold ?? []);
+    for (const p of tr.pieces) if (p.code[1] !== "k" && p.code[1] !== "p" && on.has(p.square)) tr.gold.add(p.id);
+    else tr.gold.delete(p.id);
+    for (const id of tr.gold) if (!tr.pieces.some((p) => p.id === id) && !fading.some((f) => f.piece.id === id)) tr.gold.delete(id);
+  }
+  const look = (p: BoardPiece) => `${pieceClass(p.code)}${tr.elephants.has(p.id) ? " elephant" : ""}${tr.gold.has(p.id) ? " gold" : ""}`;
 
   // Captured pieces fade and sliding ones settle: drawn again once they're done.
   useEffect(() => {

@@ -60,7 +60,9 @@ export type KingCue =
   | "foeTriumph"
   | "foeDrained"
   | "rushAsk"
-  | "rushWell";
+  | "rushWell"
+  // Don Dough's dough landing on the board (Nov 11).
+  | "dough";
 
 export const KING_LINES: Record<KingCue, readonly string[]> = {
   // One of these as the battle begins (Eric, Oct 9: one opening line, from a much bigger pool).
@@ -146,6 +148,7 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
   ],
   // Dash's Scramble Rush (Eric, Nov 6): after his sweep, and the crowd putting enough of the pieces back. Said whether he has
   // fallen or not (his Last Stand spent): the test needs his word.
+  dough: ["Squash it before it rises!"],
   rushAsk: ["Put the pieces back where they came from. Hurry!", "Every piece to its own square. Quickly now!", "You saw the board. Set it right, fast!"],
   rushWell: ["Well remembered!", "Every piece home. Well done!", "Sharp eyes! The board is ours again."],
 };
@@ -195,6 +198,7 @@ const KIND: Record<KingCue, Kind> = {
   foeDrained: "critical",
   rushAsk: "critical",
   rushWell: "critical",
+  dough: "critical",
 };
 
 /** How much each kind of line matters to his voice: critical cuts in; a remark waits its turn ahead of small talk. */

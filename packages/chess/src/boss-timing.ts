@@ -293,11 +293,11 @@ export const fullMoonMs = (boss: { powers?: { events?: readonly { kind: string }
   boss?.powers?.events?.some((e) => e.kind === "fullMoon") ? POWER_FX.fullMoon : 0;
 
 /**
- * Don Dough's moments at the start of his turn (as the crowd's move just played landed: a `doughRise`, a `doughSquash` or his
- * `goldPlate` among this turn's events): they play while he thinks, so his thinking lasts at least as long (the ms; 0: none).
+ * Don Dough's moments at the start of his turn (as the crowd's move just played landed: a `doughRise` or `doughSquash` marked
+ * `by` the crowd, or his `goldPlate`, among this turn's events): they play while he thinks, so his thinking lasts at least as long (the ms; 0: none).
  */
-export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string }[] } | null } | null | undefined): number =>
-  powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "doughRise" | "doughSquash" | "goldPlate" } => e.kind === "doughRise" || e.kind === "doughSquash" || e.kind === "goldPlate"));
+export const zebraTurnMs = (boss: { powers?: { events?: readonly { kind: string; by?: string }[] } | null } | null | undefined): number =>
+  powerMomentMs((boss?.powers?.events ?? []).filter((e): e is { kind: "doughRise" | "doughSquash" | "goldPlate" } => e.kind === "goldPlate" || ((e.kind === "doughRise" || e.kind === "doughSquash") && e.by === "crowd")));
 
 /**
  * Folio's moments at the start of its turn (as the crowd's move just played landed: a `fold` or a `revision` among this
@@ -439,9 +439,9 @@ export const lastStandAttackHits = (): number[] => kingAttackHits().map((t) => L
  * The bosses whose character has a `kingAttack` (the app's BOSS_KITS: a unit test keeps the two the same), by
  * BOSS_ROSTER id, in the kits' order. Hollow first (Eric, Oct 10: to try it before the others get theirs); Alfil's ankus
  * jabs (Oct 17); Boingo's pies, Sawyer's saw and Wrangler's lasso (Eric, Oct 18); Ginger's cane, Jefferson's Roman
- * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18); Smudgy's paint (Oct 19); Moo & Moon's moonbeams (Oct 20); Puddles' hose (Oct 23); Babur's balloons (Oct 24); Folio's ink (Oct 27); Timber's hammer and plank (Nov 2); Dash's claws (Nov 6): every playable boss but the Hidden Boss.
+ * candle and Big Boy's lollipop (Eric, Oct 18); Chub & Chirp's carrots (Oct 18); Smudgy's paint (Oct 19); Moo & Moon's moonbeams (Oct 20); Puddles' hose (Oct 23); Babur's balloons (Oct 24); Folio's ink (Oct 27); Timber's hammer and plank (Nov 2); Dash's claws (Nov 6); Don Dough's bread rifle (Nov 11): every playable boss but the Hidden Boss.
  */
-export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash"];
+export const KING_ATTACKERS: readonly string[] = ["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash", "zebra"];
 export const hasKingAttack = (bossId: string | null | undefined): boolean => !!bossId && KING_ATTACKERS.includes(bossId);
 
 /** The crowd is checkmated on this board (the boss's move mated it). */
