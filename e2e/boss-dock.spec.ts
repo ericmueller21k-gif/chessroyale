@@ -85,7 +85,7 @@ test("the row is exactly the board's width under its edges at every width; the G
     // (Eric's iPhone 14 Plus, Nov 11: the strip tall enough for the two, one above the other; the bar collapsed and not.)
     { name: "428x746", viewport: { width: 428, height: 746 }, phone: true, king: "stack" },
     { name: "428x926", viewport: { width: 428, height: 926 }, phone: true, king: "stack" },
-    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "under" },
+    { name: "768", viewport: { width: 768, height: 1024 }, phone: false, king: "stack" },
     { name: "844x390", viewport: { width: 844, height: 390 }, phone: true, king: "beside" },
     { name: "1024", viewport: { width: 1024, height: 768 }, phone: false, king: "corner" },
     { name: "1280", viewport: { width: 1280, height: 800 }, phone: false, king: "corner" },
