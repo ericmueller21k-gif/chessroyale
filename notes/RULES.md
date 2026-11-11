@@ -123,3 +123,5 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
   Back to one Opus when XP's phases are done. Other workers stay off the result screens while XP phase 1 is open.
 
 - **Fable (Eric, Nov 11):** at most ONE Fable helper at a time, at `medium` effort, and only when Eric asks for Fable ("if it's Fable, just do one Fable at medium, because otherwise that's going to kill [our usage]").
+
+- **Worktree tests (Nov 11):** a worktree with `node_modules` symlinked to the main checkout resolves `@chessroyale/*` to the MAIN checkout's packages, not the worktree's. For cross-package tests, make `node_modules` a dir of links with `@chessroyale/*` pointing at the worktree's `packages/*` (as done for wt-bz).
