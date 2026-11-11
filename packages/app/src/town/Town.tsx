@@ -1325,6 +1325,7 @@ function startTown(
   };
   const run = () => {
     if (raf || !alive || document.hidden || held || away) return;
+    rec?.pause();
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };

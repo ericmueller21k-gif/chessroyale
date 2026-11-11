@@ -172,6 +172,12 @@ export class FrameRec {
     const now = this.frameNow;
     const dt = this.prevNow < 0 ? 0 : now - this.prevNow;
     this.prevNow = now;
+    // (The first frame after a pause, a shop or a hidden tab: its time is the pause's, not a frame's.)
+    if (dt === 0 && this.state === "rec") {
+      this.heading = heading;
+      this.zoom = zoom;
+      return;
+    }
     const work = this.clock() - this.t0;
     const turnRate = dt > 0 && !Number.isNaN(this.heading) ? (Math.abs(((((heading - this.heading) % 360) + 540) % 360) - 180) * 1000) / dt : 0;
     const zoomed = !Number.isNaN(this.zoom) && Math.abs(zoom - this.zoom) > 1e-4;
@@ -207,6 +213,10 @@ export class FrameRec {
     if (this.state === "done") return;
     this.state = "done";
     this.onDone?.();
+  }
+  /** The frames stop (a shop, a hidden tab): the next one starts afresh. */
+  pause(): void {
+    this.prevNow = -1;
   }
   /** Again: an empty run, waiting for the first move. */
   again(): void {

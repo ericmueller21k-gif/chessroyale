@@ -170,6 +170,25 @@ describe("the recorder", () => {
     expect(rec.run.flags[2]! & F.gap).toBeTruthy();
   });
 
+  it("a pause (a shop, a hidden tab) isn't a frame: the first frame after it isn't recorded", () => {
+    const { rec, at } = rig();
+    for (const t of [0, 16.7, 33.4]) {
+      at(t);
+      rec.begin(t);
+      rec.end(true, 0, 2);
+    }
+    // (The first frame starts the run: two recorded.)
+    expect(rec.run.n).toBe(2);
+    rec.pause();
+    for (const t of [9000, 9016.7]) {
+      at(t);
+      rec.begin(t);
+      rec.end(true, 0, 2);
+    }
+    expect(rec.run.n).toBe(3);
+    expect(Array.from(rec.run.total.subarray(0, 3)).map((x) => +x.toFixed(1))).toEqual([16.7, 16.7, 16.7]);
+  });
+
   it("stops after 30 s (onDone once); Again starts an empty run that waits again", () => {
     const { rec, at } = rig();
     let done = 0;
