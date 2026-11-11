@@ -210,6 +210,33 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   for (const f of z1.figs.filter((x) => x.name !== z1.say!.who)) expect(["sitListen", "sitPuff"]).toContain(f.anim);
   await shot(page, "back");
 
+  // Walking round to the table's end (Eric, Nov 11, his iPhone: the table and its board ghosted there, dark patches on the floor):
+  // every frame, walking and at rest, the floor's tiles lie in the floor (the pieces standing: the walls, the furniture), and nothing but
+  // the door and the near wall goes see-through over you. (Before: 196 tiles stood up too, the table and rug tiles see-through.)
+  type Still = { ups: number; ghosts: string[] };
+  await page.evaluate(() => {
+    const w = window as unknown as { __ups: Still[]; __upsOn: boolean; __shopStill?: () => Still | null };
+    w.__ups = [];
+    w.__upsOn = true;
+    const tick = () => {
+      const s = w.__shopStill?.();
+      if (s) w.__ups.push({ ups: s.ups, ghosts: s.ghosts });
+      if (w.__upsOn) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await walkTo(page, [8, 6]);
+  await page.waitForTimeout(600);
+  const ups = await page.evaluate(() => {
+    const w = window as unknown as { __ups: Still[]; __upsOn: boolean };
+    w.__upsOn = false;
+    return w.__ups;
+  });
+  expect(ups.length, "frames sampled").toBeGreaterThan(30);
+  expect(Math.max(...ups.map((u) => u.ups)), "pieces standing in a frame").toBeLessThan(60);
+  expect([...new Set(ups.flatMap((u) => u.ghosts))].filter((n) => !["bdoor", "bhem", "bhem-post"].includes(n)), "see-through over you").toEqual([]);
+  await shot(page, "back-table-end");
+
   // His card at the table's foot: his Challenge alone (Eric, Nov 11: "we don't need the talk button").
   await walkTo(page, [8, 7]);
   const don = page.getByRole("dialog", { name: "Don Dough", exact: true });

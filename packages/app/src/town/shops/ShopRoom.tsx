@@ -1602,6 +1602,10 @@ function startRoom(
     return true;
   };
   let still: HTMLCanvasElement | null = null;
+  /** (Tests, `__shopStill`) The upright pieces drawn in the last frame, and those drawn see-through over you (their names). */
+  let upsN = 0;
+  let ghostN = 0;
+  const ghosts: string[] = new Array(16).fill("");
   /** (Tests, `__shopStill`) Frames whose back came from the kept copy, and copies made. */
   let stillDrawn = 0;
   let stillMade = 0;
@@ -2213,7 +2217,10 @@ function startRoom(
     // (Rolling Dough's two rooms: only their doors and near walls, `seeThru`.)
     const thru = !!cave || (!!art.floor && (!art.seeThru || art.seeThru.includes(u.name)));
     const over = lv ? overlaps(youMid(), x, y, x + w, y + h * s) : overlaps(youFig, x, y, x + w, y + h * s);
-    g.globalAlpha = upAlpha(pt.depth, thru && youFig.on && u.z > youFig.z && over, thru);
+    const ghost = thru && youFig.on && u.z > youFig.z && over;
+    g.globalAlpha = upAlpha(pt.depth, ghost, thru);
+    upsN++;
+    if (ghost && ghostN < ghosts.length) ghosts[ghostN++] = u.name;
     if (pieceEmis && darkNow && darkNow.level > 0) addEmis(pieceEmis, x, y, s, img.width, u.flip, g.globalAlpha * (1 - darkNow.black));
     if (u.flip) {
       g.save();
@@ -3716,6 +3723,7 @@ function startRoom(
   };
   const draw = (now: number) => {
     emN = 0;
+    upsN = ghostN = 0;
     // (Closing in on the claw machine, the camera comes down to the Close camera too, so you look at the cabinet, not down into it.)
     const zoomNow = cab ? zoomCur * (1 - clawE) : zoomCur;
     for (const k of CAM_KEYS) {
@@ -4393,9 +4401,10 @@ function startRoom(
   };
   /**
    * (Tests) The room's back kept while the view rests: frames that drew it from the kept copy, and copies made; whether WebGL draws it
-   * (back-gl.ts), the floor's triangles the 2D canvas laid in the last back drawn (none with WebGL) and WebGL's.
+   * (back-gl.ts), the floor's triangles the 2D canvas laid in the last back drawn (none with WebGL) and WebGL's; the upright pieces drawn
+   * in the last frame and those drawn see-through over you.
    */
-  const hookStill = () => (testSwitchesAllowed() ? { drawn: stillDrawn, made: stillMade, gl: !!gb && !gb.lost, backTris, glTris: gb?.tris ?? 0 } : null);
+  const hookStill = () => (testSwitchesAllowed() ? { drawn: stillDrawn, made: stillMade, gl: !!gb && !gb.lost, backTris, glTris: gb?.tris ?? 0, ups: upsN, ghosts: ghosts.slice(0, ghostN) } : null);
   /**
    * (Tests) The back drawn both ways at the view now, WebGL's and the 2D way's (Nov 11, "same pixels as now"): the share of the canvas's
    * pixels that differ by more than 8 and more than 48 in a channel, and the mean difference. Null without WebGL. The next frame draws as
