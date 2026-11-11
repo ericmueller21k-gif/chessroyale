@@ -1,3 +1,4 @@
+- Nov 11 07:05: #637 home chat + View profile bottom-right opened (54797e9, targeted), CI watcher blc24eect; stills sent to Eric (428x746 light/dark, 1536x864). Haiku helper archived.
 - Nov 11 07:01: #636 frame report LIVE (fa47932). Told Eric: hunchess.com/town?report on phone and laptop. Next: analyze his screenshots; room-perf helper running.
 - #635 CI run 42974022516 done, red: phone lobby tests lobby-chat:238, votes:322, crowd:136, chat-mod:18, opening-vote:149 (all window.match missing after the private lobby); desktop shop:1480 (known flake). Waiting on reviewer, then one xhigh fix helper.
 - Nov 11 07:00: Eric: trailer notes in notes/trailer.md (not now). Laptop (Dell, Chrome) has the same town fps issues (loading in, turning): run ?report there too once #636 is live; fixes should be shared.
