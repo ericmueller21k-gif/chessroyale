@@ -1555,6 +1555,22 @@ test("the Shop tab's page (Eric's mockup, Nov 9): the special offer, five cards 
   expect(await boxes()).toEqual(before);
   await page.keyboard.press("Escape");
   await expect(pop).toHaveCount(0);
+  // Escape the moment the pop-up is in the page (before it's painted): it closes too. (Its listener waited for a paint, so an Escape
+  // pressed as it opened was lost: this test on CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+  await page.evaluate(() => {
+    const w = window as unknown as { __popEsc?: boolean };
+    w.__popEsc = false;
+    const obs = new MutationObserver(() => {
+      if (!document.querySelector(".shop-pop")) return;
+      obs.disconnect();
+      w.__popEsc = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  });
+  await page.locator('.shop-card[data-offer="key"] .shop-price').click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __popEsc?: boolean }).__popEsc)).toBe(true);
+  await expect(pop).toHaveCount(0);
   await page.locator('.shop-offer .shop-price').click();
   await expect(pop).toHaveText(/Buying opens soon\./);
   await page.mouse.click(5, 5);
