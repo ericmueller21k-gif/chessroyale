@@ -13,7 +13,8 @@
  * loop's start; the pads hide a decoder's silence at the file's ends). Lengths come from themes.json, never from here.
  *
  * Its room too (Nov 11, docs/decisions/2026-11-11-area-banner-room-music.md): walked into through the door on your own, the boss's
- * theme plays there (`roomMusic`), until you leave or a battle takes over (which restarts it from its intro).
+ * theme plays there (`roomMusic`), until you leave. A challenge from the town starts the theme as its splash starts (`splashMusic`;
+ * a room's already playing carries straight through), and the battle carries it on.
  */
 import { MUSIC } from "@chessroyale/core";
 import { forgetAudioFile, isMuted, isPageHidden, loadAudioFile, musicBus, onAudioRebuilt, onMuteChange } from "./sound.ts";
@@ -180,7 +181,9 @@ async function loadTheme(boss: string): Promise<Theme | null> {
     asked.add(boss);
     log(`music:load:${boss}`);
   }
-  const [intro, loop] = await Promise.all([th.intro ? loadAudioFile(musicUrl(th.intro)) : Promise.resolve(null), loadAudioFile(musicUrl(th.loop))]);
+  // (The intro first, short and quick to decode, then the loop: Nov 11.)
+  const intro = th.intro ? await loadAudioFile(musicUrl(th.intro)) : null;
+  const loop = await loadAudioFile(musicUrl(th.loop));
   return loop ? { themes, intro, loop } : null;
 }
 
@@ -207,8 +210,13 @@ export function bossMusic(b: MusicBattle | null) {
   if (!b) return;
   if (!battle) {
     battle = { ...b };
-    // (A battle ends the room's music: its theme, already decoded if it's this boss's, starts again from its intro as the battle
-    // starts. Not forgotten: forgetTheme keeps a theme whose battle has begun.)
+    // (Its splash's music, started as the challenge's splash started, carries on: no restart at "START!".)
+    if (carried?.boss === b.boss) {
+      playing = { ...carried, key: b.key };
+      carried = null;
+      log(`music:carry:${b.boss}`);
+    }
+    // (Any room's music ends: a battle picked from the menu. Not forgotten: forgetTheme keeps a theme whose battle has begun.)
     endRoom();
     if (wanted()) void loadTheme(b.boss);
   }
@@ -253,10 +261,11 @@ function endBattle() {
  * boss met in a visit (two minutes decoded is about 45 MB). Not while a battle against the same boss has begun since.
  */
 function forgetTheme(boss: string) {
-  if (battle?.boss === boss || room === boss) return;
+  const kept = () => battle?.boss === boss || room === boss || carried?.boss === boss;
+  if (kept()) return;
   void loadThemes().then((t) => {
     const th = t?.themes[boss];
-    if (!th || battle?.boss === boss || room === boss) return;
+    if (!th || kept()) return;
     for (const name of [th.intro, th.loop]) if (name) forgetAudioFile(musicUrl(name));
   });
 }
@@ -268,10 +277,17 @@ function forgetTheme(boss: string) {
 let room: string | null = null;
 let roomPlaying: (Playing & { boss: string }) | null = null;
 let roomStarting: string | null = null;
+/** The boss whose theme roomMusicLoad loaded, to let go if it never plays (a challenge called off). */
+let loadedFor: string | null = null;
 
-/** You set off through a boss's door on your own: its theme starts loading (if music is wanted), to be ready as the room shows. */
+/**
+ * You set off through a boss's door (on your own, or to fight it: its splash then starts the theme at once): its theme starts
+ * loading, if music is wanted, to be ready as the room shows.
+ */
 export function roomMusicLoad(boss: string) {
-  if (wanted()) void loadTheme(boss);
+  if (!wanted()) return;
+  loadedFor = boss;
+  void loadTheme(boss);
 }
 
 /**
@@ -279,7 +295,7 @@ export function roomMusicLoad(boss: string) {
  * null: you left (a fade over MUSIC.endFadeMs, then it stops and its theme is let go). A battle on: nothing (the battle's own plays).
  */
 export function roomMusic(boss: string | null) {
-  if (boss === room) return maybeStartRoom(false);
+  if (boss && boss === room) return maybeStartRoom(false);
   endRoom();
   room = boss;
   maybeStartRoom(false);
@@ -306,7 +322,8 @@ function maybeStartRoom(loopOnly: boolean) {
 }
 
 function endRoom() {
-  const was = room;
+  const was = room ?? loadedFor;
+  loadedFor = null;
   room = null;
   roomStarting = null;
   const p = roomPlaying;
@@ -317,10 +334,62 @@ function endRoom() {
   stopPlaying(p, MUSIC.endFadeMs);
 }
 
+// ---- A challenge from the town (Eric, Nov 11): the theme starts the moment the boss's full-screen splash starts, and the battle
+// carries it on. Town.tsx's stormIn calls splashMusic as the splash starts (holding its covering frame until it resolves, at most
+// MUSIC.splashHoldMs) and splashDone once the splash is gone. From the boss menu: the battle starts it after its intro, as before. ----
+/** The splash's music, until the battle takes it over (bossMusic). */
+let carried: (Playing & { boss: string }) | null = null;
+let splashTok = 0;
+
+/**
+ * The challenge's splash starts: `boss`'s theme starts now (its intro, then the loop), or as soon as it's decoded (the promise
+ * resolves then, or at once with nothing to wait for). Its room's theme already playing (Don Dough's: you walked in) carries straight
+ * through, no restart.
+ */
+export function splashMusic(boss: string): Promise<void> {
+  const tok = ++splashTok;
+  if (roomPlaying?.boss === boss) {
+    carried = roomPlaying;
+    roomPlaying = null;
+    room = loadedFor = roomStarting = null;
+    log(`music:splash:${boss}:room`);
+    return Promise.resolve();
+  }
+  endRoom();
+  if (!wanted() || battle) return Promise.resolve();
+  return loadTheme(boss).then((got) => {
+    if (!got || tok !== splashTok || carried || playing || !wanted()) return;
+    const bus = musicBus();
+    if (!bus) return;
+    const plan = musicPlan(got.themes, boss, bus.ctx.currentTime + MUSIC.startDelayS, !got.intro);
+    if (!plan) return;
+    try {
+      const p = startPlan(bus.ctx, bus.master, plan, got.intro, got.loop, level());
+      // (Late, the battle already picked: it's the battle's now.)
+      if (battle?.boss === boss) playing = { ...p, key: battle.key, boss };
+      else carried = { ...p, boss };
+      log(`music:splash:${boss}`);
+    } catch {
+      // Ignore audio errors: the challenge goes on in silence.
+    }
+  });
+}
+
+/** The splash is gone: its music, if no battle took it over (a challenge that didn't start), fades out and stops. */
+export function splashDone() {
+  splashTok++;
+  const p = carried;
+  carried = null;
+  if (!p) return;
+  log(`music:splashEnd:${p.boss}`);
+  stopPlaying(p, MUSIC.endFadeMs);
+  setTimeout(() => forgetTheme(p.boss), MUSIC.endFadeMs + 250);
+}
+
 /** The switches or the page changed: fade to the level they make now (the loop keeps its place), or start if it hadn't. */
 function relevel() {
   const l = level();
-  for (const p of [playing, roomPlaying]) {
+  for (const p of [playing, roomPlaying, carried]) {
     if (!p) continue;
     log(`music:level:${l}`);
     try {
@@ -345,9 +414,11 @@ if (typeof document !== "undefined") document.addEventListener("visibilitychange
 onAudioRebuilt(() => {
   const p = playing;
   const r = roomPlaying;
+  const c = carried;
   playing = null;
   roomPlaying = null;
-  for (const q of [p, r]) {
+  carried = null;
+  for (const q of [p, r, c]) {
     try {
       q?.gain.disconnect();
     } catch {

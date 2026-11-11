@@ -283,6 +283,10 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // (The music's log, and its files' fetches: Don's theme plays from walking in, carried through his splash into the battle.)
+  await page.addInitScript(() => void ((window as unknown as { __soundLog: string[] }).__soundLog = []));
+  const themeGets: string[] = [];
+  page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/music/zebra") && themeGets.push(new URL(r.url()).pathname)));
   await asAdmin(page);
   await page.goto("/town?sky=day");
   await townReady(page);
@@ -374,6 +378,10 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   await expect(page.getByRole("status", { name: /^Don Dough, threat/ }), "the battle against Don Dough").toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
   await shot(page, "challenge-battle");
+  // His theme (Eric, Nov 11): started as you walked in, carried through his splash into the battle: no restart, fetched once.
+  const musicLog = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:")));
+  expect(musicLog.filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load"))).toEqual(["music:room:zebra", "music:splash:zebra:room", "music:carry:zebra"]);
+  expect(themeGets.sort()).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
   const zb = await page.evaluate(() => (window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean; outOn: boolean; kept: number[]; carried: string[]; faded: string[]; frontFirst: Record<string, number>; steps: string[]; lines: string[] } }).__zb);
   // The beat, in order: they stand, draw and aim with Fedora's line, Don's "Relax", they lower, his challenge line.
   expect(zb.steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);

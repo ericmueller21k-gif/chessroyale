@@ -4230,8 +4230,10 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  * - `fadeMs`: Music or Sound switched off, or the page hidden: faded out over this (and back in).
  * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
  * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
+ * - `splashHoldMs`: a challenge from the town starts the theme as the boss's full-screen splash starts (Eric, Nov 11); a theme not
+ *   ready by then holds the splash's covering frame up to this much longer, then the battle goes on and the music joins when ready.
  */
-export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05, splashHoldMs: 2000 } as const;
 
 /**
  * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";

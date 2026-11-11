@@ -680,8 +680,8 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
   gold rules above and below, the home's name in Archivo Black (`town/AreaBanner.tsx`, `areaBannerOf`, from the homes' and rooms'
   data). Fades in 0.4 s, holds 1.8 s, fades out 0.6 s (`AREA_BANNER`; reduced motion: no fades); taps pass through it; sized from
-  the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows (below,
-  and docs/areas/bosses.md "Music"). Tests: `e2e/zebra-home.spec.ts` (the banner's words, place, taps through it, gone by 4 s; none
+  the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows; a
+  challenge's starts as its splash starts, the splash held up to 2 s for it (`stormIn`; docs/areas/bosses.md "Music"). Tests: `e2e/zebra-home.spec.ts` (the banner's words, place, taps through it, gone by 4 s; none
   arriving by the challenge), `packages/app/test/music.test.ts` ("a boss's room").
   docs/decisions/2026-11-11-area-banner-room-music.md.
 - **The room** (`shops/ShopRoom.tsx`): 20 × 20 squares from the art's layout (`shops/babur-art.ts`, `shops/puddles-art.ts`, copied from

@@ -43,7 +43,7 @@ import { openProfile } from "../profile-nav.ts";
 import { account, myPawnColor, onAccountChange, playerName } from "../account.ts";
 import { TOWN_ASKED, testSwitchesAllowed } from "../test-switches.ts";
 import { play, warmSounds } from "../sound.ts";
-import { roomMusic, roomMusicLoad } from "../music.ts";
+import { roomMusic, roomMusicLoad, splashDone, splashMusic } from "../music.ts";
 import { AreaBanner, areaBannerOf, type AreaBannerText } from "./AreaBanner.tsx";
 import { SELECT_SOUND, TOWN_SOUNDS, townSound } from "../characters/boss-select.ts";
 import { N, colI, fromCam, newPt, proj, rel, rowI, wrapFX, wrapFY, wrapI } from "./camera.ts";
@@ -66,7 +66,7 @@ import { StreetZoom, parkSide } from "./zoom-steps.ts";
 import { PAWN_HEAD, PAWN_PX, Renderer, pawnImage, type Hit, type YouArt } from "./render.ts";
 import { dropRiders, leaveRider, ridersHeld, rideArt, shareRider, type Rider, type RiderPawn } from "./rides.ts";
 import { rideSpeed } from "../components/rides/scale.ts";
-import { mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
+import { MUSIC, mountOf, secondColor, shownLook, sideOfPawn } from "@chessroyale/core";
 import { painter2d, type Backend, type Painter } from "./paint.ts";
 import { painterGL } from "./paint-gl.ts";
 import { reportTownFallback } from "../problems.ts";
@@ -237,9 +237,11 @@ export function TownScreen({
     // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
     roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
-    // (Walked in on your own: the boss's theme loads as the door zooms, ready as the room shows. Not by a challenge: Eric, Nov 11.)
+    // (The boss's theme loads as the door zooms: walked in on your own, it plays as the room shows; by a challenge, not until its
+    // splash. Eric, Nov 11.)
     byDoor.current = !challenge;
-    if (!challenge) roomMusicLoad(id);
+    // (A challenge's too: its splash starts the theme, Eric, Nov 11; loaded now it's ready by then.)
+    roomMusicLoad(id);
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
     // (A challenge's intro art too: loaded only now, as you go in to fight.)
@@ -257,6 +259,7 @@ export function TownScreen({
     const fight = intro ? await intro.catch(() => null) : null;
     if (!got || !box.current || (challenge && !fight)) {
       // (It didn't load: back out to the town as you were.)
+      roomMusic(null);
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
@@ -281,14 +284,20 @@ export function TownScreen({
     if (flow.current !== "intro") return;
     step("introDone");
     const storm = m.startTransition(intro);
+    // (Eric, Nov 11: the boss's theme starts the moment his splash starts, the battle carrying it on. Not ready yet: the splash's
+    // covering frame (each boss's last frame, Folio's crumpled ball) holds until it is, MUSIC.splashHoldMs at most.)
+    const music = splashMusic(id);
     await storm.covered;
+    const ready = Promise.race([music, later(MUSIC.splashHoldMs)]);
     step("stormCovers");
     try {
       await onBossChallenge?.(id, ctl.current?.challengeStand() ?? null);
     } finally {
       step("battleReady");
+      await ready;
       await storm.out();
       step("stormGone");
+      splashDone();
     }
   };
   /**

@@ -65,6 +65,8 @@ const forgot: string[] = [];
 // (Decoded buffers kept as sound.ts keeps them, until forgotten: `fetched` lists the misses, each a real fetch and decode.)
 const bufs = new Map<string, { url: string }>();
 const fetched: string[] = [];
+/** (Set: an intro's decode waits for it.) */
+const gate = { intro: null as Promise<void> | null };
 const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: [] as (() => void)[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
@@ -73,7 +75,8 @@ vi.mock("../src/sound.ts", () => ({
   loadAudioFile: (url: string) => {
     files.push(url);
     if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url }));
-    return Promise.resolve(bufs.get(url)!);
+    const buf = bufs.get(url)!;
+    return gate.intro && url.endsWith("-intro.mp3") ? gate.intro.then(() => buf) : Promise.resolve(buf);
   },
   forgetAudioFile: (url: string) => void (forgot.push(url), bufs.delete(url)),
   onAudioRebuilt: () => () => undefined,
@@ -94,7 +97,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, musicLevel, musicNow, musicPlan, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn } = await import("../src/music.ts");
+const { bossMusic, musicLevel, musicNow, musicPlan, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn, splashDone, splashMusic } = await import("../src/music.ts");
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("the plan from themes.json", () => {
@@ -279,6 +282,7 @@ describe("a boss's room", () => {
   });
   afterEach(() => {
     roomMusic(null);
+    splashDone();
     bossMusic(null);
   });
 
@@ -336,33 +340,77 @@ describe("a boss's room", () => {
     }
   });
 
-  it("challenging from inside: the battle fades the room's out and restarts the same decoded theme from its intro (no second fetch, not let go)", async () => {
+  it("Don Dough: challenged from his room, the room's theme carries straight through the splash and the battle (no restart, no second fetch)", async () => {
     vi.useFakeTimers();
     try {
       roomMusicLoad("zebra");
       roomMusic("zebra");
       await vi.advanceTimersByTimeAsync(0);
-      const roomLoop = ctx.sources[1]!;
-      ctx.currentTime = 80;
-      bossMusic({ key: "don", boss: "zebra", live: false });
-      expect(roomLoop.stoppedAt).toBe(80 + MUSIC.endFadeMs / 1000);
+      const started = ctx.sources.length;
+      await splashMusic("zebra");
       expect(roomMusicNow()).toBeNull();
-      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
-      expect(forgot).toEqual([]);
-      ctx.currentTime = 90;
+      bossMusic({ key: "don", boss: "zebra", live: false });
       bossMusic({ key: "don", boss: "zebra", live: true });
-      await vi.advanceTimersByTimeAsync(0);
-      const [bIntro, bLoop] = ctx.sources.slice(2);
-      expect(bIntro!.started).toEqual([90 + MUSIC.startDelayS, undefined]);
-      expect(bLoop!.buffer).toBe(roomLoop.buffer);
-      expect(fetched).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
-      expect(musicNow()?.boss).toBe("zebra");
-      // (Leaving the room after the battle began: the theme is kept while its battle is on.)
-      roomMusic(null);
+      splashDone();
       await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(ctx.sources).toHaveLength(started);
+      expect(ctx.sources.every((s) => s.stoppedAt === null)).toBe(true);
+      expect(musicNow()?.boss).toBe("zebra");
+      expect(fetched).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
       expect(forgot).toEqual([]);
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("a challenge from the town (Eric, Nov 11): the theme starts as the splash starts, from its intro; the battle carries it on, no restart at START", async () => {
+    roomMusicLoad("grex");
+    await settle();
+    expect(ctx.sources).toHaveLength(0);
+    ctx.currentTime = 100;
+    await splashMusic("grex");
+    const [intro, loop] = ctx.sources;
+    expect(intro!.started).toEqual([100 + MUSIC.startDelayS, undefined]);
+    expect(loop!.loop).toBe(true);
+    bossMusic({ key: "town-fight", boss: "grex", live: false });
+    splashDone();
+    bossMusic({ key: "town-fight", boss: "grex", live: true });
+    await settle();
+    expect(ctx.sources).toHaveLength(2);
+    expect(ctx.sources.every((s) => s.stoppedAt === null)).toBe(true);
+    expect(musicNow()?.boss).toBe("grex");
+  });
+
+  it("a splash whose battle never comes (called off): its music fades out and stops once the splash is gone", async () => {
+    await splashMusic("grex");
+    ctx.currentTime = 120;
+    splashDone();
+    for (const s of ctx.sources) expect(s.stoppedAt).toBe(120 + MUSIC.endFadeMs / 1000);
+    expect(musicNow()).toBeNull();
+  });
+
+  it("the battle from the menu (no splash): started after its intro, as before", async () => {
+    bossMusic({ key: "menu", boss: "grex", live: false });
+    await settle();
+    expect(ctx.sources).toHaveLength(0);
+    bossMusic({ key: "menu", boss: "grex", live: true });
+    await settle();
+    expect(ctx.sources).toHaveLength(2);
+  });
+
+  it("the intro is decoded first, then the loop", async () => {
+    let open = () => {};
+    gate.intro = new Promise((ok) => (open = ok));
+    try {
+      roomMusicLoad("zebra");
+      await settle();
+      // (The loop isn't asked for until the intro is in.)
+      expect(files).toEqual(["/music/zebra-intro.mp3"]);
+      open();
+      await settle();
+      expect(files).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
+    } finally {
+      gate.intro = null;
     }
   });
 
