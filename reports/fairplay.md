@@ -19,12 +19,12 @@ Average loss per move over every bank position, against the calibration curve th
 
 | UCI_Elo | Emulated loss per move | Calibration curve |
 | --- | --- | --- |
-| 1320 | 9.61 | 12.02 |
-| 1600 | 7.03 | 9.30 |
-| 1900 | 5.98 | 7.06 |
-| 2200 | 4.94 | 5.37 |
-| 2500 | 4.21 | 4.08 |
-| 2800 | 2.69 | 3.10 |
+| 1320 | 9.46 | 12.02 |
+| 1600 | 7.39 | 9.30 |
+| 1900 | 6.33 | 7.06 |
+| 2200 | 5.46 | 5.37 |
+| 2500 | 4.50 | 4.08 |
+| 2800 | 2.39 | 3.10 |
 
 Of the honest players' picks, 55% count (the rest: the opening, forced moves, only moves and recaptures most of the crowd found, positions already won or lost); 7.2% of counted positions are hard (fewer than 10% of the crowd found the best move).
 
@@ -51,33 +51,60 @@ Full engine user: review and ban within 1 / 2 / 5 matches. Others: review / ban 
 
 | Set | Full engine: review | Full engine: ban | 20-40% (1500) | 20-40% (1900) | Hard positions only | When its move is a mistake | Blended | Honest review /1000 (1500 / 2000 / 2400 / 2700) | Honest bans /1000 (any strength) |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| settings.ts | 49% / 78% / 99% | 4.8% / 55% / 98% | 2.0% / 0% | 6.5% / 0% | 73% / 42% | 33% / 6.9% | 47% / 4.7% | 4.8 / 17.8 / 36.0 / 103.0 | 2 of 45,000 |
+| settings.ts | 47% / 78% / 98% | 6.2% / 56% / 97% | 3.2% / 0% | 6.9% / 0.2% | 75% / 44% | 36% / 6.9% | 54% / 6.4% | 4.8 / 17.8 / 36.0 / 103.0 | 2 of 45,000 |
 
 ## Near the engine's best (Nov 11)
 
 A deep-checked pick counts as the engine's best when it's the search's best or within `deep.nearBestLoss` (1 point) of it (`nearBest`): the share bars (`banDeep`, `banOneDeep`) read that. The evidence keeps the search's best as its best (its honest chances are fitted on that) but never counts a near-best pick as "neither", and the engine user's profile (`signals.cheatDeep`) is the live demo's. "Pool" is the level that pools (any ban-level verdict since Nov 11: one match past every one-match bar, or the two-match path). Within 1, 2 and 5 matches.
 
-Against the deep re-check (its best / its next two or near its best / neither): Eddie-like 69% / 28% / 2.8%; full engine 85% / 15% / 0%; in settings, `cheatDeep` 74% / 24% / 2.0%.
+Against the deep re-check (its best / its next two or near its best / neither): Eddie-like 69% / 28% / 2.9%; full engine 85% / 15% / 0%; in settings, `cheatDeep` 74% / 24% / 2.0%.
 
-| Who | Before (exact match): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |
+| Who | Before (exact match, no strength path): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |
 | --- | --- | --- | --- | --- |
-| Another engine's top move every move (Eddie-like) | 0.1% / 7.0% / 17% | 0% / 17% / 74% | 100% / 99% | 87% / 94% |
-| Full engine (top move, 3-12 s) | 9.9% / 51% / 93% | 4.8% / 55% / 98% | 99% / 99% | 92% / 100% |
+| Another engine's top move every move (Eddie-like) | 0.2% / 6.4% / 18% | 0.1% / 19% / 80% | 100% / 100% | 87% / 94% |
+| Full engine (top move, 3-12 s) | 11% / 53% / 93% | 6.2% / 56% / 97% | 98% / 98% | 92% / 100% |
+| The engine's 2nd or 3rd choice every move | 0% / 0% / 0% | 0% / 0% / 0% | 3.1% / 3.1% | 33% / 78% |
 | Honest 2200 (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 25.0 / 25.8 | 50% / 79% |
 | Honest 2400 (per 1,000) | 0 / 0 / 0 | 0 / 0.2 / 0.2 | 33.4 / 36.0 | 56% / 80% |
 | Honest 2500 (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 42.6 / 49.8 | 56% / 80% |
 | Honest 2600 (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0.2 | 53.2 / 70.0 | 58% / 80% |
 | Honest 2700 (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 74.6 / 103.0 | 61% / 82% |
-| Maia 2200 (likeliest move) (per 1,000) | 0 / 0 / 0 | 0 / 0.4 / 2.0 | 103.2 / 142.6 | 62% / 87% |
-| Maia 2200 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 22.8 / 29.2 | 53% / 80% |
-| Maia 2400 (likeliest move) (per 1,000) | 0 / 0.8 / 1.0 | 0 / 1.8 / 6.0 | 108.6 / 164.8 | 65% / 88% |
-| Maia 2400 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 32.6 / 42.2 | 56% / 81% |
-| Maia 2500 (likeliest move) (per 1,000) | 0 / 0.2 / 0.2 | 0 / 2.6 / 3.8 | 64.6 / 71.4 | 65% / 88% |
-| Maia 2500 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0.2 / 0.2 | 32.6 / 40.4 | 56% / 82% |
-| Maia 2600 (likeliest move) (per 1,000) | 0 / 2.8 / 4.0 | 0 / 4.0 / 8.2 | 141.2 / 169.6 | 65% / 88% |
-| Maia 2600 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 36.8 / 49.2 | 57% / 82% |
+| Maia 2200 (likeliest move) (per 1,000) | 0 / 0 / 0 | 0 / 2.0 / 3.4 | 99.8 / 150.6 | 61% / 87% |
+| Maia 2200 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 21.6 / 27.8 | 54% / 80% |
+| Maia 2400 (likeliest move) (per 1,000) | 0 / 0.2 / 0.4 | 0 / 1.0 / 4.2 | 96.4 / 157.8 | 65% / 88% |
+| Maia 2400 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 31.0 / 43.2 | 57% / 82% |
+| Maia 2500 (likeliest move) (per 1,000) | 0 / 0.6 / 0.8 | 0 / 0.4 / 2.0 | 57.4 / 60.8 | 65% / 88% |
+| Maia 2500 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 28.2 / 39.2 | 56% / 82% |
+| Maia 2600 (likeliest move) (per 1,000) | 0 / 2.2 / 3.0 | 0 / 2.6 / 6.6 | 134.6 / 163.6 | 65% / 88% |
+| Maia 2600 (drawn) (per 1,000) | 0 / 0 / 0 | 0 / 0 / 0 | 32.6 / 42.8 | 58% / 82% |
 
-Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within 5 matches: 103 of 65,000 (1.6 per 1,000). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.
+Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within 5 matches: 83 of 65,000 (1.3 per 1,000), every path (sustained strength below included). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.
+
+## Sustained strength (Nov 11)
+
+Eric: "People easily get around that by playing the second or third best move ... by 4 or 5 games, if their Elo is just ridiculous like that, put them in the cheater queue." The 5 newest matches with 8+ counted moves averaging a match strength of 3,000 or more pool the player (`sustainedStrength`, `levels.poolStrength*`), whatever their top-move share. Below: everyone with 5 such matches in their 5 (matches here are short, so many have fewer), and their average.
+
+| Who | With 5 such matches | Average strength: median / 99th pct / max | At 3,000+ |
+| --- | --- | --- | --- |
+| Another engine's top move every move (Eddie-like) | 375 of 1,250 | 3201 / 3365 / 3385 | 366 (98%) |
+| Full engine (top move, 3-12 s) | 410 of 1,250 | 2715 / 3060 / 3165 | 10 (2.4%) |
+| The engine's 2nd or 3rd choice every move | 64 of 1,250 | 1874 / 2316 / 2316 | 0 (0%) |
+| Engine when its own move is a mistake (a 1500 player) | 374 of 1,250 | 2679 / 2928 / 3002 | 1 (0.3%) |
+| Honest 2200 | 882 of 5,000 | 1955 / 2449 / 2677 | 0 (0%) |
+| Honest 2400 | 1,082 of 5,000 | 2047 / 2650 / 2903 | 0 (0%) |
+| Honest 2500 | 1,247 of 5,000 | 2092 / 2605 / 2796 | 0 (0%) |
+| Honest 2600 | 1,455 of 5,000 | 2154 / 2698 / 2940 | 0 (0%) |
+| Honest 2700 | 1,513 of 5,000 | 2257 / 2757 / 2926 | 0 (0%) |
+| Maia 2200 (likeliest move) | 1,559 of 5,000 | 2070 / 2582 / 2792 | 0 (0%) |
+| Maia 2200 (drawn) | 1,118 of 5,000 | 1870 / 2435 / 2712 | 0 (0%) |
+| Maia 2400 (likeliest move) | 1,658 of 5,000 | 2149 / 2719 / 2838 | 0 (0%) |
+| Maia 2400 (drawn) | 1,273 of 5,000 | 1932 / 2514 / 2759 | 0 (0%) |
+| Maia 2500 (likeliest move) | 1,614 of 5,000 | 2117 / 2650 / 2784 | 0 (0%) |
+| Maia 2500 (drawn) | 1,336 of 5,000 | 1925 / 2496 / 2764 | 0 (0%) |
+| Maia 2600 (likeliest move) | 1,494 of 5,000 | 2171 / 2745 / 2864 | 0 (0%) |
+| Maia 2600 (drawn) | 1,322 of 5,000 | 1941 / 2547 / 2817 | 0 (0%) |
+
+A cheater who always plays the engine's 2nd or 3rd choice plays like an ordinary strong player here: those moves give away real points (the strength measure is the points lost), and the crowd's cuts send them out early, with few counted moves. No strength bar catches them without catching strong people; where the 2nd or 3rd choice is practically equal to the best, the near-best count does.
 
 ## The thresholds in settings.ts, in full
 
@@ -87,13 +114,14 @@ Review: a person looks and results are held. Ban: the ban level, which pools (`e
 
 | Cheater | Counted moves (median) | Match strength (median) | Deep matches (median) | Review 1 / 2 / 5 | Ban 1 / 2 / 5 | Same phone: ban 2 / 5 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Full engine (top move, 3-12 s) | 14 | 2622 | 93% | 49% / 78% / 99% | 4.8% / 55% / 98% | 60% / 98% |
-| Engine on 20-40% of moves (a 1500 player) | 10 | 1760 | 57% | 0.4% / 0.6% / 2.0% | 0% / 0% / 0% | 0% / 0.2% |
-| Engine on 20-40% of moves (a 1900 player) | 13 | 1912 | 60% | 0.6% / 1.0% / 6.5% | 0% / 0% / 0% | 0% / 0.2% |
-| Engine in hard positions only (a 1500 player) | 14 | 2288 | 80% | 11% / 29% / 73% | 0.1% / 11% / 42% | 12% / 46% |
-| Engine when its own move is a mistake (a 1500 player) | 14 | 2614 | 74% | 4.6% / 11% / 33% | 0% / 1.1% / 6.9% | 2.1% / 6.1% |
-| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 13 | 2087 | 67% | 5.8% / 14% / 47% | 0% / 1.2% / 4.7% | 2.1% / 7.0% |
-| Another engine's top move every move (Eddie-like) | 15 | 3203 | 86% | 67% / 89% / 99% | 0% / 17% / 74% | 17% / 74% |
+| Full engine (top move, 3-12 s) | 14 | 2610 | 93% | 47% / 78% / 98% | 6.2% / 56% / 97% | 58% / 98% |
+| Engine on 20-40% of moves (a 1500 player) | 10 | 1760 | 56% | 0.3% / 0.9% / 3.2% | 0% / 0% / 0% | 0% / 0% |
+| Engine on 20-40% of moves (a 1900 player) | 13 | 1893 | 60% | 0.4% / 1.4% / 6.9% | 0% / 0.1% / 0.2% | 0% / 0% |
+| Engine in hard positions only (a 1500 player) | 13 | 2282 | 80% | 12% / 31% / 75% | 0% / 13% / 44% | 12% / 44% |
+| Engine when its own move is a mistake (a 1500 player) | 14 | 2612 | 73% | 5.5% / 12% / 36% | 0.1% / 2.0% / 6.9% | 1.1% / 7.0% |
+| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 13 | 2078 | 67% | 5.9% / 16% / 54% | 0% / 1.7% / 6.4% | 1.4% / 6.1% |
+| Another engine's top move every move (Eddie-like) | 14 | 3144 | 86% | 60% / 87% / 100% | 0.1% / 19% / 80% | 18% / 79% |
+| The engine's 2nd or 3rd choice every move | 9 | 1675 | 27% | 0% / 0% / 3.1% | 0% / 0% / 0% | 0% / 0% |
 
 ### Honest players: false flags per 1,000 players within 5 matches (5,000 players each)
 
@@ -113,18 +141,19 @@ Review: a person looks and results are held. Ban: the ban level, which pools (`e
 
 | Who | Review within 5 | Ban within 2 / 5 |
 | --- | --- | --- |
-| Full engine (top move, 3-12 s) | 97% | 52% / 96% |
-| Engine on 20-40% of moves (a 1500 player) | 1.9% | 0% / 0% |
-| Engine on 20-40% of moves (a 1900 player) | 7.5% | 0.2% / 0.5% |
-| Engine in hard positions only (a 1500 player) | 54% | 9.4% / 34% |
-| Engine when its own move is a mistake (a 1500 player) | 20% | 1.1% / 4.0% |
-| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 31% | 1.4% / 8.5% |
-| Another engine's top move every move (Eddie-like) | 98% | 17% / 74% |
-| Honest 2200 (per 1,000; 2,500 players) | 20.4 | 0 / 0 |
-| Honest 2400 (per 1,000; 2,500 players) | 27.2 | 0 / 0 |
-| Honest 2500 (per 1,000; 2,500 players) | 26.8 | 0 / 0 |
-| Honest 2600 (per 1,000; 2,500 players) | 41.2 | 0 / 0 |
-| Honest 2700 (per 1,000; 2,500 players) | 58.0 | 0 / 0 |
+| Full engine (top move, 3-12 s) | 98% | 54% / 96% |
+| Engine on 20-40% of moves (a 1500 player) | 2.7% | 0.2% / 0.2% |
+| Engine on 20-40% of moves (a 1900 player) | 5.1% | 0% / 0% |
+| Engine in hard positions only (a 1500 player) | 57% | 10% / 39% |
+| Engine when its own move is a mistake (a 1500 player) | 21% | 0.8% / 3.8% |
+| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 30% | 1.9% / 7.4% |
+| Another engine's top move every move (Eddie-like) | 97% | 14% / 71% |
+| The engine's 2nd or 3rd choice every move | 2.7% | 0% / 0% |
+| Honest 2200 (per 1,000; 2,500 players) | 13.2 | 0 / 0 |
+| Honest 2400 (per 1,000; 2,500 players) | 24.8 | 0 / 0 |
+| Honest 2500 (per 1,000; 2,500 players) | 35.6 | 0 / 0 |
+| Honest 2600 (per 1,000; 2,500 players) | 44.8 | 0 / 0.4 |
+| Honest 2700 (per 1,000; 2,500 players) | 64.4 | 0 / 1.2 |
 
 ### Match scores and evidence (median / 90th / 99th / max)
 
@@ -136,13 +165,14 @@ Review: a person looks and results are held. Ban: the ban level, which pools (`e
 | Honest 2500 | 0.0 / 2.5 / 7.9 / 13.8 | -4.1 / 0.0 / 2.9 / 10.6 | 0.0 / 0.8 / 5.3 / 6.0 | 0.0 / 1.0 / 1.0 / 1.0 |
 | Honest 2600 | 0.0 / 3.3 / 8.2 / 17.9 | -3.6 / 0.6 / 4.0 / 12.1 | 0.0 / 1.6 / 5.4 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
 | Honest 2700 | 0.0 / 4.1 / 8.8 / 17.5 | -2.9 / 1.1 / 4.9 / 9.7 | 0.0 / 2.4 / 5.6 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
-| Full engine (top move, 3-12 s) | 9.1 / 16.3 / 20.5 / 25.5 | 7.1 / 10.4 / 12.7 / 15.1 | 0.2 / 5.2 / 6.0 / 6.0 | 1.0 / 1.0 / 1.0 / 1.5 |
-| Engine on 20-40% of moves (a 1500 player) | 0.0 / 1.5 / 6.6 / 13.7 | -3.3 / 0.0 / 3.0 / 9.6 | 0.0 / 0.0 / 3.6 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
-| Engine on 20-40% of moves (a 1900 player) | 0.0 / 2.8 / 8.3 / 17.1 | -3.1 / 0.5 / 4.2 / 9.2 | 0.0 / 0.7 / 5.0 / 6.0 | 0.0 / 1.0 / 1.0 / 1.0 |
-| Engine in hard positions only (a 1500 player) | 3.6 / 9.2 / 14.4 / 20.0 | 2.1 / 7.2 / 9.9 / 15.8 | 0.0 / 3.2 / 5.5 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
-| Engine when its own move is a mistake (a 1500 player) | 2.5 / 6.5 / 11.7 / 16.6 | -0.1 / 4.5 / 7.3 / 9.4 | 0.1 / 3.8 / 5.5 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
-| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 1.9 / 7.8 / 13.3 / 18.9 | 1.2 / 5.5 / 8.6 / 14.6 | 0.0 / 1.9 / 5.9 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
-| Another engine's top move every move (Eddie-like) | 10.6 / 14.6 / 17.2 / 20.1 | 3.1 / 6.0 / 8.3 / 10.8 | 6.0 / 6.0 / 6.0 / 6.0 | 1.0 / 1.0 / 1.0 / 2.0 |
+| Full engine (top move, 3-12 s) | 9.2 / 16.4 / 20.7 / 25.2 | 7.2 / 10.6 / 12.8 / 15.2 | 0.1 / 5.1 / 6.0 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
+| Engine on 20-40% of moves (a 1500 player) | 0.0 / 1.6 / 6.9 / 18.3 | -3.4 / 0.1 / 2.9 / 8.4 | 0.0 / 0.0 / 4.3 / 6.0 | 0.0 / 1.0 / 1.0 / 1.0 |
+| Engine on 20-40% of moves (a 1900 player) | 0.0 / 2.8 / 8.5 / 18.1 | -3.2 / 0.5 / 4.0 / 9.8 | 0.0 / 0.4 / 5.0 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
+| Engine in hard positions only (a 1500 player) | 3.8 / 9.4 / 14.7 / 20.1 | 2.4 / 7.2 / 10.4 / 12.7 | 0.0 / 3.3 / 5.6 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
+| Engine when its own move is a mistake (a 1500 player) | 2.5 / 6.7 / 11.6 / 19.8 | -0.2 / 4.6 / 7.5 / 11.8 | 0.1 / 3.8 / 5.6 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
+| Blended: the engine's 1st, 2nd or 3rd choice (50/30/20%) | 2.0 / 8.1 / 13.7 / 24.2 | 1.4 / 5.8 / 8.9 / 12.4 | 0.0 / 2.0 / 6.0 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
+| Another engine's top move every move (Eddie-like) | 10.2 / 14.7 / 17.5 / 21.4 | 3.0 / 6.1 / 8.7 / 11.2 | 5.4 / 6.0 / 6.0 / 6.0 | 0.0 / 1.0 / 1.0 / 2.0 |
+| The engine's 2nd or 3rd choice every move | 0.0 / 1.3 / 6.2 / 10.0 | -4.1 / -0.1 / 1.0 / 4.3 | 0.0 / 0.0 / 5.1 / 6.0 | 0.0 / 1.0 / 1.0 / 1.5 |
 
 ## What this can't tell
 

@@ -40,7 +40,8 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
 - **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level (one
-  deep-checked match past every one-match bar, or the two-match path: Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
+  deep-checked match past every one-match bar, the two-match path, or sustained strength: the 5 newest matches of 8+ counted moves
+  averaging 3,000 (`levels.poolStrength*`); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
   or a new account with 2 of its first 10 matches at the one-match ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or bots (`mayPlay`, `queueName`'s `engine`), and matchmade
   lobbies turn away the other side's newcomers ("This match has already started."); results not held, their profile as ever, public rankings
   leave them out (`NOT_POOLED`), evidence kept and deep-checked in full. The review page's `pool` tab (grouped queries, never one a player):

@@ -723,7 +723,7 @@ if (process.env.FAIRPLAY_BANNED) {
 
 if (process.env.FAIRPLAY_GRID) {
   // A compact line per threshold set, to compare them (FAIRPLAY_SETS); no report written.
-  const head = ["set", "full: rev 1/2", "full: ban 1/2/5", "Eddie: ban 1/2/5", "20-40% (1500): rev/ban 5", "20-40% (1900): rev/ban 5", "hard only: rev/ban 5", "mistakes: rev/ban 5", "blended: rev/ban 5", "honest review /1000 (1500, 2000, 2400, 2700)", "honest bans (count@strength)", "Maia bans (count@kind)", "few people: full ban 5"];
+  const head = ["set", "full: rev 1/2", "full: ban 1/2/5", "Eddie: ban 1/2/5", "2nd/3rd: ban 2/5", "20-40% (1500): rev/ban 5", "20-40% (1900): rev/ban 5", "hard only: rev/ban 5", "mistakes: rev/ban 5", "blended: rev/ban 5", "honest review /1000 (1500, 2000, 2400, 2700)", "honest bans (count@strength)", "Maia bans (count@kind)", "few people: full ban 5"];
   console.log(head.join(" | "));
   for (const set of SETS) {
     for (const subs of [honest, cheaters, honestFew, cheatersFew, maiaHonest]) evaluate(subs, set.st);
@@ -736,6 +736,7 @@ if (process.env.FAIRPLAY_GRID) {
         `${pct(reached(of(cheaters, 0), "review", 1))}/${pct(reached(of(cheaters, 0), "review", 2))}`,
         [1, 2, 5].map((k) => pct(reached(of(cheaters, 0), "ban", k))).join("/"),
         [1, 2, 5].map((k) => pct(reached(of(cheaters, 6), "ban", k))).join("/"),
+        [2, 5].map((k) => pct(reached(of(cheaters, 7), "ban", k))).join("/"),
         rb(1),
         rb(2),
         rb(3),
@@ -843,7 +844,8 @@ out("");
 
 // Near the engine's best (Nov 11): before and after, on the engine users and the strong people.
 {
-  const before: Settings = { ...base, near: 0, signals: { ...base.signals, cheatDeep: [0.85, 0.13, 0.02] } };
+  // (Before Nov 11: the exact match, the old engine-user profile, no sustained-strength path.)
+  const before: Settings = { ...base, near: 0, signals: { ...base.signals, cheatDeep: [0.85, 0.13, 0.02] }, levels: { ...base.levels, poolStrengthMatches: 0 } };
   out("## Near the engine's best (Nov 11)");
   out("");
   out(
@@ -864,11 +866,12 @@ out("");
     const xs = subs.flatMap((sub) => sub.summaries.filter((x) => x.deepChecked >= FAIRPLAY.levels.banMatchChecked).map((x) => x.deepMatch / x.deepChecked));
     return xs.length ? `${pct(quant(xs, 0.5))} / ${pct(quant(xs, 0.9))}` : "–";
   };
-  out("| Who | Before (exact match): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |");
+  out("| Who | Before (exact match, no strength path): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |");
   out("| --- | --- | --- | --- | --- |");
   const rows: { name: string; subs: Subject[]; per1000: boolean }[] = [
     { name: CHEATERS[6]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[6]), per1000: false },
     { name: CHEATERS[0]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[0]), per1000: false },
+    { name: CHEATERS[7]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[7]), per1000: false },
     ...HONEST.filter((k) => k.elo >= 2200).map((k) => ({ name: `Honest ${k.elo} (per 1,000)`, subs: honest.filter((x) => x.kind === k), per1000: true })),
     ...MAIA.map((k) => ({ name: `${k.name} (per 1,000)`, subs: maiaHonest.filter((x) => x.kind === k), per1000: true })),
   ];
@@ -888,7 +891,31 @@ out("");
   const strong = [...honest.filter((x) => x.kind.elo >= 2200), ...maiaHonest];
   evaluate(strong, base);
   const pooled = strong.filter((x) => x.levels[MATCHES - 1] === "ban").length;
-  out(`Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within ${MATCHES} matches: ${pooled} of ${strong.length.toLocaleString("en-US")} (${per1000(pooled / strong.length)} per 1,000). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.`);
+  const lv = base.levels;
+  const avgOf = (sub: Subject) => {
+    const ms = sub.summaries.filter((x) => x.counted >= lv.poolStrengthCounted && x.perf !== null);
+    return ms.length >= lv.poolStrengthMatches ? ms.slice(0, lv.poolStrengthMatches).reduce((t, x) => t + x.perf!, 0) / lv.poolStrengthMatches : null;
+  };
+  out(`Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within ${MATCHES} matches: ${pooled} of ${strong.length.toLocaleString("en-US")} (${per1000(pooled / strong.length)} per 1,000), every path (sustained strength below included). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.`);
+  out("");
+  out("## Sustained strength (Nov 11)");
+  out("");
+  out(
+    `Eric: "People easily get around that by playing the second or third best move ... by 4 or 5 games, if their Elo is just ridiculous like that, put them in the cheater queue." The ${lv.poolStrengthMatches} newest matches with ${lv.poolStrengthCounted}+ counted moves averaging a match strength of ${lv.poolStrength.toLocaleString("en-US")} or more pool the player (\`sustainedStrength\`, \`levels.poolStrength*\`), whatever their top-move share. Below: everyone with ${lv.poolStrengthMatches} such matches in their ${MATCHES} (matches here are short, so many have fewer), and their average.`,
+  );
+  out("");
+  out(`| Who | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ |`);
+  out("| --- | --- | --- | --- |");
+  for (const kind of [CHEATERS[6]!, CHEATERS[0]!, CHEATERS[7]!, CHEATERS[4]!, ...HONEST.filter((k) => k.elo >= 2200), ...MAIA]) {
+    const subs = [...cheaters, ...honest, ...maiaHonest].filter((x) => x.kind === kind);
+    const avgs = subs.map(avgOf).filter((x): x is number => x !== null);
+    const at = avgs.filter((a) => a >= lv.poolStrength).length;
+    out(`| ${kind.name} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} |`);
+  }
+  out("");
+  out(
+    `A cheater who always plays the engine's 2nd or 3rd choice plays like an ordinary strong player here: those moves give away real points (the strength measure is the points lost), and the crowd's cuts send them out early, with few counted moves. No strength bar catches them without catching strong people; where the 2nd or 3rd choice is practically equal to the best, the near-best count does.`,
+  );
   out("");
 }
 

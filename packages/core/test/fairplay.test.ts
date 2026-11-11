@@ -253,7 +253,7 @@ describe("levels", () => {
 
   it("sustained strength (Eric, Nov 11): the newest poolStrengthMatches matches of poolStrengthCounted+ counted moves averaging poolStrength pool, whatever the top-move share", () => {
     expect([L.poolStrengthMatches, L.poolStrengthCounted, L.poolStrength]).toEqual([5, 8, 3000]);
-    const at = (perf: number, counted = L.poolStrengthCounted, daysAgo = 1) => ({ score: 6, perf, counted, deepChecked: 0, deepMatch: 0, evidence: 0, at: now - daysAgo * day });
+    const at = (perf: number, counted: number = L.poolStrengthCounted, daysAgo = 1) => ({ score: 6, perf, counted, deepChecked: 0, deepMatch: 0, evidence: 0, at: now - daysAgo * day });
     const five = [3400, 3130, 2657, 3400, 3100].map((p) => at(p));
     expect(sustainedStrength(five)).toBe(3137);
     expect(playerLevel(five, now)).toEqual({ level: "ban", reasons: ["strength: 3,137 average over 5 matches"] });

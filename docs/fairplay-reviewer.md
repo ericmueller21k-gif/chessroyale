@@ -75,7 +75,8 @@ matches.
 the same bar as automatic bans (`policy.levels`), from matches the deep re-check has gone through:
 - at least `banMatches` deep-checked matches whose `summary.evidence` adds up to `banEvidence` or more, with
   `banDeepChecked` or more moves checked among them, at or near the engine's best (`deepNear`) on `banDeep` or more of them, and
-  a best match strength of `banPerf` or more; or one match past every `banOne*` bar;
+  a best match strength of `banPerf` or more; or one match past every `banOne*` bar; or the newest `poolStrengthMatches`
+  matches of `poolStrengthCounted`+ counted moves averaging a strength of `poolStrength` or more (detection pools these);
 - and nothing in the moves that a strong honest player would explain better (for example: the "hard" finds are all
   recaptures or obvious threats the crowd simply missed in a time scramble).
 - Supporting signs (never enough alone): think times that don't follow difficulty (`summary.timeCorr` near 0 or below,
