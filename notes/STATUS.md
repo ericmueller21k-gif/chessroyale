@@ -1,3 +1,4 @@
+- Nov 11 07:15: Eric OK: a town loading bar that paints+uploads the WHOLE town up front (3-5 s fine), kept across building visits. Sent to room-perf helper (atlas must hold the whole town; 0 resets; memory checked).
 - Nov 11 07:10: Eric ran /town?report on his iPhone 14 Plus (notes/fps/). Cold: 1st pct 19 fps, 1189 painted, Buildings worst 143 ms. Warm: 1st pct 38, 4353 uploads, 12 ATLAS RESETS (paint-gl MAX_PAGES 6 x 2048, whole-page reset). Outside our code 14/17 ms steady. Sent to the room-perf helper as extra scope (atlas thrash + cold paint).
 - Nov 11 07:05: #637 home chat + View profile bottom-right opened (54797e9, targeted), CI watcher blc24eect; stills sent to Eric (428x746 light/dark, 1536x864). Haiku helper archived.
 - Nov 11 07:01: #636 frame report LIVE (fa47932). Told Eric: hunchess.com/town?report on phone and laptop. Next: analyze his screenshots; room-perf helper running.
