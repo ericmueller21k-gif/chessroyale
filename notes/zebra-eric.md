@@ -80,3 +80,6 @@ closing line is one of the six, at random.
 
 ## Eric, Nov 11: where you fight
 "The main room is still where you fight, make sure a normal fight pad is on the ground there. For his animation just have 4 of his goons who follow you in carry a chair and a board and a table, 1 item per goon ... so the board and chairs are in the back room but brought into the front." (Talk to Don in the back room; four goons carry the table, board and two chairs to the front room's pad; all five watch.)
+
+## Eric, Nov 11: placement
+"Make sure his building is not right next to another one." (Clear space all round, at least the other homes' gap; a test guards it.)
