@@ -9,8 +9,9 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   (`components/ResultDuo.tsx`): the boss on the left (his bow, his line), your pawn on the right facing him, and under it your name,
   "+N XP", "Level N", the bar filling from your old XP to the new and its parts ("Win +50", never the minutes: `xpShownParts`), or
   why there was none (`XpResult compact`; [2026-11-09-xp-box.md](../decisions/2026-11-09-xp-box.md)). A loss: his `kingAttack` plays
-  where he stands (landing to laugh, 1.9 s) and your pawn jolts at each lash; a win: his defeat; a draw: both stand. 16 px between
-  his figure and your pawn at rest; his blow lands on your pawn but never passes it. Tests: `e2e/boss-result.spec.ts`,
+  where he stands (landing to laugh, 1.9 s) and your pawn jolts at each lash; a win: his defeat; a draw: both stand. Your pawn's art is
+  centered over the XP column (Nov 11: it was 20 px right; `.rd-you .you-pawn-bob` has no margin override; the row gap is 24 px, 20
+  under 360). 16 px between his figure and your pawn at rest (12 under 360); his blow lands on your pawn but never passes it. Tests: `e2e/boss-result.spec.ts`,
   `e2e/formats.spec.ts` (after a Last Stand); frames: `node scripts/frames-boss-result.mjs <dir> <boss> <win|loss|draw|resign> [width]`.
   XP's rules and storage: [accounts.md](accounts.md), "XP and levels".
 
