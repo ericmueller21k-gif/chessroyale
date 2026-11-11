@@ -48,6 +48,16 @@ export function deviceHaptics(): HapticDevice {
   }
 }
 
+/**
+ * Why Settings → Sound's "Vibration" is greyed on a device that has this way, or null where it works. An iPhone or iPad: greyed
+ * (Eric, Nov 11: iOS 27's Safari gives web pages no tick; docs/decisions/2026-11-11-mate-effects-iphone-vibration.md). Its switch path stays,
+ * so `?haptics=debug` still shows what a later iOS does.
+ */
+export function vibrationGreyed(w: HapticWay): string | null {
+  if (w === "ios") return "Not available on iPhone.";
+  return w ? null : "Not available on this device.";
+}
+
 let way: HapticWay | undefined;
 /** This device's way (read once). */
 export function hapticWay(): HapticWay {

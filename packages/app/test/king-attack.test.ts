@@ -29,7 +29,7 @@ import { smudgySound, type SmudgySound } from "../src/characters/smudgy-sounds.t
 import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import type { KingAttackKit } from "../src/characters/kits.ts";
 import { frameKeys, renderFrame, type Anim } from "../src/characters/sprite.ts";
-import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace } from "../src/components/KingAttack.tsx";
+import { ATTACK_ROOM_ABOVE, KING_MIDDLE, attackTop, kingAttackBeat, kingAttackPlace, mateItems } from "../src/components/KingAttack.tsx";
 import { evalBarOn } from "../src/prefs.ts";
 import { timberSound, type TimberSound } from "../src/characters/timber-sounds.ts";
 import { DASH_LINES } from "../src/characters/dash-lines.ts";
@@ -54,6 +54,25 @@ describe("the kit's kingAttack", () => {
       .map(([name]) => BOSS_ROSTER.find((b) => b.kit === name)!.id);
     expect(withAttack).toEqual([...KING_ATTACKERS]);
     expect(withAttack).toEqual(["clown", "gingerbread", "grex", "hollow", "bigboy", "sawyer", "pig", "alfil", "hopper", "smudgy", "moo", "gardener", "tiger", "folio", "timber", "dash", "zebra"]);
+  });
+
+  it("each boss's mate on your king shows its own effects, never another boss's (Eric, Nov 11: Babur's mate showed Hollow's dark)", () => {
+    const kits = Object.entries(BOSS_KITS).filter(([, k]) => k.kingAttack);
+    // Its hits: an effect no other boss's attack uses (Dash's were Jefferson's fireball pops until Nov 11).
+    const owner = new Map<string, string>();
+    for (const [name, k] of kits)
+      for (let i = 0; i < KING_ATTACK.lashes; i++) {
+        const fx = k.kingAttack!.hit("e1", i, "L", 0).name;
+        expect(owner.get(fx) ?? name, `${name}'s hit ${fx} is ${owner.get(fx)}'s`).toBe(name);
+        owner.set(fx, name);
+      }
+    // What it leaves on the king's square: Hollow's dark for him alone, nothing for the rest; his violet flash his alone.
+    const end = KING_ATTACK.ms + 5000;
+    for (const [name, k] of kits) {
+      const left = mateItems(k.kingAttack!, "e1", 0, end).map((it) => it.name);
+      expect(left, name).toEqual(name === "Hollow" ? ["darkSquare"] : []);
+      expect(k.kingAttack!.glow, name).toBe(name === "Hollow" ? "#9c6cff" : undefined);
+    }
   });
 
   it("Alfil's: a `jab` cue on each of the shared hits, lasting the attack exactly, his ankus's tip in the king's square, a gold jab on it each hit", () => {
@@ -394,7 +413,9 @@ describe("Dash's attack on a king (Nov 6)", () => {
     expect(hits.map((f) => f.cue)).toEqual(kingAttackHits().map((_, i) => (i % 2 ? "snap" : "whoosh")));
     expect([kit.sounds.whoosh, kit.sounds.snap, kit.sounds.zip, kit.sounds.skid]).toEqual(["dashWhoosh", "dashSnap", "dashZip", "dashSqueak"]);
     for (const f of anim.frames) if (f.cue) expect(kit.sounds[f.cue], f.cue).toBeTruthy();
-    expect(ka.hit("e1", 0, "L", 7)).toEqual({ square: "e1", name: "popHit", anim: "hitHL", since: 7 });
+    // (His own claw marks, high then low, from his side: Jefferson's fireball pops until Nov 11.)
+    expect(ka.hit("e1", 0, "L", 7)).toEqual({ square: "e1", name: "clawHit", anim: "hitHL", since: 7 });
+    for (const a of ["hitHL", "hitHR", "hitLL", "hitLR"]) expect(EFFECTS.clawHit.ch.anims[a]!.frames.some((f) => (f.specks?.length ?? 0) > 20), a).toBe(true);
     expect(kit.chance.kingAttack).toBe(1);
     expect(DASH_LINES.kingAttack?.length).toBeGreaterThan(0);
   });

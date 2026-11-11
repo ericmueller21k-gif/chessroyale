@@ -43,6 +43,14 @@ describe("haptics (Eric, Nov 9): a tick on a tap and a move, a few boss moments"
     expect(pickWay({ vibrate: false, touch: false, ios: false, switchInput: true })).toBe(null);
   });
 
+  it("Settings → Vibration: greyed on an iPhone or iPad, \"Not available on iPhone.\" (Eric, Nov 11: iOS 27 gives web pages no tick), its switch path kept for ?haptics=debug", async () => {
+    const { vibrationGreyed, pickWay } = await load();
+    expect(vibrationGreyed("ios")).toBe("Not available on iPhone.");
+    expect(vibrationGreyed(null)).toBe("Not available on this device.");
+    expect(vibrationGreyed("vibrate")).toBe(null);
+    expect(pickWay({ vibrate: false, touch: true, ios: true, switchInput: true })).toBe("ios");
+  });
+
   it("reads the device: an iPhone, an iPad that says it's a Mac, a phone, a computer", async () => {
     device({ vibrate: false, ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X)", switchInput: true });
     expect((await load()).hapticWay()).toBe("ios");
