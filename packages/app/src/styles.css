@@ -9750,16 +9750,16 @@ button.fd-logo {
   outline-offset: 2px;
 }
 /*
- * "View profile" (Eric, Nov 11: "top right of that white container, not too small, not too big, moved over a bit more to the
- * right"): its own row at the card's top, right-aligned (the director, Nov 11: above the name's line on every phone height). Its
- * 44 px tap box overlaps the card's padding by 10 px top and bottom, so the row takes 24 px, and its words sit about 16 px in from
- * the top-right corner, 15 px semibold in the link blue, a chevron after them. Its sweep: a light band crossing the words once every 6 s
- * (the gradient is clipped to the text), resting between sweeps; none under reduced motion.
+ * "View profile" (Eric, Nov 11: "top right of that white container", moved to the bottom right on the director's call, Nov 11, as
+ * it cut into the name): in the card's bottom-right corner, 12 px in from its right and bottom edges, so the words sit about 16 px
+ * in from the edge (the chevron's own padding). Its 44 px tap box is out of the flow, so nothing else on the card moves. Blue, a
+ * chevron, and a light sweep every 6 s (none under reduced motion). Its no-overlap check: home-layout.spec.ts.
  */
 .fd-hero-profile {
-  order: -2;
-  align-self: flex-end;
-  margin: -10px 12px -10px 0;
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -9789,12 +9789,6 @@ button.fd-logo {
   30%,
   100% {
     background-position: 0% 0;
-  }
-}
-/* A computer's card has its side padding (18 px): the row reaches into it by that much less. */
-@media (min-width: 1024px) {
-  .fd-root.framed .fd-hero-profile {
-    margin-right: -6px;
   }
 }
 .fd-hero-profile:active {
