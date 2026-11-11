@@ -28,7 +28,10 @@ const FAQ: [string, string][] = [
   ["Can I play on my phone?", "It's made for phones. Add it to your home screen and it opens like an app."],
 ];
 
-/** The 50 v 50 loop. Muted is set on the element itself, as phones only autoplay muted video. */
+/**
+ * The demo reel (Nov 11): 50 v 50, the town and a boss, ranked 1 v 1, the Hidden Boss, about 20 s on a loop (scripts/reel/record-reel.ts,
+ * scripts/encode-demo.sh). Muted is set on the element itself, as phones only autoplay muted video.
+ */
 function DemoVideo() {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -39,10 +42,10 @@ function DemoVideo() {
     void v.play().catch(() => undefined);
   }, []);
   return (
-    <video ref={ref} class="demo-video" poster="/media/crowd-demo.jpg" autoplay muted loop playsInline preload="auto" aria-label="A 50 v 50 match being played">
-      <source src="/media/crowd-demo.mp4" type="video/mp4" />
+    <video ref={ref} class="demo-video" poster="/media/hunchess-reel.jpg" autoplay muted loop playsInline preload="auto" aria-label="A short reel: a 50 v 50 match, the town and a boss battle, a ranked 1 v 1, and the Hidden Boss">
+      <source src="/media/hunchess-reel.mp4" type="video/mp4" />
       {/* (WebM too, for browsers without H.264, e.g. open-source Chromium; neither is precached: vite.config.ts.) */}
-      <source src="/media/crowd-demo.webm" type="video/webm" />
+      <source src="/media/hunchess-reel.webm" type="video/webm" />
     </video>
   );
 }
@@ -81,7 +84,7 @@ export function LandingScreen({
       <div class="landing-main">
         <figure class="demo-frame">
           <DemoVideo />
-          <figcaption class="muted small">A 50 v 50 match</figcaption>
+          <figcaption class="muted small">A look inside HunChess</figcaption>
         </figure>
         <div class="landing-actions">
           {notice && (

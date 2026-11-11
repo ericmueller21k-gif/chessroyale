@@ -6,8 +6,10 @@
  * captions are drawn in the game's pixel font as see-through pictures (reports/demo/captions/).
  *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|hidden|captions]
  */
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { expect, type Browser, type Page } from "@playwright/test";
+// (The e2e's own `test`: every context starts with the first-time walkthrough and the quests overlay marked seen.)
+import { BOARD_SEL, test } from "../../e2e/helpers.ts";
 import { HIDDEN_BOSS_CAPTION, REEL_CAPTIONS, drawHiddenBoss } from "./hidden-boss.ts";
 
 const OUT = "reports/demo";
@@ -15,6 +17,7 @@ const OUT = "reports/demo";
 /** Every painted frame of `page` from now until `stop()`, written as JPEGs with their times; `mark(name)` notes a moment. */
 async function recorder(page: Page, scene: string) {
   const dir = `${OUT}/${scene}`;
+  let dropped = false;
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(`${dir}/frames`, { recursive: true });
   const cdp = await page.context().newCDPSession(page);
@@ -37,11 +40,19 @@ async function recorder(page: Page, scene: string) {
   })();
   const t0 = Date.now() / 1000;
   return {
+    /** Stops and throws its frames away (the other player's view). */
+    async drop() {
+      dropped = true;
+      capturing = false;
+      await loop;
+      rmSync(dir, { recursive: true, force: true });
+    },
     mark(name: string) {
       marks[name] = Date.now() / 1000 - t0;
       console.log(`${scene}: ${name} at ${marks[name]!.toFixed(2)} s`);
     },
-    async stop() {
+    async stop(rename?: string) {
+      if (dropped) return;
       await page.waitForTimeout(300);
       capturing = false;
       await loop;
@@ -52,6 +63,10 @@ async function recorder(page: Page, scene: string) {
       frames.forEach((f, i) => lines.push(`file frames/${f.file}`, `duration ${((frames[i + 1]?.t ?? f.t + 0.04) - f.t).toFixed(4)}`));
       writeFileSync(`${dir}/frames.txt`, lines.join("\n") + "\n");
       writeFileSync(`${dir}/marks.json`, JSON.stringify(marks, null, 2));
+      if (rename) {
+        rmSync(`${OUT}/${rename}`, { recursive: true, force: true });
+        renameSync(dir, `${OUT}/${rename}`);
+      }
       console.log(`${scene}: ${frames.length} frames over ${((frames.at(-1)?.t ?? first) - first).toFixed(1)} s`);
     },
   };
@@ -84,11 +99,20 @@ async function asAdmin(page: Page) {
 }
 
 test("crowd", async ({ page }) => {
+  test.setTimeout(150_000);
   // Scene 1: a solo 50 v 50 (as the old demo): you pick the engine's move after a moment, like a person.
   await setUp(page, "Hunter");
   await page.goto(`/?debug&mode=crowd&augments=0&clock=10&nolanding`);
+  // Home: 50 v 50, Bots, PLAY, the Bot level box's OK (as e2e/helpers.ts soloFromHome).
+  const row = page.getByRole("radiogroup", { name: "RANKED" });
+  await row.getByRole("radio", { name: /^50 v 50/ }).click();
+  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
+  await page.getByRole("button", { name: "PLAY", exact: true }).click();
+  const box = page.getByRole("dialog", { name: "Bot level" });
+  const ok = box.getByRole("button", { name: "OK", exact: true });
+  if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
   const rec = await recorder(page, "crowd");
-  await page.getByRole("button", { name: /Play solo vs 99 bots/ }).click();
+  await ok.click();
   rec.mark("start");
   const stopAt = Date.now() + 40_000;
   let lastBoard = "";
@@ -135,7 +159,7 @@ test("town", async ({ page }) => {
       document.head.append(s);
     });
   });
-  await page.goto("/town?debug&nolanding");
+  await page.goto("/town?debug&nolanding&sky=day");
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
   await page.waitForTimeout(2500);
   const you = () => page.evaluate(() => (window as unknown as TownHooks).__townYou?.() ?? null);
@@ -208,30 +232,36 @@ async function rankedPlayer(browser: Browser, name: string, rank: string) {
 }
 
 test("ranked", async ({ browser }) => {
+  test.setTimeout(150_000);
   // Scene 3: a ranked 1 v 1 between two players (two pages), recorded from one: the stage, the vote, a quick opening.
   const a = await rankedPlayer(browser, "Hunter", "gold-2");
   const b = await rankedPlayer(browser, "Knightowl", "gold-3");
   const pool = `reel${Math.random().toString(36).slice(2, 8)}`;
-  const rec = await recorder(a, "ranked");
+  // (Both players' views are recorded until the board is up; the one playing White is kept: the board the right way up.)
+  const recA = await recorder(a, "ranked-a");
+  const recB = await recorder(b, "ranked-b");
+  const both = (name: string) => [recA, recB].forEach((r) => r.mark(name));
   await a.goto(`/1v1?nolanding&debug&pool=${pool}&rank=gold-2`);
-  rec.mark("search");
+  both("search");
   await b.goto(`/1v1?nolanding&debug&pool=${pool}&rank=gold-3`);
   for (const p of [a, b]) await expect(p.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible({ timeout: 30_000 });
-  rec.mark("versus");
+  both("versus");
   for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 15_000 });
-  rec.mark("vote");
+  both("vote");
   await a.waitForTimeout(800);
   for (const p of [a, b]) {
     await p.locator(".vote-me").click();
     await p.getByRole("button", { name: "Pick Blitz 3+2" }).click();
   }
   for (const p of [a, b]) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 20_000 });
-  rec.mark("play");
+  both("play");
   const side = async (p: Page) => (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as "w" | "b";
   const white = (await side(a)) === "w" ? a : b;
   const black = white === a ? b : a;
+  const rec = white === a ? recA : recB;
+  await (white === a ? recB : recA).drop();
   const squareAt = async (p: Page, sq: string) => {
-    const box = (await p.locator(".board-area .board-squares, .board-area [class*=squares]").first().boundingBox())!;
+    const box = (await p.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
     const w = (await side(p)) === "w";
     const f = sq.charCodeAt(0) - 97;
     const r = Number(sq[1]) - 1;
@@ -252,7 +282,7 @@ test("ranked", async ({ browser }) => {
   }
   await a.waitForTimeout(1500);
   rec.mark("end");
-  await rec.stop();
+  await rec.stop("ranked");
 });
 
 test("hidden", async ({ page }) => {

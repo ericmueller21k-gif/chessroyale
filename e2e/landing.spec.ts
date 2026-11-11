@@ -25,7 +25,7 @@ test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, i
   // The demo loop is there and plays.
   const video = page.locator("video.demo-video");
   await expect(video).toBeVisible();
-  expect((await page.request.get("/media/crowd-demo.mp4")).status()).toBe(200);
+  expect((await page.request.get("/media/hunchess-reel.mp4")).status()).toBe(200);
   await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentTime)).toBeGreaterThan(0.2);
   await oldEnough(page);
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
