@@ -40,8 +40,9 @@ export function panelHtml(s: Summary, d: Device): string {
   // The parts: the mean ms a frame overall and split, and the worst.
   let t = `<table class="tfr-parts"><thead><tr><th>ms a frame</th>`;
   for (const g of s.segs) t += `<th>${esc(g.name)}</th>`;
-  t += `<th>Worst</th></tr><tr class="tfr-sub"><td>frames · fps</td>`;
-  for (const g of s.segs) t += `<td>${g.frames} · ${fps(g.fps)}</td>`;
+  t += `<th>Worst</th></tr><tr class="tfr-sub"><td>frames·fps</td>`;
+  // (Tight, "332·60": six columns since the rooms joined, Nov 11, on a 428 px phone.)
+  for (const g of s.segs) t += `<td>${g.frames}·${fps(g.fps)}</td>`;
   t += `<td></td></tr></thead><tbody>`;
   for (let k = 0; k < NP; k++) {
     const hot = k === s.top ? " class=\"tfr-hot\"" : "";
