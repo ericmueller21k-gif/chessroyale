@@ -21,7 +21,9 @@ function look(p: Page) {
       const r = el.getBoundingClientRect();
       return r.width > 0 && r.height > 0 ? r : null;
     };
-    const screen = document.querySelector(".screen.game")!;
+    // (No game screen yet, as a reload draws it: nothing shows, and a check waiting for a layout looks again. The match is on the
+    // window before its screen is drawn: CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+    const screen = document.querySelector(".screen.game") ?? document.createElement("div");
     const panel = screen.querySelector(".under-board") ?? screen.querySelector(".mini-tower");
     const box = seen(panel);
     const tower = seen(screen.querySelector(".mini-tower"));
