@@ -1348,9 +1348,10 @@ export const SHOP_ZEBRA_BACK_MARKS = { boss: [4.3, 6.82], you: [8.45, 6.75], tab
 /**
  * The back room's camera through the challenge (its own, as Ginger's: `BossIntro.cam`, from the table's middle): CHALLENGE_FEEL's
  * usual (south 0.8, west 0.75) is made for a 20-square room and leaves this small room's lower half empty and you at the phone's edge;
- * this one centers the kingpin and you (west -0.35: a little east of the table) and comes north (south 0.1). Zoom 1 (the town's).
+ * this one centers the kingpin and you (west -0.35: a little east of the table) and comes north of the table (south -0.8), so the
+ * room fills the phone's screen top to bottom instead of its upper half. Zoom 1 (the town's).
  */
-export const SHOP_ZEBRA_BACK_CAM = { south: 0.1, west: -0.35, zoom: 1 } as const;
+export const SHOP_ZEBRA_BACK_CAM = { south: -0.8, west: -0.35, zoom: 1 } as const;
 /** The doors: the way back to the front room (row 10), its squares, the squares just inside it, and where you arrive. */
 export const SHOP_ZEBRA_BACK_DOORS = {
   front: { squares: [{ c: 3, r: 10 }, { c: 4, r: 10 }], inside: [{ c: 3, r: 9 }, { c: 4, r: 9 }], arrive: [3.5, 9], to: "front" },
