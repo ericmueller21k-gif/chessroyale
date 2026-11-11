@@ -402,7 +402,7 @@ test("the boss's attack on your pawn on a slow phone: a loss's result screen whi
 });
 
 for (const who of ["a player's town", "an admin's street town"] as const)
-  test(`Chess Town on a slow phone: ${who} draws its first frame soon after the tap, with no long freeze (Nov 10, phone load 3)`, { tag: "@perf" }, async ({ page }) => {
+  test(`Chess Town on a slow phone: ${who} draws its first frame (the street town: its loading screen, Nov 11) soon after the tap, with no long freeze (Nov 10, phone load 3)`, { tag: "@perf" }, async ({ page }) => {
     test.skip(test.info().project.name !== "phone", "one run is enough (the phone, slowed)");
     test.setTimeout(2 * 60_000);
     const street = who !== "a player's town";
@@ -421,17 +421,23 @@ for (const who of ["a player's town", "an admin's street town"] as const)
     await page.evaluate(() => addEventListener("pointerup", () => ((window as unknown as { __tap: number }).__tap = performance.now()), { capture: true, once: true }));
     await town.click();
     const canvas = page.locator("canvas.town-canvas");
-    await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 60_000 });
+    // (The street town, Nov 11: its loading screen first (Eric: "I have no issue with doing a loading screen for the town… even if it
+    // takes 3 or 5 seconds"): what's timed is the tap to that screen; its first frame comes once every picture is in.)
+    const sinceTap = () => page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
+    if (street) await expect(page.locator(".town-loading")).toBeVisible({ timeout: 60_000 });
+    const shown = street ? await sinceTap() : 0;
+    await expect(canvas).toHaveAttribute("data-ready", "1", { timeout: 90_000 });
     await expect(canvas).toHaveAttribute("data-backend", street ? "webgl" : "2d");
-    const first = await page.evaluate(() => performance.now() - (window as unknown as { __tap: number }).__tap);
+    const loaded = await sinceTap();
+    const first = street ? shown : loaded;
     // (The first frame was drawn just before data-ready was read: within one frame of it.)
     const long = await page.evaluate(() => {
       const w = window as unknown as { __long: { s: number; d: number }[]; __tap: number };
       return Math.max(0, ...w.__long.filter((e) => e.s >= w.__tap - 5).map((e) => e.d));
     });
-    console.log(`${who} (slowed phone): first frame ${Math.round(first)} ms after the tap, longest task ${Math.round(long)} ms`);
+    console.log(`${who} (slowed phone): ${street ? "loading screen" : "first frame"} ${Math.round(first)} ms after the tap, the town's first frame ${Math.round(loaded)} ms, longest task ${Math.round(long)} ms`);
     // (Nov 10, headless Chromium: about 1.7 s and 1.1 s for a player's, 2.1 s and 1.4 s for the street town; before phone load 3,
     // 3.2 s and 1.9 s, 5.8 s and 4.6 s.)
-    expect(first, "tap to first frame (ms)").toBeLessThan(street ? 3000 : 2500);
+    expect(first, street ? "tap to the loading screen (ms)" : "tap to first frame (ms)").toBeLessThan(street ? 3000 : 2500);
     expect(long, "longest task (ms)").toBeLessThan(2000);
   });

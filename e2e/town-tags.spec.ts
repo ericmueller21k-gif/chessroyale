@@ -34,7 +34,7 @@ const canvas = (p: Page) => p.locator("canvas.town-canvas");
 /** The town, open, by day, with fifty more guests in it, and its first frames drawn. */
 async function open(page: Page, query = "&crowd=50") {
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForFunction(() => typeof (window as unknown as Hooks).__townTags === "function");
   await page.evaluate(() => (window as any).__townChatter?.(false));
   await page.waitForTimeout(800);
@@ -140,7 +140,7 @@ test("name tags show only near you by default: a far figure has none, a near one
 
   // It survives a reload (remembered on this device), shown picked in the sheet, with the far tags still drawn.
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForFunction(() => typeof (window as unknown as Hooks).__townTags === "function");
   await page.waitForTimeout(1200);
   const again = await read(page);

@@ -25,6 +25,7 @@ import { rideScale, scaledAt, scaledSeat, seatAnchor } from "../components/rides
 import { FACINGS, type RiderDraft, type RiderFacing } from "../components/rides/kit.ts";
 import { loadRide, rideCells } from "../components/rides/load.ts";
 import { RideLayer, RideMark, svgImage, svgText, type RideColors } from "../components/rides/draw.tsx";
+import { art2d } from "./paint.ts";
 
 /** The pawn a rider carries: its picture (the square's, dressed or plain), the margin round the pawn's box in it, and its top (a share of the picture, down). */
 export interface RiderPawn {
@@ -243,7 +244,7 @@ export class Rider {
                 const c = document.createElement("canvas");
                 c.width = img!.width;
                 c.height = img!.height;
-                c.getContext("2d")!.drawImage(img!, 0, 0);
+                art2d(c).drawImage(img!, 0, 0);
                 tr.frames[v]![n]![f] = c;
               },
             });
@@ -297,7 +298,7 @@ export class Rider {
     const c = document.createElement("canvas");
     c.width = Math.ceil(rv.w * s);
     c.height = Math.ceil(rv.h * s);
-    const g = c.getContext("2d")!;
+    const g = art2d(c);
     g.imageSmoothingQuality = "high";
     // The ride's cell at its scale (its layers drawn at that size).
     const cx = (rv.cell[0] - rv.x0) * s;

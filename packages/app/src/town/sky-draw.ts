@@ -11,6 +11,7 @@ import { clamp, N, type View } from "./camera.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { LOOKS, SKY_STOPS, look, mixRGB, type Look, type SkyWeights } from "./sky.ts";
 import type { Ctx } from "./paint.ts";
+import { art2d } from "./paint.ts";
 
 const lookOf = look;
 const css = (c: readonly number[], a = 1) => (a >= 1 ? `rgb(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0})` : `rgba(${c[0]! | 0},${c[1]! | 0},${c[2]! | 0},${a.toFixed(3)})`);
@@ -149,7 +150,7 @@ export class SkyPainter {
     a = document.createElement("canvas");
     a.width = w * s;
     a.height = h * s;
-    const g = a.getContext("2d")!;
+    const g = art2d(a);
     const cols = lookOf(look).cloud.map((rgb) => css(rgb));
     for (let y = 0; y < h; y++)
       for (let x = 0; x < w; x++) {
@@ -171,7 +172,7 @@ export class SkyPainter {
     const size = Math.ceil(R * 4.4);
     a = document.createElement("canvas");
     a.width = a.height = Math.ceil(size * D);
-    const g = a.getContext("2d")!;
+    const g = art2d(a);
     g.scale(D, D);
     const c = size / 2;
     const glow = g.createRadialGradient(c, c, R * 0.6, c, c, size / 2);

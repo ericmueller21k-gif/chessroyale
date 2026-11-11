@@ -39,7 +39,7 @@ async function still(p: Page, name: string) {
 /** The town, open and drawn; your square once you've stopped (the same square after a Stay). */
 async function openTown(p: Page, query = "sky=day&townafk=off") {
   await p.goto(`/town?${query}`);
-  await expect(canvas(p)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(p)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await p.waitForTimeout(600);
   return (await you(p))!;
 }
@@ -47,7 +47,7 @@ async function openTown(p: Page, query = "sky=day&townafk=off") {
 /** Stay: the dialog closes, and you're still in the town on the same square. */
 async function expectStayed(p: Page, square: string) {
   await expect(leaveDialog(p)).toHaveCount(0);
-  await expect(canvas(p)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(p)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await p.waitForTimeout(800);
   expect(await you(p), "still on the same square").toBe(square);
   expect(new URL(p.url()).pathname).toBe("/town");
@@ -209,7 +209,7 @@ test("no input for the limit: the AFK drop goes home with its own pop-up, and no
   await openTown(page, "sky=day&townafk=off");
   await asSignedIn(page, "leave");
   await page.goto(`/town?sky=day&townroom=leave${Date.now().toString(36)}&townafk=2,6,600`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page).toHaveURL(/\/$/, { timeout: 30_000 });
   await expect(page.getByRole("alertdialog", { name: "You've been dropped from the town" })).toBeVisible();
   await expect(leaveDialog(page)).toHaveCount(0);

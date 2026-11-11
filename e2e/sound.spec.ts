@@ -91,7 +91,7 @@ test("coming back from another app, sound is back on the first tap: a suspended 
   const contexts = () => page.evaluate(() => ((window as any).__contexts as AudioContext[]).map((c) => c.state));
   const heard = () => page.evaluate(() => ((window as any).__soundLog as string[]).filter((l) => l.startsWith("bigboyClack:")));
   await page.goto("/town?sky=day");
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.evaluate(() => (window as any).__townGlide?.("bigboy"));
   /** Whether the camera stood still over the last two frames (a glide over). */
   const camStill = () =>

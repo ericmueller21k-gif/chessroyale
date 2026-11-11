@@ -176,6 +176,13 @@ export function TownScreen({
   shopIn.current = inside?.room.def.home ?? null;
   /** A guest's town time is up: "Make an account to keep exploring" over the town, which takes no more steps. */
   const [gated, setGated] = useState(false);
+  /**
+   * The street town's loading screen (Nov 11, Eric: "I have no issue with doing a loading screen for the town… even if it takes 3 or 5
+   * seconds… loads it all in at once and then it stays there"): up while every picture is painted and uploaded (startTown's `loadTown`).
+   * Its bar is moved directly (`loadBar`), not by a render a step.
+   */
+  const [loading, setLoading] = useState(STREET_TOWN && !NO_WEBGL_STREET);
+  const loadBar = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     if (!gated) return;
     // (No key reaches the town or a room under the pop-up: the arrow keys would walk you on.)
@@ -368,7 +375,14 @@ export function TownScreen({
     const t = startTown(box.current!, canvas.current!, chips.current, cardEl.current!, live.current!, setZoomedOut, setCard, seatOf(seat), (s, face) => {
       const b = TOWN_BOTS[s.bot]!;
       onPlayBot?.({ seat: seatText(s), name: botLabel(b), rating: b.rating, look: isSprite(b.look) ? null : b.look.wear, face });
-    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"));
+    }, (id, x, y, challenge) => void goIn(id, x, y, challenge), stand, () => step("cancel"), (share) => {
+      if (share === null) return setLoading(false);
+      const bar = loadBar.current;
+      if (bar) {
+        bar.style.transform = `scaleX(${share})`;
+        bar.parentElement!.setAttribute("aria-valuenow", String(Math.round(share * 100)));
+      }
+    });
     ctl.current = t;
     // Away (Eric, Nov 7; afk.ts, here-net.ts): the "zzz" over your pawn (the town's and a shop's), out to home after too long, and the
     // beats that put you (and your "zzz") in everyone else's town. A boss's challenge (from the fight to the battle) and the claw
@@ -648,6 +662,15 @@ export function TownScreen({
         {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
             inside a building (it's the town's). */}
         {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} onHome={(id) => ctl.current?.walkHome(id)} />}
+        {/* The street town's loading screen (Nov 11): the boss's loading card's look, its bar real progress. */}
+        {loading && (
+          <div class="boss-loading town-loading" role="status" aria-live="polite">
+            <strong class="boss-loading-title">Building the town…</strong>
+            <span class="boss-loading-bar" role="progressbar" aria-label="Building the town" aria-valuemin={0} aria-valuemax={100} aria-valuenow={0}>
+              <i ref={loadBar} />
+            </span>
+          </div>
+        )}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -800,6 +823,8 @@ function startTown(
   stand: Stand | null = null,
   /** A boss's challenge called off on the way to its door (a tap elsewhere walked you away). */
   onChallengeOff: () => void = () => {},
+  /** The loading screen's progress (0 to 1), then null once the town is loaded (`loadTown`). */
+  onLoading: (share: number | null) => void = () => {},
 ) {
   const f = TOWN_FEEL;
   /** The world's canvas (a new one if the street town's WebGL fails as it starts: a canvas keeps the first kind of context it gave). */
@@ -1084,6 +1109,8 @@ function startTown(
   let alive = true;
   /** (Tests, `__townHold`) The frame loop held: the last frame stays, and nothing moves. */
   let held = false;
+  /** The loading screen is up (`loadTown`): no frames yet. */
+  let loading = painter.kind === "webgl";
   /** Inside a shop: the town waits as you left it (no frames, nothing moves) until you come out. */
   let away = false;
   /** A home's "Go in" sent you to its door (its index in HOMES; -1: none): you go in once you stand there. */
@@ -1328,7 +1355,7 @@ function startTown(
   /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
    * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
   const run = (gap = true) => {
-    if (raf || !alive || document.hidden || held || away) return;
+    if (raf || !alive || document.hidden || held || away || loading) return;
     if (gap) {
       rec?.pause();
       FPS?.restart();
@@ -2015,8 +2042,8 @@ function startTown(
   };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
-    const p = painter as Painter & { uploads?: number; resets?: number };
-    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
+    const p = painter as Painter & { uploads?: number; resets?: number; stats?: () => unknown };
+    return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0, atlas: p.stats?.() ?? null, loading, loadMs, loadPaintMs };
   };
   const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
   hooks.__townAt = hookAt;
@@ -2044,8 +2071,48 @@ function startTown(
   hooks.__townHere = hookHere;
   hooks.__townReport = hookReport;
 
-  run();
-  draw(performance.now()); // the first frame, before the screen shows
+  /**
+   * The loading screen (Nov 11, Eric: "loads it all in at once and then it stays there if you go in and out of buildings"): every
+   * picture the street town can show painted (render.ts `warm`), then uploaded for good, tallest first, onto an atlas made once as deep
+   * as they need (paint-gl.ts `keep`, `kept`), a slice a frame (`f.loadSliceMs`) so the bar moves: painting its first share
+   * (`f.loadPaintShare`), uploading the rest. The frames, and so the town's clock, start once it's done. Today's town (Canvas 2D) has
+   * nothing to upload: it starts at once.
+   */
+  const loadTown = async () => {
+    const t0 = performance.now();
+    const keep = (src: CanvasImageSource) => painter.keep?.(src);
+    const tick = () => new Promise<void>((go) => requestAnimationFrame(() => go()));
+    // (Whatever goes wrong here, the town opens: what wasn't made is made as it shows, as before.)
+    try {
+      for (let share = 0; share < 1 && alive; ) {
+        share = r.warm(f.loadSliceMs, keep);
+        onLoading(share * f.loadPaintShare);
+        await tick();
+      }
+      loadPaintMs = performance.now() - t0;
+      for (let share = 0; share < 1 && alive; ) {
+        share = painter.kept?.(f.loadSliceMs) ?? 1;
+        onLoading(f.loadPaintShare + (1 - f.loadPaintShare) * share);
+        if (share < 1) await tick();
+      }
+    } catch (e) {
+      console.warn("town load:", e);
+    }
+    if (!alive) return;
+    loadMs = performance.now() - t0;
+    loading = false;
+    onLoading(null);
+    run();
+    draw(performance.now());
+  };
+  let loadMs = 0;
+  let loadPaintMs = 0;
+  if (loading) void loadTown();
+  else {
+    onLoading(null);
+    run();
+    draw(performance.now()); // the first frame, before the screen shows
+  }
 
   return {
     /**

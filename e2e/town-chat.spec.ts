@@ -135,7 +135,7 @@ const scrollOf = (p: Page) => p.locator(".tc-log").evaluate((el) => ({ top: el.s
  */
 async function open(page: Page, query = "", sky = "day") {
   await page.goto(`/town?sky=${sky}&townroom=${room}${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
 }
@@ -764,12 +764,12 @@ test("the header's chat icon cycles always on, new messages only, off (both bubb
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.new);
   expect(await page.evaluate((k) => localStorage.getItem(k), CHAT.modeKey)).toBe("new");
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.new);
   await expect(log(page)).toHaveCSS("opacity", "0");
   await page.evaluate((k) => localStorage.setItem(k, "off"), CHAT.modeKey);
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.off);
   await expect(page.locator(".town-chat")).toBeHidden();
 });
@@ -874,7 +874,7 @@ test("\"Chat background\": off by default; on, the faint tint stays behind the b
   await expect(box).toHaveAttribute("data-blur", "1");
   // Remembered: a reload comes back with it on.
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page.locator(".town-chat")).toHaveAttribute("data-blur", "1");
   // By night the tint is a faint dark one (the text is white: white on a light tint wouldn't read).
   await open(page, "", "night");
@@ -900,7 +900,7 @@ test("always on never fades: after the wait, after minutes, with the lines still
   await page.clock.install({ time: new Date(2026, 9, 28, 12, 0, 0) });
   // (The away rule off: these jumps are 5 minutes of no input, which would send the player home; town-afk.spec.ts has that rule.)
   await page.goto(`/town?sky=day&townroom=${room}&townafk=off`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
   await page.evaluate(() => (window as any).__townChatter(false));
   await expect(icon(page)).toHaveAttribute("aria-label", LABEL.always);
@@ -960,7 +960,7 @@ test("the text's tone flips with the clock when the sky does: ink before 19:30 a
   await page.clock.install({ time: new Date(2026, 9, 28, 19, 28, 0) });
   // (?townafk=off: the clock jumps hours, and the away rule would send this idle page home: town/afk.ts.)
   await page.goto(`/town?townafk=off&townroom=${room}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const box = page.locator(".town-chat");
   await expect(box).toHaveAttribute("data-tone", "day");
   await page.waitForFunction(() => typeof (window as any).__townSay === "function");
@@ -1095,7 +1095,7 @@ test("the typing line (a signed-in player's): no placeholder, 80 characters, a c
 test("a guest taps the box and gets the typing line greyed, saying how to chat (nothing hidden); the box and the blur are the same; without the test switches no hooks either", { tag: "@phone-only" }, async ({ page }) => {
   await page.route("**/api/auth/config", (route) => route.fulfill({ json: { accounts: false, google: false, email: false } }));
   await page.goto(`/town?sky=day&townroom=${room}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(page.locator(".town-chat")).toHaveCount(1);
   const box = page.locator(".town-chat");
   const field = page.locator(".tc-form input");
@@ -1188,7 +1188,7 @@ test("press and hold on the box and drag it anywhere on the map; it stays, is re
   await carry(page, grip(b3), { x: grip(b3).x + 30, y: grip(b3).y + 40 });
   const b4 = await rectOf(page, ".town-chat");
   await page.reload();
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   near(await rectOf(page, ".town-chat"), b4);
 });
 
@@ -1464,7 +1464,7 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await expect(page.locator(".fd-overlay")).toContainText(cyName);
   await page.locator(".fd-overlay").getByRole("button", { name: "Back" }).first().click();
   await expect(page.locator(".fd-overlay")).toHaveCount(0);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1");
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
 
   // Mute: Cy's lines leave this log, and a new one never shows.
   await cyLine.locator(".tc-name").click();

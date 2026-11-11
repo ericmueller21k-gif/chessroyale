@@ -11,6 +11,7 @@
  */
 import type { Pt } from "../camera.ts";
 import type { Ctx } from "../paint.ts";
+import { art2d } from "../paint.ts";
 import { bakeFace, gridTexel, rampsOf, triPixels, type Cut, type Poly, type Ramps } from "./bake.ts";
 import { affine, area, facesOf, lightStep, texOf, type Model, type PFace, type Shape, type Step, type V3 } from "./prims.ts";
 
@@ -67,7 +68,7 @@ export function pack(items: Cut[]): Piece[] {
       for (let j = 0; j < it.h; j++) img.data.set(it.data.subarray(j * it.w * 4, (j + 1) * it.w * 4), ((p.y + j) * cv.width + p.x) * 4);
       out[p.i] = { cv, sx: p.x, sy: p.y, w: it.w, h: it.h, ox: p.x + it.ox, oy: p.y + it.oy };
     }
-    cv.getContext("2d")!.putImageData(img, 0, 0);
+    art2d(cv).putImageData(img, 0, 0);
   }
   return out;
 }
