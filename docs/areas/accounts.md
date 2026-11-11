@@ -162,8 +162,9 @@ policy's "Friends" entry (`screens/Legal.tsx`) says the same in plain words.
 | `users.allow_invites` | Who may invite you: NULL everyone, "friends", "none" | With the account |
 | `users.hide_online` | 1: online and last seen hidden from everyone | With the account |
 
-Nothing else is stored: no friend codes, no search index, no chat between friends. Who's online and who's in a match
-stay in the live hub's memory (never written).
+Nothing else is stored: no friend codes, no chat between friends. The friends page's player search (Nov 11) reads names through an
+index on `users.name` (`users_name`, any case: a prefix is a range, never a scan; `searchPlayers` in `friends.ts`), nothing new kept.
+Who's online, who's in a match and what they're doing (`?doing=`) stay in the live hub's memory (never written).
 
 ## Where the code is
 

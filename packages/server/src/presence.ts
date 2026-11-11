@@ -1,4 +1,4 @@
-import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRONT_DOOR, type Activity } from "@chessroyale/core";
 import { sha256, type Sql } from "./accounts.ts";
 import { liveHub } from "./live-hub.ts";
 import type { Env } from "./index.ts";
@@ -15,6 +15,8 @@ type Waiter = (p: Promise<unknown>) => void;
 const pending = new Map<string, number>();
 /** What the live line's own requests said about being in a match since the last batch (friends lists show it). */
 const busyPending = new Map<string, boolean>();
+/** What the live line's own requests said each account is doing (the friends page's "In Chess Town"). */
+const doingPending = new Map<string, Activity>();
 let flushedAt = 0;
 let flushTimer = false;
 
@@ -28,11 +30,13 @@ function flush(env: Pick<Env, "LIVE">, now: number): Promise<unknown> {
   const ids = [...pending.keys()];
   const at = Math.max(...pending.values());
   const busy = busyPending.size ? Object.fromEntries(busyPending) : undefined;
+  const doing = doingPending.size ? Object.fromEntries(doingPending) : undefined;
   pending.clear();
   busyPending.clear();
+  doingPending.clear();
   // (The hub answers with friends' news for any of them: their next live line from this instance says so.)
   return liveHub(env)
-    .seen(ids, at, busy)
+    .seen(ids, at, busy, doing)
     .then((news) => {
       for (const [id, t] of Object.entries(news ?? {})) rememberInbox(id, t);
     })
@@ -41,11 +45,12 @@ function flush(env: Pick<Env, "LIVE">, now: number): Promise<unknown> {
 
 /**
  * An account was heard from now. Passed on at once if the last batch went long enough ago, else with the next. `busy`:
- * the live line's request says whether its app is in a match (other requests leave it as it was).
+ * the live line's request says whether its app is in a match, and `doing` what it's doing (other requests leave both as they were).
  */
-export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, waitUntil: Waiter, busy?: boolean) {
+export function markSeen(env: Pick<Env, "LIVE">, userId: string, now: number, waitUntil: Waiter, busy?: boolean, doing?: Activity) {
   pending.set(userId, now);
   if (busy !== undefined) busyPending.set(userId, busy);
+  if (doing) doingPending.set(userId, doing);
   const since = now - flushedAt;
   if (since >= CAPACITY.presence.flushMs || pending.size >= 500) {
     waitUntil(flush(env, now));
