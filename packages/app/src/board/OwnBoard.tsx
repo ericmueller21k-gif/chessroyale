@@ -21,7 +21,7 @@
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import { BOARD } from "@chessroyale/core";
-import { haptic } from "../haptics.ts";
+import { haptic, hapticAtLift, hapticAtPress, type LiftTick } from "../haptics.ts";
 import { applyMove, inCheck, isChess960Fen, pieceAt, sideToMove, touchesDark } from "@chessroyale/chess";
 import { BoardTurn, coordLabel, type QuarterTurn } from "../board-view.ts";
 import { BRUSHES, FILES, NO_MARKS, SLIDE_MS, arrowColor, boardInputs, boardSize, cellOf, destsFor, drawArrows, follow, gestureMoves, highlightColor, marksEmpty, pieceClass, pickedUp, pieceCloseTo, positionKey, premoveDests, premovePieces, premoveQueueTurn, premoveSquares, pressDown, pressMove, pressUp, readPieces, refusedMove, slidePiece, squareAtPoint, stillRunning, toggleArrow, toggleSquare, userArrowShape, USER_ARROW, type BoardPiece, type Box, type PieceCode, type Premove, type Press, type PressBoard } from "./logic.ts";
@@ -283,6 +283,15 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   const pressMouse = useRef(false);
   /** When the press went down (Date.now()): let go within HAPTICS.holdMs, it was a tap. */
   const pressAt = useRef(0);
+  /** The press going down now (inside onDown), and a move's tick it made, kept for its lift on an iPhone (haptics.ts). */
+  const downNow = useRef<{ pointer: number; square: string } | null>(null);
+  const liftTick = useRef<LiftTick | null>(null);
+  /** A move's tick: as the finger lifts if a press-down made it (an iPhone's tick needs the lift), else at once. */
+  const moveTick = () => {
+    const d = downNow.current;
+    if (d) liftTick.current = hapticAtPress("move", d.pointer, d.square);
+    else haptic("move");
+  };
   /** A right-drag (an arrow, or a square's color where it started), and the square and color under it now. */
   const right = useRef<{ from: string; at: string | null; pointer: number; box: Box; mods: PointerEvent } | null>(null);
   const pieceEls = useRef(new Map<number, HTMLElement>());
@@ -313,7 +322,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       // (A pawn you can see reaching the last rank: you pick its piece. From the dark: a queen.)
       if (piece?.type === "p" && !s.darkList.includes(from) && (to[1] === "8" || to[1] === "1")) return setPromotion({ from, to, dark: true });
       acts.darkTry(from + to);
-      return haptic("move");
+      return moveTick();
     }
     const legal = gestureMoves(s.fen, moves, from, to);
     // (Hollow's dark takes a drop anywhere: an ordinary move that isn't on stays where it was.)
@@ -336,7 +345,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     local.current = { pieces: after, last: [from, to] };
     redraw();
     acts.move(legal[0]!);
-    haptic("move");
+    moveTick();
   };
 
   /** A move made ahead (a premove): its piece shows at once on its new square, both squares in the premove color. */
@@ -348,7 +357,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const many = pressMouse.current;
     if (s.shown.get(from)?.[1] === "p" && to[1] === (side === "w" ? "8" : "1")) return setPromotion({ from, to, premove: { key: s.ykey, side, many } });
     addPremove(s.ykey, { from, to }, many);
-    haptic("move");
+    moveTick();
   };
 
   /** A move from the board's gestures: made now, or ahead. */
@@ -447,6 +456,14 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onDown = (e: PointerEvent) => {
+    try {
+      pressedDown(e);
+    } finally {
+      downNow.current = null;
+    }
+  };
+
+  const pressedDown = (e: PointerEvent) => {
     if (small) return;
     // (A second finger: the drag in progress is let go.)
     if (press.current) {
@@ -460,6 +477,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
     const box = boxOf();
     const sq = squareAtPoint(e.clientX, e.clientY, box, s.orientation, s.turn);
     if (!sq) return;
+    downNow.current = { pointer: e.pointerId, square: sq };
     // (A mouse press on the board starts no text selection; a touch's scrolling is decided in onTouch, below.)
     if (mouse) e.preventDefault();
     pressMouse.current = mouse;
@@ -474,7 +492,7 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
       if (s.darkSel) {
         if (sq === s.darkSel) return void setDarkSel(null);
         setDarkSel(null);
-        if (!mine) return void (acts.darkTry(s.darkSel + sq), haptic("move"));
+        if (!mine) return void (acts.darkTry(s.darkSel + sq), moveTick());
       } else {
         const held = selected.current;
         if (held && sq !== held && mine) selected.current = null;
@@ -530,6 +548,13 @@ function BoardLayer({ fen, orientation, lastMove, interactive, moves, arrows, sm
   };
 
   const onUp = (e: PointerEvent) => {
+    // A move's tick kept for this finger's lift (an iPhone): it plays now, on the same square (haptics.ts).
+    const lt = liftTick.current;
+    if (lt && e.pointerId === lt.pointer) {
+      liftTick.current = null;
+      const s = live.current;
+      hapticAtLift(lt, e.pointerId, e.type === "pointerup" ? squareAtPoint(e.clientX, e.clientY, boxOf(), s.orientation, s.turn) : null);
+    }
     // A right-click let go: on its own square, that square's color; on another, an arrow; off the board, nothing.
     const rd = right.current;
     if (rd && e.pointerId === rd.pointer) {
