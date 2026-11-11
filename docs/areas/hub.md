@@ -219,7 +219,8 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     A computer's only (`LIVE_WINDOW_MEDIA`: 1280 px wide, 600 px tall, a mouse; never mounted on a phone or tablet)
     and always silent, whatever the sound setting (its board is `silent`; Eric, Oct 12).
 - **The live line** is GET `/api/live`: polled every `FRONT_DOOR.livePollMs` while a front-door screen shows it, every
-  `heartbeatMs` elsewhere (a match), never while the tab is hidden. The same request says you're here. Online = seen
+  `heartbeatMs` elsewhere (a match), never while the tab is hidden; a request with no answer is given up after `liveTimeoutMs` (10 s,
+  Nov 11: one that never answered stopped every later one, and the chats riding on it). The same request says you're here. Online = seen
   within `onlineWindowMs`. The numbers come from the live hub (see [ops.md](ops.md)). Squads' lobbies report to the
   hub too (Oct 15) but stay off this line: they count for the overload limit and the ops health view only.
 - **The queue screen:** the lobby's seats fill on screen (people, then bots popping in after the fill time), the wait

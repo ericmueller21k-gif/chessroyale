@@ -257,6 +257,16 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A pop-up's, menu's or sheet's key and tap-away listeners go in a layout effect, never `useEffect` (which waits for a paint): a
     test presses Escape the moment it is in the page (a MutationObserver), not after looking at it.
   - Such a watcher waits for that pop-up's own class: `index.html` always holds a hidden `[role="dialog"]` ("Turn your phone upright").
+- **The flaky batch of Nov 11, second half** (`docs/decisions/2026-11-11-flaky-batch.md`, batch 2):
+  - A layout read straight after `setViewportSize` can come before the app's ResizeObserver (which runs before the next paint): wait
+    for the boxes to hold over a few painted frames, then measure.
+  - A tap aimed at something on a moving camera (a glide, a zoom back out of a room) is read again once the point holds still: a
+    missed tap walks you off, and the camera follows you.
+  - A state that changes after the judge (a timer's minute, a meter) is read from a per-frame watcher, not a 5 s poll: the judge took
+    over 5 s on CI's desktop.
+  - A value whose `null` means "everything" (`allowed`: every legal move) is checked as everything, never assumed to be a list.
+  - An answer that can't be read is a failure, never `{}` taken for it; and a request the app waits on before asking again has a
+    timeout (`AbortSignal.timeout`): one that never answered stopped the live line and every chat riding on it.
 
 ## Eric's rules hold
 

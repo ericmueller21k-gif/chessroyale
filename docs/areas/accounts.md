@@ -217,3 +217,6 @@ offered, how long each answer lasts).
   answer in the same PR.
 - A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
   with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.
+- The app's `api()` (`account.ts`) never takes an answer it couldn't read for one: a 2xx that isn't a JSON object fails like a server
+  error (502, asked again where a server error is), so a cut-off `/api/me` never becomes a profile without its `user` (Nov 11:
+  every screen reading `profile.user` threw). `account-load.test.ts`.
