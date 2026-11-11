@@ -78,6 +78,12 @@ export interface BossIntro {
   cam?: { readonly south: number; readonly west: number; readonly zoom: number };
   /** What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet. */
   crewLine?: string;
+  /**
+   * Met inside, not brought in from the town (Don Dough, Nov 11: the kingpin stays in his back room; his challenge starts from his card
+   * there, Town.tsx challengeHere): you both come out through the door from the home's other room, beside each other, and walk to your
+   * marks in this one (his front room's pad).
+   */
+  fromDoor?: true;
 }
 
 /**
@@ -350,6 +356,20 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     layout: "across",
     custom: false,
     cues: { table: "pop", wipe: "clownSlideUp" },
+  },
+  // (Nov 11: Don Dough, met in his bakery's back room; the fight in its front room, on the pad: shops/intros/zebra.ts. Played once his
+  // boss is in the game, from his card there (shops.ts canChallengeInside); his line the art's battle start. You both walk out of the
+  // back door to where you stand (`seated`: no hop back) while his goons carry the table, chairs and board out (zebra-scene.ts
+  // SetupScene). His camera centred on the table so the five watching behind it show. His sounds a placeholder until his boss's round.)
+  zebra: {
+    name: "Don Dough",
+    line: "Hope you studied. Pop!",
+    layout: "across",
+    custom: true,
+    seated: true,
+    fromDoor: true,
+    cam: { south: 0.8, west: 0, zoom: 1 },
+    cues: { pop: "pop", wipe: "zebraThump" },
   },
 };
 

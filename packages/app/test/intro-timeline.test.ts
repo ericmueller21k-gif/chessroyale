@@ -23,6 +23,7 @@ import type { ShopPlace } from "../src/town/shops/room.ts";
  */
 type Log = { boss: string; length: number; attack: number | null; beats: [string, number, number | null][]; cues: [number, string][]; events: [number, string, string | number | boolean][] };
 const logOf = (id: string): Log => JSON.parse(readFileSync(new URL(`./intro-logs/${id}.json`, import.meta.url), "utf8"));
+const { ZEBRA_INTRO } = await import("../src/town/shops/intros/zebra.ts");
 const ROOMS: Record<string, { layout: readonly ShopPlace[]; marks: { boss: readonly [number, number]; you: readonly [number, number] } | null; data: IntroData }> = {
   alfil: { layout: SHOP_ALFIL_LAYOUT, marks: null, data: ALFIL_INTRO },
   bigboy: { layout: SHOP_BIGBOY_LAYOUT, marks: SHOP_BIGBOY_MARKS, data: BIGBOY_INTRO },
@@ -109,9 +110,10 @@ describe("intros as data: each moved intro plays as it did on main (its beat log
   it("every intro as data is found by its home's name (shops/intros/<home>.ts, its default export: intro.ts loads it so) and is a custom intro's", () => {
     const files = import.meta.glob<IntroData>(["../src/town/shops/intros/*.ts", "!../src/town/shops/intros/common.ts"], { eager: true, import: "default" });
     const homes = Object.keys(files).map((f) => f.replace(/^.*\/|\.ts$/g, "")).sort();
-    expect(homes).toEqual(Object.keys(ROOMS).sort());
+    // (Don Dough's, Nov 11, is new as data: it has no log from main to match. shop-zebra.test.ts plays it.)
+    expect(homes).toEqual([...Object.keys(ROOMS), "zebra"].sort());
     for (const h of homes) {
-      expect(files[`../src/town/shops/intros/${h}.ts`], h).toBe(ROOMS[h]!.data);
+      expect(files[`../src/town/shops/intros/${h}.ts`], h).toBe(ROOMS[h]?.data ?? ZEBRA_INTRO);
       expect(introOf(h as HomeId)?.custom, h).toBe(true);
     }
   });

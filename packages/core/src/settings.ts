@@ -1788,7 +1788,8 @@ export const BOSS_POWERS = {
  * them (the boss select, Boss alone and a Solo raid), until Eric says go. **To put one live for everyone, take its id out of
  * this list** (core boss.ts's `adminFirst`; nothing else changes).
  */
-export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash"];
+// (Nov 11: "zebra", Don Dough, before his boss is in the roster: his home, Rolling Dough, is in an admin's town only meanwhile.)
+export const BOSS_ADMIN_FIRST: readonly string[] = ["timber", "dash", "zebra"];
 
 /**
  * How Sawyer's split pawn looks (packages/app/src/components/Sawyer.tsx). Looks only: the rules, the engine and the

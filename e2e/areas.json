@@ -611,6 +611,10 @@
       "paths": ["e2e/town-afk.spec.ts", "packages/server/src/town-here.ts", "packages/server/src/town-here-api.ts", "packages/app/src/components/AwayNote.tsx"],
       "specs": ["e2e/town-afk.spec.ts"]
     },
+    "Rolling Dough, Don Dough's bakery (Nov 11: the front room, the back room and the door between them, the guards, the chatter, the talk beat)": {
+      "paths": ["e2e/zebra-home.spec.ts", "packages/app/src/town/shops/zebra-*.ts", "packages/app/src/town/shops/bakery-kit.ts", "packages/app/src/town/shops/intros/zebra.ts", "packages/app/src/town/houses/zebra.ts", "packages/app/src/characters/zebra-sounds.ts", "packages/app/src/characters/sidekicks/zebrakeeper.ts"],
+      "specs": ["e2e/zebra-home.spec.ts"]
+    },
     "Boingo's claw machine in his Funhouse (the play on the server, the cabinet in the room)": {
       "paths": ["packages/server/src/claw.ts", "packages/app/src/town/shops/boingo-art.ts", "packages/app/src/town/shops/claw-cabinet.ts", "packages/app/src/town/kit/models/claw-cabinet.ts"],
       "specs": ["e2e/claw.spec.ts", "e2e/shop.spec.ts"]
