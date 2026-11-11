@@ -408,6 +408,12 @@ a.town-btn.town-look {
   margin-bottom: 8px;
   font-style: italic;
 }
+/* A stand-in's line (Rolling Dough's guard out front, Nov 11): the card's full width and two lines' room kept from the start, so his
+   Talk never resizes the card (his longest line takes two). */
+.town-card-line.town-stand-in {
+  width: 206px;
+  min-height: calc(2em * 1.35);
+}
 /* The card's buttons on the dark card (the chat's menu keeps `.town-btn` as it was: it's a light box): a plain one is a dark gray
    with a gray border and white words, the primary one gold with dark words, a greyed one dimmer and flat (words 4.5:1 on it). */
 .town-card .town-btn {

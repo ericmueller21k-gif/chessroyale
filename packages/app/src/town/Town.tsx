@@ -488,7 +488,7 @@ export function TownScreen({
             {card && home && !card.confirm && card.kind === "boss" && !hasTownBoss(home) && (
               <>
                 <h2>{figureName(home)}</h2>
-                <p class="town-card-text town-card-line">{card.line ?? "\u00a0"}</p>
+                <p class="town-card-text town-card-line town-stand-in">{card.line ?? "\u00a0"}</p>
                 <button type="button" class="town-btn primary" onClick={() => ctl.current?.talk()}>
                   Talk
                 </button>
