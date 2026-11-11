@@ -9,6 +9,10 @@ import base from "../../playwright.config.ts";
  * (PW_CHROMIUM=/path/to/chrome where Playwright's own browser isn't installed.)
  * then scripts/encode-demo.sh joins the scenes into packages/app/public/media/hunchess-reel.{mp4,webm,jpg}.
  */
+const launchOptions = process.env.PW_CHROMIUM
+  ? { executablePath: process.env.PW_CHROMIUM }
+  : {};
+
 export default defineConfig({
   ...base,
   testDir: ".",
@@ -16,6 +20,33 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   timeout: 600_000,
-  webServer: { ...(base.webServer as object), cwd: resolve(import.meta.dirname, "../..") } as typeof base.webServer,
-  projects: [{ name: "reel", use: { browserName: "chromium", viewport: { width: 390, height: 844 }, deviceScaleFactor: 2.5, isMobile: true, hasTouch: true, colorScheme: "light", launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {} } }],
+  webServer: {
+    ...(base.webServer as object),
+    cwd: resolve(import.meta.dirname, "../.."),
+  } as typeof base.webServer,
+  projects: [
+    // The phone's reel: a phone at 2.5x (the reel is 860 px wide). The computer's: a 1920 × 1080 window (the game's computer layouts).
+    {
+      name: "reel",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 2.5,
+        isMobile: true,
+        hasTouch: true,
+        colorScheme: "light",
+        launchOptions,
+      },
+    },
+    {
+      name: "wide",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        colorScheme: "light",
+        launchOptions,
+      },
+    },
+  ],
 });

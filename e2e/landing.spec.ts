@@ -12,6 +12,33 @@ async function oldEnough(page: Page) {
   await page.getByRole("button", { name: "Continue" }).click();
 }
 
+test("landing on a computer: the 16:9 reel as the hero (70% of the width, at most 62% of the height), the sign-in beside it above the fold", async ({ page }) => {
+  test.skip(test.info().project.name !== "desktop", "a computer's layout");
+  await page.route("**/api/auth/config", (r) => r.fulfill({ json: signInOn }));
+  for (const [w, h] of [
+    [1280, 800],
+    [1440, 900],
+    [1920, 1080],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    const video = page.locator("video.demo-video");
+    await expect(video).toBeVisible();
+    // Only the computer's reel loads (Eric, Nov 11: "a wide rectangle on the computer… like a cinema").
+    await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentSrc)).toMatch(/\/media\/hunchess-reel-wide\.(mp4|webm)$/);
+    const box = (await video.boundingBox())!;
+    const want = Math.min(0.7 * w, ((0.62 * h) * 16) / 9);
+    expect(Math.abs(box.width - want), `${w}x${h}: ${box.width} wide, want ${want}`).toBeLessThan(2);
+    expect(Math.abs(box.width / box.height - 16 / 9)).toBeLessThan(0.01);
+    // The sign-in and the guest button are on screen without scrolling; nothing scrolls sideways.
+    for (const b of [page.getByRole("button", { name: "Continue" }), page.getByRole("button", { name: /Play vs \d+ bots as a guest/ })]) {
+      const r = (await b.boundingBox())!;
+      expect(r.y + r.height, `${w}x${h}`).toBeLessThanOrEqual(h);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(w);
+  }
+});
+
 test("landing: demo loop, sign-in, guests play bots only, FAQ and legal pages, invite links", async ({ page }) => {
   test.skip(test.info().project.name !== "phone", "one run is enough");
   await page.route("**/api/auth/config", (r) => r.fulfill({ json: signInOn }));

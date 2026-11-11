@@ -5,20 +5,28 @@
  * (marks.json, seconds from its first
  * frame), which scripts/encode-demo.sh cuts and joins. The Hidden Boss (scene 4) is pixel art drawn here, not a game screen; the
  * captions are drawn in the game's pixel font as see-through pictures (reports/demo/captions/).
- *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|ranks|hidden|captions]
+ *   npx playwright test -c scripts/reel/reel.config.ts [-g crowd|town|ranked|ranks|hidden|captions|landing; --project reel (the phone) or wide (a computer)]
  */
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { expect, type Browser, type Page } from "@playwright/test";
 // (The e2e's own `test`: every context starts with the first-time walkthrough and the quests overlay marked seen.)
 import { BOARD_SEL, test } from "../../e2e/helpers.ts";
-import { HIDDEN_BOSS_CAPTION, RANKS_CAPTION, REEL_CAPTIONS, drawHiddenBoss } from "./hidden-boss.ts";
+import {
+  HIDDEN_BOSS_CAPTION,
+  RANKS_CAPTION,
+  REEL_CAPTIONS,
+  drawHiddenBoss,
+} from "./hidden-boss.ts";
 import { drawRankShuffle, shuffleSteps } from "./rank-shuffle.ts";
 
 const OUT = "reports/demo";
+/** The computer's reel (the `wide` project: 1920 × 1080, the game's computer layouts) or the phone's. Its scenes go to `<scene>-wide`. */
+const isWide = () => test.info().project.name === "wide";
+const sfx = () => (isWide() ? "-wide" : "");
 
 /** Frames of `page` from now until `stop()`, written as JPEGs with their times; `mark(name)` notes a moment. */
 async function recorder(page: Page, scene: string) {
-  const dir = `${OUT}/${scene}`;
+  const dir = `${OUT}/${scene}${sfx()}`;
   let dropped = false;
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(`${dir}/frames`, { recursive: true });
@@ -28,12 +36,19 @@ async function recorder(page: Page, scene: string) {
   // Back-to-back sharp screenshots (at the page's pixel ratio) of the part the reel shows (the top 700 CSS px), each stamped with its time. (Chrome's
   // screencast would give every painted frame, but only at 1x in a headless browser.)
   const scale = await page.evaluate(() => devicePixelRatio);
+  // The part the reel shows: a phone's top 700 CSS px, or a computer's whole window.
+  const area = isWide() ? page.viewportSize()! : { width: 390, height: 700 };
   let capturing = true;
   const loop = (async () => {
     while (capturing) {
       const t = Date.now() / 1000;
       const shot = await cdp
-        .send("Page.captureScreenshot", { format: "jpeg", quality: Number(process.env.REEL_JPEG ?? 90), optimizeForSpeed: true, clip: { x: 0, y: 0, width: 390, height: 700, scale } })
+        .send("Page.captureScreenshot", {
+          format: "jpeg",
+          quality: Number(process.env.REEL_JPEG ?? 90),
+          optimizeForSpeed: true,
+          clip: { x: 0, y: 0, ...area, scale },
+        })
         .catch(() => null);
       if (!shot) continue;
       const file = `f${String(frames.length).padStart(5, "0")}.jpg`;
@@ -61,16 +76,24 @@ async function recorder(page: Page, scene: string) {
       await loop;
       // (Marks are in wall time since the start; the frames' own times start at the first frame: shift the marks onto those.)
       const first = frames[0]?.t ?? t0;
-      for (const k of Object.keys(marks)) marks[k] = Math.max(0, marks[k]! - (first - t0));
+      for (const k of Object.keys(marks))
+        marks[k] = Math.max(0, marks[k]! - (first - t0));
       const lines = ["ffconcat version 1.0"];
-      frames.forEach((f, i) => lines.push(`file frames/${f.file}`, `duration ${((frames[i + 1]?.t ?? f.t + 0.04) - f.t).toFixed(4)}`));
+      frames.forEach((f, i) =>
+        lines.push(
+          `file frames/${f.file}`,
+          `duration ${((frames[i + 1]?.t ?? f.t + 0.04) - f.t).toFixed(4)}`,
+        ),
+      );
       writeFileSync(`${dir}/frames.txt`, lines.join("\n") + "\n");
       writeFileSync(`${dir}/marks.json`, JSON.stringify(marks, null, 2));
       if (rename) {
-        rmSync(`${OUT}/${rename}`, { recursive: true, force: true });
-        renameSync(dir, `${OUT}/${rename}`);
+        rmSync(`${OUT}/${rename}${sfx()}`, { recursive: true, force: true });
+        renameSync(dir, `${OUT}/${rename}${sfx()}`);
       }
-      console.log(`${scene}: ${frames.length} frames over ${((frames.at(-1)?.t ?? first) - first).toFixed(1)} s`);
+      console.log(
+        `${scene}: ${frames.length} frames over ${((frames.at(-1)?.t ?? first) - first).toFixed(1)} s`,
+      );
     },
   };
 }
@@ -94,7 +117,10 @@ async function asAdmin(page: Page) {
     try {
       const res = await route.fetch();
       const body = await res.json().catch(() => null);
-      await route.fulfill({ response: res, json: body ? { ...body, admin: true } : body });
+      await route.fulfill({
+        response: res,
+        json: body ? { ...body, admin: true } : body,
+      });
     } catch {
       // The page is gone.
     }
@@ -109,11 +135,15 @@ test("crowd", async ({ page }) => {
   // Home: 50 v 50, Bots, PLAY, the Bot level box's OK (as e2e/helpers.ts soloFromHome).
   const row = page.getByRole("radiogroup", { name: "RANKED" });
   await row.getByRole("radio", { name: /^50 v 50/ }).click();
-  await page.getByRole("radiogroup", { name: "Matchmaking" }).getByRole("radio", { name: /^Bots/ }).click();
+  await page
+    .getByRole("radiogroup", { name: "Matchmaking" })
+    .getByRole("radio", { name: /^Bots/ })
+    .click();
   await page.getByRole("button", { name: "PLAY", exact: true }).click();
   const box = page.getByRole("dialog", { name: "Bot level" });
   const ok = box.getByRole("button", { name: "OK", exact: true });
-  if (await ok.isDisabled()) await box.getByRole("radio", { name: /^Medium/ }).click();
+  if (await ok.isDisabled())
+    await box.getByRole("radio", { name: /^Medium/ }).click();
   const rec = await recorder(page, "crowd");
   await ok.click();
   rec.mark("start");
@@ -122,7 +152,12 @@ test("crowd", async ({ page }) => {
   while (Date.now() < stopAt) {
     const state = await page.evaluate(() => {
       const m = (window as any).match;
-      return m ? { kind: m.phase.kind, key: m.phase.board ? `${m.phase.board.ply}` : "" } : { kind: "none", key: "" };
+      return m
+        ? {
+            kind: m.phase.kind,
+            key: m.phase.board ? `${m.phase.board.ply}` : "",
+          }
+        : { kind: "none", key: "" };
     });
     if (state.kind === "results") break;
     if (state.kind === "play" && state.key !== lastBoard) {
@@ -132,9 +167,18 @@ test("crowd", async ({ page }) => {
       await page.evaluate(async () => {
         const m = (window as any).match;
         if (m.phase.kind !== "play") return;
-        const top = await Promise.race([m.runner.topMovesFor(m.phase.board.fen), new Promise((r) => setTimeout(() => r(null), 4000))]);
+        const top = await Promise.race([
+          m.runner.topMovesFor(m.phase.board.fen),
+          new Promise((r) => setTimeout(() => r(null), 4000)),
+        ]);
         const fallback = [...(m.runner.planned?.values() ?? [])][0];
-        if (m.phase.kind === "play") m.submit(top ? (top as any)[Math.random() < 0.6 ? 0 : 1]?.move ?? (top as any)[0].move : fallback);
+        if (m.phase.kind === "play")
+          m.submit(
+            top
+              ? ((top as any)[Math.random() < 0.6 ? 0 : 1]?.move ??
+                  (top as any)[0].move)
+              : fallback,
+          );
       });
       rec.mark(`picked${state.key}`);
     }
@@ -173,24 +217,48 @@ test("town", async ({ page }) => {
     performance.now = () => map(real());
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => raf((ts) => cb(map(ts)));
-    (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp = (n: number) => {
+    (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp = (
+      n: number,
+    ) => {
       virt = map(real());
       base = real();
       k = n;
     };
   });
   await page.goto("/town?debug&nolanding&sky=day");
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute(
+    "data-ready",
+    "1",
+    { timeout: 30_000 },
+  );
   await page.waitForTimeout(2500);
-  const you = () => page.evaluate(() => (window as unknown as TownHooks).__townYou?.() ?? null);
+  const you = () =>
+    page.evaluate(() => (window as unknown as TownHooks).__townYou?.() ?? null);
   const walk = async (sq: [number, number]) => {
-    await page.evaluate((s) => (window as unknown as TownHooks).__townWalk?.(s), sq);
+    await page.evaluate(
+      (s) => (window as unknown as TownHooks).__townWalk?.(s),
+      sq,
+    );
     await page.waitForTimeout(150);
-    await expect.poll(async () => (await you())?.moving, { timeout: 20_000, intervals: [100] }).toBe(false);
+    await expect
+      .poll(async () => (await you())?.moving, {
+        timeout: 20_000,
+        intervals: [100],
+      })
+      .toBe(false);
   };
   console.log("you start at", await you());
-  const route = (process.env.REEL_PARK ?? "17,17 28,17 28,12 18,12 18,16").split(" ").map((p) => p.split(",").map(Number) as [number, number]);
-  const warp = (n: number) => page.evaluate((x) => (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp(x), n);
+  const route = (process.env.REEL_PARK ?? "17,17 28,17 28,12 18,12 18,16")
+    .split(" ")
+    .map((p) => p.split(",").map(Number) as [number, number]);
+  const warp = (n: number) =>
+    page.evaluate(
+      (x) =>
+        (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp(
+          x,
+        ),
+      n,
+    );
   await warp(0.5);
   const rec = await recorder(page, "town");
   rec.mark("park");
@@ -198,35 +266,57 @@ test("town", async ({ page }) => {
   rec.mark("parkEnd");
   await warp(1);
   // Big Boy: the camera glides to his Crib (as his chip would), a tap on him, Challenge alone, Fight.
-  await page.evaluate(() => (window as unknown as TownHooks).__townGlide?.("bigboy"));
+  await page.evaluate(() =>
+    (window as unknown as TownHooks).__townGlide?.("bigboy"),
+  );
   await page.waitForTimeout(1800);
   rec.mark("glided");
   const card = page.getByRole("dialog", { name: "Big Boy", exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
-    if (await page.getByRole("dialog").isVisible()) await page.keyboard.press("Escape");
-    const at = await page.evaluate(() => (window as unknown as TownHooks).__townAt?.("boss", "bigboy") ?? null);
-    if (!at) await page.evaluate(() => (window as unknown as TownHooks).__townGlide?.("bigboy"));
+    if (await page.getByRole("dialog").isVisible())
+      await page.keyboard.press("Escape");
+    const at = await page.evaluate(
+      () =>
+        (window as unknown as TownHooks).__townAt?.("boss", "bigboy") ?? null,
+    );
+    if (!at)
+      await page.evaluate(() =>
+        (window as unknown as TownHooks).__townGlide?.("bigboy"),
+      );
     expect(at).not.toBeNull();
     const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
     await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 30_000 });
   rec.mark("card");
-  await expect.poll(async () => (await you())?.moving, { timeout: 30_000 }).toBe(false);
+  await expect
+    .poll(async () => (await you())?.moving, { timeout: 30_000 })
+    .toBe(false);
   await page.waitForTimeout(600);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   await page.waitForTimeout(700);
   rec.mark("confirm");
-  await page.getByRole("dialog", { name: "Challenge Big Boy?" }).getByRole("button", { name: "Fight" }).click();
+  await page
+    .getByRole("dialog", { name: "Challenge Big Boy?" })
+    .getByRole("button", { name: "Fight" })
+    .click();
   rec.mark("fight");
-  await expect(page.locator("canvas.town-shop-canvas")).toHaveAttribute("data-room", "bigboy", { timeout: 30_000 });
+  await expect(page.locator("canvas.town-shop-canvas")).toHaveAttribute(
+    "data-room",
+    "bigboy",
+    { timeout: 30_000 },
+  );
   rec.mark("room");
   const steps = new Set<string>();
   const until = Date.now() + 40_000;
   while (Date.now() < until) {
-    const s = await page.evaluate(() => (window as unknown as TownHooks).__shopIntro?.()?.step ?? null);
-    const m = await page.evaluate(() => (window as any).match?.phase?.kind ?? null);
+    const s = await page.evaluate(
+      () => (window as unknown as TownHooks).__shopIntro?.()?.step ?? null,
+    );
+    const m = await page.evaluate(
+      () => (window as any).match?.phase?.kind ?? null,
+    );
     if (s && !steps.has(s)) {
       steps.add(s);
       rec.mark(`intro:${s}`);
@@ -250,7 +340,9 @@ async function rankedPlayer(browser: Browser, name: string, rank: string) {
   await setUp(page, name);
   await asAdmin(page);
   await page.goto(`/?nolanding&rank=${rank}`);
-  await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "PLAY", exact: true }),
+  ).toBeVisible();
   return page;
 }
 
@@ -267,32 +359,60 @@ test("ranked", async ({ browser }) => {
   await a.goto(`/1v1?nolanding&debug&pool=${pool}&rank=gold-2`);
   both("search");
   await b.goto(`/1v1?nolanding&debug&pool=${pool}&rank=gold-3`);
-  for (const p of [a, b]) await expect(p.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible({ timeout: 30_000 });
+  for (const p of [a, b])
+    await expect(p.locator(".dv-versus .dv-st-them .dv-st-pawn")).toBeVisible({
+      timeout: 30_000,
+    });
   both("versus");
-  for (const p of [a, b]) await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 15_000 });
+  for (const p of [a, b])
+    await expect(p.locator(".dv-vote")).toBeVisible({ timeout: 15_000 });
   both("vote");
   await a.waitForTimeout(800);
   for (const p of [a, b]) {
     await p.locator(".vote-me").click();
     await p.getByRole("button", { name: "Pick Blitz 3+2" }).click();
   }
-  for (const p of [a, b]) await expect(p.locator(".dv-status")).toContainText(/first move/, { timeout: 20_000 });
+  for (const p of [a, b])
+    await expect(p.locator(".dv-status")).toContainText(/first move/, {
+      timeout: 20_000,
+    });
   both("play");
-  const side = async (p: Page) => (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as "w" | "b";
+  const side = async (p: Page) =>
+    (await p.locator(".dv-strip.dv-you").getAttribute("data-side")) as
+      | "w"
+      | "b";
   const white = (await side(a)) === "w" ? a : b;
   const black = white === a ? b : a;
   const rec = white === a ? recA : recB;
   await (white === a ? recB : recA).drop();
   const squareAt = async (p: Page, sq: string) => {
-    const box = (await p.locator(`.board-area ${BOARD_SEL.squares}`).boundingBox())!;
+    const box = (await p
+      .locator(`.board-area ${BOARD_SEL.squares}`)
+      .boundingBox())!;
     const w = (await side(p)) === "w";
     const f = sq.charCodeAt(0) - 97;
     const r = Number(sq[1]) - 1;
     const col = w ? f : 7 - f;
     const row = w ? 7 - r : r;
-    return { x: box.x + ((col + 0.5) * box.width) / 8, y: box.y + ((row + 0.5) * box.height) / 8 };
+    return {
+      x: box.x + ((col + 0.5) * box.width) / 8,
+      y: box.y + ((row + 0.5) * box.height) / 8,
+    };
   };
-  const line = ["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d4", "f3d4", "g8f6", "b1c3", "a7a6", "c1e3", "e7e5"];
+  const line = [
+    "e2e4",
+    "c7c5",
+    "g1f3",
+    "d7d6",
+    "d2d4",
+    "c5d4",
+    "f3d4",
+    "g8f6",
+    "b1c3",
+    "a7a6",
+    "c1e3",
+    "e7e5",
+  ];
   for (const [i, uci] of line.entries()) {
     const p = i % 2 === 0 ? white : black;
     await p.waitForTimeout(500 + Math.random() * 700);
@@ -312,7 +432,7 @@ test("hidden", async ({ page }) => {
   // Scene 4: the Hidden Boss, pixel art (hidden-boss.ts) on the app's own page (its fonts), its loop recorded as the others.
   await page.goto("/?nolanding");
   await page.waitForTimeout(1000);
-  await page.evaluate(drawHiddenBoss);
+  await page.evaluate(drawHiddenBoss, isWide());
   const rec = await recorder(page, "hidden");
   rec.mark("start");
   await page.waitForTimeout(7000);
@@ -326,38 +446,56 @@ test("ranks", async ({ page }) => {
   await page.waitForTimeout(800);
   const rec = await recorder(page, "ranks");
   rec.mark("start");
-  await page.evaluate(drawRankShuffle, shuffleSteps());
+  await page.evaluate(drawRankShuffle, { ...shuffleSteps(), wide: isWide() });
   await page.waitForTimeout(5500);
   rec.mark("end");
   await rec.stop();
 });
 
 test("captions", async ({ page }) => {
-  // The captions: one see-through picture each, 860 px wide (the reel's width: 344 CSS px at 2.5x), in the game's pixel font.
-  mkdirSync(`${OUT}/captions`, { recursive: true });
-  await page.setViewportSize({ width: 344, height: 600 });
+  // The captions: one see-through picture each, as wide as the reel (the phone's 860 px: 344 CSS px at 2.5x; the computer's 1920, on
+  // one line, big enough to read from a few feet away), in the game's pixel font.
+  const wide = isWide();
+  const dir = `${OUT}/captions${sfx()}`;
+  mkdirSync(dir, { recursive: true });
+  await page.setViewportSize(
+    wide ? { width: 1920, height: 1080 } : { width: 344, height: 600 },
+  );
   await page.goto("/?nolanding");
   await page.waitForTimeout(800);
-  for (const [i, text] of [...REEL_CAPTIONS, HIDDEN_BOSS_CAPTION, RANKS_CAPTION].entries()) {
-    await page.evaluate((t) => {
-      document.body.innerHTML = "";
-      document.documentElement.style.background = "transparent";
-      document.body.style.cssText = "margin:0;background:transparent";
-      const d = document.createElement("div");
-      d.id = "cap";
-      d.style.cssText =
-        "position:absolute;left:0;right:0;top:0;padding:10px 12px;font:14px/1.7 'Press Start 2P',monospace;text-align:center;color:#f4b740;" +
-        "text-shadow:2px 0 0 #1a1406,-2px 0 0 #1a1406,0 2px 0 #1a1406,0 -2px 0 #1a1406,2px 2px 0 #1a1406;" +
-        "background:rgba(14,15,19,0.78);border-top:2px solid #f4b740;border-bottom:2px solid #f4b740;white-space:pre-line";
-      d.textContent = t;
-      document.body.append(d);
-    }, text);
+  for (const [i, text] of [
+    ...REEL_CAPTIONS,
+    HIDDEN_BOSS_CAPTION,
+    RANKS_CAPTION,
+  ].entries()) {
+    await page.evaluate(
+      ([t, w]) => {
+        document.body.innerHTML = "";
+        document.documentElement.style.background = "transparent";
+        document.body.style.cssText = "margin:0;background:transparent";
+        const d = document.createElement("div");
+        d.id = "cap";
+        d.style.cssText =
+          `position:absolute;left:0;right:0;top:0;padding:${w ? "22px 24px" : "10px 12px"};font:${w ? 44 : 14}px/1.7 'Press Start 2P',monospace;` +
+          "text-align:center;color:#f4b740;" +
+          (w
+            ? "text-shadow:4px 0 0 #1a1406,-4px 0 0 #1a1406,0 4px 0 #1a1406,0 -4px 0 #1a1406,4px 4px 0 #1a1406;"
+            : "text-shadow:2px 0 0 #1a1406,-2px 0 0 #1a1406,0 2px 0 #1a1406,0 -2px 0 #1a1406,2px 2px 0 #1a1406;") +
+          `background:rgba(14,15,19,0.78);border-top:${w ? 4 : 2}px solid #f4b740;border-bottom:${w ? 4 : 2}px solid #f4b740;white-space:pre-line`;
+        d.textContent = w ? t.replace(/\s*\n\s*/g, " ") : t;
+        document.body.append(d);
+      },
+      [text, wide] as const,
+    );
     await page.evaluate(() => document.fonts.ready);
-    await page.locator("#cap").screenshot({ path: `${OUT}/captions/c${i + 1}.png`, omitBackground: true });
+    await page
+      .locator("#cap")
+      .screenshot({ path: `${dir}/c${i + 1}.png`, omitBackground: true });
   }
 });
 
 test("landing", async ({ browser }) => {
+  test.skip(isWide(), "once, in the phone project");
   // The landing page with the reel at its new size: phones 320, 390 and 430 wide, computers 1280 × 800, 1440 × 900 and 1920 × 1080.
   // Stills to reports/demo/landing/, and the video's box and any sideways scroll, logged.
   mkdirSync(`${OUT}/landing`, { recursive: true });
@@ -370,17 +508,43 @@ test("landing", async ({ browser }) => {
     { w: 1920, h: 1080, phone: false },
   ];
   for (const s of sizes) {
-    const ctx = await browser.newContext({ viewport: { width: s.w, height: s.h }, deviceScaleFactor: s.phone ? 2 : 1, isMobile: s.phone, hasTouch: s.phone, colorScheme: "light" });
+    const ctx = await browser.newContext({
+      viewport: { width: s.w, height: s.h },
+      deviceScaleFactor: s.phone ? 2 : 1,
+      isMobile: s.phone,
+      hasTouch: s.phone,
+      colorScheme: "light",
+    });
     const page = await ctx.newPage();
     // (The landing shows only where sign-in is set up: faked, as e2e/landing.spec.ts does.)
-    await page.route("**/api/auth/config", (r) => r.fulfill({ json: { accounts: true, google: true, email: true, onlineNeedsSignIn: true } }));
+    await page.route("**/api/auth/config", (r) =>
+      r.fulfill({
+        json: {
+          accounts: true,
+          google: true,
+          email: true,
+          onlineNeedsSignIn: true,
+        },
+      }),
+    );
     await page.goto("/");
     const video = page.locator("video.demo-video");
     await expect(video).toBeVisible();
     await page.waitForTimeout(1500);
     const box = (await video.boundingBox())!;
-    const scroll = await page.evaluate(() => document.documentElement.scrollWidth);
-    console.log(`${s.w}x${s.h}: video ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)} × ${Math.round(box.height)} (${Math.round((box.height / s.h) * 100)}% of the height); page ${scroll} wide`);
+    const scroll = await page.evaluate(
+      () => document.documentElement.scrollWidth,
+    );
+    const src = await video.evaluate((v: HTMLVideoElement) =>
+      v.currentSrc.split("/").pop(),
+    );
+    const signIn = await page
+      .getByRole("button", { name: /Play vs \d+ bots as a guest/ })
+      .boundingBox();
+    console.log(
+      `${s.w}x${s.h}: ${src} ${Math.round(box.x)},${Math.round(box.y)} ${Math.round(box.width)} × ${Math.round(box.height)} (${Math.round((box.width / s.w) * 100)}% wide, ` +
+        `${Math.round((box.height / s.h) * 100)}% high); guest button's bottom ${Math.round(signIn!.y + signIn!.height)}; page ${scroll} wide`,
+    );
     await page.screenshot({ path: `${OUT}/landing/landing-${s.w}x${s.h}.png` });
     await ctx.close();
   }

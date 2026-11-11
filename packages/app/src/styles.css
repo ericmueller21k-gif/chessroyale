@@ -4305,6 +4305,48 @@ button.history-label {
     max-width: 720px;
   }
 }
+/* A computer (Eric, Nov 11: "a wide rectangle on the computer… like a cinema… a much larger size of the entire screen"): the 16:9
+   reel is the hero, about 70% of the window's width and at most 62% of its height, centered under the title; the sign-in a compact
+   panel to its right, or under it where the two don't fit side by side (below 1200 px). */
+@media (min-width: 1024px) {
+  .screen.landing {
+    width: min(100vw, 1800px);
+  }
+  .landing-head {
+    text-align: center;
+    justify-items: center;
+  }
+  .landing-main {
+    grid-template-columns: auto;
+    justify-content: center;
+    justify-items: center;
+    align-items: start;
+    gap: 20px;
+  }
+  .landing-actions {
+    width: min(100%, 420px);
+  }
+  .faq {
+    width: min(100%, 720px);
+    margin-inline: auto;
+  }
+  .demo-video.wide {
+    width: min(70vw, calc(62vh * 16 / 9));
+    height: auto;
+    aspect-ratio: 16 / 9;
+    border-radius: 16px;
+  }
+}
+@media (min-width: 1200px) {
+  .landing-main {
+    grid-template-columns: auto 300px;
+    gap: 28px;
+  }
+  .landing-actions {
+    width: 300px;
+    align-self: center;
+  }
+}
 /* Narrow phones: the email box gets its own line. */
 .signin-options .signin-row {
   flex-wrap: wrap;
