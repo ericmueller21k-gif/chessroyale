@@ -1,3 +1,4 @@
+- Nov 11 23:35: area banner mockup sent; waiting Eric OK. Then ONE helper builds banner + room music (after an Opus slot frees).
 - Nov 11 23:30: Eric: boss figures on the Boss Battle stage too small -> ~1.5x. Spotted: Don Dough tile shows emoji (zebra missing in SELECT_FRAMING/TINT). Haiku helper on claude/select-stage-size.
 - Nov 11 23:25: Eric: boss dock: stack God King over pawn when tight; Jefferson fireworks strip cut off at right -> move into his boss card horizontally. Helper (Opus high) on claude/dock-stack. (2 Opus high running: Babur + dock.)
 - Nov 11 23:20: Eric: Babur mating showed Hollow's dark matter on the tile (bug). Helper (Opus high) on claude/babur-mate-vibration: that bug + grey Vibration on iPhone ("Not available on iPhone", Eric OK).
