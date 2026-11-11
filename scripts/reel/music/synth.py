@@ -147,6 +147,48 @@ class Mix:
         kw.setdefault("attack", 0.012), kw.setdefault("sustain", 0.75), kw.setdefault("decay", 0.12), kw.setdefault("release", 0.04)
         return self.add(m, beats, self.REED, vol, vib=0.005, **kw)
 
+    # ---- leads Eric picked by ear (Nov 11, from seven tried on the woodshop songs): "Fiddle, gritty, both great, square too" ----
+    def tone(self, m, beats, harm, vol, detune=(0.0,), vib=0.0, vib_hz=5.5, scoop=0.0, scoop_s=0.03, attack=0.02, release=0.03,
+             trem=0.0, trem_hz=6.0, bright=None) -> np.ndarray:
+        """A held note built from its harmonics: `detune` cents, a copy each; `vib` once the note settles; `scoop`
+        semitones: it slides up into the note from that far under; `trem`: the level wobbles; `bright` (s): the upper
+        harmonics die away that fast."""
+        k = self.k(beats)
+        t = np.arange(k) / self.sr
+        out = np.zeros(k)
+        for c in detune:
+            f = self.hz(m + c / 100) * (1 + vib * np.sin(2 * np.pi * vib_hz * t) * np.clip((t - 0.1) / 0.12, 0, 1)) * 2 ** (-scoop * np.exp(-t / scoop_s) / 12)
+            ph = 2 * np.pi * np.cumsum(f) / self.sr
+            for i, a in enumerate(harm):
+                if a == 0 or self.hz(m) * (i + 1) > 0.45 * SR:
+                    continue
+                w = a * np.sin((i + 1) * ph + 0.7 * i)
+                out += w * (0.25 + 0.75 * np.exp(-t * i / (bright * 3))) if bright is not None and i > 0 else w
+        env = np.minimum(1, t / attack) * np.minimum(1, (k - 1 - np.arange(k)) / (release * self.sr))
+        if trem:
+            env = env * (1 - trem * (0.5 - 0.5 * np.cos(2 * np.pi * trem_hz * t)))
+        return out / len(detune) * env * vol
+
+    BOWED = [1, 0.72, 0.55, 0.42, 0.3, 0.24, 0.18, 0.13, 0.1, 0.07, 0.05]
+
+    def fiddle(self, m, beats, vol=0.145) -> np.ndarray:
+        """A fiddle: a bowed string, a little slide up into each note, vibrato on the long ones (a quarter second up)."""
+        long = beats * self.beat_s >= 0.24
+        return self.tone(m, beats, self.BOWED, vol, vib=0.01 if long else 0.0, vib_hz=6.0, scoop=0.6 if long else 0.25, scoop_s=0.025,
+                         attack=0.04 if long else 0.014)
+
+    def gritty(self, m, beats, vol=0.21) -> np.ndarray:
+        """A drum-and-bass lead: three sawtooths a hair apart, driven hard, each note opening bright and closing."""
+        w = self.tone(m, beats, [1 / h for h in range(1, 17)], 1.0, detune=(-14, 0, 13), scoop=0.5, scoop_s=0.02, attack=0.006, release=0.02, bright=0.12)
+        return np.tanh(2.2 * w) * vol
+
+    def chip(self, m, beats, vol=0.15) -> np.ndarray:
+        """The old console's lead: a quarter pulse, vibrato on the long notes, with a square an octave under it."""
+        long = beats * self.beat_s >= 0.3
+        k = self.k(beats)
+        top = self.pulse(m, beats, 0.25, vol, vib=0.012 if long else 0.0, decay=0.2, sustain=0.6, release=0.008)
+        return top + self.pulse(m - 12, beats, 0.5, 0.4 * vol, decay=0.2, sustain=0.6, release=0.008)[:k]
+
     def drive(self, m, beats, vol=0.15, vib=0.007, vib_hz=4.2, attack=0.07, release=0.04, top=8500.0) -> np.ndarray:
         """An overdriven lead, the 16-bit consoles' lead-guitar sound, built from measurements of a reference's lead
         (Eric, Nov 11; no sample of it is used): every harmonic present, those up to 1.5 kHz all about 3 dB under the

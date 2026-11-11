@@ -2,8 +2,11 @@
 beaver are the same so theirs can feel similar ... make theirs the same just swap the overlaying melody, no tone
 sounds, use a drum kit. Chopping wood sounds/knocks, lots of drum and bass, earthy tones, things you'd hear in a busy
 woodshop."
-My reading of "no tone sounds": no synth voices at all (no pulse waves, bells, strings or flutes). Everything here is
-a drum kit, a bass, wood and tools; the tunes are on tuned wood (a marimba and a xylophone).
+The tunes were first on tuned wood (a marimba and a xylophone, my reading of "no tone sounds"); Eric: "whatever the
+heck is playing it I don't like it sounds really basic", and of seven others tried, "Fiddle, gritty, both great,
+square too, add them all in somehow ... and replace the instruments in both you used". So the tunes are on a fiddle,
+a gritty driven synth and the old console's square lead (synth.py's `fiddle`, `gritty`, `chip`), all three in both
+songs, in different seats.
 176 beats a minute, a drum-and-bass break: 352 beats = 88 bars = 120.0 s. E Dorian (E F# G A B C# D), the tunes mostly on
 its five-note scale (E G A B D); the bass moves the root (E, G, A, D, B, and C in the calm).
 The kit: kick, snare (and ghost strokes), hats, three toms, a rim click, a crash. The bass: a deep note driven so small
@@ -12,21 +15,21 @@ The woodshop: an axe chopping (a crack, a thock, the split), a hand saw's stroke
 a hammer on a nail (three taps rising as the nail goes in), wood knocks, planks tumbling, a drill, a table saw
 spinning up and biting into a board, wood creaking under strain, and a tree coming down.
 The fast pattern under it all: logs in 16ths, zigzagging up the scale like a saw's teeth.
-Sawyer's tunes are on the marimba, low, with the xylophone answering; the beaver's are on the xylophone, high and
-chattering (his woodpecker foreman), with the marimba answering. `compose(who)` makes either.
+Sawyer's: the fiddle leads; the gritty synth takes the low calls and the drop's tune, the square the third tune and
+the harmonies. The beaver's: the square leads, high and chattering (his woodpecker foreman); the fiddle takes the
+drop's tune and the harmonies, the gritty synth the low answers and the third tune. `compose(who)` makes either.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
-  python3 song_p.py <out.wav> [voice]      (Sawyer's)      python3 song_q.py <out.wav> [voice]      (the beaver's)
-  voice: another instrument for the lead: fiddle, harmonica, dulcimer, handpan, flute, gritty, square or drive
+  python3 song_p.py <out.wav>      (Sawyer's)      python3 song_q.py <out.wav>      (the beaver's)
 
   bars  1-8    the shop wakes: an axe alone; a hand saw; sandpaper, a hammer, the logs; the table saw spins up and cuts
   bars  9-16   the tune over the break and the bass
   bars 17-24   the tune's second half, higher; sandpaper and 16th hats; a drill, planks tumbling
-  bars 25-32   half the pace: the low and the high instrument call and answer over long sliding bass notes
+  bars 25-32   half the pace: a low voice and a high one call and answer over long sliding bass notes
   bars 33-36   the table saw spins up under a roll and the axe; wood creaks; the cut
   bars 37-44   a tree comes down, and the second tune over the hardest beat and a driving bass
   bars 45-52   drum and bass alone, the tools trading with them; then toms
-  bars 53-60   the calm: the kit out; the tune at half speed, rolled, over sandpaper and long saw strokes; the saw again
-  bars 61-68   the tune's first half, both instruments in harmony
+  bars 53-60   the calm: the kit out; the tune at half speed over sandpaper and long saw strokes; the saw again
+  bars 61-68   the tune's first half, two voices in harmony
   bars 69-76   a third tune trading bars with the toms and the tools
   bars 77-84   the tune's second half in harmony over the hardest beat
   bars 85-88   the tune's start, a run down, planks tumbling, and the table saw winding down into bar 1's axe
@@ -167,9 +170,8 @@ RIFFS = {
 }
 
 
-def compose(who: str, voice: str | None = None) -> np.ndarray:
-    """The whole song as a stereo mix: the same woodshop for both, `who`'s tunes over it ("sawyer" or "beaver").
-    `voice`: another instrument for the lead (see VOICES below), for Eric to choose from."""
+def compose(who: str) -> np.ndarray:
+    """The whole song as a stereo mix: the same woodshop for both, `who`'s tunes over it ("sawyer" or "beaver")."""
     x = Mix(SECS, BEATS, os=2, seed=149)
     put = x.put
     rng = np.random.default_rng(19)
@@ -365,7 +367,7 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
         elif taps:
             hammer(b + 1.5, 0, 0.16 * vol), knock(b + 2.75, 520, 0.14 * vol, -0.3)
 
-    # ---- wood you can play ----
+    # ---- the logs ----
     def wood(m, vol, decay, bright=0.3, ratio=4.0):
         k = int(decay * 5 * sr)
         t = np.arange(k) / sr
@@ -380,13 +382,15 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
             s = (0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5, 3, 4, 2, 3, 1)[i]
             put("logs", bar * 4 + i * 0.25, wood(n(root) + scale[s % 5] + 12 * (s // 5), vol * (1.0 if i % 4 == 0 else 0.7), 0.07, 0.5, 3.0), 0.4 if i % 2 else -0.4)
 
-    def marimba(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        put(bus, b, wood(m, 0.3 * vol, 0.24, 0.3, 4.0), pan)
-        put(bus, b, wood(m + 12, 0.18 * vol, 0.16, 0.3, 4.0), pan)  # in octaves, so it carries over the kit
+    # The three leads (synth.py's): each plays the note it is given; `d` the note's length in beats.
+    def fiddle(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        put(bus, b, x.fiddle(m, d * (0.97 if d >= 0.75 else 0.9), 0.145 * vol), pan)
 
-    def xylo(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        put(bus, b, wood(m, 0.34 * vol, 0.11, 0.55, 3.0), pan)
-        put(bus, b, wood(m - 12, 0.1 * vol, 0.16, 0.3, 4.0), pan)
+    def gritty(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        put(bus, b, x.gritty(m, d * 0.92, 0.21 * vol), pan)
+
+    def square(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        put(bus, b, x.chip(m, d * 0.9, 0.15 * vol), pan)
 
     def third(m):
         """The note two steps up the key."""
@@ -395,91 +399,10 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
             return m + 3
         return m + (DORIAN[(DORIAN.index(pc) + 2) % 7] - pc) % 12
 
-    def sing(inst, bus, start, text, vol=1.0, up=0, pan=0.0, roll=False, harmony=False):
-        """A line on the marimba or the xylophone; `roll`: a long note is struck over and over, as a player holds one;
-        `harmony`: each note's third instead of the note."""
+    def sing(inst, bus, start, text, vol=1.0, up=0, pan=0.0, harmony=False):
+        """A line on one of the leads, `up` semitones from where it is written; `harmony`: each note's third instead."""
         for b, d, m in line(start, text):
-            m = (third(m) if harmony else m) + up
-            inst(b, m, vol, pan, bus, d)
-            if roll and d >= 1.5 and inst not in HELD:
-                for j in range(1, int(d / 0.25)):
-                    inst(b + j * 0.25, m, vol * 0.5, pan, bus, 0.25)
-
-    # ---- other leads (Eric, on the marimba and xylophone: "sounds really basic"; these are his choices) ----
-    def tone(m, beats, harm, vol, detune=(0.0,), vib=0.0, vib_hz=5.5, scoop=0.0, scoop_s=0.03, attack=0.02, release=0.03, trem=0.0, trem_hz=6.0, bright=None):
-        """A held note built from its harmonics: `detune` cents, a copy each; `vib` once the note settles; `scoop`
-        semitones: it slides up into the note from that far under; `trem`: the level wobbles; `bright` (s): the
-        upper harmonics die away that fast."""
-        k = x.k(beats)
-        t = np.arange(k) / sr
-        out = np.zeros(k)
-        for c in detune:
-            f = x.hz(m + c / 100) * (1 + vib * np.sin(tau * vib_hz * t) * np.clip((t - 0.1) / 0.12, 0, 1)) * 2 ** (-scoop * np.exp(-t / scoop_s) / 12)
-            ph = tau * np.cumsum(f) / sr
-            for i, a in enumerate(harm):
-                if a == 0 or x.hz(m) * (i + 1) > 0.45 * 48000:
-                    continue
-                w = a * np.sin((i + 1) * ph + 0.7 * i)
-                out += w * (0.25 + 0.75 * np.exp(-t * i / (bright * 3))) if bright is not None and i > 0 else w
-        env = np.minimum(1, t / attack) * np.minimum(1, (k - 1 - np.arange(k)) / (release * sr))
-        if trem:
-            env = env * (1 - trem * (0.5 - 0.5 * np.cos(tau * trem_hz * t)))
-        return out / len(detune) * env * vol
-
-    FIDDLE = [1, 0.72, 0.55, 0.42, 0.3, 0.24, 0.18, 0.13, 0.1, 0.07, 0.05]
-    REEDS = [1, 0.5, 0.7, 0.3, 0.5, 0.2, 0.35, 0.12, 0.2, 0.08, 0.12]
-    STRUCK = [1, 0.8, 0.6, 0.5, 0.4, 0.3, 0.22, 0.16, 0.12, 0.09, 0.07, 0.05]
-    SAWS = [1 / h for h in range(1, 17)]
-
-    def fiddle(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A fiddle: a bowed string, a little slide up into each note, vibrato on the long ones."""
-        long = d >= 0.75
-        put(bus, b, tone(m + 12, d * (0.97 if long else 0.9), FIDDLE, GAIN["fiddle"] * vol, vib=0.01 if long else 0.0, vib_hz=6.0,
-                         scoop=0.6 if long else 0.25, scoop_s=0.025, attack=0.04 if long else 0.014), pan)
-
-    def harmonica(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A harmonica: two reeds a hair apart, bent up into each note, the hand's wobble on the long ones, breath."""
-        long = d >= 0.75
-        w = tone(m + 12, d * 0.95, REEDS, GAIN["harmonica"] * vol, detune=(-6, 6), scoop=0.9 if long else 0.4, scoop_s=0.04, attack=0.018, trem=0.25 if long else 0.0, trem_hz=6.5)
-        put(bus, b, w + hiss(len(w), 7000, 0.6) * np.minimum(1, np.arange(len(w)) / (0.02 * sr)) * tail(len(w), 0.03) * 0.12 * GAIN["harmonica"] * vol, pan)
-
-    def dulcimer(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A hammered dulcimer: bright strings in pairs a hair apart, struck and left to ring."""
-        w = tone(m + 12, d + 1.2, STRUCK, GAIN["dulcimer"] * vol, detune=(-8, 7), attack=0.003, release=0.05, bright=0.16)
-        put(bus, b, w * np.exp(-np.arange(len(w)) / sr / 0.26), pan)
-
-    def handpan(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A handpan: a steel bowl struck with the fingers: the note, its octave and the fifth over that, each fading
-        at its own pace."""
-        k = int(1.2 * sr)
-        t = np.arange(k) / sr
-        f = tau * x.hz(m) * t
-        w = np.sin(f) * np.exp(-t / 0.45) + 0.6 * np.sin(2.003 * f) * np.exp(-t / 0.3) + 0.4 * np.sin(2.997 * f) * np.exp(-t / 0.2) + 0.12 * np.sin(4.1 * f) * np.exp(-t / 0.08)
-        put(bus, b, (w + 0.25 * hiss(k, 3000) * np.exp(-t / 0.004)) * np.minimum(1, t / 0.003) * tail(k) * GAIN["handpan"] * vol, pan)
-
-    def flute_marimba(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A wooden flute with the marimba an octave under it."""
-        marimba(b, m, 0.7 * vol, pan, bus)
-        put(bus, b, x.flute(m + 12, max(d * 0.95, 0.2), GAIN["flute"] * vol), pan + 0.2)
-
-    def gritty(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """A drum-and-bass lead: three sawtooths a hair apart, driven hard, each note opening bright and closing."""
-        w = tone(m, d * 0.92, SAWS, 1.0, detune=(-14, 0, 13), scoop=0.5, scoop_s=0.02, attack=0.006, release=0.02, bright=0.12)
-        put(bus, b, np.tanh(2.2 * w) * GAIN["gritty"] * vol, pan)
-
-    def square(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """The old console's lead: a pulse wave, vibrato on the long notes, a square an octave under."""
-        put(bus, b, x.pulse(m + 12, d * 0.9, 0.25, GAIN["square"] * vol, vib=0.012 if d >= 1 else 0.0, decay=0.2, sustain=0.6, release=0.008), pan)
-        put(bus, b, x.pulse(m, d * 0.9, 0.5, 0.4 * GAIN["square"] * vol, decay=0.2, sustain=0.6, release=0.008), pan)
-
-    def driven(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
-        """The overdriven lead measured from Eric's reference (synth.py's `drive`)."""
-        put(bus, b, x.drive(m, d * 0.96, GAIN["drive"] * vol), pan)
-
-    # Each one's level, set by measurement so they all sit where the marimba does.
-    GAIN = {"fiddle": 0.145, "harmonica": 0.2, "dulcimer": 0.276, "handpan": 0.22, "flute": 0.19, "gritty": 0.21, "square": 0.15, "drive": 0.152}
-    VOICES = {"fiddle": fiddle, "harmonica": harmonica, "dulcimer": dulcimer, "handpan": handpan, "flute": flute_marimba, "gritty": gritty, "square": square, "drive": driven}
-    HELD = (fiddle, harmonica, flute_marimba, gritty, square, driven)  # these hold a long note; the others are struck again
+            inst(b, (third(m) if harmony else m) + up, vol, pan, bus, d)
 
     # ---- the bass ----
     def bass(b, m, beats, vol=0.42, slide=0.0):
@@ -664,27 +587,42 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
     power_saw(348, 3.6, 380, 45, 0.12, up=False)
     hammer(350.5, 0, 0.14), hammer(351, 2, 0.16), knock(351.5, 420, 0.16, -0.3)
 
-    # ======== the tunes ========
+    # ======== the tunes: the fiddle, the gritty synth and the square, all three in both songs ========
     tunes = TUNES[who]
-    lead, answer = (marimba, xylo) if who == "sawyer" else (xylo, marimba)
-    lead = VOICES[voice] if voice else lead
-    far = 12 if who == "sawyer" else -12  # where the answering instrument sits against the lead
     first, second = "|".join(tunes["tune"].split("|")[:8]), "|".join(tunes["tune"].split("|")[8:])
-    sing(lead, "lead", 32, tunes["tune"])  # bars 9-24
-    sing(lead, "lead", 96, tunes["call"][0])  # bars 25-32: the call and the answer
-    sing(answer, "answer", 96, tunes["call"][1], pan=0.3)
-    sing(lead, "lead", 144, tunes["second"])  # bars 37-44, the other instrument an octave off
-    sing(answer, "answer", 144, tunes["second"], vol=0.4, up=far, pan=0.3)
-    sing(lead, "lead", 208, tunes["calm"], vol=0.85, roll=True)  # bars 53-60
-    sing(lead, "lead", 240, first)  # bars 61-68, in harmony
-    sing(answer, "answer", 240, first, vol=0.5, up=far, pan=0.3, harmony=True)
-    sing(lead, "lead", 272, tunes["third"])  # bars 69-76
-    sing(answer, "answer", 296, "|".join(tunes["third"].split("|")[6:]), vol=0.4, up=far, pan=0.3)  # its last two bars, both
-    sing(lead, "lead", 304, second)  # bars 77-84, in harmony and octaves
-    sing(answer, "answer", 304, second, vol=0.5, up=far, pan=0.3, harmony=True)
-    sing(answer, "answer", 304, second, vol=0.3, up=far, pan=-0.3)
-    sing(lead, "lead", 336, tunes["end"])  # bars 85-87
-    sing(answer, "answer", 336, tunes["end"], vol=0.35, up=far, pan=0.3)
+    last_two = "|".join(tunes["third"].split("|")[6:])
+    if who == "sawyer":  # his tunes are written low (E4 to A5)
+        sing(fiddle, "lead", 32, tunes["tune"], up=12)  # bars 9-24: the fiddle
+        sing(gritty, "lead", 96, tunes["call"][0])  # bars 25-32: the gritty synth calls, low; the fiddle answers, high
+        sing(fiddle, "answer", 96, tunes["call"][1], pan=0.3)
+        sing(gritty, "lead", 144, tunes["second"])  # bars 37-44, the drop: the gritty synth, the square an octave over it
+        sing(square, "answer", 144, tunes["second"], vol=0.5, up=12, pan=0.3)
+        sing(fiddle, "lead", 208, tunes["calm"], vol=0.85, up=12)  # bars 53-60: the fiddle alone, long notes
+        sing(fiddle, "lead", 240, first, up=12)  # bars 61-68: the fiddle, the square in harmony
+        sing(square, "answer", 240, first, vol=0.45, up=12, pan=0.3, harmony=True)
+        sing(square, "lead", 272, tunes["third"])  # bars 69-76: the square; the gritty synth joins its last two bars
+        sing(gritty, "answer", 296, last_two, vol=0.5, pan=0.3)
+        sing(fiddle, "lead", 304, second, up=12)  # bars 77-84: the fiddle, the gritty synth an octave under, the square in harmony
+        sing(gritty, "answer", 304, second, vol=0.5, pan=-0.3)
+        sing(square, "answer", 304, second, vol=0.4, up=12, pan=0.3, harmony=True)
+        sing(fiddle, "lead", 336, tunes["end"], up=12)  # bars 85-87
+        sing(gritty, "answer", 336, tunes["end"], vol=0.5, pan=0.3)
+    else:  # the beaver's are written high (B4 to B6)
+        sing(square, "lead", 32, tunes["tune"])  # bars 9-24: the square, chattering
+        sing(square, "lead", 96, tunes["call"][0], up=-12)  # bars 25-32: the square calls; the gritty synth answers, low
+        sing(gritty, "answer", 96, tunes["call"][1], pan=0.3)
+        sing(fiddle, "lead", 144, tunes["second"])  # bars 37-44, the drop: the fiddle, the gritty synth an octave under
+        sing(gritty, "answer", 144, tunes["second"], vol=0.5, up=-12, pan=0.3)
+        sing(square, "lead", 208, tunes["calm"], vol=0.8)  # bars 53-60: the square alone, long notes
+        sing(square, "lead", 240, first)  # bars 61-68: the square, the fiddle in harmony
+        sing(fiddle, "answer", 240, first, vol=0.5, pan=0.3, harmony=True)
+        sing(gritty, "lead", 272, tunes["third"], up=-12)  # bars 69-76: the gritty synth; the square joins its last two bars
+        sing(square, "answer", 296, last_two, vol=0.5, pan=0.3)
+        sing(square, "lead", 304, second)  # bars 77-84: the square, the fiddle in harmony, the gritty synth an octave under
+        sing(fiddle, "answer", 304, second, vol=0.5, pan=0.3, harmony=True)
+        sing(gritty, "answer", 304, second, vol=0.45, up=-12, pan=-0.3)
+        sing(square, "lead", 336, tunes["end"])  # bars 85-87
+        sing(gritty, "answer", 336, tunes["end"], vol=0.5, up=-12, pan=0.3)
 
     # The bass (and, lightly, the logs) ducks under each kick.
     marks = x.buses.pop("duck")[0]
@@ -694,15 +632,13 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
     x.buses["bass"] *= gain
     x.buses["logs"] *= 0.6 + 0.4 * gain
 
-    if voice == "drive":
-        x.echo("lead", 0.75, 0.14, 0.06)  # the old console's echo on its lead
     levels = {"snare": 1.7, "hats": 2.3, "toms": 0.9, "drum": 1.5, "bass": 0.58, "logs": 1.9, "sawing": 1.15, "taps": 2.2, "fx": 1.2, "lead": 0.85, "answer": 0.85}
     return x.mixdown(levels, lowpass=8500, room=0.12)
 
 
-def main(out: str, voice: str | None = None) -> None:
-    write_wav(out, compose("sawyer", voice))
+def main(out: str) -> None:
+    write_wav(out, compose("sawyer"))
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:3])
+    main(sys.argv[1])
