@@ -1,5 +1,5 @@
 /**
- * The kingpin (working id `zebra`, `boss-zebra`; his name is Eric's call): the zebra who runs "just a bakery" (Eric's design,
+ * Don Dough (Eric named him Nov 11; working id `zebra`, `boss-zebra`), the kingpin: the zebra who runs "just a bakery" (Eric's design,
  * Nov 10; drawn by hand on the weekly plan usage). A zebra with a big pudgy belly, standing upright as the giraffes do: a
  * charcoal fedora with a red band (his ears up behind it), a burgundy pinstripe vest straining over the belly (gold buttons,
  * little gaps pulled open, his stripes peeking out under its hem), a white waist apron tied under the belly, flour dust on the
@@ -14,7 +14,7 @@
  * BOSS_ZEBRA_PORTRAIT: the part of `idle` frame 0 a portrait shows (his head and hat).
  */
 import type { Anim, Character, Frame, Speck } from "../../../../packages/app/src/characters/sprite.ts";
-import { ARMS, build, crumbFall, FOOT, frame, H, hahas, PARTS, puff, stars, W, ZEBRA_PALETTE, type Built, type Look, type Pose, type Pt } from "../crew-zebra/zebra-rig.ts";
+import { ARMS, build, crumbFall, doughLump, FOOT, frame, H, hahas, PARTS, puff, stars, W, ZEBRA_PALETTE, type Built, type Look, type Pose, type Pt } from "../crew-zebra/zebra-rig.ts";
 
 export const KINGPIN: Look = { id: "zk", hat: "fedora", top: "pin", boss: true, seed: 1 };
 const K = KINGPIN;
@@ -279,6 +279,26 @@ const relaxFrames = (seated: boolean): Anim => {
 const relax = relaxFrames(false);
 const sitRelax = relaxFrames(true);
 
+/**
+ * drop (Rising Dough): he dips a hoof into his apron pocket, comes up with a lump of raw dough, gives it a little toss in his
+ * hoof, winds back and lobs it out to our right toward the board (cue `drop` f5, as it leaves his hoof), a smug look after it.
+ * The lump leaves the frame's right side at about (90, 34) on f7; the board then plays ZEBRA_DOUGH `land` on its square.
+ */
+const drop: Anim = {
+  loop: false,
+  frames: [
+    f(140, { ...REST, eyes: "open" }),
+    f(150, { ...REST, armN: [[5, 12], [9, 21]], eyes: "fwd", hy: 1, mouth: "pout" }),
+    f(150, { ...REST, armN: [[8, 6], [12, 2]], eyes: "half", mouth: "smirk" }, { specks: (b) => doughLump([b.hoofN[0] + 1, b.hoofN[1] - 3]) }),
+    f(110, { ...REST, armN: [[8, 4], [12, -3]], eyes: "half", mouth: "smirk" }, { specks: (b) => doughLump([b.hoofN[0] + 1, b.hoofN[1] - 8], 1) }),
+    f(150, { ...REST, armN: [[2, -4], [-3, -11]], eyes: "fwd", mouth: "grin", hx: -1 }, { specks: (b) => doughLump([b.hoofN[0], b.hoofN[1] - 3]) }),
+    f(80, { ...REST, armN: [[9, -3], [16, -8]], eyes: "fwd", mouth: "open", hx: 1 }, { cue: "drop", specks: (b) => doughLump([b.hoofN[0] + 6, b.hoofN[1] - 4], 1) }),
+    f(80, { ...REST, armN: [[9, 0], [16, 3]], eyes: "fwd", mouth: "grin", hx: 1 }, { specks: () => doughLump([76, 30], 0) }),
+    f(80, { ...REST, armN: [[9, 2], [15, 6]], eyes: "half", mouth: "grin", hx: 1 }, { specks: () => doughLump([89, 34], 1) }),
+    f(260, { ...REST, eyes: "half", mouth: "smirk", brows: "one" }),
+  ],
+};
+
 // ---- At the back room's table (seated on a chair 11 px up; his roll lies on the table: ZEBRA_ROLL `table`).
 
 const SIT: Pose = { sit: 11, armN: ARMS.belly, armF: ARMS.bellyF, eyes: "half", mouth: "smirk" };
@@ -321,14 +341,14 @@ const sitScoff: Anim = {
 
 export const BOSS_ZEBRA: Character = {
   id: "boss-zebra",
-  name: "The kingpin",
+  name: "Don Dough",
   w: W,
   h: H,
   foot: FOOT,
   palette: ZEBRA_PALETTE,
   halo: "#3a3440",
   parts: PARTS,
-  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, cheer, bigCheer, victory, defeat, breadPop, volley, relax, sitTalk, sitListen, sitScoff, sitRelax },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, cheer, bigCheer, victory, defeat, breadPop, volley, relax, drop, sitTalk, sitListen, sitScoff, sitRelax },
 };
 /** The part of `idle` frame 0 a portrait shows (his head, ears and fedora), in frame px. */
 export const BOSS_ZEBRA_PORTRAIT = { x: 22, y: 22, w: 40, h: 36 } as const;

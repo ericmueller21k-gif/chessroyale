@@ -86,6 +86,9 @@ export const ZEBRA_PALETTE: Record<string, string> = {
   ":": "#b9c4ce",
   "!": "#8fd3ff", // a drop of sweat
   "*": "#fffbe8", // a pop's white-hot heart
+  "<": "#fff6e0", // raw dough (Don Dough's lump): lit, mid, shade
+  ">": "#ecd4a0",
+  "?": "#c9a466",
   "-": "#0d0e1280", // ground shadow: core, rim
   "+": "#0d0e1244",
 };
@@ -879,6 +882,20 @@ export function breadstick([x, y]: Pt, tilt = 0): { specks: Speck[]; tip: Pt } {
     out.push([px, py, i % 3 === 1 ? "%" : "9"], [px, py + 1, i === 6 ? "9" : "7"]);
   }
   return { specks: out, tip: [Math.round(x + 8), Math.round(y + 6 * dy - 1)] };
+}
+/** A lump of raw dough in the air or a hoof at (x, y), about 6 px across, `squish`: flattened a little (a wobble in flight). */
+export function doughLump([x, y]: Pt, squish = 0): Speck[] {
+  const out: Speck[] = [];
+  const rx = 3.2 + squish * 0.6;
+  const ry = 3 - squish * 0.6;
+  for (let j = -4; j <= 4; j++)
+    for (let i = -4; i <= 4; i++) {
+      const d = Math.hypot(i / (rx + 1), j / (ry + 1));
+      const din = Math.hypot(i / rx, j / ry);
+      if (din <= 1) out.push([x + i, y + j, i + j < -1 ? "<" : i + j > 1 ? "?" : ">"]);
+      else if (d <= 1) out.push([x + i, y + j, "k"]);
+    }
+  return out;
 }
 /** Dizzy stars round (x, y), `t` frames on. */
 export function stars([x, y]: Pt, t: number): Speck[] {

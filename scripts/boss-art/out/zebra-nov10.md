@@ -1,9 +1,10 @@
-# The zebra bakery's characters (Nov 10): the kingpin, his five crew, the bread rifle, the puff, the bread splash
+# The zebra bakery's characters (Nov 10-11): Don Dough, his five crew, the bread rifle, the puff, the bread splash, Rising Dough
 
 **Eric's design (Nov 10, `notes/zebra-eric.md`):** a mob that runs "just a bakery", really chess-obsessed nerds; the zebras are
 the giraffes' rivals. They stand upright like the giraffes and hold big French rolls two-handed like rifles. The kingpin has a
 big pudgy belly. His battle start: he pulls the roll, "fires" at you (a little *pop*), and laughs. His God King save is the
-same, as rapid fire. Working id **`zebra`**; his name is Eric's call and appears nowhere in the art.
+same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)** and gave him his passive, **Rising Dough**
+("Eric, Nov 11" in `notes/zebra-eric.md`); its art is the last section here.
 
 **Drawn by hand** on the weekly plan usage (no API spend). Art only: nothing is wired into the game.
 
@@ -11,17 +12,20 @@ same, as rapid fire. Working id **`zebra`**; his name is Eric's call and appears
 | Folder | Exports | What |
 |---|---|---|
 | `crew-zebra/zebra-rig.ts` | `build`, `frame`, `ZEBRA_PALETTE`, `PARTS`, `ARMS`, `paintRoll`, `ZEBRA_TABLE_TOP` | The one zebra, dressed six ways (as `npc-grex/giraffe-rig.ts` is for the giraffes) |
-| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | The kingpin: 20 animations |
+| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`, name "Don Dough"), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | Don Dough: 21 animations |
 | `crew-zebra/crew-zebra.ts` | `NPC_ZEBRA_GUARD_A`, `_GUARD_B`, `NPC_ZEBRA_CREW_C`, `_D`, `_E`, `ZEBRA_WATCH_FRAME`, `LOOKS` | The five crew |
 | `zebra-props/zebra-props.ts` | `ZEBRA_ROLL`, `INTRO_ZEBRA_PUFF`, `INTRO_ZEBRA_STORM`, `INTRO_ZEBRA_FRONT` | The roll on its own, the muzzle puff, the splash |
+| `zebra-props/zebra-dough.ts` | `ZEBRA_DOUGH`, `ZEBRA_TIMER`, `KINDS` | Rising Dough: the dough on the board, the oven timer |
 
 **Pictures** (all on the game's dark ground):
 - `zebra-sheet.png`: the dealer giraffe (left, for scale), then the kingpin and the five crew, feet on one line, at 3x.
-- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 20).
+- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 21).
 - `crew-zebra/frames-guards.png` and `frames-table.png` (2x); `crew-zebra/gifs/<anim>.gif` (3x, each with every crew member
   that has it, side by side); `back-room-chatter.gif` (the kingpin's `sitScoff` beside C talking, D listening, E arguing).
 - `zebra-props/props.png` (the roll lying and leaning, the puff's frames, 4x), `splash.png` (two tiles and the front, 3x),
   `gifs/splash.gif`, `gifs/puff.gif` (6x).
+- `zebra-props/dough.png` and `timer.png` (4x); `zebra-props/gifs/dough-proof.gif`, `dough-rise.gif`, `dough-squash.gif`,
+  `dough-land.gif`, `timer-roll.gif`, `timer-ding.gif` (6x).
 - Make them again: `scripts/boss-art/zebra-stills.ts` (`sheet`, `gif`; its header has the usage).
 
 ## Size, frame and feet
@@ -34,7 +38,7 @@ same, as rapid fire. Working id **`zebra`**; his name is Eric's call and appears
   - The table pokes land about 24 px over the foot, at about (54, 76). A table top drawn there matches.
   - `ZEBRA_TABLE_TOP` is 27, a park table's height.
 
-## The kingpin (`BOSS_ZEBRA`)
+## Don Dough, the kingpin (`BOSS_ZEBRA`)
 **The look:**
 - A charcoal fedora with a red band, flour-dusted, his ears up behind it.
 - A burgundy pinstripe vest straining over the belly: gold buttons, little gaps pulled open, his stripes peeking out under its hem.
@@ -63,6 +67,7 @@ same, as rapid fire. Working id **`zebra`**; his name is Eric's call and appears
 | **`volley`** | 8 x 70-80 ms, 0.6 s, loops | **`volley` f0** | His God King save: aimed, rapid fire. The roll kicks up and back, four puffs a loop drifting off, a mad grin, the belly shaking. To start from his rest, play `breadPop` f1-f4 (the pull) first, or cut straight in. |
 | **`relax`** | 6, 1.0 s | **`relax` f1** | Standing: a calm-down pat of the air to his crew, "easy, easy", eyes half shut, a smile |
 | `sitRelax` | 6, 1.0 s | `relax` f1 | The same, seated |
+| **`drop`** | 9, 1.2 s | **`drop` f5** | Rising Dough: a hoof into his apron pocket, up with a lump of raw dough, a little toss in his hoof, a wind-back and a lob out to our right (it leaves the frame at about (90, 34) on f7), a smug look after it. The board then plays `ZEBRA_DOUGH` `land` on its square |
 | `sitTalk` | 10, 1.5 s, loops | `tap` f4, f6 | Seated, gesturing, then two pokes at the table ("rook b1 takes, check") |
 | `sitListen` | 10, 2.3 s, loops | none | Seated, hooves on the belly, a nod, then one brow up |
 | `sitScoff` | 8, 1.4 s, loops | `tsk` f1 | He's always right: chin up, eyes shut, a hoof raised and wagged, "no, no, no", then an open hoof |
@@ -125,6 +130,42 @@ same, as rapid fire. Working id **`zebra`**; his name is Eric's call and appears
   - **No flashing:** the haze never changes brightness. The rolls turn 30° a frame, the boules 15°. It is no faster than
     the other wipes.
 
+## Rising Dough (`zebra-props/zebra-dough.ts`)
+Eric: he drops lumps of dough that show what they'll become; squash them before they rise. The timer counts "minutes" that
+are moves, one off for every move (yours and his), with "a cool millisecond drop down where it looks like all of a sudden a
+minute passed".
+
+**`ZEBRA_DOUGH`: 32 x 32, foot [16, 31].** It is a board square's effect frame (`effects/common.ts` `SQUARE`), its base on the
+square's bottom middle, drawn at the board's square size. For each kind `k` (p, n, b, r, q):
+
+| Animation | Frames, length | Cues | What it does |
+|---|---|---|---|
+| `land` (any kind) | 4, 0.3 s | `plop` f2 | A plain lump drops in from above, stretches, plops flat with a little flour, settles. Then show `k` |
+| `k` | 4 x 320 ms, loops | none | Raw dough shaped roughly like the piece, proofing (a slow breath), flour on its lit side |
+| `kRise` | 8, 0.9 s | `rise` f0, `pop` f4 | It swells and browns to a golden crust, then pops in a ring of flour that thins out. Draw his real piece on the square from f4; the flour clears over it |
+| `kSquash` | 6, 0.6 s | `squash` f0 | Pressed flat as your piece lands on it: a pancake with splats, a puff of flour round your piece (drawn on top by the board), the pancake fading |
+
+- The shapes, at square size:
+  - pawn: a ball on a collar;
+  - knight: a horse's head looking left, an eye and a mane line;
+  - bishop: a tall dome with a slit and a tip;
+  - rook: a block with three crenels;
+  - queen: a slim body under a fan of five crown points.
+- The baked frames stay inside the square.
+
+**`ZEBRA_TIMER`: 38 x 22, foot [19, 20].** One per dough, shown on his side:
+- **Sizes:** 2x on a phone (76 x 44 CSS px), 3x on a computer (114 x 66). Stack them down his side, the newest at the bottom.
+- **The look:** a white kitchen timer with a red button. The dough's kind is printed on its left. A green-grey LCD shows MM:00
+  in seven-segment digits (the unlit segments show faintly). From 01:59 down the digits are red.
+
+| Animation | Frames, length | Cues | What it does |
+|---|---|---|---|
+| `kNN` (NN 00-15) | 1, still | none | Shows NN:00 (e.g. `n07`, `q15`) |
+| `kRollNN` (NN 01-15) | 7, 0.25 s | `roll` f0 | The drop from NN:00: the minute goes and the seconds race 59, 47, 36, 24, 13, 05, 00 in a blink. It ends showing (NN-1):00, the same as `k(NN-1)` |
+| `kDing` | 6, 0.8 s | `ding` f0 | At 00:00: the LCD flashes dark and light, bell lines ring off its top, a jiggle. Then play the dough's `kRise` |
+
+Eric's times (pawn 4, knight and bishop 7, rook 10, queen 15) fit: the timer goes to 15.
+
 ## Cues for the sound round
 None of these have sounds yet.
 
@@ -143,6 +184,12 @@ None of these have sounds yet.
 | `flick` | guard A's `guard` f6 | The giraffe dealer's toothpick flick |
 | `thud`, `tip`, `point`, `hurt`, `snap` | his `entrance`, `move`, `hurt`, `defeat` | A belly-flop thud, a hat brim's soft tick, a little *hm*, an "oof", a crusty *crack* as the roll snaps |
 | `tumble`, `whoosh` | the splash's storm f0, front f0 | A soft floury rush, a whoosh |
+| `drop` | Don Dough's `drop` f5 | A soft *whup* of a lump of dough lobbed |
+| `plop` | `ZEBRA_DOUGH` `land` f2 | A wet, doughy *plop* on the board |
+| `roll` | `ZEBRA_TIMER` `kRollNN` f0 | A fast electronic tick-roll, a quick trill of beeps falling (about 0.2 s, quiet: it plays every move) |
+| `ding` | `ZEBRA_TIMER` `kDing` f0 | A kitchen timer's *ding-ding* (bright, short, not a harsh alarm) |
+| `rise`, `pop` | `ZEBRA_DOUGH` `kRise` f0, f4 | A soft swelling *fwoomp*, then a light oven *pop* with a puff |
+| `squash` | `ZEBRA_DOUGH` `kSquash` f0 | A squishy *splat* with a flour puff |
 
 ## Calls for Eric
 1. **The kingpin's look**:
@@ -167,14 +214,19 @@ None of these have sounds yet.
 6. **Zebras stand a head under the giraffes** (about 69 px to 79): the rivals look up at them. They can be made taller.
 7. **Four at the back table** is the kingpin and C, D, E. The two guards stay in the front room.
 8. **The splash is light** (a cream flour haze) where the others are dark or icy, so the golden loaves read.
-9. **Gameplay ideas** (Eric asked for suggestions; his call, not drawn):
+9. **Rising Dough:**
+   - The dough is raw-dough cream, shaped like its piece; the rise browns it before the pop.
+   - The timer's kind icon is printed on it, so each timer matches its dough.
+   - The last minute is red, and the seconds race on every move: 0.25 s, so a move never waits on it.
+10. **Gameplay ideas** (from before his passive was chosen; the ultimate is still open, "something with the black and white cookie"):
    - *Bread Line*: a row of pieces is "on hold" (frozen) for a turn.
    - *Crumb Trail*: a capture leaves a crumb square the next piece to land on loses its turn.
    - *Hot Out of the Oven*: his ultimate drops a loaf on three squares; pieces there are blocked for two turns.
    - The `volley` art fits a several-square strike.
 
 ## For the code round
-- Register `BOSS_ZEBRA` in `characters/index.ts` and its kit (portrait `BOSS_ZEBRA_PORTRAIT` from `idle` f0).
+- Register `BOSS_ZEBRA` (Don Dough) in `characters/index.ts` and its kit (portrait `BOSS_ZEBRA_PORTRAIT` from `idle` f0).
+- Rising Dough: `drop` (him), then `ZEBRA_DOUGH` `land` and `k` on the square; each move plays the timer's `kRollNN`; at 00:00 `kDing` then `kRise`; your piece landing on it plays `kSquash`.
 - `breadPop` is the battle start; `volley` is the God King save.
 - Add the sounds above in a `zebra-sounds.ts`. They must pass `boss-sounds-finite.test.ts`, and they should be quiet: the
   five-way `draw` happens at once.
