@@ -1,3 +1,4 @@
+- Nov 11 08:14: #635 fix round pushed + prepped (99284a1; watcher bp5whch7f); body updated; fix helper archived. Also found: friends page never polled the live line (watchLive added). Merge when green (full-e2e label on).
 - Nov 11 08:00: #638 room perf MERGED (f0d709b). Town-loading helper branched from it: tell it to merge main before .done.
 - Nov 11 07:56: #635 WIP run: the 5 lobby tests now PASS (query kept); friends.spec:39/:136 need the URL regex (told helper). New flake: town-chat-history.spec:57 (failed 12.5 s, passed on retry) -> flaky batch.
 - Nov 11 07:48: #638 room perf opened (d6ade2a; watcher b1dzxuem1): Eric's room 42-44 and exit 2-4 fps were the ?fps pill (no room counter); room floor cached when still (4x slow 21->59 fps). Town loading helper session_01JuCWRrmmD2bNndv5fvWLcj (Opus high) on claude/town-loading from town-room-perf. Room-perf helper archived.
