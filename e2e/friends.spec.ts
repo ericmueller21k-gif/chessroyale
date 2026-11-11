@@ -26,7 +26,7 @@ async function player(browser: Browser, name: string): Promise<{ page: Page; id:
 async function openFriends(page: Page) {
   if (isComputer()) await page.locator(".fr-panel").getByRole("button", { name: "All friends ›" }).click();
   else {
-    await page.locator(".fd-top .fd-ring").click();
+    await page.locator(".fd-hero-profile").click();
     await page.getByRole("button", { name: /^Friends/ }).click();
   }
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();

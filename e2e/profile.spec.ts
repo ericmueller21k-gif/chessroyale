@@ -48,8 +48,8 @@ test("your profile: tap your pawn; the same structure as anyone's, with your own
   // Home names your 1 v 1 rank under your name, the tier in its color; no rating rank's name (retired Oct 28).
   await expect(page.locator(".fd-hero-sub")).toHaveText("Paragon 5 · 45 RP");
   await expect(page.locator(".fd-hero-sub .fd-rank")).toHaveText("Paragon 5");
-  // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await expect(page.getByRole("heading", { name: "Eric" })).toBeVisible();
   await expect(page.getByText("Online now")).toBeVisible();
   // The card: the 1 v 1 rank's pill, then the rating's number alone.
@@ -221,7 +221,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   // (No crate holds a ride yet; only admins have them. Given straight, as admins will own them.)
   await giveItems(page, [{ def: "riding-chirp", color: "cobalt", blemish: 40 }]);
   await page.reload();
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await page.getByRole("button", { name: "Open locker" }).click();
   const previews = page.locator(".locker-preview .locker-avatar");
   // (One pawn in the preview since Nov 7, in your default color; it was two, white and black.)
@@ -250,7 +250,7 @@ test("rides (Oct 31): the locker's Ride tab wears one; the preview's pawns ride 
   await expect.poll(pic, { timeout: 5_000 }).not.toBe(first);
   // Your profile: your pawn rides it, and Wearing lists it with its slot. (The locker's Back goes home.)
   await page.getByRole("button", { name: "Back", exact: true }).first().click();
-  await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+  await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
   await expect(page.locator('.fd-card .avatar.riding[data-ride="riding-chirp"]')).toHaveCount(1);
   await expect(page.locator(".fd-item").filter({ hasText: "Riding Chirp" })).toContainText("Ride · Cobalt · 60% pure");
   // Off again: the pawn alone, in the same boxes.
@@ -279,12 +279,10 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   await wearItem(page, "ride", ride!);
   await page.reload();
   await expect(page.locator(".fd-hero .avatar.riding[data-ride=\"riding-chirp\"]")).toHaveCount(1);
-  // A computer's side menu's Profile item rides too (its top right ring went, Nov 7). A phone's top bar shows your pawn's face,
-  // still: never riding (Eric, Nov 9).
-  if (await page.locator(".fd-top-face:visible").count()) {
-    await expect(page.locator(".fd-top-face .avatar")).toHaveCount(1);
-    await expect(page.locator(".fd-top-face .avatar.riding")).toHaveCount(0);
-  } else await expect(page.locator(".fd-side .fd-menu-icon:visible .avatar.riding")).toHaveCount(1);
+  // A computer's side menu's Profile item rides too (its top right ring went, Nov 7). A phone has no pawn up top since Nov 11
+  // (its profile is the card's "View profile"): nothing of yours rides in the top bar.
+  if (await page.locator(".fd-side .fd-menu-icon:visible").count()) await expect(page.locator(".fd-side .fd-menu-icon:visible .avatar.riding")).toHaveCount(1);
+  else await expect(page.locator(".fd-top .avatar")).toHaveCount(0);
   await page.evaluate(() => document.fonts.ready);
   expect(await boxes(), "nothing grew or moved when the pawn mounted").toEqual(before);
   // The ride fills the pawn's own box and its idle plays.
@@ -300,7 +298,7 @@ test("rides on home (Nov 1): the big pawn and your ring ride Riding Chirp, its i
   expect(await riding.getAttribute("data-scale")).toBe("0.75");
   await page.goto("/?rideScale=1");
   await expect(page.locator('.fd-hero .avatar.riding[data-scale="1"]')).toHaveCount(1);
-  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount((await page.locator(".fd-top-face:visible").count()) ? 0 : 1);
+  await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-scale="1"]')).toHaveCount((await page.locator(".fd-side .fd-menu-icon:visible").count()) ? 1 : 0);
   await page.evaluate(() => document.fonts.ready);
   expect(await boxes(), "nothing grew or moved at a bigger ride").toEqual(before);
   // Off again: the pawn alone, in the same boxes.
@@ -362,8 +360,8 @@ test.describe("rides lazy", () => {
     await page.reload();
     const home = ".fd-hero, .fd-hero .fd-pawn-box, .fd-hero .avatar.riding, .fd-ring:visible .fd-pawn-box, .fd-ring:visible .avatar.riding, .fd-side .fd-menu-icon:visible .avatar.riding";
     await expect(page.locator('.fd-hero .avatar.riding[data-ride="riding-chirp"][data-drawn="0"]')).toHaveCount(1);
-    // (A computer's side menu's Profile item since Nov 7; a phone's top bar shows a still face, no ride, since Nov 9.)
-    const ringRides = (await page.locator(".fd-top-face:visible").count()) ? 0 : 1;
+    // (A computer's side menu's Profile item since Nov 7; a phone has no pawn up top since Nov 11: no ride to count.)
+    const ringRides = (await page.locator(".fd-side .fd-menu-icon:visible").count()) ? 1 : 0;
     await expect(page.locator(':is(.fd-ring, .fd-side .fd-menu-icon):visible .avatar.riding[data-drawn="0"]')).toHaveCount(ringRides);
     await page.evaluate(() => document.fonts.ready);
     const homeBefore = await settled(home);
@@ -374,7 +372,7 @@ test.describe("rides lazy", () => {
     // Your profile's pawn, the same.
     open = await holdDrawing(page, "riding-chirp");
     await page.reload();
-    await page.getByRole("button", { name: "Your profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+    await page.getByRole("button", { name: "View profile", exact: true }).or(page.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
     // (The profile itself first: until its data comes the page shows "Loading…" in a different layout, so a slow
     // server measured that one and then the loaded page, 255 px apart (CI, Nov 1). The ride is held either way.)
     await expect(page.locator(".fd-card .fd-seen")).toBeVisible();
