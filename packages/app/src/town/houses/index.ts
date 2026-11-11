@@ -21,6 +21,7 @@ import { HOUSE_TIGER, HOUSE_TIGER_SIGN, HOUSE_TIGER_LIGHTS, HOUSE_TIGER_POOLS } 
 import { HOUSE_FOLIO, HOUSE_FOLIO_SIGN, HOUSE_FOLIO_LIGHTS, HOUSE_FOLIO_POOLS } from "./folio.ts";
 import { HOUSE_TIMBER, HOUSE_TIMBER_SIGN, HOUSE_TIMBER_LIGHTS, HOUSE_TIMBER_POOLS } from "./timber.ts";
 import { HOUSE_BLITZ, HOUSE_BLITZ_SIGN, HOUSE_BLITZ_LIGHTS, HOUSE_BLITZ_POOLS } from "./blitz.ts";
+import { HOUSE_ZEBRA, HOUSE_ZEBRA_SIGN, HOUSE_ZEBRA_LIGHTS } from "./zebra.ts";
 
 export interface HouseArt {
   ch: Character;
@@ -51,6 +52,8 @@ export const HOUSES: Record<HomeId, HouseArt> = {
   timber: { ch: HOUSE_TIMBER, sign: HOUSE_TIMBER_SIGN, lights: HOUSE_TIMBER_LIGHTS, pools: HOUSE_TIMBER_POOLS },
   // (Dash's Kicks, the art's house-blitz; in an admin's town only while Dash is in the game for admins first: world.ts ADMIN_TOWN.)
   dash: { ch: HOUSE_BLITZ, sign: HOUSE_BLITZ_SIGN, lights: HOUSE_BLITZ_LIGHTS, pools: HOUSE_BLITZ_POOLS },
+  // (Rolling Dough, Don Dough's bakery, Nov 11: the art's house-zebra; in an admin's town only while he's in the game for admins first.)
+  zebra: { ch: HOUSE_ZEBRA, sign: HOUSE_ZEBRA_SIGN, lights: HOUSE_ZEBRA_LIGHTS, pools: [] },
 };
 
 /**

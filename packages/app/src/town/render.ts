@@ -54,12 +54,12 @@ import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type B
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
 /** Each boss's sprite (its real one: its `idle` frames). */
-export const BOSS_ART: Record<HomeId, Character> = {
+export const BOSS_ART: Record<TownBossId, Character> = {
   tiger: TIGER_FIGURE,
   gingerbread: GINGERBREAD,
   grex: GREX,
@@ -103,6 +103,9 @@ export const BOSS_FACE: Record<HomeId, readonly [x: number, y: number, size: num
   timber: [14, 5, 40],
   // (His backwards cap and face.)
   dash: [21, 9, 38],
+  // (Rolling Dough has no boss in the town, Don Dough being in his back room: its chip shows the bakery's door, the eyes peeking
+  // through its blinds, in the home's own picture: chipFace.)
+  zebra: [72, 82, 44],
 };
 
 // ---- Colors (the prototype's, sampled from Eric's reference picture).
@@ -3950,7 +3953,8 @@ export class Renderer {
   /** What a place's chip shows: its boss's first idle frame and the box round the boss's head, or the Colosseum's crown. */
   chipFace(place: Place): { img: HTMLCanvasElement; box: readonly [x: number, y: number, size: number] } {
     if (place.id === "coliseum") return { img: this.chipIcon.get(0), box: CHIP_ICON_BOX };
-    return { img: this.bossFrames[this.town.bosses.findIndex((b) => b.home.id === place.id)]!.get(0), box: BOSS_FACE[place.id] };
+    const b = this.town.bosses.findIndex((x) => x.home.id === place.id);
+    return { img: b < 0 ? this.houseFrames[this.places.indexOf(place)]!.get(0) : this.bossFrames[b]!.get(0), box: BOSS_FACE[place.id] };
   }
 }
 

@@ -30,7 +30,7 @@ import PLAN from "./street-plan.json" with { type: "json" };
 export const HOME_BODY: Readonly<Record<HomeId, readonly [w: number, x0: number, x1: number]>> = {
   timber: [144, 26, 118], sawyer: [144, 20, 114], gingerbread: [144, 28, 104], grex: [144, 18, 122], clown: [144, 28, 116], tiger: [144, 28, 116],
   bigboy: [144, 18, 126], blitz: [144, 22, 122], hopper: [144, 4, 140], pig: [144, 12, 128], moo: [144, 8, 136], hollow: [144, 28, 124],
-  gardener: [144, 24, 120], smudgy: [144, 20, 124], folio: [144, 16, 112], alfil: [208, 34, 176],
+  gardener: [144, 24, 120], smudgy: [144, 20, 124], folio: [144, 16, 112], alfil: [208, 34, 176], zebra: [144, 12, 132],
 };
 
 /** The street town's buildings' picture pixels a world square (boxes.ts BUILD_PX: drawn TOWN_FEEL.streetBuildScale bigger than 37). */

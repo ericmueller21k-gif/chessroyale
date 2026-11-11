@@ -885,6 +885,36 @@
     "arches": [],
     "crest": false
    }
+  },
+  {
+   "kind": "home",
+   "id": "zebra",
+   "v": 0,
+   "c0": 13,
+   "r0": 17,
+   "w": 4,
+   "d": 3,
+   "facing": "S",
+   "street": "south-st",
+   "side": false,
+   "art": "homeBox(\"zebra\")",
+   "name": "Rolling Dough",
+   "inset": 0.45,
+   "depth": 2.3,
+   "door": {
+    "c": 15,
+    "r": 16
+   },
+   "rest": {
+    "c": 13,
+    "r": 16
+   },
+   "wander": {
+    "x0": 12.7,
+    "x1": 16.3,
+    "y0": 15.7,
+    "y1": 16.85
+   }
   }
  ],
  "park": {
