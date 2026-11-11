@@ -151,11 +151,31 @@ function puffAnim(look: Look, seated: boolean): Anim {
   };
 }
 
+/**
+ * Walking (added in the game, Nov 11, for his challenge's set-up: the crew carry the table, the board and the chairs out to the front
+ * room's pad; the rig's own pieces, nothing new drawn): a stride a step (cue `step` on each footfall). `carry`: both arms forward under
+ * what he carries (drawn by the room at his hooves); `walk`: the roll held at port, as the guards hold it.
+ */
+const STRIDE: readonly (readonly [Pt, Pt])[] = [
+  [[-5, 0], [5, 0]],
+  [[-1, 2], [1, 0]],
+  [[5, 0], [-5, 0]],
+  [[1, 0], [-1, 2]],
+];
+function walkAnim(look: Look, carry: boolean): Anim {
+  return {
+    loop: true,
+    frames: STRIDE.map((feet, i) =>
+      frame(look, 130, carry ? { feet, bob: i % 2, armF: [[7, 5], [14, 4]], armN: [[8, 5], [16, 3]], eyes: "fwd", mouth: "flat" } : { feet, bob: i % 2, gun: PORT, eyes: "fwd", brows: "down", mouth: "flat" }, i % 2 === 0 ? { cue: "step" } : {}),
+    ),
+  };
+}
+
 // ---- The guards.
 
 function guard(look: Look, id: string, name: string): Character {
   const g = lazyAnim(() => guardAnim(look));
-  return char(id, name, { idle: g, guard: g, watch: lazyAnim(() => watchAnim(look)), draw: lazyAnim(() => drawAnim(look, PORT)), aim: lazyAnim(() => aimAnim(look)), lower: lazyAnim(() => lowerAnim(look)), puff: lazyAnim(() => puffAnim(look, false)) });
+  return char(id, name, { idle: g, guard: g, watch: lazyAnim(() => watchAnim(look)), draw: lazyAnim(() => drawAnim(look, PORT)), aim: lazyAnim(() => aimAnim(look)), lower: lazyAnim(() => lowerAnim(look)), puff: lazyAnim(() => puffAnim(look, false)), walk: lazyAnim(() => walkAnim(look, false)), carry: lazyAnim(() => walkAnim(look, true)) });
 }
 export const NPC_ZEBRA_GUARD_A = guard(LOOKS.guardA, "npc-zebra-guard-a", "The bakery's door guard (flat cap)");
 export const NPC_ZEBRA_GUARD_B = guard(LOOKS.guardB, "npc-zebra-guard-b", "The bakery's door guard (paper cap)");
@@ -238,6 +258,8 @@ function tableCrew(look: Look, id: string, name: string, seed: number): Characte
     aim: lazyAnim(() => aimAnim(look)),
     lower: lazyAnim(() => lowerAnim(look)),
     puff: lazyAnim(() => puffAnim(look, false)),
+    walk: lazyAnim(() => walkAnim(look, false)),
+    carry: lazyAnim(() => walkAnim(look, true)),
   });
 }
 export const NPC_ZEBRA_CREW_C = tableCrew(LOOKS.crewC, "npc-zebra-crew-c", "The bakery's table crew (toque, glasses)", 0);

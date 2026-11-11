@@ -4,16 +4,16 @@
  * as data, the words and the room's sounds. Pure: the room (room.ts), the scene (zebra-scene.ts), the timeline (timeline.ts).
  */
 import { describe, expect, it } from "vitest";
-import { makeRoom, onPass, passArrive, tapTarget, inTalkRange } from "../src/town/shops/room.ts";
+import { findPath, makeRoom, onPass, passArrive, tapTarget, inTalkRange, walkable } from "../src/town/shops/room.ts";
 import { BACK_ROOMS, SHOPS, canChallengeInside } from "../src/town/shops/shops.ts";
-import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_ZEBRA_DOORS, SHOP_ZEBRA_BACK_DOORS, SHOP_ZEBRA_FLOOR, SHOP_ZEBRA_LAYOUT } from "../src/town/shops/zebra-art.ts";
+import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_ZEBRA_DOORS, SHOP_ZEBRA_BACK_DOORS, SHOP_ZEBRA_FLOOR, SHOP_ZEBRA_LAYOUT, SHOP_ZEBRA_PAD } from "../src/town/shops/zebra-art.ts";
 import { NPC_ZEBRA_CREW_C, NPC_ZEBRA_CREW_D, NPC_ZEBRA_CREW_E, NPC_ZEBRA_GUARD_A, ZEBRA_WATCH_FRAME } from "../src/town/shops/zebra-crew.ts";
 import { BOSS_ZEBRA } from "../src/town/shops/zebra-don.ts";
-import { BackScene, FrontScene, ZEBRA_GUARDS, lineMs, watchFrame, type SceneClips } from "../src/town/shops/zebra-scene.ts";
+import { BackScene, FrontScene, SetupScene, ZEBRA_GUARDS, lineMs, watchFrame, type CarriedNow, type SceneClips, type SceneFig } from "../src/town/shops/zebra-scene.ts";
 import { ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_KEEPER_LINES, ZEBRA_TALK } from "../src/town/shops/zebra-lines.ts";
 import { clipsOf, timelineBeats, timelineCues } from "../src/town/shops/timeline.ts";
 import { ZEBRA_INTRO } from "../src/town/shops/intros/zebra.ts";
-import { introOf } from "../src/town/shops/challenge.ts";
+import { CHALLENGE_FEEL, introOf, marksFeel, marksOf, seatedMarks } from "../src/town/shops/challenge.ts";
 import { ZEBRA_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
 import { MOVE_PEAK } from "../src/characters/synth.ts";
 import { SHOP_FEEL } from "../src/town/feel.ts";
@@ -23,6 +23,8 @@ const back = BACK_ROOMS.zebra!;
 const frontRoom = makeRoom(SHOP_ZEBRA_LAYOUT, front.keeper, 20, SHOP_ZEBRA_FLOOR, front.talk, null, front.talkAt ?? null);
 const backRoom = makeRoom(SHOP_ZEBRA_BACK_LAYOUT, back.keeper, SHOP_ZEBRA_BACK_N, SHOP_ZEBRA_BACK_FLOOR, back.talk, null, back.talkAt ?? null);
 const sq = (s: { c: number; r: number }) => `${s.c},${s.r}`;
+/** A square of the front room's floor, not a wall or a solid piece (the guards' posts count as floor: they walk off them). */
+const walkableSq = (c: number, r: number) => walkable(frontRoom, c, r) || ZEBRA_GUARDS.some((g) => Math.round(g.at[0]) === c && Math.round(g.at[1]) === r);
 
 describe("the two rooms and the door between them (Nov 11)", () => {
   it("the front room's door at the back left leads to the back room: its squares blocked, its card on the two just inside, as the art has them", () => {
@@ -62,7 +64,7 @@ describe("the two rooms and the door between them (Nov 11)", () => {
     expect(front.says).toEqual(ZEBRA_KEEPER_LINES);
     expect(back).toMatchObject({ part: "back", name: "Don Dough", hideKid: true, chatTone: "night" });
     expect(canChallengeInside("zebra")).toBe(false);
-    expect(introOf("zebra")).toMatchObject({ name: "Don Dough", inPlace: true, seated: true, custom: true });
+    expect(introOf("zebra")).toMatchObject({ name: "Don Dough", fromDoor: true, seated: true, custom: true });
   });
 });
 
@@ -166,19 +168,61 @@ describe("the back table (Eric, Nov 10: the crew argue, he one-ups them)", () =>
     // (Fedora's line while they aim; Don's "Relax" before they lower.)
     expect(s.talking()).toBe(true);
   });
-  it("in his challenge the crew stand easy from the start and he isn't drawn by the room (his intro draws him)", () => {
-    const s = new BackScene(clips, 0, 0, true);
-    expect(s.step(100)).toBe("done");
-    const figs = s.figs(100, []);
-    expect(figs.map((f) => f.name).sort()).toEqual(["crew-c", "crew-d", "crew-e", "don"]);
-    expect(s.figs(100, [], false).map((f) => f.name)).not.toContain("don");
-    for (const f of figs.filter((x) => x.name !== "don")) expect(f.anim).toBe("puff");
+});
+
+describe("his challenge, in the front room (Eric, Nov 11: \"The main room is still where you fight\")", () => {
+  const pad = marksOf(SHOP_ZEBRA_LAYOUT, "across", null, marksFeel(null, CHALLENGE_FEEL))!;
+  const marks = seatedMarks(pad);
+  const door = passArrive(frontRoom)!;
+  it("a normal fight pad on the front room's floor, clear of the counter, the mixer and the walkway between the guards", () => {
+    expect(pad.table).toEqual({ c: 10, r: 12 });
+    const P = SHOP_ZEBRA_PAD;
+    for (let r = P.r0; r <= P.r1; r++) for (let c = P.c0; c <= P.c1; c++) expect(frontRoom.blocked[r * 20 + c], `${c},${r}`).toBe(0);
+    // (The walkway from the door up between the guards, columns 9-10 below the pad, stays open; the guards' squares too far to touch it.)
+    for (let r = P.r1 + 1; r <= 18; r++) for (const c of [9, 10]) expect(frontRoom.blocked[r * 20 + c], `${c},${r}`).toBe(0);
+  });
+  it("the four goons carry the table, both chairs and the board out of the back door, set them up, and all five watch behind the table before his line", () => {
+    const clipsFront: SceneClips = Object.fromEntries(
+      [["crew-c", NPC_ZEBRA_CREW_C], ["crew-d", NPC_ZEBRA_CREW_D], ["crew-e", NPC_ZEBRA_CREW_E], ["guard-a", NPC_ZEBRA_GUARD_A], ["guard-b", NPC_ZEBRA_GUARD_A]].map(([k, ch]) => [
+        k as string,
+        Object.fromEntries(Object.entries(clipsOf(ch as typeof BOSS_ZEBRA)).map(([n, c]) => [n, { ms: c.ms, loop: !!(ch as typeof BOSS_ZEBRA).anims[n]!.loop }])),
+      ]),
+    );
+    const S = new SetupScene(clipsFront, (a, b) => findPath(frontRoom, a, b), marks, door, ZEBRA_GUARDS[1].at, 0);
+    const figs: SceneFig[] = [];
+    const carried: CarriedNow[] = [];
+    const seen = new Map<string, Set<string>>();
+    const items = new Set<string>();
+    for (let t = 0; t <= S.end() + 500; t += 25) {
+      S.figs(t, figs, carried);
+      for (const f of figs) (seen.get(f.name) ?? seen.set(f.name, new Set()).get(f.name)!).add(f.anim);
+      for (const q of carried) items.add(q.item);
+      // (Nobody stands on the counter, the mixer or a wall: every figure on the floor, rounded to its square.)
+      for (const f of figs) expect(walkableSq(Math.round(f.c), Math.round(f.r)) || f.name === "guard-b", `${f.name} at ${f.c.toFixed(2)},${f.r.toFixed(2)}`).toBe(true);
+    }
+    expect([...items].sort()).toEqual(["board", "bossChair", "table", "youChair"]);
+    expect(S.placed(S.end()).sort()).toEqual(["board", "bossChair", "table", "youChair"]);
+    for (const n of ["crew-c", "crew-d", "crew-e", "guard-a"]) expect([...seen.get(n)!], n).toContain("carry");
+    // At the end: all five on their watch spots behind the table, facing it, none in front of the board, Don or you.
+    S.figs(S.end() + 1, figs, carried);
+    expect(figs).toHaveLength(5);
+    expect(carried).toHaveLength(0);
+    for (const f of figs) {
+      expect(f.r, f.name).toBeLessThan(marks.table.r - 1.5);
+      expect(f.c, f.name).toBeGreaterThan(marks.boss.c);
+      expect(f.c, f.name).toBeLessThan(marks.you.c);
+      expect(["puff", "guard"], f.name).toContain(f.anim);
+    }
+    // (All set before his line: the walk out (your way to your mark, a step a CHALLENGE_FEEL.walkStepMs), settling, facing, the hold.)
+    const walk = findPath(frontRoom, door, marks.youSq)!.length * CHALLENGE_FEEL.walkStepMs + CHALLENGE_FEEL.settleMs;
+    const line = timelineBeats(ZEBRA_INTRO.timeline).find((b) => b.step === "line")!.at;
+    expect(S.end()).toBeLessThan(walk + line);
   });
 });
 
 describe("his intro, as data", () => {
-  it("on the marks, his line, his breadPop (its pop cued), a beat; no God King attack; he's on his own figure from the start", () => {
-    expect(timelineBeats(ZEBRA_INTRO.timeline).map((b) => b.step)).toEqual(["face", "line", "pop", "laugh", "done"]);
+  it("on the marks, a hold for the set-up, his line, his breadPop (its pop cued), a beat; no God King attack; his own figure", () => {
+    expect(timelineBeats(ZEBRA_INTRO.timeline).map((b) => b.step)).toEqual(["face", "setup", "line", "pop", "laugh", "done"]);
     expect(timelineCues(ZEBRA_INTRO.timeline).map((c) => c.cue)).toContain("pop");
     expect(ZEBRA_INTRO).toMatchObject({ noAttack: true, figure: BOSS_ZEBRA, mover: BOSS_ZEBRA });
     expect(Object.keys(introOf("zebra")!.cues)).toContain("pop");

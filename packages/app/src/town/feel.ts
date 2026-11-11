@@ -819,5 +819,14 @@ export const SHOP_FEEL = {
     exchangeGapMs: 1400,
     beat: { staggerMs: 120, aimLeadMs: 150, lowerAfterMs: 900, gapMs: 300 },
     dim: 0.36,
+    /**
+     * His challenge's set-up in the front room (Eric, Nov 11: "4 of his goons who follow you in carry a chair and a board and a table, 1
+     * item per goon"): the first goon `leadMs` after you start walking out, the next each `followMs` after; a square every `stepMs`;
+     * `setMs` setting it down (it's in place halfway); a square every `backMs` stepping back to where he watches, `watchBack` rows behind
+     * the table, `watchGap` squares apart. His line waits `holdMs` after you're both on your marks, so all is set and everyone watching.
+     */
+    setup: { leadMs: 500, followMs: 450, stepMs: 220, setMs: 350, backMs: 260, watchBack: 2.2, watchGap: 0.95, holdMs: 2600 },
+    /** How high a goon carries his thing (the room's pixels over his feet: at his hooves). */
+    carryUp: 26,
   },
 } as const;

@@ -715,6 +715,30 @@ function layoutOf(): { at: (name: string, col: number, row: number, solid: boole
   };
   return { at, list };
 }
+// ---- The fight pad (added in the game, Nov 11: Eric, "make sure a normal fight pad is on the ground there"; the challenge plays in the
+// front room). Flat floor tiles, `circle-<col>-<row>` as every home's battle circle (challenge.ts marksOf finds it by them): a burgundy
+// mat with a gold edge and a band of zebra stripes, columns 8-12, rows 11-13 (5 x 3), clear of the counter, the mixer and the walkway
+// between the guards.
+export const SHOP_ZEBRA_PAD = { c0: 8, c1: 12, r0: 11, r1: 13 } as const;
+Object.assign(PALETTE, { n: "#7a2232", o: "#651a2a", E: "#d6a23e", F: "#8f6420", t: "#f1ebe0", u: "#211c1d" });
+{
+  const P = SHOP_ZEBRA_PAD;
+  const W = (P.c1 - P.c0 + 1) * T;
+  const H = (P.r1 - P.r0 + 1) * T;
+  for (let row = P.r0; row <= P.r1; row++)
+    for (let col = P.c0; col <= P.c1; col++) {
+      const c = cv(T, T);
+      for (let y = 0; y < T; y++)
+        for (let x = 0; x < T; x++) {
+          const X = (col - P.c0) * T + x;
+          const Y = (row - P.r0) * T + y;
+          const e = Math.min(X, Y, W - 1 - X, H - 1 - Y);
+          put(c, x, y, e < 2 ? "F" : e < 4 ? "E" : e < 9 ? (((X + Y) >> 2) & 1 ? "t" : "u") : e < 10 ? "E" : hash(X >> 1, Y >> 1, 9) < 0.12 ? "o" : "n");
+        }
+      still(`circle-${col}-${row}`, [1, 1], c, [18, 18], false);
+    }
+}
+
 const FRONT = layoutOf();
 {
   const { at } = FRONT;
@@ -723,6 +747,7 @@ const FRONT = layoutOf();
     for (let col = 0; col < 20; col++) {
       if (!isOpen(col, row)) at("floor-stock", col, row, false);
       else if (row === 18 && (col === 9 || col === 10)) at(col === 9 ? "mat-w" : "mat-e", col, row, false);
+      else if (col >= SHOP_ZEBRA_PAD.c0 && col <= SHOP_ZEBRA_PAD.c1 && row >= SHOP_ZEBRA_PAD.r0 && row <= SHOP_ZEBRA_PAD.r1) at(`circle-${col}-${row}`, col, row, false);
       else if (FLOUR.has(`${col},${row}`)) at("floor-flour", col, row, false);
       else at((col * 7 + row * 3) % 5 === 0 ? "floor-b" : "floor-a", col, row, false);
     }

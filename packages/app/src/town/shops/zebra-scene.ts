@@ -145,8 +145,6 @@ export class BackScene {
     now = 0,
     /** Where the chatter starts (an exchange's index): a test plays one from the top. */
     start = 0,
-    /** As after the talk beat from the start (his challenge: the crew standing easy, no chatter). */
-    after = false,
   ) {
     this.ex = start % ZEBRA_CHATTER.length;
     this.lineAt = now + SHOP_FEEL.zebra.firstMs;
@@ -161,7 +159,6 @@ export class BackScene {
     const challenge = Math.max(relax + lineMs(ZEBRA_TALK.relax.text), lowered) + Z.gapMs;
     const end = challenge + lineMs(ZEBRA_TALK.challenge.text);
     this.T = { up, drawn, line, relax, lower, lowered, challenge, end };
-    if (after) this.beatAt = now - end;
   }
   /** The talk beat has started (and the chatter stopped for good). */
   talking(): boolean {
@@ -218,12 +215,12 @@ export class BackScene {
     const l = ZEBRA_CHATTER[this.ex]![this.li]!;
     return now >= this.lineAt && now < this.lineAt + lineMs(l.text) ? { who: l.who, text: l.text } : null;
   }
-  /** Don (unless `don` is false: his challenge draws him) and the crew this frame. Into `out` (cleared). */
-  figs(now: number, out: SceneFig[], don = true): SceneFig[] {
+  /** Don and the crew this frame. Into `out` (cleared). */
+  figs(now: number, out: SceneFig[]): SceneFig[] {
     out.length = 0;
     const say = this.saying(now);
     const fig = (p: { readonly name: string; readonly at: readonly [number, number] }, anim: string, t: number, flip: boolean) =>
-      (don || p.name !== "don") && out.push({ name: p.name, anim, frame: clipFrame(this.clips[p.name]?.[anim], t), c: p.at[0], r: p.at[1], flip });
+      out.push({ name: p.name, anim, frame: clipFrame(this.clips[p.name]?.[anim], t), c: p.at[0], r: p.at[1], flip });
     if (this.beatAt === null) {
       // The chatter: the speaker on his loop (a crew member arguing or talking; Don scoffing or talking), the rest listening.
       const l = ZEBRA_CHATTER[this.ex]![this.li]!;
@@ -259,5 +256,145 @@ export class BackScene {
       return fig(p, "puff", lo - clipLen(crew.lower) + i * 600, false);
     });
     return out;
+  }
+}
+
+/** What the goons carry out to the pad: the table, its two chairs and the board. */
+export type SetupItem = "table" | "bossChair" | "youChair" | "board";
+type Pt2 = { c: number; r: number };
+/** A carried item this frame: what, where (the carrier's foot), which way he faces. */
+export interface CarriedNow {
+  item: SetupItem;
+  c: number;
+  r: number;
+  flip: boolean;
+}
+
+/**
+ * His challenge's set-up in the front room (Eric, Nov 11: "The main room is still where you fight … 4 of his goons who follow you in carry
+ * a chair and a board and a table, 1 item per goon. So the board and chairs are in the back room but brought into the front."). Four goons
+ * come out of the back room's door after you and Don, one after another, each carrying one thing round the counter and the mixer to the
+ * pad (the room's own way, `path`): the table, Don's chair, yours, then the board onto the table; each sets his down and steps back to
+ * watch behind the table, the fifth (the door guard in the paper cap) walking over from the door to stand with them. Everyone ends on his
+ * watch spot facing the table, in a row `watchBack` behind it, so the board, Don and you stay clear. Pure; times are ms.
+ */
+export class SetupScene {
+  private readonly runs: {
+    name: string;
+    item: SetupItem | null;
+    start: number;
+    /** The way there (squares, then the exact spot), its end time, when the item is set, the way back to watch, its end. */
+    there: Pt2[];
+    arrive: number;
+    set: number;
+    back: Pt2[];
+    done: number;
+    idle: string;
+  }[] = [];
+  constructor(
+    private readonly clips: SceneClips,
+    /** The room's way from one square to another (room.ts findPath: the squares after `from`), or null. */
+    path: (from: Pt2, to: Pt2) => Pt2[] | null,
+    m: { table: Pt2; bossStool: Pt2; youStool: Pt2 },
+    /** The square just inside the back door (where you come out), and the paper-cap guard's post. */
+    door: Pt2,
+    post: readonly [number, number],
+    /** When you start walking out (the room's first frame, plus its beat just inside). */
+    t0: number,
+  ) {
+    const S = SHOP_FEEL.zebra.setup;
+    const T = m.table;
+    const row = T.r - S.watchBack;
+    const watch = (k: number): Pt2 => ({ c: T.c + k * S.watchGap, r: row });
+    const sqOf = (p: Pt2) => ({ c: Math.round(p.c), r: Math.round(p.r) });
+    /** From `from` to `to`: the room's squares, then the exact spot. */
+    const route = (from: Pt2, to: Pt2): Pt2[] => {
+      const a = sqOf(from);
+      const b = sqOf(to);
+      return [from, ...(path(a, b) ?? [b]), to];
+    };
+    const carriers: { name: string; item: SetupItem; at: Pt2; watch: number }[] = [
+      { name: "crew-c", item: "table", at: { c: T.c, r: T.r - 1 }, watch: 0 },
+      { name: "crew-e", item: "bossChair", at: { c: m.bossStool.c, r: T.r - 1 }, watch: -1 },
+      { name: "guard-a", item: "youChair", at: { c: m.youStool.c, r: T.r - 1 }, watch: 1 },
+      { name: "crew-d", item: "board", at: { c: T.c, r: T.r - 1 }, watch: -2 },
+    ];
+    const len = (pts: Pt2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.c - pts[i]!.c, p.r - pts[i]!.r), 0);
+    carriers.forEach((k, i) => {
+      const start = t0 + S.leadMs + i * S.followMs;
+      const there = route(door, k.at);
+      const arrive = start + len(there) * S.stepMs;
+      const back = [k.at, watch(k.watch)];
+      const done = arrive + S.setMs + len(back) * S.backMs;
+      this.runs.push({ name: k.name, item: k.item, start, there, arrive, set: arrive + S.setMs / 2, back, done, idle: k.name === "guard-a" ? "guard" : "puff" });
+    });
+    // (The paper-cap guard walks over from his post by the door, his roll at port, as the first goon comes out.)
+    const from = { c: post[0], r: post[1] };
+    const there = route(from, watch(2));
+    const start = t0 + S.leadMs;
+    const arrive = start + len(there) * S.stepMs;
+    this.runs.push({ name: "guard-b", item: null, start, there, arrive, set: arrive, back: [], done: arrive, idle: "guard" });
+    this.table = T;
+  }
+  private readonly table: Pt2;
+  /** When the last of them is on his watch spot. */
+  end(): number {
+    return Math.max(...this.runs.map((r) => r.done));
+  }
+  /** Each item set down by `now`. */
+  placed(now: number): SetupItem[] {
+    return this.runs.filter((r) => r.item && now >= r.set).map((r) => r.item!);
+  }
+  /** Who stands where this frame, and what's being carried (into `out` and `carried`, both cleared). */
+  figs(now: number, out: SceneFig[], carried: CarriedNow[]): void {
+    out.length = 0;
+    carried.length = 0;
+    const at = (pts: Pt2[], u: number): { c: number; r: number; dc: number } => {
+      // (`u` squares along the polyline; its last leg's direction.)
+      let left = u;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1]!;
+        const b = pts[i]!;
+        const d = Math.hypot(b.c - a.c, b.r - a.r);
+        if (left <= d || i === pts.length - 1) {
+          const k = d ? Math.min(1, left / d) : 1;
+          return { c: a.c + (b.c - a.c) * k, r: a.r + (b.r - a.r) * k, dc: b.c - a.c };
+        }
+        left -= d;
+      }
+      const p = pts[pts.length - 1]!;
+      return { c: p.c, r: p.r, dc: 0 };
+    };
+    const S = SHOP_FEEL.zebra.setup;
+    const faceTable = (c: number) => c > this.table.c + 0.01;
+    for (const r of this.runs) {
+      const clip = (a: string) => this.clips[r.name]?.[a];
+      if (now < r.start) {
+        // (Still in the back room; the guard at his post.)
+        if (r.name === "guard-b") out.push({ name: r.name, anim: "guard", frame: clipFrame(clip("guard"), now), c: r.there[0]!.c, r: r.there[0]!.r, flip: true });
+        continue;
+      }
+      if (now < r.arrive) {
+        const p = at(r.there, (now - r.start) / S.stepMs);
+        const anim = r.item ? "carry" : "walk";
+        out.push({ name: r.name, anim, frame: clipFrame(clip(anim), now - r.start), c: p.c, r: p.r, flip: p.dc < 0 });
+        if (r.item) carried.push({ item: r.item, c: p.c, r: p.r, flip: p.dc < 0 });
+        continue;
+      }
+      if (now < r.arrive + S.setMs) {
+        const p = r.there[r.there.length - 1]!;
+        out.push({ name: r.name, anim: "carry", frame: 0, c: p.c, r: p.r, flip: faceTable(p.c) });
+        if (r.item && now < r.set) carried.push({ item: r.item, c: p.c, r: p.r, flip: faceTable(p.c) });
+        continue;
+      }
+      if (now < r.done) {
+        // (Stepping back to watch, facing the table.)
+        const p = at(r.back, (now - r.arrive - S.setMs) / S.backMs);
+        out.push({ name: r.name, anim: "walk", frame: clipFrame(clip("walk"), now), c: p.c, r: p.r, flip: faceTable(p.c) });
+        continue;
+      }
+      const p = r.back.length ? r.back[r.back.length - 1]! : r.there[r.there.length - 1]!;
+      out.push({ name: r.name, anim: r.idle, frame: clipFrame(clip(r.idle), now + r.start), c: p.c, r: p.r, flip: faceTable(p.c) });
+    }
   }
 }

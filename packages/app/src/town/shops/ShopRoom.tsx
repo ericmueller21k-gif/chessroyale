@@ -47,7 +47,7 @@ import type { Rider } from "../rides.ts";
 import { rideSpeed } from "../../components/rides/scale.ts";
 import { STORE_PANELS, driftAt, type PoolDrift, camFocus, ceilingPanel, inTalkRange, lightsAt, litDx, overlaps, upAlpha, walkable, youBox, isFloor, makeRoom, onDoor, onPass, passArrive, tapTarget, findPath, stepFor, type Room, type ShopPlace, type Sq } from "./room.ts";
 import { POOL_LINE, bossHoldings, buyBossCrate, canAfford, holdLine, priceLine, prizeRows, roomDef, wayText, type CrateWay, type ShopDef } from "./shops.ts";
-import { BackScene, FrontScene, ZEBRA_GUARDS, type BeatStep, type SceneClips, type SceneFig, type SceneSay } from "./zebra-scene.ts";
+import { BackScene, FrontScene, SetupScene, ZEBRA_GUARDS, type BeatStep, type CarriedNow, type SceneClips, type SceneFig, type SceneSay } from "./zebra-scene.ts";
 import { iceAt, introCam, isIce, type IceNow } from "./challenge.ts";
 import type { BlitzNow } from "./challenge.ts";
 import { CHALLENGE_FEEL, attackStart, attackTime, bubbleSize, caveLight, chantOf, drainAt, frameAt as animFrame, castIntroAt, introAt, introCues, introLength, isDark, lineOf, marksFeel, marksOf, seatedMarks, type DarkNow, type DrawnMarks, type IntroNow } from "./challenge.ts";
@@ -200,7 +200,14 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
       pools: m.SHOP_ZEBRA_POOLS,
       floor: m.SHOP_ZEBRA_FLOOR,
       upright: ["mixer"],
-      people: { "guard-a": { ch: c.NPC_ZEBRA_GUARD_A, anims: ["watch"] }, "guard-b": { ch: c.NPC_ZEBRA_GUARD_B, anims: ["watch"] } },
+      // (The guards watching you; and for his challenge's set-up, the goons who carry it out and watch: zebra-scene.ts SetupScene.)
+      people: {
+        "guard-a": { ch: c.NPC_ZEBRA_GUARD_A, anims: ["watch", "guard", "walk", "carry"] },
+        "guard-b": { ch: c.NPC_ZEBRA_GUARD_B, anims: ["watch", "guard", "walk"] },
+        "crew-c": { ch: c.NPC_ZEBRA_CREW_C, anims: ["carry", "walk", "puff"] },
+        "crew-d": { ch: c.NPC_ZEBRA_CREW_D, anims: ["carry", "walk", "puff"] },
+        "crew-e": { ch: c.NPC_ZEBRA_CREW_E, anims: ["carry", "walk", "puff"] },
+      },
       scene: "zebra-front" as const,
       standing: m.SHOP_ZEBRA_GUARDS.map((g) => g.square),
       cueSounds: { thump: "zebraThump" as const },
@@ -224,8 +231,6 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
           "crew-e": { ch: c.NPC_ZEBRA_CREW_E, anims: CREW },
         },
         scene: "zebra-back" as const,
-        // (Don Dough's challenge, at his table: he at its head, you at its foot.)
-        marks: { boss: m.SHOP_ZEBRA_BACK_MARKS.boss, you: m.SHOP_ZEBRA_BACK_MARKS.you },
         dim: SHOP_FEEL.zebra.dim,
         outside: "#2a1d14",
         fixCam: { x: m.SHOP_ZEBRA_BACK_MARKS.table[0] - m.SHOP_ZEBRA_BACK_CAM.west, y: m.SHOP_ZEBRA_BACK_MARKS.table[1] + m.SHOP_ZEBRA_BACK_CAM.south },
@@ -374,8 +379,6 @@ export interface ShopCtl {
   recenter: () => void;
   /** The claw machine's controls are open (the away rule's clock holds: afk.ts). */
   busy?: () => boolean;
-  /** The square you stand on (a challenge started inside starts you there: Don Dough's). */
-  here?: () => Sq;
 }
 
 /**
@@ -389,7 +392,7 @@ export interface RoomIntro {
   onDone: () => void;
 }
 
-export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false, startAt }: { /** Where you start (a challenge started inside: where you stood). */ startAt?: Sq; /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it). */ arrived?: boolean; /** Through the door to the home's other room (Rolling Dough's). */ onPass?: () => void; /** The boss's Challenge (Don Dough's, from his card in his back room). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed, "Coming soon"). */ canChallenge?: boolean }) {
+export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onReady, ctl, intro = null, zzz = () => false, arrived = false, onPass, onChallenge, canChallenge = false }: { /** You're away (afk.ts): a "zzz" over your pawn. */ zzz?: () => boolean; room: LoadedRoom; youArt: () => YouArt | null; /** The town's rider you're on (its frames ready), or null: on foot. */ youRider: () => Rider | null; youName: () => string; onZoom: (out: boolean) => void; onOut: () => void; onReady: () => void; ctl: { current: ShopCtl | null }; /** A boss's challenge to play here (none: the shop as usual). */ intro?: RoomIntro | null; /** You came in through the door from the home's other room (you start just inside it). */ arrived?: boolean; /** Through the door to the home's other room (Rolling Dough's). */ onPass?: () => void; /** The boss's Challenge (Don Dough's, from his card in his back room). */ onChallenge?: () => void; /** His boss is in the game to fight (none yet: Challenge greyed, "Coming soon"). */ canChallenge?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const cardEl = useRef<HTMLDivElement>(null);
@@ -403,7 +406,7 @@ export function ShopRoom({ room, youArt, youRider, youName, onZoom, onOut, onRea
     const r = (eng.current = startRoom(box.current!, canvas.current!, cardEl.current!, room, youArt, youRider, youName, onZoom, (c) => {
       setCard(c);
       setMsg("");
-    }, intro, zzz, arrived, () => setTalked(true), startAt));
+    }, intro, zzz, arrived, () => setTalked(true)));
     ctl.current = r;
     onReady();
     return () => {
@@ -576,7 +579,6 @@ function startRoom(
   zzz: () => boolean = () => false,
   arrived = false,
   onTalked: () => void = () => {},
-  startAt?: Sq,
 ) {
   const f = TOWN_FEEL;
   const S = SHOP_FEEL;
@@ -594,7 +596,7 @@ function startRoom(
   const g = cv.getContext("2d")!;
   // (Through the door from the home's other room: just inside it, facing away from it, into the room.)
   const arrive = arrived ? passArrive(room) : null;
-  const you = new Walker(startAt ?? arrive ?? room.start, f.youStepMs, true, f.walkEase);
+  const you = new Walker(arrive ?? room.start, f.youStepMs, true, f.walkEase);
   // (A room's rows run toward the camera, the town's away: up the screen is a row less. The walker's views and the arrow keys
   // follow it: Walker.rowsUp. Facing the counter, north: up the screen, its back.)
   you.rowsUp = -1;
@@ -627,8 +629,8 @@ function startRoom(
   /** Its crumple's DOM layer has been started (as its quiet line goes: crumple-gl.ts prepareCrumple). */
   let crumpleReady = false;
   const across = marks?.layout === "across";
-  // (A boss met inside, Don Dough at his table: on his mark from the start; every other walks in beside you.)
-  const boss = ci && marks ? new Walker(ci.def.inPlace ? marks.bossSq : { c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
+  // (Every boss walks in beside you: from the town's door, or (Don Dough, met in his back room) out of the door from it.)
+  const boss = ci && marks ? new Walker(ci.def.fromDoor && arrive ? { c: arrive.c - 1, r: arrive.r } : { c: room.start.c - 1, r: room.start.r }, C.walkStepMs, false) : null;
   if (boss) boss.rowsUp = -1;
   // The arrow keys walk you about the room (arrows.ts): a square the floor has and nobody's (the challenge's boss, if it's here).
   // Not during a challenge's intro, whose script walks you.
@@ -1955,8 +1957,14 @@ function startRoom(
   const clips: SceneClips = pf ? Object.fromEntries(Object.entries(pf).map(([k, a]) => [k, Object.fromEntries(Object.entries(a).map(([n, x]) => [n, { ms: x.ms, loop: x.loop }]))])) : {};
   const sceneT0 = performance.now();
   const front = art.scene === "zebra-front" ? new FrontScene(clips, Math.random, sceneT0) : null;
-  // (In his challenge the crew stand easy, as after the talk beat, and he's the intro's: drawn from its cast, not here.)
-  const backScene = art.scene === "zebra-back" ? new BackScene(clips, sceneT0, 0, !!ci) : null;
+  const backScene = art.scene === "zebra-back" ? new BackScene(clips, sceneT0) : null;
+  // (His challenge, on the front room's pad: the goons carry the table, the chairs and the board out of the back door after you and him,
+  // set them up and step back to watch with the fifth: zebra-scene.ts SetupScene. Their carried things and the set-up as drawn now.)
+  const setup =
+    art.scene === "zebra-front" && ci && marks && arrive
+      ? new SetupScene(clips, (a, b) => findPath(room, a, b), marks, arrive, ZEBRA_GUARDS[1].at, sceneT0 + C.insideMs)
+      : null;
+  const carriedNow: CarriedNow[] = [];
   const sceneFigs: SceneFig[] = [];
   let say: SceneSay | null = null;
   let beat: BeatStep | null = null;
@@ -1988,10 +1996,11 @@ function startRoom(
   /** Rolling Dough's people where they stand this frame, into `crewFigs` (each by its row among the pieces). */
   const collectPeople = (now: number) => {
     if (!pf) return;
-    if (front) {
+    if (setup) setup.figs(now, sceneFigs, carriedNow);
+    else if (front) {
       you.pose(now, pose);
       front.figs(now, pose.x, pose.y, sceneFigs);
-    } else if (backScene) backScene.figs(now, sceneFigs, !ci);
+    } else if (backScene) backScene.figs(now, sceneFigs);
     for (const p of sceneFigs) {
       if (crewN >= CREW_MAX) return;
       const an = pf[p.name]?.[p.anim];
@@ -2000,6 +2009,45 @@ function startRoom(
       const ch = art.people![p.name]!.ch;
       Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: img.height, fx: ch.foot[0], fy: ch.foot[1], k: 1, c: p.c, r: p.r, z: p.r, flip: p.flip, up: 0 });
     }
+    // (What the goons carry: at their hooves, in front of them, a hair nearer than them.)
+    for (const q of carriedNow) {
+      if (crewN >= CREW_MAX || !ci) return;
+      const img = q.item === "table" ? ci.table.leg : q.item === "board" ? boardSlab() : ci.table.stool;
+      Object.assign(crewFigs[crewN++]!, { img, elf: false, sx: 0, sy: 0, w: img.width, h: img.height, fx: img.width / 2, fy: img.height, k: 1, c: q.c + (q.flip ? -0.45 : 0.45), r: q.r, z: q.r + 0.01, flip: false, up: SHOP_FEEL.zebra.carryUp });
+    }
+  };
+  let slab: HTMLCanvasElement | null = null;
+  /** The board as a goon carries it: a slab of the table's palette's two squares, 8 across (made once). */
+  const boardSlab = (): HTMLCanvasElement => {
+    if (slab) return slab;
+    const c = (slab = document.createElement("canvas"));
+    c.width = 32;
+    c.height = 6;
+    const q = c.getContext("2d")!;
+    const P = ci!.table.palette;
+    q.fillStyle = P["4"] ?? "#6b4a2e";
+    q.fillRect(0, 2, 32, 4);
+    for (let i = 0; i < 8; i++) {
+      q.fillStyle = (i % 2 ? P.D : P.L) ?? (i % 2 ? "#5b3a22" : "#e8d2a8");
+      q.fillRect(i * 4, 0, 4, 2);
+    }
+    return c;
+  };
+  /** His set-up on the pad: each thing as it's set down (the table's leg, the chairs, the board on the table). At the table's row. */
+  const drawSetup = (now: number) => {
+    if (!setup || !ci || !marks) return;
+    const T = ci.table;
+    const placed = setup.placed(now);
+    g.imageSmoothingEnabled = false;
+    const put = (img: HTMLCanvasElement, at: { c: number; r: number }, fx: number) => {
+      if (!P(at.c, at.r)) return;
+      const s = pt.k / SQ;
+      g.drawImage(img, pt.x - fx * s, pt.y - T.ch.foot[1] * s, img.width * s, img.height * s);
+    };
+    if (placed.includes("bossChair")) put(T.stool, marks.bossStool, T.stool.width / 2);
+    if (placed.includes("youChair")) put(T.stool, marks.youStool, T.stool.width / 2);
+    if (placed.includes("table")) put(T.leg, marks.table, T.ch.foot[0] - T.leg.width);
+    if (placed.includes("board") && P(marks.table.c, marks.table.r)) paintTable(g, v, marks.table.c - camX, camY - marks.table.r, T.palette, marks.layout);
   };
   const sayHead = { x: 0, y: 0, px: 0 };
   /** Where the one talking has his head on screen this frame (his bubble's tail), or false: he isn't drawn. */
@@ -2806,7 +2854,10 @@ function startRoom(
    */
   const drawCenter = () => {
     const n = introNow;
-    if (ca) return drawCast(false);
+    if (ca) {
+      drawSetup(performance.now());
+      return drawCast(false);
+    }
     if (!ci || !marks || !n || !P(marks.table.c, marks.table.r)) return;
     const s = pt.k / SQ;
     const x = pt.x;
@@ -4090,7 +4141,6 @@ function startRoom(
     recenter: () => {
       follow = true;
     },
-    here: () => you.here(),
     busy: () => !!cab && CLAW_PLAY.open,
     stop: () => {
       alive = false;

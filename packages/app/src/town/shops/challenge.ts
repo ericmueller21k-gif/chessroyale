@@ -79,10 +79,11 @@ export interface BossIntro {
   /** What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet. */
   crewLine?: string;
   /**
-   * Met inside, not brought in from the town (Don Dough, Nov 11: the kingpin stays in his back room): he's on his mark from the start
-   * and you walk to yours from where you stood to talk to him; his room's challenge starts from his card (Town.tsx challengeHere).
+   * Met inside, not brought in from the town (Don Dough, Nov 11: the kingpin stays in his back room; his challenge starts from his card
+   * there, Town.tsx challengeHere): you both come out through the door from the home's other room, beside each other, and walk to your
+   * marks in this one (his front room's pad).
    */
-  inPlace?: true;
+  fromDoor?: true;
 }
 
 /**
@@ -356,18 +357,18 @@ export const BOSS_INTROS: Readonly<Partial<Record<HomeId, BossIntro>>> = {
     custom: false,
     cues: { table: "pop", wipe: "clownSlideUp" },
   },
-  // (Nov 11: Don Dough, met inside his bakery's back room, seated at his table's head: shops/intros/zebra.ts. Played once his boss is in
-  // the game, from his card there (shops.ts canChallengeInside); his line the art's battle start. His own camera, the art's for the
-  // small room. His sounds a placeholder until his boss's round: the app's pop for his shot.)
+  // (Nov 11: Don Dough, met in his bakery's back room; the fight in its front room, on the pad: shops/intros/zebra.ts. Played once his
+  // boss is in the game, from his card there (shops.ts canChallengeInside); his line the art's battle start. You both walk out of the
+  // back door to where you stand (`seated`: no hop back) while his goons carry the table, chairs and board out (zebra-scene.ts
+  // SetupScene). His camera centred on the table so the five watching behind it show. His sounds a placeholder until his boss's round.)
   zebra: {
     name: "Don Dough",
     line: "Hope you studied. Pop!",
     layout: "across",
     custom: true,
     seated: true,
-    inPlace: true,
-    clear: 2.08,
-    cam: { south: -0.8, west: -0.35, zoom: 1 },
+    fromDoor: true,
+    cam: { south: 0.8, west: 0, zoom: 1 },
     cues: { pop: "pop", wipe: "zebraThump" },
   },
 };
@@ -782,12 +783,11 @@ export function marksOf(layout: readonly ShopPlace[], how: IntroLayout, drawn?: 
     r0 = Math.min(r0, p.row);
     r1 = Math.max(r1, p.row);
   }
-  // (No circle: a room whose art draws its marks at its own table, Don Dough's back room (Nov 11), stands you on them.)
-  if (c0 > c1 && !(drawn && how === "across")) return null;
+  if (c0 > c1) return null;
   const table = { c: (c0 + c1) / 2, r: (r0 + r1) / 2 };
   // (A piece in the circle's middle squares: the table goes in front of it, south.)
   const inMiddle = (p: ShopPlace) => p.solid && p.col <= Math.ceil(table.c) && p.col + (p.w ?? 1) - 1 >= Math.floor(table.c) && p.row >= Math.floor(table.r) && p.row - (p.d ?? 1) + 1 <= Math.ceil(table.r);
-  if (c0 <= c1 && layout.some(inMiddle)) table.r += feel.clearOff;
+  if (layout.some(inMiddle)) table.r += feel.clearOff;
   const d = feel.standOff[how];
   const k = feel.stoolOff;
   const across = how === "across";

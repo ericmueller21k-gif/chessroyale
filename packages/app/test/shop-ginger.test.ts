@@ -487,10 +487,10 @@ describe("his challenge intro (Nov 5: Eric's design)", () => {
     expect(cues.find((c) => c.cue === "clack")!.at).toBe(T.landed);
   });
 
-  it("his own camera (centred on the table, the art's INTRO_GINGER_CAM), only his and Don Dough's (Nov 11, his small back room's): every other boss's is the challenge camera for its layout, as before", () => {
+  it("his own camera (centred on the table, the art's INTRO_GINGER_CAM), only his and Don Dough's (Nov 11: centred on the table, so the five watching behind it show): every other boss's is the challenge camera for its layout, as before", () => {
     expect(introCam(d)).toEqual(INTRO_GINGER_CAM);
     expect(introCam(d)).not.toEqual(CHALLENGE_FEEL.cam.across);
-    expect(BOSS_INTROS.zebra!.cam).toEqual({ south: -0.8, west: -0.35, zoom: 1 });
+    expect(BOSS_INTROS.zebra!.cam).toEqual({ south: 0.8, west: 0, zoom: 1 });
     for (const [id, b] of Object.entries(BOSS_INTROS)) {
       if (id === "gingerbread" || id === "zebra") continue;
       expect(b!.cam, id).toBeUndefined();
