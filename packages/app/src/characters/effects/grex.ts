@@ -476,19 +476,20 @@ export const FIREBALL_FALL: Character = {
   },
 };
 
-// ---- The shots still up there: a column of 24 little rockets by the board's right edge, lit while they're up, spent
-// once they've fallen (lit from the bottom: the column empties from the top down as they come down).
+// ---- The shots still up there: a row of 24 little rockets in his boss card (Eric, Nov 11: the column by the board's right
+// edge was cut off by a phone's screen), lit while they're up, spent once they've fallen (lit from the left: the row empties
+// from the right as they come down).
 
 const SHOTS = 24;
-const PIP_H = 6;
+const PIP_W = 4;
 const pipLit: Part = { grid: [".Y.", "yxy", "qYq", "qvq", "qqq"] };
 const pipSpent: Part = { grid: ["...", ".s.", "sss", "sSs", "sss"], outline: false };
 export const CANDLE_SHOTS: Character = {
   id: "candle-shots",
   name: "Shots still up there",
-  w: 7,
-  h: SHOTS * PIP_H + 2,
-  foot: [3, SHOTS * PIP_H + 1],
+  w: SHOTS * PIP_W + 3,
+  h: 9,
+  foot: [(SHOTS * PIP_W + 3) >> 1, 8],
   palette: FIRE_PALETTE,
   parts: { lit: pipLit, spent: pipSpent },
   anims: Object.fromEntries(
@@ -498,13 +499,10 @@ export const CANDLE_SHOTS: Character = {
         loop: true,
         frames: [0, 1, 2, 3].map((i): Frame => ({
           ms: 140,
-          // (Pip n from the top; the bottom `left` are lit.)
-          layers: Array.from({ length: SHOTS }, (_, n): Layer => ({ part: n >= SHOTS - left ? "lit" : "spent", x: 2, y: 2 + n * PIP_H })),
+          // (Pip n from the left; the first `left` are lit.)
+          layers: Array.from({ length: SHOTS }, (_, n): Layer => ({ part: n < left ? "lit" : "spent", x: 2 + n * PIP_W, y: 2 })),
           // Each lit one's little flame flickers above it, out of step with its neighbors.
-          specks: Array.from({ length: left }, (_, j): Speck => {
-            const n = SHOTS - 1 - j;
-            return [3, 1 + n * PIP_H - ((n + i) % 2), (n + i) % 3 ? "f" : "Y"];
-          }),
+          specks: Array.from({ length: left }, (_, n): Speck => [3 + n * PIP_W, 1 - ((n + i) % 2), (n + i) % 3 ? "f" : "Y"]),
         })),
       },
     ]),

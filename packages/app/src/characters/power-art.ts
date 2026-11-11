@@ -37,7 +37,7 @@
  *                               left and right: the first at `launch`, each at a `shot` cue. Fly a `candleShot` from
  *                               the candle's top on each, along its tilt (grex.ts: CANDLE_SWEEP, candleMuzzle), so
  *                               they fan out. The last frame holds until you take him off. While the shots are up,
- *                               show `candleShots` by the board's right edge: `left<n>` for the n still up (24 to 0).
+ *                               show `candleShots` in his boss card: `left<n>` for the n still up (24 to 0).
  *     ultimateHit  "capture"    His laugh, as fireballs come down (lines: `kit.lines.ultimateHit`): for each, fly
  *                               `fireballFall` fall from above the board onto its square, play its `land` there,
  *                               then the square is a stage-1 `fireTile` (land ends on stage1's first frame), which
@@ -216,8 +216,8 @@
  *   candleShot     square  fly (loop), pop (ends empty). A Roman candle rocket pointing up; move it up.
  *   fireballFall   square  fall (loop), land (ends on fireTile's stage1 look). Move the falling one down onto
  *                          the square, land it there, then carry on with fireTile stage1.
- *   candleShots    strip   left24 ... left0 (loops), 7 x 146: a column of the shots still up (lit rockets from
- *                          the bottom, then spent). Size its box to keep its shape (width = height x 7 / 146).
+ *   candleShots    strip   left24 ... left0 (loops), 99 x 9: a row of the shots still up (lit rockets from
+ *                          the left, then spent). Size its box to keep its shape (height = width x 9 / 99).
  *   fireShadow     square  grow1, shadow1 (loop), grow2, shadow2 (loop), grow3, shadow3 (loop): the shadow of a
  *                          fireball coming down on the square, small 3 turns out, bigger, then the biggest (a
  *                          glow round it) the turn before it lands. See-through; draw it under the pieces.

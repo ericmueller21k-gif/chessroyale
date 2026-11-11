@@ -14,8 +14,8 @@ import { CRITICAL } from "../speech.tsx";
  * G-REX's fire on screen (the characters' sprites): the tiles in their stages on one canvas, each with a small
  * countdown (the crowd moves left before it burns: 3, 2, 1, and 0 as it burns), the sparkler, the Roman candle and its
  * fireballs (moments), the fireballs' shadows growing on the squares they'll hit (one canvas under the pieces), a piece
- * burning after the crowd's move (FireBurn), and the column of the candle's shots still up by the board's right edge
- * (CandlePips). His rules: packages/chess/src/bosses/grex.ts.
+ * burning after the crowd's move (FireBurn), and the row of the candle's shots still up in his boss card (CandlePips,
+ * the bar's prop slot: candleRow). His rules: packages/chess/src/bosses/grex.ts.
  */
 
 /**
@@ -27,7 +27,7 @@ export const SPARK = { flyAt: 1450, landAt: 1850 } as const;
  * The Roman candle: the banner, then he drops onto the middle of the board (his `romanCandle`), slams the candle down
  * (the board jolts at its `slam` cue) and fires his 24 shots, sweeping it left and right: the first at its `launch` cue
  * and one at each `shot`, each a `candleShot` streaking off from the candle's top along its tilt, so they fan out, and
- * one more lit in the column of shots up by the board. Then he jumps off, and the first wave's shadows appear.
+ * one more lit in the row of shots up in his boss card. Then he jumps off, and the first wave's shadows appear.
  */
 const ROMAN = bossKit("Jefferson")?.ch.anims.romanCandle ?? null;
 export const CANDLE = {
@@ -206,9 +206,9 @@ const LAND_MS = () => animLength(EFFECTS.fireballFall.ch.anims.land!);
 const FIZZLE_MS = () => animLength(EFFECTS.fireTile.ch.anims.fizzle!);
 
 /**
- * The Roman candle's shots still up: the characters' column by the board's right edge (`candleShots`, `left<n>`), in
- * the gutter beside the board (never over it, its timer bar or the eval bar), from the moment he fires until the last
- * fireball lands.
+ * The Roman candle's shots still up: the characters' row (`candleShots`, `left<n>`) in his boss card's free room under
+ * "N moves left" (BossUi.barProp, as Hollow's bulbs and Timber's workshop; Eric, Nov 11: the column by the board's right
+ * edge was cut off by a phone's screen), from the moment he fires until the last fireball lands.
  */
 export function CandlePips({ left }: { left: number }) {
   const n = Math.max(0, Math.min(CANDLE_SHOTS, left));
@@ -232,7 +232,6 @@ function sparkMoment({ moment, t, orientation, banner, cast }: MomentProps) {
 function candleMoment({ boss, moment, now, t, kit, banner, anim: kitAnim }: MomentProps) {
   const anim = kitAnim();
   const times = candleShotTimes(kit).map((x) => moment.at + CANDLE.rexAt + x);
-  const shots = times.filter((x) => now >= x).length;
   return (
     <div class="power-moment pm-candle">
       {banner("ROMAN CANDLE!", `${CANDLE_SHOTS} shots up…`, "fire long")}
@@ -243,7 +242,6 @@ function candleMoment({ boss, moment, now, t, kit, banner, anim: kitAnim }: Mome
         </span>
       )}
       {times.map((since, i) => (now >= since && now < since + CANDLE.shotMs ? <CandleShot key={i} i={i} since={since} /> : null))}
-      {shots > 0 && <CandlePips left={shots} />}
     </div>
   );
 }
@@ -288,8 +286,30 @@ function fireproofMoment({ boss, moment, now, t, orientation }: MomentProps) {
   );
 }
 
+/**
+ * The shots still up, in his boss card (BossUi.barProp): during the candle's own moment the row fills as he fires; after it,
+ * the shots still to fall, counting those of a wave still in the air until each lands. Through his turn the bar draws it every
+ * frame (BossBarExtra), so a shot lights or goes out as it's seen on the board.
+ */
+function candleRow({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
+  const p = boss.powers;
+  if (!p) return null;
+  const list = moments();
+  const now = Date.now();
+  const candleM = list.find((m) => m.kind === "candle");
+  if (candleM && now < candleM.at + candleM.ms) {
+    const shots = candleShotTimes(bossKit(boss.name)).filter((x) => now >= candleM.at + CANDLE.rexAt + x).length;
+    return shots > 0 ? <CandlePips left={shots} /> : null;
+  }
+  if (!p.candle) return null;
+  const wave = list.find((m) => m.kind === "fireball");
+  const inAir = wave ? (wave.squares ?? []).filter((_, i) => now < wave.at + fireballLandAt(i)).length : 0;
+  return p.candle.left > 0 || inAir > 0 ? <CandlePips left={p.candle.left + inAir} /> : null;
+}
+
 export const GREX_UI = {
   id: "grex",
+  barProp: candleRow,
   ultimate: { name: "the Roman Candle" },
   moments: {
     spark: { order: 0, kit: "power", appearAt: (m, square) => (m.square === square ? m.at + SPARK.landAt : undefined), view: sparkMoment },
@@ -319,18 +339,12 @@ export const GREX_UI = {
       const landed = moments.some((m) => m.kind === "spark" && m.square === t.square) ? "spark" : moments.some((m) => m.kind === "fireball" && m.squares?.includes(t.square)) ? "fireball" : null;
       return [tileItem(t, since, landed, now)];
     });
-    // The candle's pips: shots still to fall (during the candle's own moment, it shows them filling).
-    const candleM = moments.find((m) => m.kind === "candle");
-    const wave = moments.find((m) => m.kind === "fireball");
-    const inAir = wave ? (wave.squares ?? []).filter((_, i) => now < wave.at + fireballLandAt(i)).length : 0;
-    const pips = p.candle && !(candleM && now < candleM.at + candleM.ms) && (p.candle.left > 0 || inAir > 0) ? p.candle.left + inAir : null;
     // The fireballs' shadows: on a canvas of their own, under the pieces (a piece on the square stands on its shadow).
     const shadows = shadowItems(boss, moments, now);
     return {
       under: shadows.length > 0 && <BoardEffects items={shadows} orientation={orientation} class="pw-shadow-board" />,
       over: (
         <>
-          {pips !== null && <CandlePips left={pips} />}
           {fire.length > 0 && <BoardEffects items={tiles} orientation={orientation} class="pw-fire-board" />}
           {/* (One marker a tile: what's on fire, at which stage, and its countdown: the crowd moves left before it burns.) */}
           {fire.map((t) =>

@@ -15475,19 +15475,32 @@ img.qicon {
     translate: 0 0;
   }
 }
-/* The candle's shots still up: a column in the gutter beside the board's right edge (the characters' 7 x 146 sprite,
-   kept to its shape, as tall as the board), never over the board, its timer bar or the eval bar (on the left). On a
-   phone the board row keeps 24 px there; on a computer there's room. */
+/* The candle's shots still up: a row in his boss card's free room (the bar's prop slot, as Hollow's bulbs and Timber's
+   workshop; Eric, Nov 11: the column by the board's right edge was cut off by a phone's screen). The characters' 99 x 9
+   sprite, kept to its shape, 2 screen px a sprite px where the room has it; at the slot's right, under "N moves left". */
 .pw-pips {
   position: absolute;
-  z-index: 9;
-  left: calc(var(--board-size, 100%) + 5px);
-  top: calc(var(--board-size, 100%) / 2);
-  translate: 0 -50%;
-  width: min(16px, calc(var(--board-size, 100%) * 7 / 146));
-  aspect-ratio: 7 / 146;
+  right: 0;
+  top: 4px;
+  display: block;
+  width: min(100%, 198px);
+  aspect-ratio: 99 / 9;
   pointer-events: none;
-  filter: drop-shadow(0.15cqw 0.15cqw 0 rgba(0, 0, 0, 0.4));
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.5));
+}
+/* A computer's bar is one short row: the row takes the free room's left part, centered on the bar's height, between his bars
+   and "Move N" (as Timber's workshop and Tick's tally). */
+@media (min-width: 900px) and (min-height: 600px) {
+  .boss-bar .boss-prop:has(> .pw-pips) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .boss-bar .pw-pips {
+    top: 50%;
+    right: auto;
+    left: 4px;
+    transform: translateY(-50%);
+  }
 }
 /* The fire's banners: embers and flame. */
 .fight-banner.power-cut.fire .fb-band {
@@ -23997,6 +24010,77 @@ button.sq-tiny {
   }
   .boss-dock.dk-strip.dk-pawn:has(> .gk-tool) > .dk-race-below {
     right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 186px);
+  }
+}
+/* Stacked (Eric, Nov 11: "put the king and pawn vertical. When space is tight, this is too small and compact. They should be
+   stacked, the king on top"): where the strip is tall enough (BossDock's stackScale: `dk-stack`, `--dk-k`), the God King and
+   your pawn share one column at the strip's right, he on top under the row, your pawn under him, each `--dk-k` times its
+   side-by-side size (as big as the strip's height lets the two be, at most the old two columns' width). The panel keeps the
+   rest. His menu still opens above the row, his words to his left over the panel; his ⚡ and 🐟 and the carrot count stand
+   just left of the column. */
+@media (max-width: 899px) and (min-height: 520px) {
+  .screen.game > .boss-dock.dk-strip.dk-pawn.dk-stack {
+    grid-template-columns: var(--dk-left, 0px) minmax(0, 1fr) calc(58px * var(--dk-k, 1)) minmax(0, calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%)));
+    grid-template-rows: auto calc(62px * var(--dk-k, 1)) minmax(0, 1fr);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .boss-dock-main {
+    grid-column: 2 / 4;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-panel {
+    grid-row: 2 / 4;
+    margin-right: 6px;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .gk-unit {
+    grid-column: 3;
+    grid-row: 2;
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(62px * var(--dk-k, 1));
+    grid-template-rows: 1fr calc(12px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit-btn {
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(50px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit .god-king {
+    width: calc(50px * var(--dk-k, 1));
+    height: calc(50px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit-charges {
+    font-size: calc(9px * var(--dk-k, 1));
+    line-height: calc(12px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen .god-king.fallen {
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(58px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen.has-power {
+    grid-template-rows: calc(24px * var(--dk-k, 1)) 1fr;
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack .gk-unit.fallen.has-power .gk-unit-btn {
+    height: calc(38px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .gk-unit > .gk-bubble {
+    max-width: calc(var(--dk-w, 100vw) - 58px * var(--dk-k, 1) - 30px);
+  }
+  .boss-dock.dk-strip.dk-stack > .you-pawn {
+    --pw: calc(68px * var(--dk-k, 1));
+    --feet: calc(6px * var(--dk-k, 1));
+    grid-column: 3;
+    grid-row: 3;
+    width: calc(58px * var(--dk-k, 1));
+    height: calc(62px * var(--dk-k, 1));
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .ult-test.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 34px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .engine-move.gk-tool {
+    left: calc(var(--dk-left, 0px) + var(--dk-w, 100%) - 58px * var(--dk-k, 1) - 64px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 8px);
+  }
+  .boss-dock.dk-strip.dk-pawn.dk-stack:has(> .gk-tool) > .dk-race-below {
+    right: calc(100% - var(--dk-left, 0px) - var(--dk-w, 100%) + 58px * var(--dk-k, 1) + 70px);
   }
 }
 /* Where the panel is narrower than a capture's row (with its time) needs, the row tightens (320 to 390 px wide phones). */

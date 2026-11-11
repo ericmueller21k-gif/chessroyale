@@ -1,6 +1,6 @@
 import { expect, type Page } from "@playwright/test";
 import { Chess } from "chess.js";
-import { BOARD_SEL, engineTop, test, watchFor, bossAloneFromHome, submitMove } from "./helpers.ts";
+import { engineTop, test, watchFor, bossAloneFromHome, submitMove } from "./helpers.ts";
 import { MUSIC } from "@chessroyale/core";
 
 /**
@@ -154,7 +154,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
 
   // Step onto it if a piece can (the God King's warning, once a match).
   await play(page, { step: true });
-  // The Roman candle: its banner, G-REX on the middle of the board, the column of pips filling as he fires.
+  // The Roman candle: its banner, G-REX on the middle of the board, the row of pips in his boss card filling as he fires.
   await expect(banner(page, "ROMAN CANDLE!")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".pm-rex")).toBeVisible({ timeout: 5_000 });
   await expect(page.locator(".pw-pips")).toBeVisible({ timeout: 8_000 });
@@ -162,14 +162,19 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
   const p3 = await powers(page);
   expect(p3.candle).toEqual({ at: 3, left: 24 });
   expect(p3.fire[0].stage).toBe(2);
-  await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", "24");
+  await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", "24");
   await expect(page.locator(".power-board .pw-fire.stage-2 .pw-count")).toHaveText("2");
-  // The pips stand in the gutter right of the board: never over it or its timer bar (no eval bar is drawn since Nov 1).
-  const [pips, board, timer] = await Promise.all([".power-board .pw-pips", BOARD_SEL.squares, ".timer-bar"].map((s) => page.locator(s).first().boundingBox()));
-  expect(pips!.x).toBeGreaterThanOrEqual(board!.x + board!.width - 0.5);
-  expect(pips!.x + pips!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
-  expect(pips!.height).toBeGreaterThan(pips!.width * 10);
-  if (timer) expect(pips!.x).toBeGreaterThanOrEqual(timer.x + timer.width - 0.5);
+  // The pips: a row in his boss card's free room (Eric, Nov 11: the column by the board's right edge was cut off by the screen),
+  // whole inside the card and the screen, clear of his name, his level and "N moves left".
+  const [pips, card, name, level, status] = await Promise.all([".boss-prop .pw-pips", ".boss-bar", ".boss-name strong", ".boss-level", ".boss-next"].map((s) => page.locator(s).first().boundingBox()));
+  const clear = (a: typeof pips, b: typeof pips) => !a || !b || a.x + a.width <= b.x + 0.5 || b.x + b.width <= a.x + 0.5 || a.y + a.height <= b.y + 0.5 || b.y + b.height <= a.y + 0.5;
+  expect(pips!.width).toBeGreaterThan(pips!.height * 8);
+  expect(pips!.x).toBeGreaterThanOrEqual(card!.x - 0.5);
+  expect(pips!.x + pips!.width).toBeLessThanOrEqual(Math.min(card!.x + card!.width, page.viewportSize()!.width) + 0.5);
+  expect(pips!.y).toBeGreaterThanOrEqual(card!.y - 0.5);
+  expect(pips!.y + pips!.height).toBeLessThanOrEqual(card!.y + card!.height + 0.5);
+  for (const [what, b] of [["name", name], ["level", level], ["moves left", status]] as const) expect(clear(pips, b), `the row clear of his ${what}`).toBe(true);
+  await expect(page.locator(".power-board .pw-pips")).toHaveCount(0);
   // The first wave's square is shadowed, small: it falls 3 turns after the launch.
   expect(p3.shadows).toEqual([{ square: expect.any(String), lands: 6, stage: 1 }]);
   await expect.poll(() => shadowsShown(page)).toEqual({ [p3.shadows[0].square]: 1 });
@@ -206,7 +211,7 @@ test("Jefferson: his tiles burn in stages counting down, a piece left on one bur
     if ((await phase(page)) !== "play") break;
     const p = await powers(page);
     left.set(p.turn, p.candle.left);
-    if (p.candle.left > 0) await expect(page.locator(".power-board .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
+    if (p.candle.left > 0) await expect(page.locator(".boss-prop .pw-pips")).toHaveAttribute("data-left", String(p.candle.left));
     // What landed this turn is what was shadowed for it (but a square the crowd's king stands on: it fizzles).
     const wave = p.events.find((e: { kind: string }) => e.kind === "fireball");
     if (shadowed.has(p.turn)) expect(wave?.squares, `turn ${p.turn}`).toEqual(shadowed.get(p.turn));

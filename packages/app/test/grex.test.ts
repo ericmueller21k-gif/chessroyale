@@ -291,15 +291,17 @@ describe("his fire on the board", () => {
     }
   });
 
-  it("counts the shots still up there in a column: left<n> shows n lit, from the bottom", () => {
+  it("counts the shots still up there in a row (his boss card's, Eric, Nov 11): left<n> shows n lit, from the left", () => {
     const shots = EFFECTS.candleShots;
     expect(shots.counter).toEqual({ prefix: "left", max: 24 });
-    expect(shots.ch.h).toBeGreaterThan(shots.ch.w * 15);
+    expect(shots.ch.w).toBeGreaterThan(shots.ch.h * 10);
     for (let n = 0; n <= 24; n++) {
       const layers = shots.ch.anims[`left${n}`]!.frames[0]!.layers;
       const lit = layers.filter((l) => l.part === "lit");
       expect(lit.length).toBe(n);
-      if (n && n < 24) expect(Math.min(...lit.map((l) => l.y))).toBeGreaterThan(Math.max(...layers.filter((l) => l.part === "spent").map((l) => l.y)));
+      if (n && n < 24) expect(Math.max(...lit.map((l) => l.x))).toBeLessThan(Math.min(...layers.filter((l) => l.part === "spent").map((l) => l.x)));
+      // (Every pip and its flame inside the frame.)
+      for (const l of layers) expect(l.x + 3, `left${n}`).toBeLessThanOrEqual(shots.ch.w - 1);
     }
   });
 
