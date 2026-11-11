@@ -13,7 +13,7 @@
  * container instance ("fairplay-1", fairplay-engine.ts), so a match's re-checks never wait behind it.
  */
 import { legalMoves, stockfishRefuses } from "@chessroyale/chess";
-import { FAIRPLAY, matchSignals, referenceStrength, skipReason, type FairMove } from "@chessroyale/core";
+import { FAIRPLAY, matchSignals, referenceStrength, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
 import { relevel, type CaseMailer } from "./fairplay.ts";
 
@@ -194,19 +194,23 @@ export async function deepCheckRun(sql: Sql, search: DeepSearch, now: number, op
   return { searches, matches };
 }
 
-/**
- * Stores a match's moves with their deep results, and its summary and score worked out again: "done" (every counted move), "capped"
- * (out of the queue, not done: a review queues it again) or "waiting" (still queued).
- */
-async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], state: "done" | "capped" | "waiting"): Promise<void> {
-  // (Measured against the player's strength as it was before that match, as when it was first scored.)
+/** A stored match's summary worked out again from its moves, measured against the player's strength as it was before that match (as when it was first scored). */
+async function summaryOf(sql: Sql, row: Pick<QueueRow, "user_id" | "played_at">, moves: readonly FairMove[]): Promise<FairSummary> {
   const before = await sql.all<{ perf: number | null }>(
     "SELECT perf FROM fairplay_matches WHERE user_id = ? AND played_at < ? ORDER BY played_at DESC LIMIT 10",
     row.user_id,
     row.played_at,
   );
   const rating = (await sql.first<{ rating: number | null }>("SELECT rating FROM users WHERE id = ?", row.user_id))?.rating ?? null;
-  const summary = matchSignals(moves, referenceStrength(before.map((b) => b.perf), rating));
+  return matchSignals(moves, referenceStrength(before.map((b) => b.perf), rating));
+}
+
+/**
+ * Stores a match's moves with their deep results, and its summary and score worked out again: "done" (every counted move), "capped"
+ * (out of the queue, not done: a review queues it again) or "waiting" (still queued).
+ */
+async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], state: "done" | "capped" | "waiting"): Promise<void> {
+  const summary = await summaryOf(sql, row, moves);
   await sql.run(
     "UPDATE fairplay_matches SET moves = ?, summary = ?, score = ?, perf = ?, deep_done = ?, deep_queued = ? WHERE id = ?",
     JSON.stringify(moves),
@@ -217,4 +221,37 @@ async function saveDeep(sql: Sql, row: QueueRow, moves: FairMove[], state: "done
     state === "waiting" ? 1 : 0,
     row.id,
   );
+}
+
+/**
+ * The near-best count's catch-up (Nov 11; docs/decisions/2026-11-11-near-best.md): an open case's matches whose stored summary predates
+ * it (no `deepExact`) and still keep their moves get their summary worked out again from the deep results already stored (each move's
+ * rank and loss: no searches), then the player's level again (relevel), as after a deep re-check. A summary worked out again carries
+ * `deepExact`, so a match is caught up once and the next run finds nothing: safe to run every time (the Worker's schedule, before the
+ * re-check). At most `limit` matches a run; the rest on the next. Returns the matches caught up.
+ */
+export async function recountDeep(sql: Sql, now: number, opts: { mail?: CaseMailer; limit?: number } = {}): Promise<number> {
+  const rows = await sql.all<{ id: number; user_id: string; played_at: number; moves: string }>(
+    `SELECT m.id, m.user_id, m.played_at, m.moves FROM fairplay_cases c JOIN fairplay_matches m ON m.user_id = c.user_id
+     WHERE c.status IN ('watch', 'review', 'pool') AND m.moves IS NOT NULL AND json_valid(m.summary)
+       AND json_extract(m.summary, '$.deepChecked') > 0 AND json_extract(m.summary, '$.deepExact') IS NULL
+     ORDER BY m.played_at LIMIT ?`,
+    opts.limit ?? 100,
+  );
+  const touched = new Set<string>();
+  for (const row of rows) {
+    let moves: FairMove[];
+    try {
+      moves = JSON.parse(row.moves) as FairMove[];
+    } catch {
+      // (Unreadable moves: marked caught up with the count it has, so the next run doesn't pick it again.)
+      await sql.run("UPDATE fairplay_matches SET summary = json_set(summary, '$.deepExact', json_extract(summary, '$.deepMatch')) WHERE id = ?", row.id);
+      continue;
+    }
+    const summary = await summaryOf(sql, row, moves);
+    await sql.run("UPDATE fairplay_matches SET summary = ?, score = ?, perf = ? WHERE id = ?", JSON.stringify(summary), summary.score, summary.perf, row.id);
+    touched.add(row.user_id);
+  }
+  for (const userId of touched) await relevel(sql, userId, now, opts.mail);
+  return rows.length;
 }

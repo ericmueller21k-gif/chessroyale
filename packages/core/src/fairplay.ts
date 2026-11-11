@@ -72,6 +72,13 @@ export interface FairMove {
   deep?: { best: string; rank: number; loss: number; top?: string[] };
 }
 
+/**
+ * Whether a deep-checked pick counts as the engine's best (Eric, Nov 11; docs/decisions/2026-11-11-near-best.md): its rank is 1,
+ * or it gives away at most FAIRPLAY.deep.nearBestLoss points by the deep search's own numbers. Two strong engines often prefer
+ * different, practically equal moves, so an exact match undercounts every engine user whose engine isn't ours.
+ */
+export const nearBest = (d: Pick<NonNullable<FairMove["deep"]>, "rank" | "loss">, near: number = FAIRPLAY.deep.nearBestLoss): boolean => d.rank === 1 || d.loss <= near;
+
 export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp" | "engineToken" | "bossPower";
 
 /** A settings group with its numbers widened (FAIRPLAY is `as const`), so tests and the simulation can try others. */
@@ -233,9 +240,13 @@ export interface FairSummary {
   /** Counted moves with a look-away during the clock, and how many of those found the best. */
   awayMoves: number;
   awayFound: number;
-  /** The deep re-check: counted moves checked, how many picks were its best (a "deep match"), in its top 3, its average loss. */
+  /**
+   * The deep re-check: counted moves checked; picks at or near its best (a "deep match": nearBest, which the ban bars read); picks
+   * that were its very best (rank 1; a summary without it predates the near-best count, Nov 11); in its top 3; its average loss.
+   */
   deepChecked: number;
   deepMatch: number;
+  deepExact: number;
   deepTop3: number;
   deepLoss: number | null;
   /** The suspicion score and its parts. */
@@ -249,7 +260,13 @@ export interface FairSummary {
  * this match's strength (up to strengthCap), so an honest strong player isn't flagged for finding what strong players
  * find.
  */
-export function matchSignals(moves: readonly FairMove[], ref: number | null, s: Signals = FAIRPLAY.signals, sc: Score = FAIRPLAY.score): FairSummary {
+export function matchSignals(
+  moves: readonly FairMove[],
+  ref: number | null,
+  s: Signals = FAIRPLAY.signals,
+  sc: Score = FAIRPLAY.score,
+  near: number = FAIRPLAY.deep.nearBestLoss,
+): FairSummary {
   const counted = moves.filter((m) => skipReason(m, s) === null);
   const losses = counted.map((m) => m.loss);
   const perf = matchPerf(losses, s);
@@ -297,7 +314,8 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
   }
   const timeCorr = times.length >= s.minTimed ? spearman(times, difficulty) : null;
   const checked = counted.filter((m) => m.deep);
-  const deepMatch = checked.filter((m) => m.deep!.rank === 1).length;
+  const deepMatch = checked.filter((m) => nearBest(m.deep!, near)).length;
+  const deepExact = checked.filter((m) => m.deep!.rank === 1).length;
   const deepTop3 = checked.filter((m) => m.deep!.rank <= 3).length;
   const deepLoss = checked.length ? checked.reduce((a, m) => a + m.deep!.loss, 0) / checked.length : null;
   const enough = counted.length >= sc.minCounted;
@@ -327,6 +345,7 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
     awayFound,
     deepChecked: checked.length,
     deepMatch,
+    deepExact,
     deepTop3,
     deepLoss: deepLoss === null ? null : round2(deepLoss),
     score,
@@ -379,24 +398,15 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
   if (checked.length >= lv.banMatches && evidence >= lv.banEvidence && deepChecked >= lv.banDeepChecked && deepShare >= lv.banDeep && bestPerf >= lv.banPerf) {
     return {
       level: "ban",
-      reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves the engine's best, best strength ${bestPerf}`],
+      reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves near the engine's best, best strength ${bestPerf}`],
     };
   }
   const one = checked.find((m) => atBanBar(m, lv));
-  if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves the engine's best, strength ${one.perf}`] };
+  if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves near the engine's best, strength ${one.perf}`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };
   return { level: "none", reasons: [] };
-}
-
-/**
- * Whether a ban-level verdict rests on two matches or more: it still stands with any one of them left out (the engine pool's level
- * path: docs/decisions/2026-11-10-engine-pool.md). Fair play records a match once per lobby, so one lobby's judges, honest or forged,
- * never carry it alone (the #618 review, M3); a ban that rests on one match opens a review instead (a person looks).
- */
-export function banSpread(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): boolean {
-  return playerLevel(matches, now, lv).level === "ban" && matches.every((_, i) => playerLevel(matches.filter((__, j) => j !== i), now, lv).level === "ban");
 }
 
 /**

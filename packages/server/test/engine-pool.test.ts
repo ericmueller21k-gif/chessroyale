@@ -112,7 +112,7 @@ describe("into the pool", () => {
     expect(sent).toEqual([]);
   });
 
-  it("the level path: a ban resting on one match opens a review (a person looks); on two (two lobbies) it pools any account; results not held, the profile as ever", async () => {
+  it("the level path: one deep-checked match past every one-match bar pools any account at once (Eric, Nov 11); results not held, the profile as ever", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);
     const sent: string[] = [];
@@ -121,11 +121,11 @@ describe("into the pool", () => {
     await recordResult(sql, p.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2500, ranked: true }, T0 - 1000);
     const before = (await publicProfile(sql, p.id, T0))!;
     const one = await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0, mail);
-    expect(one).toMatchObject({ verdict: { level: "ban" }, acted: "review" });
-    expect(await caseOf(sql, p.id)).toMatchObject({ status: "review", reason: expect.stringMatching(/^level ban on one match \(two would pool\): one match/) });
+    expect(one).toMatchObject({ verdict: { level: "ban" }, acted: "pool" });
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: one match: evidence [\d.]+, 20\/20 moves near the engine's best/) });
     const two = await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0 + 1000, mail);
     expect(two).toMatchObject({ verdict: { level: "ban" }, acted: "pool" });
-    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: 2 deep-checked matches/) });
+    expect((await caseOf(sql, p.id))?.status).toBe("pool");
     expect(sent).toEqual([]);
     expect(await eligibleForRanked(sql, p.id)).toBe(true);
     expect((await sql.first<{ held: number }>("SELECT held FROM results WHERE user_id = ?", p.id))?.held).toBe(0);
@@ -136,7 +136,7 @@ describe("into the pool", () => {
     const reporter = await player(sql, "Rae");
     await reportPlayer(sql, reporter, p.id, "Cheating", "CCCCC", T0 + 3000);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
-    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", p.id)).map((l) => l.action)).toEqual(["review", "pool", "note", "note"]);
+    expect((await sql.all<{ action: string }>("SELECT action FROM fairplay_log WHERE user_id = ? ORDER BY id", p.id)).map((l) => l.action)).toEqual(["pool", "note", "note", "note"]);
   });
 
   it("public rankings leave the pool out: others' Top N% don't count a pooled player; theirs looks as ever", async () => {
@@ -280,10 +280,8 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     // Their next match, an honest one: the matches before the Release were weighed by it.
     await recordFairPlay(sql, p.id, { lobby: "CCCCC", mode: "crowd", moves: plain }, T0 + 4000, mail);
     expect((await caseOf(sql, p.id))?.status).not.toBe("pool");
-    // A new one at the bar (detection's level again, from the matches since): a review (one match: a person looks); a second, back in.
+    // A new one at the bar (detection's level again, from the matches since): back in (one match past every bar pools: Nov 11).
     await recordFairPlay(sql, p.id, { lobby: "DDDDD", mode: "crowd", moves: bar }, T0 + 5000, mail);
-    expect((await caseOf(sql, p.id))?.status).toBe("review");
-    await recordFairPlay(sql, p.id, { lobby: "EEEEE", mode: "crowd", moves: bar }, T0 + 6000, mail);
     expect((await caseOf(sql, p.id))?.status).toBe("pool");
   });
 
@@ -322,10 +320,7 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     const p = await player(sql, "Pat");
     const q = await player(sql, "Quinn");
     await recordResult(sql, p.id, { mode: "crowd", online: true, placement: 1, players: 100, rating: 2400, ranked: true }, T0 - DAY);
-    for (const [u, lobby] of [[p, "AAAAA"], [q, "BBBBB"]] as const) {
-      await recordFairPlay(sql, u.id, { lobby, mode: "crowd", moves: bar }, T0 - 1000);
-      await recordFairPlay(sql, u.id, { lobby: `${lobby.slice(0, 4)}C`, mode: "crowd", moves: bar }, T0);
-    }
+    for (const [u, lobby] of [[p, "AAAAA"], [q, "BBBBB"]] as const) await recordFairPlay(sql, u.id, { lobby, mode: "crowd", moves: bar }, T0);
     // In the pool: Pat loses both 1 v 1 games to Quinn (pooled) and one crowd match.
     for (const [id, at] of [["G1", T0 + DAY], ["G2", T0 + 2 * DAY]] as const)
       await sql.run(
@@ -345,7 +340,7 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
       by: "detection",
       why: expect.stringMatching(/^level ban/),
       games: 2,
-      evidence: { matches: 2, atBar: 2, deepMatch: 40, deepChecked: 40, bestPerf: 3400, pooledPerf: 3400 },
+      evidence: { matches: 1, atBar: 1, deepMatch: 20, deepChecked: 20, bestPerf: 3400, pooledPerf: 3400 },
       inPool: { games: 1, wins: 0, duelWins: 0, duelLosses: 2, duelDraws: 0, vsPool: 2, vsPoolScore: 0, matches: 0, atBar: 0 },
     });
     const env = { DB: d1, ADMIN_EMAILS: "pat-admin@example.com,eric@example.com" };
@@ -358,7 +353,7 @@ describe("Release, the reviewer, the kept evidence and the admin list", () => {
     expect(page).toContain(`action="/admin/fairplay/case/${p.id}"`);
     expect(page).toContain('value="release">Release</button>');
     expect(page).toContain('<a href="/admin/fairplay/pool.json">1–2</a>');
-    // A person's decision on Quinn's case (Eric releases them; two more matches at the bar put them back): the admin is in the log and
+    // A person's decision on Quinn's case (Eric releases them; matches at the bar put them back): the admin is in the log and
     // the case's decided_by. The download: every pooled player's file, moves and all, and no email anywhere (the #618 review, M1).
     expect(await decide(sql, q.id, "release", "admin:eric@example.com", "checking: reach me at eric@example.com", T0 + 4 * DAY)).toEqual({ ok: true, status: "cleared" });
     for (const [lobby, at] of [["BBBBD", T0 + 5 * DAY], ["BBBBE", T0 + 6 * DAY]] as const) await recordFairPlay(sql, q.id, { lobby, mode: "crowd", moves: bar }, at);

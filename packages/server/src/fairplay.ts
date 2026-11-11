@@ -19,7 +19,7 @@
  * FAIRPLAY.evidenceDaysUnflagged days, so a report made after a match still finds its games; for FAIRPLAY.evidenceDays
  * when the player was flagged or reported, and never deleted while their case is open (see purgeEvidence).
  */
-import { FAIRPLAY, banSpread, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
+import { FAIRPLAY, matchSignals, newAccountPool, playerLevel, referenceStrength, type FairLevel, type FairMove, type FairSummary, type LevelInput, type LevelVerdict } from "@chessroyale/core";
 import { getUser, identityHashes, refreshRating, type Sql, type User } from "./accounts.ts";
 
 /** A case's status; "closed": a watch with nothing new for FAIRPLAY.evidenceDays (not a decision on the merits). */
@@ -455,7 +455,6 @@ export async function recordFairPlay(
   const c = await caseOf(sql, userId);
   const inputs = [...levelInputs(history, c), { ...summary, at: now }];
   let verdict = playerLevel(inputs, now, lv);
-  let spread = verdict.level === "ban" && banSpread(inputs, now, lv);
   const flagged = summary.score >= lv.watch || verdict.level !== "none" || (!!c && OPEN.includes(c.status));
   const added = await sql.first<{ id: number }>(
     `INSERT INTO fairplay_matches (user_id, lobby, mode, played_at, counted, perf, score, level, summary, moves, keep_until)
@@ -476,13 +475,13 @@ export async function recordFairPlay(
   );
   // (A retry whose row went in on an earlier try, which stopped before the steps below: the level from what's stored, as relevel's, so a
   // person's decision since counts; then the same steps, both safe to repeat. The review of #610, m1.)
-  if (!added) ({ verdict, spread } = await levelNow(sql, userId, c, now));
+  if (!added) verdict = await levelNow(sql, userId, c, now);
   // The deep re-check: a flagged match queues every match of theirs still kept (earlier ones can clear them).
   if (summary.score >= FAIRPLAY.deep.queueScore || verdict.level !== "none") await queueDeep(sql, userId);
   // (A retry acts only when the case is still below what the verdict asks: it finishes what an earlier try missed, and writes no
   // second note when nothing was missed. The delta review of #610, m1-a.)
-  const aim = aimOf(verdict, spread);
-  const acted = !added && aim && caseRank(c?.status) >= caseRank(aim) ? ACTED[aim] : await actOn(sql, userId, verdict, spread, now, mail);
+  const aim = aimOf(verdict);
+  const acted = !added && aim && caseRank(c?.status) >= caseRank(aim) ? ACTED[aim] : await actOn(sql, userId, verdict, now, mail);
   const pooled = await poolNewAccount(sql, userId, now);
   await purgeEvidence(sql, now);
   return { summary, verdict, acted: pooled ? "pool" : acted };
@@ -523,8 +522,8 @@ function levelInputs(history: readonly HistoryRow[], c: Case | null): LevelInput
  * does about it. The deep re-check's entry point (fairplay-deep.ts).
  */
 export async function relevel(sql: Sql, userId: string, now: number, mail?: CaseMailer): Promise<{ verdict: LevelVerdict; acted: Acted }> {
-  const { verdict, spread } = await levelNow(sql, userId, await caseOf(sql, userId), now);
-  const acted = await actOn(sql, userId, verdict, spread, now, mail);
+  const verdict = await levelNow(sql, userId, await caseOf(sql, userId), now);
+  const acted = await actOn(sql, userId, verdict, now, mail);
   return { verdict, acted: (await poolNewAccount(sql, userId, now)) ? "pool" : acted };
 }
 
@@ -549,28 +548,23 @@ async function poolNewAccount(sql: Sql, userId: string, now: number): Promise<bo
   return true;
 }
 
-/**
- * A player's level from their stored matches now (since the case's last decision), acting on nothing; for a ban, whether it rests on two
- * matches or more (`spread`: core's banSpread).
- */
-async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): Promise<{ verdict: LevelVerdict; spread: boolean }> {
+/** A player's level from their stored matches now (since the case's last decision), acting on nothing. */
+async function levelNow(sql: Sql, userId: string, c: Case | null, now: number): Promise<LevelVerdict> {
   const history = await sql.all<HistoryRow>(
     "SELECT id, perf, score, counted, played_at, summary FROM fairplay_matches WHERE user_id = ? ORDER BY played_at DESC, id DESC LIMIT 20",
     userId,
   );
-  const inputs = levelInputs(history, c);
-  const verdict = playerLevel(inputs, now, FAIRPLAY.levels);
-  return { verdict, spread: verdict.level === "ban" && banSpread(inputs, now, FAIRPLAY.levels) };
+  return playerLevel(levelInputs(history, c), now, FAIRPLAY.levels);
 }
 
 type Enforcement = "watch" | "review" | "pool" | "ban";
 
 /** The case status actOn moves a verdict to (as its branches below), for a retry's check. */
-function aimOf(verdict: LevelVerdict, spread: boolean): CaseStatus | undefined {
+function aimOf(verdict: LevelVerdict): CaseStatus | undefined {
   if (verdict.level === "none") return undefined;
   const mode = FAIRPLAY.enforcement as Enforcement;
   if (verdict.level === "watch" || mode === "watch") return "watch";
-  if (verdict.level === "ban" && mode === "pool") return spread ? "pool" : "review";
+  if (verdict.level === "ban" && mode === "pool") return "pool";
   return verdict.level === "ban" && mode === "ban" ? "banned" : "review";
 }
 const ACTED = { watch: "watch", review: "review", pool: "pool", banned: "ban" } as Record<CaseStatus, Acted>;
@@ -579,21 +573,16 @@ const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 4 : s 
 /**
  * What detection does with a level, as far as FAIRPLAY.enforcement allows: "watch" only records (a watch case, its
  * log saying what the level would have done), "review" also opens reviews, "pool" sends a ban-level player to the engine pool
- * (quietly: no email) when the ban rests on two matches or more (`spread`), else opens a review, "ban" bans them. Returns what it did.
+ * (quietly: no email), on one deep-checked match past every one-match bar or on the two-match path (Eric, Nov 11: "It's better we
+ * put people in this queue than under"; docs/decisions/2026-11-11-near-best.md), "ban" bans them. Returns what it did.
  */
-async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, spread: boolean, now: number, mail?: CaseMailer): Promise<Acted> {
+async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: number, mail?: CaseMailer): Promise<Acted> {
   if (verdict.level === "none") return "none";
   const mode = FAIRPLAY.enforcement as Enforcement;
   const why = verdict.reasons.join("; ");
   if (verdict.level === "watch" || mode === "watch") {
     await raiseCase(sql, userId, "watch", "detection", verdict.level === "watch" ? why : `level ${verdict.level}, not acted on (watch only): ${why}`, now);
     return "watch";
-  }
-  if (verdict.level === "ban" && mode === "pool" && !spread) {
-    // (One match at the bar, so one lobby's judges: a person looks first. Eric: "if some player accidentally does for a game, they won't
-    // get banned". The #618 review, M3.)
-    await raiseCase(sql, userId, "review", "detection", `level ban on one match (two would pool): ${why}`, now);
-    return "review";
   }
   if (verdict.level === "ban" && mode === "pool") {
     // (Already pooled: the new evidence goes in its log, raiseCase's note. Banned by a person: nothing more.)
