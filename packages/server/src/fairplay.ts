@@ -565,7 +565,7 @@ function aimOf(verdict: LevelVerdict): CaseStatus | undefined {
   const mode = FAIRPLAY.enforcement as Enforcement;
   if (verdict.level === "watch" || mode === "watch") return "watch";
   if (verdict.level === "ban" && mode === "pool") return "pool";
-  return verdict.level === "ban" && mode === "ban" ? "banned" : "review";
+  return verdict.level === "ban" && mode === "ban" && verdict.path !== "strength" ? "banned" : "review";
 }
 const ACTED = { watch: "watch", review: "review", pool: "pool", banned: "ban" } as Record<CaseStatus, Acted>;
 const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 4 : s === "pool" ? 3 : s === "review" ? 2 : s === "watch" ? 1 : 0);
@@ -574,7 +574,9 @@ const caseRank = (s: CaseStatus | undefined): number => (s === "banned" ? 4 : s 
  * What detection does with a level, as far as FAIRPLAY.enforcement allows: "watch" only records (a watch case, its
  * log saying what the level would have done), "review" also opens reviews, "pool" sends a ban-level player to the engine pool
  * (quietly: no email), on one deep-checked match past every one-match bar or on the two-match path (Eric, Nov 11: "It's better we
- * put people in this queue than under"; docs/decisions/2026-11-11-near-best.md), "ban" bans them. Returns what it did.
+ * put people in this queue than under"; docs/decisions/2026-11-11-near-best.md), "ban" bans them, except on sustained strength
+ * (`path` "strength": the judges' numbers alone, no deep re-check), which opens a review instead (the review of #629, m1). Returns what
+ * it did.
  */
 async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: number, mail?: CaseMailer): Promise<Acted> {
   if (verdict.level === "none") return "none";
@@ -591,7 +593,7 @@ async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: numbe
     else await setCase(sql, userId, "pool", "detection", `level ban: ${why}`, now);
     return "pool";
   }
-  if (verdict.level === "ban" && mode === "ban") {
+  if (verdict.level === "ban" && mode === "ban" && verdict.path !== "strength") {
     const c = await caseOf(sql, userId);
     if (c?.status !== "banned") {
       await setCase(sql, userId, "banned", "detection", why, now);
@@ -600,7 +602,8 @@ async function actOn(sql: Sql, userId: string, verdict: LevelVerdict, now: numbe
     }
     return "ban";
   }
-  await raiseCase(sql, userId, "review", "detection", verdict.level === "ban" ? `level ban, reviewed instead (enforcement: review): ${why}` : why, now);
+  const instead = verdict.path === "strength" ? "level ban (sustained strength), reviewed instead" : "level ban, reviewed instead (enforcement: review)";
+  await raiseCase(sql, userId, "review", "detection", verdict.level === "ban" ? `${instead}: ${why}` : why, now);
   return "review";
 }
 

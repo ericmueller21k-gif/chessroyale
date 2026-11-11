@@ -224,11 +224,14 @@ interface Seat {
   moves: FairMove[];
 }
 
-/** One team's side of a 50 v 50: its seats pick on its plies, a cut after each stage's picks (CUT_AFTER). */
-function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) {
+/**
+ * One team's side of a 50 v 50: its seats pick on its plies, a cut after each stage's picks (CUT_AFTER). `whole`: no cuts, every ply
+ * of its side to the bank game's end (a long game played alone: the review of #629, m4).
+ */
+function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean, whole = false) {
   const plies = game.filter((p) => p.ply % 2 === color);
   let cut = 0;
-  for (let k = 0; k < plies.length && cut < KNOCKOUTS.length; k++) {
+  for (let k = 0; k < plies.length && (whole || cut < KNOCKOUTS.length); k++) {
     const pos = plies[k]!;
     const alive = seats.filter((s) => s.alive);
     const picks = alive.map((s) => {
@@ -280,7 +283,7 @@ function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) 
       });
     }
     // The cuts: after each stage's picks, the lowest scores go (less thinking wins a tie).
-    if (k + 1 === CUT_AFTER[cut]) {
+    if (!whole && k + 1 === CUT_AFTER[cut]) {
       const order = alive.sort((a, b) => a.score - b.score || b.think - a.think);
       for (const s of order.slice(0, KNOCKOUTS[cut]!)) s.alive = false;
       cut++;
@@ -291,7 +294,7 @@ function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) 
 /** A crowd player's strength: the population, UCI_Elo ~ N(1500, 350). */
 const crowdElo = () => Math.max(900, Math.min(2700, 1500 + 350 * gauss()));
 
-function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: boolean) {
+function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: boolean, whole = false) {
   const game = games[Math.floor(rng() * games.length)]!;
   // Subjects spread over both teams; the rest of each team of 50 is the crowd.
   const teams: Seat[][] = [[], []];
@@ -301,8 +304,8 @@ function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: b
     teams[i % 2]!.push({ subject: sub, elo, score: 0, think: 0, alive: true, moves: [] });
   });
   for (const t of teams) while (t.length < 50) t.push({ subject: null, elo: crowdElo(), score: 0, think: 0, alive: true, moves: [] });
-  playTeam(game, 0, teams[0]!, crowdInfo);
-  playTeam(game, 1, teams[1]!, crowdInfo);
+  playTeam(game, 0, teams[0]!, crowdInfo, whole);
+  playTeam(game, 1, teams[1]!, crowdInfo, whole);
   for (const seat of [...teams[0]!, ...teams[1]!]) {
     const sub = seat.subject;
     if (!sub) continue;
@@ -330,7 +333,7 @@ if (maiaData)
 console.log(maiaData ? "Maia's picks loaded (fairplay-maia.ts)" : "no Maia file: run fairplay-maia.ts for the strong-people rows");
 
 /** Plays every subject through `MATCHES` matches, 12 subjects to a match (6 per team). */
-function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false): Subject[] {
+function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false, whole = false): Subject[] {
   const subjects: Subject[] = [];
   for (const kind of kinds) for (let i = 0; i < n; i++) subjects.push({ kind, rate: kind.rate?.() ?? 0, samePhone, summaries: [], levels: [], movesByMatch: [] });
   // Shuffle so each match mixes kinds.
@@ -338,7 +341,7 @@ function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false): Sub
     const j = Math.floor(rng() * (i + 1));
     [subjects[i], subjects[j]] = [subjects[j]!, subjects[i]!];
   }
-  for (let m = 0; m < MATCHES; m++) for (let i = 0; i < subjects.length; i += 12) playMatch(games, subjects.slice(i, i + 12), m, crowdInfo);
+  for (let m = 0; m < MATCHES; m++) for (let i = 0; i < subjects.length; i += 12) playMatch(games, subjects.slice(i, i + 12), m, crowdInfo, whole);
   return subjects;
 }
 
@@ -412,6 +415,9 @@ const cheatersSame = run(CHEATERS, Math.round(PLAYERS / 8), true, true);
 const honestFew = run(HONEST.filter((k) => k.elo >= 2200), Math.round(PLAYERS / 2), false);
 const cheatersFew = run(CHEATERS, Math.round(PLAYERS / 8), false);
 const maiaHonest = maiaData ? run(MAIA, PLAYERS) : [];
+// (A whole game alone: no crowd, no cuts, every move of one side; strong people only, for sustained strength. The review of #629, m4.)
+const STRONG = [...HONEST.filter((k) => k.elo >= 2200), ...(maiaData ? MAIA : [])];
+const strongWhole = run([...STRONG, CHEATERS[6]!, CHEATERS[7]!], Math.round(PLAYERS / 5), false, false, true);
 console.log(`played in ${Math.round((Date.now() - t0) / 1000)} s`);
 
 // ---------------- The hard-find model's slope, fitted on honest players ----------------
@@ -916,6 +922,24 @@ out("");
   out(
     `A cheater who always plays the engine's 2nd or 3rd choice plays like an ordinary strong player here: those moves give away real points (the strength measure is the points lost), and the crowd's cuts send them out early, with few counted moves. No strength bar catches them without catching strong people; where the 2nd or 3rd choice is practically equal to the best, the near-best count does.`,
   );
+  out("");
+  // A whole game alone (the review of #629, m4): no crowd rates, no cuts, every move of one side of a bank game.
+  evaluate(strongWhole, base);
+  out(
+    `**A whole game alone** (no crowd, no cuts: every move of one side of a bank game, as a boss raid played alone; ${Math.round(PLAYERS / 5).toLocaleString("en-US")} players each). Ranked 1 v 1 records no judged picks, so this path never reads it. The bank's positions don't follow the player's moves, so a game a strong player is winning, where most moves lose little, isn't here: unmeasured.`,
+  );
+  out("");
+  out(`| Who | Counted moves (median) | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ | Pool within ${MATCHES} (every path) |`);
+  out("| --- | --- | --- | --- | --- | --- |");
+  for (const kind of [CHEATERS[6]!, CHEATERS[7]!, ...STRONG]) {
+    const subs = strongWhole.filter((x) => x.kind === kind);
+    const avgs = subs.map(avgOf).filter((x): x is number => x !== null);
+    const at = avgs.filter((a) => a >= lv.poolStrength).length;
+    const f = kind.cheat ? pct : per1000;
+    out(
+      `| ${kind.name}${kind.cheat ? "" : " (per 1,000)"} | ${quant(subs.flatMap((x) => x.summaries.map((y) => y.counted)), 0.5)} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} | ${f(reached(subs, "ban", MATCHES))} |`,
+    );
+  }
   out("");
 }
 

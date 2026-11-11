@@ -375,6 +375,11 @@ export type FairLevel = "none" | "watch" | "review" | "ban";
 export interface LevelVerdict {
   level: FairLevel;
   reasons: string[];
+  /**
+   * "strength": the ban level from sustained strength alone, which rests on the judges' numbers with no deep re-check, so it pools or
+   * opens a review but never bans (the review of #629, m1: the server's actOn).
+   */
+  path?: "strength";
 }
 
 /** What playerLevel reads from each match (older summaries without the deep fields count as unchecked). */
@@ -384,7 +389,7 @@ export type LevelInput = Pick<FairSummary, "score" | "perf" | "counted"> & Parti
  * A player's level from their recent match summaries (any order; only `at` within the window counts, at most
  * windowMatches of the newest). Ban needs overwhelming evidence confirmed by the deep re-check: super-GM strength
  * and engine-like moves over two matches with high scores, or one match past every bar; or a strength no honest player keeps
- * up over several matches (sustainedStrength).
+ * up over several matches (sustainedStrength: `path` "strength", never a ban on its own).
  */
 export function playerLevel(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): LevelVerdict {
   const recent = matches
@@ -411,7 +416,7 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
   const one = checked.find((m) => atBanBar(m, lv));
   if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves near the engine's best, strength ${one.perf}`] };
   const strong = sustainedStrength(recent, lv);
-  if (strong !== null) return { level: "ban", reasons: [`strength: ${strong.toLocaleString("en-US")} average over ${lv.poolStrengthMatches} matches`] };
+  if (strong !== null) return { level: "ban", path: "strength", reasons: [`strength: ${strong.toLocaleString("en-US")} average over ${lv.poolStrengthMatches} matches`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };

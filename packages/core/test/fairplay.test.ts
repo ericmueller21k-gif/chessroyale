@@ -269,7 +269,7 @@ describe("levels", () => {
     const at = (perf: number, counted: number = L.poolStrengthCounted, daysAgo = 1) => ({ score: 6, perf, counted, deepChecked: 0, deepMatch: 0, evidence: 0, at: now - daysAgo * day });
     const five = [3400, 3130, 2657, 3400, 3100].map((p) => at(p));
     expect(sustainedStrength(five)).toBe(3137);
-    expect(playerLevel(five, now)).toEqual({ level: "ban", reasons: ["strength: 3,137 average over 5 matches"] });
+    expect(playerLevel(five, now)).toEqual({ level: "ban", path: "strength", reasons: ["strength: 3,137 average over 5 matches"] });
     // Four aren't enough; a short match doesn't count (nor stand in for one); below the bar, a review at most.
     expect(playerLevel(five.slice(0, 4), now).level).not.toBe("ban");
     expect(playerLevel([...five.slice(0, 4), at(3400, L.poolStrengthCounted - 1)], now).level).not.toBe("ban");
