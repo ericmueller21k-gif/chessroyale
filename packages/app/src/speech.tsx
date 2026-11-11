@@ -308,8 +308,10 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
   const leaving = until - now < SPEECH.fadeMs;
   // (Whole pixels, rounded away from the edge it came off: rounded to the nearest, a box 12.25 px over the top moved 12
   // and stayed a quarter pixel above the window, every frame of its line.)
-  const move = fit.dx || fit.dy ? `translate(${fit.dx > 0 ? Math.ceil(fit.dx) : Math.floor(fit.dx)}px, ${Math.ceil(fit.dy)}px)` : null;
-  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
+  // (The CSS `translate` property, not `transform`: a box's pop-in animates `transform` with its fill held, which overrode the move, so
+  // for its first moments a box stayed under the menu or off the edge (Hollow's words, Nov 11: 21 px under a computer's side menu).)
+  const move = fit.dx || fit.dy ? `${fit.dx > 0 ? Math.ceil(fit.dx) : Math.floor(fit.dx)}px ${Math.ceil(fit.dy)}px` : null;
+  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { translate: move } : {}) } : undefined;
   return (
     <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}${fitted?.three ? " wide3" : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
       {/* (One block inside the box, the line's words in it: a bar's bubble clamps it to three rows, styles.css.) */}
