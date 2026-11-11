@@ -358,7 +358,8 @@ export function summarize(r: RunData): Summary {
     bakes += r.bakes[i]!;
     if (r.turn[i]! > maxTurn) maxTurn = r.turn[i]!;
   }
-  const load = F.load | F.upload | F.reset;
+  // (Loading: pictures painted, sight lines, an atlas reset. Not a plain upload: a name tag or a board drawn again uploads most frames.)
+  const load = F.load;
   const segs = [
     segment(r, "All", () => true),
     segment(r, "Walk", (i) => !!(r.flags[i]! & F.walk) && !(r.flags[i]! & F.turn)),

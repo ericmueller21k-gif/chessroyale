@@ -844,7 +844,10 @@ button.town-pic.player {
 }
 .tfr-panel {
   position: absolute;
-  inset: 6px;
+  inset: 6px 6px auto;
+  max-height: calc(100% - 12px);
+  max-width: 560px;
+  margin-inline: auto;
   z-index: 40;
   overflow: hidden;
   padding: 8px 10px;
@@ -916,4 +919,24 @@ button.town-pic.player {
   padding-left: 18px;
   font-size: 10px;
   line-height: 1.2;
+}
+/* A computer's box is wide: the panel at a readable size in its middle. */
+@media (hover: hover) and (pointer: fine) {
+  .tfr-panel {
+    max-width: 660px;
+    font-size: 12.5px;
+  }
+  .tfr-head {
+    font-size: 17px;
+  }
+  .tfr-fps {
+    font-size: 13px;
+  }
+  .tfr-fps b {
+    font-size: 18px;
+  }
+  .tfr-parts,
+  .tfr-worst ol {
+    font-size: 12px;
+  }
 }

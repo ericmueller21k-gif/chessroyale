@@ -94,6 +94,11 @@ describe("the frame report's summary (/town?report, Nov 11)", () => {
     expect(s.resets).toBe(1);
   });
 
+  it("loading is pictures painted, sight lines or an atlas reset; a plain upload (a tag drawn again) isn't", () => {
+    const s = summarize(runOf([[16, F.upload, {}, 0, 2], [16, F.load | F.upload, {}, 0, 1, 1], [16, F.load | F.sight], [16, F.load | F.reset]]));
+    expect(s.segs[3]!.frames).toBe(3);
+  });
+
   it("an empty run says so (no frames: nothing to divide by)", () => {
     const s = summarize(newRun(4));
     expect([s.frames, s.meanFps, s.p50, s.top, s.topTurn, s.ours, s.worst.length]).toEqual([0, 0, 0, -1, -1, -1, 0]);
