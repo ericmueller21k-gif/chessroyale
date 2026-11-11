@@ -283,9 +283,10 @@ export function TownScreen({
     setInside({ room, View: at.View, intro: null, arrived: true, n: (at.n ?? 0) + 1 });
   };
   /**
-   * A challenge started inside (Don Dough's, from his card in his back room after his talk beat; Nov 11): his intro and the front room
-   * load, the back room fades to black and the front room fades in in challenge mode (Eric: "The main room is still where you fight"):
-   * you and he come out of the back door to the pad, his goons carrying the set-up after you, then his transition and the battle.
+   * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
+   * Nov 11): his intro and the front room load, the back room fades to black and the front room fades in in challenge mode (Eric: "The
+   * main room is still where you fight"): you and he come out of the back door to the pad, his goons carrying the set-up after you, then
+   * his transition and the battle.
    * "Back to town" puts you at his door in the town, where you stood to go in.
    */
   const challengeHere = async () => {

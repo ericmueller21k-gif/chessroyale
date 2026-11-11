@@ -807,7 +807,9 @@ export const SHOP_FEEL = {
    * characters, about 4.4 s). The guards say one now and then (`guardMs`, at random), sooner while you're beside them or by the back
    * door (`guardNearMs`). The back table's chatter: its first line `firstMs` after you come in, `lineGapMs` between lines, `exchangeGapMs`
    * between exchanges. The talk beat: the crew `staggerMs` apart; Fedora's line `aimLeadMs` after his draw; they lower `lowerAfterMs` into
-   * Don's "Relax"; his challenge line `gapMs` after. `dim`: the back room's dark wash (the art's mockup: 0.36), its lights added over it.
+   * Don's "Relax"; his challenge line `gapMs` after. While they aim, each points his roll at you (zebra-scene.ts aimAt): your rows
+   * toward the camera count `aimRowK` of a column on screen, and the roll at his shoulder sits `aimDrop` squares above your middle.
+   * `dim`: the back room's dark wash (the art's mockup: 0.36), its lights added over it.
    */
   zebra: {
     lineMs: 1800,
@@ -817,7 +819,15 @@ export const SHOP_FEEL = {
     firstMs: 900,
     lineGapMs: 500,
     exchangeGapMs: 1400,
-    beat: { staggerMs: 120, aimLeadMs: 150, lowerAfterMs: 900, gapMs: 300 },
+    beat: { staggerMs: 120, aimLeadMs: 150, lowerAfterMs: 900, gapMs: 300, aimRowK: 0.8, aimDrop: 0.7 },
+    /**
+     * The walk-out in the back room after his challenge line (Eric, Nov 11: "watch all of them walk out, like pick up the stuff in the
+     * back and walk out"; zebra-scene.ts WalkOut): the crew set off `followMs` apart, the door guard comes in for your chair at once; a
+     * square every `stepMs`; `pickMs` picking a thing up (in his hooves halfway); Don gets up `donAfterMs` after the last is picked up,
+     * a square every `donStepMs`, and you set off `youAfterMs` after him. Through the door each fades out between rows `fade[0]` and
+     * `fade[1]` (in the front room, in between the same distance from its door).
+     */
+    out: { followMs: 450, stepMs: 200, pickMs: 400, donAfterMs: 300, donStepMs: 240, youAfterMs: 450, fade: [10.1, 10.8] },
     dim: 0.36,
     /**
      * His challenge's set-up in the front room (Eric, Nov 11: "4 of his goons who follow you in carry a chair and a board and a table, 1
@@ -826,7 +836,8 @@ export const SHOP_FEEL = {
      * the table, `watchGap` squares apart. His line waits `holdMs` after you're both on your marks, so all is set and everyone watching.
      */
     setup: { leadMs: 500, followMs: 450, stepMs: 220, setMs: 350, backMs: 260, watchBack: 2.2, watchGap: 0.95, holdMs: 2600 },
-    /** How high a goon carries his thing (the room's pixels over his feet: at his hooves). */
+    /** How high a goon carries his thing (the room's pixels over his feet: at his hooves); the kept board on its table's top. */
     carryUp: 26,
+    boardUp: 27,
   },
 } as const;
