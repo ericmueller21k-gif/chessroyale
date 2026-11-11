@@ -125,4 +125,4 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **Fable (Eric, Nov 11):** at most ONE Fable helper at a time, at `medium` effort, and only when Eric asks for Fable ("if it's Fable, just do one Fable at medium, because otherwise that's going to kill [our usage]").
 
 - **Worktree tests (Nov 11):** a worktree with `node_modules` symlinked to the main checkout resolves `@chessroyale/*` to the MAIN checkout's packages, not the worktree's. For cross-package tests, make `node_modules` a dir of links with `@chessroyale/*` pointing at the worktree's `packages/*` (as done for wt-bz).
-- Stills for Eric always include 430x740 (his iPhone 15 Pro Max in Safari, bars on). Nov 11: a 390x844 still showed the tall home card (name above pawn); his phone shows the short one (pawn left, name right) and he read it as a version mismatch.
+- Stills for Eric: the BASELINE is 428x746 (his iPhone 14 Plus in Safari, bars on; Eric, Nov 11), listed first; other widths still tested. Nov 11: a 390x844 still showed the tall home card (name above pawn); his phone shows the short one (pawn left, name right) and he read it as a version mismatch.
