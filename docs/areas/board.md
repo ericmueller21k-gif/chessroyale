@@ -125,7 +125,10 @@ Lane: the director (every screen draws it; a boss's powers draw over it). How ea
   opponent's or a replay's, not a premove playing by itself (`pickedUp` in logic.ts decides the tap; OwnBoard calls
   `haptic`). Every board through `OwnBoard`. Settings → Sound, "Vibration" (on; per device, `prefs.ts`; greyed with "Not
   available on this device" where there's no way: a computer, an old iPhone). An iPhone has no Vibration API: its ticks
-  are the hidden-switch trick, inside the tap only.
+  are the hidden-switch trick, inside the tap only. A touch's press-down isn't a gesture there, so a tick a press-down
+  makes (a tap-tap move, a premove or a Hollow try placed by tap) plays as that finger lifts on the same square, within
+  `holdMs` (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md); Android ticks at once. The
+  iPhone's Settings → Sounds & Haptics → System Haptics must be on.
 - **Chess960's castling** (DECISIONS.md, "Chess960's rules"), only for a Chess960 position (its FEN names castling
   rooks by file): the move is written as the king taking its own rook (e1h1), so the king dragged or tapped onto its
   rook castles; the king dragged onto the square it castles to (g1 or c1, as in normal chess) castles too wherever that
@@ -188,7 +191,7 @@ game settings (`prefs.ts`). Your arrows' size: `USER_ARROW` (logic.ts); their co
   and by a finger's drag, played, and one cancelled by a tap; haptics: a tap-select ticks `select`, a tap-move `move`, a
   held press nothing, a held drag only `move`, Vibration off nothing).
 - Haptics: `packages/app/test/haptics.test.ts` (the way picked, patterns from `HAPTICS`, Vibration off, never throwing,
-  an iPhone's ticks, the boss cues, once per key; `pickedUp`).
+  an iPhone's ticks, an iPhone's press-down tick played at the lift (same finger, square, within holdMs) and Android's at once, the boss cues, once per key; `pickedUp`).
 - e2e: every test that touches the board finds its parts through `BOARD_SEL` in `e2e/helpers.ts`. `e2e/perf.spec.ts`
   checks the board isn't drawn every frame while Jefferson's Roman candle plays over it (`hbDraws`).
   `e2e/castling.spec.ts` castles by tap-tap and drag, normal chess and Chess960 (both gestures).

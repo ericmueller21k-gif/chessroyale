@@ -8,6 +8,8 @@ import { vibrationOn } from "./prefs.ts";
  * - `ios`: an iPhone or iPad, which has no Vibration API: a hidden `<input type="checkbox" switch>` toggled through its
  *   label plays the system's switch tick (iOS 18 and later). It plays only inside a user gesture (a tap's handlers), so
  *   a moment that comes by itself (a boss power on his turn) likely plays nothing there. A pattern is one tick per pulse.
+ *   A touch's press going down isn't a gesture (only its lift is), so a tick from a press-down waits for that finger's
+ *   lift there (`hapticAtPress` / `hapticAtLift`; docs/decisions/2026-11-11-ios-move-tick.md).
  * - none (a computer, an old phone): nothing, and Settings shows the switch greyed.
  * Never throws and never waits: a move is never held up by it.
  */
@@ -100,6 +102,32 @@ function tryTick() {
   } catch {
     // No vibration here.
   }
+}
+
+/** A tick a press-down made, kept on an iPhone for that finger's lift. */
+export interface LiftTick {
+  pointer: number;
+  square: string;
+  at: number;
+  kind: HapticKind;
+}
+
+/**
+ * A tick from a press going down (a tap-tap move made on the second press, a premove placed, a try into Hollow's dark).
+ * With the Vibration API it plays at once. On an iPhone a touch's press-down isn't a gesture, so the tick would play
+ * nothing there: it's returned instead, for `hapticAtLift` to play as that finger lifts.
+ */
+export function hapticAtPress(kind: HapticKind, pointer: number, square: string, at: number = Date.now()): LiftTick | null {
+  if (hapticWay() !== "ios") {
+    haptic(kind);
+    return null;
+  }
+  return { pointer, square, at, kind };
+}
+
+/** A finger lifted (pointerup): a tick kept for it plays if it's the same finger, on the same square, within HAPTICS.holdMs. */
+export function hapticAtLift(t: LiftTick | null, pointer: number, square: string | null, at: number = Date.now()): void {
+  if (t && t.pointer === pointer && t.square === square && at - t.at < HAPTICS.holdMs) haptic(t.kind);
 }
 
 const done = new Set<string>();
