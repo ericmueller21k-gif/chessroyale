@@ -1,4 +1,5 @@
-"""Song N (Eric, Nov 11): Dash the cheetah's theme, a two-minute loop. His direction: "rap style like r&b, a slow
+"""Song N (Eric, Nov 11): Don Dough the zebra's theme, a two-minute loop (written for Dash the cheetah; Eric, on the
+finished song: "it doesn't actually fit Dash's character ... I think Don Doe is the way to go"). His direction: "rap style like r&b, a slow
 primary beat of a slightly out of tune waveform piano/synth. The background has snare drums, dubstep drops, a lot
 going on in the background, but the main piano roll is slow and spaced out, it can play a pretty simple shape the
 whole time, but make it a unique one."

@@ -1,7 +1,7 @@
 """Builds the game-ready boss themes: each song as an intro piece (played once) and a loop piece (repeated), as OGG and
 MP3, with a manifest. Both pieces get one fixed gain (about -16 LUFS for intro + one pass of the loop, a little under where the
 peaks need the room) and master.py's soft ceiling.
-  python3 handoff.py <out folder>
+  python3 handoff.py <out folder> [boss id ...]   (only those bosses; the folder's themes.json keeps the others)
 
 How the pieces are made: the song is rendered twice. Once keeping only the notes that start before the intro's end,
 so the intro's tails ring on past it (the intro file is the intro plus those tails). Once keeping only the rest, into
@@ -11,6 +11,7 @@ and PAD + loopSeconds: an encoder's added silence (MP3's) then shifts nothing th
 """
 import importlib
 import json
+import os
 import subprocess
 import sys
 import wave
@@ -24,7 +25,7 @@ PAD = 0.5
 TAIL = 4.0
 HEADROOM = 0.86  # the pieces' summed peak before encoding: -1.3 dBFS
 # boss id (packages/core's), the song's module, the intro's length in beats (0: the whole song loops).
-SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio")]
+SONGS = [("grex", "song_m", 16, "Jefferson"), ("bigboy", "song_k", 0, "Big Boy"), ("hollow", "song_l", 16, "Hollow"), ("folio", "song_o", 54, "Folio"), ("zebra", "song_n", 16, "Don Dough")]
 
 
 def render(module: str, intro_beats: float, part: str) -> np.ndarray:
@@ -67,9 +68,14 @@ def ceiling(y: np.ndarray) -> np.ndarray:
     return np.where(a < k, y, np.sign(y) * (k + (c - k) * np.tanh((a - k) / (c - k))))
 
 
-def main(out: str) -> None:
+def main(out: str, *only: str) -> None:
     manifest = {"pad": PAD, "note": "Play <intro> once at t0. Start <loop> at t0 + introSeconds from offset pad, looping between pad and pad + loopSeconds.", "themes": {}}
+    if only and os.path.exists(f"{out}/themes.json"):
+        with open(f"{out}/themes.json") as f:
+            manifest["themes"] = json.load(f)["themes"]
     for boss, module, intro_beats, name in SONGS:
+        if only and boss not in only:
+            continue
         mod = importlib.import_module(module)
         beat_s = 60 / mod.BPM
         loop = render(module, intro_beats, "loop")
@@ -133,4 +139,4 @@ def main(out: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:])
