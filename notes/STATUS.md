@@ -1,3 +1,4 @@
+- Nov 11 12:36: #640 CI green (a5340f5); waiting on Eric OK (squads-replay guard). New retry-only: shop.spec:1124 [desktop] (up-is-up in rooms; an eric.md guard) -> next flaky batch with boss-challenge:155, timber:79.
 - Nov 11 12:30: #640 flaky batch opened (a5340f5; watcher b3nzihj76): 2 app Escape bugs (town chat line menu, shop pop-up: useEffect -> layout effect), squads-play/squads-replay/panel races. HOLD: squads-replay is an eric.md guard (made stricter) -> asked Eric for OK. Open: boss-challenge:155, timber:79, older list, 8 more pop-ups with useEffect key listeners. Flaky helper archived.
 - Nov 11 12:10: #639 town loading MERGED (991813d). Next: Eric runs /town?report on his phone (load time, memory OK?).
 - Nov 11 11:47: flaky helper session_01JuCWRshZykAneZryXicRHE (Opus high) on claude/flaky-nov11 (brief notes/briefs/flaky-batch-nov11.md). Main red 4 runs (all retry-only passes).
