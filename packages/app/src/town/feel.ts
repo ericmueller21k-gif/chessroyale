@@ -827,7 +827,7 @@ export const SHOP_FEEL = {
      * a square every `donStepMs`, and you set off `youAfterMs` after him. Through the door each fades out between rows `fade[0]` and
      * `fade[1]` (in the front room, in between the same distance from its door).
      */
-    out: { followMs: 450, stepMs: 200, pickMs: 400, donAfterMs: 300, donStepMs: 240, youAfterMs: 450, fade: [10.1, 10.8] },
+    out: { followMs: 450, stepMs: 200, pickMs: 400, donAfterMs: 800, donStepMs: 240, youAfterMs: 450, fade: [10.1, 10.8] },
     dim: 0.36,
     /**
      * His challenge's set-up in the front room (Eric, Nov 11: "4 of his goons who follow you in carry a chair and a board and a table, 1
@@ -838,6 +838,6 @@ export const SHOP_FEEL = {
     setup: { leadMs: 500, followMs: 450, stepMs: 220, setMs: 350, backMs: 260, watchBack: 2.2, watchGap: 0.95, holdMs: 2600 },
     /** How high a goon carries his thing (the room's pixels over his feet: at his hooves); the kept board on its table's top. */
     carryUp: 26,
-    boardUp: 27,
+    boardUp: 23,
   },
 } as const;

@@ -316,22 +316,25 @@ type P2 = readonly [number, number];
  * and back west; the flat-cap door guard comes in through the door for your chair. The board before the table: it lies on it.
  */
 const EXIT: readonly P2[] = [
-  [4.2, 8.2],
-  [3.6, 9.2],
-  [3.6, 11],
+  [4.4, 8.2],
+  [4.1, 9.2],
+  [4.1, 11],
 ];
 const LANE: readonly P2[] = [
   [9.1, 5.1],
   [9.1, 8.2],
 ];
 export const ZEBRA_OUT: readonly { name: string; item: SetupItem; start: number; to: readonly P2[] }[] = [
-  { name: "guard-a", item: "youChair", start: 0, to: [[3.6, 11], [3.6, 9.2], [5.3, 8.2]] },
+  { name: "guard-a", item: "youChair", start: 0, to: [[4.1, 11], [4.1, 9.2], [5.3, 8.2]] },
   { name: "crew-e", item: "bossChair", start: 0, to: [[7.15, 5.06], ...LANE, [6.2, 8.2]] },
   { name: "crew-d", item: "board", start: 1, to: [[6.15, 5.06], ...LANE, [7.1, 8.2]] },
   { name: "crew-c", item: "table", start: 2, to: [[5.15, 5.06], ...LANE, [7.1, 8.2]] },
 ];
-/** Don's way out: up out of his wingback, beside it, down to the door and through. */
-const DON_OUT: readonly P2[] = [ZEBRA_DON.at, [3.3, 7.5], [3.4, 9.2], [3.4, 11]];
+/**
+ * Don's way out: up out of his wingback and forward off it, down to the door and through. (The door's east half, as everyone's: its
+ * west half is at a phone's edge.)
+ */
+const DON_OUT: readonly P2[] = [ZEBRA_DON.at, [4.2, 7.9], [4.1, 9.2], [4.1, 11]];
 const lenOfPts = (pts: readonly P2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]), 0);
 /** `u` squares along a polyline: where, and its leg's east-west way. Into `o`. */
 function along(pts: readonly P2[], u: number, o: { c: number; r: number; dc: number }): void {
@@ -567,7 +570,8 @@ export class SetupScene {
         if (r.item) carried.push({ item: r.item, c: p.c, r: p.r, flip: p.dc < 0 });
         continue;
       }
-      if (now < r.arrive + S.setMs) {
+      // (Setting his thing down; the paper-cap guard has none: he's straight on his watch.)
+      if (r.item && now < r.arrive + S.setMs) {
         const p = r.there[r.there.length - 1]!;
         out.push({ name: r.name, anim: "carry", frame: 0, c: p.c, r: p.r, flip: faceTable(p.c) });
         if (r.item && now < r.set) carried.push({ item: r.item, c: p.c, r: p.r, flip: faceTable(p.c) });

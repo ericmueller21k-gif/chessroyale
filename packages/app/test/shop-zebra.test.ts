@@ -192,6 +192,11 @@ describe("the back table (Eric, Nov 10: the crew argue, he one-ups them)", () =>
   });
 });
 
+/** The animations each room draws for its people (ShopRoom's loader, `people`). */
+const CREW_BACK = ["sitListen", "sitTalk", "sitArgue", "sitPuff", "standUp", "draw", "aim", "aimAt", "lower", "puff", "walk", "carry"];
+const BACK_ANIMS: Record<string, string[]> = { don: ["sitListen", "sitTalk", "sitScoff", "sitRelax", "idle"], "crew-c": CREW_BACK, "crew-d": CREW_BACK, "crew-e": CREW_BACK, "guard-a": ["walk", "carry"] };
+const FRONT_ANIMS: Record<string, string[]> = { "guard-a": ["watch", "guard", "walk", "carry"], "guard-b": ["watch", "guard", "walk"], "crew-c": ["carry", "walk", "puff"], "crew-d": ["carry", "walk", "puff"], "crew-e": ["carry", "walk", "puff"] };
+
 describe("the walk-out (Eric, Nov 11: \"watch all of them walk out, like pick up the stuff in the back and walk out\")", () => {
   const solid = (c: number, r: number) => !walkable(backRoom, c, r) && !backRoom.pass!.squares.some((q) => q.c === c && q.r === r);
   it("the set is kept by the back door, on solid squares clear of the way in and his card's spots", () => {
@@ -226,13 +231,20 @@ describe("the walk-out (Eric, Nov 11: \"watch all of them walk out, like pick up
       keptBefore = kept.length;
       for (const f of figs) {
         lastSeen.set(f.name, t);
+        expect(BACK_ANIMS[f.name], `${f.name} ${f.anim}`).toContain(f.anim);
         // (On the floor or in the doorway: never on a wall, the table, Don's chair or the set. The crew step off the bench along its
         // front, where they stood up; Don gets up out of his chair.)
         const bench = f.r < 5.2 && f.c > 4.5 && f.c < 9.2;
-        if (f.anim !== "sitListen" && !bench && !(f.name === "don" && f.r < 7.5 && f.c > 3.3)) expect(solid(Math.round(f.c), Math.round(f.r)) && f.r < 10, `${f.name} ${f.anim} at ${f.c.toFixed(2)},${f.r.toFixed(2)}`).toBe(false);
+        if (f.anim !== "sitListen" && !bench && !(f.name === "don" && f.r < 7.6)) expect(solid(Math.round(f.c), Math.round(f.r)) && f.r < 10, `${f.name} ${f.anim} at ${f.c.toFixed(2)},${f.r.toFixed(2)}`).toBe(false);
         // (Fading only through the door.)
         if ((f.a ?? 1) < 1) expect(f.r, f.name).toBeGreaterThan(10);
       }
+      // (Nobody walks through anybody: every two of them in view more than half a square apart.)
+      for (let i = 0; i < figs.length; i++)
+        for (let j = i + 1; j < figs.length; j++) {
+          const [p, q] = [figs[i]!, figs[j]!];
+          if ((p.a ?? 1) > 0.3 && (q.a ?? 1) > 0.3) expect(Math.hypot(p.c - q.c, p.r - q.r), `${p.name} and ${q.name} at ${t}`).toBeGreaterThan(0.6);
+        }
     }
     expect([...items].sort()).toEqual(["board", "bossChair", "table", "youChair"]);
     W.kept(W.youAt, kept);
@@ -284,6 +296,8 @@ describe("his challenge, in the front room (Eric, Nov 11: \"The main room is sti
       for (const f of figs) expect(walkableSq(Math.round(f.c), Math.round(f.r)) || f.name === "guard-b" || (f.r < door.r - 0.5 && Math.abs(f.c - door.c) < 1), `${f.name} at ${f.c.toFixed(2)},${f.r.toFixed(2)}`).toBe(true);
       // (and the first frame anyone carrying shows, he's behind the door.)
       for (const f of figs) if (f.anim === "carry" && !firstSeen.has(f.name)) firstSeen.set(f.name, f.r);
+      // (Only animations the front room draws for each (ShopRoom's loader): one it lacks would leave him undrawn, a gap.)
+      for (const f of figs) expect(FRONT_ANIMS[f.name], `${f.name} ${f.anim}`).toContain(f.anim);
     }
     expect([...items].sort()).toEqual(["board", "bossChair", "table", "youChair"]);
     expect(S.placed(S.end()).sort()).toEqual(["board", "bossChair", "table", "youChair"]);

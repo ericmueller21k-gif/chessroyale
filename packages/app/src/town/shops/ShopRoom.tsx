@@ -1974,6 +1974,7 @@ function startRoom(
    */
   let walkOut: WalkOut | null = null;
   let youOut = false;
+  let youWay: Sq[] | null = null;
   let walkedOut = false;
   /** The set's things still kept by the back room's door (the walk-out's `kept`; all of them until it starts). */
   const keptNow: SetupItem[] = backScene ? ["youChair", "bossChair", "table", "board"] : [];
@@ -2005,15 +2006,24 @@ function startRoom(
         walkOut = new WalkOut(clips, now);
         dest.on = false;
         waitFor = null;
-        if (you.moving()) you.halt();
+        // (You wait at the foot of his table, his card's spot, clear of their way out, wherever the beat left you.)
+        const wait = { c: 8, r: 7 };
+        if (!inTalkRange(room, you.goalC(), you.goalR())) you.go(findPath(room, you.here(), wait) ?? []);
+        else if (you.moving()) you.halt();
       }
       if (walkOut) {
         walkOut.kept(now, keptNow);
+        // (Then out after Don: set off at `youAt`, and not so soon you'd reach the door before he's through it.)
         if (!youOut && now >= walkOut.youAt && !you.moving()) {
-          youOut = true;
-          const door = room.pass!.inside[room.pass!.inside.length - 1]!;
-          const to = room.pass!.squares.find((q) => q.c === door.c) ?? room.pass!.squares[0]!;
-          you.go([...(findPath(room, you.here(), door) ?? []), to, { c: to.c, r: to.r + 1 }]);
+          if (!youWay) {
+            const door = room.pass!.inside[room.pass!.inside.length - 1]!;
+            const to = room.pass!.squares.find((q) => q.c === door.c) ?? room.pass!.squares[0]!;
+            youWay = [...(findPath(room, you.here(), door) ?? []), to, { c: to.c, r: to.r + 1 }];
+          }
+          if (now >= walkOut.donGone() - (youWay.length - 2) * C.walkStepMs) {
+            youOut = true;
+            you.go(youWay);
+          }
         }
         if (youOut && !walkedOut && you.pose(now, pose).y >= room.pass!.squares[0]!.r - 0.3) {
           walkedOut = true;
