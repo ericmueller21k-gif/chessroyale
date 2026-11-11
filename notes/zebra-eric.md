@@ -98,3 +98,4 @@ closing line is one of the six, at random.
   moment it just loaded it in." (Director: in the back room the goons pick up the table, chairs and board and walk out the back door; then
   the front room, where they come through the door carrying them to the pad.)
 - Town loading (Eric, Nov 11): "I have no issue with doing a loading screen for the town... even if it takes 3 or 5 seconds... loads it all in at once and then it stays there if you go in and out of buildings."
+- Room loading (Eric, Nov 11): "when you go into a building, just make it take an extra second. We probably don't even need to show a loading bar, and just load the whole inside."
