@@ -249,6 +249,18 @@ test("Rolling Dough: Challenge from Don's card in the back room plays his intro 
   await don.getByRole("button", { name: "Talk" }).click();
   await expect(don).toBeHidden();
   await expect(don).toBeVisible({ timeout: 30_000 });
+  // (Every frame from here: Beanie's line seen in the intro, and which wipe covers the screen: his bread splash, never the default.)
+  await page.evaluate(() => {
+    const w = window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean }; __shopIntro?: () => { crewLine?: boolean } | null };
+    w.__zb = { crew: false, storm: false, wipe: false };
+    const look = () => {
+      if (w.__shopIntro?.()?.crewLine) w.__zb.crew = true;
+      if (document.querySelector(".boss-storm")) w.__zb.storm = true;
+      if (document.querySelector(".boss-wipe")) w.__zb.wipe = true;
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
   await don.getByRole("button", { name: "Challenge" }).click();
   // (A confirm, where the challenge asks for one.)
   const fight = page.getByRole("button", { name: "Fight", exact: true });
@@ -257,5 +269,6 @@ test("Rolling Dough: Challenge from Don's card in the back room plays his intro 
   await expect(page.getByRole("status", { name: /^Don Dough, threat/ }), "the battle against Don Dough").toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
   await shot(page, "challenge-battle");
+  expect(await page.evaluate(() => (window as unknown as { __zb: unknown }).__zb), "Beanie's line, then his bread splash as the wipe").toEqual({ crew: true, storm: true, wipe: false });
   expect(errors).toEqual([]);
 });
