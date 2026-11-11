@@ -38,10 +38,43 @@ export interface FriendEntry {
   online: boolean;
   /** Online and in a match (their app says so). */
   busy: boolean;
+  /** What they're doing while online (their app says so with its live line); absent offline, while hidden, or from an older app. */
+  doing?: Activity;
   /** They hide when they're online (Settings → Friends): no dot either way. */
   hidden: boolean;
   /** When they were last seen (ms; `users.last_seen`), for "Last online 2h ago"; null while they hide it (older servers: absent). */
   lastSeen?: number | null;
+}
+
+/**
+ * What a player is doing, as their app says with its live line (`?doing=`; the friends page shows it under an online friend's name,
+ * Eric, Nov 11). The live hub keeps it in memory beside "in a match"; nothing is stored.
+ */
+export const ACTIVITIES = ["home", "town", "queue", "crowd", "boss", "duel", "squads", "classic", "autochess"] as const;
+export type Activity = (typeof ACTIVITIES)[number];
+export const isActivity = (v: unknown): v is Activity => (ACTIVITIES as readonly unknown[]).includes(v);
+
+/** "In a 50 v 50": an online friend's line on the friends page. */
+export const ACTIVITY_LINES: Record<Activity, string> = {
+  home: "On the home screen",
+  town: "In Chess Town",
+  queue: "In a queue",
+  crowd: "In a 50 v 50",
+  boss: "In a boss battle",
+  duel: "In a 1 v 1",
+  squads: "In a Squads match",
+  classic: "In a match",
+  autochess: "Playing Auto chess",
+};
+
+/** A player found by name (GET /api/friends/search): public fields only, as their profile shows them. */
+export interface PlayerSearchEntry {
+  id: string;
+  name: string;
+  /** Their icon: a character, or a drawn one (a PNG data URL), public as on their profile. */
+  icon: string;
+  /** Their level, from their XP (core's levelOf), as their profile shows it. */
+  level: number;
 }
 
 export interface FriendRequestEntry {

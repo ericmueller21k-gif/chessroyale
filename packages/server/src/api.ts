@@ -18,7 +18,7 @@ import { chatIconResponse, chatPostResponse, chatSlice, globalRoomOf } from "./g
 import { forgetLook, townHereResponse } from "./town-here-api.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, chatRoomOf, mayTownChat, reportedLine, townChallengeNote, townPostResponse, townRemoveResponse, townSlice } from "./town-chat-api.ts";
 import { accountDownload, deleteAccount } from "./account-data.ts";
-import { XP, AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
+import { XP, AGE_GATE, ASK_AGE_LINE, FAIRPLAY, TOO_YOUNG_LINE, adminFirst, bossCrateDef, bossDef, cleanPawnColor, isActivity, isWelcomeCrate, tokenBossName } from "@chessroyale/core";
 import {
   buyItem,
   cleanEmail,
@@ -236,6 +236,9 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
   if (path === "/api/live" && request.method === "GET") {
     // ?busy=1: the app is in a match (friends lists show "In a match"). `inbox`: friends' news for you (presence.ts).
     const busy = url.searchParams.get("busy") === "1";
+    // ?doing=town: what the app is doing (the friends page's "In Chess Town"; core's ACTIVITIES, anything else ignored).
+    const doingAsked = url.searchParams.get("doing");
+    const doing = isActivity(doingAsked) ? doingAsked : undefined;
     let inbox: number | undefined;
     if (env.LIVE && waitUntil) {
       // The live hub: presence in batches (the session lookup cached), the numbers from its memory.
@@ -243,13 +246,13 @@ export async function handleAccountApi(request: Request, env: AccountEnv, fetche
       if (uid && firstSighting(uid, now)) {
         // Just arrived: the hub hears at once, and its numbers (which include you) refresh this instance's.
         // (Typed as sent: RPC's types widen the votes' [SAN, count] pairs to plain arrays.)
-        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
+        const counts = (await liveHub(env as Required<Pick<AccountEnv, "LIVE">>).arrive(uid, now, busy, doing).catch(() => null)) as (LiveCounts & { inbox?: number }) | null;
         if (counts) {
           const { inbox: news, ...numbers } = counts;
           if (news) rememberInbox(uid, news);
           liveCache = { at: now, body: numbers };
         }
-      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy);
+      } else if (uid) markSeen(env as Required<Pick<AccountEnv, "LIVE">>, uid, now, waitUntil, busy, doing);
       if (uid) inbox = inboxOf(uid);
     } else await touchSession(sql, token, now);
     if (!liveCache || now - liveCache.at > LIVE_CACHE_MS) {

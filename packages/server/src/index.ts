@@ -161,6 +161,7 @@ async function handle(request: Request, rawEnv: Env, ctx: ExecutionContext): Pro
       session: readCookie(request, SESSION_COOKIE),
       play: request.method === "POST" && (url.pathname === "/api/play" || url.pathname === "/api/lobby" || url.pathname === "/api/1v1/play" || /^\/api\/squads\/(play|party|lobby)$/.test(url.pathname) || url.pathname === "/api/boss/party"),
       friends: request.method === "POST" && url.pathname.startsWith("/api/friends/"),
+      search: request.method === "GET" && url.pathname === "/api/friends/search",
     },
     t,
     rawEnv.LOAD_TEST === "1",

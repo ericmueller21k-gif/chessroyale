@@ -12,6 +12,7 @@ import {
   friendsState,
   mayInvite,
   removeFriend,
+  searchPlayers,
   sendInvite,
   sendRequest,
   setFriendSettings,
@@ -47,7 +48,9 @@ const isId = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9_
 
 /**
  * GET /api/friends → { state } | { off } | { signIn }: your friends list (FriendsState, core/friends.ts).
- * GET /api/friends/online → { online: { [id]: { online, busy } } }: only who's online (a list's refresh on screen).
+ * GET /api/friends/online → { online: { [id]: { online, busy, doing? } } }: only who's online (a list's refresh on screen).
+ * GET /api/friends/search?q=NAME → { players: PlayerSearchEntry[] }: players whose name starts with it (searchPlayers: public
+ *   fields only; banned, test accounts and, where signing in is set up, guests left out). Its own rate limit (CAPACITY.rateLimits.search).
  * POST /api/friends/ACTION with JSON, each answering with the list as it is after it (or { message } and a status):
  *   request {id} · answer {id, accept} · cancel {id} · remove {id} · block {id} · unblock {id}
  *   invite {id, kind, code}: to your private lobby (kind: its mode) or Squads party ("squads"), still open;
@@ -60,7 +63,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   const url = new URL(request.url);
   const path = url.pathname;
   if (path !== "/api/friends" && !path.startsWith("/api/friends/")) return null;
-  const get = request.method === "GET" && (path === "/api/friends" || path === "/api/friends/online");
+  const get = request.method === "GET" && (path === "/api/friends" || path === "/api/friends/online" || path === "/api/friends/search");
   if (!get && request.method !== "POST") return json({ message: "Not found" }, 404);
   if (!env.DB) return json({ message: "Accounts aren't set up yet." }, 503);
   if (!friendsOn(env)) return get ? json({ off: true }) : json({ message: FRIENDS_OFF }, 503);
@@ -79,6 +82,7 @@ export async function handleFriendsApi(request: Request, env: FriendsEnv, waitUn
   if (!me) return json({ message: "No account on this device yet." }, 401);
   const needSignIn = signInRequired(env);
   if (needSignIn && !isSignedIn(me)) return get ? json({ signIn: true }) : json({ message: SIGN_IN_FOR_FRIENDS }, 401);
+  if (request.method === "GET" && path === "/api/friends/search") return json({ players: await searchPlayers(sql, me.id, url.searchParams.get("q") ?? "", needSignIn) });
   const answer = async () => json({ state: await friendsState(sql, me.id, now, presenceOf) });
   if (get) return answer();
 

@@ -173,7 +173,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     then goes to its page. A phone and a touch tablet have none.
     wait above PLAY. The shop, your profile and Play with friends are in a phone's top bar and a computer's side menu,
     not on home's column (Eric, Oct 18; [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)).
-  - **Play with friends** (a phone's friends overlay's **Private lobby ›** since Nov 9, a computer's side menu): **Get friend code** makes a
+  - **Play with friends** (the friends page's **Private lobby**, a computer's side menu): **Get friend code** makes a
     lobby in the row's pick (50 v 50 if none, or with 1 v 1 or Squads picked) and copies its invite link as it opens
     (the lobby screen says "Invite link copied: paste it to your friends"); join one by its code; **Your friends ›**
     (with "N new") opens the friends list. The full Boss raid screen's Play with friends makes a raid, as before (the
@@ -252,23 +252,23 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   the rank's label from the profile, null until it loads). The first-time pawn-vote hint is `VoteHint`
   (`components/VoteHint.tsx`, once per device: `brc.voteHintSeen`), for every pawn vote to use.
 - **Friends** (Oct 15; [docs/decisions/2026-10-15-friends-and-invites.md](../decisions/2026-10-15-friends-and-invites.md); the rules and data on [accounts.md](accounts.md)):
-  - **The friends overlay (phone, Nov 9; [docs/decisions/2026-11-09-friends-overlay.md](../decisions/2026-11-09-friends-overlay.md)):**
-    the top bar's **Friends** opens a centered box in the Quests overlay's shell (`components/FriendsOverlay.tsx`; the same dim,
-    card, crest and ✕; the dim or Escape closes it), a fixed height with the list scrolling inside: invites to you (Join, ✕),
-    friend requests (Accept, Decline), then your friends in the server's order (online, in a match, the rest), the offline
-    ones greyed with "Last online 2h ago" (`FriendEntry.lastSeen`, the account's `users.last_seen`, null while they hide it;
-    "Offline" without one). Tap a friend: a menu over the box's foot with **Invite to play** (`InviteButton`: your lobby or
-    party, or one made in home's mode; greyed with its reason when they're offline) and **View profile**. Above the list,
-    **Private lobby ›** ("Make one or join with a code": Play with friends' sheet, signed out too; Eric, Nov 9); its footer,
-    "Requests sent and blocked ›" (`/friends`).
-    Signed out: "Sign in to add friends …" and Sign in; no friends: "Add friends from their profile: tap their name anywhere";
-    paused: `pausedLine("friends")`.
-  - **Where:** a phone's way in is **Friends** in home's top bar (the overlay above; its "Requests sent and blocked ›"), or Friends on your own
+  - **The friends page** (`/friends`, `screens/Friends.tsx`; Eric, Nov 11, [decision](../decisions/2026-11-11-friends-page.md): it replaced the Nov 9
+    pop-up): Back, a search box (names starting with what's typed, any case, from 2 characters, 250 ms after typing stops: `GET /api/friends/search`,
+    public fields only, banned, test accounts and, where sign-in is set up, guests left out; its own rate limit), the results in a fixed-size box over
+    the page (icon, name, level; a tap opens their profile, where Add Friend is), **Private lobby** ("Make one or join with a code": Play with friends'
+    sheet), **Online** (each with what they're doing: the app's live line says `?doing=`, core's `ACTIVITIES`,
+    kept in the live hub's memory beside "in a match"; Invite) and **Offline** ("Last online 2h ago", Invite greyed), then invites and friend
+    requests when any (under the lists, so nothing above them moves when they arrive: fix round, Nov 11), then "Requests sent and blocked ›"
+    (Cancel, Unblock) and Settings. The query and hash stay on the address in and out of `/friends` and a profile opened from it (test switches, links). The page watches the live line (`watchLive`) while open: its inbox count is how a new request or invite reaches the list. The search reads
+    `users_name`, or `users_name_signed` (partial: signed-in accounts only, its WHERE the search's own text) where sign-in is set up, ordered by
+    the name alone so LIMIT stops after six rows (never every guest named "Player").
+  - **Known staleness (accepted):** `doing` can be a moment stale across Worker instances: two instances' batches can reach the hub out of order
+    (the town, then home from another instance flushed first), and the list shows the older activity until the next 30 s heartbeat. Same as
+    `busy` today (`presence.ts`, `live.ts`); not worth ordering the batches.
+  - **Where:** a phone's way in is **Friends** in home's top bar (the page above), or Friends on your own
     profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's right column has "FRIENDS ›" (Nov 7: the list and its Invite buttons went with Eric's mockup; requests' count
-    beside it). Both open the friends list (`/friends`): invites to you (Join,
-    ✕), friend requests (Accept, Decline), your friends online first (In a match next, then the rest; Invite on each),
-    the requests you sent (Cancel) and who you've blocked (Unblock).
+    beside it). Both open the friends page.
   - **Someone's profile:** Add friend (or Cancel request, Accept friend, Remove friend), Invite to play, Block and
     Report; Remove and Block ask for a second tap. Blocked: Unblock and Report only.
   - **Inviting:** to your private lobby while it waits, or your Squads party; at the front door with neither, the
@@ -412,7 +412,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
   `profile.spec.ts` also checks that home's pawn and your ring ride your ride in the same boxes (Nov 1), at every ride's 0.75 and as drawn too (`?rideScale=1`), and ("rides lazy", Nov 1) that while a ride's drawing (its own chunk) is held back home's pawn and ring, your profile's pawn and the locker's tile keep the same boxes, the pawn sitting where it will ride, the ride appearing under it; `crate-banner.spec.ts` also the crate pages' gambling warning (shop.md);
   unit: `packages/app/test/home-art.test.ts` (the 50/50 pick and `?town=`, the scene's whole-pixel layout at phone, computer and short-laptop sizes, the four drawings' frames, the clock's three skies and `?sky=`, and that each look keeps every pixel in its place); `home-polish.spec.ts` also checks Chess Town's button under the three skies (the clock's edges, `?sky=`, nothing moving, no swap while you look);
   `install.spec.ts`, `crate-banner.spec.ts`, `friends.spec.ts` (two players: request, accept, online, the invites
-  setting, an invite joined from its toast, a block; the phone's line at 320 px), `eval-bar.spec.ts` (never shown, testers
+  setting, an invite joined from its toast, a block; the friends page: search, profile, accept, "In Chess Town", phone and computer), `eval-bar.spec.ts` (never shown, testers
   too: the Testing row shown, off and disabled, the board's room, phone and computer; players: no bar, no switch), `piece-sounds.spec.ts`
   (pick, preview, reload, what loads, every file's start and loudness; the Reveal sound), `faq.spec.ts` (Settings →
   FAQ, a jump to a section, a link to a heading, back).

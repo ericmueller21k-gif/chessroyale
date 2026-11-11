@@ -1,5 +1,12 @@
-import { CAPACITY, FRONT_DOOR } from "@chessroyale/core";
+import { CAPACITY, FRONT_DOOR, type Activity } from "@chessroyale/core";
 import type { Sql } from "./accounts.ts";
+
+/** A friend's presence: online, in a match, and (online) what their app says they're doing. */
+export interface Presence {
+  online: boolean;
+  busy: boolean;
+  doing?: Activity;
+}
 import type { LiveMatchBoard } from "./lobby.ts";
 
 export type { LiveMatchBoard };
@@ -184,6 +191,8 @@ export class LiveBoard {
   private lobbies = new Map<string, LobbySummary & { updatedAt: number }>();
   /** Accounts whose app last said it was in a match (friends lists show "In a match"). */
   private busy = new Set<string>();
+  /** What each account's app last said it was doing (the friends page's "In Chess Town"; core's ACTIVITIES). */
+  private doing = new Map<string, Activity>();
   /**
    * Something new for an account (a friend request, an invite, a request accepted), and when: passed back to the Worker
    * instances that see it, so its next live line says so and the app fetches its friends list (presence.ts).
@@ -195,11 +204,15 @@ export class LiveBoard {
     this.seen.delete(id);
     this.written.delete(id);
     this.busy.delete(id);
+    this.doing.delete(id);
     this.news.delete(id);
   }
 
-  /** `busy`: what these accounts' apps said about being in a match (only the live line's own request says). */
-  markSeen(ids: readonly string[], at: number, busy?: Readonly<Record<string, boolean>>) {
+  /**
+   * `busy`: what these accounts' apps said about being in a match; `doing`: what they said they're doing (only the live line's own
+   * request says either).
+   */
+  markSeen(ids: readonly string[], at: number, busy?: Readonly<Record<string, boolean>>, doing?: Readonly<Record<string, Activity>>) {
     for (const id of ids) if ((this.seen.get(id) ?? 0) < at) this.seen.set(id, at);
     if (busy) {
       for (const [id, b] of Object.entries(busy)) {
@@ -207,14 +220,16 @@ export class LiveBoard {
         else this.busy.delete(id);
       }
     }
+    if (doing) for (const [id, d] of Object.entries(doing)) this.doing.set(id, d);
   }
 
-  /** Online now, and in a match: for friends lists (at most FRIENDS.max at a time, by the caller). */
-  presenceOf(ids: readonly string[], now: number): Record<string, { online: boolean; busy: boolean }> {
-    const out: Record<string, { online: boolean; busy: boolean }> = {};
+  /** Online now, in a match, and what they're doing while online: for friends lists (at most FRIENDS.max at a time, by the caller). */
+  presenceOf(ids: readonly string[], now: number): Record<string, Presence> {
+    const out: Record<string, Presence> = {};
     for (const id of ids) {
       const online = this.isOnline(id, now);
-      out[id] = { online, busy: online && this.busy.has(id) };
+      const doing = online ? this.doing.get(id) : undefined;
+      out[id] = { online, busy: online && this.busy.has(id), ...(doing ? { doing } : {}) };
     }
     return out;
   }
@@ -335,6 +350,7 @@ export class LiveBoard {
         this.seen.delete(id);
         this.written.delete(id);
         this.busy.delete(id);
+        this.doing.delete(id);
       }
     }
     // (An app fetches its list within seconds of news; an hour on, the news is in any list it loads.)
