@@ -98,7 +98,8 @@ async function poll() {
       const q = new URLSearchParams(rs.map((r) => r.query()).filter(Boolean).join("&"));
       if (busy) q.set("busy", "1");
       if (doing) q.set("doing", doing);
-      const res = await fetch(`/api/live${q.size ? `?${q}` : ""}`, { credentials: "same-origin" });
+      // (Given up after liveTimeoutMs: a request that never answered stopped every later one, and the chats riding on them.)
+      const res = await fetch(`/api/live${q.size ? `?${q}` : ""}`, { credentials: "same-origin", signal: AbortSignal.timeout(FRONT_DOOR.liveTimeoutMs) });
       if (res.ok) {
         const body = (await res.json()) as LiveCounts;
         current = body;
