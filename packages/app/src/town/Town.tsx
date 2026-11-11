@@ -32,7 +32,7 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
-import { FrameRec, NP, P, REC, browserOf, setRec, summarize, timerStep } from "./frame-report.ts";
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -203,6 +203,10 @@ export function TownScreen({
     el.style.pointerEvents = to ? "auto" : "none";
   };
   const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
+  /** (`?report`) The frames from now on are going in or out of a building (RF.goIn, RF.goOut; 0: neither): frame-report.ts. */
+  const doorPhase = (f: number) => {
+    if (REC) REC.door = f;
+  };
   const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
@@ -211,6 +215,7 @@ export function TownScreen({
   const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
+    doorPhase(RF.goIn);
     const F = SHOP_FEEL;
     if (challenge) step("atDoor");
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
@@ -232,6 +237,7 @@ export function TownScreen({
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       if (challenge) {
         step("cancel");
         ctl.current?.endChallenge();
@@ -272,6 +278,7 @@ export function TownScreen({
     doorBusy.current = true;
     const F = SHOP_FEEL;
     const to = at.room.def.part === "back" ? "front" : "back";
+    doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
     fadeTo(1, F.fadeMs);
@@ -280,6 +287,7 @@ export function TownScreen({
     if (!room || !box.current) {
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       return;
     }
     setShopOut(F.startZoom === 1);
@@ -303,6 +311,7 @@ export function TownScreen({
     // (Eric, Nov 11: "The main room is still where you fight": his intro plays in the front room, you both coming out of the back door.)
     const intro = import("./shops/intro.ts").then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
     const front = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id, "front"));
+    doorPhase(RF.goIn);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     const fight = await intro.catch(() => null);
@@ -311,6 +320,7 @@ export function TownScreen({
       step("cancel");
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       return;
     }
     ctl.current?.standHere();
@@ -320,7 +330,10 @@ export function TownScreen({
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
     fadeTo(0, SHOP_FEEL.fadeMs);
-    setTimeout(() => (doorBusy.current = false), SHOP_FEEL.fadeMs);
+    setTimeout(() => {
+      doorBusy.current = false;
+      doorPhase(0);
+    }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
@@ -333,6 +346,7 @@ export function TownScreen({
       ctl.current?.endChallenge();
     }
     const F = SHOP_FEEL;
+    doorPhase(RF.goOut);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     setInside(null);
@@ -346,6 +360,7 @@ export function TownScreen({
     await later(F.doorZoomMs);
     if (cv) cv.style.transition = cv.style.transformOrigin = "";
     doorBusy.current = false;
+    doorPhase(0);
   };
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
@@ -1015,11 +1030,9 @@ function startTown(
   // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
   // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
   // the frame loop, nothing else.
+  // (FpsCount, frame-report.ts: a room's frames count too, Nov 11.)
   let fpsEl: HTMLElement | null = null;
-  let fpsN = 0;
-  let fpsPrev = 0;
-  let fpsAt = 0;
-  let fpsPrevAt = 0;
+  let fps: FpsCount | null = null;
   if (TOWN_ASKED.fps) {
     fpsEl = document.createElement("div");
     fpsEl.className = "town-fps";
@@ -1027,6 +1040,7 @@ function startTown(
     // (The backend follows the numbers, "· WebGL" or "· 2D", from town.css: the pill's text stays the numbers.)
     fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
+    setFps((fps = new FpsCount(fpsEl)));
   }
   // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
   // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
@@ -1308,25 +1322,17 @@ function startTown(
         if (sec !== recSecs) recPill?.set(`● Recording ${(recSecs = sec)} s`, true);
       }
     }
-    if (fpsEl) {
-      fpsN++;
-      if (!fpsAt) fpsAt = fpsPrevAt = now;
-      else if (now - fpsAt >= 500) {
-        const n = fpsN + fpsPrev;
-        const ms = now - fpsPrevAt;
-        fpsEl.textContent = `${Math.round((n * 1000) / ms)} fps · ${(ms / n).toFixed(1)} ms`;
-        fpsEl.dataset.fps = String(Math.round((n * 1000) / ms));
-        fpsPrev = fpsN;
-        fpsN = 0;
-        fpsPrevAt = fpsAt;
-        fpsAt = now;
-      }
-    }
+    FPS?.tick(now);
     raf = requestAnimationFrame(frame);
   };
-  const run = () => {
+  /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
+   * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
+  const run = (gap = true) => {
     if (raf || !alive || document.hidden || held || away) return;
-    rec?.pause();
+    if (gap) {
+      rec?.pause();
+      FPS?.restart();
+    }
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -2149,7 +2155,7 @@ function startTown(
         base = freshView(turn, look, baseHeading(h.c, h.r, 0));
         heading = turn.to;
       }
-      run();
+      run(false);
     },
     /** The large map's portraits (TownMap.tsx): each boss home's place and its boss's face, as its chip shows it. */
     mapFaces: (): MapFace[] =>
@@ -2203,6 +2209,7 @@ function startTown(
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
+      if (FPS === fps) setFps(null);
       recPill?.remove();
       recPanel?.remove();
       if (REC === rec) setRec(null);

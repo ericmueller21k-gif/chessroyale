@@ -36,6 +36,7 @@ import { artFacing } from "../../characters/sprites.ts";
 import { testSwitchesAllowed } from "../../test-switches.ts";
 import { newPt, newView, proj, setView, type CamPair } from "../camera.ts";
 import { SHOP_FEEL, TOWN_FEEL, type CamSet } from "../feel.ts";
+import { F as RF, FPS, P as RP, REC } from "../frame-report.ts";
 import type { LightPool, LightSpot } from "../houses/kit.ts";
 import { Press } from "../press.ts";
 import { anyHeld, keyWalk } from "../arrows.ts";
@@ -1075,6 +1076,7 @@ function startRoom(
     const key = `${kind}|${text}|${DPR}`;
     let c = tagArt.get(key);
     if (c) return c;
+    const t0 = REC ? performance.now() : 0;
     c = document.createElement("canvas");
     const tg = c.getContext("2d")!;
     const s = 12;
@@ -1099,6 +1101,7 @@ function startRoom(
     tg.fillStyle = ink;
     tg.fillText(text, 4 + w / 2, 4 + h / 2);
     tagArt.set(key, c);
+    if (REC) REC.paint(performance.now() - t0);
     return c;
   };
 
@@ -3206,6 +3209,11 @@ function startRoom(
   };
   const drawFigure = (k: number, now: number) =>
     k >= 8 ? drawCrewFig(k - 8) : k === 0 ? drawKid(now) : k === 1 ? drawYou(now) : k === 2 ? drawBoss(now) : k === 3 ? (ci?.ice ? drawIceCenter(now) : cw && ci?.crew ? drawCrewCenter(now) : rp ? drawRopeCenter() : drawCenter()) : k === 6 ? drawCast(true) : rp ? drawBucket(k === 4 ? "b" : "w") : drawStool(k === 4 ? marks!.bossStool : marks!.youStool);
+  /** A figure drawn, and (`?report`) its time marked: you, the boss, the fight's set as props, everyone else as other players. */
+  const drawFig = (k: number, now: number, rc: typeof REC) => {
+    drawFigure(k, now);
+    rc?.mark(k === 1 ? RP.you : k === 2 ? RP.bosses : k >= 3 && k <= 6 ? RP.props : RP.people);
+  };
   /** A speech bubble's lines (wrapped once for its words, at its size). */
   const bubbles = new Map<string, { lines: string[]; w: number }>();
   /**
@@ -3522,6 +3530,10 @@ function startRoom(
     }
     setView(v, W, H, 0, 1, 0, 0, sets);
     if (cab && clawE > 0) clawLens();
+    // (`?report`: the room's parts under the town's names, frame-report.ts: the ceiling and what's past the walls as the sky, the floor
+    // as the ground, the pieces and the fight's set as props, the figures, the lights, the tags and bubbles, the card.)
+    const rc = REC;
+    rc?.mark(RP.camera);
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
@@ -3549,6 +3561,7 @@ function startRoom(
       for (let i = 1; i < 4; i++) g.lineTo(q[i]!.x, q[i]!.y);
       g.fill();
     }
+    rc?.mark(RP.sky);
     flat(floor, 0, 0, 0, 0, n, n, S.floorBlock);
     for (const p of flats) {
       const img = frameAt(p.name, now);
@@ -3576,7 +3589,9 @@ function startRoom(
     } else dest.on = false;
     // (Hollow's challenge: the glows over the room, with his dark: drawDarkPass.)
     // (A dim room, Rolling Dough's back room: its lights go on over its dark wash, after everything's drawn.)
+    rc?.mark(RP.ground);
     if (!dk && !art.dim) drawGlows(now);
+    rc?.mark(RP.lights);
     // Far to near: the pieces by their rows, the Shopkeeper and you (and in a challenge the boss and the board between you) each
     // drawn before the first piece nearer than them.
     you.pose(now, pose);
@@ -3611,12 +3626,14 @@ function startRoom(
     collectElves();
     collectPeople(now);
     for (let i = 0; i < crewN; i++) addFig(crewFigs[i]!.z, 8 + i);
+    rc?.mark(RP.plan);
     let k = 0;
     for (const u of ups) {
-      while (k < figN && figZ[k]! < u.z) drawFigure(figK[k++]!, now);
+      while (k < figN && figZ[k]! < u.z) drawFig(figK[k++]!, now, rc);
       drawUp(u, now);
+      rc?.mark(RP.props);
     }
-    while (k < figN) drawFigure(figK[k++]!, now);
+    while (k < figN) drawFig(figK[k++]!, now, rc);
     if (art.dim) {
       g.fillStyle = `rgba(10,8,18,${art.dim})`;
       g.fillRect(0, 0, W, H);
@@ -3626,6 +3643,7 @@ function startRoom(
     if (fo && introNow?.folio?.plane) drawFolioPlane(introNow.folio.plane);
     if (rp && introNow?.rope) drawRopeLines();
     if (dk) drawDarkPass(now);
+    rc?.mark(RP.lights);
     if (kidBox.on && !ci && !cave) drawTag("Shopkeeper", "sidekick", kidBox.hx, kidBox.hy);
     // (Hollow's intro: your tag fades as the drain starts, so the dark isn't broken by a bright label.)
     const tagA = darkNow?.tag ?? 1;
@@ -3648,7 +3666,9 @@ function startRoom(
       const [a, b] = iceNow.carriers;
       if (P((a.c + b.c) / 2, (a.r + b.r) / 2)) drawBubble(cl, pt.x, pt.y - 28 * (pt.k / SQ), 25 * (pt.k / SQ));
     }
+    rc?.mark(RP.labels);
     placeCard();
+    rc?.mark(RP.chips);
     const h = you.here();
     const key = `${h.c},${h.r}`;
     if (cv.dataset.you !== key) cv.dataset.you = key;
@@ -3739,6 +3759,8 @@ function startRoom(
   const frame = (now: number) => {
     raf = 0;
     if (!alive) return;
+    // (`?report`, frame-report.ts: the room's frames go into the town's run, marked "in a room"; `?fps` counts them.)
+    REC?.begin(now);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     zoomCur += (zoomTarget - zoomCur) * (1 - Math.exp(-dt * f.zoomRate));
@@ -3792,7 +3814,10 @@ function startRoom(
       vx = (vx - w * jx * dt) * e;
       vy = (vy - w * jy * dt) * e;
     } else vx = vy = 0;
+    REC?.mark(RP.logic);
     draw(now);
+    REC?.end(you.moving(), NaN, NaN, RF.room);
+    FPS?.tick(now);
     // (Folio's: once its intro hands over to the crumple, the room is under the crumple's cover, its last frame what the crumple
     // took: it stops drawing, so the crumple has the page's thread to itself.)
     if (fo && introDone) {
@@ -3810,7 +3835,13 @@ function startRoom(
     if (raf) cancelAnimationFrame(raf);
     raf = 0;
   };
-  const onVisibility = () => (document.hidden ? halt() : run());
+  // (Back from a hidden tab: the report and the `?fps` pill start afresh, the hidden time isn't a frame.)
+  const onVisibility = () => {
+    if (document.hidden) return halt();
+    REC?.pause();
+    FPS?.restart();
+    run();
+  };
   document.addEventListener("visibilitychange", onVisibility);
   const ro = new ResizeObserver(() => {
     if (resize()) draw(performance.now());
