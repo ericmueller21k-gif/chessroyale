@@ -42,8 +42,8 @@ file and played by **FluidSynth 2.3** (free music software, LGPL; a tool we run,
 ships, add FluidR3_GM's copyright line to `LICENSES.md`.
 
 ## Mix and loudness
-Both are mastered to **-16.0 LUFS** (measured with ffmpeg's EBU R128 meter), peaks at about -1.2 dBFS (chiptune) and
--1.5 dBFS (orchestra), no clipping. The gain is fixed and the ceiling works on each sample alone, so the loop point isn't
+Both are mastered to **-16.0 LUFS** (measured with ffmpeg's EBU R128 meter), peaks at about -1.5 dBFS (chiptune) and
+-1.2 dBFS (orchestra), no clipping. The gain is fixed and the ceiling works on each sample alone, so the loop point isn't
 touched; whatever rings on past the end (echo, reverb) is folded back onto the start.
 
 ## To know
