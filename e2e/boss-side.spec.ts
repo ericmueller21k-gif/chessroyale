@@ -165,6 +165,7 @@ test("Hollow's darkness on a computer: he casts where he stands, by the board's 
           shown: !!fig && getComputedStyle(fig).visibility === "visible",
           words: box(".boss-char.place-side .bc-bubble"),
           caster: box(".pm-caster"),
+          menu: box(".gm-frame > .fd-side"),
         });
         if (w.__cast.length < 3000) requestAnimationFrame(look);
       };
@@ -177,16 +178,18 @@ test("Hollow's darkness on a computer: he casts where he stands, by the board's 
     await submitMove(page, mv.from + mv.to, fen);
     await expect.poll(() => page.evaluate(() => (window as any).__cast.some((f: { dark: boolean; anim: string }) => f.dark && f.anim === "darkCast")), { timeout: 30_000, message: `${w}: his cast` }).toBe(true);
     await expect.poll(() => page.evaluate(() => (window as any).__cast.at(-1).dark), { timeout: 10_000 }).toBe(false);
-    const seen = (await page.evaluate(() => (window as any).__cast)) as { dark: boolean; anim: string; fig: number[]; box: number[]; shown: boolean; words: number[] | null; caster: number[] | null }[];
+    const seen = (await page.evaluate(() => (window as any).__cast)) as { dark: boolean; anim: string; fig: number[]; box: number[]; shown: boolean; words: number[] | null; caster: number[] | null; menu: number[] | null }[];
     const dark = seen.filter((f) => f.dark);
     expect(dark.length, `${w}: the cover's frames`).toBeGreaterThan(10);
     for (const f of dark) {
       expect(f.caster, `${w}: no figure at the board's corner`).toBeNull();
       expect(f.shown, `${w}: his figure where he stands shows`).toBe(true);
       expect(f.fig, `${w}: his figure stays where it stands`).toEqual(rest);
-      // (His words, while up, open over him: their right edge his box's, their bottom over it.)
+      // (His words, while up, open over him: their right edge his box's, their bottom over it; or, where that would put them under the
+      // computer's side menu, moved just clear of it (speech.tsx, Nov 11: nothing hidden under the menu).)
       if (f.words) {
-        expect(f.words[2], `${w}: his words with him`).toBe(f.box[2]);
+        if (f.menu && f.words[0] <= f.menu[2] + 1 && f.words[2] > f.box[2]) expect(f.words[0], `${w}: his words just clear of the menu`).toBeGreaterThanOrEqual(f.menu[2] - 1);
+        else expect(f.words[2], `${w}: his words with him`).toBe(f.box[2]);
         expect(f.words[3], `${w}: over him`).toBeLessThanOrEqual(f.box[1]);
       }
     }

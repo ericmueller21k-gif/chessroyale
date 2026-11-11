@@ -1,7 +1,7 @@
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
-import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
+import type { PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace, playInPlace } from "./BossCharacter.tsx";
@@ -50,6 +50,10 @@ export interface Moment {
   growth?: WaterGrowth[];
   /** Dash's clock fit: how many smacks. */
   count?: number;
+  /** Don Dough's dough or gold piece: its kind (p, n, b, r, q). */
+  shape?: string;
+  /** Don Dough's opening comment: the library's name for your opening (none: his fallback). */
+  opening?: string;
 }
 
 /** Which of a boss kit's moments a power's moment is (its animation and lines: characters/power-art.ts). */
@@ -96,7 +100,7 @@ export interface MomentUi {
   /** It plays on a screen of its own (the funhouse, his extra move, the Big Bounce) when this says so. */
   own?: (boss: BossView) => boolean;
   /** Its line, when the kit's lines for its moment aren't the whole story (Hollow's first cover of the dark). */
-  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier">) => string | null;
+  line?: (kit: BossKit | null, m: Pick<Moment, "kind" | "key" | "first" | "pick" | "ult" | "by" | "tier" | "shape" | "opening">) => string | null;
   /** When the boss says its line (ms into the moment: as it begins unless given), into its voice (speech.tsx). */
   lineAt?: number;
   /** How much its line matters (speech.tsx): an ultimate's cuts in on another line, anything else waits its turn. */
@@ -360,3 +364,11 @@ export function SoundAt({ id, at, now, sound }: { id: string; at: number; now: n
 }
 
 export type { BoardItem };
+
+const DOUGH_KINDS = new Set<string>(["doughDrop", "doughRise", "doughSquash"]);
+/**
+ * A moment's key (its line's pick and the voice's dedupe): the boss, the kind, the turn, who caused it; for Don Dough's dough also
+ * its square, since two lumps can rise (or be squashed) on one move.
+ */
+export const momentKey = (bossId: string | undefined, e: Pick<PowerEvent, "kind" | "turn" | "by" | "square">): string =>
+  `${bossId}:${e.kind}:${e.turn}${DOUGH_KINDS.has(e.kind) && e.square ? `:${e.square}` : ""}${e.by ? `:${e.by}` : ""}`;

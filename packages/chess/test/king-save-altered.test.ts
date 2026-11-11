@@ -22,6 +22,9 @@ function judge(blunder: () => string): EngineLike {
   };
 }
 
+/** Don Dough with nothing on the board: no dough, no gold, no rise (his next drop far off). */
+const ZEBRA_FRESH = { lumps: [], drops: 0, next: 99, rises: [], squashes: [], gold: [], gilds: [] };
+
 type Patch = (fen: string) => Partial<BossPowerState>;
 
 /** A battle against `id`, the crowd White to move on `fen` (the game so far when not given), its powers patched. */
@@ -175,6 +178,15 @@ const AUDIT: Record<string, { on: Record<string, Patch>; off: Patch } | { none: 
   },
   // (Dash's slaps and his scramble take time, never a square or a move: the save works as ever.)
   dash: { none: "his powers change no square and limit no move: the save works as ever" },
+  // (Don Dough's dough stops his own pieces' moves onto it, and the turn a piece rose changed the board outside a move: the save sits
+  // those out. A gold piece takes a crowd pawn's capture away only when one could take it: that turn too.)
+  zebra: {
+    on: {
+      "a lump of his dough": (f) => ({ zebra: { ...ZEBRA_FRESH, lumps: [{ n: 0, slot: 0, piece: "p", square: emptyTarget(f), left: 3, at: 0 }], drops: 1 } }),
+      "the turn a piece of his rose": () => ({ zebra: { ...ZEBRA_FRESH, drops: 1, rises: [{ at: 0, side: "boss", n: 0, piece: "p", square: "a6" }] } }),
+    },
+    off: () => ({ zebra: ZEBRA_FRESH }),
+  },
 };
 
 describe("the God King's Last Stand on a board a boss has changed: every boss", () => {

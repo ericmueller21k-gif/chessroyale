@@ -1823,6 +1823,7 @@ export class MatchRunner {
       memo: runner.bossMemo,
       now: () => runner.clockNow(),
       random: () => runner.opts.rng(),
+      library: runner.opts.library,
     };
   }
 

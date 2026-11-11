@@ -3587,8 +3587,10 @@ function startRoom(
       if (zzz()) drawZzz(g, youHead.x + 9, youHead.y + 10, 1, now, tagA);
     }
     if (ci && introNow?.line && bossHead.on) drawBubble(introLine, bossHead.x, bossHead.y, bossHead.px);
-    // (Rolling Dough: a guard's or the counter zebra's line, the back table's chatter, the talk beat's lines.)
+    // (Rolling Dough: a guard's or the counter zebra's line, the back table's chatter, the talk beat's lines. In Don Dough's challenge,
+    // Beanie's line after his pop, over him where he watches: intros/zebra.ts's `crewLine` beat.)
     if (!ci && say && headOf(say.who)) drawBubble(say.text, sayHead.x, sayHead.y, sayHead.px);
+    if (setup && ci?.def.crewLine && introNow?.cast?.crewLine?.on && headOf("crew-e")) drawBubble(ci.def.crewLine, sayHead.x, sayHead.y, sayHead.px);
     if (chant && introNow?.chant && bossHead.on) drawBubble(chant, bossHead.x, bossHead.y, bossHead.px);
     // (Ginger's board carriers call out as they come: over them, their size.)
     const cl = ci?.def.crewLine;

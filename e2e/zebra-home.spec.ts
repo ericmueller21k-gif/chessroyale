@@ -6,7 +6,7 @@ import { asAdmin, test, townReady } from "./helpers.ts";
  * Dough is in the game for admins first): walk in from the town; the two guards' `watch` follows you; the counter zebra's Talk has him
  * say a line; through the door at the back left into the back room (its own room) and out again; the chatter at the back table; and
  * the talk beat (the crew stand, draw and aim with Fedora's line, Don waves them down, they lower, his challenge line), his Challenge
- * greyed with "Coming soon" until his boss is in the game. ZEBRA_SHOTS=<dir>: the stills for the PR.
+ * open now his boss is in the game (admins first). ZEBRA_SHOTS=<dir>: the stills for the PR.
  * Test hooks: the room's canvas (`data-room`, `data-part`, `data-you`, `data-ready`), `__shopAt("keeper" | "pass" | "square")`,
  * `__shopZebra()` (who's drawn, their animation and frame, who's talking, the talk beat's step, the chatter's place, you).
  */
@@ -172,7 +172,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   for (const f of z1.figs.filter((x) => x.name !== z1.say!.who)) expect(["sitListen", "sitPuff"]).toContain(f.anim);
   await shot(page, "back");
 
-  // The talk beat: walk up to the table's foot, his card (Talk; Challenge greyed); Talk.
+  // The talk beat: walk up to the table's foot, his card (Talk; Challenge greyed until you've talked to him); Talk.
   await walkTo(page, [8, 7]);
   const don = page.getByRole("dialog", { name: "Don Dough", exact: true });
   await expect(don).toBeVisible({ timeout: 15_000 });
@@ -208,16 +208,67 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   expect(steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);
   expect(lines).toEqual(["Hey! Who let HIM back here?!", "Relax, relax. Put the bread down.", "So. You came to play, or to watch the stream?"]);
   for (const a of ["standUp", "draw", "aim", "lower", "puff"]) expect([...anims], a).toContain(a);
-  // His card again: Talk done (greyed); his boss isn't in the game yet, so Challenge stays greyed, with why under it.
+  // His card again: Talk done (greyed); Challenge open (his boss is in the game).
   await expect(don).toBeVisible();
   await expect(don.getByRole("button", { name: "Talk" })).toBeDisabled();
-  await expect(don.getByRole("button", { name: "Challenge" })).toBeDisabled();
-  await expect(don).toContainText("Coming soon");
+  await expect(don.getByRole("button", { name: "Challenge" })).toBeEnabled();
+  await expect(don).not.toContainText("Coming soon");
   await shot(page, "talk-done");
   await page.keyboard.press("Escape");
 
   // Back out front: you arrive just inside the back door.
   await goThrough(page, "Go out front", null);
   await expect(room(page)).toHaveAttribute("data-you", "4,7");
+  expect(errors).toEqual([]);
+});
+
+test("Rolling Dough: Challenge from Don's card in the back room plays his intro in the front room and starts the battle against Don Dough (admins first)", async ({ page }) => {
+  test.setTimeout(240_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asAdmin(page);
+  await page.goto("/town?sky=day");
+  await townReady(page);
+  await page.evaluate(() => (window as unknown as Hooks).__townGlide?.("zebra"));
+  await expect.poll(() => homeAt(page), { message: "the bakery comes into view" }).not.toBeNull();
+  const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
+  await expect(async () => {
+    if (await card.isVisible()) return;
+    const at = await homeAt(page);
+    expect(at).not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(card).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  await card.getByRole("button", { name: "Go in" }).click();
+  await expect(room(page)).toHaveAttribute("data-ready", "1", { timeout: 20_000 });
+  await goThrough(page, "Go in", "back");
+  await walkTo(page, [8, 7]);
+  const don = page.getByRole("dialog", { name: "Don Dough", exact: true });
+  await expect(don).toBeVisible({ timeout: 15_000 });
+  // (Challenge opens once you've talked to him: the talk beat first.)
+  await don.getByRole("button", { name: "Talk" }).click();
+  await expect(don).toBeHidden();
+  await expect(don).toBeVisible({ timeout: 30_000 });
+  // (Every frame from here: Beanie's line seen in the intro, and which wipe covers the screen: his bread splash, never the default.)
+  await page.evaluate(() => {
+    const w = window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean }; __shopIntro?: () => { crewLine?: boolean } | null };
+    w.__zb = { crew: false, storm: false, wipe: false };
+    const look = () => {
+      if (w.__shopIntro?.()?.crewLine) w.__zb.crew = true;
+      if (document.querySelector(".boss-storm")) w.__zb.storm = true;
+      if (document.querySelector(".boss-wipe")) w.__zb.wipe = true;
+      requestAnimationFrame(look);
+    };
+    requestAnimationFrame(look);
+  });
+  await don.getByRole("button", { name: "Challenge" }).click();
+  // (A confirm, where the challenge asks for one.)
+  const fight = page.getByRole("button", { name: "Fight", exact: true });
+  if (await fight.isVisible({ timeout: 3000 }).catch(() => false)) await fight.click();
+  // His intro in the front room, then the battle against him.
+  await expect(page.getByRole("status", { name: /^Don Dough, threat/ }), "the battle against Don Dough").toBeVisible({ timeout: 120_000 });
+  await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
+  await shot(page, "challenge-battle");
+  expect(await page.evaluate(() => (window as unknown as { __zb: unknown }).__zb), "Beanie's line, then his bread splash as the wipe").toEqual({ crew: true, storm: true, wipe: false });
   expect(errors).toEqual([]);
 });

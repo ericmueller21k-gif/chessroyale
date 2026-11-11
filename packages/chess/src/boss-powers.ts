@@ -70,6 +70,7 @@ export * from "./bosses/moo.ts";
 export * from "./bosses/folio.ts";
 export * from "./bosses/timber.ts";
 export * from "./bosses/dash.ts";
+export * from "./bosses/zebra.ts";
 export * from "./bosses/index.ts";
 
 /** A battle's powers as it starts (nothing has happened yet; the first turn is set up by prepareTurn). */
