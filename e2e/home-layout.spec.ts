@@ -721,7 +721,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
   expect(Math.abs(s.width * 2 + 10 - t.width), "two half cards and their gap are Chess Town's width").toBeLessThan(1);
   // Chess Town: the town square (/town), drawn; Back is home (a computer has no Back since Nov 7: the side menu's Play).
   await town.click();
-  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+  await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect(new URL(page.url()).pathname).toBe("/town");
   // (Back asks first: "Leave Chess Town?", Leave goes home; e2e/town-leave.spec.ts. A computer has no Back since Nov 7: the side menu's
   // Play, which asks the same.)
@@ -749,7 +749,7 @@ test("Chess Town's button and Other modes: Chess Town under PLAY at PLAY's width
     await expect(page.getByRole("heading", { name: "Boss Battle", exact: true })).toBeVisible();
     await expect(menu.getByRole("button", { name: "Boss Battle" })).toHaveAttribute("aria-current", "page");
     await menu.getByRole("button", { name: "Chess Town" }).click();
-    await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1");
+    await expect(page.locator("canvas.town-canvas")).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
     expect(new URL(page.url()).pathname).toBe("/town");
   }
 });

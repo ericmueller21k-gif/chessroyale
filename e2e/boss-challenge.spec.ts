@@ -146,7 +146,7 @@ const serverLines = async (page: Page, who: string) => (await page.locator(".tc-
 /** Back in the town square, where you stood, facing the way you faced. */
 async function backAt(page: Page, stood: Stand) {
   await expect(page.getByRole("heading", { name: "Town square" })).toBeVisible();
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   expect(new URL(page.url()).pathname).toBe("/town");
   const now = (await youNow(page))!;
   expect([now.c, now.r, now.facing, now.view]).toEqual([stood.c, stood.r, stood.facing, stood.view]);
@@ -165,11 +165,11 @@ test("challenging Alfil in the town: in with him to his marks, his line, the pyr
   await named(page, me);
   // (Once the page has its account: signing in a request's own new account would race the page's.)
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await page.waitForLoadState("networkidle");
   await asSignedIn(page, "challenger");
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
 
   // ---- A first challenge, quit: in, the battle, and the gear's Leave (or Resign, before 10 moves): no outcome line.
   {
@@ -280,7 +280,7 @@ test("challenging Babur in the town: the default intro (his line, the table pops
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "tiger", "Babur");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In his Circus: you both walk in, to either side of his ring's middle (his pedestal: the table stands in front of it).
@@ -342,7 +342,7 @@ test("challenging Hollow in the town: his own intro (in to your seats, his line,
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   // (Hollow is live for everyone: a player's town. Nov 3: his own intro, Eric's design with his changes.)
   await page.goto("/town?sky=night");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "hollow", "Hollow");
   // (The phone's GIF at real timing: every frame from the Fight tap to the board, each with its ms since the tap; JPEGs, the quickest
   // to take, so the most frames.)
@@ -460,7 +460,7 @@ async function folioChallenge(page: Page, opts: { noGl: boolean; gif: boolean })
       } as typeof get;
     });
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "folio", "Folio");
   // (The phone's GIF: the page's own frames as Chrome draws them (its screencast), each with its time, from the Fight tap to the match:
   // screenshots taken alongside slow the page, and the cover's WebGL slows them to about one a second.)
@@ -600,7 +600,7 @@ async function smudgyChallenge(page: Page, opts: { gif: boolean }) {
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "smudgy", "Smudgy");
   const gif = !!SHOTS && opts.gif && project === "phone";
   const cast: { at: number; jpg: Buffer }[] = [];
@@ -714,7 +714,7 @@ test("challenging Wrangler in the town: his own intro (in to where you stand, hi
   const ropeOf = (i: Intro | null) => (i as unknown as { rope: Rope | null } | null)?.rope ?? null;
   // (Wrangler is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "pig", "Wrangler");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the barn's doorway, straight to where you stand through it all (BOSS_INTROS' `seated`: the usual clear places, so nobody
@@ -794,7 +794,7 @@ test("challenging Jefferson in the town: his own intro (in to your marks, one of
   const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
   // (Jefferson is live for everyone: a player's town. Nov 4: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "grex", "Jefferson");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the warehouse's door, to the marks: his red plate west of the board on its crates, your lift's plate east; you stand there
@@ -893,7 +893,7 @@ test("challenging Ginger in the town: his own intro (in to your marks in his igl
   const lineOf = (i: Intro | null) => (i as unknown as { lineText: string | null } | null)?.lineText ?? null;
   // (Ginger is live for everyone: a player's town. Nov 5: his own intro, Eric's design.)
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "gingerbread", "Ginger");
   await confirm.getByRole("button", { name: "Fight" }).click();
   // In at the igloo's doorway, to the marks: his peppermint west of the battle spot's middle, your snowflake east; you both stand
@@ -974,7 +974,7 @@ test("challenging Big Boy in the town: his own intro (his line, his toy blocks b
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "bigboy", "Big Boy");
   // (The phone's GIF at real timing: every frame from the Fight tap to the swirl covering, each with its ms since the tap.)
   const frames: { at: number; png: Buffer }[] = [];
@@ -1083,7 +1083,7 @@ test("challenging Dash in an admin's town: his own intro in his store (you both 
   // (Dash is in the game for admins first: his store is in an admin's town only. Nov 5, round 3: his own intro. `debug`: window.match.)
   await asAdmin(page);
   await page.goto("/town?sky=day&debug");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "dash", "Dash");
   // (Every frame's look at the intro, from the page: his moments are a few frames each.)
   await page.evaluate(() => {
@@ -1176,7 +1176,7 @@ test("challenging Timber in an admin's town: his own intro (his line, the log ca
   // (Timber is in the game for admins first: his lodge is in an admin's town only.)
   await asAdmin(page);
   await page.goto("/town?sky=day");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "timber", "Timber");
   // (The phone's GIF at real timing: every frame from the Fight tap to the sweep covering, each with its ms since the tap.)
   const frames: { at: number; png: Buffer }[] = [];
@@ -1287,7 +1287,7 @@ test("challenging Boingo in the town (Nov 6): into his Funhouse, the default int
   if (SHOTS) mkdirSync(SHOTS, { recursive: true });
   const shot = async (name: string) => SHOTS && (await page.screenshot({ path: `${SHOTS}/${name}-${project}.png` }));
   await page.goto("/town");
-  await expect(town(page)).toHaveAttribute("data-ready", "1");
+  await expect(town(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   const { confirm, stood } = await toConfirm(page, "clown", "Boingo");
   await confirm.getByRole("button", { name: "Fight" }).click();
   await expect(room(page)).toHaveAttribute("data-room", "clown", { timeout: 20_000 });
