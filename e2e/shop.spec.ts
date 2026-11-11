@@ -49,6 +49,35 @@ async function homeAt(p: Page, id: string) {
   const cv = (await town(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
+/**
+ * Where to tap a home once the view holds still: its point the same over three painted frames (null if it isn't drawn then, or after
+ * 3 s still moving). The camera glides to a far home (its chip, Hollow Peak), trails you out of a room's door and zooms back out
+ * after one: a point read while it moves is 30 to 180 px off by the time the click lands, the click walks you off, the camera
+ * follows you and the home leaves the screen (PR #640's run: "drawn" null for 20 s on desktop; locally, 2 of 3 first taps missed).
+ */
+async function homeStill(p: Page, id: string) {
+  const xy = await p.evaluate(
+    (h) =>
+      new Promise<{ x: number; y: number } | null>((done) => {
+        const at = () => (window as unknown as Hooks).__townAt?.("home", h) ?? null;
+        const until = performance.now() + 3000;
+        let last = at();
+        let same = 0;
+        const look = () => {
+          const now = at();
+          same = now && last && Math.hypot(now.x - last.x, now.y - last.y) < 0.5 ? same + 1 : 0;
+          last = now;
+          if (same >= 3 || performance.now() > until) done(same >= 3 ? now : null);
+          else requestAnimationFrame(look);
+        };
+        requestAnimationFrame(look);
+      }),
+    id,
+  );
+  if (!xy) return null;
+  const cv = (await town(p).boundingBox())!;
+  return { x: cv.x + xy.x, y: cv.y + xy.y };
+}
 /** Where to tap something in the room now (in the page); null while it isn't on screen. */
 async function shopAt(p: Page, kind: "keeper" | "door" | "square", sq?: readonly [number, number]) {
   const xy = await p.evaluate(([k, s]) => (window as unknown as Hooks).__shopAt?.(k as string, s as [number, number] | undefined) ?? null, [kind, sq] as const);
@@ -96,8 +125,8 @@ async function goIn(p: Page, id: string, name: string) {
     if (await card.isVisible()) return;
     // (A boss strolling in front of its home may take the tap: close its card and tap again.)
     if (await p.getByRole("dialog").isVisible()) await p.keyboard.press("Escape");
-    const at = await homeAt(p, id);
-    expect(at, "drawn").not.toBeNull();
+    const at = await homeStill(p, id);
+    expect(at, "drawn, the view still").not.toBeNull();
     await p.mouse.click(at!.x, at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
   }).toPass({ timeout: 20_000 });
