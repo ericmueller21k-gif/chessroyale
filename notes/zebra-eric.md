@@ -42,3 +42,19 @@ funny, but still a good animation."
 
 **Gameplay:** Eric will decide ("I will come up with the actual thing about him as far as how he plays. Feel free to give me some
 suggestions"). Start on the artwork now.
+
+## Eric, Nov 11 (by voice): name and passive
+- **Name: Don Dough.** "The Don Dough is good, and the rising dough is a good passive for him."
+- **Passive: Rising Dough.** "He drops early on in the game. He'll do this a few times ... randomly like a piece of dough." "It's better
+  that you do know what it is" (the dough shows what it will become). The God King says something like "squash it before it rises".
+  - **Times:** "if it's a pawn, it'll take maybe 4 turns. A knight or bishop is 7, and a rook is 10, and a queen is 15." (Elsewhere: "it'll
+    probably end up coming up after 5 turns, aka 5 minutes"; "12 turns is probably too little for a queen"; "we'll just experiment with
+    the numbers and the placement".)
+  - **Odds and places:** "he should rarely get the queen, the rook. Those can be put near his side somewhere, but somewhere that's gettable
+    for the pawn." "He gets about a pawn and a half to maybe 1 knight sometimes per game. On occasion, he may throw out a queen." "You're not
+    going to have too much trouble trying to squander [squash] his pieces."
+  - **The oven timer, not a meter:** "a little timer, like an oven timer, like a digital timer" on his side, counting down in "minutes"
+    that are turns: "it shows 12 minutes. When you play your turn, the timer drops to 11 minutes, but it does a cool millisecond drop down
+    where it looks like all of a sudden a minute passed. And then when he plays, it drops again." (So one minute per move, yours and his.)
+  - Not a real-time timer ("we already kind of do that with Babur").
+- **Ultimate:** not decided: "something with the black and white cookie ... I'll think on that while I'm away."
