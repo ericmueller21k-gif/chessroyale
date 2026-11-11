@@ -28,6 +28,7 @@ import { TIGER_FIGURE } from "../characters/tiger-figure.ts";
 import { FOLIO } from "../characters/folio.ts";
 import { BOSS_BEAVER } from "../characters/timber.ts";
 import { BOSS_BLITZ } from "../characters/boss-blitz.ts";
+import { NPC_ZEBRA_GUARD_A } from "./shops/zebra-crew.ts";
 import { N, colI, rowI, bandOf, clamp, drawable, enterOf, farOf, forEachSquare, hazeMix, newPt, newView, pastCurve, pickSquare, proj, radial, rel, rimYAt, setHeading, setView, stepCams, tableLift, toCam, wrapF, wrapFX, wrapFY, type Quad, type TableLift, type View } from "./camera.ts";
 import { CHAT_BOX } from "./chat.ts";
 import { MAP_BOX } from "./minimap.ts";
@@ -54,7 +55,7 @@ import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type B
 import { seenEither, seenFrom, seenReady } from "./seen.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
-import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, groundAt, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
+import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
 import { drawZzz } from "./zzz.ts";
 import { TAG_STYLE, TagCache, easeTag, namesMode, tagAlpha, type NamesMode, type TagKind } from "./tags.ts";
 
@@ -79,6 +80,11 @@ export const BOSS_ART: Record<TownBossId, Character> = {
   // (Dash as drawn, without the room his game figure keeps on its right for his entrance's zip-in: dash-figure.ts.)
   dash: BOSS_BLITZ,
 };
+/** A home whose boss is inside: its stand-in's sprite out front (world.ts STAND_IN). Rolling Dough's guard (Nov 11): the front room's
+ * flat-cap door guard, his roll at port arms; Don's size, as drawn. */
+const STAND_IN_ART: Record<IndoorId, Character> = { zebra: NPC_ZEBRA_GUARD_A };
+/** The town figure's sprite for a home: its boss's, or its stand-in's. */
+const figureArt = (id: HomeId): Character => (id === "zebra" ? STAND_IN_ART[id] : BOSS_ART[id]);
 /**
  * Each boss's head in its first idle frame (x, y and a side, in its pixels): what its edge chip shows. (Slice 1 cropped
  * the top of the frame, which showed Babur's balloons, not Babur.)
@@ -903,7 +909,7 @@ export class Renderer {
     });
     this.hedgeTops = STREET_TOWN ? [0, 1, 2].map((v) => new FrameCache(hedgeTop(v))) : [];
     this.propTop = PROPS.map(() => 0);
-    this.bossFrames = town.bosses.map((b) => new FrameCache(BOSS_ART[b.home.id]));
+    this.bossFrames = town.bosses.map((b) => new FrameCache(figureArt(b.home.id)));
     for (const p of town.people) if (isSprite(p.look) && !this.spriteArt.has(p.look.sprite)) this.spriteArt.set(p.look.sprite, new SpriteFrames(p.look.sprite));
     this.houseFrames = this.places.map((h) => new FrameCache(artOf(h).ch));
     this.placeGlow = this.places.map(() => null);
@@ -1605,7 +1611,7 @@ export class Renderer {
       } else if (it.kind === "part") this.drawPart(it, now);
       else if (it.kind === "boss") {
         const b = town.bosses[it.i]!;
-        const ch = BOSS_ART[b.home.id];
+        const ch = figureArt(b.home.id);
         const img = this.bossFrames[it.i]!.at(now, it.i * 977);
         b.walker.pose(now, pose);
         // (The street town: a boss whose drawing would reach past the box's foot or side fades out first, so none is ever cut off.)
@@ -3596,9 +3602,11 @@ export class Renderer {
       const it = this.bossItems[i]!;
       if (!it.on) return false;
       // The top of its head (its chip's face box, in its picture), not the top of its picture's box.
-      const id = this.town.bosses[i]!.home.id;
+      const home = this.town.bosses[i]!.home;
+      const id = home.id;
       out.x = it.fx;
-      out.y = it.y0 + (BOSS_FACE[id][1] / BOSS_ART[id].h) * (it.y1 - it.y0) - 4;
+      // (A stand-in's face box isn't his: Rolling Dough's chip shows its door. The top of his picture.)
+      out.y = it.y0 + ((hasTownBoss(home) ? BOSS_FACE[id][1] : 0) / figureArt(id).h) * (it.y1 - it.y0) - 4;
       return out.y > 0 && out.y < this.H && out.x > 0 && out.x < this.W;
     }
     const it = this.houseItems[i]!;
@@ -3722,7 +3730,7 @@ export class Renderer {
     const out: { name: string; x0: number; y0: number; x1: number; y1: number; fy: number; alpha: number }[] = [];
     for (const it of this.items) {
       if (!it.on || (it.kind !== "boss" && it.kind !== "person")) continue;
-      const name = it.kind === "boss" ? this.town.bosses[it.i]!.home.boss : this.town.people[it.i]!.name;
+      const name = it.kind === "boss" ? figureName(this.town.bosses[it.i]!.home) : this.town.people[it.i]!.name;
       out.push({ name, x0: it.x0, y0: it.y0, x1: it.x1, y1: it.y1, fy: it.fy, alpha: it.kind === "boss" ? this.bossAlpha[it.i] ?? 1 : this.personAlpha[it.i] ?? 1 });
     }
     return out;
@@ -3882,7 +3890,7 @@ export class Renderer {
         if ((hi.on && hi.x1 > 0 && hi.x0 < W && hi.y0 < H && hi.y1 > 0) || this.farOn) continue;
       } else {
         if (hi.on && hi.fx > 0 && hi.fx < W && hi.hy < H) continue;
-        if (town.bosses[i]?.onScreen) continue; // (the bosses are in the homes' order: world.ts; a home with none in the town, Rolling Dough, last)
+        if (town.bosses[i]?.onScreen) continue; // (the bosses are in the homes' order: world.ts; Rolling Dough's guard, a stand-in, last)
       }
       order.push(i);
     }
@@ -3954,7 +3962,8 @@ export class Renderer {
   chipFace(place: Place): { img: HTMLCanvasElement; box: readonly [x: number, y: number, size: number] } {
     if (place.id === "coliseum") return { img: this.chipIcon.get(0), box: CHIP_ICON_BOX };
     const b = this.town.bosses.findIndex((x) => x.home.id === place.id);
-    return { img: b < 0 ? this.houseFrames[this.places.indexOf(place)]!.get(0) : this.bossFrames[b]!.get(0), box: BOSS_FACE[place.id] };
+    // (A stand-in's home, Rolling Dough's: its own picture's door, not him.)
+    return { img: b < 0 || !hasTownBoss(this.town.bosses[b]!.home) ? this.houseFrames[this.places.indexOf(place)]!.get(0) : this.bossFrames[b]!.get(0), box: BOSS_FACE[place.id] };
   }
 }
 
