@@ -14,4 +14,4 @@ for t in A:track_a B:track_b C:song_c D:song_d E:song_e F:song_f G:song_g H:song
   ffmpeg -hide_banner -v error -y -i "$out/track-${t%%:*}.wav" -c:a libvorbis -q:a 6 "$out/track-${t%%:*}.ogg"
   ffmpeg -hide_banner -v error -y -i "$out/track-${t%%:*}.wav" -c:a libmp3lame -q:a 2 "$out/track-${t%%:*}.mp3"
 done
-python3 levels.py "$out"/track-A.wav "$out"/track-B.wav "$out"/track-C.wav:1.5 "$out"/track-D.wav:1.875 "$out"/track-E.wav:1.6667 "$out"/track-F.wav:1.5 "$out"/track-G.wav:1.5 "$out"/track-H.wav:2.5 "$out"/track-I.wav:2.1429 "$out"/track-J.wav:1.7647 "$out"/track-K.wav:1.3636 "$out"/track-L.wav:6 "$out"/track-M.wav:6.6667
+python3 levels.py "$out"/track-A.wav "$out"/track-B.wav "$out"/track-C.wav:1.5 "$out"/track-D.wav:1.875 "$out"/track-E.wav:1.6667 "$out"/track-F.wav:1.5 "$out"/track-G.wav:1.5 "$out"/track-H.wav:2.5 "$out"/track-I.wav:2.1429 "$out"/track-J.wav:1.7647 "$out"/track-K.wav:5.4545 "$out"/track-L.wav:6 "$out"/track-M.wav:6.6667
