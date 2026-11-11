@@ -35,3 +35,6 @@ and lastly an ominous figure aka hidden boss in all black sitting on a stool in 
 The reel's frames as stills (one per scene) and the reel itself (MP4) to orphan branch `stills/landing-reel`. Push; PR title
 "Landing: a new demo reel (50 v 50, the town and bosses, ranked, the Hidden Boss)"; body (≤40 lines) to `.pr-body.md`; `.done` LAST.
 Wait for green CI.
+
+## Eric, Nov 11 (later): the ranked scene
+"For the ranked clip make it even a few seconds longer and shuffle through all the ranked symbols and names and add another line like 'become a grandmaster' or whatever the highest rank is. I trust your vision." (Director: the shuffle Wood → Transcendent, landing on Transcendent: "Become Transcendent.")
