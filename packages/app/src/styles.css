@@ -10240,6 +10240,20 @@ button.fd-logo {
       overflow: hidden;
     }
   }
+  /*
+   * A very short card (under 110 px: a 360 × 640 phone): the pawn and name row starts at the left, so the "View profile" link
+   * (bottom right, Nov 11, the director's call) fits beside the name; the pawn fits inside the card's content height, always.
+   * Only this row moves, and only on these cards.
+   */
+  @container fd-hero (max-height: 110px) {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
+      justify-content: flex-start;
+    }
+    .fd-hero .fd-pawn-hero {
+      height: clamp(40px, calc(100cqh - 22px), 130px);
+    }
+  }
 }
 /* Under PLAY (Oct 24): "Other modes", the RANKED label's style at 11 px, over the Boss raid and Auto chess cards. Centered over
    the cards (Oct 26, Eric). */
