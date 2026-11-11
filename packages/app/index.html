@@ -65,6 +65,14 @@
       .hc-load.failed .hc-load-line { color: var(--fd-text); }
       /* (Under the line, out of the box's own height: the bar and its line are what's centered.) */
       .hc-load-retry { position: absolute; top: calc(100% + 12px); }
+      /* A phone held sideways (Eric, Nov 11: "rotation disabled for this app on mobile"): a browser can't lock the page's rotation
+         outside an installed app (its manifest is portrait), so this covers the app until the phone is upright. Shown only at a
+         landscape height of 500 px or less: a tablet or a computer is taller and never sees it. */
+      .rotate-lock { display: none; position: fixed; inset: 0; z-index: 2147483600; flex-direction: column; align-items: center;
+        justify-content: center; gap: 18px; padding: 24px; background: var(--fd-bg, #14161b); color: var(--fd-text, #eef0f4);
+        font: 600 18px/24px Archivo, system-ui, sans-serif; text-align: center; }
+      .rotate-lock p { margin: 0; }
+      @media (orientation: landscape) and (max-height: 500px) { .rotate-lock { display: flex; } }
     </style>
   </head>
   <body>
@@ -118,6 +126,14 @@
         };
       })();
     </script>
+    <div id="rotate-lock" class="rotate-lock" role="dialog" aria-modal="true" aria-label="Turn your phone upright">
+      <svg viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="7.5" y="2.5" width="9" height="16" rx="2" />
+        <path d="M3.2 9.2A9 9 0 0 1 12 3.5" />
+        <path d="M20.8 14.8A9 9 0 0 1 12 20.5" />
+      </svg>
+      <p>Turn your phone upright to play</p>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

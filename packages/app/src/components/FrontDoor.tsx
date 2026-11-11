@@ -107,30 +107,12 @@ export function DressedPawn({
   );
 }
 
-/**
- * Your pawn in a gold ring: it opens your profile. `face` (a phone's top bar, Nov 9): the same square as the shop's, showing
- * only the pawn's face, still (no ride), with no ring; the stylesheet's `.fd-top-face` does the cropping.
- */
-export function MyPawnButton({ onClick, face = false }: { onClick: () => void; face?: boolean }) {
-  const p = account().profile;
-  return (
-    <button type="button" class={face ? "fd-ring fd-top-face" : "fd-ring"} aria-label="Your profile" onClick={onClick}>
-      <DressedPawn look={p?.locker?.look} size="ring" ride={!face} own />
-    </button>
-  );
-}
-
-/**
- * Your pawn in its ring (the home's top bar on a phone; the top right of the page on a computer). No coins (Eric,
- * Oct 18: "nobody needs to see their coins" there; the shop and your profile show them).
- */
-export function AccountBar({ onProfile, tourId, face = false }: { onProfile: () => void; tourId?: string; face?: boolean }) {
-  return (
-    <div class="fd-top-right" data-tour={tourId}>
-      <MyPawnButton onClick={onProfile} face={face} />
-    </div>
-  );
-}
+/** Chat: a speech bubble, drawn as the shop's and friends' icons are (a phone's top bar, Nov 11). */
+export const ChatIcon = () => (
+  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9.5a1.5 1.5 0 0 1-1.5 1.5h-9l-5 4v-4H4A1.5 1.5 0 0 1 2.5 16.5V7A1.5 1.5 0 0 1 4 5.5z" />
+  </svg>
+);
 
 /** Settings: a gear (the side menu, your profile). */
 export const GearIcon = () => (

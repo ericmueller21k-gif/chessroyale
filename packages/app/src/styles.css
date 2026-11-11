@@ -9093,6 +9093,9 @@ button.history-label {
   --fd-danger: #f2a3a3;
   --fd-danger-line: #5b2a2a;
   --fd-scrim: rgba(0, 0, 0, 0.55);
+  /* The card's "View profile" (Nov 11): a lighter blue on the dark card (6.4:1), and the sweep across it. */
+  --fd-link: #60a5fa;
+  --fd-shine: #e0f2fe;
 }
 :root[data-theme="light"] {
   --fd-bg: #f4f2ee;
@@ -9111,6 +9114,9 @@ button.history-label {
   --fd-danger: #b42318;
   --fd-danger-line: #f1b5ae;
   --fd-scrim: rgba(20, 22, 27, 0.4);
+  /* The card's "View profile": #2563eb on white (5.2:1). */
+  --fd-link: #2563eb;
+  --fd-shine: #8ab8f7;
   --fd-shadow: 0.16;
 }
 body:has(.fd-root) {
@@ -9491,19 +9497,26 @@ button.fd-logo {
     gap: 6px;
   }
 }
-@media (max-width: 399px) {
-  .fd-top .fd-logo {
-    font-size: clamp(18px, 5.2vw, 20px);
-  }
-}
-@media (max-width: 359px) {
-  .fd-top .fd-logo {
-    font-size: 15px;
-  }
+/*
+ * The row (the logo, five buttons, the gaps) must fit the bar at every phone width (Nov 11, the director): below 375 px the
+ * buttons are 40 px, from 375 up 44 px; the word logo's width is about 5.3 times its font size, so it takes what the row leaves
+ * (the bar's 18 px margins and 6 px gaps; 10 px gaps from 430 px). Below 344 px the logo is the app's icon (below).
+ */
+@media (max-width: 374px) {
   .fd-top .fd-ring,
   .fd-top .fd-icon-btn {
     width: 40px;
     height: 40px;
+  }
+}
+@media (min-width: 344px) and (max-width: 374px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 270px) / 5.3), 20px);
+  }
+}
+@media (min-width: 375px) and (max-width: 459px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 296px) / 5.3), 20px);
   }
 }
 /*
@@ -9631,7 +9644,46 @@ button.fd-logo {
     margin: 0;
   }
 }
+/*
+ * The phone's chat (Eric, Nov 11: "a chat icon" in the top bar, in place of the pawn): the global chat as a full-screen sheet over
+ * home, its × a 44 px square at the top right. Home under it stays as it was (ChatSheet.tsx).
+ */
+.chat-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--fd-bg);
+  padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+}
+.chat-sheet-top {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 44px;
+}
+.chat-sheet-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: 400 32px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.chat-sheet-close:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+.chat-sheet > .gchat {
+  flex: 1 1 0;
+  min-height: 0;
+}
 .fd-hero {
+  position: relative;
   flex: 1 1 auto;
   min-height: 230px;
   display: flex;
@@ -9696,6 +9748,62 @@ button.fd-logo {
 .fd-pawn.fd-tap:focus-visible {
   outline: 2px solid var(--fd-gold, #f5c542);
   outline-offset: 2px;
+}
+/*
+ * "View profile" (Eric, Nov 11: "top right of that white container", moved to the bottom right on the director's call, Nov 11, as
+ * it cut into the name): in the card's bottom-right corner, 12 px in from its right and bottom edges, so the words sit about 16 px
+ * in from the edge (the chevron's own padding). Its 44 px tap box is out of the flow, so nothing else on the card moves. Blue, a
+ * chevron, and a light sweep every 6 s (none under reduced motion). Its no-overlap check: home-layout.spec.ts.
+ */
+.fd-hero-profile {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-link);
+  font: 600 15px/1 Archivo, system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+.fd-hero-profile-text {
+  background: linear-gradient(100deg, var(--fd-link) 40%, var(--fd-shine) 50%, var(--fd-link) 60%) no-repeat;
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fd-profile-sweep 6s ease-in-out infinite;
+}
+@keyframes fd-profile-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  30%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+.fd-hero-profile:active {
+  transform: scale(0.97);
+}
+.fd-hero-profile:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-hero-profile-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
 }
 /* Your icon to the left of your name and rating: the pair centered under your pawn, the words ranged left. */
 .fd-hero-id {
@@ -10130,6 +10238,27 @@ button.fd-logo {
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       overflow: hidden;
+    }
+  }
+  /*
+   * A very short card (under 110 px: a 360 × 640 phone): the pawn and name row starts at the left, so the "View profile" link
+   * (bottom right, Nov 11, the director's call) fits beside the name; the pawn fits inside the card's content height, always.
+   * Only this row moves, and only on these cards.
+   */
+  @container fd-hero (max-height: 110px) {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
+      justify-content: flex-start;
+    }
+    .fd-hero .fd-pawn-hero {
+      height: clamp(40px, calc(100cqh - 22px), 130px);
+    }
+    /* The link (the director, Nov 11): its box at the card's bottom edge and 13 px words, so the words clear the name's words. */
+    .fd-hero-profile {
+      bottom: 0;
+    }
+    .fd-hero-profile-text {
+      font-size: 13px;
     }
   }
 }

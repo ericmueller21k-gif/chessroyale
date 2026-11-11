@@ -86,8 +86,8 @@ test("quick chat picks in the profile: search, a check, n/10, free lines only (t
   await named(phone, "Phoney");
   for (const p of [desk, phone]) {
     await p.goto("/");
-    // (Your profile: the top bar's pawn on a phone, the side menu's Profile on a computer: the right column's pawn went, Nov 7.)
-    await p.getByRole("button", { name: "Your profile", exact: true }).or(p.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
+    // (Your profile: "View profile" on your card on a phone, the side menu's Profile on a computer.)
+    await p.getByRole("button", { name: "View profile", exact: true }).or(p.getByRole("navigation", { name: "Menu" }).getByRole("button", { name: "Profile" })).filter({ visible: true }).first().click();
     await expect(p.locator(".qp")).toBeVisible();
   }
 
