@@ -72,6 +72,13 @@ export interface FairMove {
   deep?: { best: string; rank: number; loss: number; top?: string[] };
 }
 
+/**
+ * Whether a deep-checked pick counts as the engine's best (Eric, Nov 11; docs/decisions/2026-11-11-near-best.md): its rank is 1,
+ * or it gives away at most FAIRPLAY.deep.nearBestLoss points by the deep search's own numbers. Two strong engines often prefer
+ * different, practically equal moves, so an exact match undercounts every engine user whose engine isn't ours.
+ */
+export const nearBest = (d: Pick<NonNullable<FairMove["deep"]>, "rank" | "loss">, near: number = FAIRPLAY.deep.nearBestLoss): boolean => d.rank === 1 || d.loss <= near;
+
 export type SkipReason = "book" | "forced" | "only" | "recapture" | "decided" | "powerUp" | "engineToken" | "bossPower";
 
 /** A settings group with its numbers widened (FAIRPLAY is `as const`), so tests and the simulation can try others. */
@@ -147,23 +154,29 @@ export function honestChance(crowd: number, found: number, rating: number, model
 /**
  * One counted pick's evidence: the log-likelihood that an engine user made it rather than an honest player of strength
  * `rating`.
- *   - Checked by the deep re-check: was the pick its best, one of its next two, or neither? An honest player's chances
- *     come from the crowd in that position (how many of them picked its best, its top 3: honestChance), an engine
- *     user's are cheatDeep (its own engine can differ from ours, so its pick is sometimes our second or third).
+ *   - Checked by the deep re-check: was the pick its best, one of its next two or near its best (nearBest, within `near` points:
+ *     Nov 11), or neither? An honest player's chances come from the crowd in that position (how many of them picked its best, its
+ *     top 3: honestChance, fitted on its best alone, so a near-best pick is never "its best" here), an engine user's are cheatDeep
+ *     (its own engine can differ from ours, so its pick is sometimes our second or third, or another practically equal move).
  *   - Not checked: was the pick within foundLoss of the judges' best? An engine user does that at least cheatFind of
  *     the time.
- * A best move the crowd missed is strong evidence; a pick outside the engine's top 3 counts strongly the other way.
+ * A best move the crowd missed is strong evidence; a pick outside the engine's top 3 and not near its best counts strongly the
+ * other way.
  */
-export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.signals): { outcome: number; honest: number[]; evidence: number } {
+export function moveEvidence(m: FairMove, rating: number, s: Signals = FAIRPLAY.signals, near: number = FAIRPLAY.deep.nearBestLoss): { outcome: number; honest: number[]; evidence: number } {
   const clampP = (p: number) => Math.min(0.98, Math.max(0.02, p));
   if (m.deep) {
     const top = m.deep.top ?? [m.deep.best];
-    const outcome = m.deep.rank === 1 ? 0 : m.deep.rank <= 3 ? 1 : 2;
+    const outcome = m.deep.rank === 1 ? 0 : m.deep.rank <= 3 || nearBest(m.deep, near) ? 1 : 2;
     // (Older records without the crowd's picks: its count for the judges' best stands in for that move.)
     const count = (x: string) => (m.picks ? (m.picks[x] ?? 0) : x === m.best ? m.crowdFound : 0);
     const share = (moves: readonly string[]) => Math.min(m.crowd, moves.reduce((t, x) => t + count(x), 0));
     const p1 = clampP(honestChance(m.crowd, share(top.slice(0, 1)), rating, s.findDeep, s.soloDeep, s));
-    const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(top.slice(0, 3)), rating, s.findDeep3, s.soloDeep3, s)));
+    // (Outcome 1 is "its next two or near its best": a near-best pick outside its top 3 adds the crowd on that pick, else a move most of
+    // the crowd played reads as engine evidence. The review of #629, M1.)
+    const top3 = top.slice(0, 3);
+    const second = outcome === 1 && !top3.includes(m.move) ? [...top3, m.move] : top3;
+    const p3 = Math.max(p1 + 0.02, clampP(honestChance(m.crowd, share(second), rating, s.findDeep3, s.soloDeep3, s)));
     const honest = [p1, p3 - p1, Math.max(0.01, 1 - p3)];
     // An engine user finds our best at least as often as an honest player would; its other chances keep their shape.
     const q0 = Math.max(s.cheatDeep[0], p1);
@@ -233,9 +246,13 @@ export interface FairSummary {
   /** Counted moves with a look-away during the clock, and how many of those found the best. */
   awayMoves: number;
   awayFound: number;
-  /** The deep re-check: counted moves checked, how many picks were its best (a "deep match"), in its top 3, its average loss. */
+  /**
+   * The deep re-check: counted moves checked; picks at or near its best (a "deep match": nearBest, which the ban bars read); picks
+   * that were its very best (rank 1; a summary without it predates the near-best count, Nov 11); in its top 3; its average loss.
+   */
   deepChecked: number;
   deepMatch: number;
+  deepExact: number;
   deepTop3: number;
   deepLoss: number | null;
   /** The suspicion score and its parts. */
@@ -249,7 +266,13 @@ export interface FairSummary {
  * this match's strength (up to strengthCap), so an honest strong player isn't flagged for finding what strong players
  * find.
  */
-export function matchSignals(moves: readonly FairMove[], ref: number | null, s: Signals = FAIRPLAY.signals, sc: Score = FAIRPLAY.score): FairSummary {
+export function matchSignals(
+  moves: readonly FairMove[],
+  ref: number | null,
+  s: Signals = FAIRPLAY.signals,
+  sc: Score = FAIRPLAY.score,
+  near: number = FAIRPLAY.deep.nearBestLoss,
+): FairSummary {
   const counted = moves.filter((m) => skipReason(m, s) === null);
   const losses = counted.map((m) => m.loss);
   const perf = matchPerf(losses, s);
@@ -277,7 +300,7 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
       awayMoves++;
       if (f) awayFound++;
     }
-    evidence += moveEvidence(m, strength, s).evidence;
+    evidence += moveEvidence(m, strength, s, near).evidence;
     const rate = crowdRate(m, s);
     if (rate === null) continue;
     // (A premove's time measures no thinking: it's left out of timing, and counts for everything else.)
@@ -297,7 +320,8 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
   }
   const timeCorr = times.length >= s.minTimed ? spearman(times, difficulty) : null;
   const checked = counted.filter((m) => m.deep);
-  const deepMatch = checked.filter((m) => m.deep!.rank === 1).length;
+  const deepMatch = checked.filter((m) => nearBest(m.deep!, near)).length;
+  const deepExact = checked.filter((m) => m.deep!.rank === 1).length;
   const deepTop3 = checked.filter((m) => m.deep!.rank <= 3).length;
   const deepLoss = checked.length ? checked.reduce((a, m) => a + m.deep!.loss, 0) / checked.length : null;
   const enough = counted.length >= sc.minCounted;
@@ -327,6 +351,7 @@ export function matchSignals(moves: readonly FairMove[], ref: number | null, s: 
     awayFound,
     deepChecked: checked.length,
     deepMatch,
+    deepExact,
     deepTop3,
     deepLoss: deepLoss === null ? null : round2(deepLoss),
     score,
@@ -350,6 +375,11 @@ export type FairLevel = "none" | "watch" | "review" | "ban";
 export interface LevelVerdict {
   level: FairLevel;
   reasons: string[];
+  /**
+   * "strength": the ban level from sustained strength alone, which rests on the judges' numbers with no deep re-check, so it pools or
+   * opens a review but never bans (the review of #629, m1: the server's actOn).
+   */
+  path?: "strength";
 }
 
 /** What playerLevel reads from each match (older summaries without the deep fields count as unchecked). */
@@ -358,7 +388,8 @@ export type LevelInput = Pick<FairSummary, "score" | "perf" | "counted"> & Parti
 /**
  * A player's level from their recent match summaries (any order; only `at` within the window counts, at most
  * windowMatches of the newest). Ban needs overwhelming evidence confirmed by the deep re-check: super-GM strength
- * and engine-like moves over two matches with high scores, or one match past every bar.
+ * and engine-like moves over two matches with high scores, or one match past every bar; or a strength no honest player keeps
+ * up over several matches (sustainedStrength: `path` "strength", never a ban on its own).
  */
 export function playerLevel(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): LevelVerdict {
   const recent = matches
@@ -379,11 +410,13 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
   if (checked.length >= lv.banMatches && evidence >= lv.banEvidence && deepChecked >= lv.banDeepChecked && deepShare >= lv.banDeep && bestPerf >= lv.banPerf) {
     return {
       level: "ban",
-      reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves the engine's best, best strength ${bestPerf}`],
+      reasons: [`${checked.length} deep-checked matches: evidence ${r1(evidence)}, ${Math.round(deepShare * 100)}% of ${deepChecked} moves near the engine's best, best strength ${bestPerf}`],
     };
   }
   const one = checked.find((m) => atBanBar(m, lv));
-  if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves the engine's best, strength ${one.perf}`] };
+  if (one) return { level: "ban", reasons: [`one match: evidence ${r1(one.evidence ?? 0)}, ${one.deepMatch}/${one.deepChecked} moves near the engine's best, strength ${one.perf}`] };
+  const strong = sustainedStrength(recent, lv);
+  if (strong !== null) return { level: "ban", path: "strength", reasons: [`strength: ${strong.toLocaleString("en-US")} average over ${lv.poolStrengthMatches} matches`] };
   if (top1 >= lv.reviewOne) return { level: "review", reasons: [`a match scored ${top1}`] };
   if (top2 >= lv.reviewTwo) return { level: "review", reasons: [`two matches scored ${scores[0]} and ${scores[1]}`] };
   if (top1 >= lv.watch) return { level: "watch", reasons: [`a match scored ${top1}`] };
@@ -391,12 +424,16 @@ export function playerLevel(matches: readonly LevelInput[], now: number, lv: Lev
 }
 
 /**
- * Whether a ban-level verdict rests on two matches or more: it still stands with any one of them left out (the engine pool's level
- * path: docs/decisions/2026-11-10-engine-pool.md). Fair play records a match once per lobby, so one lobby's judges, honest or forged,
- * never carry it alone (the #618 review, M3); a ban that rests on one match opens a review instead (a person looks).
+ * Sustained strength (Eric, Nov 11): the average match strength of the newest `poolStrengthMatches` matches with `poolStrengthCounted`
+ * counted moves or more each (`matches` newest first, already in the window), when there are that many and it reaches `poolStrength`;
+ * else null. Catches an engine user who plays its second or third choice, whose top-move share stays low.
  */
-export function banSpread(matches: readonly LevelInput[], now: number, lv: Levels = FAIRPLAY.levels): boolean {
-  return playerLevel(matches, now, lv).level === "ban" && matches.every((_, i) => playerLevel(matches.filter((__, j) => j !== i), now, lv).level === "ban");
+export function sustainedStrength(matches: readonly Pick<LevelInput, "perf" | "counted">[], lv: Levels = FAIRPLAY.levels): number | null {
+  const n = lv.poolStrengthMatches;
+  const enough = matches.filter((m) => m.counted >= lv.poolStrengthCounted && m.perf !== null).slice(0, n);
+  if (n < 1 || enough.length < n) return null;
+  const avg = Math.round(enough.reduce((t, m) => t + m.perf!, 0) / n);
+  return avg >= lv.poolStrength ? avg : null;
 }
 
 /**

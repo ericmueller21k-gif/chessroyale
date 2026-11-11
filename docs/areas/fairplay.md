@@ -39,9 +39,10 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   (no online play, solo stays open; an appeal a person decides; their sign-in identities are kept hashed so a new
   account with them is banned too, and a device they played from puts new accounts in review), **cleared** (held
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
-- **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level resting on two
-  matches, so two lobbies (`banSpread`: one match at the bar opens a review), or a new account with 2 of its first 10 matches at the one-match
-  ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or bots (`mayPlay`, `queueName`'s `engine`), and matchmade
+- **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level (one
+  deep-checked match past every one-match bar, the two-match path, or sustained strength: the 5 newest matches of 8+ counted moves
+  averaging 3,000 (`levels.poolStrength*`; the judges' numbers alone, so under `enforcement: "ban"` it opens a review, never a ban); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
+  or a new account with 2 of its first 10 matches at the one-match ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or bots (`mayPlay`, `queueName`'s `engine`), and matchmade
   lobbies turn away the other side's newcomers ("This match has already started."); results not held, their profile as ever, public rankings
   leave them out (`NOT_POOLED`), evidence kept and deep-checked in full. The review page's `pool` tab (grouped queries, never one a player):
   why, the evidence, how they do there (hints: in-pool engine play first; "crushed" only from 1 v 1 against the pool; a strength drop), Release,
@@ -75,8 +76,12 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   off-peak), over every legal move in groups of at most 8 (`moveGroups`, as 1 v 1's check), never the judges' list, which a device
   sent (Nov 10); a position's whole budget taken before its first search, and outside a review, a ban or the pool a match only as far as
   `levels.banMatchChecked` (8) moves (a review queues the rest: `setCase`). The judges' quick numbers can open a review, never a ban. **Detection never bans since Nov 10**
-  (the outside review's finding 3): at the ban bar on two matches it pools (`FAIRPLAY.enforcement: "pool"`), on one it opens a review; bans are a person's. A move in a position Stockfish refuses is
+  (the outside review's finding 3): at the ban bar it pools (`FAIRPLAY.enforcement: "pool"`); bans are a person's. A move in a position Stockfish refuses is
   passed over (the engine server never gets one: [engine.md](engine.md)), so it can't stop the queue.
+- **Near the engine's best** (Eric, Nov 11): a deep-checked pick counts as the engine's best at rank 1 or within `deep.nearBestLoss` (1 point)
+  of it (`nearBest`): the share bars read that, and the evidence never counts such a pick as "neither". The review page says "82% near the
+  engine's best" and marks a move "≈ engine". Summaries from before are worked out again from their stored deep results by the schedule, once
+  each (`recountDeep`, matches played before `RECOUNT_BEFORE` only: remove both after a week of catching up nothing). Its numbers: `reports/fairplay.md`, "Near the engine's best" (`fairplay-maia.ts`: Maia 2200-2600 people).
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
   engine server" also checks the player's kept 1 v 1 games (`fairplay-duel.ts`, `checkDuelGames`): reported ones

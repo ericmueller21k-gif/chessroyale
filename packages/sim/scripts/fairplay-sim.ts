@@ -40,6 +40,7 @@ import {
 } from "@chessroyale/core";
 import { pickDepth, randUint, skillPick } from "../src/skill.ts";
 import type { BankGame, BankPosition } from "./fairplay-bank.ts";
+import { MAIA_FILE, MAIA_RATINGS, type MaiaEntry } from "./fairplay-maia.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const PLAYERS = Number(process.argv[2] ?? 2000);
@@ -79,6 +80,8 @@ interface Pos {
   diff: number;
   /** The judges' best moves, best first (the deep re-check's candidates). */
   top: string[];
+  /** Maia's likeliest moves at each rating (fairplay-maia.ts), when its file is there. */
+  maia?: Record<number, [string, number][]>;
 }
 
 function prepare(p: BankPosition): Pos {
@@ -145,6 +148,8 @@ interface Kind {
   /** Honest strength (UCI_Elo), or the cheater's own strength for the moves it plays itself. */
   elo: number;
   cheat?: (pos: Pos, own: string, rate: number) => string | null;
+  /** An honest player who picks otherwise than Stockfish's limited strength (Maia: a strong person). */
+  pick?: (pos: Pos) => string;
   /** Cheaters on 20-40% of moves draw their rate per player. */
   rate?: () => number;
 }
@@ -164,7 +169,34 @@ const CHEATERS: Kind[] = [
       return p.cheat[r < 0.5 ? 0 : r < 0.8 ? 1 : 2] ?? p.cheat[0]!;
     },
   },
+  // Engine Eddie (the live demo, Nov 11): every pick another engine's top move, here the judges' own quick search (the browser engine,
+  // 250k nodes), which is our deep re-check's exact best about as often as the live demo's Stockfish 19 was our 17.1's (74%).
+  { name: "Another engine's top move every move (Eddie-like)", elo: 1500, cheat: (p) => p.best },
+  // (Eric, Nov 11: "People easily get around that by playing the second or third best move.")
+  { name: "The engine's 2nd or 3rd choice every move", elo: 1500, cheat: (p) => p.cheat[rng() < 0.5 ? 1 : 2] ?? p.cheat[1] ?? p.cheat[0]! },
 ];
+
+/** Strong people (Maia-3, fairplay-maia.ts): its likeliest move ("raw", as the demo's Strong Sam), or drawn as people vary. */
+const maiaPick = (rating: number, drawn: boolean) => (p: Pos): string => {
+  const ms = p.maia?.[rating];
+  if (!ms?.length) return honestPick(p, rating);
+  if (!drawn) return ms[0]![0];
+  // Temperature 1, top-p 0.95 (the demo's everyday players' draw).
+  const kept: [string, number][] = [];
+  let total = 0;
+  for (const m of ms) {
+    if (kept.length && total + m[1] > 0.95) break;
+    kept.push(m);
+    total += m[1];
+  }
+  let x = rng() * total;
+  for (const [m, w] of kept) if ((x -= w) < 0) return m;
+  return kept[kept.length - 1]![0];
+};
+const MAIA: Kind[] = MAIA_RATINGS.flatMap((elo) => [
+  { name: `Maia ${elo} (likeliest move)`, elo, pick: maiaPick(elo, false) },
+  { name: `Maia ${elo} (drawn)`, elo, pick: maiaPick(elo, true) },
+]);
 
 interface Subject {
   kind: Kind;
@@ -192,16 +224,19 @@ interface Seat {
   moves: FairMove[];
 }
 
-/** One team's side of a 50 v 50: its seats pick on its plies, a cut after each stage's picks (CUT_AFTER). */
-function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) {
+/**
+ * One team's side of a 50 v 50: its seats pick on its plies, a cut after each stage's picks (CUT_AFTER). `whole`: no cuts, every ply
+ * of its side to the bank game's end (a long game played alone: the review of #629, m4).
+ */
+function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean, whole = false) {
   const plies = game.filter((p) => p.ply % 2 === color);
   let cut = 0;
-  for (let k = 0; k < plies.length && cut < KNOCKOUTS.length; k++) {
+  for (let k = 0; k < plies.length && (whole || cut < KNOCKOUTS.length); k++) {
     const pos = plies[k]!;
     const alive = seats.filter((s) => s.alive);
     const picks = alive.map((s) => {
-      const own = honestPick(pos, s.elo);
       const sub = s.subject;
+      const own = sub?.kind.pick ? sub.kind.pick(pos) : honestPick(pos, s.elo);
       const engine = sub?.kind.cheat ? sub.kind.cheat(pos, own, sub.rate) : null;
       const move = engine ?? own;
       const think = engine ? engineThink() : honestThink(pos);
@@ -248,7 +283,7 @@ function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) 
       });
     }
     // The cuts: after each stage's picks, the lowest scores go (less thinking wins a tie).
-    if (k + 1 === CUT_AFTER[cut]) {
+    if (!whole && k + 1 === CUT_AFTER[cut]) {
       const order = alive.sort((a, b) => a.score - b.score || b.think - a.think);
       for (const s of order.slice(0, KNOCKOUTS[cut]!)) s.alive = false;
       cut++;
@@ -259,7 +294,7 @@ function playTeam(game: Pos[], color: 0 | 1, seats: Seat[], crowdInfo: boolean) 
 /** A crowd player's strength: the population, UCI_Elo ~ N(1500, 350). */
 const crowdElo = () => Math.max(900, Math.min(2700, 1500 + 350 * gauss()));
 
-function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: boolean) {
+function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: boolean, whole = false) {
   const game = games[Math.floor(rng() * games.length)]!;
   // Subjects spread over both teams; the rest of each team of 50 is the crowd.
   const teams: Seat[][] = [[], []];
@@ -269,8 +304,8 @@ function playMatch(games: Pos[][], subjects: Subject[], at: number, crowdInfo: b
     teams[i % 2]!.push({ subject: sub, elo, score: 0, think: 0, alive: true, moves: [] });
   });
   for (const t of teams) while (t.length < 50) t.push({ subject: null, elo: crowdElo(), score: 0, think: 0, alive: true, moves: [] });
-  playTeam(game, 0, teams[0]!, crowdInfo);
-  playTeam(game, 1, teams[1]!, crowdInfo);
+  playTeam(game, 0, teams[0]!, crowdInfo, whole);
+  playTeam(game, 1, teams[1]!, crowdInfo, whole);
   for (const seat of [...teams[0]!, ...teams[1]!]) {
     const sub = seat.subject;
     if (!sub) continue;
@@ -286,9 +321,19 @@ const games = loadBank()
 const positions = games.flat();
 for (const p of positions) byFen.set(p.fen, p);
 console.log(`bank: ${games.length} games, ${positions.length} positions`);
+const maiaData: Record<string, MaiaEntry> | null = existsSync(MAIA_FILE) ? (JSON.parse(gunzipSync(readFileSync(MAIA_FILE)).toString()) as Record<string, MaiaEntry>) : null;
+if (maiaData)
+  for (const p of positions) {
+    const e = maiaData[p.fen];
+    if (!e) continue;
+    p.maia = e.r;
+    // (Moves only Maia would play, scored by the same judge search; the judged best stays as the bank has it.)
+    for (const [m, x] of Object.entries(e.extra)) if (!p.exp.has(m)) p.exp.set(m, x);
+  }
+console.log(maiaData ? "Maia's picks loaded (fairplay-maia.ts)" : "no Maia file: run fairplay-maia.ts for the strong-people rows");
 
 /** Plays every subject through `MATCHES` matches, 12 subjects to a match (6 per team). */
-function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false): Subject[] {
+function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false, whole = false): Subject[] {
   const subjects: Subject[] = [];
   for (const kind of kinds) for (let i = 0; i < n; i++) subjects.push({ kind, rate: kind.rate?.() ?? 0, samePhone, summaries: [], levels: [], movesByMatch: [] });
   // Shuffle so each match mixes kinds.
@@ -296,17 +341,20 @@ function run(kinds: Kind[], n: number, crowdInfo = true, samePhone = false): Sub
     const j = Math.floor(rng() * (i + 1));
     [subjects[i], subjects[j]] = [subjects[j]!, subjects[i]!];
   }
-  for (let m = 0; m < MATCHES; m++) for (let i = 0; i < subjects.length; i += 12) playMatch(games, subjects.slice(i, i + 12), m, crowdInfo);
+  for (let m = 0; m < MATCHES; m++) for (let i = 0; i < subjects.length; i += 12) playMatch(games, subjects.slice(i, i + 12), m, crowdInfo, whole);
   return subjects;
 }
 
-type Settings = { signals: FairSignals; score: FairScore; levels: FairLevels; queueScore: number };
+/** A threshold set: the signals, score and levels groups, the deep re-check's queue score and its near-best loss (FAIRPLAY.deep). */
+type Settings = { signals: FairSignals; score: FairScore; levels: FairLevels; queueScore: number; near: number };
 const rank: Record<FairLevel, number> = { none: 0, watch: 1, review: 2, ban: 3 };
 
 /** Scores every subject's matches with a settings set: the level after each match. */
 /**
  * The deep re-check of one match's counted moves, as the server does it afterwards: our deep engine's best (the bank's
- * full-network engine) among the judges' top moves and the pick, the pick's rank and loss.
+ * full-network engine) among the judges' top moves and the pick, the pick's rank and loss. The bank has no deep engine scores, so a
+ * pick other than its best loses what the judges see between the two either way round (Nov 11): where the judges prefer the pick,
+ * the two engines disagree by about that much (before, such a pick lost nothing: every other engine's top move "near the best").
  */
 function deepCheck(moves: FairMove[], st: Settings): FairMove[] {
   return moves.map((m) => {
@@ -315,7 +363,8 @@ function deepCheck(moves: FairMove[], st: Settings): FairMove[] {
     const order = [...new Set([pos.cheat[0]!, ...pos.cheat.slice(1), ...pos.top])];
     const at = order.indexOf(m.move);
     const rank = at >= 0 ? at + 1 : order.length + 1;
-    return { ...m, deep: { best: pos.cheat[0]!, rank, loss: Math.max(0, m.loss - loss(pos, pos.cheat[0]!)), top: order.slice(0, 3) } };
+    const lost = m.move === pos.cheat[0] ? 0 : Math.round(Math.abs(m.loss - loss(pos, pos.cheat[0]!)) * 100) / 100;
+    return { ...m, deep: { best: pos.cheat[0]!, rank, loss: lost, top: order.slice(0, 3) } };
   });
 }
 
@@ -329,16 +378,16 @@ function evaluate(subjects: Subject[], st: Settings) {
     sub.movesByMatch.forEach((raw, m) => {
       const at = (m + 1) * HOUR;
       const refAt = (i: number) => referenceStrength(sub.summaries.slice(0, i).map((s) => s.perf), null);
-      let summary = { ...matchSignals(raw, refAt(m), st.signals, st.score), at };
+      let summary = { ...matchSignals(raw, refAt(m), st.signals, st.score, st.near), at };
       let lv = playerLevel([...sub.summaries, summary], at + 1, st.levels).level;
       // Queued for the deep re-check (a flagged match, or a player already watched), done before their next match.
       // As on the server, once a player is flagged every earlier match still kept is checked too (it can clear them).
       if (summary.score >= st.queueScore || lv !== "none" || best !== "none") {
-        summary = { ...matchSignals(deepCheck(raw, st), refAt(m), st.signals, st.score), at };
+        summary = { ...matchSignals(deepCheck(raw, st), refAt(m), st.signals, st.score, st.near), at };
         checked[m] = true;
         for (let i = 0; i < m; i++) {
           if (checked[i]) continue;
-          sub.summaries[i] = { ...matchSignals(deepCheck(sub.movesByMatch[i]!, st), refAt(i), st.signals, st.score), at: sub.summaries[i]!.at };
+          sub.summaries[i] = { ...matchSignals(deepCheck(sub.movesByMatch[i]!, st), refAt(i), st.signals, st.score, st.near), at: sub.summaries[i]!.at };
           checked[i] = true;
         }
         lv = playerLevel([...sub.summaries, summary], at + 1, st.levels).level;
@@ -365,6 +414,10 @@ const cheaters = run(CHEATERS, Math.round(PLAYERS / 4));
 const cheatersSame = run(CHEATERS, Math.round(PLAYERS / 8), true, true);
 const honestFew = run(HONEST.filter((k) => k.elo >= 2200), Math.round(PLAYERS / 2), false);
 const cheatersFew = run(CHEATERS, Math.round(PLAYERS / 8), false);
+const maiaHonest = maiaData ? run(MAIA, PLAYERS) : [];
+// (A whole game alone: no crowd, no cuts, every move of one side; strong people only, for sustained strength. The review of #629, m4.
+// Played in the report's near-best section, after every other draw, so the rest of the report's numbers stay as they were.)
+const STRONG = [...HONEST.filter((k) => k.elo >= 2200), ...(maiaData ? MAIA : [])];
 console.log(`played in ${Math.round((Date.now() - t0) / 1000)} s`);
 
 // ---------------- The hard-find model's slope, fitted on honest players ----------------
@@ -465,7 +518,7 @@ console.log(`settings: ${JSON.stringify({ findJudge: FAIRPLAY.signals.findJudge,
 
 // ---------------- Threshold sets ----------------
 
-const base: Settings = { signals: FAIRPLAY.signals, score: FAIRPLAY.score, levels: FAIRPLAY.levels, queueScore: FAIRPLAY.deep.queueScore };
+const base: Settings = { signals: FAIRPLAY.signals, score: FAIRPLAY.score, levels: FAIRPLAY.levels, queueScore: FAIRPLAY.deep.queueScore, near: FAIRPLAY.deep.nearBestLoss };
 // (FAIRPLAY_USE_FITTED=1: every set uses the models fitted above, to try them before they go in settings.ts.)
 if (process.env.FAIRPLAY_USE_FITTED) base.signals = { ...base.signals, ...fitted };
 const SETS: { name: string; st: Settings }[] = [{ name: "settings.ts", st: base }];
@@ -511,16 +564,17 @@ if (process.env.FAIRPLAY_DIAG) {
 }
 
 if (process.env.FAIRPLAY_DIAG2) {
-  // Per kind, per match: counted, perf, evidence without and with the deep re-check, score with deep.
+  // Per kind, per match: counted, perf, evidence without and with the deep re-check, score with deep (the last set's settings).
   const q3 = (xs: number[]) => [0.1, 0.5, 0.9, 0.99].map((q) => quant(xs, q).toFixed(1)).join("/");
   console.log("kind | counted | perf | evidence (judges) | evidence (deep) | deep share | score (deep) p10/p50/p90/p99");
-  for (const kind of [...HONEST, ...CHEATERS]) {
-    const subs = [...honest, ...cheaters].filter((s) => s.kind === kind);
+  for (const kind of [...HONEST, ...MAIA, ...CHEATERS]) {
+    const subs = [...honest, ...maiaHonest, ...cheaters].filter((s) => s.kind === kind);
     const c: number[] = [], pf: number[] = [], e1: number[] = [], e2: number[] = [], ds: number[] = [], sc: number[] = [];
     for (const sub of subs)
       for (const raw of sub.movesByMatch) {
-        const a = matchSignals(raw, null, base.signals, base.score);
-        const b = matchSignals(deepCheck(raw, base), null, base.signals, base.score);
+        const st = SETS[SETS.length - 1]!.st;
+        const a = matchSignals(raw, null, st.signals, st.score, st.near);
+        const b = matchSignals(deepCheck(raw, st), null, st.signals, st.score, st.near);
         c.push(a.counted);
         pf.push(a.perf ?? 0);
         e1.push(a.evidence);
@@ -596,6 +650,69 @@ if (process.env.FAIRPLAY_DIAG4) {
   process.exit(0);
 }
 
+if (process.env.FAIRPLAY_STRENGTH) {
+  // Per kind: the average match strength over the matches with poolStrengthCounted counted moves or more (the newest
+  // poolStrengthMatches, as sustainedStrength reads them), for every subject with that many: quantiles, and the share past poolStrength.
+  const lv = SETS[SETS.length - 1]!.st.levels;
+  console.log(`kind | players with ${lv.poolStrengthMatches} matches of ${lv.poolStrengthCounted}+ counted | average strength p50 / p90 / p99 / p99.9 / max | at ${lv.poolStrength}+`);
+  for (const kind of [...HONEST, ...MAIA, ...CHEATERS]) {
+    const subs = [...honest, ...maiaHonest, ...cheaters].filter((x) => x.kind === kind);
+    const avgs: number[] = [];
+    for (const sub of subs) {
+      const ms = sub.movesByMatch.map((raw) => matchSignals(raw, null)).filter((x) => x.counted >= lv.poolStrengthCounted && x.perf !== null);
+      if (ms.length >= lv.poolStrengthMatches) avgs.push(ms.slice(0, lv.poolStrengthMatches).reduce((t, x) => t + x.perf!, 0) / lv.poolStrengthMatches);
+    }
+    const q = [0.5, 0.9, 0.99, 0.999].map((f) => Math.round(quant(avgs, f))).join(" / ");
+    console.log(`${kind.name} | ${avgs.length} of ${subs.length} | ${q} / ${Math.round(Math.max(...avgs))} | ${pct(avgs.filter((a) => a >= lv.poolStrength).length / Math.max(1, avgs.length))}`);
+  }
+  process.exit(0);
+}
+
+if (process.env.FAIRPLAY_PROFILE) {
+  // The engine users' picks against the deep re-check, over counted moves: its best, one of its next two or near its best, neither
+  // (moveEvidence's outcomes: the evidence's cheatDeep), and near its best (nearBest).
+  for (const kind of [CHEATERS[0]!, CHEATERS[6]!]) {
+    const n = [0, 0, 0];
+    let nb = 0;
+    for (const sub of cheaters.filter((x) => x.kind === kind))
+      for (const raw of sub.movesByMatch)
+        for (const m of deepCheck(raw, base)) {
+          if (!m.deep || skipReason(m) !== null) continue;
+          n[m.deep.rank === 1 ? 0 : m.deep.rank <= 3 || m.deep.loss <= base.near ? 1 : 2]!++;
+          if (m.deep.rank === 1 || m.deep.loss <= base.near) nb++;
+        }
+    const t = n[0]! + n[1]! + n[2]!;
+    console.log(`${kind.name}: ${n.map((x) => (x / t).toFixed(3)).join(" / ")} (near the best ${(nb / t).toFixed(3)}, ${t} moves)`);
+  }
+  process.exit(0);
+}
+
+if (process.env.FAIRPLAY_WHY) {
+  // Per set: which path pools honest players and Eddie-like cheaters (one match past every banOne* bar, or the two-match path).
+  for (const set of SETS) {
+    for (const subs of [honest, maiaHonest, cheaters]) evaluate(subs, set.st);
+    const tally = (subs: Subject[]) => {
+      const t = { one: 0, two: 0, n: subs.length };
+      for (const sub of subs) {
+        if (sub.levels[MATCHES - 1] !== "ban") continue;
+        const i = sub.levels.indexOf("ban");
+        const why = playerLevel(sub.summaries.slice(0, i + 1), (i + 1) * 3_600_000 + 1, set.st.levels).reasons[0] ?? "";
+        if (why.startsWith("one match")) t.one++;
+        else t.two++;
+      }
+      return `${t.one}+${t.two}/${t.n}`;
+    };
+    const strong = [...honest.filter((x) => x.kind.elo >= 2200), ...maiaHonest];
+    console.log(`${set.name}: honest 2200+ (SF and Maia) one+two ${tally(strong)} | Eddie ${tally(cheaters.filter((x) => x.kind === CHEATERS[6]))} | full ${tally(cheaters.filter((x) => x.kind === CHEATERS[0]))}`);
+    const show = (sub: Subject) => sub.summaries.map((x) => `${x.perf}/${x.counted}/${x.evidence}/${x.deepMatch}-${x.deepExact}of${x.deepChecked}`).join("  ");
+    if (process.env.FAIRPLAY_WHY === "2") {
+      for (const sub of maiaHonest.filter((x) => x.levels[MATCHES - 1] === "ban").slice(0, 6)) console.log(`  ${sub.kind.name}: ${sub.levels.join(",")} :: ${show(sub)}`);
+      for (const sub of cheaters.filter((x) => x.kind === CHEATERS[6]).slice(0, 6)) console.log(`  Eddie: ${sub.levels.join(",")} :: ${show(sub)}`);
+    }
+  }
+  process.exit(0);
+}
+
 if (process.env.FAIRPLAY_BANNED) {
   // The honest players a set bans, match by match (what made them look like engines).
   const st = SETS[SETS.length - 1]!.st;
@@ -612,10 +729,10 @@ if (process.env.FAIRPLAY_BANNED) {
 
 if (process.env.FAIRPLAY_GRID) {
   // A compact line per threshold set, to compare them (FAIRPLAY_SETS); no report written.
-  const head = ["set", "full: rev 1/2", "full: ban 1/2/5", "20-40% (1500): rev/ban 5", "20-40% (1900): rev/ban 5", "hard only: rev/ban 5", "mistakes: rev/ban 5", "blended: rev/ban 5", "honest review /1000 (1500, 2000, 2400, 2700)", "honest bans (count@strength)", "few people: full ban 5"];
+  const head = ["set", "full: rev 1/2", "full: ban 1/2/5", "Eddie: ban 1/2/5", "2nd/3rd: ban 2/5", "20-40% (1500): rev/ban 5", "20-40% (1900): rev/ban 5", "hard only: rev/ban 5", "mistakes: rev/ban 5", "blended: rev/ban 5", "honest review /1000 (1500, 2000, 2400, 2700)", "honest bans (count@strength)", "Maia bans (count@kind)", "few people: full ban 5"];
   console.log(head.join(" | "));
   for (const set of SETS) {
-    for (const subs of [honest, cheaters, honestFew, cheatersFew]) evaluate(subs, set.st);
+    for (const subs of [honest, cheaters, honestFew, cheatersFew, maiaHonest]) evaluate(subs, set.st);
     const of = (subs: Subject[], i: number) => subs.filter((s) => s.kind === CHEATERS[i]);
     const h = (elo: number) => honest.filter((s) => s.kind.elo === elo);
     const rb = (i: number) => `${pct(reached(of(cheaters, i), "review", 5))}/${pct(reached(of(cheaters, i), "ban", 5))}`;
@@ -624,6 +741,8 @@ if (process.env.FAIRPLAY_GRID) {
         set.name,
         `${pct(reached(of(cheaters, 0), "review", 1))}/${pct(reached(of(cheaters, 0), "review", 2))}`,
         [1, 2, 5].map((k) => pct(reached(of(cheaters, 0), "ban", k))).join("/"),
+        [1, 2, 5].map((k) => pct(reached(of(cheaters, 6), "ban", k))).join("/"),
+        [2, 5].map((k) => pct(reached(of(cheaters, 7), "ban", k))).join("/"),
         rb(1),
         rb(2),
         rb(3),
@@ -631,6 +750,10 @@ if (process.env.FAIRPLAY_GRID) {
         rb(5),
         [1500, 2000, 2400, 2700].map((e) => per1000(reached(h(e), "review", MATCHES))).join(", "),
         HONEST.map((k) => [k.elo, h(k.elo).filter((x) => x.levels[MATCHES - 1] === "ban").length] as const)
+          .filter(([, n]) => n)
+          .map(([e, n]) => `${n}@${e}`)
+          .join(" ") || "0",
+        MAIA.map((k) => [k.name.replace("Maia ", "").replace(" (likeliest move)", "r").replace(" (drawn)", "d"), maiaHonest.filter((x) => x.kind === k && x.levels[MATCHES - 1] === "ban").length] as const)
           .filter(([, n]) => n)
           .map(([e, n]) => `${n}@${e}`)
           .join(" ") || "0",
@@ -654,8 +777,10 @@ out("");
 out(`- **Positions:** \`fairplay-bank.ts\` played ${games.length} Crowd games from the starting position the way a crowd does (50 honest players pick, the most popular move is played), ${positions.length} positions in all. Each was analyzed once: the judges' search (the browser engine, 250k nodes, top 8, plus every other move anyone might pick), Stockfish's own MultiPV-4 lines at depths 1-11, and a strong engine (the full network, 1M nodes, top 3), which stands in for both a cheater's engine app and our deep re-check.`);
 out(`- **Honest players** pick the way Stockfish's limited strength (UCI_Elo) does, emulated exactly from those lines (\`src/skill.ts\`), at 1200 to 2700, with ±100 of form from match to match. The crowd around them is honest players of N(1500, 350). Think time: lognormal, longer on harder moves (3.5 s + 9 s × the share of 1500 players who'd miss the move). A look-away on 2% of moves.`);
 out(`- **Cheaters** copy the engine with 3-12 s delays whatever the move. Their engine agrees with our deep re-check's best ${Math.round(ENGINE_AGREE * 100)}% of the time (else they play our second choice): two strong engines, depths or versions don't always agree, so this is deliberately not 100%. Types: every move; 20-40% of moves (per player) at 1500 and 1900; only in hard positions; only when their own move would lose 5+ points; and a blend of the engine's 1st, 2nd and 3rd choices (50/30/20%). "Same phone": a look-away on 90% of engine moves.`);
+out(`- **Eddie-like** (Nov 11, after the live demo): every pick another engine's top move, here the judges' own search's (250k nodes), which is the strong engine's exact best about as often as the live demo's Stockfish 19 was our 17.1's (74%).`);
+out(`- **Strong people** (Nov 11): Maia-3 at 2200, 2400, 2500 and 2600 (\`fairplay-maia.ts\`: its moves in every bank position, any it would play that the judges hadn't scored scored the same way), either its likeliest move every time ("likeliest", as the demo's Strong Sam) or drawn as people vary (temperature 1, top-p 0.95). The likeliest move is the same every time in the same position, and the bank has ${games.length} games, so its rows move in clusters.`);
 out(`- **A match:** each player is on a team of 50 and picks on its team's plies: a cut after picks ${CUT_AFTER.join(", ")} (the team-final schedule, half of each cut per team), to the final eight. The final's few moves aren't simulated (fewer counted moves than real finalists get: conservative).`);
-out(`- **The deep re-check** runs on any match that scored ${FAIRPLAY.deep.queueScore}+ or of a player already flagged, before their next match.`);
+out(`- **The deep re-check** runs on any match that scored ${FAIRPLAY.deep.queueScore}+ or of a player already flagged, before their next match. The bank has no deep scores, so a pick other than the strong engine's best loses what the judges see between the two, either way round (Nov 11; before, a pick the judges preferred lost nothing).`);
 out(`- **"Few people":** the same matches with fewer than ${FAIRPLAY.signals.minCrowd} other people picking (bots fill the lobby), so there are no crowd rates and only strength-based chances apply.`);
 out("");
 out("## Honest players: does the emulation play at its strength?");
@@ -723,13 +848,122 @@ for (const set of SETS) {
 }
 out("");
 
+// Near the engine's best (Nov 11): before and after, on the engine users and the strong people.
+{
+  // (Before Nov 11: the exact match, the old engine-user profile, no sustained-strength path.)
+  const before: Settings = { ...base, near: 0, signals: { ...base.signals, cheatDeep: [0.85, 0.13, 0.02] }, levels: { ...base.levels, poolStrengthMatches: 0 } };
+  out("## Near the engine's best (Nov 11)");
+  out("");
+  out(
+    `A deep-checked pick counts as the engine's best when it's the search's best or within \`deep.nearBestLoss\` (${FAIRPLAY.deep.nearBestLoss} point) of it (\`nearBest\`): the share bars (\`banDeep\`, \`banOneDeep\`) read that. The evidence keeps the search's best as its best (its honest chances are fitted on that) but never counts a near-best pick as "neither", and the engine user's profile (\`signals.cheatDeep\`) is the live demo's. "Pool" is the level that pools (any ban-level verdict since Nov 11: one match past every one-match bar, or the two-match path). Within 1, 2 and 5 matches.`,
+  );
+  out("");
+  const profile = (kind: Kind) => {
+    const n = [0, 0, 0];
+    for (const sub of cheaters.filter((x) => x.kind === kind))
+      for (const raw of sub.movesByMatch)
+        for (const m of deepCheck(raw, base)) if (m.deep && skipReason(m) === null) n[m.deep.rank === 1 ? 0 : m.deep.rank <= 3 || m.deep.loss <= base.near ? 1 : 2]!++;
+    const t = n[0]! + n[1]! + n[2]!;
+    return n.map((x) => pct(x / t)).join(" / ");
+  };
+  out(`Against the deep re-check (its best / its next two or near its best / neither): Eddie-like ${profile(CHEATERS[6]!)}; full engine ${profile(CHEATERS[0]!)}; in settings, \`cheatDeep\` ${FAIRPLAY.signals.cheatDeep.map((x) => pct(x)).join(" / ")}.`);
+  out("");
+  const share = (subs: Subject[]) => {
+    const xs = subs.flatMap((sub) => sub.summaries.filter((x) => x.deepChecked >= FAIRPLAY.levels.banMatchChecked).map((x) => x.deepMatch / x.deepChecked));
+    return xs.length ? `${pct(quant(xs, 0.5))} / ${pct(quant(xs, 0.9))}` : "–";
+  };
+  out("| Who | Before (exact match, no strength path): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |");
+  out("| --- | --- | --- | --- | --- |");
+  const rows: { name: string; subs: Subject[]; per1000: boolean }[] = [
+    { name: CHEATERS[6]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[6]), per1000: false },
+    { name: CHEATERS[0]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[0]), per1000: false },
+    { name: CHEATERS[7]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[7]), per1000: false },
+    ...HONEST.filter((k) => k.elo >= 2200).map((k) => ({ name: `Honest ${k.elo} (per 1,000)`, subs: honest.filter((x) => x.kind === k), per1000: true })),
+    ...MAIA.map((k) => ({ name: `${k.name} (per 1,000)`, subs: maiaHonest.filter((x) => x.kind === k), per1000: true })),
+  ];
+  const cells = new Map<string, string>();
+  for (const [key, st] of [["before", before], ["now", base]] as const) {
+    for (const subs of [honest, cheaters, maiaHonest]) evaluate(subs, st);
+    for (const row of rows) {
+      const f = row.per1000 ? per1000 : pct;
+      cells.set(`${key}:${row.name}`, [1, 2, 5].map((k) => f(reached(row.subs, "ban", k))).join(" / "));
+      cells.set(`${key}-review:${row.name}`, f(reached(row.subs, "review", 5)));
+      if (key === "now") cells.set(`share:${row.name}`, share(row.subs));
+    }
+  }
+  for (const row of rows)
+    out(`| ${row.name} | ${cells.get(`before:${row.name}`)} | ${cells.get(`now:${row.name}`)} | ${cells.get(`before-review:${row.name}`)} / ${cells.get(`now-review:${row.name}`)} | ${cells.get(`share:${row.name}`)} |`);
+  out("");
+  const strong = [...honest.filter((x) => x.kind.elo >= 2200), ...maiaHonest];
+  evaluate(strong, base);
+  const pooled = strong.filter((x) => x.levels[MATCHES - 1] === "ban").length;
+  const lv = base.levels;
+  const avgOf = (sub: Subject) => {
+    const ms = sub.summaries.filter((x) => x.counted >= lv.poolStrengthCounted && x.perf !== null);
+    return ms.length >= lv.poolStrengthMatches ? ms.slice(0, lv.poolStrengthMatches).reduce((t, x) => t + x.perf!, 0) / lv.poolStrengthMatches : null;
+  };
+  out(`Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within ${MATCHES} matches: ${pooled} of ${strong.length.toLocaleString("en-US")} (${per1000(pooled / strong.length)} per 1,000), every path (sustained strength below included). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.`);
+  out("");
+  out("## Sustained strength (Nov 11)");
+  out("");
+  out(
+    `Eric: "People easily get around that by playing the second or third best move ... by 4 or 5 games, if their Elo is just ridiculous like that, put them in the cheater queue." The ${lv.poolStrengthMatches} newest matches with ${lv.poolStrengthCounted}+ counted moves averaging a match strength of ${lv.poolStrength.toLocaleString("en-US")} or more pool the player (\`sustainedStrength\`, \`levels.poolStrength*\`), whatever their top-move share. Below: everyone with ${lv.poolStrengthMatches} such matches in their ${MATCHES} (matches here are short, so many have fewer), and their average.`,
+  );
+  out("");
+  out(`| Who | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ |`);
+  out("| --- | --- | --- | --- |");
+  for (const kind of [CHEATERS[6]!, CHEATERS[0]!, CHEATERS[7]!, CHEATERS[4]!, ...HONEST.filter((k) => k.elo >= 2200), ...MAIA]) {
+    const subs = [...cheaters, ...honest, ...maiaHonest].filter((x) => x.kind === kind);
+    const avgs = subs.map(avgOf).filter((x): x is number => x !== null);
+    const at = avgs.filter((a) => a >= lv.poolStrength).length;
+    out(`| ${kind.name} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} |`);
+  }
+  out("");
+  out(
+    `A cheater who always plays the engine's 2nd or 3rd choice plays like an ordinary strong player here: those moves give away real points (the strength measure is the points lost), and the crowd's cuts send them out early, with few counted moves. No strength bar catches them without catching strong people; where the 2nd or 3rd choice is practically equal to the best, the near-best count does.`,
+  );
+  out("");
+  // A whole game alone (the review of #629, m4): no crowd rates, no cuts, every move of one side of a bank game.
+  const strongWhole = run([...STRONG, CHEATERS[6]!, CHEATERS[7]!], Math.round(PLAYERS / 5), false, false, true);
+  evaluate(strongWhole, base);
+  // Which path pooled them (the first match at the ban level): one match, the two-match path or sustained strength.
+  const paths = (subs: Subject[]) => {
+    const t = { one: 0, two: 0, strength: 0 };
+    for (const sub of subs) {
+      const i = sub.levels.indexOf("ban");
+      if (i < 0) continue;
+      const v = playerLevel(sub.summaries.slice(0, i + 1), (i + 1) * 3_600_000 + 1, base.levels);
+      if (v.path === "strength") t.strength++;
+      else if (v.reasons[0]?.startsWith("one match")) t.one++;
+      else t.two++;
+    }
+    return t;
+  };
+  out(
+    `**A whole game alone** (no crowd, no cuts: every move of one side of a bank game, as a boss raid played alone; ${Math.round(PLAYERS / 5).toLocaleString("en-US")} players each). Ranked 1 v 1 records no judged picks, so this path never reads it. The bank's positions don't follow the player's moves, so a game a strong player is winning, where most moves lose little, isn't here: unmeasured.`,
+  );
+  out("");
+  out(`| Who | Counted moves (median) | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ | Pool within ${MATCHES} (every path) | By one match / two / strength (players) |`);
+  out("| --- | --- | --- | --- | --- | --- | --- |");
+  for (const kind of [CHEATERS[6]!, CHEATERS[7]!, ...STRONG]) {
+    const subs = strongWhole.filter((x) => x.kind === kind);
+    const avgs = subs.map(avgOf).filter((x): x is number => x !== null);
+    const at = avgs.filter((a) => a >= lv.poolStrength).length;
+    const f = kind.cheat ? pct : per1000;
+    out(
+      `| ${kind.name}${kind.cheat ? "" : " (per 1,000)"} | ${quant(subs.flatMap((x) => x.summaries.map((y) => y.counted)), 0.5)} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} | ${f(reached(subs, "ban", MATCHES))} | ${Object.values(paths(subs)).join(" / ")} |`,
+    );
+  }
+  out("");
+}
+
 const chosen = SETS[0]!;
 for (const subs of [honest, cheaters, cheatersSame, honestFew, cheatersFew]) evaluate(subs, chosen.st);
 out(`## The thresholds in settings.ts, in full`);
 out("");
 out("### Catch rate per cheater type (a second device: no look-aways)");
 out("");
-out("Review: a person looks and results are held. Ban: automatic. Within 1, 2 and 5 matches.");
+out("Review: a person looks and results are held. Ban: the ban level, which pools (`enforcement` \"pool\": never a ban since Nov 10). Within 1, 2 and 5 matches.");
 out("");
 out("| Cheater | Counted moves (median) | Match strength (median) | Deep matches (median) | Review 1 / 2 / 5 | Ban 1 / 2 / 5 | Same phone: ban 2 / 5 |");
 out("| --- | --- | --- | --- | --- | --- | --- |");
@@ -786,7 +1020,8 @@ out("");
 out("## What this can't tell");
 out("");
 out("- Real people aren't Stockfish at a lower strength: their mistakes are more human (missed tactics), and how often a strong person matches the engine may differ. The evidence model is fitted on the emulated players; refit it from real games (`honestChance`) once there are enough flagged-and-cleared matches, and keep auto-bans conservative until then.");
-out(`- How often a real cheater's engine agrees with our deep re-check is assumed (${Math.round(ENGINE_AGREE * 100)}%). Lower agreement means slower bans, never more false ones.`);
+out(`- How often a real cheater's engine agrees with our deep re-check is assumed (${Math.round(ENGINE_AGREE * 100)}% for the copy-the-engine types; the live demo's 74% for Eddie-like). Lower agreement means slower bans, never more false ones.`);
+out("- The deep re-check's loss for a pick other than its best is the judges' gap between the two (the bank has no deep scores), so who counts as near the best is an estimate: two engines as close as the demo's (Stockfish 19 and 17.1, both at about 2M nodes) disagree on closer moves than the judges' quick search and the strong engine here.");
 out("- Timing and look-aways are modeled, not measured; they add few points and never ban on their own.");
 out("- A cheater using the engine on a fifth to two fifths of moves plays like a stronger honest player: no move-by-move statistic can tell them apart without far more matches. Reports and a strength far above their own history are what catch them.");
 out("");
