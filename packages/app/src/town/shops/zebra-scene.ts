@@ -9,13 +9,16 @@
  *   but a bakery" line, sooner while you stand near them or by the back door. The counter zebra's lines come from his Talk.
  * - **The back room:** Don Dough in his wingback at the head of the table, the crew on the bench along its north side turned to him. The
  *   chatter loops in bubbles (the crew argue, he one-ups them: zebra-lines.ts), each speaker on his talking or arguing loop, the others
- *   listening. **The talk beat** (Eric: "if you walk up to him and talk to him, they all of a sudden all stand guard and draw their
- *   breadsticks … point them at you. And then he tells them all to relax. And then they put them down"): the crew stand up (turned to
- *   you at the table's foot) and draw, aim at you with Fedora's line, Don waves them down with his, they lower, his challenge line. The
- *   chatter stops for it, and stays stopped: the crew stay standing (there's no sit-down animation) until the room loads again.
+ *   listening. **The challenge beat** (Eric: "if you walk up to him and talk to him, they all of a sudden all stand guard and draw their
+ *   breadsticks … point them at you. And then he tells them all to relax. And then they put them down"; Nov 11: "when you hit challenge,
+ *   it just goes through the talk animation no matter what"): his card's Challenge starts it. The crew stand up and draw, aim at you
+ *   with Fedora's line (each turned to your side and his roll at the angle nearest you, following you as you move: `aimAt`), Don waves
+ *   them down with his, they lower, his challenge line. The chatter stops for good. Then **the walk-out** (`WalkOut`; Eric: "watch all
+ *   of them walk out, like pick up the stuff in the back and walk out"): four goons each pick up one thing of the set kept in the
+ *   room (`ZEBRA_BACK_SET`) and carry it out through the back door, Don and you following; the front room's `SetupScene` goes on.
  */
 import { SHOP_FEEL } from "../feel.ts";
-import { ZEBRA_WATCH_FRAME } from "./zebra-crew.ts";
+import { ZEBRA_AIM_ANGLES, ZEBRA_AIM_LOOP, ZEBRA_WATCH_FRAME } from "./zebra-crew.ts";
 import { ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_TALK, type ZebraWho } from "./zebra-lines.ts";
 
 /** A clip as the scene needs it: each frame's ms (the art's), and whether it loops. */
@@ -26,7 +29,10 @@ export interface SceneClip {
 /** Every person's animations by name (from their art, as the room loads; the test passes the art's own). */
 export type SceneClips = Readonly<Record<string, Readonly<Record<string, SceneClip>>>>;
 
-/** One person to draw this frame: their art's name, its animation and frame, their foot (squares), mirrored (facing west). */
+/**
+ * One person to draw this frame: their art's name, its animation and frame, their foot (squares), mirrored (facing west); how solid
+ * (`a`, 1 unless they're going or coming through a door) and lifted (`up`, the room's pixels: Don's step).
+ */
 export interface SceneFig {
   name: string;
   anim: string;
@@ -34,6 +40,8 @@ export interface SceneFig {
   c: number;
   r: number;
   flip: boolean;
+  a?: number;
+  up?: number;
 }
 /** Who says what now (a speech bubble over them). */
 export interface SceneSay {
@@ -69,6 +77,20 @@ export function clipFrame(c: SceneClip | undefined, t: number): number {
 /** A clip's length (ms). */
 export const clipLen = (c: SceneClip | undefined): number => (c ? sum(c.ms) : 0);
 
+/**
+ * Which way a standing crew member at `at` points his roll at you at (x, y) (your foot, squares): mirrored when you're west of him,
+ * and the index into ZEBRA_AIM_ANGLES nearest the angle down to your middle on screen (your rows toward the camera are `aimRowK` of
+ * a column; his roll is `aimDrop` squares above your middle). Plain arithmetic: called per draw, nothing kept.
+ */
+export function aimAt(at: readonly [number, number], x: number, y: number): { i: number; flip: boolean } {
+  const B = SHOP_FEEL.zebra.beat;
+  const dx = x - at[0];
+  const deg = (Math.atan2((y - at[1]) * B.aimRowK + B.aimDrop, Math.max(0.25, Math.abs(dx))) * 180) / Math.PI;
+  let i = 0;
+  for (let k = 1; k < ZEBRA_AIM_ANGLES.length; k++) if (Math.abs(ZEBRA_AIM_ANGLES[k]! - deg) < Math.abs(ZEBRA_AIM_ANGLES[i]! - deg)) i = k;
+  return { i, flip: dx < 0 };
+}
+
 /** A guard's `watch` frame for you at (x, y): the art's rule. */
 export function watchFrame(g: { readonly at: readonly [number, number]; readonly face: number }, x: number, y: number): number {
   let dx = (x - g.at[0]) * g.face;
@@ -79,7 +101,7 @@ export function watchFrame(g: { readonly at: readonly [number, number]; readonly
 /** How long a line stays up: a base and a little more for each character (SHOP_FEEL.zebra). */
 export const lineMs = (text: string): number => SHOP_FEEL.zebra.lineMs + SHOP_FEEL.zebra.perCharMs * text.length;
 
-/** The front room: the guards watching you, their lines now and then, and the counter zebra's from his Talk. */
+/** The front room: the guards watching you, their lines now and then and when tapped, and the counter zebra's from his Talk. */
 export class FrontScene {
   private next = 0;
   private lineI = 0;
@@ -114,6 +136,11 @@ export class FrontScene {
     this.say = { who: "keeper", text, until: now + lineMs(text) };
     this.next = Math.max(this.next, this.say.until + SHOP_FEEL.zebra.guardNearMs[0]);
   }
+  /** A guard you tapped says `text` now ("He's in the back."): over anyone else's. */
+  guard(now: number, who: "guard-a" | "guard-b", text: string): void {
+    this.say = { who, text, until: now + lineMs(text) };
+    this.next = Math.max(this.next, this.say.until + SHOP_FEEL.zebra.guardNearMs[0]);
+  }
   saying(): SceneSay | null {
     return this.say ? { who: this.say.who, text: this.say.text } : null;
   }
@@ -127,10 +154,10 @@ export class FrontScene {
   }
 }
 
-/** The talk beat's steps, in order (the test hook's names). */
+/** The challenge beat's steps, in order (the test hook's names). */
 export type BeatStep = "stand" | "draw" | "aim" | "relax" | "lower" | "challenge" | "done";
 
-/** The back room: the chatter's loop, and the talk beat once you talk to him. */
+/** The back room: the chatter's loop, and the challenge beat once you press his Challenge. */
 export class BackScene {
   /** Where in the chatter (exchange, line) and when that line started. */
   private ex = 0;
@@ -160,11 +187,11 @@ export class BackScene {
     const end = challenge + lineMs(ZEBRA_TALK.challenge.text);
     this.T = { up, drawn, line, relax, lower, lowered, challenge, end };
   }
-  /** The talk beat has started (and the chatter stopped for good). */
+  /** The challenge beat has started (and the chatter stopped for good). */
   talking(): boolean {
     return this.beatAt !== null;
   }
-  /** Talk to him: the beat starts now (once a visit). */
+  /** His Challenge: the beat starts now (once a visit). */
   talk(now: number): void {
     if (this.beatAt === null) this.beatAt = now;
   }
@@ -178,7 +205,7 @@ export class BackScene {
     const T = this.T;
     return t < T.up ? "stand" : t < T.drawn ? "draw" : t < T.relax ? "aim" : t < T.lower ? "relax" : t < T.challenge ? "lower" : t < T.end ? "challenge" : "done";
   }
-  /** The beat's length (ms): from Talk to his challenge line gone. */
+  /** The beat's length (ms): from Challenge to his challenge line gone. */
   beatLength(): number {
     return this.T.end;
   }
@@ -215,8 +242,8 @@ export class BackScene {
     const l = ZEBRA_CHATTER[this.ex]![this.li]!;
     return now >= this.lineAt && now < this.lineAt + lineMs(l.text) ? { who: l.who, text: l.text } : null;
   }
-  /** Don and the crew this frame. Into `out` (cleared). */
-  figs(now: number, out: SceneFig[]): SceneFig[] {
+  /** Don and the crew this frame, you at (x, y) (they stand turned to you and aim at you). Into `out` (cleared). */
+  figs(now: number, out: SceneFig[], x = 99, y = 7): SceneFig[] {
     out.length = 0;
     const say = this.saying(now);
     const fig = (p: { readonly name: string; readonly at: readonly [number, number] }, anim: string, t: number, flip: boolean) =>
@@ -242,39 +269,204 @@ export class BackScene {
     else if (t < T.challenge) fig(ZEBRA_DON, "sitRelax", t - T.relax, false);
     else if (t < T.end) fig(ZEBRA_DON, "sitTalk", t - T.challenge, false);
     else fig(ZEBRA_DON, "sitListen", now, false);
-    // The crew, each a stagger after the last: up (turned to you), draw, aim, lower, then standing easy (`puff`).
+    // The crew, each a stagger after the last: up (turned to you), draw, aim at you, lower, then standing easy (`puff`). Each faces
+    // your side all through, and while he aims his roll points at you (`aimAt`'s frame for your angle, on the aim loop's beat),
+    // from the draw's swing on; his lower starts from about the angle he held.
     ZEBRA_CREW.forEach((p, i) => {
       const u = t - i * Z.staggerMs;
       const crew = this.clips[p.name]!;
       if (u < 0) return fig(p, "sitListen", now, true);
-      if (u < clipLen(crew.standUp)) return fig(p, "standUp", u, false);
+      const aim = aimAt(p.at, x, y);
+      if (u < clipLen(crew.standUp)) return fig(p, "standUp", u, aim.flip);
       const d = u - clipLen(crew.standUp);
-      if (d < clipLen(crew.draw)) return fig(p, "draw", d, false);
+      if (d < swingMs(crew.draw)) return fig(p, "draw", d, aim.flip);
       const lo = t - T.lower - i * Z.staggerMs;
-      if (lo < 0) return fig(p, "aim", d - clipLen(crew.draw), false);
-      if (lo < clipLen(crew.lower)) return fig(p, "lower", lo, false);
-      return fig(p, "puff", lo - clipLen(crew.lower) + i * 600, false);
+      if (lo < 0) {
+        const f = clipFrame(crew.aim, d - swingMs(crew.draw));
+        return out.push({ name: p.name, anim: "aimAt", frame: aim.i * ZEBRA_AIM_LOOP + f, c: p.at[0], r: p.at[1], flip: aim.flip });
+      }
+      // (Held at 20 degrees or more, his lower starts at its second frame (25), at 30 or more its third (50).)
+      const skip = crew.lower ? crew.lower.ms.slice(0, ZEBRA_AIM_ANGLES[aim.i]! >= 30 ? 2 : ZEBRA_AIM_ANGLES[aim.i]! >= 20 ? 1 : 0).reduce((a, b) => a + b, 0) : 0;
+      if (lo + skip < clipLen(crew.lower)) return fig(p, "lower", lo + skip, aim.flip);
+      return fig(p, "puff", lo - clipLen(crew.lower) + i * 600, aim.flip);
     });
     return out;
+  }
+}
+/** The draw's swing (its first three frames: from his side, up, round); the aim takes over from there. */
+const swingMs = (c: SceneClip | undefined): number => (c ? sum(c.ms.slice(0, 3)) : 0);
+
+/**
+ * The set kept in the back room (Eric, Nov 11: "the board and chairs are in the back room but brought into the front"): your chair
+ * nearest the door, Don's, then the table with the board lying on it, along the rug's front before the big table (squares: each one's
+ * foot; row 8, as a computer's view of the room ends at row 9). Its squares are solid. Who carries which, in the order: ZEBRA_OUT.
+ */
+export const ZEBRA_BACK_SET: Readonly<Record<SetupItem, readonly [number, number]>> = {
+  youChair: [5.3, 8.3],
+  bossChair: [6.2, 8.3],
+  table: [7.1, 8.3],
+  board: [7.1, 8.3],
+};
+/** The set's squares (solid: nobody walks through it). */
+export const ZEBRA_BACK_SET_SQUARES = [
+  { c: 5, r: 8 },
+  { c: 6, r: 8 },
+  { c: 7, r: 8 },
+] as const;
+type P2 = readonly [number, number];
+/**
+ * The walk-out's goons (their art's names), what each carries and his way (squares, a figure's foot): from where he stands to just above
+ * his thing (row 9, the free row between the set and the room's front wall), then west along it and out of the door (columns 3-4, row 10).
+ * The crew file off the bench east (the table blocks the way south), down past the table's east end (column 9, clear of you at its foot)
+ * and back west; the flat-cap door guard comes in through the door for your chair. The board before the table: it lies on it.
+ */
+const EXIT: readonly P2[] = [
+  [4.4, 9],
+  [4.1, 9.6],
+  [4.1, 11],
+];
+const LANE: readonly P2[] = [
+  [9.1, 5.1],
+  [9.1, 9],
+];
+export const ZEBRA_OUT: readonly { name: string; item: SetupItem; start: number; to: readonly P2[] }[] = [
+  { name: "guard-a", item: "youChair", start: 0, to: [[4.1, 11], [4.1, 9.6], [5.3, 9]] },
+  { name: "crew-e", item: "bossChair", start: 0, to: [[7.15, 5.06], ...LANE, [6.2, 9]] },
+  { name: "crew-d", item: "board", start: 1, to: [[6.15, 5.06], ...LANE, [7.1, 9]] },
+  { name: "crew-c", item: "table", start: 2, to: [[5.15, 5.06], ...LANE, [7.1, 9]] },
+];
+/**
+ * Don's way out: up out of his wingback and forward off it, down to the door and through. (The door's east half, as everyone's: its
+ * west half is at a phone's edge.)
+ */
+const DON_OUT: readonly P2[] = [ZEBRA_DON.at, [4.2, 7.9], [4.1, 9.6], [4.1, 11]];
+const lenOfPts = (pts: readonly P2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p[0] - pts[i]![0], p[1] - pts[i]![1]), 0);
+/** `u` squares along a polyline: where, and its leg's east-west way. Into `o`. */
+function along(pts: readonly P2[], u: number, o: { c: number; r: number; dc: number }): void {
+  let left = Math.max(0, u);
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1]!;
+    const b = pts[i]!;
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (left <= d || i === pts.length - 1) {
+      const k = d ? Math.min(1, left / d) : 1;
+      o.c = a[0] + (b[0] - a[0]) * k;
+      o.r = a[1] + (b[1] - a[1]) * k;
+      o.dc = b[0] - a[0];
+      return;
+    }
+    left -= d;
+  }
+}
+/** How solid a figure is at row `r` in the back room: fading out through the door (SHOP_FEEL.zebra.out.fade). */
+export const doorAlpha = (r: number): number => {
+  const [a, b] = SHOP_FEEL.zebra.out.fade;
+  return Math.max(0, Math.min(1, (b - r) / (b - a)));
+};
+
+/**
+ * The walk-out (Nov 11), from the moment his challenge line ends (`t0`): the goons pick up the set and carry it out of the back door
+ * (ZEBRA_OUT; the flat-cap door guard comes in for your chair), Don gets up and follows, then you (ShopRoom walks you: `youAt`). The
+ * camera holds the room; once you're through the door the room fades to the front room (Town.tsx challengeHere). Pure; times are ms.
+ */
+export class WalkOut {
+  private readonly runs: { name: string; item: SetupItem; start: number; to: readonly P2[]; there: number; pick: number; out: readonly P2[]; gone: number }[];
+  /** When Don gets up, and when you set off. */
+  readonly donAt: number;
+  readonly youAt: number;
+  private readonly o = { c: 0, r: 0, dc: 0 };
+  constructor(
+    private readonly clips: SceneClips,
+    private readonly t0: number,
+  ) {
+    const O = SHOP_FEEL.zebra.out;
+    this.runs = ZEBRA_OUT.map((k) => {
+      const start = t0 + k.start * O.followMs;
+      const there = start + lenOfPts(k.to) * O.stepMs;
+      const pick = there + O.pickMs;
+      const out = [k.to[k.to.length - 1]!, ...EXIT];
+      return { ...k, start, there, pick, out, gone: pick + lenOfPts(out) * O.stepMs };
+    });
+    this.donAt = Math.max(...this.runs.map((r) => r.pick)) + O.donAfterMs;
+    this.youAt = this.donAt + O.youAfterMs;
+  }
+  /** When the last goon is through the door, and when Don is. */
+  goonsGone(): number {
+    return Math.max(...this.runs.map((r) => r.gone));
+  }
+  donGone(): number {
+    return this.donAt + lenOfPts(DON_OUT) * SHOP_FEEL.zebra.out.donStepMs;
+  }
+  /** The set's things still where they're kept at `now`. */
+  kept(now: number, out: SetupItem[]): SetupItem[] {
+    out.length = 0;
+    for (const r of this.runs) if (now < r.there + SHOP_FEEL.zebra.out.pickMs / 2) out.push(r.item);
+    return out;
+  }
+  /** Who stands where this frame and what's carried (into `out` and `carried`, both cleared). Don's on his seat until he gets up. */
+  figs(now: number, out: SceneFig[], carried: CarriedNow[]): void {
+    out.length = 0;
+    carried.length = 0;
+    const O = SHOP_FEEL.zebra.out;
+    const o = this.o;
+    const clip = (n: string, a: string) => this.clips[n]?.[a];
+    // Don: seated (listening) until he gets up; then his standing figure stepping out to the door, a little hop a step.
+    if (now < this.donAt) out.push({ name: "don", anim: "sitListen", frame: clipFrame(clip("don", "sitListen"), now), c: ZEBRA_DON.at[0], r: ZEBRA_DON.at[1], flip: false });
+    else {
+      const u = (now - this.donAt) / O.donStepMs;
+      along(DON_OUT, u, o);
+      const a = doorAlpha(o.r);
+      if (a > 0) out.push({ name: "don", anim: "idle", frame: clipFrame(clip("don", "idle"), now), c: o.c, r: o.r, flip: o.dc < 0, a, up: Math.abs(Math.sin(Math.PI * u)) * 3 });
+    }
+    for (const r of this.runs) {
+      if (now < r.start) {
+        // (The crew standing easy where the beat left them; the guard still out front.)
+        if (r.name !== "guard-a") out.push({ name: r.name, anim: "puff", frame: clipFrame(clip(r.name, "puff"), now), c: r.to[0]![0], r: r.to[0]![1], flip: false });
+        continue;
+      }
+      if (now < r.there) {
+        along(r.to, (now - r.start) / O.stepMs, o);
+        const a = doorAlpha(o.r);
+        if (a > 0) out.push({ name: r.name, anim: "walk", frame: clipFrame(clip(r.name, "walk"), now - r.start), c: o.c, r: o.r, flip: o.dc < 0, a });
+        continue;
+      }
+      if (now < r.pick) {
+        // (Bent to it, facing the way out: west.)
+        const p = r.to[r.to.length - 1]!;
+        out.push({ name: r.name, anim: "carry", frame: 0, c: p[0], r: p[1], flip: true });
+        if (now >= r.there + O.pickMs / 2) carried.push({ item: r.item, c: p[0], r: p[1], flip: true });
+        continue;
+      }
+      if (now < r.gone) {
+        along(r.out, (now - r.pick) / O.stepMs, o);
+        const a = doorAlpha(o.r);
+        if (a <= 0) continue;
+        out.push({ name: r.name, anim: "carry", frame: clipFrame(clip(r.name, "carry"), now - r.pick), c: o.c, r: o.r, flip: o.dc <= 0, a });
+        carried.push({ item: r.item, c: o.c, r: o.r, flip: o.dc <= 0, a });
+      }
+    }
+    void this.t0;
   }
 }
 
 /** What the goons carry out to the pad: the table, its two chairs and the board. */
 export type SetupItem = "table" | "bossChair" | "youChair" | "board";
 type Pt2 = { c: number; r: number };
-/** A carried item this frame: what, where (the carrier's foot), which way he faces. */
+/** A carried item this frame: what, where (the carrier's foot), which way he faces; how solid (through a door). */
 export interface CarriedNow {
   item: SetupItem;
   c: number;
   r: number;
   flip: boolean;
+  a?: number;
 }
 
 /**
  * His challenge's set-up in the front room (Eric, Nov 11: "The main room is still where you fight … 4 of his goons who follow you in carry
  * a chair and a board and a table, 1 item per goon. So the board and chairs are in the back room but brought into the front."). Four goons
- * come out of the back room's door after you and Don, one after another, each carrying one thing round the counter and the mixer to the
- * pad (the room's own way, `path`): the table, Don's chair, yours, then the board onto the table; each sets his down and steps back to
+ * come through the back room's door after you and Don (from behind it: the walk-out's other side), one after another, each carrying one
+ * thing round the counter and the mixer to the pad (the room's own way, `path`): the table, Don's chair, yours, then the board onto the
+ * table; each sets his down and steps back to
  * watch behind the table, the fifth (the door guard in the paper cap) walking over from the door to stand with them. Everyone ends on his
  * watch spot facing the table, in a row `watchBack` behind it, so the board, Don and you stay clear. Pure; times are ms.
  */
@@ -320,9 +512,11 @@ export class SetupScene {
       { name: "crew-d", item: "board", at: { c: T.c, r: T.r - 1 }, watch: -2 },
     ];
     const len = (pts: Pt2[]) => pts.slice(1).reduce((s, p, i) => s + Math.hypot(p.c - pts[i]!.c, p.r - pts[i]!.r), 0);
+    // (Each comes through the door: from behind it, out of sight behind the wall until he steps through, so nobody pops in.)
+    const through = { c: door.c - 0.4, r: door.r - 1.6 };
     carriers.forEach((k, i) => {
       const start = t0 + S.leadMs + i * S.followMs;
-      const there = route(door, k.at);
+      const there = [through, ...route(door, k.at)];
       const arrive = start + len(there) * S.stepMs;
       const back = [k.at, watch(k.watch)];
       const done = arrive + S.setMs + len(back) * S.backMs;
@@ -381,7 +575,8 @@ export class SetupScene {
         if (r.item) carried.push({ item: r.item, c: p.c, r: p.r, flip: p.dc < 0 });
         continue;
       }
-      if (now < r.arrive + S.setMs) {
+      // (Setting his thing down; the paper-cap guard has none: he's straight on his watch.)
+      if (r.item && now < r.arrive + S.setMs) {
         const p = r.there[r.there.length - 1]!;
         out.push({ name: r.name, anim: "carry", frame: 0, c: p.c, r: p.r, flip: faceTable(p.c) });
         if (r.item && now < r.set) carried.push({ item: r.item, c: p.c, r: p.r, flip: faceTable(p.c) });

@@ -6,8 +6,10 @@ import {
   moveEvidence,
   matchPerf,
   matchSignals,
+  nearBest,
   playerLevel,
   ratingForLoss,
+  sustainedStrength,
   referenceStrength,
   skipReason,
   spearman,
@@ -94,6 +96,19 @@ describe("signals", () => {
     const judged = moveEvidence(mv({ loss: 0, crowdFound: 2 }), 2000);
     expect(judged.evidence).toBeGreaterThan(0.5);
     expect(moveEvidence(mv({ loss: 9, crowdFound: 30 }), 2000).evidence).toBeLessThan(0);
+  });
+
+  it("evidence, a near-best pick ranked 4th or lower (the review of #629, M1): the crowd on that move counts, as for a 2nd or 3rd choice", () => {
+    const top = ["e2e4", "d2d4", "g1f3"];
+    // A 2400 player's pick 0.8 off the deep search's best and 4th in its order, with `on` of 40 others on the same move.
+    const pick = (on: number, rank = 4) => mv({ move: "c2c4", loss: 0.8, crowdFound: 3, picks: { c2c4: on, e2e4: 3, d2d4: 2 }, deep: { best: "e2e4", rank, loss: 0.8, top: rank > 3 ? top : ["e2e4", "d2d4", "c2c4"] } });
+    const crowded = moveEvidence(pick(30), 2400);
+    expect(crowded.outcome).toBe(1);
+    // (Was +0.47 at 30 and at 5 alike: the honest chance came from the top 3's share alone, the crowd on the move changing nothing.)
+    expect(crowded.evidence).toBeLessThan(-0.75);
+    expect(moveEvidence(pick(5), 2400).evidence).toBeGreaterThan(crowded.evidence + 0.5);
+    // The same as the same move ranked 3rd (no one on the 3rd choice it displaces), where the crowd on it always counted.
+    expect(crowded.evidence).toBeCloseTo(moveEvidence(pick(30, 3), 2400).evidence, 5);
   });
 
   it("spearman: rank correlation, null without enough or without spread", () => {
@@ -195,6 +210,22 @@ describe("signals", () => {
     expect(matchSignals(human, null).evidence).toBeLessThan(-5);
   });
 
+  it("near the engine's best (Eric, Nov 11): a deep match is rank 1 or within nearBestLoss by the deep search's numbers; deepExact counts rank 1 alone", () => {
+    const near = FAIRPLAY.deep.nearBestLoss;
+    expect(near).toBe(1);
+    expect(nearBest({ rank: 1, loss: 0 })).toBe(true);
+    expect(nearBest({ rank: 3, loss: near })).toBe(true);
+    expect(nearBest({ rank: 2, loss: near + 0.01 })).toBe(false);
+    const top = ["e2e4", "d2d4", "g1f3"];
+    const moves = Array.from({ length: 12 }, (_, i) =>
+      mv({ ply: 14 + 2 * i, loss: 0.5, crowdFound: 12, picks: { e2e4: 12, d2d4: 15 }, deep: i < 6 ? { best: "e2e4", rank: 1, loss: 0, top } : { best: "e2e4", rank: 2, loss: i < 10 ? near : near + 1, top } }),
+    );
+    const s = matchSignals(moves, null);
+    expect([s.deepChecked, s.deepMatch, s.deepExact]).toEqual([12, 10, 6]);
+    // (At 0, the exact count, as before Nov 11.)
+    expect(matchSignals(moves, null, FAIRPLAY.signals, FAIRPLAY.score, 0).deepMatch).toBe(6);
+  });
+
   it("reference strength: the median of 3+ recent match strengths, else the rating", () => {
     expect(referenceStrength([1800, null, 2000, 1900], 1500)).toBe(1900);
     expect(referenceStrength([1800, 2000], 1500)).toBe(1500);
@@ -231,5 +262,19 @@ describe("levels", () => {
     expect(playerLevel([{ ...strong, perf: L.banPerf - 1 }, { ...strong, perf: L.banPerf - 1 }], now).level).not.toBe("ban");
     const one = { ...m(L.banOneEvidence, L.banOnePerf), evidence: L.banOneEvidence, deepChecked: L.banOneDeepChecked, deepMatch: Math.ceil(L.banOneDeep * L.banOneDeepChecked) };
     expect(playerLevel([one], now)).toMatchObject({ level: "ban", reasons: [expect.stringMatching(/one match/)] });
+  });
+
+  it("sustained strength (Eric, Nov 11): the newest poolStrengthMatches matches of poolStrengthCounted+ counted moves averaging poolStrength pool, whatever the top-move share", () => {
+    expect([L.poolStrengthMatches, L.poolStrengthCounted, L.poolStrength]).toEqual([5, 8, 3000]);
+    const at = (perf: number, counted: number = L.poolStrengthCounted, daysAgo = 1) => ({ score: 6, perf, counted, deepChecked: 0, deepMatch: 0, evidence: 0, at: now - daysAgo * day });
+    const five = [3400, 3130, 2657, 3400, 3100].map((p) => at(p));
+    expect(sustainedStrength(five)).toBe(3137);
+    expect(playerLevel(five, now)).toEqual({ level: "ban", path: "strength", reasons: ["strength: 3,137 average over 5 matches"] });
+    // Four aren't enough; a short match doesn't count (nor stand in for one); below the bar, a review at most.
+    expect(playerLevel(five.slice(0, 4), now).level).not.toBe("ban");
+    expect(playerLevel([...five.slice(0, 4), at(3400, L.poolStrengthCounted - 1)], now).level).not.toBe("ban");
+    expect(playerLevel([2900, 2900, 3100, 3000, 3000].map((p) => at(p)), now).level).not.toBe("ban");
+    // The newest five count: an old strong run with weaker matches since doesn't.
+    expect(sustainedStrength([2400, 2400, 2400, 2400, 2400, 3400, 3400, 3400, 3400, 3400].map((p, i) => at(p, 12, i + 1)))).toBeNull();
   });
 });

@@ -77,8 +77,21 @@ export const ZEBRA_GUARD_LINES: readonly ZebraLine[] = [
   { who: "guard-a", text: "Nobody plays nothing in here. Got it?" },
   { who: "guard-b", text: "Hooves off the baguettes, pal." },
 ];
-/** The counter zebra's two (his Talk says the next each time: no crate yet, Eric's Nov 11 brief). */
-export const ZEBRA_KEEPER_LINES: readonly string[] = ["Rye, sourdough, or... the special box?", "Fresh today. Fresh every day. No questions."];
+/**
+ * "He's in the back" (Eric, Nov 11: "anyone else you talk to or walk up to and click on in the shop that's in the front tells you he's in
+ * the back"): a guard you tap, and the counter zebra's Talk (no crate yet), one at random each time.
+ */
+export const ZEBRA_BACK_LINES: readonly string[] = ["He's in the back.", "Boss? In the back. Knock first.", "He's in the back. Don't touch the rolls.", "Back room. He's busy. Studying... bread."];
+/**
+ * The guard out front (Eric, Nov 11: "when you talk to him, he just says like the boss man is inside or something"): his card's Talk,
+ * one at random each time.
+ */
+export const ZEBRA_OUTSIDE_LINES: readonly string[] = ["Boss man's inside. In the back.", "Don's in the back. Bread's up front. Simple.", "He's inside. Wipe your hooves first.", "Looking for the boss? Inside, all the way back."];
+/** A line of `lines` at random, never the one just said (`last`) while there's another. */
+export function pickLine(lines: readonly string[], last: string | null, rand: () => number = Math.random): string {
+  const pool = lines.length > 1 ? lines.filter((l) => l !== last) : lines;
+  return pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))]!;
+}
 
 /** The talk beat (walking up to the kingpin): the crew draw on you, he waves them down, his challenge. */
 export const ZEBRA_TALK = {

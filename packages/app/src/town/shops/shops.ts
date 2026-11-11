@@ -13,7 +13,7 @@ import { buyBossCrateOnServer, tokenCount } from "../../account.ts";
 import type { HomeId } from "../world.ts";
 import type { SkyTone } from "../sky.ts";
 import type { Sq } from "./room.ts";
-import { ZEBRA_KEEPER_LINES } from "./zebra-lines.ts";
+import { ZEBRA_BACK_LINES } from "./zebra-lines.ts";
 
 export interface ShopDef {
   /** Its home. */
@@ -22,7 +22,7 @@ export interface ShopDef {
   boss: string;
   /** Its crate's name, word for word ("Babur's Boss Crate"); null: none yet (Rolling Dough, Nov 11: its Shopkeeper's chat only). */
   crate: string | null;
-  /** A shop with no crate yet: what its Shopkeeper says to Talk, the next each time, in a bubble over him (Rolling Dough's). */
+  /** A shop with no crate yet: what its Shopkeeper says to Talk, one at random each time, in a bubble over him (Rolling Dough's). */
   says?: readonly string[];
   /**
    * The home's second room (Rolling Dough's back room, Nov 11): reached through its door from the front room, not from the town; its
@@ -123,7 +123,7 @@ export const SHOPS: Readonly<Partial<Record<HomeId, ShopDef>>> = {
   // baker's cap behind the counter, left of the register, facing into the room (the art's SHOP_ZEBRA_KEEPER), drawn at his art's size
   // (73 px). He has no name: "Shopkeeper". No crate yet (his items come later): Talk has him say one of his lines. A bright bakery:
   // the day tone. Its back room is BACK_ROOMS'.
-  zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_KEEPER_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
+  zebra: { home: "zebra", boss: "Don Dough", crate: null, says: ZEBRA_BACK_LINES, kid: "zebrakeeper", at: [12.5, 7.3], tall: 73, flip: true, keeper: [{ c: 12, r: 7 }, { c: 13, r: 7 }], prizes: [], roof: "bakery", chatTone: "day" },
 };
 
 /**

@@ -62,7 +62,7 @@ describe("the review of #610: its findings, fixed", () => {
     expect(skipReason({ ...moves[1]!, gap: 35 })).toBe("only");
   });
 
-  it("M1: an honest player's obvious moves, reported by lying judges in one lobby, reach the ban bar: a review, never the pool; the reviewer's token can't ban them; a person can", async () => {
+  it("M1, since Nov 11: an honest player's obvious moves, reported by lying judges in one lobby, reach the ban bar: the engine pool (Eric: \"It's better we put people in this queue than under\"), never a ban; the reviewer's token can't ban or move them; a person releases them", async () => {
     expect(FAIRPLAY.enforcement).toBe("pool");
     const { sql } = memoryDb();
     await ensureSchema(sql);
@@ -70,16 +70,15 @@ describe("the review of #610: its findings, fixed", () => {
     await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: forgedMatch() }, QUIET - HOUR);
     expect((await caseOf(sql, p.id))?.status).toBe("review");
     for (let i = 0; i < 5; i++) await deepCheckRun(sql, onlyMoveSearch, QUIET, { all: true, perRun: 200 });
-    // At the ban bar on that one match, so on one lobby's judges: a review (a person looks), not the engine pool (the #618 review, M3).
-    expect((await sql.all<{ reason: string }>("SELECT reason FROM fairplay_log WHERE user_id = ? AND action = 'note'", p.id)).map((l) => l.reason)).toContainEqual(
-      expect.stringMatching(/^level ban on one match \(two would pool\): one match/),
-    );
+    // At the ban bar on that one match, so on one lobby's judges: the engine pool since Nov 11 (a review before: the #618 review, M3).
+    // Quiet and undone by a person's Release; the deep re-check's own facts per move (ROADMAP.md, fair play: M1 steps 1-3) close it.
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: one match/) });
     const r = await decide(sql, p.id, "ban", "reviewer", "deep re-check confirms engine moves", QUIET + 1000);
     expect(r).toEqual({ ok: false, status: 409, message: expect.stringMatching(/^a ban is for a person/) });
-    expect((await caseOf(sql, p.id))?.status).toBe("review");
-    // Review, watch and clear stay the reviewer's.
-    expect(await decide(sql, p.id, "watch", "reviewer", "obvious moves the crowd missed", QUIET + 2000)).toEqual({ ok: true, status: "watch" });
-    expect((await decide(sql, p.id, "ban", "admin:eric@example.com", "a person read the games", QUIET + 3000)).ok).toBe(true);
+    expect(await decide(sql, p.id, "watch", "reviewer", "obvious moves the crowd missed", QUIET + 2000)).toEqual({ ok: false, status: 409, message: "engine pool cases are for a person" });
+    expect((await caseOf(sql, p.id))?.status).toBe("pool");
+    expect(await decide(sql, p.id, "release", "admin:eric@example.com", "lying judges: obvious moves", QUIET + 3000)).toEqual({ ok: true, status: "cleared" });
+    expect((await decide(sql, p.id, "ban", "admin:eric@example.com", "a person read the games", QUIET + 4000)).ok).toBe(true);
     expect((await caseOf(sql, p.id))?.status).toBe("banned");
   });
 

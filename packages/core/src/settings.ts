@@ -3589,8 +3589,9 @@ export const FAIRPLAY = {
    * The engine pool (Eric, Nov 10; docs/decisions/2026-11-10-engine-pool.md): an account detection puts here only ever meets other
    * pooled accounts (or bots) in every queue, and nothing on its screen differs. In: a level that used to ban (`enforcement` "pool"),
    * or a new account with `newHits` of its first `newGames` fair-play matches at the one-match ban bar (`levels.banOne*`), with no
-   * review. Out: a person's Release on the review page. Its evidence is kept while it's pooled. (The level path pools only a ban that
-   * rests on two matches, so two lobbies: one match at the bar opens a review, core's banSpread.)
+   * review. Out: a person's Release on the review page. Its evidence is kept while it's pooled. (Since Nov 11 one deep-checked match
+   * past every `banOne*` bar pools too, as the two-match path does: Eric, "It's better we put people in this queue than under";
+   * docs/decisions/2026-11-11-near-best.md.)
    */
   pool: {
     newGames: 10,
@@ -3629,7 +3630,7 @@ export const FAIRPLAY = {
   /**
    * The deep re-check (server/fairplay-deep.ts): a flagged player's counted moves searched again on the engine server
    * (native Stockfish, the full network), over every legal move (in groups of at most 8, one search each: the engine's
-   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is the deep search's best. Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
+   * own candidates, never the judges' list; Nov 10). "Deep match": the pick is at or near the deep search's best (`nearBestLoss`). Run by the Worker's schedule: cases in review at once, others off-peak, within a daily
    * budget of its own (its own container instance, so matches never wait behind it).
    */
   deep: {
@@ -3643,6 +3644,15 @@ export const FAIRPLAY = {
     offPeakUtc: [3, 10] as readonly [number, number],
     /** The judges' best moves kept with each pick as evidence (FairMove.top): this many. (The re-check searches every legal move.) */
     candidates: 8,
+    /**
+     * Near the engine's best (Eric, Nov 11; docs/decisions/2026-11-11-near-best.md): a deep-checked pick counts as the engine's best
+     * (a "deep match", what `levels.banDeep` and `banOneDeep` read) when it's the search's best or gives away at most this many
+     * points of expected score by the search's own numbers (core's nearBest). Two strong engines often prefer different, practically
+     * equal moves (the live demo, Nov 11: Stockfish 19's top move was our 17.1's exact best 74% of the time). 1 point is about 0.1 to
+     * 0.3 pawns from a level position on Stockfish's win/draw/loss scale (more material, more pawns a point), the judges' own grain
+     * for "found the best" (`signals.foundLoss`): never a real mistake. reports/fairplay.md, "Near the engine's best".
+     */
+    nearBestLoss: 1,
   },
   /**
    * Signals (core/fairplay.ts): which positions count, and what each signal measures. Tuned by the simulation
@@ -3689,10 +3699,12 @@ export const FAIRPLAY = {
     /** An engine user picks the judges' best at least this often, wherever the crowd stands (the evidence's other side). */
     cheatFind: 0.8,
     /**
-     * An engine user's picks against the deep re-check: its best this often, one of its next two, neither (its own
-     * engine, depth or version can differ from ours).
+     * An engine user's picks against the deep re-check: its best this often, one of its next two or near its best
+     * (`deep.nearBestLoss`), neither (its own engine, depth or version can differ from ours). Measured Nov 11: the live demo's
+     * Stockfish 19 was our 17.1's exact best 74% of the time; the simulation's other engine splits the rest about 12 to 1
+     * (reports/fairplay.md, "Near the engine's best"). Was [0.85, 0.13, 0.02], a guess.
      */
-    cheatDeep: [0.85, 0.13, 0.02] as readonly [number, number, number],
+    cheatDeep: [0.74, 0.24, 0.02] as readonly [number, number, number],
     /** Timing: a hard find this fast is suspicious; timing needs this many counted moves with a crowd. */
     fastHardMs: 5_000,
     minTimed: 8,
@@ -3744,8 +3756,8 @@ export const FAIRPLAY = {
     /**
      * Auto-ban: only overwhelming evidence, and only from matches the deep re-check has gone through (`banMatchChecked`
      * moves or more each). Either at least `banMatches` such matches in the window whose evidence adds up to `banEvidence`, with `banDeepChecked` moves
-     * checked among them, a deep-match share of `banDeep` and a best match strength of `banPerf`; or one match past
-     * every `banOne*` bar.
+     * checked among them, a deep-match share (at or near the engine's best: `deep.nearBestLoss`) of `banDeep` and a best match
+     * strength of `banPerf`; or one match past every `banOne*` bar. With `enforcement` "pool", either pools (never a ban).
      */
     banMatches: 2,
     /** (A match counts toward a ban only with this many of its moves deep-checked.) */
@@ -3758,6 +3770,16 @@ export const FAIRPLAY = {
     banOneDeepChecked: 12,
     banOneDeep: 0.9,
     banOnePerf: 2400,
+    /**
+     * Sustained strength (Eric, Nov 11: "People easily get around that by playing the second or third best move ... by 4 or 5 games,
+     * if their Elo is just ridiculous like that, put them in the cheater queue"): the newest `poolStrengthMatches` matches in the
+     * window with `poolStrengthCounted` counted moves or more each, their match strengths averaging `poolStrength` or more, pool the
+     * player whatever their top-move share (a ban-level verdict, as the bars above; never a ban: `enforcement`). Each match is its own
+     * lobby, so no one lobby's judges carry it. reports/fairplay.md, "Sustained strength".
+     */
+    poolStrengthMatches: 5,
+    poolStrengthCounted: 8,
+    poolStrength: 3000,
   },
 } as const;
 

@@ -564,7 +564,7 @@ interface ReportAccount {
   email: string;
   case: { status: string; reason: string | null; opened_at: number; decided_at: number | null } | null;
   log: { at: number; action: string; by: string; reason: string | null }[];
-  matches: { lobby: string | null; playedAt: number; moves: number | null; counted: number; perf: number | null; found: number | null; evidence: number | null; deepChecked: number; deepMatch: number; deepQueued: boolean; score: number; level: string }[];
+  matches: { lobby: string | null; playedAt: number; moves: number | null; counted: number; perf: number | null; found: number | null; evidence: number | null; deepChecked: number; deepMatch: number; deepExact?: number | null; deepQueued: boolean; score: number; level: string }[];
   results: { played_at: number; placement: number; players: number }[];
 }
 
@@ -583,12 +583,12 @@ function reportText(accounts: ReportAccount[]): string {
   for (const a of accounts) {
     lines.push(`| ${a.name} | ${a.matches.length} | ${a.case?.status ?? "none"} | ${(a.case?.reason ?? "").replace(/\|/g, "/").slice(0, 160)} |`);
   }
-  // (Deep: the deep re-check's best among the moves it has checked; "queued": more to check on its schedule; "–": none checked, as
-  // for a match that never needed it.)
-  lines.push("", "| Account | Lobby | Ended | Counted / picks | Found | Strength | Evidence | Deep best / checked | Score | Level |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
+  // (Deep: picks at or near the deep re-check's best (Nov 11), its very best in brackets, among the moves it has checked; "queued":
+  // more to check on its schedule; "–": none checked, as for a match that never needed it.)
+  lines.push("", "| Account | Lobby | Ended | Counted / picks | Found | Strength | Evidence | Near the engine's best / checked (its best) | Score | Level |", "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |");
   for (const a of accounts) {
     for (const m of a.matches) {
-      const deep = m.deepChecked ? `${m.deepMatch}/${m.deepChecked}` : "–";
+      const deep = m.deepChecked ? `${m.deepMatch}/${m.deepChecked}${typeof m.deepExact === "number" ? ` (${m.deepExact})` : ""}` : "–";
       lines.push(
         `| ${a.name} | ${m.lobby ?? "–"} | ${utc(m.playedAt)} | ${m.counted}/${m.moves ?? "?"} | ${m.found ?? "–"} | ${m.perf ?? "–"} | ${r1(m.evidence)} | ${deep}${m.deepQueued ? " (queued)" : ""} | ${r1(m.score)} | ${m.level} |`,
       );

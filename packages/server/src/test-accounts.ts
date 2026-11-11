@@ -121,6 +121,8 @@ export async function testAccountsReport(sql: Sql) {
         evidence: pick("evidence"),
         deepChecked: pick("deepChecked") ?? 0,
         deepMatch: pick("deepMatch") ?? 0,
+        // (Its very best alone; null on a summary from before the near-best count, Nov 11.)
+        deepExact: pick("deepExact"),
         deepDone: r.deep_done === 1,
         deepQueued: r.deep_queued === 1,
         score: r.score,

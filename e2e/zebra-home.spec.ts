@@ -1,18 +1,23 @@
 import { expect, type Page } from "@playwright/test";
 import { asAdmin, test, townReady } from "./helpers.ts";
+import { ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES } from "../packages/app/src/town/shops/zebra-lines.ts";
 
 /**
  * Rolling Dough, Don Dough's bakery (Nov 11; docs/areas/town-square.md, "Inside a shop"), on a phone and a computer, as an admin (Don
- * Dough is in the game for admins first): walk in from the town; the two guards' `watch` follows you; the counter zebra's Talk has him
- * say a line; through the door at the back left into the back room (its own room) and out again; the chatter at the back table; and
- * the talk beat (the crew stand, draw and aim with Fedora's line, Don waves them down, they lower, his challenge line), his Challenge
- * open now his boss is in the game (admins first). ZEBRA_SHOTS=<dir>: the stills for the PR.
+ * Dough is in the game for admins first): the guard out front and his Talk ("the boss is inside"); walk in from the town; the two
+ * guards' `watch` follows you; a tapped guard and the counter zebra's Talk say he's in the back; through the door at the back left into
+ * the back room (its own room) and out again; the chatter at the back table; Don's card, his Challenge alone. Then his challenge: the
+ * beat (the crew stand, draw and aim at you with Fedora's line, following you as you move; Don waves them down, they lower, his
+ * challenge line), the walk-out (four goons pick up the set kept in the back room and carry it out of the back door, Don and you following),
+ * the front room's set-up (they come through the door) and the battle. ZEBRA_SHOTS=<dir>: the stills for the PR (and a frame every
+ * 250 ms of the walk-out, `out-NN`).
  * Test hooks: the room's canvas (`data-room`, `data-part`, `data-you`, `data-ready`), `__shopAt("keeper" | "pass" | "square")`,
- * `__shopZebra()` (who's drawn, their animation and frame, who's talking, the talk beat's step, the chatter's place, you).
+ * `__shopZebra()` (who's drawn, their animation, frame and how solid, who's talking, the beat's step, the chatter's place, you, the
+ * walk-out's kept and carried things).
  */
 test.use({ actionTimeout: 15_000 });
 const SHOTS = process.env.ZEBRA_SHOTS;
-const ZEBRA_LINES = { draw: "Hey! Who let HIM back here?!", relax: "Relax, relax. Put the bread down." };
+const ZEBRA_LINES = { draw: "Hey! Who let HIM back here?!", relax: "Relax, relax. Put the bread down.", challenge: "So. You came to play, or to watch the stream?" };
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -26,7 +31,8 @@ test.beforeEach(async ({ page }) => {
 
 const room = (p: Page) => p.locator("canvas.town-shop-canvas");
 type Fig = { name: string; anim: string; frame: number; at: [number, number]; flip: boolean };
-type Zebra = { part: string; figs: Fig[]; say: { who: string; text: string } | null; beat: string | null; chatter: { exchange: number; line: number } | null; you: [number, number] };
+type Out = { kept: string[]; carried: { item: string; at: [number, number]; a: number }[] };
+type Zebra = { part: string; figs: Fig[]; say: { who: string; text: string } | null; beat: string | null; chatter: { exchange: number; line: number } | null; you: [number, number]; out: Out | null; alpha: Record<string, number> };
 type Hooks = {
   __townAt?: (k: string, id: string) => { x: number; y: number } | null;
   __townGlide?: (to: string) => void;
@@ -35,14 +41,14 @@ type Hooks = {
   __shopZebra?: () => Zebra | null;
 };
 const zebra = (p: Page) => p.evaluate(() => (window as unknown as Hooks).__shopZebra?.() ?? null);
-async function shopAt(p: Page, kind: "keeper" | "pass" | "square", sq?: readonly [number, number]) {
+async function shopAt(p: Page, kind: "keeper" | "pass" | "square" | "guard-a" | "guard-b", sq?: readonly [number, number]) {
   const xy = await p.evaluate(([k, s]) => (window as unknown as Hooks).__shopAt?.(k as string, s as [number, number] | undefined) ?? null, [kind, sq] as const);
   if (!xy) return null;
   const cv = (await room(p).boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
 }
-async function homeAt(p: Page) {
-  const xy = await p.evaluate(() => (window as unknown as Hooks).__townAt?.("home", "zebra") ?? null);
+async function homeAt(p: Page, kind: "home" | "boss" = "home") {
+  const xy = await p.evaluate((k) => (window as unknown as Hooks).__townAt?.(k, "zebra") ?? null, kind);
   if (!xy) return null;
   const cv = (await p.locator("canvas.town-canvas").boundingBox())!;
   return { x: cv.x + xy.x, y: cv.y + xy.y };
@@ -84,7 +90,7 @@ async function goThrough(p: Page, button: "Go in" | "Go out front", part: "back"
 }
 const shot = async (p: Page, name: string) => SHOTS && (await p.screenshot({ path: `${SHOTS}/${name}-${test.info().project.name}.png` }));
 
-test("Rolling Dough: in, the guards watch you, the counter zebra's line, through to the back room, the chatter, the talk beat, and back", async ({ page }) => {
+test("Rolling Dough: in, the guards watch you, the counter zebra's line, through to the back room, the chatter, Don's Challenge, and back", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -108,6 +114,26 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
       await expect(page.getByRole("dialog", { name: "Map of the town" })).toHaveCount(0);
     }
   }
+  // The guard out front (Eric, Nov 11), where the other homes' bosses stand: his card, Talk, "the boss is inside" (a line at random).
+  const guard = page.getByRole("dialog", { name: "Bakery guard", exact: true });
+  await expect(async () => {
+    if (await guard.isVisible()) return;
+    const at = await homeAt(page, "boss");
+    expect(at, "the guard out front on screen").not.toBeNull();
+    await page.mouse.click(at!.x, at!.y);
+    await expect(guard).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 20_000 });
+  await expect(guard.getByRole("button")).toHaveText(["Talk"]);
+  const box0 = (await guard.boundingBox())!;
+  await guard.getByRole("button", { name: "Talk" }).click();
+  await expect.poll(async () => ZEBRA_OUTSIDE_LINES.includes((await guard.locator(".town-card-line").textContent()) ?? ""), { message: "he says the boss is inside" }).toBe(true);
+  // (His line's row was there before he spoke: the card keeps its size.)
+  const box1 = (await guard.boundingBox())!;
+  expect([box1.width, box1.height].map(Math.round)).toEqual([box0.width, box0.height].map(Math.round));
+  await page.waitForTimeout(400);
+  await shot(page, "guard-out-front");
+  await page.keyboard.press("Escape");
+  await expect(guard).toBeHidden();
   const card = page.getByRole("dialog", { name: "Rolling Dough", exact: true });
   await expect(async () => {
     if (await card.isVisible()) return;
@@ -147,7 +173,19 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   expect(seen.size, "their look changed as you walked past them").toBeGreaterThan(1);
   await shot(page, "front");
 
-  // The counter zebra: Talk has him say one of his lines (no crate yet).
+  // A guard you tap tells you he's in the back (Eric, Nov 11), in a bubble; you stay where you are.
+  // (Where he's drawn is read and tapped in one go, again until he speaks: the camera can still be settling after your walk.)
+  await expect(async () => {
+    const gb = await shopAt(page, "guard-b");
+    expect(gb, "the guard is drawn").not.toBeNull();
+    await page.mouse.click(gb!.x, gb!.y);
+    await expect.poll(async () => (await zebra(page))?.say?.who, { message: "the guard says he's in the back", timeout: 3000 }).toBe("guard-b");
+  }).toPass({ timeout: 20_000 });
+  expect(ZEBRA_BACK_LINES).toContain((await zebra(page))!.say!.text);
+  await expect(room(page)).toHaveAttribute("data-you", "10,13");
+  await shot(page, "guard-line");
+
+  // The counter zebra: Talk has him say he's in the back too (no crate yet).
   await expect.poll(() => shopAt(page, "keeper"), { message: "the counter zebra is drawn" }).not.toBeNull();
   const k = (await shopAt(page, "keeper"))!;
   await page.mouse.click(k.x, k.y);
@@ -155,7 +193,7 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await expect(keeper).toBeVisible({ timeout: 15_000 });
   await keeper.getByRole("button", { name: "Talk" }).click();
   await expect.poll(async () => (await zebra(page))?.say, { message: "he says a line" }).toMatchObject({ who: "keeper" });
-  expect(["Rye, sourdough, or... the special box?", "Fresh today. Fresh every day. No questions."]).toContain((await zebra(page))!.say!.text);
+  expect(ZEBRA_BACK_LINES).toContain((await zebra(page))!.say!.text);
   await page.keyboard.press("Escape");
 
   // Through the door at the back left: the back room, its own room (dim: the night tone).
@@ -172,48 +210,14 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   for (const f of z1.figs.filter((x) => x.name !== z1.say!.who)) expect(["sitListen", "sitPuff"]).toContain(f.anim);
   await shot(page, "back");
 
-  // The talk beat: walk up to the table's foot, his card (Talk; Challenge greyed until you've talked to him); Talk.
+  // His card at the table's foot: his Challenge alone (Eric, Nov 11: "we don't need the talk button").
   await walkTo(page, [8, 7]);
   const don = page.getByRole("dialog", { name: "Don Dough", exact: true });
   await expect(don).toBeVisible({ timeout: 15_000 });
-  await expect(don.getByRole("button")).toHaveText(["Talk", "Challenge"]);
-  await expect(don.getByRole("button", { name: "Challenge" })).toBeDisabled();
-  await don.getByRole("button", { name: "Talk" }).click();
-  // (His card steps aside so the beat shows; it comes back as the beat ends.)
-  await expect(don).toBeHidden();
-  const steps: string[] = [];
-  const lines: string[] = [];
-  const anims = new Set<string>();
-  const shotsTaken = new Set<string>();
-  await expect
-    .poll(
-      async () => {
-        const z = (await zebra(page))!;
-        if (z.beat && steps[steps.length - 1] !== z.beat) steps.push(z.beat);
-        // (Only the beat's lines: until the scene's next frame starts the beat, the hook can still report the chatter line that was up
-        // as Talk was tapped; from the beat on, the chatter is stopped for good.)
-        if (z.beat && z.say && lines[lines.length - 1] !== z.say.text) lines.push(z.say.text);
-        for (const f of z.figs) if (f.name !== "don") anims.add(f.anim);
-        // (The stills: the crew aiming with Fedora's line; Don waving them down with his.)
-        const still = z.say?.text === ZEBRA_LINES.draw ? "talk-aim" : z.say?.text === ZEBRA_LINES.relax ? "talk-relax" : null;
-        if (SHOTS && still && !shotsTaken.has(still)) {
-          shotsTaken.add(still);
-          await shot(page, still);
-        }
-        return z.beat;
-      },
-      { message: "the talk beat plays through", timeout: 30_000, intervals: [100] },
-    )
-    .toBe("done");
-  expect(steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);
-  expect(lines).toEqual(["Hey! Who let HIM back here?!", "Relax, relax. Put the bread down.", "So. You came to play, or to watch the stream?"]);
-  for (const a of ["standUp", "draw", "aim", "lower", "puff"]) expect([...anims], a).toContain(a);
-  // His card again: Talk done (greyed); Challenge open (his boss is in the game).
-  await expect(don).toBeVisible();
-  await expect(don.getByRole("button", { name: "Talk" })).toBeDisabled();
+  await expect(don.getByRole("button")).toHaveText(["Challenge"]);
   await expect(don.getByRole("button", { name: "Challenge" })).toBeEnabled();
-  await expect(don).not.toContainText("Coming soon");
-  await shot(page, "talk-done");
+  await expect(don).not.toContainText("Talk");
+  await shot(page, "don-card");
   await page.keyboard.press("Escape");
 
   // Back out front: you arrive just inside the back door.
@@ -222,7 +226,18 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   expect(errors).toEqual([]);
 });
 
-test("Rolling Dough: Challenge from Don's card in the back room plays his intro in the front room and starts the battle against Don Dough (admins first)", async ({ page }) => {
+/** The crew's aim at you at (x, y): the scene's rule (zebra-scene.ts aimAt; SHOP_FEEL.zebra.beat), its angle's index and side. */
+const AIM_ANGLES = [0, 10, 20, 30, 40];
+const aimOf = (at: [number, number], x: number, y: number) => {
+  const dx = x - at[0];
+  const deg = (Math.atan2((y - at[1]) * 0.8 + 0.7, Math.max(0.25, Math.abs(dx))) * 180) / Math.PI;
+  let i = 0;
+  for (let k = 1; k < AIM_ANGLES.length; k++) if (Math.abs(AIM_ANGLES[k]! - deg) < Math.abs(AIM_ANGLES[i]! - deg)) i = k;
+  return { i, flip: dx < 0 };
+};
+const CREW: Record<string, [number, number]> = { "crew-c": [5.15, 5.06], "crew-d": [6.15, 5.06], "crew-e": [7.15, 5.06] };
+
+test("Rolling Dough: Challenge plays the beat (the crew aim at you, following you), the walk-out from the back room, the set-up in the front room, and the battle against Don Dough", async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -245,30 +260,90 @@ test("Rolling Dough: Challenge from Don's card in the back room plays his intro 
   await walkTo(page, [8, 7]);
   const don = page.getByRole("dialog", { name: "Don Dough", exact: true });
   await expect(don).toBeVisible({ timeout: 15_000 });
-  // (Challenge opens once you've talked to him: the talk beat first.)
-  await don.getByRole("button", { name: "Talk" }).click();
-  await expect(don).toBeHidden();
-  await expect(don).toBeVisible({ timeout: 30_000 });
-  // (Every frame from here: Beanie's line seen in the intro, and which wipe covers the screen: his bread splash, never the default.)
+  // (Every frame from here, in the page: the back room's walk-out (the set kept, what's carried, who fades through the door), the
+  // front room's goons (where each carrier is first drawn), Beanie's line, and which wipe covers the screen.)
   await page.evaluate(() => {
-    const w = window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean }; __shopIntro?: () => { crewLine?: boolean } | null };
-    w.__zb = { crew: false, storm: false, wipe: false };
+    type Z = { part: string; beat: string | null; say: { text: string } | null; figs: { name: string; anim: string; at: [number, number] }[]; out: { kept: string[]; carried: { item: string; a: number }[] } | null; alpha: Record<string, number> };
+    const w = window as unknown as {
+      __zb: { crew: boolean; storm: boolean; wipe: boolean; outOn: boolean; kept: number[]; carried: string[]; faded: string[]; frontFirst: Record<string, number>; steps: string[]; lines: string[] };
+      __shopIntro?: () => { crewLine?: boolean } | null;
+      __shopZebra?: () => Z | null;
+    };
+    w.__zb = { crew: false, storm: false, wipe: false, outOn: false, kept: [], carried: [], faded: [], frontFirst: {}, steps: [], lines: [] };
     const look = () => {
-      if (w.__shopIntro?.()?.crewLine) w.__zb.crew = true;
-      if (document.querySelector(".boss-storm")) w.__zb.storm = true;
-      if (document.querySelector(".boss-wipe")) w.__zb.wipe = true;
+      const z = w.__shopZebra?.();
+      const b = w.__zb;
+      // (The beat's steps and lines, from its start: until its first frame the hook can still report the chatter line that was up.)
+      if (z?.part === "back" && z.beat && b.steps[b.steps.length - 1] !== z.beat) b.steps.push(z.beat);
+      if (z?.part === "back" && z.beat && z.say && b.lines[b.lines.length - 1] !== z.say.text) b.lines.push(z.say.text);
+      if (z?.part === "back" && z.out) {
+        b.outOn = true;
+        if (b.kept[b.kept.length - 1] !== z.out.kept.length) b.kept.push(z.out.kept.length);
+        for (const q of z.out.carried) if (!b.carried.includes(q.item)) b.carried.push(q.item);
+        for (const [n, a] of Object.entries(z.alpha)) if (a < 1 && !b.faded.includes(n)) b.faded.push(n);
+      }
+      if (z?.part === "front") {
+        for (const f of z.figs) if (f.anim === "carry" && !(f.name in b.frontFirst)) b.frontFirst[f.name] = f.at[1];
+      }
+      if (w.__shopIntro?.()?.crewLine) b.crew = true;
+      if (document.querySelector(".boss-storm")) b.storm = true;
+      if (document.querySelector(".boss-wipe")) b.wipe = true;
       requestAnimationFrame(look);
     };
     requestAnimationFrame(look);
   });
+  // His Challenge: his card steps aside and the beat plays (no other button).
+  await expect(don.getByRole("button")).toHaveText(["Challenge"]);
   await don.getByRole("button", { name: "Challenge" }).click();
-  // (A confirm, where the challenge asks for one.)
-  const fight = page.getByRole("button", { name: "Fight", exact: true });
-  if (await fight.isVisible({ timeout: 3000 }).catch(() => false)) await fight.click();
-  // His intro in the front room, then the battle against him.
+  await expect(don).toBeHidden();
+  // The aim follows you: at the table's foot (east of them) each faces east, his roll at your angle; walk west of them, and each turns
+  // west, his roll at your new angle.
+  const aiming = async (want: "east" | "west") => {
+    const z = (await zebra(page))!;
+    const out: string[] = [];
+    for (const [n, at] of Object.entries(CREW)) {
+      const f = z.figs.find((x) => x.name === n)!;
+      const a = aimOf(at, z.you[0], z.you[1]);
+      const ok = f.anim === "aimAt" && Math.floor(f.frame / 8) === a.i && f.flip === a.flip && f.flip === (want === "west");
+      out.push(ok ? "ok" : `${n} ${f.anim} ${f.frame} ${f.flip} (want ${a.i * 8}+ ${a.flip})`);
+    }
+    return out.join(", ");
+  };
+  await expect.poll(() => aiming("east"), { message: "they aim at you at the table's foot", timeout: 8000, intervals: [100] }).toBe("ok, ok, ok");
+  await shot(page, "aim-east");
+  await walkTo(page, [4, 8]);
+  await expect.poll(() => aiming("west"), { message: "they turn and aim at you by the door", timeout: 3000, intervals: [100] }).toBe("ok, ok, ok");
+  await shot(page, "aim-west");
+  // The rest of the beat: Don's "Relax", they lower, his challenge line; then the walk-out (you're walked out of the door last).
+  await expect.poll(async () => (await zebra(page))?.beat, { message: "the beat plays through", timeout: 20_000 }).toBe("done");
+  await expect.poll(async () => (await zebra(page))?.out?.kept.length ?? -1, { message: "the walk-out starts" }).toBeGreaterThanOrEqual(0);
+  // (The stills, and for the GIF a frame every 250 ms, until the room changes.)
+  for (let k = 0; SHOTS && k < 40; k++) {
+    if ((await room(page).getAttribute("data-part")) !== "back") break;
+    await page.screenshot({ path: `${SHOTS}/out-${String(k).padStart(2, "0")}-${test.info().project.name}.png` });
+    await page.waitForTimeout(150);
+  }
+  // Through the door: the front room, the challenge (its set-up, his intro), then the battle.
+  await expect(room(page)).not.toHaveAttribute("data-part", /./, { timeout: 20_000 });
+  await page.waitForTimeout(1200);
+  await shot(page, "front-setup");
   await expect(page.getByRole("status", { name: /^Don Dough, threat/ }), "the battle against Don Dough").toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
   await shot(page, "challenge-battle");
-  expect(await page.evaluate(() => (window as unknown as { __zb: unknown }).__zb), "Beanie's line, then his bread splash as the wipe").toEqual({ crew: true, storm: true, wipe: false });
+  const zb = await page.evaluate(() => (window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean; outOn: boolean; kept: number[]; carried: string[]; faded: string[]; frontFirst: Record<string, number>; steps: string[]; lines: string[] } }).__zb);
+  // The beat, in order: they stand, draw and aim with Fedora's line, Don's "Relax", they lower, his challenge line.
+  expect(zb.steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);
+  expect(zb.lines).toEqual([ZEBRA_LINES.draw, ZEBRA_LINES.relax, ZEBRA_LINES.challenge]);
+  // The walk-out: all four kept in the back room, picked up one by one, each carried, every goon and Don fading out through the door.
+  expect(zb.outOn).toBe(true);
+  expect(zb.kept[0]).toBe(4);
+  expect(zb.kept[zb.kept.length - 1]).toBe(0);
+  expect([...zb.kept].sort((a, b) => b - a)).toEqual(zb.kept);
+  expect([...zb.carried].sort()).toEqual(["board", "bossChair", "table", "youChair"]);
+  expect([...zb.faded].sort()).toEqual(["crew-c", "crew-d", "crew-e", "don", "guard-a"]);
+  // The front room: each carrier first drawn behind the back door (row 6), coming through it: nobody pops in.
+  expect(Object.keys(zb.frontFirst).sort()).toEqual(["crew-c", "crew-d", "crew-e", "guard-a"]);
+  for (const [n, r] of Object.entries(zb.frontFirst)) expect(r, n).toBeLessThan(6);
+  expect({ crew: zb.crew, storm: zb.storm, wipe: zb.wipe }, "Beanie's line, then his bread splash as the wipe").toEqual({ crew: true, storm: true, wipe: false });
   expect(errors).toEqual([]);
 });

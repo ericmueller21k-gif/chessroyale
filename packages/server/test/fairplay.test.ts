@@ -225,6 +225,29 @@ describe("fair-play records", () => {
     }
   });
 
+  it("sustained strength rests on the judges' numbers alone (the review of #629, m1): under \"ban\" it opens a review, never a ban; under \"pool\" it pools", async () => {
+    const run = async (mode: string) => {
+      const saved = FAIRPLAY.enforcement;
+      (FAIRPLAY as { enforcement: string }).enforcement = mode;
+      try {
+        const { sql } = memoryDb();
+        await ensureSchema(sql);
+        const p = await player(sql, "Strong");
+        const sent: string[] = [];
+        let r: Awaited<ReturnType<typeof recordFairPlay>> | null = null;
+        // Five matches of 20 counted moves, each a strength past 3,000, none deep-checked (so neither deep path can fire).
+        for (let i = 0; i < 5; i++) r = await recordFairPlay(sql, p.id, { lobby: `AAAA${"ABCDE"[i]}`, mode: "crowd", moves: picks(20, true) }, 50 * DAY + i * 3_600_000, async (_u, kind) => void sent.push(kind));
+        expect(r!.verdict).toMatchObject({ level: "ban", path: "strength", reasons: [expect.stringMatching(/^strength: /)] });
+        const last = await sql.first<{ reason: string }>("SELECT reason FROM fairplay_log WHERE user_id = ? ORDER BY id DESC LIMIT 1", p.id);
+        return { acted: r!.acted, status: (await caseOf(sql, p.id))?.status, banned: sent.includes("banned"), last: last?.reason };
+      } finally {
+        (FAIRPLAY as { enforcement: string }).enforcement = saved;
+      }
+    };
+    expect(await run("ban")).toEqual({ acted: "review", status: "review", banned: false, last: expect.stringMatching(/^level ban \(sustained strength\), reviewed instead: strength: /) });
+    expect(await run("pool")).toMatchObject({ acted: "pool", status: "pool", banned: false, last: expect.stringMatching(/^level ban: strength: /) });
+  });
+
   it("a report after a match keeps that match's evidence the full 30 days; old evidence goes unless the case is open", async () => {
     const { sql } = memoryDb();
     await ensureSchema(sql);

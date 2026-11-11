@@ -322,7 +322,8 @@ const trimmed = (src: HTMLCanvasElement): HTMLCanvasElement => {
   return c;
 };
 /** A picture's third (0 the left square, 1 the middle, 2 the right), as a canvas of its own. */
-const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
+/** A third of a table's picture (0: a stool, 1: the leg): Rolling Dough's back room cuts its kept set the same way. */
+export const third = (img: HTMLCanvasElement, i: number): HTMLCanvasElement => {
   const w = Math.round(img.width / 3);
   const c = canvasOf(w, img.height);
   c.getContext("2d")!.drawImage(img, i * w, 0, w, img.height, 0, 0, w, img.height);
