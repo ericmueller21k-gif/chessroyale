@@ -5210,12 +5210,6 @@ button.history-label {
   opacity: 0.9;
   font-variant-numeric: tabular-nums;
 }
-.boss-loading-first {
-  max-width: 250px;
-  font-size: 12px;
-  line-height: 1.35;
-  opacity: 0.8;
-}
 .boss-loading-leave {
   margin-top: 4px;
 }
