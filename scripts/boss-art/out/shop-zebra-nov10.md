@@ -9,6 +9,8 @@ app code was changed. Drawn by hand in code on the weekly plan usage (no API spe
   scoring slashes, boule, roll, croissant, tin loaf, braid), tiny chess pieces, board sketches, arrows. Copy it beside the art in the game.
 - The zebras are the other session's (`out/crew-zebra`, `out/boss-zebra`), placed here; the counter zebra is a stand-in (a call, below).
 - The chatter, its checks and the talk beat's lines: [zebra-chatter-nov10.md](zebra-chatter-nov10.md).
+- Don Dough's opening comments (a line per family, 3 or 4 moves in) and his Rising Dough and Gold Plate lines:
+  [zebra-openings-nov10.md](zebra-openings-nov10.md).
 - The mockups: `npx tsx scripts/boss-art/bakery-view.ts stills <dir>` and `... gif <out.gif>` (the town's camera, as `shop-view.ts`;
   the ceilings, the town ground round the bakery and the computer's side panels are the mockup's own).
 
@@ -173,7 +175,7 @@ the doorway's warm spill. The room is dim (the mockup washes it about 36 % dark 
 | `peek` | HOUSE_ZEBRA f4 | a blind slat's flick |
 
 ## Calls for Eric
-1. **The name** (the game writes it on the sign): **Rolling Dough** (dough is money: the mockup shows this one), **The Family Bakery**,
+1. **The bakery's name** (the game writes it on the sign; the kingpin is Don Dough, Eric, Nov 11): **Rolling Dough** (dough is money: the mockup shows this one), **The Family Bakery**,
    or **Totally Normal Bakery**.
 2. **The counter zebra:** none of the five drawn crew stands there (two guard the door, three sit at the table). Either a **sixth zebra**
    in a paper cap and apron (the stills' stand-in, from the crew rig), or **guard B** (paper cap, apron) moves behind the counter and only

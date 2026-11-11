@@ -29,6 +29,8 @@ interface Check {
   compare?: { better: string; worse: string; by: number; say: string };
   /** A pawn or piece of the side to move that "hangs" after the line: attacked by the side that just moved, defended by nobody. */
   hangs?: string;
+  /** "X hits Y": after the line, the piece on each first square attacks the second square. */
+  attacks?: [string, string][];
 }
 
 const CHECKS: Check[] = [
@@ -122,6 +124,39 @@ const CHECKS: Check[] = [
     evals: [{ lo: 0.9, hi: 1, at: 0, say: "king and pawn (Ke1, e2 against Ke8): White to move wins" }],
     compare: { better: "Kd2", worse: "e4", by: 0.3, say: "the king first (Kd2) wins; the pawn first (e4) lets Black take the opposition: a draw" },
   },
+  // ---- Don Dough's opening comments (zebra-openings-nov10.md): each family's sample line, its name, and its concrete claims.
+  { id: "op-italian", san: "e4 e5 Nf3 Nc6 Bc4", name: "Italian Game", attacks: [["c4", "f7"]] },
+  { id: "op-italian-slow", san: "e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3", name: "Italian Game" },
+  { id: "op-ruy", san: "e4 e5 Nf3 Nc6 Bb5", name: "Ruy Lopez", attacks: [["b5", "c6"], ["c6", "e5"]] },
+  { id: "op-scotch", san: "e4 e5 Nf3 Nc6 d4 exd4 Nxd4", name: "Scotch Game" },
+  {
+    id: "op-petrov",
+    san: "e4 e5 Nf3 Nf6 Nxe5",
+    name: "Petrov",
+    compare: { better: "d6", worse: "Nxe4", by: 0.03, say: "3...d6 first; copying with 3...Nxe4 scores worse (4.Qe2)" },
+  },
+  { id: "op-petrov-qe2", san: "e4 e5 Nf3 Nf6 Nxe5 Nxe4 Qe2", attacks: [["e2", "e4"]] },
+  { id: "op-kings-gambit", san: "e4 e5 f4 exf4 Nf3 g5", name: "King's Gambit Accepted" },
+  { id: "op-sicilian", san: "e4 c5", name: "Sicilian Defense", attacks: [["c5", "d4"]] },
+  { id: "op-open-sicilian", san: "e4 c5 Nf3 d6 d4 cxd4", name: "Sicilian Defense" },
+  { id: "op-french", san: "e4 e6 d4 d5", name: "French Defense" },
+  { id: "op-caro", san: "e4 c6 d4 d5", name: "Caro-Kann", attacks: [["c6", "d5"]] },
+  { id: "op-scandinavian", san: "e4 d5 exd5 Qxd5 Nc3", name: "Scandinavian Defense", attacks: [["c3", "d5"]] },
+  { id: "op-pirc", san: "e4 d6 d4 Nf6 Nc3 g6", name: "Pirc Defense" },
+  { id: "op-modern", san: "e4 g6 d4 Bg7", name: "Modern Defense", attacks: [["g7", "d4"]] },
+  { id: "op-alekhine", san: "e4 Nf6 e5 Nd5 c4 Nb6 d4", name: "Alekhine", attacks: [["d4", "e5"]] },
+  { id: "op-alekhine-chase", san: "e4 Nf6 e5 Nd5 c4", name: "Alekhine", attacks: [["c4", "d5"]] },
+  { id: "op-qgd", san: "d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7", name: "Queen's Gambit Declined" },
+  { id: "op-qga", san: "d4 d5 c4 dxc4", name: "Queen's Gambit Accepted" },
+  { id: "op-slav", san: "d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5", name: "Slav", attacks: [["c6", "d5"]] },
+  { id: "op-london", san: "d4 d5 Nf3 Nf6 Bf4 c5 e3 Nc6 c3 Qb6", name: "London", hangs: "b2" },
+  { id: "op-kid", san: "d4 Nf6 c4 g6 Nc3 Bg7 e4 d6", name: "King's Indian" },
+  { id: "op-nimzo", san: "d4 Nf6 c4 e6 Nc3 Bb4", name: "Nimzo-Indian", attacks: [["b4", "c3"]] },
+  { id: "op-qid", san: "d4 Nf6 c4 e6 Nf3 b6 g3 Bb7", name: "Queen's Indian", attacks: [["b7", "e4"]] },
+  { id: "op-dutch", san: "d4 f5", name: "Dutch Defense", attacks: [["f5", "e4"]] },
+  { id: "op-stonewall", san: "d4 f5 c4 Nf6 g3 e6 Bg2 d5 Nf3 c6", name: "Dutch" },
+  { id: "op-english", san: "c4 e5", name: "English Opening" },
+  { id: "op-reti", san: "Nf3 d5 c4", name: "Réti Opening", attacks: [["c4", "d5"]] },
 ];
 
 const engine = await createNodeEngine({ nodes: NODES, hashMb: 64 }, STOCKFISH_FULL_BUILD);
@@ -188,6 +223,12 @@ for (const c of CHECKS) {
     const pass = g.get(sq)?.color === mover && g.isAttacked(sq, other) && !g.isAttacked(sq, mover);
     if (!pass) ok = false;
     notes.push(`hangs ${pass ? "ok" : "FAILS"}: ${c.hangs} (the side to move's) attacked, defended by nobody`);
+  }
+  for (const [from, to] of c.attacks ?? []) {
+    const p = g.get(from as Parameters<Chess["get"]>[0]);
+    const pass = !!p && g.attackers(to as Parameters<Chess["get"]>[0], p.color).includes(from as Parameters<Chess["get"]>[0]);
+    if (!pass) ok = false;
+    notes.push(`attacks ${pass ? "ok" : "FAILS"}: ${from} hits ${to}`);
   }
   if (!ok) bad++;
   console.log(`${ok ? "PASS" : "FAIL"} ${c.id}: ${notes.join("; ")}`);
