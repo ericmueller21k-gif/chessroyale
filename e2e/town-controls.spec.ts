@@ -401,9 +401,9 @@ test("the minimap: on by default at the top right, your dot moving with you and 
   expect(Math.abs(bb.x + bb.width / 2 - (tb.x + tb.width / 2)), "in the middle across").toBeLessThan(2);
   expect(Math.abs(bb.y + bb.height / 2 - (tb.y + tb.height / 2)), "in the middle down").toBeLessThan(2);
   const faces = page.locator(".tm-face");
-  await expect(faces).toHaveCount(16);
+  await expect(faces).toHaveCount(17);
   const ids = await faces.evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.home));
-  expect(new Set(ids).size).toBe(16);
+  expect(new Set(ids).size).toBe(17);
   // (Each portrait drawn: some of its pixels not blank.)
   const drawn = await faces.evaluateAll((els) =>
     els.filter((e) => {
@@ -413,7 +413,7 @@ test("the minimap: on by default at the top right, your dot moving with you and 
       return false;
     }).length,
   );
-  expect(drawn, "every portrait drawn").toBe(16);
+  expect(drawn, "every portrait drawn").toBe(17);
   await expect(page.locator(".tm-big [data-icon=park]")).toHaveCount(1);
   await expect(page.locator(".tm-big [data-icon=colosseum]")).toHaveCount(1);
   await expect(page.locator(".tm-big .tm-you")).toHaveCount(1);
