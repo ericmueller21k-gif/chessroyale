@@ -169,6 +169,10 @@ describe("Rising Dough: what and where", () => {
     const kinds = new Set<string>();
     for (let n = 0; n < 400; n++) kinds.add(doughKind(QUIET_W, "b", 5, n)!);
     expect([...kinds].sort()).toEqual(S.doughQueenFree ? ["p", "q"] : ["p"]);
+    // (A queen's no more often than the odds give it: the kinds he can't have step down to a pawn's, not to a queen's.)
+    let q = 0;
+    for (let n = 0; n < 2000; n++) if (doughKind(QUIET_W, "b", 7, n) === "q") q++;
+    expect(q / 2000).toBeLessThan(S.doughOdds.q * 2);
     const reach = new Set(legalMoves(QUIET_W).map((m) => m.slice(2, 4)));
     let reached = 0;
     for (let n = 0; n < 60; n++) if (reach.has(doughSquare(QUIET_W, "p", 9, n, [], { ...S, doughReach: "any" })!)) reached++;

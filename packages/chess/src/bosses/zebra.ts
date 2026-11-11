@@ -92,22 +92,29 @@ const rollIn = (seed: number, range: readonly [number, number], ...parts: (strin
 // ---------------- Rising Dough ----------------
 
 /**
- * The kind of his `n`-th lump (`fen`: any position; `his`: his side): doughOdds over the kinds he can have now (landRefused:
- * never a ninth pawn, never more pieces than promotions could make), from the seed. Null: none he can have.
+ * The kind of his `n`-th lump (`fen`: any position; `his`: his side): rolled from doughOdds over every kind (so a rook's and a queen's
+ * stay as rare as the odds say), from the seed; one he can't have now (a ninth pawn, more pieces than promotions could make, or past
+ * doughLeadMax pawns ahead of you on material, a queen's excepted with doughQueenFree) steps down to the next cheaper one he can
+ * (a rook's to a bishop's or knight's, then a pawn's). Null: none.
  */
 export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax" | "doughQueenFree"> = BOSS_POWERS): DoughPiece | null {
   // (Never one that would put him more than doughLeadMax pawns ahead of you on material.)
   const room = materialOf(fen, other(his)) + s.doughLeadMax - materialOf(fen, his);
-  // (A queen's, rare, whatever the lead: doughQueenFree.)
-  const open = DOUGH_PIECES.filter((k) => s.doughOdds[k] > 0 && (VALUE[k]! <= room || (k === "q" && s.doughQueenFree)) && !landRefused(fen, k, his));
-  const total = open.reduce((t, k) => t + s.doughOdds[k], 0);
+  const ok = (k: DoughPiece) => s.doughOdds[k] > 0 && (VALUE[k]! <= room || (k === "q" && s.doughQueenFree)) && !landRefused(fen, k, his);
+  const total = DOUGH_PIECES.reduce((t, k) => t + s.doughOdds[k], 0);
   if (!total) return null;
   let x = powerRoll(seed, "doughKind", n) * total;
-  for (const k of open) {
+  let rolled: DoughPiece = DOUGH_PIECES[DOUGH_PIECES.length - 1]!;
+  for (const k of DOUGH_PIECES) {
     x -= s.doughOdds[k];
-    if (x < 0) return k;
+    if (x < 0) {
+      rolled = k;
+      break;
+    }
   }
-  return open[open.length - 1]!;
+  // (Down from the one rolled, cheapest last: queen, rook, then the minor pieces (the one rolled first), then a pawn.)
+  const down: Record<DoughPiece, DoughPiece[]> = { q: ["q", "r", "b", "n", "p"], r: ["r", "b", "n", "p"], b: ["b", "n", "p"], n: ["n", "b", "p"], p: ["p"] };
+  return down[rolled].find(ok) ?? null;
 }
 
 /** How far a square is from his back rank (0 on it, 7 on yours). */
