@@ -108,6 +108,13 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
 
 ## Performance: nothing may grow with the match
 
+- **Uploads that waited for the GPU, and an atlas that never gave room back** (Nov 11, [story](../docs/history/lessons.md#uploads-that-waited-for-the-gpu-and-an-atlas-that-never-gave-room-back-nov-11-2026)):
+  - A canvas WebGL uploads is drawn in memory (`art2d`: `willReadFrequently`), never on the GPU: uploading a GPU canvas waits for the
+    GPU to finish the frame (30 to 120 ms each).
+  - An atlas that hands out room must get it back, or start pages again knowingly. Letting a picture go without its room only fills
+    the atlas for the next reset.
+  - Measure on a device: a headless frame report can miss what costs a phone (Eric's iPhone run found both).
+
 - **Lag that grows with the match** (Oct 9, [story](../docs/history/lessons.md#lag-that-grows-with-the-match-oct-9-2026)):
   - Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
     looks like a field gets read dozens of times a frame, so it must never rebuild anything.

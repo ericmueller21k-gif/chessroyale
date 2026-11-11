@@ -49,7 +49,7 @@ type Hooks = {
 async function openStreet(page: Page, query = "") {
   await asAdmin(page);
   await page.goto(`/town?sky=day${query}`);
-  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
   await expect(canvas(page)).toHaveAttribute("data-backend", "webgl");
 }
 
@@ -326,5 +326,59 @@ test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of 
   // Close: the panel goes; the town goes on.
   await panel.getByRole("button", { name: "Close" }).click();
   await expect(panel).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test("the town's loading screen (Eric, Nov 11: \"loads it all in at once and then it stays there\"): its bar fills and goes, then walking and a full turn paint nothing new and start no atlas page again", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; summary: { frames: number; bakes: number; resets: number } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean; __townPaint: () => { loading: boolean; resets: number; atlas: { kept: number; keptPages: number; unkept: number } } };
+  const errors = watchErrors(page);
+  const bar = page.locator(".town-loading").getByRole("progressbar", { name: "Building the town" });
+  // The bar's share as it shows (sampled every frame until it goes): it only goes up.
+  await page.addInitScript(() => {
+    const seen: number[] = ((window as unknown as { __bar: number[] }).__bar = []);
+    const f = () => {
+      const v = document.querySelector(".town-loading [role=progressbar]")?.getAttribute("aria-valuenow");
+      if (v !== null && v !== undefined) seen.push(Number(v));
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await asAdmin(page);
+  await page.goto("/town?sky=day&report");
+  await expect(bar).toBeVisible({ timeout: 30_000 });
+  await expect(canvas(page)).toHaveAttribute("data-ready", "1", { timeout: 40_000 });
+  await expect(page.locator(".town-loading")).toHaveCount(0);
+  const shares = await page.evaluate(() => (window as unknown as { __bar: number[] }).__bar);
+  expect(shares.length, "the bar showed").toBeGreaterThan(0);
+  expect(shares.every((v, i) => i === 0 || v >= shares[i - 1]!), `the bar only goes up: ${shares.join(",")}`).toBe(true);
+  const paint = await page.evaluate(() => (window as unknown as R).__townPaint());
+  expect(paint.loading).toBe(false);
+  expect(paint.atlas.kept, "the town's pictures kept").toBeGreaterThan(1000);
+  expect(paint.atlas.unkept, "all of them").toBe(0);
+  // Walking, then a full turn on the spot (360° in about 2 s): nothing painted, no page started again.
+  await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const w = window as unknown as R & { __spin?: boolean };
+    let h = 0;
+    let last = performance.now();
+    w.__spin = true;
+    const f = (now: number) => {
+      if (!w.__spin) return;
+      h += (180 * (now - last)) / 1000;
+      last = now;
+      w.__townHeading(h);
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await page.waitForTimeout(2200);
+  await page.locator(".tfr-pill").getByRole("button", { name: "Done" }).click();
+  await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
+  const s = (await page.evaluate(() => (window as unknown as R).__townReport()))!.summary!;
+  expect(s.frames, "frames recorded").toBeGreaterThan(10);
+  expect(s.bakes, "pictures painted after the loading screen").toBe(0);
+  expect(s.resets, "atlas pages started again").toBe(0);
+  expect((await page.evaluate(() => (window as unknown as R).__townPaint())).resets).toBe(0);
   expect(errors).toEqual([]);
 });

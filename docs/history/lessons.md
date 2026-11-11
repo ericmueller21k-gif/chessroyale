@@ -927,3 +927,20 @@ failed. `?win=1` passed for all 14.
 
 **The fix:** the spec names Hollow (as `king-attack` and `shop` already do), and the switch's comment in settings.ts
 says which bosses it can't mate at once. docs/decisions/2026-11-09-boss-result-red.md.
+
+## Uploads that waited for the GPU, and an atlas that never gave room back (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone 14 Plus. Warm: 4,353 uploads and 12 atlas resets in 28 s, most of the frame "Outside
+our code". Cold: frames up to 259 ms while turning, painting and uploading.
+
+**The cause:** two things. (1) The town's 2D pictures (tags, signs, the bubble, text) were canvases the browser drew on the GPU.
+Uploading one to WebGL first waits for the GPU to finish what it's drawing: 30 to 120 ms an upload, headless. (2) The atlas only got
+room back by starting a whole page again. A picture the sweep let go, or one that changed size, kept its old room, so the 6 pages
+filled and reset over and over, and everything on them was uploaded again.
+
+**How it was found:** each upload timed by where it came from, headless, once the loading screen had taken painting out of the
+picture.
+
+**The fix:** the town's pictures are painted and uploaded once, on a loading screen, onto an atlas sized for them. Only 2 spare pages
+start again. The town's 2D pictures are made in memory (`art2d`). docs/decisions/2026-11-11-town-loading.md.
+

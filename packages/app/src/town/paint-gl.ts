@@ -33,6 +33,7 @@
 import { REC } from "./frame-report.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
+import { art2d, artInMemory } from "./paint.ts";
 
 /** Floats a vertex: x, y, u, v, color (rgba8), flags (u32), p0 to p5. */
 const VF = 12;
@@ -40,10 +41,19 @@ const PAGE = 2048;
 /** A picture bigger than this either way gets a texture of its own. */
 const BIG = 1024;
 const PAD = 2;
-/** Atlas pages at most (the array texture grows two at a time up to this; layer 7 is the shader's "a texture of its own"). */
-const MAX_PAGES = 6;
+/**
+ * The atlas (Nov 11, the town's loading screen): one array texture of 2048 px pages (16 MB a page). Its kept pages hold the pictures
+ * the loading screen keeps (`keep`, `kept`): made once as deep as they need, never started again. The rest (SPARE pages) hold whatever's
+ * drawn later (tags, boards, the bubble, signs, text, figures dressed later), the least lately drawn of them started again when full.
+ * Until the loading screen has run: up to DEFAULT_PAGES, growing two at a time. At most MAX_PAGES.
+ */
+const DEFAULT_PAGES = 6;
+const SPARE = 2;
+const MAX_PAGES = 48;
+/** The shader's slot for "a texture of its own" (a light layer, a big picture); an atlas page's is its layer. */
+const OWN = 127;
 
-// Flags: mode (bits 0-2), texture slot (3-5), smooth (6), composite (7-8), haze (16-23).
+// Flags: mode (bits 0-2), smooth (6), composite (7-8), texture slot (9-15), haze (16-23).
 const M_SOLID = 0;
 const M_TEX = 1;
 const M_SOFTLINE = 2;
@@ -87,7 +97,7 @@ const fsFor = (tex: boolean, soft: boolean) => `#version 300 es
 #define SOFT ${soft ? 1 : 0}
 precision highp float;
 precision highp int;
-// The atlas pages (layers 0 to 6 of one array texture) and one texture of its own (layer 7: a light layer, a big picture).
+// The atlas's pages (layers of one array texture) and one texture of its own (slot 127: a light layer, a big picture).
 uniform highp sampler2DArray A;
 uniform sampler2D T;
 uniform vec2 u_tsize;
@@ -98,11 +108,11 @@ in vec4 v_p0;
 in vec2 v_p1;
 out vec4 o;
 vec4 smoothAt(uint s, vec2 uv) {
-  return s == 7u ? texture(T, uv) : texture(A, vec3(uv, float(s)));
+  return s == ${OWN}u ? texture(T, uv) : texture(A, vec3(uv, float(s)));
 }
 // Nearest: the middle of the texel under uv (what NEAREST picks; smooth sampling there reads that texel alone).
 vec2 nearUv(uint s, vec2 uv) {
-  vec2 n = s == 7u ? u_tsize : vec2(${PAGE}.0);
+  vec2 n = s == ${OWN}u ? u_tsize : vec2(${PAGE}.0);
   return (floor(uv * n) + 0.5) / n;
 }
 float erf1(float x) {
@@ -120,7 +130,7 @@ vec4 scratch(uint s, vec2 j) {
 }
 void main() {
   uint mode = v_flags & 7u;
-  uint slot = (v_flags >> 3u) & 7u; // (the texture: an atlas page's layer, or 7)
+  uint slot = (v_flags >> 9u) & 127u; // (the texture: an atlas page's layer, or OWN)
   bool smoothed = ((v_flags >> 6u) & 1u) == 1u;
   uint comp = (v_flags >> 7u) & 3u;
   // (Mode 0, solid: the color.)
@@ -176,7 +186,7 @@ interface Tex {
   h: number;
   /** A light layer's: its stream (drawn before the canvas draws the layer). */
   stream: Stream | null;
-  /** An atlas page's layer in the array (0 to MAX_PAGES - 1); -1: a texture of its own. */
+  /** An atlas page's layer in the array (0 to MAX_PAGES - 1); -1: a texture of its own (the shader's OWN). */
   layer: number;
 }
 
@@ -187,6 +197,8 @@ interface Page {
   top: number;
   used: number;
   entries: Entry[];
+  /** It holds the loading screen's kept pictures (`kept`): never started again. */
+  kept: boolean;
 }
 
 /** A source picture's place in the textures: which, where (texels), uploaded in which generation, and whether it changed. */
@@ -201,6 +213,8 @@ interface Entry {
   gen: number;
   dirty: boolean;
   used: number;
+  /** Kept for good (`keep`): never let go by the sweep, its page never started again. */
+  kept: boolean;
 }
 
 /** A target's recorded triangles: its vertices, how many, whether they read the atlas, and the texture of its own they read (one a draw). */
@@ -371,9 +385,45 @@ export function painterGL(cv: HTMLCanvasElement, onLost: (lost: boolean) => void
   }
   if (!gl) return "no-context";
   const p = new GLPainter(cv, gl, onLost);
-  if (p.init()) return p;
+  if (p.init()) {
+    artInMemory();
+    return p;
+  }
   p.dispose(); // (its context goes now: Town.tsx draws on a new canvas)
   return "shader";
+}
+
+/** A picture's size as it is now (its source's; an entry not yet placed has none of its own). */
+const wOf = (e: Entry) => (e.src as HTMLCanvasElement).width;
+const hOf = (e: Entry) => (e.src as HTMLCanvasElement).height;
+/**
+ * The shelf on `pg` a W x H picture (padding included) goes on: one as tall or up to half as tall again with room left, or a new one
+ * under the others; null if the page is full. `dry`: only says whether it would fit (nothing taken).
+ */
+function fitShelf(pg: { shelves: { y: number; h: number; x: number }[]; top: number }, W: number, H: number, dry = false): { y: number; h: number; x: number } | null {
+  const s = pg.shelves.find((sh) => sh.h >= H && sh.h <= H * 1.5 + 8 && PAGE - sh.x >= W);
+  if (s) return s;
+  if (pg.top + H > PAGE) return null;
+  if (dry) return { y: pg.top, h: H, x: 0 };
+  const n = { y: pg.top, h: H, x: 0 };
+  pg.shelves.push(n);
+  pg.top += H;
+  return n;
+}
+/** (Pure: tests) How many pages pictures of these sizes (padding included), placed in this order, take. */
+export function countPages(sizes: readonly (readonly [number, number])[]): number {
+  const pages: { shelves: { y: number; h: number; x: number }[]; top: number }[] = [];
+  for (const [W, H] of sizes) {
+    let s = null;
+    for (const pg of pages) if ((s = fitShelf(pg, W, H))) break;
+    if (!s) {
+      const pg = { shelves: [], top: 0 };
+      pages.push(pg);
+      s = fitShelf(pg, W, H);
+    }
+    if (s) s.x += W;
+  }
+  return pages.length;
 }
 
 class GLPainter implements Painter {
@@ -396,15 +446,16 @@ class GLPainter implements Painter {
   private vbo: WebGLBuffer | null = null;
   private vboSize = 0;
   private sLinear: WebGLSampler | null = null;
-  /** The atlas: one array texture, `cap` pages deep; and a blank texture for "none of its own". */
+  /** The atlas: one array texture, `cap` pages deep (up to `limit`), its pages; and a blank texture for "none of its own". */
   private atlas: WebGLTexture | null = null;
   private cap = 0;
+  private limit = DEFAULT_PAGES;
+  private pages: Page[] = [];
   private dummy: WebGLTexture | null = null;
   private readFb: WebGLFramebuffer | null = null;
   readonly main: Stream = newStream(null, -1);
   private readonly reg = new WeakMap<object, Entry>();
   private readonly live: Entry[] = [];
-  private pages: Page[] = [];
   /** The light layers' textures, by the stand-in each one's `src` is. */
   private readonly layers = new Map<object, { tex: Tex; fb: WebGLFramebuffer | null; stream: Stream; g: GLCtx }>();
   /** The same, as a list (walked every frame: no iterator made). */
@@ -418,7 +469,6 @@ class GLPainter implements Painter {
   private readonly onRestoredEv = () => {
     this.lost = false;
     this.gen++;
-    this.pages = [];
     this.init();
     // (The layers' textures and framebuffers, made again at their sizes, clear.)
     for (const l of this.layerList) {
@@ -499,6 +549,7 @@ class GLPainter implements Painter {
     gl.bindSampler(1, this.sLinear);
     this.atlas = null;
     this.cap = 0;
+    this.pages = [];
     this.dummy = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, this.dummy);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -589,6 +640,69 @@ class GLPainter implements Painter {
     if (e) e.dirty = true;
   }
 
+  /**
+   * The town's loading screen (Nov 11): `src` uploaded now and kept for good: the sweep never lets it go and its atlas page is
+   * never started again, so nothing kept is uploaded twice (unless it changes, or the context is lost). Pictures drawn later
+   * (tags, boards, bubbles) go on pages of their own, which start again when full.
+   */
+  keep(src: CanvasImageSource): void {
+    if (this.lost || this.layers.has(src)) return;
+    const e = this.entryOf(src);
+    if (e.kept) return;
+    e.kept = true;
+    this.keepQ.push(e);
+  }
+  /** Pictures `keep` was handed, waiting for `kept`; and how far `kept` has come through them (-1: not started). */
+  private keepQ: Entry[] = [];
+  private keepAt = -1;
+  /** (`stats`) Pictures `keep` was handed that didn't fit in MAX_PAGES (drawn and let go as before, on the spare pages). */
+  private unkept = 0;
+
+  /**
+   * Uploads the pictures `keep` was handed, a slice at a time (up to `budgetMs`): the first call sorts them tallest first (the shelves
+   * fill), works out the pages they need, and makes the atlas that deep plus SPARE, once (no page copied as it grows). Says how much is
+   * done (0 to 1).
+   */
+  kept(budgetMs: number): number {
+    const q = this.keepQ;
+    if (this.lost) return 1;
+    if (this.keepAt < 0) {
+      q.sort((a, b) => hOf(b) - hOf(a) || wOf(b) - wOf(a));
+      const need = countPages(q.map((e) => [wOf(e) + 2 * PAD, hOf(e) + 2 * PAD] as const).filter(([w, h]) => w > 2 * PAD && w - 2 * PAD <= BIG && h - 2 * PAD <= BIG));
+      const room = Math.min(MAX_PAGES, this.gl.getParameter(this.gl.MAX_ARRAY_TEXTURE_LAYERS) as number);
+      this.limit = Math.max(this.limit, Math.min(room, this.pages.length + need + SPARE));
+      this.grow(this.limit);
+      this.keepAt = 0;
+    }
+    const t0 = performance.now();
+    while (this.keepAt < q.length) {
+      const e = q[this.keepAt++]!;
+      this.entry(e.src as CanvasImageSource);
+      // (One that didn't fit the kept pages went on a spare one: not kept.)
+      if (e.page && !e.page.kept) {
+        e.kept = false;
+        this.unkept++;
+      }
+      if (performance.now() - t0 > budgetMs) break;
+    }
+    if (this.keepAt >= q.length) {
+      this.keepQ = [];
+      this.keepAt = -1;
+      return 1;
+    }
+    return this.keepAt / q.length;
+  }
+
+  private entryOf(src: CanvasImageSource): Entry {
+    let e = this.reg.get(src);
+    if (!e) {
+      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, dirty: true, used: 0, kept: false };
+      this.reg.set(src, e);
+      this.live.push(e);
+    }
+    return e;
+  }
+
   /** The texture (and the place in it) for `src`, uploaded if it's new, changed or lost; null for an empty picture. */
   entry(src: CanvasImageSource): Entry | Tex | null {
     const l = this.layers.get(src);
@@ -596,12 +710,7 @@ class GLPainter implements Painter {
       if (!l.tex.t) this.layerTex(l);
       return l.tex;
     }
-    let e = this.reg.get(src);
-    if (!e) {
-      e = { src, tex: null, page: null, x: 0, y: 0, w: 0, h: 0, gen: 0, dirty: true, used: 0 };
-      this.reg.set(src, e);
-      this.live.push(e);
-    }
+    const e = this.entryOf(src);
     e.used = this.frameNo;
     if (e.dirty || e.gen !== this.gen || !e.tex) this.upload(e, src);
     if (e.page) e.page.used = this.frameNo;
@@ -654,16 +763,26 @@ class GLPainter implements Painter {
     if (e.tex && !e.page && e.tex.t) gl.deleteTexture(e.tex.t);
     const W = w + 2 * PAD;
     const H = h + 2 * PAD;
-    for (const pg of this.pages) if (this.shelf(pg, e, W, H)) return;
-    let pg: Page;
-    if (this.pages.length < MAX_PAGES) {
+    // A kept picture goes on a kept page, anything else on another (so starting a page again never touches a kept one); a new page
+    // while there may be one more (a kept one keeps SPARE pages free for the rest).
+    for (const pg of this.pages) if (pg.kept === e.kept && this.shelf(pg, e, W, H)) return;
+    if (this.pages.length < this.limit - (e.kept ? SPARE : 0)) {
       const layer = this.pages.length;
       this.grow(layer + 1);
-      pg = { tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer }, shelves: [], top: 0, used: 0, entries: [] };
+      const pg: Page = { tex: { t: this.atlas, w: PAGE, h: PAGE, stream: null, layer }, shelves: [], top: 0, used: 0, entries: [], kept: e.kept };
       this.pages.push(pg);
-    } else {
-      // Full: the page least lately drawn from starts again, empty (its pictures are uploaded again as they show).
-      pg = this.pages.reduce((a, b) => (a.used <= b.used ? a : b));
+      this.shelf(pg, e, W, H);
+      return;
+    }
+    // (A kept one that doesn't fit: on the other pages, as anything else.)
+    for (const pg of this.pages) if (!pg.kept && this.shelf(pg, e, W, H)) return;
+    let pg: Page | undefined;
+    {
+      // Full: the least lately drawn from of the pages holding nothing kept starts again, empty (its pictures are uploaded again as
+      // they show). (None: the least lately drawn from of all; it isn't kept from then on.)
+      for (const p of this.pages) if (!p.kept && (!pg || p.used < pg.used)) pg = p;
+      pg ??= this.pages.reduce((a, b) => (a.used <= b.used ? a : b));
+      pg.kept = false;
       this.resets++;
       REC?.reset();
       this.flushUsing(pg.tex);
@@ -683,13 +802,13 @@ class GLPainter implements Painter {
   }
 
   /**
-   * The atlas's array texture at least `n` pages deep: made, or made again deeper (two pages more at a time, up to
-   * MAX_PAGES), the pages it held copied over on the GPU.
+   * The atlas's array texture at least `n` pages deep: made, or made again deeper (two pages more at a time, up to the limit), the
+   * pages it held copied over on the GPU. (The loading screen's `kept` makes it once, as deep as it needs.)
    */
   private grow(n: number): void {
     const { gl } = this;
     if (this.cap >= n && this.atlas) return;
-    const cap = Math.min(MAX_PAGES, Math.max(n, this.cap + 2));
+    const cap = Math.min(this.limit, Math.max(n, this.cap + 2));
     const old = this.atlas;
     if (old) for (let i = 0; i < this.pages.length; i++) this.flushUsing(this.pages[i]!.tex);
     const t = gl.createTexture()!;
@@ -710,13 +829,8 @@ class GLPainter implements Painter {
   }
 
   private shelf(pg: Page, e: Entry, W: number, H: number): boolean {
-    let s = pg.shelves.find((sh) => sh.h >= H && sh.h <= H * 1.5 + 8 && PAGE - sh.x >= W);
-    if (!s) {
-      if (pg.top + H > PAGE) return false;
-      s = { y: pg.top, h: H, x: 0 };
-      pg.shelves.push(s);
-      pg.top += H;
-    }
+    const s = fitShelf(pg, W, H);
+    if (!s) return false;
     e.tex = pg.tex;
     e.page = pg;
     e.x = s.x + PAD;
@@ -727,12 +841,38 @@ class GLPainter implements Painter {
     return true;
   }
 
+  /**
+   * (Tests and `?report`) The atlas: its pages made (16 MB each), how many are kept, and the share of their area pictures take
+   * (padding included); kept pictures, live ones, pictures `keep` couldn't fit, own-texture ones and their pixels.
+   */
+  stats(): { pages: number; keptPages: number; keptFill: number; spareFill: number; kept: number; live: number; unkept: number; big: number; bigPx: number } {
+    const fill = (kept: boolean) => {
+      let used = 0;
+      let n = 0;
+      for (const pg of this.pages) {
+        if (pg.kept !== kept) continue;
+        n++;
+        for (const e of pg.entries) if (e.page === pg) used += (e.w + 2 * PAD) * (e.h + 2 * PAD);
+      }
+      return n ? used / (n * PAGE * PAGE) : 0;
+    };
+    let kept = 0;
+    let big = 0;
+    let bigPx = 0;
+    for (const e of this.live) {
+      if (e.kept && e.tex) kept++;
+      if (e.tex && !e.page && e.tex.layer < 0) ((big += 1), (bigPx += e.w * e.h));
+    }
+    return { pages: this.cap, keptPages: this.pages.filter((p) => p.kept).length, keptFill: fill(true), spareFill: fill(false), kept, live: this.live.length, unkept: this.unkept, big, bigPx };
+  }
+
   /** Lets go of pictures not drawn for a while (a big one's own texture is freed; a page's place comes back when the page starts again). */
   private sweep(): void {
     const { gl, live } = this;
     for (let i = live.length - 1; i >= 0; i--) {
       const e = live[i]!;
-      if (this.frameNo - e.used < 600) continue;
+      // (A picture on an atlas page stays until its page starts again: letting it go would only upload it again into new room.)
+      if (e.kept || e.page || this.frameNo - e.used < 600) continue;
       if (e.tex && !e.page && e.tex.t) gl.deleteTexture(e.tex.t);
       e.tex = null;
       e.page = null;
@@ -742,17 +882,17 @@ class GLPainter implements Painter {
     }
   }
 
-  /** Where the shader finds `tex` in `st`'s next draw: an atlas page's layer, or 7 (one texture of its own a draw: another one draws what `st` holds first). */
+  /** Where the shader finds `tex` in `st`'s next draw: an atlas page's layer, or OWN (one texture of its own a draw: another one draws what `st` holds first). */
   slot(st: Stream, tex: Tex): number {
     if (tex.layer >= 0) {
       st.atlas = true;
       return tex.layer;
     }
-    if (st.big === tex) return 7;
+    if (st.big === tex) return OWN;
     if (tex.stream && tex.stream.n > 0) this.flush(tex.stream); // (a layer: its own draws go first)
     if (st.big) this.flush(st);
     st.big = tex;
-    return 7;
+    return OWN;
   }
 
   /** Room for `n` more vertices in `st`. */
@@ -1554,7 +1694,7 @@ class GLCtx {
       const cv = old?.cv ?? document.createElement("canvas");
       cv.width = Math.ceil(x1 - bx) + 2 * pad + 1;
       cv.height = Math.ceil(y1 - by) + 2 * pad + 1;
-      const g = cv.getContext("2d")!;
+      const g = art2d(cv);
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.clearRect(0, 0, cv.width, cv.height);
       g.shadowColor = this.shadowColor;
@@ -1594,7 +1734,7 @@ class GLCtx {
     if (!e || a <= 0) return;
     const { tex, u0, v0, u1, v1 } = this.uvOf(e, 0, 0, cv.width, cv.height);
     const slot = this.P.slot(this.st, tex);
-    const flags = M_TEX | (slot << 3) | (this.comp() << 7);
+    const flags = M_TEX | (slot << 9) | (this.comp() << 7);
     const c = this.white(a);
     this.polyRoom(4);
     const w = cv.width;
@@ -1888,7 +2028,7 @@ class GLCtx {
     if (a <= 0 || !dw || !dh) return;
     const { tex, u0, v0, u1, v1 } = this.uvOf(e, sx, sy, sw, sh);
     const slot = this.P.slot(this.st, tex);
-    const flags = M_TEX | (slot << 3) | (this.imageSmoothingEnabled ? 64 : 0) | (this.comp() << 7);
+    const flags = M_TEX | (slot << 9) | (this.imageSmoothingEnabled ? 64 : 0) | (this.comp() << 7);
     const c = this.white(a);
     const m = this.m;
     this.polyRoom(4);
@@ -1916,7 +2056,7 @@ class GLCtx {
     const { tex, u0, v0, u1, v1 } = this.uvOf(e, 0, 0, e.w, e.h);
     const slot = this.P.slot(this.st, tex);
     const hz = Math.round(Math.min(1, Math.max(0, haze)) * 255);
-    const flags = M_SOFTIMG | (slot << 3) | (this.imageSmoothingEnabled ? 64 : 0) | (this.comp() << 7) | (hz << 16);
+    const flags = M_SOFTIMG | (slot << 9) | (this.imageSmoothingEnabled ? 64 : 0) | (this.comp() << 7) | (hz << 16);
     const hc = this.color(horizon, this.col);
     // (The vertex color carries the horizon's color, unpremultiplied, and the alpha.)
     const c = this.col2;
@@ -2014,7 +2154,7 @@ class GLCtx {
     const cv = document.createElement("canvas");
     cv.width = Math.max(1, left + Math.ceil((mt.actualBoundingBoxRight + pad) * scale));
     cv.height = Math.max(1, top + Math.ceil((mt.actualBoundingBoxDescent + pad) * scale));
-    const c = cv.getContext("2d")!;
+    const c = art2d(cv);
     c.setTransform(scale, 0, 0, scale, left, top);
     c.font = this.font;
     c.textAlign = this.textAlign;

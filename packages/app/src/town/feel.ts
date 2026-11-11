@@ -223,6 +223,14 @@ export const TOWN_FEEL = {
   boxBakeMs: 1.5,
   /** The same while you stand still and the view isn't turning (Nov 11: a still frame has room, and what a look round shows gets ready sooner). */
   boxBakeStillMs: 4,
+  /**
+   * The street town's loading screen (Nov 11, Eric: "loads it all in at once and then it stays there"; Town.tsx `loadTown`): the work done
+   * between two of its frames (ms; the bar moves between them), and the bar's share for painting every picture (the rest: uploading them).
+   */
+  loadSliceMs: 40,
+  loadPaintShare: 0.5,
+  /** How long it waits for the sidekicks' sheets (ms; they load as the town opens): past it, one not in yet is drawn when it's in, as before. */
+  loadSheetWaitMs: 3000,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
   nameDropStep: 3,
