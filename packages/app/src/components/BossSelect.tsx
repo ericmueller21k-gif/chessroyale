@@ -55,6 +55,8 @@ export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: Bo
  * its idle's first frame (the rows it draws in).
  */
 const PX = 0.8;
+/** The old cap (before Nov 11): a figure's head-to-feet height, in cqi. Never drawn smaller than that old size. */
+const TALLEST = 56;
 const FOOT_AT = 50;
 /**
  * Where a boss's feet stand, in its own pixels, for one whose frame's `foot` point isn't between its feet (Eric, Oct 25:
@@ -73,7 +75,10 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
     const rows = frameKeys(ch, ch.anims[idle]!.frames[0]!);
     const top = Math.max(0, rows.findIndex((r) => r.some((k) => k !== null)));
     // (Never wider than the stage: a wide one, Wrangler's lasso out to one side, slides over to stay whole.)
-    const px = Math.min(PX * STAGE_SCALE, STAGE_ROOM / Math.max(1, ch.h - top), 100 / ch.w);
+    const tall = Math.max(1, ch.foot[1] - top);
+    // (Bigger, never smaller than before: the old size is the floor, Eric's STAGE_SCALE the aim, the room above the feet the cap.)
+    const before = Math.min(PX, TALLEST / tall, 100 / ch.w);
+    const px = Math.max(before, Math.min(PX * STAGE_SCALE, STAGE_ROOM / tall, 100 / ch.w));
     const width = ch.w * px;
     const footX = STAGE_FOOT_X[ch.id] ?? ch.foot[0];
     placed.set(ch.id, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - footX * px)), width }));
