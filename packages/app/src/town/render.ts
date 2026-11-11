@@ -3882,7 +3882,7 @@ export class Renderer {
         if ((hi.on && hi.x1 > 0 && hi.x0 < W && hi.y0 < H && hi.y1 > 0) || this.farOn) continue;
       } else {
         if (hi.on && hi.fx > 0 && hi.fx < W && hi.hy < H) continue;
-        if (town.bosses[i]!.onScreen) continue; // (the bosses are in the homes' order: world.ts)
+        if (town.bosses[i]?.onScreen) continue; // (the bosses are in the homes' order: world.ts; a home with none in the town, Rolling Dough, last)
       }
       order.push(i);
     }

@@ -119,6 +119,12 @@ interface RoomArt {
   standing?: readonly Sq[];
   /** A dark wash over the whole room, its lights added over it (Rolling Dough's dim back room: SHOP_FEEL.zebra.dim). */
   dim?: number;
+  /**
+   * Where the camera looks while it's at the town's zoomed-in camera (the default), in place of following you: a small room seen whole
+   * (Rolling Dough's back room: the art's SHOP_ZEBRA_BACK_CAM from the table's middle, so Don Dough, his crew and you are all on a
+   * phone's screen and its edge isn't). At Close it follows you, no nearer the front than this.
+   */
+  fixCam?: { readonly x: number; readonly y: number };
   /** The sound each of its pieces' frame cues plays as that frame comes round (Rolling Dough's: the Big Mix's thump, the TV's click). */
   cueSounds?: Readonly<Record<string, SoundName>>;
   /** The ground past its low front wall (none: the bright day; Rolling Dough's back room: the dark planks of the hall beyond). */
@@ -220,6 +226,7 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
         scene: "zebra-back" as const,
         dim: SHOP_FEEL.zebra.dim,
         outside: "#2a1d14",
+        fixCam: { x: m.SHOP_ZEBRA_BACK_MARKS.table[0] - m.SHOP_ZEBRA_BACK_CAM.west, y: m.SHOP_ZEBRA_BACK_MARKS.table[1] + m.SHOP_ZEBRA_BACK_CAM.south },
         cueSounds: { click: "zebraClick" as const },
       };
     }),
@@ -1103,6 +1110,8 @@ function startRoom(
   let zoomTarget = zoomCur;
   let camX = you.c;
   let camY = you.r;
+  // (A room seen from its own camera: there from the first frame.)
+  if (art.fixCam && !cam && zoomCur === 1) [camX, camY] = [art.fixCam.x, art.fixCam.y];
   let vx = 0;
   let vy = 0;
   let follow = true;
@@ -1959,10 +1968,16 @@ function startRoom(
       front.step(now, near);
       say = front.saying();
     } else if (backScene) {
+      const was = beat;
       beat = backScene.step(now);
       if (!told && (beat === "challenge" || beat === "done")) {
         told = true;
         onTalked();
+      }
+      // (His card comes back once the beat is over, with his Challenge: Talk had put it away so the beat shows.)
+      if (beat === "done" && was !== "done" && !you.moving() && inTalkRange(room, you.hereC(), you.hereR())) {
+        shut = "";
+        setCard("talk");
       }
       say = backScene.saying(now);
     }
@@ -3536,8 +3551,8 @@ function startRoom(
 
   // ---- The cards: the Shopkeeper's and the way out's show when you stop near them; the crate's from Talk.
   let card: ShopCard | null = null;
-  /** The square where you closed a card: it doesn't open again until you've moved on. */
-  let shut = "";
+  /** The square where you closed a card: it doesn't open again until you've moved on (and where you came in through a door between rooms). */
+  let shut = arrive ? `${arrive.c},${arrive.r}` : "";
   let cardW = NaN;
   let cardH = NaN;
   let cardX = NaN;
@@ -3651,6 +3666,9 @@ function startRoom(
       you.pose(now, pose);
       let gx = marks ? marks.table.c - cam!.west : pose.x;
       let gy = marks ? marks.table.r + cam!.south : pose.y;
+      // (Rolling Dough's back room: seen whole from its own camera; at Close, following you, no nearer its front than that.)
+      const fc = art.fixCam;
+      if (fc && !marks) [gx, gy] = zoomTarget === 1 ? [fc.x, fc.y] : [gx, Math.min(gy, fc.y + 1)];
       // (Closing in on the claw machine: toward the cabinet's front middle.)
       if (cab && clawE > 0) {
         gx += ((cab.x0 + cab.x1) / 2 - gx) * clawE;
@@ -4060,7 +4078,11 @@ function startRoom(
     talk: () => {
       const now = performance.now();
       if (front && def.says?.length) front.keeper(now, def.says[saysI++ % def.says.length]!);
-      backScene?.talk(now);
+      // (Don Dough's talk beat: his card steps aside so the crew and he show; it comes back as the beat ends.)
+      if (backScene && !backScene.talking()) {
+        backScene.talk(now);
+        close();
+      }
     },
     recenter: () => {
       follow = true;
