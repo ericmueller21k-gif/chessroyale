@@ -340,13 +340,18 @@ export async function friendsOnline(sql: Sql, meId: string, now: number, presenc
   return presenceRows(rows, now, presenceOf);
 }
 
-/** searchPlayers' read (exported for its test: the plan uses the name index). */
+/** A signed-in account: the search's filter where signing in is set up, and `users_name_signed`'s WHERE (the same text). */
+export const SIGNED_IN = "email IS NOT NULL OR google_sub IS NOT NULL";
+/**
+ * searchPlayers' read (exported for its test: the plan uses the name index). Ordered by the index's own order only, so LIMIT
+ * stops after the first rows (a second key would sort every match first).
+ */
 export const searchSql = (needSignIn: boolean) =>
   `SELECT u.id, u.name, u.icon, w.xp FROM users u LEFT JOIN wallets w ON w.user_id = u.id
    WHERE u.name >= ?1 COLLATE NOCASE AND u.name < ?2 COLLATE NOCASE AND u.id != ?3 AND u.test IS NOT 1
      AND NOT EXISTS (SELECT 1 FROM fairplay_cases c WHERE c.user_id = u.id AND c.status = 'banned')
-     ${needSignIn ? "AND (u.email IS NOT NULL OR u.google_sub IS NOT NULL)" : ""}
-   ORDER BY u.name COLLATE NOCASE, u.id LIMIT ?4`;
+     ${needSignIn ? `AND (${SIGNED_IN})` : ""}
+   ORDER BY u.name COLLATE NOCASE LIMIT ?4`;
 /** Its parameters: the range's top is the prefix and the highest character there is, so every name that starts with it sorts below. */
 export const searchParams = (prefix: string, meId: string) => [prefix, `${prefix}\u{10FFFF}`, meId, FRIENDS.searchMax] as const;
 
@@ -357,8 +362,9 @@ export const SEARCH_MAX_CHARS = 32;
  * Players whose name starts with `q`, any case (the friends page's search, Eric, Nov 11): at most FRIENDS.searchMax, by name.
  * Only what their profile shows anyone (id, name, icon, level), never an email. Left out: you, banned accounts (fair play's
  * `banned`), test accounts (`users.test`), and, where signing in is set up, guests (they can't be added as friends). The
- * engine pool's players show as anyone else's, never marked. One read on the `users_name` index (name, any case): a prefix is
- * a range on it, so a search never scans the table. Fewer than FRIENDS.searchMinChars characters: nobody.
+ * engine pool's players show as anyone else's, never marked. One read on the `users_name` index (name, any case), or
+ * `users_name_signed` where signing in is set up: a prefix is a range on it, in its order, so a search reads a few rows and
+ * stops, never the table or every guest named "Player". Fewer than FRIENDS.searchMinChars characters: nobody.
  */
 export async function searchPlayers(sql: Sql, meId: string, q: string, needSignIn: boolean): Promise<PlayerSearchEntry[]> {
   const prefix = q.trim().slice(0, SEARCH_MAX_CHARS);

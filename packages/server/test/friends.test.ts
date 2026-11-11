@@ -458,13 +458,19 @@ describe("the player search (the friends page, Eric, Nov 11)", () => {
     expect((await search({ DB: d1, PAUSE_FRIENDS: "1" }, users[0]!.token, "pawn")).body).toEqual({ off: true });
   });
 
-  it("is one read on the name index (a range, never a scan of the players)", async () => {
-    const { sql, ids } = await world(["Ann"]);
+  it("is one read on the name index, in its order (a range that stops at the limit, never every guest named Player)", async () => {
+    // (Every new account is "Player": a few hundred guests, and a few signed-in players who share the prefix.)
+    const { sql, ids } = await world(["Ann", ...Array.from({ length: 300 }, () => "Player"), ...Array.from({ length: 8 }, (_, i) => `Playful ${i}`)]);
+    for (const id of ids.slice(-8)) await sql.run("UPDATE users SET email = ? WHERE id = ?", `${id}@example.com`, id);
     for (const signIn of [false, true]) {
-      const plan = await sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${searchSql(signIn)}`, ...searchParams("an", ids[0]!));
-      expect(plan.map((p) => p.detail).join(" | ")).toMatch(/SEARCH u USING INDEX users_name \(name>\? AND name<\?\)/);
-      expect(plan.map((p) => p.detail).join(" | ")).not.toMatch(/SCAN u\b/);
+      const plan = (await sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${searchSql(signIn)}`, ...searchParams("pl", ids[0]!))).map((p) => p.detail).join(" | ");
+      expect(plan).toMatch(new RegExp(`SEARCH u USING INDEX ${signIn ? "users_name_signed" : "users_name"} \\(name>\\? AND name<\\?\\)`));
+      expect(plan).not.toMatch(/SCAN u\b/);
+      // (No sort after the read: LIMIT stops the range after its first rows.)
+      expect(plan).not.toMatch(/TEMP B-TREE/);
     }
+    expect((await searchPlayers(sql, ids[0]!, "pl", true)).map((p) => p.name)).toEqual(Array.from({ length: FRIENDS.searchMax }, (_, i) => `Playful ${i}`));
+    expect(await searchPlayers(sql, ids[0]!, "pl", false)).toHaveLength(FRIENDS.searchMax);
     expect(await searchPlayers(sql, ids[0]!, "zz", false)).toEqual([]);
   });
 

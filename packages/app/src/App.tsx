@@ -1483,7 +1483,8 @@ export function App() {
     setShowFaq(false);
     setShowShop(false);
     setShowFriends(false);
-    if (location.pathname !== "/") history.replaceState(null, "", "/");
+    // (From /friends, the page's query and hash stay: a test switch or tour link, as the pop-up kept them before, Nov 11.)
+    if (location.pathname !== "/") history.replaceState(null, "", location.pathname === "/friends" ? `/${location.search}${location.hash}` : "/");
   };
   const nav: FrontNav = {
     home: () => {
@@ -1530,7 +1531,7 @@ export function App() {
     friendsList: () => {
       goHome();
       setShowFriends(true);
-      history.replaceState(null, "", "/friends");
+      history.replaceState(null, "", `/friends${location.search}${location.hash}`);
     },
     signIn: () => chooseGuest(false),
   };
@@ -1955,12 +1956,12 @@ export function App() {
         <FriendsScreen
           onBack={() => {
             setShowFriends(false);
-            if (location.pathname === "/friends") history.replaceState(null, "", "/");
+            if (location.pathname === "/friends") history.replaceState(null, "", `/${location.search}${location.hash}`);
           }}
           onSettings={() => {
             setShowFriends(false);
             setShowSettings(true);
-            history.replaceState(null, "", "/settings");
+            history.replaceState(null, "", `/settings${location.search}`);
           }}
           onPrivateLobby={nav.friends}
           onSignIn={() => chooseGuest(false)}
