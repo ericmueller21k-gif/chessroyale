@@ -1,3 +1,4 @@
+- Nov 11 23:10: #644 haptics LIVE (4dbac9a). #645 engine loading copy opened (a5b6796; watcher bom563d60); still sent. FAQ still says ~40 MB (Eric call).
 - Nov 11 23:05: #644 iOS haptics MERGED (4dbac9a). global-chat:46 retry-only again (known). Pending: engine loading copy (Haiku session_01JuCWRvMJQP88LLS1PNvYta).
 - Nov 11 22:45: boss music LIVE (b7cb743). Music chat at xhigh (Eric set it): not frozen, 8.5 min thinking at 435k context; recommended medium + a fresh chat next batch.
 - Nov 11 22:45: #643 boss music MERGED (b7cb743): grex, bigboy (120 s), hollow (2 min), folio, zebra. #644 main merged (f2f29a7) for a fresh run.
