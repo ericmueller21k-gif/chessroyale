@@ -254,8 +254,15 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     pop-up): Back, a search box (names starting with what's typed, any case, from 2 characters, 250 ms after typing stops: `GET /api/friends/search`,
     public fields only, banned, test accounts and, where sign-in is set up, guests left out; its own rate limit), the results in a fixed-size box over
     the page (icon, name, level; a tap opens their profile, where Add Friend is), **Private lobby** ("Make one or join with a code": Play with friends'
-    sheet), invites and friend requests when any, **Online** (each with what they're doing: the app's live line says `?doing=`, core's `ACTIVITIES`,
-    kept in the live hub's memory beside "in a match"; Invite) and **Offline** ("Last online 2h ago", Invite greyed), then "Requests sent and blocked ›" (Cancel, Unblock) and Settings.
+    sheet), **Online** (each with what they're doing: the app's live line says `?doing=`, core's `ACTIVITIES`,
+    kept in the live hub's memory beside "in a match"; Invite) and **Offline** ("Last online 2h ago", Invite greyed), then invites and friend
+    requests when any (under the lists, so nothing above them moves when they arrive: fix round, Nov 11), then "Requests sent and blocked ›"
+    (Cancel, Unblock) and Settings. The query and hash stay on the address in and out of `/friends` (test switches, links). The search reads
+    `users_name`, or `users_name_signed` (partial: signed-in accounts only, its WHERE the search's own text) where sign-in is set up, ordered by
+    the name alone so LIMIT stops after six rows (never every guest named "Player").
+  - **Known staleness (accepted):** `doing` can be a moment stale across Worker instances: two instances' batches can reach the hub out of order
+    (the town, then home from another instance flushed first), and the list shows the older activity until the next 30 s heartbeat. Same as
+    `busy` today (`presence.ts`, `live.ts`); not worth ordering the batches.
   - **Where:** a phone's way in is **Friends** in home's top bar (the page above), or Friends on your own
     profile, each with the count of requests and invites (Eric, Oct 18: home's line above the live line is gone,
     [docs/decisions/2026-10-18-play-at-the-bottom.md](../decisions/2026-10-18-play-at-the-bottom.md)); a computer's right column has "FRIENDS ›" (Nov 7: the list and its Invite buttons went with Eric's mockup; requests' count

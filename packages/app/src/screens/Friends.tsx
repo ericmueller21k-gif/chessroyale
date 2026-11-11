@@ -77,6 +77,39 @@ export function FriendsScreen({
         </div>
       )}
       {status === "off" && <p class="fd-note fp-empty">{pausedLine("friends")}</p>}
+      {(on || status === "unknown") && (
+        <>
+          <section class="fd-section" aria-labelledby="fp-online">
+            <h2 class="fd-label" id="fp-online">
+              ONLINE{on ? ` · ${online.length}` : ""}
+            </h2>
+            {!on && <Placeholders n={2} />}
+            {on && !state.friends.length && <p class="fd-note fp-empty">No friends yet. Search for a player above, or tap a name anywhere, then Add Friend.</p>}
+            {on && !!state.friends.length && !online.length && <p class="fd-note fp-empty">None of your friends are online right now.</p>}
+            <div class="fr-list">
+              {online.map((f) => (
+                <FriendRow key={f.id} f={f}>
+                  <InviteButton uid={f.id} onNote={setNote} greyed />
+                </FriendRow>
+              ))}
+            </div>
+          </section>
+          <section class="fd-section" aria-labelledby="fp-offline">
+            <h2 class="fd-label" id="fp-offline">
+              OFFLINE{on ? ` · ${offline.length}` : ""}
+            </h2>
+            {!on && <Placeholders n={2} />}
+            <div class="fr-list fp-offline">
+              {offline.map((f) => (
+                <FriendRow key={f.id} f={f}>
+                  <InviteButton uid={f.id} onNote={setNote} greyed disabled={!f.hidden} title={mode && !f.hidden ? `${friendStatus(f)}: you can invite them once they're online.` : undefined} />
+                </FriendRow>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+      {/* (Invites and requests under the lists, Nov 11: they arrive after the lists' placeholders, so nothing above them moves.) */}
       {!!invites.length && (
         <section class="fd-section" aria-labelledby="fr-invites">
           <h2 class="fd-label" id="fr-invites">
@@ -113,38 +146,6 @@ export function FriendsScreen({
             ))}
           </div>
         </section>
-      )}
-      {(on || status === "unknown") && (
-        <>
-          <section class="fd-section" aria-labelledby="fp-online">
-            <h2 class="fd-label" id="fp-online">
-              ONLINE{on ? ` · ${online.length}` : ""}
-            </h2>
-            {!on && <Placeholders n={2} />}
-            {on && !state.friends.length && <p class="fd-note fp-empty">No friends yet. Search for a player above, or tap a name anywhere, then Add Friend.</p>}
-            {on && !!state.friends.length && !online.length && <p class="fd-note fp-empty">None of your friends are online right now.</p>}
-            <div class="fr-list">
-              {online.map((f) => (
-                <FriendRow key={f.id} f={f}>
-                  <InviteButton uid={f.id} onNote={setNote} greyed />
-                </FriendRow>
-              ))}
-            </div>
-          </section>
-          <section class="fd-section" aria-labelledby="fp-offline">
-            <h2 class="fd-label" id="fp-offline">
-              OFFLINE{on ? ` · ${offline.length}` : ""}
-            </h2>
-            {!on && <Placeholders n={2} />}
-            <div class="fr-list fp-offline">
-              {offline.map((f) => (
-                <FriendRow key={f.id} f={f}>
-                  <InviteButton uid={f.id} onNote={setNote} greyed disabled={!f.hidden} title={mode && !f.hidden ? `${friendStatus(f)}: you can invite them once they're online.` : undefined} />
-                </FriendRow>
-              ))}
-            </div>
-          </section>
-        </>
       )}
       <div class="fp-foot">
         <button type="button" class="fd-row-link" disabled={!on} onClick={() => setMore(true)}>

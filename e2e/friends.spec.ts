@@ -135,9 +135,11 @@ test("two players: a request accepted, online in each other's list, the invites 
 
 test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up; a search finds a player by name as you type, nothing moving; their profile's Add Friend; accepted, each sees the other online with what they're doing; Private lobby opens the code sheet", async ({ browser }) => {
   test.setTimeout(3 * 60_000);
-  // (A name of each project's own: both projects share the server, and a search finds every name that starts the same.)
-  const tag = isComputer() ? "C" : "P";
-  const ann = await player(browser, `Ann Seeker ${tag}`);
+  // (Names of this run's own: both projects share the server, and D1 lasts the whole run, so a retry or a rerun makes another "Bo
+  // Findme". The project, the retry and the time: 16 characters at most, a name's limit; digits only, so the name filter never
+  // trips on them.)
+  const tag = `${isComputer() ? "C" : "P"}${test.info().retry}${String(Date.now() % 10_000).padStart(4, "0")}`;
+  const ann = await player(browser, `Ann Seek ${tag}`);
   const bo = await player(browser, `Bo Findme ${tag}`);
   const page = ann.page;
 
@@ -178,12 +180,12 @@ test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up
 
   // Bo: the request on his friends page; he accepts. Ann is online, on a front-door page.
   await openFriends(bo.page);
-  const request = bo.page.locator("#fr-requests ~ .fr-list .fr-row", { hasText: `Ann Seeker ${tag}` });
+  const request = bo.page.locator("#fr-requests ~ .fr-list .fr-row", { hasText: `Ann Seek ${tag}` });
   await expect(request).toContainText("wants to be friends", NEWS);
   await request.getByRole("button", { name: "Accept" }).click();
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
   await expect(bo.page.locator("#fp-online")).toHaveText("ONLINE · 1");
-  await expect(bo.page.locator(".fr-row", { hasText: `Ann Seeker ${tag}` })).toContainText("On the home screen");
+  await expect(bo.page.locator(".fr-row", { hasText: `Ann Seek ${tag}` })).toContainText("On the home screen");
 
   // Bo goes to Chess Town: Ann's page says so (his app tells the server as it changes; her list on its next load).
   await bo.page.goto("/town?nolanding");
