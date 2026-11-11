@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { FRIENDS, type FriendsAnswer, type FriendsState, type InviteEntry, type InviteKind } from "@chessroyale/core";
+import { FRIENDS, type Activity, type FriendsAnswer, type FriendsState, type InviteEntry, type InviteKind, type PlayerSearchEntry } from "@chessroyale/core";
 import { account, mustSignInToPlayOnline, onAccountChange } from "./account.ts";
 import { liveNow, onLive } from "./live.ts";
 
@@ -142,11 +142,12 @@ async function refreshOnline(): Promise<void> {
   if (!state || inFlight || !state.friends.some((f) => !f.hidden)) return;
   try {
     const res = await fetch("/api/friends/online", { credentials: "same-origin" });
-    const body = res.ok ? ((await res.json()) as { online?: Record<string, { online: boolean; busy: boolean }> }) : null;
+    const body = res.ok ? ((await res.json()) as { online?: Record<string, { online: boolean; busy: boolean; doing?: Activity }> }) : null;
     if (!body?.online || !state) return;
     const live = body.online;
     const now = Date.now();
-    const friends = state.friends.map((f) => {
+    const friends = state.friends.map(({ doing: _was, ...f }) => {
+      // (What they're doing is the latest answer's alone: none in it, none now.)
       const next = { ...f, ...(live[f.id] ?? { online: false, busy: false }) };
       // (Online at the last look and not now: they left about now, which beats D1's last-seen from the list's load.)
       if (f.online && !next.online && !f.hidden) next.lastSeen = now;
@@ -213,6 +214,24 @@ export const saveFriendSettings = (patch: { invites?: FriendsState["settings"]["
 export function dismissInvite(inv: InviteEntry) {
   if (toast && inviteKey(toast) === inviteKey(inv)) hideToast();
   return act("dismiss", { id: inv.from });
+}
+
+// ---------------- Finding players by name ----------------
+
+/** What the friends page's search box last held (kept while a profile opened from it is on screen, so Back finds it as it was). */
+let searchKept = "";
+export const keptSearch = () => searchKept;
+export const keepSearch = (q: string) => void (searchKept = q);
+
+/**
+ * Players whose name starts with `q` (GET /api/friends/search: public fields only, at most FRIENDS.searchMax). Throws with the
+ * server's line when it refuses (too many searches, signed out, friends off).
+ */
+export async function findPlayers(q: string, signal?: AbortSignal): Promise<PlayerSearchEntry[]> {
+  const res = await fetch(`/api/friends/search?q=${encodeURIComponent(q)}`, { credentials: "same-origin", signal });
+  const body = (await res.json().catch(() => ({}))) as { players?: PlayerSearchEntry[]; message?: string; off?: true; signIn?: true };
+  if (body.players) return body.players;
+  throw new Error(body.message ?? (body.signIn ? "Sign in to find players." : "Search isn't available right now."));
 }
 
 // ---------------- Inviting, and joining an invite ----------------

@@ -1,6 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "preact/hooks";
-import { type MatchmakingType, CROWD_MISSES, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
+import { type Activity, type MatchmakingType, CROWD_MISSES, SQUADS, botLevelMean, POWER_IDS, WEAK_BOTS, bossDef, bossIdFromLink, CROWD_KNOCKOUTS, RAID_SETTINGS, bossPartySettings, raidBossElo, DEFAULT_SETTINGS, DRAW_RULES, QUICK_PACE, bestMoveOf, definedOnly, matchFeats, modeSettings, pausedLine, speedOption, startOption, type DrawRule, type FinalFormat, type ModeChoiceId, type Settings } from "@chessroyale/core";
 import { bossInUrl, bossTierFromUrl, chosenBoss, chosenHomeMode, chosenMode, lobbyModeOf, prefetchBossAlone, raidInUrl, rememberBossPick } from "./screens/Home.tsx";
 import { lastBoss } from "./boss-history.ts";
 import { unlockAudio } from "./components/Countdown.tsx";
@@ -24,7 +24,7 @@ import { account, askAgeAgain, loadAccount, mustSignInToPlayOnline, playerName, 
 import { leavesNote } from "./ranked.ts";
 import { isAdmin } from "./boss-brain.ts";
 import { difficultyElo, difficultyMaia } from "./boss-difficulty.ts";
-import { setLiveBusy, startLive } from "./live.ts";
+import { setLiveBusy, setLiveDoing, startLive } from "./live.ts";
 import { setInviteHost } from "./friends.ts";
 import { FriendsScreen } from "./screens/Friends.tsx";
 import { SettingsScreen } from "./screens/Settings.tsx";
@@ -1645,6 +1645,30 @@ export function App() {
   });
   // In a match (not its lobby or results): the live line says so, for friends' lists.
   setLiveBusy((!!match && !["loading", "lobby", "results"].includes(match.phase.kind)) || (!!squads && !squadsWaiting(squads.lobby)) || (!!duel && !duel.snapshot().end));
+  // What you're doing, for friends' lists (the friends page's "In Chess Town", Eric, Nov 11): a match's mode, a queue or lobby
+  // waiting, the town, auto chess, else the front door's pages ("On the home screen").
+  const doing: Activity = match
+    ? ["loading", "lobby"].includes(match.phase.kind)
+      ? "queue"
+      : match.settings.raid || match.boss
+        ? "boss"
+        : match.settings.mode === "crowd"
+          ? "crowd"
+          : "classic"
+    : duel
+      ? "duel"
+      : squads
+        ? squadsWaiting(squads.lobby)
+          ? "queue"
+          : "squads"
+        : duelQueue || inLine
+          ? "queue"
+          : showTown
+            ? "town"
+            : showAutoChess
+              ? "autochess"
+              : "home";
+  setLiveDoing(doing);
 
   /**
    * The side menu while you're in the queue (it stays on a computer): Play is where you are, and your profile opens over
@@ -1938,6 +1962,8 @@ export function App() {
             setShowSettings(true);
             history.replaceState(null, "", "/settings");
           }}
+          onPrivateLobby={nav.friends}
+          onSignIn={() => chooseGuest(false)}
         />
       </FrontFrame>
     );

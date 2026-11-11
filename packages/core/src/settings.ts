@@ -3174,7 +3174,7 @@ export const FRIENDS = {
   /** …this long after the last keystroke… */
   searchDebounceMs: 250,
   /** …and shows at most this many players (names starting with what was typed, any case). */
-  searchMax: 8,
+  searchMax: 6,
 } as const;
 
 /**

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
-import { FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
+import { ACTIVITY_LINES, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
 import {
   addFriend,
   answerFriend,
@@ -32,11 +32,13 @@ import { ago } from "../public-profile.ts";
  */
 
 /**
- * "Online", "In a match", "Last online 2h ago" (or "Offline" when the server didn't say when), or "Online status hidden" for a
- * friend who hides it. The "ago" words are the public profile's (public-profile.ts).
+ * What they're doing while online ("In Chess Town", "In a 50 v 50": core's ACTIVITY_LINES, Eric, Nov 11), else "In a match" or
+ * "Online" (an app that doesn't say yet); "Last online 2h ago" (or "Offline" when the server didn't say when), or "Online status
+ * hidden" for a friend who hides it. The "ago" words are the public profile's (public-profile.ts).
  */
 export function friendStatus(f: FriendEntry, now = Date.now()): string {
   if (f.hidden) return "Online status hidden";
+  if (f.online && f.doing) return ACTIVITY_LINES[f.doing];
   if (f.busy) return "In a match";
   if (f.online) return "Online";
   if (!f.lastSeen) return "Offline";

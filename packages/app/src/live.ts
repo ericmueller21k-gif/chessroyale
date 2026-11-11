@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import { FRONT_DOOR } from "@chessroyale/core";
+import { FRONT_DOOR, type Activity } from "@chessroyale/core";
 
 /**
  * The live line ("214 online · 9 matches running · 31 in queue") and the playing-now list, from GET /api/live.
@@ -60,6 +60,11 @@ let busy = false;
 export function setLiveBusy(on: boolean) {
   busy = on;
 }
+/** What this app is doing (App says): the request says so, and friends' lists show it ("In Chess Town"; core's ACTIVITIES). */
+let doing: Activity | null = null;
+export function setLiveDoing(what: Activity) {
+  doing = what;
+}
 /** Hears every answer (friends.ts reads `inbox`). */
 export function onLive(fn: () => void): () => void {
   listeners.add(fn);
@@ -84,6 +89,7 @@ async function poll() {
       const rs = [...riders];
       const q = new URLSearchParams(rs.map((r) => r.query()).filter(Boolean).join("&"));
       if (busy) q.set("busy", "1");
+      if (doing) q.set("doing", doing);
       const res = await fetch(`/api/live${q.size ? `?${q}` : ""}`, { credentials: "same-origin" });
       if (res.ok) {
         const body = (await res.json()) as LiveCounts;
