@@ -22,8 +22,8 @@ function claws(y: number, step: 0 | 1 | 2): Speck[] {
   const out: Speck[] = [];
   const len = 14;
   for (let k = 0; k < 3; k++) {
-    const x0 = 7 + k * 3;
-    const y0 = y - 6 + k * 3;
+    const x0 = 9 - k * 2;
+    const y0 = y - 9 + k * 4;
     const from = step === 2 ? len / 2 : 0;
     const to = step === 0 ? len / 2 : len;
     for (let i = from; i < to; i++) {

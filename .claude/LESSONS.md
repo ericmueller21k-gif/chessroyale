@@ -300,4 +300,8 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - Before fixing "the boss broke the rule", rebuild the position from the screenshot and list its legal moves: the
     rule's own exceptions come first.
 
+- **Hollow's dark at Babur's mate** (Nov 11, [story](../docs/history/lessons.md#hollows-dark-at-baburs-mate-nov-11-2026)):
+  - Code shared by every boss draws nothing of one boss's (his effect, his color): a boss's own look goes in its kit,
+    and a test walks every kit (king-attack.test.ts: each boss's hits and mate its own).
+
 - **The FAQ follows the rules** (Oct 11): a PR that changes a rule, a number's meaning or a boss updates its words in `packages/app/src/faq/content.ts` in the same PR; numbers there come from the settings objects, never typed in.

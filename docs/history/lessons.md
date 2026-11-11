@@ -987,3 +987,15 @@ from a MutationObserver the moment each pop-up is in the page: the menu and the 
 
 **The fix:** layout effects for both listeners; each spec presses Escape at the pop-up's first frame; the party sheet's watcher waits
 for `.sq-party`. docs/decisions/2026-11-11-flaky-batch.md (it lists eight more pop-ups with the same `useEffect`).
+
+## Hollow's dark at Babur's mate (Nov 11, 2026)
+
+**What Eric saw:** "when Babur mated me it showed the dark matter Hollow uses on the tile."
+
+**Why:** the mate on your king was built for Hollow first (Oct 10): the king toppled into his dark (`darkItem`) and flashed his
+violet at each lash, both drawn in the shared `KingAttack.tsx`. When every boss got an attack, those stayed there, so every boss's
+mate ended on Hollow's dark square. The tests checked Hollow's mate only. The same sweep found Dash's swipes showing Jefferson's
+fireball pops (`popItem`).
+
+**The fix:** the dark and the violet are Hollow's kit's (`mateMark`, `glow`); Dash got his own claw marks (`clawHit`); a test walks
+every boss's kit. docs/decisions/2026-11-11-mate-effects-iphone-vibration.md.
