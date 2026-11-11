@@ -12,7 +12,7 @@ async function oldEnough(page: Page) {
   await page.getByRole("button", { name: "Continue" }).click();
 }
 
-test("landing on a computer: the 16:9 reel as the hero (70% of the width, at most 62% of the height), the sign-in beside it above the fold", async ({ page }) => {
+test("landing on a computer: two panes filling the window, the 16:9 reel big on the left and still, the sign-in and questions scrolling on the right", async ({ page }) => {
   test.skip(test.info().project.name !== "desktop", "a computer's layout");
   await page.route("**/api/auth/config", (r) => r.fulfill({ json: signInOn }));
   for (const [w, h] of [
@@ -26,16 +26,31 @@ test("landing on a computer: the 16:9 reel as the hero (70% of the width, at mos
     await expect(video).toBeVisible();
     // Only the computer's reel loads (Eric, Nov 11: "a wide rectangle on the computer… like a cinema").
     await expect.poll(() => video.evaluate((v: HTMLVideoElement) => v.currentSrc)).toMatch(/\/media\/hunchess-reel-wide\.(mp4|webm)$/);
+    // The page fills the window and never scrolls, either way (Eric, Nov 11: "the left, the large part where the video plays, is not").
+    const doc = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]);
+    expect(doc, `${w}x${h}`).toEqual([w, h]);
+    // The reel: 16:9, at least 60% of the window's width (measured: 1280 816, 1440 976, 1920 1456), in the left pane, wholly on screen.
     const box = (await video.boundingBox())!;
-    const want = Math.min(0.7 * w, ((0.62 * h) * 16) / 9);
-    expect(Math.abs(box.width - want), `${w}x${h}: ${box.width} wide, want ${want}`).toBeLessThan(2);
-    expect(Math.abs(box.width / box.height - 16 / 9)).toBeLessThan(0.01);
-    // The sign-in and the guest button are on screen without scrolling; nothing scrolls sideways.
+    expect(Math.abs(box.width / box.height - 16 / 9), `${w}x${h}`).toBeLessThan(0.01);
+    expect(box.width, `${w}x${h}`).toBeGreaterThanOrEqual(0.6 * w);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(h);
+    const side = page.locator(".landing-side");
+    const col = (await side.boundingBox())!;
+    expect(box.x + box.width, `${w}x${h}`).toBeLessThan(col.x);
+    // The sign-in and the guest button are on screen, at the top of the right column.
     for (const b of [page.getByRole("button", { name: "Continue" }), page.getByRole("button", { name: /Play vs \d+ bots as a guest/ })]) {
       const r = (await b.boundingBox())!;
+      expect(r.x, `${w}x${h}`).toBeGreaterThanOrEqual(col.x);
       expect(r.y + r.height, `${w}x${h}`).toBeLessThanOrEqual(h);
     }
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(w);
+    // With every answer open the questions run long: the right column scrolls on its own, and the reel stays where it was.
+    for (const d of await page.locator(".faq details").all()) await d.evaluate((e: HTMLDetailsElement) => (e.open = true));
+    expect(await side.evaluate((e) => e.scrollHeight > e.clientHeight), `${w}x${h}`).toBe(true);
+    await side.evaluate((e) => (e.scrollTop = e.scrollHeight));
+    await expect.poll(() => side.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+    expect(await video.boundingBox()).toEqual(box);
+    expect(await page.evaluate(() => [window.scrollX, window.scrollY, document.documentElement.scrollHeight])).toEqual([0, 0, h]);
   }
 });
 

@@ -4090,9 +4090,10 @@ button.history-label {
 .landing-tag strong {
   color: var(--text);
 }
-.landing-main {
-  display: grid;
-  gap: 18px;
+/* The two panes of a computer's layout: on a phone, no boxes of their own (the screen's column holds their parts, as before). */
+.landing-stage,
+.landing-side {
+  display: contents;
 }
 /* The demo reel (Eric, Nov 11: "Make it much bigger"): on a phone, the screen's whole width, edge to edge (the frame reaches out
    over the screen's side padding; at most 480 px wide on a tablet); its box keeps its size while it loads (aspect-ratio). */
@@ -4279,13 +4280,21 @@ button.history-label {
   white-space: pre;
 }
 @media (min-width: 900px) {
+  /* (900 to 1023 px: the portrait reel beside the sign-in, the title above and the questions below, across both.) */
   .screen.landing {
     width: min(100vw, 980px);
-  }
-  .landing-main {
+    display: grid;
     grid-template-columns: auto 1fr;
-    align-items: center;
-    gap: 40px;
+    align-content: start;
+    gap: 18px 40px;
+  }
+  .landing-head,
+  .faq,
+  .landing-foot {
+    grid-column: 1 / -1;
+  }
+  .landing-actions {
+    align-self: center;
   }
   .landing-head {
     text-align: left;
@@ -4305,46 +4314,63 @@ button.history-label {
     max-width: 720px;
   }
 }
-/* A computer (Eric, Nov 11: "a wide rectangle on the computer… like a cinema… a much larger size of the entire screen"): the 16:9
-   reel is the hero, about 70% of the window's width and at most 62% of its height, centered under the title; the sign-in a compact
-   panel to its right, or under it where the two don't fit side by side (below 1200 px). */
+/* A computer (Eric, Nov 11: "Move the whole screen to the left, fill it up mostly … the questions can just be a scrollable thing
+   underneath the sign-in … the right side is scrollable, but the left, the large part where the video plays, is not"): the page fills
+   the window and never scrolls. Left, the title and the 16:9 reel, as big as fits and centered; right, a 380 px column with the
+   sign-in on top and the questions under it, the one part that scrolls. */
 @media (min-width: 1024px) {
   .screen.landing {
-    width: min(100vw, 1800px);
+    width: 100vw;
+    height: var(--app-h);
+    min-height: 0;
+    overflow: hidden;
+    padding: 24px 28px;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .landing-stage,
+  .landing-side {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-height: 0;
+    min-width: 0;
   }
   .landing-head {
     text-align: center;
     justify-items: center;
   }
-  .landing-main {
-    grid-template-columns: auto;
+  /* The reel's pane is the box it fits in (container-type: size), less a line for the caption under it. */
+  .demo-frame {
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    justify-items: center;
-    align-items: start;
-    gap: 20px;
-  }
-  .landing-actions {
-    width: min(100%, 420px);
-  }
-  .faq {
-    width: min(100%, 720px);
-    margin-inline: auto;
   }
   .demo-video.wide {
-    width: min(70vw, calc(62vh * 16 / 9));
+    width: min(100cqw, calc((100cqh - 24px) * 16 / 9));
     height: auto;
     aspect-ratio: 16 / 9;
     border-radius: 16px;
   }
-}
-@media (min-width: 1200px) {
-  .landing-main {
-    grid-template-columns: auto 300px;
-    gap: 28px;
+  .landing-side {
+    gap: 18px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 6px;
   }
   .landing-actions {
-    width: 300px;
-    align-self: center;
+    align-self: stretch;
+  }
+  .faq {
+    max-width: none;
+  }
+  .landing-foot {
+    margin-top: auto;
   }
 }
 /* Narrow phones: the email box gets its own line. */

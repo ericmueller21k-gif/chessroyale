@@ -94,23 +94,27 @@ export function LandingScreen({
 }) {
   return (
     <div class="screen landing">
-      <header class="landing-head">
-        <h1 class="logo">
-          <span class="logo-crown" aria-hidden="true">
-            ♚
-          </span>
-          HunChess
-          <MuteButton />
-        </h1>
-        <p class="landing-tag">
-          <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
-        </p>
-      </header>
-      <div class="landing-main">
+      {/* Two panes on a computer (Eric, Nov 11): the title and the reel stay put on the left, the sign-in and the questions scroll on the
+          right. Below 1024 px both wrappers are display: contents, so a phone's column is as before. */}
+      <div class="landing-stage">
+        <header class="landing-head">
+          <h1 class="logo">
+            <span class="logo-crown" aria-hidden="true">
+              ♚
+            </span>
+            HunChess
+            <MuteButton />
+          </h1>
+          <p class="landing-tag">
+            <strong>{CROWD.lobbySize} players. One board.</strong> Pick the best move for your team of {CROWD.lobbySize / 2}. The crowd plays it.
+          </p>
+        </header>
         <figure class="demo-frame">
           <DemoVideo />
           <figcaption class="muted small">A look inside HunChess</figcaption>
         </figure>
+      </div>
+      <div class="landing-side">
         <div class="landing-actions">
           {notice && (
             <p class="landing-notice" role="status">
@@ -132,19 +136,19 @@ export function LandingScreen({
           </button>
           <p class="muted small landing-note">Guests play solo against bots. Online matches need an account.</p>
         </div>
+        <section class="faq">
+          <h2>Questions</h2>
+          {FAQ.map(([q, a]) => (
+            <details key={q}>
+              <summary>{q}</summary>
+              <p>{a}</p>
+            </details>
+          ))}
+        </section>
+        <footer class="landing-foot muted small">
+          <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
+        </footer>
       </div>
-      <section class="faq">
-        <h2>Questions</h2>
-        {FAQ.map(([q, a]) => (
-          <details key={q}>
-            <summary>{q}</summary>
-            <p>{a}</p>
-          </details>
-        ))}
-      </section>
-      <footer class="landing-foot muted small">
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/copyright">Copyright</a>
-      </footer>
     </div>
   );
 }
