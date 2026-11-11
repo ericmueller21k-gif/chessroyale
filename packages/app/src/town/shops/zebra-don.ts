@@ -14,6 +14,7 @@
  * BOSS_ZEBRA_PORTRAIT: the part of `idle` frame 0 a portrait shows (his head and hat).
  */
 import type { Anim, Character, Frame, Speck } from "../../characters/sprite.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 import { ARMS, build, crumbFall, doughLump, FOOT, frame, H, hahas, PARTS, puff, stars, W, ZEBRA_PALETTE, type Built, type Look, type Pose, type Pt } from "./zebra-rig.ts";
 
 export const KINGPIN: Look = { id: "zk", hat: "fedora", top: "pin", boss: true, seed: 1 };
@@ -57,7 +58,7 @@ function anim(name: string, loop: boolean, frames: { ms: number; p: Pose; x?: Ex
 
 // ---- The standard set.
 
-const idle: Anim = {
+const idle: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 12 }, (_, i) => {
     const pat = i === 6 || i === 8; // a pat on the belly
@@ -70,8 +71,8 @@ const idle: Anim = {
       mouth: i >= 6 && i <= 8 ? "smile" : "smirk",
     });
   }),
-};
-const entrance: Anim = {
+}));
+const entrance: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(110, { ...REST, air: 7, armN: ARMS.up, armF: ARMS.wave, eyes: "wide", mouth: "o", feet: [[-4, 3], [5, 2]] }),
@@ -84,8 +85,8 @@ const entrance: Anim = {
     f(160, { ...REST, armN: [[8, -2], [7, -14]], eyes: "half", mouth: "grin" }),
     f(300, { ...REST }),
   ],
-};
-const thinking: Anim = {
+}));
+const thinking: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(i === 6 ? 120 : 260, {
@@ -98,8 +99,8 @@ const thinking: Anim = {
       jig: i % 4 === 2 ? 1 : 0,
     }),
   ),
-};
-const move: Anim = {
+}));
+const move: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { ...REST, eyes: "fwd" }),
@@ -108,7 +109,7 @@ const move: Anim = {
     f(160, { ...REST, armN: ARMS.point, eyes: "half", mouth: "smile", hx: 1 }),
     f(160, { ...REST }),
   ],
-};
+}));
 /** Pull the roll, aim, fire once; `after`: what follows the pop. */
 const pull = (ms = 110) => [
   { ms, p: { ...GRAB, eyes: "fwd" as const, mouth: "smirk" as const } },
@@ -119,7 +120,7 @@ const stow = (ms = 120) => [
   { ms, p: { gun: STOW, armF: ARMS.bellyF, eyes: "half" as const, mouth: "smirk" as const } },
   { ms: 110, p: { ...GRAB, eyes: "half" as const, mouth: "smirk" as const } },
 ];
-const capture = anim("capture", false, [
+const capture: Anim = lazyAnim(() => anim("capture", false, [
   ...pull(),
   { ms: 140, p: { gun: AIM, eyes: "mad", mouth: "grit", hx: 1 } },
   { ms: 110, p: { gun: KICK, eyes: "mad", mouth: "grin", dx: -1, jig: 1, hx: 1 }, shot: [0], x: { cue: "pop" } },
@@ -128,8 +129,8 @@ const capture = anim("capture", false, [
   { ms: 160, p: { gun: HUG, eyes: "shut", mouth: "laugh", jig: 2 }, shot: [3], x: { specks: (b) => hahas(b.mouth, 0) } },
   ...stow(),
   { ms: 200, p: { ...REST } },
-]);
-const hurt: Anim = {
+]));
+const hurt: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(90, { ...REST, hatLift: 4, jig: 2, eyes: "wide", mouth: "o", brows: "up", dx: -2 }, { cue: "hurt", shake: [-1, 0], pal: { c: "#ffffff", C: "#ffffff", d: "#e6e2ee", v: "#c04a5e", V: "#8a2a3a" } }),
@@ -139,8 +140,8 @@ const hurt: Anim = {
     f(160, { ...REST, eyes: "mad", mouth: "frown", armN: [[8, -2], [7, -14]] }),
     f(200, { ...REST, eyes: "half", mouth: "flat" }),
   ],
-};
-const check = anim("check", false, [
+}));
+const check: Anim = lazyAnim(() => anim("check", false, [
   ...pull(100),
   { ms: 160, p: { gun: AIM, eyes: "mad", brows: "down", mouth: "flat", hx: 1 }, x: { cue: "cock" } },
   { ms: 220, p: { gun: AIM, eyes: "half", brows: "down", mouth: "smirk", hx: 1 } },
@@ -148,14 +149,14 @@ const check = anim("check", false, [
   { ms: 200, p: { gun: AIM, eyes: "mad", brows: "down", mouth: "smirk", hx: 1 } },
   ...stow(),
   { ms: 200, p: { ...REST } },
-]);
-const smug: Anim = {
+]));
+const smug: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(i % 2 ? 150 : 230, { ...REST, hy: -1, jig: i % 2 ? 1 : -1, eyes: i === 5 ? "shut" : "half", brows: "one", mouth: i % 4 === 1 ? "grin" : "smirk" }),
   ),
-};
-const rattled: Anim = {
+}));
+const rattled: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(120, {
@@ -169,8 +170,8 @@ const rattled: Anim = {
       sweat: i % 4 < 2 ? 1 : 2,
     }),
   ),
-};
-const cheer: Anim = {
+}));
+const cheer: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(120, { ...REST, eyes: "open", mouth: "smile" }),
@@ -179,8 +180,8 @@ const cheer: Anim = {
     f(130, { ...REST, hy: 2, eyes: "shut", mouth: "grin", armN: [[7, 6], [11, 9]], jig: 1 }),
     f(200, { ...REST, eyes: "half", mouth: "smirk" }),
   ],
-};
-const bigCheer = anim("bigCheer", false, [
+}));
+const bigCheer: Anim = lazyAnim(() => anim("bigCheer", false, [
   ...pull(100),
   { ms: 110, p: { gun: { deg: -84, at: [5, -14], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", air: 3, feet: [[-5, 2], [5, 3]] }, x: { cue: "laugh" } },
   { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", jig: 2, bob: 1 }, x: { specks: (b) => hahas(b.mouth, 0) } },
@@ -188,8 +189,8 @@ const bigCheer = anim("bigCheer", false, [
   { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "grin", jig: 2, bob: 1 } },
   ...stow(),
   { ms: 200, p: { ...REST } },
-]);
-const victory: Anim = {
+]));
+const victory: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) => {
     const up = i % 4 < 2;
@@ -204,8 +205,8 @@ const victory: Anim = {
       mouth: i % 2 ? "grin" : "laugh",
     }, { ...(i === 0 ? { cue: "laugh" } : {}), specks: (b) => [...crumbFall(14, 86, 4, i, 3), ...(i % 2 ? [] : hahas(b.mouth, i))] });
   }),
-};
-const defeat: Anim = {
+}));
+const defeat: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(100, { ...REST, slung: false, gun: { deg: -40, at: [6, 0], grip: 6 }, eyes: "wide", mouth: "o", brows: "up", jig: 2, hatAt: [40, 30] }, { cue: "hurt", shake: [-1, 0] }),
@@ -216,7 +217,7 @@ const defeat: Anim = {
       f(170, { sit: 7, gun: { deg: 38, at: [10, 9], grip: 10, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "frown", jig: t % 2 ? -1 : 0, hatAt: [14, 101] }, { specks: (b) => stars([b.head[0] - 2, b.head[1] - 9], t) }),
     ),
   ],
-};
+}));
 
 // ---- His own moves.
 
@@ -225,7 +226,7 @@ const defeat: Anim = {
  * sights down it, "fires" (a little puff of flour and crumbs, cue `pop`), then laughs (cue `laugh`), the belly bouncing, and
  * slings it back. About 2.6 s; it ends on his idle's first frame.
  */
-const breadPop = anim("breadPop", false, [
+const breadPop: Anim = lazyAnim(() => anim("breadPop", false, [
   { ms: 200, p: { ...REST } },
   ...pull(130),
   { ms: 130, p: { gun: AIM, eyes: "fwd", mouth: "smirk", hx: 1 } },
@@ -240,13 +241,13 @@ const breadPop = anim("breadPop", false, [
   { ms: 150, p: { gun: HUG, eyes: "shut", mouth: "grin", jig: 1 } },
   ...stow(),
   { ms: 160, p: { ...REST } },
-]);
+]));
 /**
  * volley (his God King save, Eric's words: "firing off a bunch of shots with this loaf of bread"): a looping rapid fire, the
  * roll kicking up with each shot and coming back, four puffs a loop drifting off, his belly shaking, a mad grin (cue `volley`
  * f0: one rattle of four soft pops a loop). Play `pull`'s frames first if he hasn't the roll out: this loop starts aimed.
  */
-const volley = anim(
+const volley: Anim = lazyAnim(() => anim(
   "volley",
   true,
   Array.from({ length: 8 }, (_, i) => {
@@ -260,7 +261,7 @@ const volley = anim(
       x: i === 0 ? { cue: "volley" } : {},
     };
   }),
-);
+));
 /** relax (the back room's talk beat, standing): a calm-down wave of his hoof to his crew, "easy, easy" (cue `relax` f1). */
 const relaxFrames = (seated: boolean): Anim => {
   const base: Pose = seated ? { sit: 11, armF: ARMS.bellyF } : { ...REST, armF: ARMS.bellyF };
@@ -276,15 +277,15 @@ const relaxFrames = (seated: boolean): Anim => {
     ],
   };
 };
-const relax = relaxFrames(false);
-const sitRelax = relaxFrames(true);
+const relax: Anim = lazyAnim(() => relaxFrames(false));
+const sitRelax: Anim = lazyAnim(() => relaxFrames(true));
 
 /**
  * drop (Rising Dough): he dips a hoof into his apron pocket, comes up with a lump of raw dough, gives it a little toss in his
  * hoof, winds back and lobs it out to our right toward the board (cue `drop` f5, as it leaves his hoof), a smug look after it.
  * The lump leaves the frame's right side at about (90, 34) on f7; the board then plays ZEBRA_DOUGH `land` on its square.
  */
-const drop: Anim = {
+const drop: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(140, { ...REST, eyes: "open" }),
@@ -297,7 +298,7 @@ const drop: Anim = {
     f(80, { ...REST, armN: [[9, 2], [15, 6]], eyes: "half", mouth: "grin", hx: 1 }, { specks: () => doughLump([89, 34], 1) }),
     f(260, { ...REST, eyes: "half", mouth: "smirk", brows: "one" }),
   ],
-};
+}));
 
 /**
  * goldPlate (his ultimate, Gold Plate, Eric Nov 11): a baker's golden glaze. He brings out a little pot of gold glaze against his
@@ -339,7 +340,7 @@ const brush = (h: Pt, dx: number, dy: number, wet = true): Speck[] => {
 /** Glitter flung off the brush ahead of it, `t` frames on. */
 const fling = (h: Pt, t: number): Speck[] =>
   [0, 1, 2, 3, 4, 5].map((n): Speck => [Math.round(h[0] + 9 + n * 2.6 + t * 2), Math.round(h[1] - 3 + ((n * 5) % 7) - t), n % 3 === 0 ? "*" : n % 3 === 1 ? "g" : "h"]);
-const goldPlate: Anim = {
+const goldPlate: Anim = lazyAnim(() => ({
   loop: false,
   frames: [
     f(300, { ...REST, eyes: "fwd", mouth: "smirk", brows: "one" }),
@@ -362,12 +363,12 @@ const goldPlate: Anim = {
     f(420, { ...REST, armN: ARMS.open, eyes: "shut", mouth: "smile", hy: -2, hx: -1 }, { specks: (b) => [[b.hoofN[0] + 4, b.hoofN[1] - 3, "*"], [b.hoofN[0] + 5, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 3, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 4, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 2, "g"]] }),
     f(300, { ...REST, eyes: "half", mouth: "smirk", brows: "one" }),
   ],
-};
+}));
 /**
  * goldBrag (loops, 8 frames, 1.6 s): after the gilding, while the piece shines and he says his line (your pawns are worthless
  * against it): chin up, talking, a hoof pointing down at the board (your pawns), then patting his belly, a smug chuckle.
  */
-const goldBrag: Anim = {
+const goldBrag: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 8 }, (_, i) =>
     f(200, {
@@ -381,13 +382,13 @@ const goldBrag: Anim = {
       jig: i >= 4 ? (i % 2 ? 1 : -1) : 0,
     }),
   ),
-};
+}));
 
 // ---- At the back room's table (seated on a chair 11 px up; his roll lies on the table: ZEBRA_ROLL `table`).
 
 const SIT: Pose = { sit: 11, armN: ARMS.belly, armF: ARMS.bellyF, eyes: "half", mouth: "smirk" };
 /** Talking: gesturing, then poking the table twice (cue `tap`), "rook b1 takes, check". */
-const sitTalk: Anim = {
+const sitTalk: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(160, { ...SIT, armN: ARMS.open, mouth: "open", eyes: "fwd" }),
@@ -401,15 +402,15 @@ const sitTalk: Anim = {
     f(160, { ...SIT, armN: ARMS.calmLow, mouth: "open", eyes: "fwd" }),
     f(200, { ...SIT, armN: ARMS.calmLow, mouth: "smile", eyes: "blink" }),
   ],
-};
-const sitListen: Anim = {
+}));
+const sitListen: Anim = lazyAnim(() => ({
   loop: true,
   frames: Array.from({ length: 10 }, (_, i) =>
     f(i === 6 ? 110 : 240, { ...SIT, eyes: i === 6 ? "blink" : i >= 2 && i <= 4 ? "fwd" : "half", hy: i === 3 ? 2 : i === 4 ? 1 : 0, jig: i % 5 === 2 ? 1 : 0, mouth: i === 8 ? "pout" : "smirk", brows: i >= 7 ? "one" : undefined }),
   ),
-};
+}));
 /** He's always right: chin up, eyes shut, a hoof raised and wagged, "no, no, no" (cue `tsk` f1). */
-const sitScoff: Anim = {
+const sitScoff: Anim = lazyAnim(() => ({
   loop: true,
   frames: [
     f(160, { ...SIT, armN: ARMS.finger, eyes: "half", mouth: "smirk", brows: "one", hy: -1 }),
@@ -421,7 +422,7 @@ const sitScoff: Anim = {
     f(200, { ...SIT, armN: ARMS.open, eyes: "half", mouth: "open", brows: "one" }),
     f(200, { ...SIT, armN: ARMS.belly, eyes: "half", mouth: "smirk", jig: 1 }),
   ],
-};
+}));
 
 export const BOSS_ZEBRA: Character = {
   id: "boss-zebra",

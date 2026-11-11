@@ -24,6 +24,7 @@
  *   the roll down at his side in his far hoof, a breadstick in his teeth, a curl of steam [puff]).
  */
 import type { Anim, Character, Frame } from "../../characters/sprite.ts";
+import { lazyAnim } from "../../characters/sprite.ts";
 import { ARMS, breadstick, FOOT, frame, H, PARTS, steam, W, ZEBRA_PALETTE, type Look, type Pose, type Pt } from "./zebra-rig.ts";
 
 export const LOOKS = {
@@ -153,8 +154,8 @@ function puffAnim(look: Look, seated: boolean): Anim {
 // ---- The guards.
 
 function guard(look: Look, id: string, name: string): Character {
-  const g = guardAnim(look);
-  return char(id, name, { idle: g, guard: g, watch: watchAnim(look), draw: drawAnim(look, PORT), aim: aimAnim(look), lower: lowerAnim(look), puff: puffAnim(look, false) });
+  const g = lazyAnim(() => guardAnim(look));
+  return char(id, name, { idle: g, guard: g, watch: lazyAnim(() => watchAnim(look)), draw: lazyAnim(() => drawAnim(look, PORT)), aim: lazyAnim(() => aimAnim(look)), lower: lazyAnim(() => lowerAnim(look)), puff: lazyAnim(() => puffAnim(look, false)) });
 }
 export const NPC_ZEBRA_GUARD_A = guard(LOOKS.guardA, "npc-zebra-guard-a", "The bakery's door guard (flat cap)");
 export const NPC_ZEBRA_GUARD_B = guard(LOOKS.guardB, "npc-zebra-guard-b", "The bakery's door guard (paper cap)");
@@ -225,18 +226,18 @@ function standUpAnim(look: Look): Anim {
   };
 }
 function tableCrew(look: Look, id: string, name: string, seed: number): Character {
-  const listen = sitListenAnim(look);
+  const listen = lazyAnim(() => sitListenAnim(look));
   return char(id, name, {
     idle: listen,
-    sitTalk: sitTalkAnim(look, seed),
+    sitTalk: lazyAnim(() => sitTalkAnim(look, seed)),
     sitListen: listen,
-    sitArgue: sitArgueAnim(look),
-    sitPuff: puffAnim(look, true),
-    standUp: standUpAnim(look),
-    draw: drawAnim(look),
-    aim: aimAnim(look),
-    lower: lowerAnim(look),
-    puff: puffAnim(look, false),
+    sitArgue: lazyAnim(() => sitArgueAnim(look)),
+    sitPuff: lazyAnim(() => puffAnim(look, true)),
+    standUp: lazyAnim(() => standUpAnim(look)),
+    draw: lazyAnim(() => drawAnim(look)),
+    aim: lazyAnim(() => aimAnim(look)),
+    lower: lazyAnim(() => lowerAnim(look)),
+    puff: lazyAnim(() => puffAnim(look, false)),
   });
 }
 export const NPC_ZEBRA_CREW_C = tableCrew(LOOKS.crewC, "npc-zebra-crew-c", "The bakery's table crew (toque, glasses)", 0);

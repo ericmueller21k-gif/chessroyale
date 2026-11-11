@@ -78,6 +78,11 @@ export interface BossIntro {
   cam?: { readonly south: number; readonly west: number; readonly zoom: number };
   /** What its helpers call out as they come (Ginger's board carriers: "Coming, boss!"), in a bubble over them; none: they're quiet. */
   crewLine?: string;
+  /**
+   * Met inside, not brought in from the town (Don Dough, Nov 11: the kingpin stays in his back room): he's on his mark from the start
+   * and you walk to yours from where you stood to talk to him; his room's challenge starts from his card (Town.tsx challengeHere).
+   */
+  inPlace?: true;
 }
 
 /**

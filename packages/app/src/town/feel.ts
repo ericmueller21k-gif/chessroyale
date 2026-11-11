@@ -801,4 +801,22 @@ export const SHOP_FEEL = {
    * controls docked at the bottom.
    */
   claw: { glideMs: 900, tall: 0.56, wide: 0.8, maxMag: 3, atY: 0.4 },
+  /**
+   * Rolling Dough's people (Nov 11, shops/zebra-scene.ts). A line stays up `lineMs` plus `perCharMs` a character (the longest, 58
+   * characters, about 4.4 s). The guards say one now and then (`guardMs`, at random), sooner while you're beside them or by the back
+   * door (`guardNearMs`). The back table's chatter: its first line `firstMs` after you come in, `lineGapMs` between lines, `exchangeGapMs`
+   * between exchanges. The talk beat: the crew `staggerMs` apart; Fedora's line `aimLeadMs` after his draw; they lower `lowerAfterMs` into
+   * Don's "Relax"; his challenge line `gapMs` after. `dim`: the back room's dark wash (the art's mockup: 0.36), its lights added over it.
+   */
+  zebra: {
+    lineMs: 1800,
+    perCharMs: 45,
+    guardMs: [9000, 15000],
+    guardNearMs: [3500, 6000],
+    firstMs: 900,
+    lineGapMs: 500,
+    exchangeGapMs: 1400,
+    beat: { staggerMs: 120, aimLeadMs: 150, lowerAfterMs: 900, gapMs: 300 },
+    dim: 0.36,
+  },
 } as const;

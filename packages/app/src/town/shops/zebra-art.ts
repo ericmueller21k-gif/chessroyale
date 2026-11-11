@@ -1024,7 +1024,11 @@ export const SHOP_ZEBRA_TV_MOVES = ["e2e4", "c7c5", "g1f3", "d7d6", "d2d4", "c5d
     rect(c, TV.x + 5, TV.y + 1, 7, 1, ",");
     frames.push([whole(c, false)]);
   }
-  def("tv", [2, 1], 2 * T, WH, [T, WH - 1], frames, 400);
+  // (Its frames where the board changes carry a `click` cue: a piece set down, the sound round's. Added in the game: no pixel changes.)
+  const ply = (f: number) => Math.min(SHOP_ZEBRA_TV_MOVES.length, Math.floor(f / 1.5));
+  const clicks: Record<number, string> = {};
+  for (let f = 1; f < 16; f++) if (ply(f) !== ply(f - 1)) clicks[f] = "click";
+  def("tv", [2, 1], 2 * T, WH, [T, WH - 1], frames, 400, clicks);
 }
 
 // ---- The back room's side walls (columns 1 and 12, rows 4-9): the same dim plaster and wainscot; a bookshelf of chess books, a pinned

@@ -28,6 +28,11 @@ export interface ShopPlace {
   d?: number;
   /** The way out. */
   exit?: boolean;
+  /**
+   * A door to the home's other room (Rolling Dough, Nov 11: "back" from the front room, "front" from the back room): its squares are
+   * blocked as the way out's are; standing just inside it shows its card, and going through loads the other room.
+   */
+  door?: "back" | "front";
   /** How far into its loop it stands (ms): Smudgy's painters, the same frames each starting at its own time. */
   t0?: number;
 }
@@ -45,6 +50,16 @@ export interface Room {
   /** The way out's squares (the entrance's picture), and the squares just inside it, where "Go out" shows. */
   exits: readonly Sq[];
   doors: readonly Sq[];
+  /**
+   * A door to the home's other room (Rolling Dough's, Nov 11): its own squares, the squares just inside it (where its card shows), and
+   * which room it leads to; null: a room with one room.
+   */
+  pass: { readonly squares: readonly Sq[]; readonly inside: readonly Sq[]; readonly to: "back" | "front" } | null;
+  /**
+   * Where you stand to talk, when it isn't "near the Shopkeeper" (Don Dough, Nov 11: at the foot of his table, facing him across it);
+   * null: within talking range of the Shopkeeper's squares.
+   */
+  talkAt: readonly Sq[] | null;
   /** The Shopkeeper's squares, and the counter's (a tap on either means "talk"). */
   keeper: readonly Sq[];
   counter: readonly Sq[];
@@ -74,7 +89,7 @@ export function squaresOf(p: ShopPlace): Sq[] {
  * `n` rows of `n`, `.` floor and `#` rock) blocks every rock square too, besides the edge and the solid pieces. `talk`: the pieces
  * whose squares mean "talk" as the counter's do (a shop with no counter: Jefferson's crate and his bare corner, Nov 4).
  */
-export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = [], levels: Levels | null = null): Room {
+export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n = 20, mask?: readonly string[], talk: readonly string[] = [], levels: Levels | null = null, talkAt: readonly Sq[] | null = null): Room {
   const blocked = new Uint8Array(n * n);
   const block = (s: Sq) => s.c >= 0 && s.c < n && s.r >= 0 && s.r < n && (blocked[s.r * n + s.c] = 1);
   // The walls are the room's edge, whatever stands there.
@@ -87,10 +102,19 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
   }
   const exits: Sq[] = [];
   const counter: Sq[] = [];
+  const passSqs: Sq[] = [];
+  let passTo: "back" | "front" | null = null;
   for (const p of layout) {
     if (isFloor(p.name)) continue;
     if (p.solid) squaresOf(p).forEach(block);
     if (p.exit) exits.push(...squaresOf(p));
+    if (p.door) {
+      // (Its squares too, its picture 2 wide: blocked, as the way out's are.)
+      const sq = squaresOf({ ...p, w: Math.max(p.w ?? 1, 2) });
+      sq.forEach(block);
+      passSqs.push(...sq);
+      passTo = p.door;
+    }
     if (p.name === "counter" || talk.includes(p.name)) counter.push(...squaresOf(p));
   }
   keeper.forEach(block);
@@ -98,7 +122,11 @@ export function makeRoom(layout: readonly ShopPlace[], keeper: readonly Sq[], n 
   if (levels) for (let k = 0; k < n * n; k++) if (levels.up[k]) blocked[k] = 0;
   const doors = exits.map((s) => ({ c: s.c, r: s.r - 1 })).filter((s) => !blocked[s.r * n + s.c]);
   const start = { c: doors[doors.length - 1]?.c ?? n >> 1, r: (doors[0]?.r ?? n - 2) - 1 };
-  return { n, blocked, exits, doors, keeper, counter, start, floor, levels };
+  // (The squares just inside the door to the other room: the floor beside it, south of a door in the back wall, north of one in the
+  // front.)
+  const inside = passSqs.flatMap((s) => [{ c: s.c, r: s.r + 1 }, { c: s.c, r: s.r - 1 }]).filter((s) => s.r >= 0 && s.r < n && !blocked[s.r * n + s.c]);
+  const pass = passTo ? { squares: passSqs, inside, to: passTo } : null;
+  return { n, blocked, exits, doors, keeper, counter, start, floor, levels, pass, talkAt };
 }
 
 /**
@@ -212,10 +240,19 @@ export const walkable = (room: Room, c: number, r: number): boolean => inRoom(ro
 const has = (list: readonly Sq[], c: number, r: number) => list.some((s) => s.c === c && s.r === r);
 /** On a square just inside the way out ("Go out" shows). */
 export const onDoor = (room: Room, c: number, r: number): boolean => has(room.doors, c, r);
+/** On a square just inside the door to the home's other room (its card shows). */
+export const onPass = (room: Room, c: number, r: number): boolean => !!room.pass && has(room.pass.inside, c, r);
+/** Where you arrive through the door from the other room: just inside it, the nearer of its squares to the room's middle. */
+export const passArrive = (room: Room): Sq | null => {
+  const ins = room.pass?.inside;
+  if (!ins?.length) return null;
+  return [...ins].sort((a, b) => Math.abs(a.c - room.n / 2) - Math.abs(b.c - room.n / 2))[0]!;
+};
 /** How far a square is from the Shopkeeper: the larger of the two directions, to its nearest square. */
 export const talkDist = (room: Room, c: number, r: number): number => Math.min(...room.keeper.map((k) => Math.max(Math.abs(k.c - c), Math.abs(k.r - r))));
 /** Near enough to talk to the Shopkeeper (`SHOP_FEEL.talkRange`): on the floor (not up on a catwalk over him). */
-export const inTalkRange = (room: Room, c: number, r: number, range: number = SHOP_FEEL.talkRange): boolean => !isUp(room.levels, c, r) && talkDist(room, c, r) <= range;
+export const inTalkRange = (room: Room, c: number, r: number, range: number = SHOP_FEEL.talkRange): boolean =>
+  room.talkAt ? has(room.talkAt, c, r) : !isUp(room.levels, c, r) && talkDist(room, c, r) <= range;
 
 const DIRS = [
   [1, 0],
@@ -324,14 +361,19 @@ function best(room: Room, from: Sq, score: (c: number, r: number) => number | nu
  */
 function talkSpot(room: Room, c: number, r: number): number | null {
   if (!inTalkRange(room, c, r)) return null;
+  // (Fixed talk squares: each as good as another; the nearest wins.)
+  if (room.talkAt) return 0;
   const k = room.keeper;
   const mid = k.reduce((a, s) => a + s.c, 0) / k.length;
   const front = Math.max(...k.map((s) => s.r)) + SHOP_FEEL.talkRange;
   return Math.abs(c - mid) + 2 * Math.abs(r - front);
 }
 
-/** What a tap means inside: a square to walk to, the Shopkeeper (walk into talking range) or the door (walk to the way out). */
-export type RoomTap = { kind: "square" | "keeper" | "door"; dest: Sq | null };
+/**
+ * What a tap means inside: a square to walk to, the Shopkeeper (walk into talking range), the door (walk to the way out) or the door to
+ * the other room (walk to just inside it).
+ */
+export type RoomTap = { kind: "square" | "keeper" | "door" | "pass"; dest: Sq | null };
 
 /**
  * Where a tap on the square (c, r) sends you from `from`: the Shopkeeper or the counter, into talking range (`talkSpot`: in
@@ -341,6 +383,7 @@ export type RoomTap = { kind: "square" | "keeper" | "door"; dest: Sq | null };
 export function tapTarget(room: Room, from: Sq, c: number, r: number): RoomTap {
   if (has(room.keeper, c, r) || has(room.counter, c, r)) return { kind: "keeper", dest: best(room, from, (x, y) => talkSpot(room, x, y)) };
   if (has(room.exits, c, r) || has(room.doors, c, r)) return { kind: "door", dest: best(room, from, (x, y) => (onDoor(room, x, y) ? Math.abs(x - c) : null)) };
+  if (room.pass && (has(room.pass.squares, c, r) || has(room.pass.inside, c, r))) return { kind: "pass", dest: best(room, from, (x, y) => (onPass(room, x, y) ? Math.abs(x - c) : null)) };
   if (walkable(room, c, r)) return { kind: "square", dest: { c, r } };
   return { kind: "square", dest: best(room, from, (x, y) => Math.max(Math.abs(x - c), Math.abs(y - r))) };
 }
