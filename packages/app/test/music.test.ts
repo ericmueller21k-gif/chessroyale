@@ -62,13 +62,20 @@ const ctx = {
 };
 const files: string[] = [];
 const forgot: string[] = [];
+// (Decoded buffers kept as sound.ts keeps them, until forgotten: `fetched` lists the misses, each a real fetch and decode.)
+const bufs = new Map<string, { url: string }>();
+const fetched: string[] = [];
 const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: [] as (() => void)[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
   musicBus: () => ({ ctx, master: {} }),
-  loadAudioFile: (url: string) => (files.push(url), Promise.resolve({ url })),
-  forgetAudioFile: (url: string) => void forgot.push(url),
+  loadAudioFile: (url: string) => {
+    files.push(url);
+    if (!bufs.has(url)) (fetched.push(url), bufs.set(url, { url }));
+    return Promise.resolve(bufs.get(url)!);
+  },
+  forgetAudioFile: (url: string) => void (forgot.push(url), bufs.delete(url)),
   onAudioRebuilt: () => () => undefined,
   onMuteChange: (fn: () => void) => (sound.muteListeners.push(fn), () => undefined),
 }));
@@ -78,6 +85,7 @@ const THEMES = {
   themes: {
     grex: { intro: "grex-intro", loop: "grex-loop", introSeconds: 6.666667, loopSeconds: 113.333333 },
     bigboy: { intro: null, loop: "bigboy-loop", introSeconds: 0, loopSeconds: 60 },
+    zebra: { intro: "zebra-intro", loop: "zebra-loop", introSeconds: 4, loopSeconds: 100 },
   },
 };
 let themesAsked = 0;
@@ -86,7 +94,7 @@ vi.stubGlobal("fetch", (url: string) => {
   return Promise.resolve({ ok: true, json: () => Promise.resolve(THEMES) });
 });
 
-const { bossMusic, musicLevel, musicNow, musicPlan, setMusicOn } = await import("../src/music.ts");
+const { bossMusic, musicLevel, musicNow, musicPlan, roomMusic, roomMusicLoad, roomMusicNow, setMusicOn } = await import("../src/music.ts");
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 describe("the plan from themes.json", () => {
@@ -251,5 +259,133 @@ describe("the player through a battle", () => {
 
   it("the themes file is read once a visit", () => {
     expect(themesAsked).toBe(1);
+  });
+});
+
+// Eric, Nov 11: "add their music to the room, it loads when you walk in, then it will also be loaded already when the fight starts,
+// but to be clear, only play the music if you walk in on your own through the door, not via challenging the boss." Town.tsx calls
+// roomMusicLoad as the door zooms (walked in only), roomMusic(boss) as the room shows (walked in only), roomMusic(null) leaving.
+describe("a boss's room", () => {
+  beforeEach(() => {
+    ctx.sources = [];
+    ctx.gains = [];
+    files.length = 0;
+    fetched.length = 0;
+    forgot.length = 0;
+    bufs.clear();
+    sound.muted = false;
+    sound.hidden = false;
+    setMusicOn(true);
+  });
+  afterEach(() => {
+    roomMusic(null);
+    bossMusic(null);
+  });
+
+  it("walked in through the door: loads as the door zooms, plays its intro then its loop as the room shows", async () => {
+    roomMusicLoad("zebra");
+    await settle();
+    expect(fetched).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
+    expect(ctx.sources).toHaveLength(0);
+    ctx.currentTime = 40;
+    roomMusic("zebra");
+    await settle();
+    const [intro, loop] = ctx.sources;
+    expect(intro!.started).toEqual([40 + MUSIC.startDelayS, undefined]);
+    expect(loop!.started![0]).toBeCloseTo(40 + MUSIC.startDelayS + 4, 6);
+    expect(loop!.loop).toBe(true);
+    expect(roomMusicNow()).toEqual({ boss: "zebra", level: MUSIC.volume });
+    expect(fetched).toHaveLength(2);
+  });
+
+  it("arriving by a challenge (no roomMusic call): nothing plays in the room; the battle's music as before", async () => {
+    bossMusic({ key: "via-challenge", boss: "grex", live: false });
+    await settle();
+    expect(ctx.sources).toHaveLength(0);
+    expect(roomMusicNow()).toBeNull();
+    bossMusic({ key: "via-challenge", boss: "grex", live: true });
+    await settle();
+    expect(musicNow()?.boss).toBe("grex");
+    expect(roomMusicNow()).toBeNull();
+  });
+
+  it("Rolling Dough's door between rooms: the same boss again carries on, no restart", async () => {
+    roomMusic("zebra");
+    await settle();
+    roomMusic("zebra");
+    roomMusic("zebra");
+    await settle();
+    expect(ctx.sources).toHaveLength(2);
+    expect(ctx.sources.every((s) => s.stoppedAt === null)).toBe(true);
+  });
+
+  it("leaving fades it out over endFadeMs and stops it; its theme is let go after the fade", async () => {
+    vi.useFakeTimers();
+    try {
+      roomMusic("zebra");
+      await vi.advanceTimersByTimeAsync(0);
+      ctx.currentTime = 70;
+      roomMusic(null);
+      expect(ctx.gains[0]!.gain.lastRamp).toEqual([0, 70 + MUSIC.endFadeMs / 1000]);
+      for (const s of ctx.sources) expect(s.stoppedAt).toBe(70 + MUSIC.endFadeMs / 1000);
+      expect(roomMusicNow()).toBeNull();
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(forgot.sort()).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("challenging from inside: the battle fades the room's out and restarts the same decoded theme from its intro (no second fetch, not let go)", async () => {
+    vi.useFakeTimers();
+    try {
+      roomMusicLoad("zebra");
+      roomMusic("zebra");
+      await vi.advanceTimersByTimeAsync(0);
+      const roomLoop = ctx.sources[1]!;
+      ctx.currentTime = 80;
+      bossMusic({ key: "don", boss: "zebra", live: false });
+      expect(roomLoop.stoppedAt).toBe(80 + MUSIC.endFadeMs / 1000);
+      expect(roomMusicNow()).toBeNull();
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(forgot).toEqual([]);
+      ctx.currentTime = 90;
+      bossMusic({ key: "don", boss: "zebra", live: true });
+      await vi.advanceTimersByTimeAsync(0);
+      const [bIntro, bLoop] = ctx.sources.slice(2);
+      expect(bIntro!.started).toEqual([90 + MUSIC.startDelayS, undefined]);
+      expect(bLoop!.buffer).toBe(roomLoop.buffer);
+      expect(fetched).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
+      expect(musicNow()?.boss).toBe("zebra");
+      // (Leaving the room after the battle began: the theme is kept while its battle is on.)
+      roomMusic(null);
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(forgot).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a boss without a theme: nothing", async () => {
+    roomMusicLoad("gingerbread");
+    roomMusic("gingerbread");
+    await settle();
+    expect(files).toEqual([]);
+    expect(ctx.sources).toHaveLength(0);
+  });
+
+  it("Music off or Sound off: nothing fetched, nothing plays; Music on again starts it", async () => {
+    setMusicOn(false);
+    roomMusicLoad("zebra");
+    roomMusic("zebra");
+    await settle();
+    expect(files).toEqual([]);
+    expect(ctx.sources).toHaveLength(0);
+    setMusicOn(true);
+    await settle();
+    expect(roomMusicNow()?.boss).toBe("zebra");
+    sound.muted = true;
+    sound.muteListeners.forEach((l) => l());
+    expect(ctx.gains[0]!.gain.lastRamp![0]).toBe(0);
   });
 });

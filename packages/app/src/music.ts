@@ -204,6 +204,9 @@ export function bossMusic(b: MusicBattle | null) {
   if (!b) return;
   if (!battle) {
     battle = { ...b };
+    // (A battle ends the room's music: its theme, already decoded if it's this boss's, starts again from its intro as the battle
+    // starts. Not forgotten: forgetTheme keeps a theme whose battle has begun.)
+    endRoom();
     if (wanted()) void loadTheme(b.boss);
   }
   if (b.live && !battle.live) battle.live = true;
@@ -247,29 +250,90 @@ function endBattle() {
  * boss met in a visit (two minutes decoded is about 45 MB). Not while a battle against the same boss has begun since.
  */
 function forgetTheme(boss: string) {
-  if (battle?.boss === boss) return;
+  if (battle?.boss === boss || room === boss) return;
   void loadThemes().then((t) => {
     const th = t?.themes[boss];
-    if (!th || battle?.boss === boss) return;
+    if (!th || battle?.boss === boss || room === boss) return;
     for (const name of [th.intro, th.loop]) if (name) forgetAudioFile(musicUrl(name));
   });
 }
 
-/** The switches or the page changed: fade to the level they make now (the loop keeps its place), or start if it hadn't. */
-function relevel() {
-  const p = playing;
-  if (!p) return maybeStart(false);
-  const l = level();
-  log(`music:level:${l}`);
-  try {
-    fadeTo(p.gain.gain, l, p.ctx.currentTime, MUSIC.fadeMs);
-  } catch {
-    // Its context closed: the next tap makes a new one (onAudioRebuilt below).
-  }
+// ---- A boss's room (Eric, Nov 11: "add their music to the room, it loads when you walk in, then it will also be loaded already
+// when the fight starts, but to be clear, only play the music if you walk in on your own through the door, not via challenging the
+// boss"). Town.tsx says when: `roomMusicLoad` as the door's zoom starts, `roomMusic(boss)` as the room shows, null as you leave. ----
+/** The boss whose room you walked into (null: none, or a battle took over). */
+let room: string | null = null;
+let roomPlaying: (Playing & { boss: string }) | null = null;
+let roomStarting: string | null = null;
+
+/** You set off through a boss's door on your own: its theme starts loading (if music is wanted), to be ready as the room shows. */
+export function roomMusicLoad(boss: string) {
+  if (wanted()) void loadTheme(boss);
 }
 
-/** For the tests and the sound report: the boss whose music is playing, and its gain's target. */
+/**
+ * The room you walked into shows (`boss`: its boss; the same boss again, Rolling Dough's other room, carries on with no restart), or
+ * null: you left (a fade over MUSIC.endFadeMs, then it stops and its theme is let go). A battle on: nothing (the battle's own plays).
+ */
+export function roomMusic(boss: string | null) {
+  if (boss === room) return maybeStartRoom(false);
+  endRoom();
+  room = boss;
+  maybeStartRoom(false);
+}
+
+function maybeStartRoom(loopOnly: boolean) {
+  const r = room;
+  if (!r || battle || roomPlaying || roomStarting === r || !wanted()) return;
+  roomStarting = r;
+  void loadTheme(r).then((got) => {
+    if (roomStarting === r) roomStarting = null;
+    if (!got || room !== r || battle || roomPlaying || !wanted()) return;
+    const bus = musicBus();
+    if (!bus) return;
+    const plan = musicPlan(got.themes, r, bus.ctx.currentTime + MUSIC.startDelayS, loopOnly || !got.intro);
+    if (!plan) return;
+    try {
+      roomPlaying = { ...startPlan(bus.ctx, bus.master, plan, got.intro, got.loop, level()), boss: r };
+      log(`music:room:${r}${plan.intro ? "" : ":loop"}`);
+    } catch {
+      // Ignore audio errors: the room goes on in silence.
+    }
+  });
+}
+
+function endRoom() {
+  const was = room;
+  room = null;
+  roomStarting = null;
+  const p = roomPlaying;
+  roomPlaying = null;
+  if (was) setTimeout(() => forgetTheme(was), MUSIC.endFadeMs + 250);
+  if (!p) return;
+  log(`music:roomEnd:${p.boss}`);
+  stopPlaying(p, MUSIC.endFadeMs);
+}
+
+/** The switches or the page changed: fade to the level they make now (the loop keeps its place), or start if it hadn't. */
+function relevel() {
+  const l = level();
+  for (const p of [playing, roomPlaying]) {
+    if (!p) continue;
+    log(`music:level:${l}`);
+    try {
+      fadeTo(p.gain.gain, l, p.ctx.currentTime, MUSIC.fadeMs);
+    } catch {
+      // Its context closed: the next tap makes a new one (onAudioRebuilt below).
+    }
+  }
+  if (!playing) maybeStart(false);
+  if (!roomPlaying) maybeStartRoom(false);
+}
+
+/** For the tests and the sound report: the boss whose battle music is playing, and its gain's target. */
 export const musicNow = () => (playing ? { boss: playing.boss, level: level() } : null);
+/** The same for a room's music. */
+export const roomMusicNow = () => (roomPlaying ? { boss: roomPlaying.boss, level: level() } : null);
 
 onMuteChange(relevel);
 onMusicChange(relevel);
@@ -277,12 +341,16 @@ if (typeof document !== "undefined") document.addEventListener("visibilitychange
 // A new audio context (the old one died: sound.ts, wakeAudio): the loop starts again on it, from its start.
 onAudioRebuilt(() => {
   const p = playing;
-  if (!p) return;
+  const r = roomPlaying;
   playing = null;
-  try {
-    p.gain.disconnect();
-  } catch {
-    // Already gone with its context.
+  roomPlaying = null;
+  for (const q of [p, r]) {
+    try {
+      q?.gain.disconnect();
+    } catch {
+      // Already gone with its context.
+    }
   }
-  maybeStart(true);
+  if (p) maybeStart(true);
+  if (r) maybeStartRoom(true);
 });

@@ -4233,6 +4233,15 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  */
 export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
 
+/**
+ * The area banner (Eric, Nov 11, approving its mockup: "super clean. That's exactly what I was imagining";
+ * docs/decisions/2026-11-11-area-banner-room-music.md): as you walk into a home's room through its door (once the door's
+ * black lifts), its name across a dark band a third down the room's view, the boss's name above it in gold. Taps pass
+ * through it. Reduced motion: no fades, shown for the same total time.
+ * - `inMs`, `holdMs`, `outMs`: fade in, hold, fade out.
+ */
+export const AREA_BANNER = { inMs: 400, holdMs: 1800, outMs: 600 } as const;
+
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
 
