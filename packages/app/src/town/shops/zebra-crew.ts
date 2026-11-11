@@ -22,6 +22,8 @@
  * - all five: `draw` (once: the roll pulled up from his side, swung round and pointed at you [draw]), `aim` (loops: holding the
  *   point, a squint, a twitch), `lower` (once: relaxes, the roll down, ending pointed at the floor), `puff` (loops: standing,
  *   the roll down at his side in his far hoof, a breadstick in his teeth, a curl of steam [puff]).
+ * - the table crew: `aimAt` (the `aim` loop at each of ZEBRA_AIM_ANGLES, NOT played as an animation: the scene shows the one
+ *   pointing at you).
  */
 import type { Anim, Character, Frame } from "../../characters/sprite.ts";
 import { lazyAnim } from "../../characters/sprite.ts";
@@ -105,12 +107,22 @@ function drawAnim(look: Look, from: Pose["gun"] = SIDE): Anim {
     ],
   };
 }
-function aimAnim(look: Look): Anim {
+/**
+ * The angles `aimAt` holds the roll at (degrees below level; Eric, Nov 11: "pointing at where you are, and then when you run, it
+ * actually kind of follows your character"): each one the whole `aim` loop, so frame `i * 8 + f` is angle `i`, loop frame `f`.
+ * zebra-scene.ts aimAt picks the nearest angle to you and mirrors him to your side. (No steeper: past 40 degrees it reads as lowered.)
+ */
+export const ZEBRA_AIM_ANGLES = [0, 10, 20, 30, 40] as const;
+/** The `aim` loop's length (frames): one angle's run in `aimAt`. */
+export const ZEBRA_AIM_LOOP = 8;
+function aimAnim(look: Look, deg = 0): Anim {
+  // (Tipped down, the near hoof drops a little with it, the roll still at his shoulder.)
+  const drop = Math.round(deg / 20);
   return {
     loop: true,
-    frames: Array.from({ length: 8 }, (_, i) =>
+    frames: Array.from({ length: ZEBRA_AIM_LOOP }, (_, i) =>
       frame(look, i === 5 ? 120 : 200, {
-        gun: { ...AIM!, at: [4, 2 + (i % 4 === 2 ? 1 : 0)] },
+        gun: { ...AIM!, deg, at: [4, 2 + drop + (i % 4 === 2 ? 1 : 0)] },
         eyes: i === 5 ? "blink" : "mad",
         mouth: i === 3 ? "grit" : "flat",
         feet: [[-5, 0], [5, 0]],
@@ -119,6 +131,10 @@ function aimAnim(look: Look): Anim {
       }),
     ),
   };
+}
+/** The aim at each of ZEBRA_AIM_ANGLES, one loop after another (never played as one: zebra-scene.ts shows the frame for your angle). */
+function aimAtAnim(look: Look): Anim {
+  return { loop: true, frames: ZEBRA_AIM_ANGLES.flatMap((d) => aimAnim(look, d).frames) };
 }
 function lowerAnim(look: Look): Anim {
   const f = (ms: number, p: Pose) => frame(look, ms, { feet: [[-5, 0], [5, 0]], ...p });
@@ -256,6 +272,7 @@ function tableCrew(look: Look, id: string, name: string, seed: number): Characte
     standUp: lazyAnim(() => standUpAnim(look)),
     draw: lazyAnim(() => drawAnim(look)),
     aim: lazyAnim(() => aimAnim(look)),
+    aimAt: lazyAnim(() => aimAtAnim(look)),
     lower: lazyAnim(() => lowerAnim(look)),
     puff: lazyAnim(() => puffAnim(look, false)),
     walk: lazyAnim(() => walkAnim(look, false)),

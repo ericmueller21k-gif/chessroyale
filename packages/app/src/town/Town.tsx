@@ -286,9 +286,10 @@ export function TownScreen({
     setInside({ room, View: at.View, intro: null, arrived: true, n: (at.n ?? 0) + 1 });
   };
   /**
-   * A challenge started inside (Don Dough's, from his card in his back room after his talk beat; Nov 11): his intro and the front room
-   * load, the back room fades to black and the front room fades in in challenge mode (Eric: "The main room is still where you fight"):
-   * you and he come out of the back door to the pad, his goons carrying the set-up after you, then his transition and the battle.
+   * A challenge started inside (Don Dough's, once his Challenge's beat and walk-out have played in his back room, you through its door;
+   * Nov 11): his intro and the front room load, the back room fades to black and the front room fades in in challenge mode (Eric: "The
+   * main room is still where you fight"): you and he come out of the back door to the pad, his goons carrying the set-up after you, then
+   * his transition and the battle.
    * "Back to town" puts you at his door in the town, where you stood to go in.
    */
   const challengeHere = async () => {
@@ -631,7 +632,7 @@ export function TownScreen({
         </div>
         {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
             inside a building (it's the town's). */}
-        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} />}
+        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} onHome={(id) => ctl.current?.walkHome(id)} />}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -2156,6 +2157,28 @@ function startTown(
         const { img, box } = r.chipFace(h);
         return { id: h.id, x: h.cx, y: h.cy, color: h.color, img, box };
       }),
+    /**
+     * (Eric, Nov 11: "When you open the mini map, if you tap on one of the bosses' buildings, it'll make your guy run there. And that's
+     * it.") The large map's tap on a home: you walk to where a tap on that home in the town would take you (by its door), as that tap
+     * walks you; no card (tap the home when you're there).
+     */
+    walkHome: (id: string) => {
+      const home = HOMES.find((h) => h.id === id);
+      if (!home || away) return;
+      const dest = destFor(town, town.you.walker, { kind: "home", home });
+      if (!dest) return;
+      if (STREET_TOWN) {
+        const b = lockIn(turn, look, performance.now());
+        if (b !== null) base = b;
+      }
+      leaveClose();
+      walkOff();
+      if (card) setCard(null);
+      if (walkWalker(town.you.walker, dest)) {
+        follow = true;
+        glide = null;
+      }
+    },
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
     /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */
