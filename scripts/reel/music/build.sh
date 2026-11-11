@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Renders and masters the trailer soundtracks (A and B on the trailer's cut; C to K, loops of about 30 s) (about -16 LUFS, a soft ceiling at -1 dBFS) and encodes them:
+# Renders and masters the trailer soundtracks (A and B on the trailer's cut; C to K, loops of 30 s to a minute) (about -16 LUFS, a soft ceiling at -1 dBFS) and encodes them:
 # <out>/track-{A..K}.{wav,ogg,mp3}. Needs python3 with numpy, and ffmpeg.
 #   scripts/reel/music/build.sh [out folder: reports/trailer]
 set -euo pipefail
