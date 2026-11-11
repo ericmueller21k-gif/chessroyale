@@ -1,3 +1,4 @@
+- Nov 11 11:40: #633 pawn (gap 36 px) prepped 618eea3, CI watcher b1p9q7rzl; still sent to Eric. 320 px Smudgy/Jefferson open (follow-up, rare phones). #639 town loading opened (0cebff7, watcher bsoymdv56): 10+2 atlas pages (192 MB GPU), willReadFrequently art (uploads 30-120 ms -> 0.3), 0 painted/uploads/resets after a 4.5 s load. Risk to watch: iOS memory (192 MB GPU + CPU canvases). Helpers archived; no helpers running.
 - Nov 11 08:40: #635 friends page MERGED (9810069). Flaky add: boss-challenge.spec:155 desktop (Alfil, passed on retry).
 - Nov 11 08:14: #635 fix round pushed + prepped (99284a1; watcher bp5whch7f); body updated; fix helper archived. Also found: friends page never polled the live line (watchLive added). Merge when green (full-e2e label on).
 - Nov 11 08:00: #638 room perf MERGED (f0d709b). Town-loading helper branched from it: tell it to merge main before .done.
