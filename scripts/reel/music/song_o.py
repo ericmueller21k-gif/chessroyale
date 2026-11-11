@@ -11,14 +11,17 @@ Every melody, riff and chord progression here is original: none of it is any son
   python3 song_o.py <out.wav>
 
   bars  1-8    wind chimes, water drops and a bird; the violin's first long pulls
-  bars  9-24   the garden waltz: the violin's tune (pulls, turns and runs) over the marimba and a round bass
-  bars 25-32   a second violin answers under the first
-  bars 33-48   a second garden tune on the flute, the violin answering under it
-  bars 49-52   the hush: everything falls away, the violin hums low
-  bars 53-66   the drop (1:11): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the violins duel
-  bars 67-72   the way back, slowly
-  bars 73-84   the waltz again, a new turn of the tune, the flute joining
+  bars  9-14   the soft violin over the marimba and a round bass
+  bars 15-18   the hush: everything falls away, the violin hums low
+  bars 19-40   the first drop (0:24.5): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the violins
+               duel a bar each, then share a riff in octaves, then play together
+  bars 41-46   the way back, slowly
+  bars 47-54   the soft middle: the flute's tune, the violin answering under it
+  bars 55-58   the hush again
+  bars 59-78   the second drop (1:19), its own way: the brass alone first, then both violins dueling at once, then together
+  bars 79-84   the way back
   bars 85-88   the chimes, a last long pull, and round to bar 1
+(Eric, third go: "it's supposed to be a boss battle", so the drops are most of the song.)
 """
 import sys
 
@@ -62,22 +65,30 @@ DUEL_2 = [
     "F6:.5 E6:.25 D6:.25 A5:.5 D6:.5 F6:.5 A6:.5", "D6:.25 E6:.25 F6:.25 G6:.25 A6:.5 Bb6:.5 F6:.5 D6:.5",
     "Bb6:.5 A6:.25 G6:.25 D6:.5 G6:.5 Bb6:.5 D7:.5", "C#6:.25 D6:.25 E6:.25 F6:.25 G6:.5 A6:.5 C#7:1",
 ]
+# The first drop's middle: both violins on one riff in octaves, short notes with gaps, over Dm, C, B flat, A.
+RIFF = (
+    "D6:.5 D6:.5 -:.5 F6:.5 E6:.5 D6:.5 | A5:1 -:.5 D6:.5 F6:.5 A6:.5 | G6:.5 -:.5 G6:.5 E6:.5 C6:.5 E6:.5 | C6:1 -:.5 E6:.5 G6:.5 C7:.5 | "
+    "F6:1 D6:.5 -:.5 Bb5:.5 D6:.5 | Bb5:1 -:.5 D6:.5 F6:.5 Bb6:.5 | C#6:.5 E6:.5 -:.5 G6:.5 F6:.5 E6:.5 | A6:1.5 G6:.25 F6:.25 E6:.5 C#6:.5"
+)
+# The second drop opens on the brass alone over the bass.
+BRASS_TUNE = "F5:3 | A5:2 G5:1 | Bb5:3 | D6:2 Bb5:1"
 TOGETHER = (
     "A6:1.5 F6:.5 D6:1 | E6:.5 F6:.5 G6:.5 A6:.5 F6:1 | Bb6:1.5 F6:.5 D6:1 | F6:.5 G6:.5 A6:.5 Bb6:.5 D7:1 | "
     "D7:1 Bb6:1 G6:1 | A6:.5 G6:.5 F6:.5 E6:.5 C#6:1 | D6:.5 E6:.5 F6:.5 A6:.5 D7:1 | C#7:1.5 A6:.5 E6:1"
 )
-for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (RETURN, 36)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
+for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (RETURN, 36), (RIFF, 24), (BRASS_TUNE, 12)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 CHORDS = {
     "D": ("D4 F#4 A4", "D2"), "G": ("D4 G4 B4", "G2"), "A": ("E4 A4 C#5", "A2"), "Bm": ("D4 F#4 B4", "B2"), "Em": ("E4 G4 B4", "E2"),
-    "F#m": ("F#4 A4 C#5", "F#2"), "Dm": ("D4 F4 A4", "D2"), "Bb": ("D4 F4 Bb4", "Bb2"), "Gm": ("D4 G4 Bb4", "G2"),
+    "F#m": ("F#4 A4 C#5", "F#2"), "Dm": ("D4 F4 A4", "D2"), "Bb": ("D4 F4 Bb4", "Bb2"), "Gm": ("D4 G4 Bb4", "G2"), "C": ("E4 G4 C5", "C3"),
 }
 BARS = (
-    "D D D D D D D D  D D G G A A D D Bm Bm G Em A A D D  D D G G A A D D  "  # 1-32
-    "G G D D Em A D D G G F#m Bm Em A D D  Bm Bm Bb A  "  # 33-52: the flute's tune, the hush
-    "Dm Dm Bb Bb Gm Gm A A Dm Bb Gm A Dm A  Dm Dm Bb Bb A A  "  # 53-72: the drop, the way back
-    "D D G G A A D D Bm G A D  D D D D"  # 73-88
+    "D D D D D D D D  D D G G A A  Bm Bm Bb A  "  # 1-18: the intro, the soft violin, the hush
+    "Dm Dm Bb Bb Gm Gm A A  Dm Dm C C Bb Bb A A  Dm Bb Gm A Dm A  "  # 19-40: the first drop
+    "Dm Dm Bb Bb A A  G G D D Em A D D  Bm Bm Bb A  "  # 41-58: the way back, the flute, the hush
+    "Dm Dm Bb Bb  Dm Dm Bb Bb Gm Gm A A  Dm Dm Bb Bb Gm A Dm A  "  # 59-78: the second drop
+    "Dm Dm Bb Bb A A  D D D D"  # 79-88: the way back, the chimes
 ).split()
 assert len(BARS) == 88
 MINOR = (2, 4, 5, 7, 9, 10, 13)  # D harmonic minor, for the second violin's line under the first
@@ -211,10 +222,13 @@ def main(out: str) -> None:
         put("fx", b, np.tanh(2 * np.sin(2 * np.pi * np.cumsum(f) / x.sr)) * np.exp(-t / 0.2) * vol * np.minimum(1, (k - 1 - np.arange(k)) / (0.02 * x.sr)))
         put("fx", b, x.noise(0.9, 16000, vol * 0.3, 0.2))
 
-    def storm(first, bars_, fade=None):
+    WOB2 = [((1, 3), (2, 1)), ((3, 2),), ((1.5, 4), (1.5, 1)), ((1, 6), (1, 2), (1, 4))]
+
+    def storm(first, bars_, fade=None, kind=0):
         """Under the drop: a kick thumping on every beat and the 808 on the first; a clap and snare on every second
         bar's first beat; the wobble bass at changing speeds; hats in 8ths with rolls; short driving strings; brass
-        holding the chord; timpani and cymbals. `fade`: the way back, each bar's level from 1 down to nothing."""
+        holding the chord; timpani and cymbals. `fade`: the way back, each bar's level from 1 down to nothing. `kind` 1: the second drop's wobble
+        speeds and kit."""
         for bar in range(first, first + bars_):
             notes, root = chord(bar)
             b, odd = bar * 3, (bar - first) % 2
@@ -227,7 +241,7 @@ def main(out: str) -> None:
             if v > 0.45:
                 x.kick(b + 2.5, 0.45 * v, soft=True)
             t = b
-            for d, rate in WOB[(bar - first) % 4] if v > 0.6 else WOB[0]:
+            for d, rate in (WOB2 if kind else WOB)[(bar - first) % 4] if v > 0.6 else WOB[0]:
                 wobble(t, low + 12, d, rate if v > 0.6 else 0.3333, 0.2 * v, 22.0 * max(v, 0.25))
                 t += d
             if odd and v > 0.45:
@@ -236,6 +250,10 @@ def main(out: str) -> None:
                     x.hat(b + 2.5 + i / 12, (0.03 + 0.006 * i) * v)
             elif not odd:
                 put("drum", b, x.timp(root, 0.9, 0.34 * v))
+            if kind and v > 0.45:  # the second drop's kit: a snare on every third beat, hats in 16ths
+                x.snare(b + 2, 0.16 * v)
+                for i in range(12):
+                    x.hat(b + i * 0.25, 0.028 * v)
             if v > 0.3:
                 for i in range(6):
                     x.hat(b + i * 0.5, (0.055 if i % 2 == 0 else 0.035) * v)
@@ -255,78 +273,102 @@ def main(out: str) -> None:
     bow(12, FIRST)
     garden(6, harp=0.5, pizz=False), garden(7, harp=0.8, pizz=False)
 
-    # Bars 9-24: the garden waltz.
-    bow(24, WALTZ)
-    for bar in range(8, 24):
+    def hush(first):
+        """Four bars: everything falls away, the violin hums low and soft, a last few chimes, then nothing."""
+        b = first * 3
+        bow(b, "F#4:6 | F4:3 | E4:2 -:1", 0.075, pan=0.0)
+        garden(first, harp=0.5, pizz=False), garden(first + 1, harp=0.25, pizz=False)
+        chimes(b, b + 6, 4, 0.04)
+        for i in range(3):
+            put("pizz", b + i * 3, x.fmbass(chord(first + i)[1] + 12, 2.8, 0.2 - 0.05 * i, index=0.8, decay=0.6))
+
+    def big_boom(b):
+        boom(b, 0.9), boom(b + 0.02, 0.6)
+        put("fx", b, x.noise(1.6, 16000, 0.3, 0.45))
+
+    def trade(first, simultaneous=False):
+        """Eight bars of the duel: a bar each, left then right; or both at once, swapping lines every bar."""
+        for i in range(8):
+            one, two = (DUEL_1, DUEL_2) if i % 2 == 0 else (DUEL_2, DUEL_1)
+            if simultaneous:
+                bow((first + i) * 3, one[i // 2], 0.16, pan=-0.5, fast=True, bus="violin2")
+                bow((first + i) * 3, two[i // 2], 0.14, pan=0.5, fast=True, bus="violin2")
+            else:
+                bow((first + i) * 3, one[i // 2], 0.17, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin2")
+
+    def together(first, text, octaves=False):
+        for b, d, m in line(first * 3, text):
+            fast = d < 1
+            put("violin2", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
+            put("violin2", b, violin(m - 12 if octaves else below(m), d * (0.9 if fast else 0.98), 0.14, fast), 0.4)
+
+    def way_back(first, pulls):
+        """Six bars: the thump thins, the wobble slows to one long sweep a bar and fades; long pulls; the chimes,
+        the water and the marimba come back."""
+        b = first * 3
+        storm(first, 6, fade=(0.8, 0.62, 0.45, 0.3, 0.18, 0.08))
+        bow(b, pulls, 0.13)
+        chimes(b + 6, b + 18, 12, 0.05)
+        drips(b + 9, b + 18, 4)
+        bird(b + 14, 0.04)
+        garden(first + 4, harp=0.4, pizz=False), garden(first + 5, harp=0.8, pizz=False)
+
+    # Bars 9-14: the soft violin: the waltz's first six bars over the marimba.
+    bow(24, "|".join(WALTZ.split("|")[:6]))
+    for bar in range(8, 14):
         garden(bar)
-    chimes(24, 72, 18, 0.04)
-    drips(24, 72, 6, 0.07)
-    bird(46, 0.04)
+    chimes(24, 42, 8, 0.04)
+    drips(24, 42, 3, 0.07)
 
-    # Bars 25-32: the tune's first half again, a second violin answering under it; a little glockenspiel above.
-    first_half = "|".join(WALTZ.split("|")[:8])
-    bow(72, first_half)
-    bow(72, SECOND, 0.13, pan=0.35, bus="violin2")
-    for b, d, m in line(72, first_half):
-        if d >= 1:
-            put("chimes", b, x.bell(m + 12, d + 1, 0.05, ratio=4.0, index=1.4, decay=0.5), 0.2)
-    for bar in range(24, 32):
-        garden(bar, fill=1)
-    chimes(72, 96, 8, 0.04)
+    # Bars 15-18: the hush.
+    hush(14)
 
-    # Bars 33-48: the second garden tune on the flute, the violin answering under it in pulls and turns.
-    for b, d, m in line(96, FLUTE):
+    # Bars 19-40: the first drop (0:24.5, 30 seconds). The giant boom, then the thump: kick on every beat, the 808,
+    # the wobble bass, driving strings and brass. The violins duel a bar each; then both on one riff in octaves;
+    # then together in harmony.
+    big_boom(54)
+    storm(18, 22)
+    trade(18)
+    together(26, RIFF, octaves=True)
+    parts = TOGETHER.split("|")
+    together(34, "|".join(parts[i] for i in (0, 2, 4, 5, 6, 7)))
+    boom(78, 0.5), boom(102, 0.5), boom(111, 0.4)
+
+    # Bars 41-46: the way back.
+    way_back(40, "A5:6 | F5:3 | D5:3 | E5:6")
+
+    # Bars 47-54: the soft middle: the flute's tune, the violin answering under it.
+    for b, d, m in line(138, "|".join(FLUTE.split("|")[:8])):
         put("flute", b, x.flute(m, d * 0.96, 0.2), 0.2)
-    bow(96, PULLS, 0.12, pan=-0.3)
-    for bar in range(32, 48):
+    bow(138, "|".join(PULLS.split("|")[:8]), 0.12, pan=-0.3)
+    for bar in range(46, 54):
         garden(bar, fill=1)
-    chimes(96, 144, 18, 0.04)
-    drips(96, 144, 6, 0.07)
-    bird(118, 0.04, -0.5)
+    chimes(138, 162, 9, 0.04)
+    drips(138, 162, 3, 0.07)
+    bird(149, 0.04, -0.5)
 
-    # Bars 49-52: the hush. Everything falls away: the violin hums low and soft, a last few chimes, then nothing.
-    bow(144, "F#4:6 | F4:3 | E4:2 -:1", 0.075, pan=0.0)
-    garden(48, harp=0.5, pizz=False), garden(49, harp=0.25, pizz=False)
-    chimes(144, 150, 4, 0.04)
-    for bar in (48, 49, 50):
-        put("pizz", bar * 3, x.fmbass(chord(bar)[1] + 12, 2.8, 0.2 - 0.05 * (bar - 48), index=0.8, decay=0.6))
+    # Bars 55-58: the hush again.
+    hush(54)
 
-    # Bars 53-66: the drop (1:11, 19 seconds). A giant boom, then the thump: kick on every beat, the 808, the wobble
-    # bass, driving strings and brass. The violins duel a bar each (left, then right), then play together.
-    boom(156, 0.9), boom(156.02, 0.6)
-    put("fx", 156, x.noise(1.6, 16000, 0.3, 0.45))
-    storm(52, 14)
-    for i in range(8):
-        text = (DUEL_1 if i % 2 == 0 else DUEL_2)[i // 2]
-        bow((52 + i) * 3, text, 0.17, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin2")
-    together = TOGETHER.split("|")
-    for b, d, m in line(180, "|".join(together[i] for i in (0, 2, 4, 5, 6, 7))):
-        fast = d < 1
-        put("violin2", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
-        put("violin2", b, violin(below(m), d * (0.9 if fast else 0.98), 0.14, fast), 0.4)
-    boom(168, 0.45), boom(180, 0.5), boom(189, 0.4)
+    # Bars 59-78: the second drop (1:19, 27 seconds), its own way: other wobble speeds, a snare on every third beat
+    # and hats in 16ths. The brass alone takes a tune over the bass; then both violins duel at once, swapping lines
+    # each bar; then together, the whole phrase.
+    big_boom(174)
+    storm(58, 20, kind=1)
+    for b, d, m in line(174, BRASS_TUNE):
+        put("brass", b, x.brass(m, d * 0.95, 0.17, attack=0.05, release=0.15))
+        put("brass", b, x.brass(m - 12, d * 0.95, 0.11, attack=0.05, release=0.15), 0.2)
+    trade(62, simultaneous=True)
+    together(70, TOGETHER)
+    boom(186, 0.5), boom(210, 0.5), boom(222, 0.4)
 
-    # Bars 67-72: the way back, slowly: the thump thins and the wobble slows to one long sweep a bar and fades; the
-    # violin returns in long pulls; the chimes, the water and the marimba come back.
-    storm(66, 6, fade=(0.8, 0.62, 0.45, 0.3, 0.18, 0.08))
-    bow(198, "A5:6 | F5:3 | D5:3 | E5:6", 0.13)
-    chimes(204, 216, 12, 0.05)
-    drips(207, 216, 4)
-    bird(212, 0.04)
-    garden(70, harp=0.4, pizz=False), garden(71, harp=0.8, pizz=False)
+    # Bars 79-84: the way back.
+    way_back(78, "D6:6 | Bb5:3 | F5:3 | E5:6")
 
-    # Bars 73-84: the waltz back, a new turn of the tune; the flute joins an octave up from its seventh bar.
-    bow(216, RETURN)
-    for b, d, m in line(234, "|".join(RETURN.split("|")[6:])):
-        put("flute", b, x.flute(m + 12, d * 0.96, 0.13), 0.3)
-    for bar in range(72, 84):
-        garden(bar)
-    chimes(216, 252, 14, 0.04)
-    drips(216, 252, 5, 0.07)
-
-    # Bars 85-88: the chimes, a last long pull, and round to bar 1.
-    chimes(252, 264, 16, 0.06)
-    drips(252, 264, 6)
+    # Bars 85-88: the chimes (all struck by the second-last bar, so none is left hanging over the loop), a last long
+    # pull, and round to bar 1.
+    chimes(252, 259, 9, 0.05)
+    drips(252, 262, 5)
     bow(252, "F#5:6 D5:6", 0.14)
     for m, pan in ((n("D3"), -0.3), (n("A3"), 0.3), (n("F#4"), 0.0)):
         put("strings", 252, x.swell(x.strings(m, 12, 0.045, attack=0.3, release=0.6), 0.4), pan)
