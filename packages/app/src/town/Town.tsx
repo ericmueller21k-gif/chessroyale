@@ -270,7 +270,7 @@ export function TownScreen({
     doorBusy.current = true;
     const F = SHOP_FEEL;
     const to = at.room.def.part === "back" ? "front" : "back";
-    play("zebraDoor");
+    // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);

@@ -211,7 +211,8 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
       },
       scene: "zebra-front" as const,
       standing: m.SHOP_ZEBRA_GUARDS.map((g) => g.square),
-      cueSounds: { thump: "zebraThump" as const },
+      // (The Big Mix's thump, the TV's click and the table's murmur are off: Eric, Nov 11, "it just sounds like pounding, it's really
+      // distracting ... disable that for now". The sounds stay in zebra-sounds.ts for a later, gentler pass.)
     })),
   "zebra-back": () =>
     Promise.all([import("./zebra-art.ts"), import("./zebra-crew.ts"), import("./zebra-don.ts")]).then(([m, c, d]) => {
@@ -235,7 +236,6 @@ const ART: Partial<Record<string, () => Promise<RoomArt>>> = {
         dim: SHOP_FEEL.zebra.dim,
         outside: "#2a1d14",
         fixCam: { x: m.SHOP_ZEBRA_BACK_MARKS.table[0] - m.SHOP_ZEBRA_BACK_CAM.west, y: m.SHOP_ZEBRA_BACK_MARKS.table[1] + m.SHOP_ZEBRA_BACK_CAM.south },
-        cueSounds: { click: "zebraClick" as const },
       };
     }),
   gingerbread: () =>
@@ -1541,10 +1541,9 @@ function startRoom(
     while (i < fr.ends.length - 1 && t >= fr.ends[i]!) i++;
     return fr.frames[i]!;
   };
-  // (Rolling Dough's room sounds: each cued piece's frame now, so its cue plays once as its frame comes round; a chatter line's murmur.)
+  // (A room's cued sounds: each cued piece's frame now, so its cue plays once as its frame comes round. Rolling Dough's are off: Eric, Nov 11.)
   const cued = art.cueSounds ? Object.keys(frames).filter((k) => frames[k]!.ch.anims.idle!.frames.some((x) => x.cue && art.cueSounds![x.cue])) : [];
   const cuedAt = cued.map(() => -1);
-  let saidText = "";
   const stepSounds = (now: number) => {
     cued.forEach((name, j) => {
       const fr = frames[name]!;
@@ -1557,8 +1556,6 @@ function startRoom(
       const snd = cue ? art.cueSounds![cue] : undefined;
       if (snd) play(snd);
     });
-    if (backScene && say && say.text !== saidText) play("zebraMurmur");
-    saidText = say?.text ?? "";
   };
   /** Where things were drawn in the last frame (taps, cards, tests): the kid's box and the head points. */
   const kidBox = { x0: 0, y0: 0, x1: 0, y1: 0, on: false, hx: 0, hy: 0, px: 0 };
