@@ -11,7 +11,8 @@ Every melody, riff and chord progression here is original: none of it is any sho
 
   bars  1-2    stop-time: everyone hits together, blocks tumble
   bars  3-10   the tune: on C; up to E flat for bars 7-8; back
-  bars 11-18   the middle: on F, back to C, a bar each on D and D flat, home to C
+  bars 11-18   the middle: low marimba calls and quick high xylophone answers (on F, C, D, D flat), then a climb
+               from the bottom to the top in bursts
   bars 19-22   the tune's start again, a slide all the way down, and three hits to the loop
 """
 import sys
@@ -31,11 +32,14 @@ TUNE = (
     "G5:.5 G5:.5 A5:.5 Bb5:.5 -:.5 Bb5:.5 C6:.5 Bb5:.5 | A5:.5 G5:.5 F5:.5 G5:1 -:.5 Eb5:1 | "
     "E5:.5 F#5:.5 G5:.5 A5:.5 Bb5:.5 A5:.5 G5:.5 F#5:.5 | G5:1 -:.5 C6:.5 -:.5 C6:.5 G5:1"
 )
+# The middle, second go (Eric: "go lower, higher, quick notes, a little delay between some, and a new pattern"):
+# a low call and a quick high answer, with gaps; then a climb from the bottom to the top in bursts.
 MIDDLE = (
-    "C6:1 B5:.5 A5:.5 B5:.5 C6:.5 Eb6:1 | D6:.5 C6:.5 B5:.5 A5:.5 G5:.5 A5:.5 F5:1 | "
-    "G5:.5 A5:.5 Bb5:.5 C6:.5 D6:.5 E6:.5 F#6:1 | E6:.5 D6:.5 C6:.5 Bb5:.5 A5:.5 G5:.5 E5:1 | "
-    "F#5:.5 F#5:.5 G#5:.5 A5:.5 -:.5 C6:.5 B5:.5 A5:.5 | F5:.5 F5:.5 G5:.5 Ab5:.5 -:.5 B5:.5 Bb5:.5 Ab5:.5 | "
-    "G5:.5 F#5:.5 E5:.5 D5:.5 C5:.5 D5:.5 E5:.5 F#5:.5 | G5:.5 A5:.5 Bb5:.5 B5:.5 C6:1 -:1"
+    "F3:.5 F3:.5 -:.5 A3:.5 B3:.5 C4:.5 -:.5 Eb4:.5 | -:.5 C7:.25 B6:.25 A6:.25 G6:.25 A6:.5 -:.5 Eb7:.25 D7:.25 C7:.5 -:.5 | "
+    "C3:.5 C3:.5 -:.5 E3:.5 F#3:.5 G3:.5 -:.5 Bb3:.5 | -:.5 G6:.25 A6:.25 Bb6:.25 C7:.25 Bb6:.5 -:.5 F#6:.25 G6:.25 E6:.5 -:.5 | "
+    "D3:.5 F#3:.5 A3:.25 C4:.25 -:.5 F#6:.25 G#6:.25 A6:.25 C7:.25 -:.5 A6:.5 | Db3:.5 F3:.5 Ab3:.25 B3:.25 -:.5 F6:.25 G6:.25 Ab6:.25 B6:.25 -:.5 Ab6:.5 | "
+    "C3:.25 D3:.25 E3:.25 F#3:.25 -:.5 G3:.25 A3:.25 Bb3:.25 C4:.25 -:.5 D4:.25 E4:.25 F#4:.25 G4:.25 | "
+    "A4:.25 Bb4:.25 C5:.25 D5:.25 E5:.25 F#5:.25 G5:.25 A5:.25 Bb5:.5 B5:.5 C6:1"
 )
 TAG = (
     "E5:.5 E5:.5 F#5:.5 G5:.5 -:.5 G5:.5 A5:.5 G5:.5 | A5:.5 Bb5:.5 B5:.5 C6:1.5 -:1 | "
@@ -136,12 +140,43 @@ def main(out: str) -> None:
     squeak(23), tumble(23, 8)
     tumble(39, 8)
 
-    # Bars 11-18: the middle, a toy piano on top.
+    # Bars 11-18: the middle. Low calls on the marimba (the bass under them), quick high answers on the xylophone and
+    # toy piano with the fast pulse behind; blocks knock in the gaps. No oom-pah here. Then the climb, under a roll.
     x.crash(40, 0.14, decay=0.25)
-    tune(40, MIDDLE, piano=True)
+    t = 40.0
+    for tok in MIDDLE.replace("|", " ").split():
+        name, d = tok.split(":")
+        d = float(d)
+        if name == "-":
+            block(t, 1050, 0.16, 0.3)
+            block(t + 0.25, 760, 0.13, -0.3) if d == 0.5 else None
+        else:
+            m = n(name)
+            if m < 60:  # low: marimba, the triangle an octave under, a soft square
+                put("marimba", t, wood(m, 0.3, 0.2), -0.15)
+                put("marimba", t, wood(m + 12, 0.12, 0.16), 0.15)
+                put("bass", t, x.tri(m, d * 0.8, 0.3, release=0.01))
+                put("lead", t, x.pulse(m + 12, d * 0.7, 0.5, 0.05, decay=0.1, sustain=0.5, release=0.01), 0.1)
+            else:  # high: xylophone, toy piano, a thin pulse an octave under
+                put("xylo", t, wood(m, 0.2, 0.12), -0.1)
+                put("bell", t, x.bell(m, 0.8, 0.07, ratio=5.0, index=1.8, decay=0.2), 0.35)
+                put("lead", t, x.pulse(m - 12, d * 0.7, 0.25, 0.07, decay=0.1, sustain=0.5, release=0.01), 0.1)
+        t += d
     for bar in range(10, 18):
-        oompah(bar, n(ROOTS[bar]))
-    squeak(71), tumble(71, 8)
+        b, root = bar * 4, n(ROOTS[bar])
+        x.kick(b, 0.42, soft=True), x.kick(b + 2, 0.38, soft=True)
+        for i in range(8):
+            put("drum", b + i * 0.5, x.noise(0.03, 20000, 0.035 if i % 2 == 0 else 0.05, 0.01), -0.25)
+        answer = bar in (11, 13)
+        if answer:  # under a high answer: a held bass note, snare on 2 and 4, the fast pulse
+            put("bass", b, x.tri(root, 3.6, 0.3, release=0.02))
+            x.snare(b + 1, 0.1), x.snare(b + 3, 0.1)
+        if answer or bar >= 16:
+            for i in range(16):
+                st = (0, 1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 5, 6, 5, 4, 3)[i]
+                put("arp", b + i * 0.25, x.pulse(root + 24 + SCALE[st % 7] + 12 * (st // 7), 0.2, 0.125, 0.07, decay=0.04, sustain=0.4, release=0.004), -0.3)
+    for i in range(32):  # bars 17-18: a snare roll growing under the climb
+        x.snare(64 + i * 0.25, 0.03 + 0.004 * i)
 
     # Bars 19-22: the tune's start, the slide down with the blocks tumbling after it, and three hits.
     x.crash(72, 0.14, decay=0.25)
