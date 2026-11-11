@@ -23,7 +23,7 @@ FPS = 30
 # Scenes: name, caption (captions[-wide]/cN.png, or None), how it comes in ("cut", or a crossfade's seconds), clips.
 SCENES = [
     # 1. 50 v 50: your pick, the team's picks coming in, the reveal, the move played.
-    ("crowd", 1, "cut", [("crowd", "picked0-1.3", "picked0+3.5", 12)]),
+    ("crowd", 1, "cut", [("crowd", "picked-1.3", "picked+3.5", 12)]),
     # 2. Today's town by day: the run from the park past the Colosseum, along Colosseum Row and back by Fountain Street; the chat moving.
     ("town", 2, 0.3, [("town", "run+0.5", "runEnd", 24)]),
     # 3. The same town at night, on Moon's Ride.
@@ -53,7 +53,7 @@ SCENES = [
         ],
     ),
     # 6. Squads: the round's card, your move on your board, the three boards over it.
-    ("squads", 6, 0.3, [("squads", "duty0-2.4", "moved0+4.0", 12)]),
+    ("squads", 6, 0.3, [("squads", "duty-2.4", "moved+4.0", 12)]),
     # 7. Ranked: a few moves of the duel, then the run up the ranks to Transcendent (its start exactly on beat 107).
     ("duel", 7, 0.3, [("ranked", "move1-0.5", "move5+0.3", 7)]),
     ("ranks", 8, "cut", [("ranks", "start", "start+3.6", 9)]),
@@ -81,6 +81,10 @@ def marks(scene: str, sfx: str) -> dict[str, float]:
     for k, v in raw.items():
         out.setdefault(k, v)
         out.setdefault(k.split(" ")[0], v)  # "moved0 g1f3": by "moved0" too
+        # (Your first pick, duty and move, whichever ply or turn they fell on: "picked", "duty", "moved".)
+        for first in ("picked", "duty", "moved"):
+            if k.startswith(first):
+                out.setdefault(first, v)
         # (A boss battle's marks carry the whole state, "boss ev:warn+bounce": each event's first time by its own name too.)
         if " ev:" in k or k.startswith("ev:"):
             for e in k.split("ev:")[1].split("+"):

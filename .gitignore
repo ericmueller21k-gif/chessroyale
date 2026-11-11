@@ -16,3 +16,7 @@ reports/crowd-spread/*.jsonl
 # Stills and GIF frames: never committed (send their paths); check.yml refuses new images under docs/
 stills/
 frames/
+
+# The trailer cut from them, and its soundtracks (scripts/reel/encode-trailer.py, scripts/reel/music/build.sh)
+reports/trailer/
+__pycache__/
