@@ -13,15 +13,15 @@ Every melody, riff and chord progression here is original: none of it is any son
   bars  1-8    wind chimes, water drops and a bird; the violin's first long pulls
   bars  9-14   the soft violin over the marimba and a round bass
   bars 15-18   the hush: everything falls away, the violin hums low
-  bars 19-40   the first drop (0:24.5): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the violins
-               duel a bar each, then share a riff in octaves, then play together
-  bars 41-46   the way back, slowly
-  bars 47-54   the soft middle: the flute's tune, the violin answering under it
-  bars 55-58   the hush again
-  bars 59-78   the second drop (1:19), its own way: the brass alone first, then both violins dueling at once, then together
-  bars 79-84   the way back
-  bars 85-88   the chimes, a last long pull, and round to bar 1
-(Eric, third go: "it's supposed to be a boss battle", so the drops are most of the song.)
+  bars 19-44   the first drop (0:24.5 to 1:00): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the
+               violins duel a bar each, share a riff in octaves, play together, then duel at once under a brass tune
+  bars 45-50   a small calm: the thump thins and fades, long pulls, soft chimes
+  bar  51      near silence
+  bars 52-88   the second drop (1:09.5 to the end), crazier: an octobass leads in slow pulls, the violins dueling
+               under it; glitches and trance (a gated chord, runs, stutters, zaps); it ends on one hit and a stutter
+               falling into bar 1's chimes
+(Eric, fourth go: after the first 25 seconds the drop "should just stay that way the entire time"; the chimes only in
+the intro and softly in the calm.)
 """
 import sys
 
@@ -72,11 +72,14 @@ RIFF = (
 )
 # The second drop opens on the brass alone over the bass.
 BRASS_TUNE = "F5:3 | A5:2 G5:1 | Bb5:3 | D6:2 Bb5:1"
+# The second drop's lead: an octobass, the giant of the string family, in slow pulls two octaves under the violins.
+OCTO_1 = "D2:3 | F2:2 E2:1 | Bb1:3 | D2:2 F2:1 | G2:3 | Bb2:2 A2:1 | A2:3 | C#3:2 E3:1"
+OCTO_2 = "D3:3 | A2:2 F2:1 | Bb2:3 | F2:2 D2:1 | G2:2 Bb2:1 | A2:2 C#3:1 | D3:3 | A2:3"
 TOGETHER = (
     "A6:1.5 F6:.5 D6:1 | E6:.5 F6:.5 G6:.5 A6:.5 F6:1 | Bb6:1.5 F6:.5 D6:1 | F6:.5 G6:.5 A6:.5 Bb6:.5 D7:1 | "
     "D7:1 Bb6:1 G6:1 | A6:.5 G6:.5 F6:.5 E6:.5 C#6:1 | D6:.5 E6:.5 F6:.5 A6:.5 D7:1 | C#7:1.5 A6:.5 E6:1"
 )
-for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (RETURN, 36), (RIFF, 24), (BRASS_TUNE, 12)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
+for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (RETURN, 36), (RIFF, 24), (BRASS_TUNE, 12), (OCTO_1, 24), (OCTO_2, 24)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 CHORDS = {
@@ -85,10 +88,9 @@ CHORDS = {
 }
 BARS = (
     "D D D D D D D D  D D G G A A  Bm Bm Bb A  "  # 1-18: the intro, the soft violin, the hush
-    "Dm Dm Bb Bb Gm Gm A A  Dm Dm C C Bb Bb A A  Dm Bb Gm A Dm A  "  # 19-40: the first drop
-    "Dm Dm Bb Bb A A  G G D D Em A D D  Bm Bm Bb A  "  # 41-58: the way back, the flute, the hush
-    "Dm Dm Bb Bb  Dm Dm Bb Bb Gm Gm A A  Dm Dm Bb Bb Gm A Dm A  "  # 59-78: the second drop
-    "Dm Dm Bb Bb A A  D D D D"  # 79-88: the way back, the chimes
+    "Dm Dm Bb Bb Gm Gm A A  Dm Dm C C Bb Bb A A  Dm Bb Gm A Dm A  Dm Dm Bb Bb  "  # 19-44: the first drop
+    "Dm Dm Bb Bb A A  A  "  # 45-51: the calm, the silence
+    "Dm Dm Bb Bb Gm Gm A A  Dm Dm C C Bb Bb A A  Dm Dm Bb Bb Gm A Dm A  Dm Dm Bb Bb Gm Gm A A  Dm Bb Gm A Dm"  # 52-88: the second drop
 ).split()
 assert len(BARS) == 88
 MINOR = (2, 4, 5, 7, 9, 10, 13)  # D harmonic minor, for the second violin's line under the first
@@ -224,7 +226,7 @@ def main(out: str) -> None:
 
     WOB2 = [((1, 3), (2, 1)), ((3, 2),), ((1.5, 4), (1.5, 1)), ((1, 6), (1, 2), (1, 4))]
 
-    def storm(first, bars_, fade=None, kind=0):
+    def storm(first, bars_, fade=None, kind=0, wob_up=0, wob_vol=1.0):
         """Under the drop: a kick thumping on every beat and the 808 on the first; a clap and snare on every second
         bar's first beat; the wobble bass at changing speeds; hats in 8ths with rolls; short driving strings; brass
         holding the chord; timpani and cymbals. `fade`: the way back, each bar's level from 1 down to nothing. `kind` 1: the second drop's wobble
@@ -242,7 +244,7 @@ def main(out: str) -> None:
                 x.kick(b + 2.5, 0.45 * v, soft=True)
             t = b
             for d, rate in (WOB2 if kind else WOB)[(bar - first) % 4] if v > 0.6 else WOB[0]:
-                wobble(t, low + 12, d, rate if v > 0.6 else 0.3333, 0.2 * v, 22.0 * max(v, 0.25))
+                wobble(t, low + 12 + wob_up, d, rate if v > 0.6 else 0.3333, 0.2 * v * wob_vol, 22.0 * max(v, 0.25))
                 t += d
             if odd and v > 0.45:
                 clap(b, 0.26 * v), x.snare(b, 0.22 * v)
@@ -286,21 +288,21 @@ def main(out: str) -> None:
         boom(b, 0.9), boom(b + 0.02, 0.6)
         put("fx", b, x.noise(1.6, 16000, 0.3, 0.45))
 
-    def trade(first, simultaneous=False):
+    def trade(first, simultaneous=False, bars_=8, vol=1.0):
         """Eight bars of the duel: a bar each, left then right; or both at once, swapping lines every bar."""
-        for i in range(8):
+        for i in range(bars_):
             one, two = (DUEL_1, DUEL_2) if i % 2 == 0 else (DUEL_2, DUEL_1)
             if simultaneous:
-                bow((first + i) * 3, one[i // 2], 0.16, pan=-0.5, fast=True, bus="violin2")
-                bow((first + i) * 3, two[i // 2], 0.14, pan=0.5, fast=True, bus="violin2")
+                bow((first + i) * 3, one[i // 2], 0.16 * vol, pan=-0.5, fast=True, bus="violin2")
+                bow((first + i) * 3, two[i // 2], 0.14 * vol, pan=0.5, fast=True, bus="violin2")
             else:
-                bow((first + i) * 3, one[i // 2], 0.17, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin2")
+                bow((first + i) * 3, one[i // 2], 0.17 * vol, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin2")
 
-    def together(first, text, octaves=False):
+    def together(first, text, octaves=False, vol=1.0):
         for b, d, m in line(first * 3, text):
             fast = d < 1
-            put("violin2", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
-            put("violin2", b, violin(m - 12 if octaves else below(m), d * (0.9 if fast else 0.98), 0.14, fast), 0.4)
+            put("violin2", b, violin(m, d * (0.9 if fast else 0.98), 0.16 * vol, fast), -0.4)
+            put("violin2", b, violin(m - 12 if octaves else below(m), d * (0.9 if fast else 0.98), 0.14 * vol, fast), 0.4)
 
     def way_back(first, pulls):
         """Six bars: the thump thins, the wobble slows to one long sweep a bar and fades; long pulls; the chimes,
@@ -323,60 +325,140 @@ def main(out: str) -> None:
     # Bars 15-18: the hush.
     hush(14)
 
-    # Bars 19-40: the first drop (0:24.5, 30 seconds). The giant boom, then the thump: kick on every beat, the 808,
-    # the wobble bass, driving strings and brass. The violins duel a bar each; then both on one riff in octaves;
-    # then together in harmony.
+    def octo(m, beats, vol=0.2, short=False):
+        """The octobass: a huge bowed string, slow to speak, with a growl in it and a pure note an octave under."""
+        k = x.k(beats)
+        w = x.add(m, beats, [1 / h**0.85 for h in range(1, 19)], 1.0, detune=(-6, 5), vib=0.0 if short else 0.006,
+                  attack=0.02 if short else 0.11, sustain=0.9, decay=0.3, release=0.03 if short else 0.15)
+        w = np.tanh(1.6 * w) + 0.5 * x.add(m - 12, beats, [1], 1.0, attack=0.03, sustain=1.0, release=0.05)[:k]
+        if not short and beats >= 2:
+            u = np.linspace(0, 1, k)
+            w = w * (0.7 + 0.3 * np.sin(np.pi * u**0.8))
+        return w * vol
+
+    def octobass(start, text, vol=0.2):
+        for b, d, m in line(start, text):
+            put("octo", b, octo(m, d * 0.98, vol))
+
+    def octo_riff(bar, vol=0.2):
+        """The octobass digging in: short notes on the root with a gap, then up the fifth to the octave."""
+        root = chord(bar)[1]
+        for o, up in ((0, 0), (0.5, 0), (1.5, 0), (2, 7), (2.5, 12)):
+            put("octo", bar * 3 + o, octo(root + up, 0.42, vol, short=True))
+
+    def gate(bar, pattern="x.xx.x.xx.xx", vol=0.05):
+        """A trance gate: the chord on bright saw strings, chopped on and off in 16ths."""
+        notes, _ = chord(bar)
+        k = x.k(3)
+        w = sum(x.add(m + 12, 3, x.SAW, 1.0, detune=(-11, 0, 12), attack=0.005, sustain=1.0, release=0.01) for m in notes)
+        g = np.repeat(np.array([1.0 if c == "x" else 0.0 for c in pattern]), k // 12 + 1)[:k]
+        edge = int(0.004 * x.sr)
+        g = np.convolve(g, np.ones(edge) / edge, "same")
+        put("trance", bar * 3, w * g * vol)
+
+    def trance_arp(bar, vol=0.05):
+        """A trance run: bright short saw notes in 16ths, the root jumping its octaves round the chord."""
+        notes, root = chord(bar)
+        for i in range(12):
+            m = (root + 24, notes[1] + 12, root + 36, notes[2] + 12, root + 24, notes[2] + 12, root + 36, notes[1] + 24, root + 24, notes[0] + 24, root + 36, notes[2] + 24)[i]
+            put("trance", bar * 3 + i * 0.25, x.add(m, 0.22, x.SAW, vol, detune=(-9, 9), attack=0.003, sustain=0.3, decay=0.05, release=0.01), 0.45 if i % 2 else -0.45)
+
+    def stutter(b, m, count=8, step=0.125, vol=0.12, fall=0.0, pan=0.0):
+        """A glitch: one tiny slice of a note fired again and again (and, with `fall`, sinking)."""
+        for i in range(count):
+            put("glitch", b + i * step, x.pulse(m - fall * i, step * 0.6, 0.25, vol * (1 - 0.5 * i / count), decay=0.02, sustain=0.6, release=0.003), pan if i % 2 else -pan)
+
+    def zap(b, vol=0.1, pan=0.0):
+        """A glitch: a thin pulse falling three octaves in an instant."""
+        put("glitch", b, x.pulse(96, 0.35, 0.125, vol, bend=(0, -36), decay=0.05, sustain=0.5, release=0.01), pan)
+
+    # Bars 19-44: the first drop (0:24.5, 35 seconds; Eric, fourth go: once it drops "it should just stay that way").
+    # The giant boom, then the thump: kick on every beat, the 808, the wobble bass, driving strings and brass. The
+    # violins duel a bar each; share a riff in octaves; play together; then duel at once under a brass tune.
     big_boom(54)
-    storm(18, 22)
+    storm(18, 26)
     trade(18)
     together(26, RIFF, octaves=True)
     parts = TOGETHER.split("|")
     together(34, "|".join(parts[i] for i in (0, 2, 4, 5, 6, 7)))
-    boom(78, 0.5), boom(102, 0.5), boom(111, 0.4)
-
-    # Bars 41-46: the way back.
-    way_back(40, "A5:6 | F5:3 | D5:3 | E5:6")
-
-    # Bars 47-54: the soft middle: the flute's tune, the violin answering under it.
-    for b, d, m in line(138, "|".join(FLUTE.split("|")[:8])):
-        put("flute", b, x.flute(m, d * 0.96, 0.2), 0.2)
-    bow(138, "|".join(PULLS.split("|")[:8]), 0.12, pan=-0.3)
-    for bar in range(46, 54):
-        garden(bar, fill=1)
-    chimes(138, 162, 9, 0.04)
-    drips(138, 162, 3, 0.07)
-    bird(149, 0.04, -0.5)
-
-    # Bars 55-58: the hush again.
-    hush(54)
-
-    # Bars 59-78: the second drop (1:19, 27 seconds), its own way: other wobble speeds, a snare on every third beat
-    # and hats in 16ths. The brass alone takes a tune over the bass; then both violins duel at once, swapping lines
-    # each bar; then together, the whole phrase.
-    big_boom(174)
-    storm(58, 20, kind=1)
-    for b, d, m in line(174, BRASS_TUNE):
+    for b, d, m in line(120, BRASS_TUNE):
         put("brass", b, x.brass(m, d * 0.95, 0.17, attack=0.05, release=0.15))
         put("brass", b, x.brass(m - 12, d * 0.95, 0.11, attack=0.05, release=0.15), 0.2)
-    trade(62, simultaneous=True)
-    together(70, TOGETHER)
-    boom(186, 0.5), boom(210, 0.5), boom(222, 0.4)
+    trade(40, simultaneous=True, bars_=4)
+    boom(78, 0.5), boom(102, 0.5), boom(120, 0.5)
 
-    # Bars 79-84: the way back.
-    way_back(78, "D6:6 | Bb5:3 | F5:3 | E5:6")
+    # Bars 45-50: a small calm (1:00): the thump thins, the wobble slows and fades, long pulls, soft chimes.
+    way_back(44, "A5:6 | F5:3 | D5:3 | E5:6")
 
-    # Bars 85-88: the chimes (all struck by the second-last bar, so none is left hanging over the loop), a last long
-    # pull, and round to bar 1.
-    chimes(252, 259, 9, 0.05)
-    drips(252, 262, 5)
-    bow(252, "F#5:6 D5:6", 0.14)
-    for m, pan in ((n("D3"), -0.3), (n("A3"), 0.3), (n("F#4"), 0.0)):
-        put("strings", 252, x.swell(x.strings(m, 12, 0.045, attack=0.3, release=0.6), 0.4), pan)
-    garden(84, harp=0.6, pizz=False)
+    # Bar 51: near silence. The violin's last breath for a beat, then nothing.
+    put("violin", 150, violin(n("E4"), 1.0, 0.05) * np.linspace(1, 0, x.k(1.0)))
+
+    # Bars 52-88: the second drop (1:09.5, 50 seconds, to the end), crazier. An octobass takes the lead in slow pulls
+    # with the violins dueling under it; the wobble moves up an octave out of its way; the kit adds a snare on every
+    # third beat and hats in 16ths. Glitches and trance through it: a gated chord, runs, stutters, zaps.
+    big_boom(153), boom(153.04, 0.7)
+    storm(51, 36, kind=1, wob_up=12, wob_vol=0.6)
+
+    # 52-59: the octobass's tune, both violins dueling at once under it.
+    octobass(153, OCTO_1)
+    trade(51, simultaneous=True, vol=0.7)
+    zap(164.5, 0.08, 0.4), stutter(176, 86, 8, 0.125, 0.1, 1.0, 0.5)
+
+    # 60-67: glitch and trance. The gated chord and the runs; the violins' riff in octaves with a stutter in each gap;
+    # the octobass holding the roots.
+    for bar in range(59, 67):
+        gate(bar, ("x.xx.x.xx.xx", "xx.x.xx.x.x.", "x.x.xx.xx.x.", "xxx.x.x.xx.x")[bar % 4])
+        trance_arp(bar, 0.04)
+        put("octo", bar * 3, octo(chord(bar)[1], 2.95, 0.19))
+    together(59, RIFF, octaves=True, vol=0.85)
+    t, prev = 177.0, n("D6")
+    for tok in RIFF.replace("|", " ").split():
+        name, d = tok.split(":")
+        if name == "-":
+            stutter(t, prev, 4, 0.125, 0.09, 0.0, 0.5)
+        else:
+            prev = n(name)
+        t += float(d)
+    zap(188.5, 0.08, -0.4), zap(200.5, 0.09, 0.4)
+
+    # 68-75: the octobass's second phrase, higher; the violins together over it; the runs carry on.
+    boom(201, 0.5)
+    octobass(201, OCTO_2)
+    together(67, TOGETHER, vol=0.8)
+    for bar in range(67, 75):
+        trance_arp(bar, 0.035)
+    stutter(224, 89, 8, 0.125, 0.1, 1.0, 0.5)
+
+    # 76-83: everything. The octobass digs in on short notes; the violins duel a bar each; the gate and the runs;
+    # a zap or a stutter at the end of every bar.
+    boom(225, 0.55)
+    trade(75)
+    for bar in range(75, 83):
+        octo_riff(bar)
+        gate(bar, ("x.xx.x.xx.xx", "xx.x.xx.x.x.")[bar % 2], 0.04)
+        trance_arp(bar, 0.035)
+        zap(bar * 3 + 2.5, 0.07, 0.5 if bar % 2 else -0.5) if bar % 2 else stutter(bar * 3 + 2.5, 93, 4, 0.125, 0.08, 0.0, 0.5)
+
+    # 84-88: the last push: the octobass in long roots, the violins together; then one hit, a stutter falling away,
+    # and round to bar 1's chimes.
+    boom(249, 0.55)
+    for bar in range(83, 87):
+        put("octo", bar * 3, octo(chord(bar)[1], 2.95, 0.2))
+        trance_arp(bar, 0.04)
+    together(83, "|".join(parts[i] for i in (0, 2, 4, 5)), vol=0.85)
+    big_boom(261)
+    notes, root = chord(87)
+    put("octo", 261, octo(root, 2.6, 0.22))
+    x.kick(261, 0.8, soft=True), sub(261, root, 2.6, 0.5), x.crash(261, 0.22, decay=0.5)
+    for j, m in enumerate(notes):
+        put("brass", 261, x.brass(m - 12, 1.2, 0.12), (-0.3, 0.0, 0.3)[j])
+        put("violin2", 261, violin(m + 12, 1.0, 0.12, True), (-0.4, 0.0, 0.4)[j])
+    stutter(262, 86, 14, 0.125, 0.1, 1.0, 0.6)
 
     x.echo("chimes", 1.0, 0.25, 0.1)
     x.echo("water", 0.75, 0.3, 0.12)
-    write_wav(out, x.mixdown({"chimes": 4.5, "water": 7.0, "harp": 1.6, "strings": 1.6, "sub": 0.7, "drum": 1.6, "wobble": 1.3, "brass": 2.0, "pizz": 0.6, "flute": 1.4, "violin": 0.97, "violin2": 1.15}, lowpass=9000, room=0.3))
+    x.echo("glitch", 0.75, 0.2, 0.08)
+    write_wav(out, x.mixdown({"chimes": 4.5, "water": 7.0, "harp": 1.6, "strings": 1.6, "sub": 0.7, "drum": 1.6, "wobble": 1.3, "brass": 2.0, "pizz": 0.6, "flute": 1.4, "violin": 0.97, "violin2": 1.15, "octo": 1.6, "trance": 2.4, "glitch": 3.5}, lowpass=9000, room=0.3))
 
 
 if __name__ == "__main__":
