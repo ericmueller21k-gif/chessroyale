@@ -2,7 +2,8 @@
 firework whistling, firework exploding and crackling. With a safari twist."
 144 beats a minute, 144 beats = 36 bars = 60.0 s. A, on the five-note scale (A B C# E F#) with a G for color, sliding
 whole to C, D, E and F; the low chant bends it minor.
-Voices: a thumb-piano lead (a pulse an octave under it), marimba chords on the off-beats, a thin pulse circling the
+Voices: a marimba lead (Eric's pick of seven) and a pan flute that answers it, duels it and joins it; marimba
+chords on the off-beats, a thin pulse circling the
 scale in 16ths, a triangle bass in a 3-3-2 push, low reed voices chanting in fifths, hand drums (a high and a low),
 a shaker, a kick and a light snare; and the fireworks: whistles climbing, booms, crackle, sparkles (a scatter of high
 pings) and a sparkler's fizz.
@@ -11,10 +12,10 @@ Every melody, riff and chord progression here is original: none of it is any fil
 
   bars  1-4    a whistle climbs alone, a boom and crackle; the hand drums come in; a sparkler fizzes up; another rocket
   bars  5-12   the tune: on A, up to C, back
-  bars 13-20   the chant: low voices call, the thumb piano answers high; a pop in each gap (A, D, E)
-  bars 21-28   the second tune: D, A, F, E
+  bars 13-20   the chant: low voices call, the flute answers high; a pop in each gap (A, D, E)
+  bars 21-28   the second tune as a duel, marimba against flute: D, A, F, E
   bars 29-32   the barrage: hand drums alone under three rockets, each higher, sparkles, a sparkler and a last long whistle
-  bars 33-36   the tune's start, a run, three hits with a boom on each, and the last crackle falls into bar 1's whistle
+  bars 33-36   the tune's start (marimba and flute together), a run, three hits with a boom on each, and the last crackle falls into bar 1's whistle
 """
 import sys
 
@@ -44,8 +45,16 @@ SECOND = (
     "A5:.5 -:.5 A5:.5 C6:.5 D6:.5 C6:.5 A5:.5 G5:.5 | F5:.5 G5:.5 A5:.5 C6:.5 D6:1 F6:1 | "
     "B5:.5 B5:.5 C#6:.5 E6:.5 -:.5 E6:.5 F#6:.5 G#6:.5 | B6:2 -:.5 G#6:.5 E6:.5 B5:.5"
 )
+# The flute's side of the duel over the second tune (Eric, Nov 11: "the flute and marimba both play at the same time
+# but like dueling melodies"): it jumps into the marimba's gaps, runs while the marimba holds, falls where it climbs.
+DUEL = (
+    "-:2 D6:.25 E6:.25 F#6:.5 -:.5 F#6:.25 A6:.25 | B6:.5 A6:.5 F#6:1 -:1 D6:.25 E6:.25 F#6:.25 A6:.25 | "
+    "-:1.5 E6:.25 F#6:.25 A6:.5 -:.5 C#7:.5 B6:.5 | A6:.5 -:1 E6:.25 F#6:.25 A6:.25 B6:.25 C#7:.5 E7:1 | "
+    "-:.5 C6:.25 D6:.25 -:2 F6:.5 G6:.5 | A6:1.5 G6:.5 F6:.5 D6:.5 C6:1 | "
+    "E6:1 -:1 G#6:.25 B6:.25 -:.5 B6:.5 C#7:.5 | E7:.25 C#7:.25 B6:.25 G#6:.25 E6:.25 G#6:.25 B6:.25 C#7:.25 E7:1.5 -:.5"
+)
 END = "A5:.5 -:.5 A5:.5 -:.5 A5:.5 -:1.5"
-for name, beats in [(TUNE, 32), (CHANT, 32), (SECOND, 32), (END, 4)]:
+for name, beats in [(TUNE, 32), (CHANT, 32), (SECOND, 32), (DUEL, 32), (END, 4)]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 ROOTS = (
@@ -58,7 +67,7 @@ assert len(ROOTS) == 36
 PENT = (0, 2, 4, 7, 9, 12, 14, 16)
 
 
-def main(out: str, voice: str = "thumb") -> None:
+def main(out: str, voice: str = "marimba") -> None:
     x = Mix(SECS, BEATS, os=2, seed=127)
     put = x.put
     rng = np.random.default_rng(11)
@@ -176,6 +185,10 @@ def main(out: str, voice: str = "thumb") -> None:
         else:
             raise ValueError(voice)
 
+    def flute(start, text, vol=0.2, up=0, pan=0.3):
+        for b, d, m in line(start, text):
+            put("flute", b, x.flute(m + up, max(d * 0.95, 0.22), vol), pan)
+
     def tune(start, text, bell=False, vol=1.0):
         """The thumb piano with a pulse an octave under it; a hand-drum slap answers in each half-beat gap."""
         t = start
@@ -206,7 +219,7 @@ def main(out: str, voice: str = "thumb") -> None:
                     put("voices", t, x.reed(m + 19, d * 0.85, 0.1), 0.25)
                     put("bass", t, x.tri(m, d * 0.85, 0.3, release=0.01))
                 else:
-                    sing(t, m - 12, d)
+                    put("flute", t, x.flute(m, max(d * 0.95, 0.22), 0.2), 0.3)
             t += d
 
     # Bars 1-4: one rocket alone, its burst; the hand drums; the tune's first notes, far off; a sparkler; a rocket.
@@ -250,7 +263,8 @@ def main(out: str, voice: str = "thumb") -> None:
     # Bars 21-28: the second tune, sparkling on top.
     boom(80, 0.45, 1.2)
     x.crash(80, 0.16, decay=0.3)
-    tune(80, SECOND, bell=True)
+    tune(80, SECOND)
+    flute(80, DUEL)
     for bar in range(20, 28):
         band(bar)
     sparkle(94, 2, 8), sparkle(104, 8, 20, 0.04)
@@ -278,6 +292,7 @@ def main(out: str, voice: str = "thumb") -> None:
     x.crash(128, 0.18, decay=0.3)
     bars = TUNE.split("|")
     tune(128, "|".join(bars[:2] + bars[6:7]), bell=True)
+    flute(128, "|".join(bars[:2] + bars[6:7]), 0.16, up=12)  # the two together at the end
     for bar in (32, 33, 34):
         band(bar)
     sparkle(128, 12, 30, 0.04)
