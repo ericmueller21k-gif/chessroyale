@@ -331,6 +331,20 @@ test("the God King's Last Stand (solo raid, ?laststand=1): the ?? warning, he ta
   const boss0 = samples.find((x) => x.rects.boss)!.rects.boss!;
   const pawn0 = samples.find((x) => x.rects.pawn)!.rects.pawn!;
   expect((boss0.x + boss0.r) / 2 < (pawn0.x + pawn0.r) / 2, "the boss on the left of your pawn").toBe(true);
+  // Eric, Nov 11 (your pawn sat right of the column under it): at rest (his attack's knock is over), your pawn's art box is centered
+  // over your XP box within 2 px, on the phone (390) and the computer (1440: its project's window is 1280, so it's set wider here).
+  await page.waitForFunction(() => !["wait", "on"].includes(document.querySelector(".results-duo")?.getAttribute("data-attack") ?? "done"));
+  const vp = page.viewportSize()!;
+  if (testInfo.project.name === "desktop") await page.setViewportSize({ width: 1440, height: 900 });
+  const centers = await page.evaluate(() => {
+    const cx = (sel: string) => {
+      const b = document.querySelector(sel)!.getBoundingClientRect();
+      return (b.left + b.right) / 2;
+    };
+    return { pawn: cx(".results-duo .rd-you .you-pawn-bob"), xp: cx(".results-duo .rd-you .xp-box.xp-compact") };
+  });
+  await page.setViewportSize(vp);
+  expect(Math.abs(centers.pawn - centers.xp), "your pawn's art centered over your XP (2 px)").toBeLessThanOrEqual(2);
   const card = page.getByRole("button", { name: /The God King's Last Stand/ });
   await expect(card).toContainText(/Move \d+: \S+\?\? · /);
   await card.click();
