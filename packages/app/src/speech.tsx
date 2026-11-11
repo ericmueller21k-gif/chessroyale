@@ -294,17 +294,24 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     const e = el.current;
     if (!e || fit.dx || fit.dy) return;
     const r = e.getBoundingClientRect();
-    const out = r.top < 0 || r.left < 0 || r.right > innerWidth;
+    if (!r.width && !r.height) return; // (not drawn just now)
+    // (A computer's side menu down the window's left edge counts as off screen: a box under it is hidden. Don Dough's, Nov 11: his roll
+    // stands him further from the board, and his words came out under the menu.)
+    const nav = document.querySelector(".gm-frame > .fd-side")?.getBoundingClientRect();
+    const minX = nav && nav.width > 0 && nav.right < innerWidth / 2 ? Math.ceil(nav.right) : 0;
+    const out = r.top < 0 || r.left < minX || r.right > innerWidth;
     if (!out) return;
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
-    else setFit({ step: fit.step, dx: r.left < 0 ? -r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
+    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
   const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;
   // (Whole pixels, rounded away from the edge it came off: rounded to the nearest, a box 12.25 px over the top moved 12
   // and stayed a quarter pixel above the window, every frame of its line.)
-  const move = fit.dx || fit.dy ? `translate(${fit.dx > 0 ? Math.ceil(fit.dx) : Math.floor(fit.dx)}px, ${Math.ceil(fit.dy)}px)` : null;
-  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { transform: move } : {}) } : undefined;
+  // (The CSS `translate` property, not `transform`: a box's pop-in animates `transform` with its fill held, which overrode the move, so
+  // for its first moments a box stayed under the menu or off the edge (Hollow's words, Nov 11: 21 px under a computer's side menu).)
+  const move = fit.dx || fit.dy ? `${fit.dx > 0 ? Math.ceil(fit.dx) : Math.floor(fit.dx)}px ${Math.ceil(fit.dy)}px` : null;
+  const style = fitted || move ? { ...(fitted ? { width: `${fitted.width}px` } : {}), ...(move ? { translate: move } : {}) } : undefined;
   return (
     <div ref={el} class={`${cls}${now - at < 200 ? " fresh" : ""}${leaving ? " leaving" : ""}${fit.step ? ` fit${fit.step}` : ""}${fitted?.three ? " wide3" : ""}`} style={style} role="status" aria-label={plainLine(text)} data-fit={fit.step} {...props}>
       {/* (One block inside the box, the line's words in it: a bar's bubble clamps it to three rows, styles.css.) */}

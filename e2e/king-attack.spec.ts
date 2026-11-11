@@ -172,6 +172,9 @@ const ASSAULTS = [
   // (Dash, Nov 6: "when you blunder, all bosses are supposed to jump on the board and attack; he never had that built": his dash in,
   // ten claw swipes, his whoosh and snap. Admins first, as Timber.)
   { id: "dash", name: "Dash", facesLeft: true, sounds: ["dashWhoosh", "dashSnap"], admin: true },
+  // (Don Dough, Nov 11: "firing off a bunch of shots with this loaf of bread": ten pops of his roll. Faces our right, as drawn. Admins
+  // first, as Timber.)
+  { id: "zebra", name: "Don Dough", facesLeft: false, sounds: ["zebraPop"], admin: true },
 ];
 /** How many squares wide a boss's attack figure is drawn (its kit's: before the shrink near the board's top). */
 const attackWidth = (id: string) => {

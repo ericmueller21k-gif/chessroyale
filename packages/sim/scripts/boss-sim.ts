@@ -65,6 +65,12 @@
  * they took, the scrambles and the scrambled moves, the moves the player ran out of time on (of them, scrambled) and the
  * player's lowest bank.
  *
+ * Don Dough (id zebra): each row logs his dough (every drop: after which crowd move, the kind, the square; every rise: after
+ * which crowd move, at the end of whose move, the kind; every squash, and the ones the crowd's squash rule played), the material
+ * risen, and each Gold Plate (after which crowd move, the piece gilded). `squash` (RaidPatch): the crowd squashes a lump when the
+ * best move landing on it costs at most that share of the lump's value in pawns against its best move (the bots' own picks read
+ * the judge, which doesn't know about the dough: a crowd that knows the rule squashes when it's cheap enough).
+ *
  * Results go to reports/boss-sim/*.jsonl; `summary` writes reports/boss-calibration.md.
  */
 import { BOSS_ALONE_SCORING, BOSS_CLOCK, BOSS_ROSTER, DEFAULT_SETTINGS, RAID_SETTINGS, bossClockSettings, bossElo, bossStumbleChance, botPick, estimateRating, mulberry32, shuffle, type Rng, type Settings } from "@chessroyale/core";
@@ -296,6 +302,11 @@ interface RaidPatch {
    * never the battle).
    */
   darkMiss?: number;
+  /**
+   * Don Dough (id zebra): the crowd squashes a lump of his dough when the best move landing on it costs at most this share of
+   * the lump's value (pawn 1 … queen 9), in pawns, against the crowd's best move. Left out: the bots never aim for it.
+   */
+  squash?: number;
 }
 
 /** A wrong move into the dark: from a dark square to one it can't legally go to (the first such, for the sim's model). */
@@ -308,6 +319,28 @@ function wrongDarkTry(fen: string, dark: readonly string[]): string | null {
         if (`${f}${r}` !== d && !legal.has(m) && !legal.has(`${m}q`)) return m;
       }
   return null;
+}
+
+/**
+ * The crowd's squash of Don Dough's dough (patch.squash): of the moves landing on a lump, the best by the engine, played by the
+ * whole crowd when it costs at most `share` of that lump's value in pawns against the best move. Returns the lump's kind and the
+ * cost (null: no move lands on one, or none cheap enough).
+ */
+async function squashDough(runner: MatchRunner, engine: EngineLike, share: number): Promise<{ piece: string; cost: number } | null> {
+  const lumps = runner.boss?.powers?.zebra?.lumps ?? [];
+  if (!lumps.length) return null;
+  const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
+  const allowed = runner.crowdAllowed() ?? legalMoves(fen);
+  const onto = allowed.filter((m) => lumps.some((l) => l.square === m.slice(2, 4)));
+  if (!onto.length) return null;
+  const [best] = await engine.topMoves(fen, 1);
+  const scored = (await engine.scoreMoves(fen, onto)).map((m) => ({ ...m, lump: lumps.find((l) => l.square === m.move.slice(2, 4))! }));
+  const VALUE: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  const fit = scored.map((m) => ({ ...m, cost: Math.max(0, slamPawnsLost(best!.expected, m.expected)) })).filter((m) => m.cost <= share * VALUE[m.lump.piece]!);
+  if (!fit.length) return null;
+  const pick = fit.sort((a, b) => VALUE[b.lump.piece]! - VALUE[a.lump.piece]! || a.cost - b.cost)[0]!;
+  for (const pl of runner.alive()) (runner as unknown as { planned: Map<string, string> }).planned.set(pl.id, pick.move);
+  return { piece: pick.lump.piece, cost: Math.round(pick.cost * 100) / 100 };
 }
 
 /** His thinking (bossThinkMs, at least 1.2 s) and his move on screen (bossShowMs, 1.8 s) each turn, for the sim's clock. */
@@ -442,6 +475,8 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
         }
         if (w.bonus && w.bonus.at === runner.boss!.crowdMoves) timber.bonus += w.bonus.scraps;
       };
+      // (Don Dough: the squashes the crowd's squash rule played, with what they cost.)
+      const zebraPlans: { at: number; piece: string; cost: number }[] = [];
       // (Moo & Moon: his beams, each flurry's size, each Full Moon with the crowd's material lead as it came and after it.)
       const moo = { beams: 0, flurries: [] as number[], moons: [] as { at: number; before: number; after: number | null }[], best: 0 };
       const lead = () => {
@@ -693,6 +728,11 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
             }
           }
         }
+        // (Don Dough's dough: a crowd that knows the rule squashes a lump when it's cheap enough: patch.squash.)
+        if (patch.squash !== undefined && bossId === "zebra") {
+          const plan = await squashDough(runner, engines[0]!, patch.squash);
+          if (plan) zebraPlans.push({ at: runner.boss!.crowdMoves + 1, ...plan });
+        }
         // (The circus tiger's walls: does the engine's best move for the crowd cross one?)
         if (bossId === "tiger" && runner.boss!.powers?.hoops) {
           const fen = runner.boards.get(runner.state.boards[0]!)!.fen;
@@ -749,7 +789,24 @@ async function raid(bosses: string[], games: number, seed: number, strikes: numb
       // (Folio: its marks, folds and marks answered in time; every Crease; its Revision, what its move cost it and what the crowd's reply would have won.)
       const fo = b.powers?.folio;
       const folioRow = fo ? { drafts: fo.drafts, folds: fo.folds, answered: fo.answered, creases, creasesOff, revision: fo.revision ? { at: fo.revision.at, cost: fo.revision.cost, drop: fo.revision.drop } : null } : null;
-      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
+      // (Don Dough: his drops, rises, squashes, the material risen, his Gold Plates.)
+      const zs = b.powers?.zebra;
+      const DV: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+      const zebraRow = zs
+        ? {
+            squash: patch.squash ?? null,
+            drops: zs.drops,
+            risen: zs.rises.reduce((t, r) => t + DV[r.piece]!, 0),
+            rises: zs.rises.map((r) => ({ at: r.at, side: r.side, piece: r.piece })),
+            squashes: zs.squashes.map((r) => ({ at: r.at, side: r.side, piece: r.piece })),
+            plans: zebraPlans,
+            left: zs.lumps.map((l) => ({ piece: l.piece, left: l.left })),
+            gilds: zs.gilds,
+            talk: zs.talk?.name ?? null,
+          }
+        : null;
+      if (zs) for (const g of zs.gilds) ults.push({ kind: "goldPlate", turn: g.at });
+      const row = { boss: bossId, tag, seed, game: g, strikes: struck, tier: b.tier, elo: b.elo, result: result ?? b.result ?? null, moves: b.crowdMoves, ults: ults.length, ultTurns: ults.map((u) => u.turn), kinds: [...new Set(ults.map((u) => u.kind))], secs: Math.round((Date.now() - t0) / 1000), ...(bossId === "alfil" ? { alfil } : {}), ...(bossId === "hopper" ? { hopper, carrots } : {}), ...(bossId === "smudgy" ? { camo: camoRow, ...smudgy } : {}), ...(bossId === "moo" ? { moo } : {}), ...(bossId === "gardener" ? { garden } : {}), ...(bossId === "tiger" ? { tiger: { ...tiger, placed: b.powers?.balloon?.placed ?? 0 } } : {}), ...(bossId === "folio" ? { folio: folioRow } : {}), ...(bossId === "timber" ? { timber: { ...timber, scraps: b.powers?.workshop?.n ?? 0, pickSec } } : {}), ...(bossId === "dash" ? { dash: { ...dash, slapSeen: undefined } } : {}), ...(bossId === "zebra" ? { zebra: zebraRow } : {}), ...(bossId === "hollow" ? { alone: !!patch.alone, bulbs: !!patch.alone && patch.bulbs !== false, difficulty: patch.difficulty ?? 0, darkMiss: patch.darkMiss ?? 0, hollow } : {}) };
       appendFileSync(root + `reports/boss-sim/raid-${tag}.jsonl`, JSON.stringify(row) + "\n");
       console.log(JSON.stringify(row));
     }

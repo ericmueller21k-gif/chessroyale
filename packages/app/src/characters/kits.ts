@@ -33,6 +33,9 @@ import { FOLIO_LINES } from "./folio-lines.ts";
 import { TIMBER_FIGURE as TIMBER } from "./timber-figure.ts";
 import { BOSS_BEAVER_ATTACK as TIMBER_ATTACK } from "./timber.ts";
 import { TIMBER_CHANCE, TIMBER_LINES } from "./timber-lines.ts";
+import { BOSS_ZEBRA as ZEBRA, BOSS_ZEBRA_PORTRAIT } from "./zebra.ts";
+import { ZEBRA_ATTACK } from "./zebra-figure.ts";
+import { ZEBRA_CHANCE, ZEBRA_LINES } from "./zebra-lines.ts";
 import { DASH_ATTACK, DASH_FIGURE as DASH } from "./dash-figure.ts";
 import { DASH_CHANCE, DASH_LINES } from "./dash-lines.ts";
 import { lineSounds } from "../speech.tsx";
@@ -41,7 +44,7 @@ import { mooPowered } from "./moo-state.ts";
 import { RECLUSE_LINES } from "./recluse-lines.ts";
 import type { BossView } from "../game.ts";
 import { mapFrames, type Character } from "./sprite.ts";
-import { ankusItem, balloonItem, bonkItem, chipItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
+import { ankusItem, balloonItem, bonkItem, chipItem, flourItem, inkItem, carrotItem, frostItem, lashItem, lassoItem, moonItem, paintItem, pieItem, popItem, sawItem, waterItem, type SquareItem } from "./power-art.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
 
 /**
@@ -929,6 +932,60 @@ export const BOSS_KITS: Record<string, BossKit> = {
     // in from his side with his trail, swipes his claws at it ten times, high and low (a whoosh and a snap in turn), and dashes
     // off (dash-figure.ts: DASH_ATTACK). Facing our left; 48 frame pixels a square (he's lanky), a square off.
     kingAttack: { ch: DASH_ATTACK, anim: "kingAttack", perSquare: 48, stand: 1, facesLeft: true, hit: popItem },
+  },
+  // Don Dough, the zebra kingpin (Eric's design, Nov 10-11; his art approved Nov 11): docs/decisions/2026-11-11-don-dough.md. His art is
+  // the art branch's boss-zebra, as drawn (characters/zebra.ts, on its rig zebra-rig.ts). His sounds are his own: a bread rifle's
+  // little pops, crust and flour, a bakery's oven timer and gold glaze (characters/zebra-sounds.ts).
+  "Don Dough": {
+    barScale: 0.9,
+    barShift: 0,
+    ch: ZEBRA,
+    anims: {
+      // His battle start (Eric: "he pulls out his bread and holds it like a rifle, pretends to shoot it at you, a little pop, and
+      // then he just starts laughing").
+      entrance: "breadPop",
+      // (His periodic strike on a piece in a raid: the roll pulled, a pop, slung back.)
+      strike: "capture",
+      // Rising Dough: a lump from his apron pocket, a toss in his hoof, lobbed onto the board.
+      power: "drop",
+      // Gold Plate's warning: chin up, a chuckle (a loop); the cast: the glaze stirred, three strokes at the board, a chef's kiss.
+      ultimateWarn: "smug",
+      ultimate: "goldPlate",
+      // A lump risen into his piece: two nods and belly pats; a queen: the roll thrust overhead, laughing.
+      cheer: "cheer",
+      bigCheer: "bigCheer",
+      // Your piece squashed his dough: his hat jolted up.
+      squashed: "hurt",
+    },
+    sounds: {
+      thud: "zebraThud",
+      tip: "zebraTip",
+      point: "zebraHm",
+      draw: "zebraDraw",
+      pop: "zebraPop",
+      hurt: "zebraOof",
+      cock: "zebraCock",
+      chuckle: "zebraChuckle",
+      laugh: "zebraLaugh",
+      snap: "zebraSnap",
+      relax: "zebraRelax",
+      tsk: "zebraTsk",
+      tap: "zebraTap",
+      // (The lump lobbed.)
+      drop: "zebraLob",
+      volley: "zebraVolley",
+      stir: "zebraStir",
+      gild: "zebraGild",
+      kiss: "zebraKiss",
+    },
+    lines: ZEBRA_LINES,
+    chance: ZEBRA_CHANCE,
+    portrait: { ...BOSS_ZEBRA_PORTRAIT, anim: "idle", frame: 0 },
+    // His attack on a king (Eric, Nov 10: "it looks like he's just firing off a bunch of shots with this loaf of bread"): he drops in,
+    // aims his roll and fires ten shots (his volley), a puff of flour off its square each one, laughs and hops off (zebra-figure.ts:
+    // ZEBRA_ATTACK). Facing our right, as drawn; 37 frame pixels a square (the art's room scale), 1.1 off (his roll's end and its
+    // puff reach past the king's middle).
+    kingAttack: { ch: ZEBRA_ATTACK, anim: "kingAttack", perSquare: 37, stand: 1.1, hit: flourItem },
   },
   "Hidden Boss": {
     barScale: 1,

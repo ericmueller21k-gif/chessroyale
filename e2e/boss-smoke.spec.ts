@@ -29,6 +29,7 @@ const PASSIVE_EVENTS: Partial<Record<PowerId, PowerEventKind[]>> = {
   draft: ["draft"],
   scraps: ["build"],
   clockslap: ["slap"],
+  dough: ["doughDrop"],
 };
 
 // (A boss in the game for admins first, Timber and Dash, is checked too: the test plays as an admin.)
