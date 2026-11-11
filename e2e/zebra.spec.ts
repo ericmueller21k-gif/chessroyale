@@ -116,6 +116,8 @@ test.describe("Don Dough", () => {
     // (The roll from 04:00 and from 03:00 played: their frames drawn.)
     expect(s.frames.some((f) => f.startsWith("pRoll04:"))).toBe(true);
     expect(s.frames.some((f) => f.startsWith("pRoll03:"))).toBe(true);
+    // (The roll after his move plays to its last frame, though the bar redraws every frame while his move shows: the review's 2.)
+    expect(s.frames).toContain("pRoll03:6");
     // 1 after yours, 0 after his: it rises into his pawn (the guards allowing), the timer's ding, the dough's rise.
     await playOne(page);
     await yourMove(page);
