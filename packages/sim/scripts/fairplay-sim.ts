@@ -844,8 +844,8 @@ out("");
     const xs = subs.flatMap((sub) => sub.summaries.filter((x) => x.deepChecked >= FAIRPLAY.levels.banMatchChecked).map((x) => x.deepMatch / x.deepChecked));
     return xs.length ? `${pct(quant(xs, 0.5))} / ${pct(quant(xs, 0.9))}` : "–";
   };
-  out("| Who | Before (exact match): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Now: near-best share (median / 90th pct, matches checked) |");
-  out("| --- | --- | --- | --- |");
+  out("| Who | Before (exact match): pool 1 / 2 / 5 | Now: pool 1 / 2 / 5 | Review within 5: before / now | Now: near-best share (median / 90th pct, matches checked) |");
+  out("| --- | --- | --- | --- | --- |");
   const rows: { name: string; subs: Subject[]; per1000: boolean }[] = [
     { name: CHEATERS[6]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[6]), per1000: false },
     { name: CHEATERS[0]!.name, subs: cheaters.filter((x) => x.kind === CHEATERS[0]), per1000: false },
@@ -858,15 +858,17 @@ out("");
     for (const row of rows) {
       const f = row.per1000 ? per1000 : pct;
       cells.set(`${key}:${row.name}`, [1, 2, 5].map((k) => f(reached(row.subs, "ban", k))).join(" / "));
+      cells.set(`${key}-review:${row.name}`, f(reached(row.subs, "review", 5)));
       if (key === "now") cells.set(`share:${row.name}`, share(row.subs));
     }
   }
-  for (const row of rows) out(`| ${row.name} | ${cells.get(`before:${row.name}`)} | ${cells.get(`now:${row.name}`)} | ${cells.get(`share:${row.name}`)} |`);
+  for (const row of rows)
+    out(`| ${row.name} | ${cells.get(`before:${row.name}`)} | ${cells.get(`now:${row.name}`)} | ${cells.get(`before-review:${row.name}`)} / ${cells.get(`now-review:${row.name}`)} | ${cells.get(`share:${row.name}`)} |`);
   out("");
   const strong = [...honest.filter((x) => x.kind.elo >= 2200), ...maiaHonest];
   evaluate(strong, base);
   const pooled = strong.filter((x) => x.levels[MATCHES - 1] === "ban").length;
-  out(`Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within ${MATCHES} matches: ${pooled} of ${strong.length.toLocaleString("en-US")} (${per1000(pooled / strong.length)} per 1,000). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more.`);
+  out(`Strong people (Stockfish's strength 2200-2700 and Maia 2200-2600) in the pool within ${MATCHES} matches: ${pooled} of ${strong.length.toLocaleString("en-US")} (${per1000(pooled / strong.length)} per 1,000). Matches here are short (counted moves above); the live demo's had 9 to 32 deep-checked, and with more moves a match tells more. Review ("a person looks", results held) comes from the match scores, which the engine user's profile raises a little for strong players too: rank-2 and rank-3 picks, which an engine user now makes as often as the demo's did, clear less.`);
   out("");
 }
 
