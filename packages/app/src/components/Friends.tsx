@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import { ACTIVITY_LINES, FRIENDS, inviteWhat, type FriendEntry, type InviteEntry } from "@chessroyale/core";
 import {
@@ -231,7 +231,8 @@ export function InviteFriends() {
 function InviteSheet({ onClose }: { onClose: () => void }) {
   const { state } = useFriends(true);
   const [note, setNote] = useState<string | null>(null);
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);

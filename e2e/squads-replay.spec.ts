@@ -167,9 +167,17 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
   const tags = await page.evaluate(() => {
     const out: { text: string; w: number; h: number; fs: number }[] = [];
     (window as any).__tags = out;
+    // (And, while the replay's board is up, the status line and whether the free seconds show the replay's icon: the same look.)
+    const during: { status: string; icon: boolean }[] = [];
+    (window as any).__during = during;
     const t = setInterval(() => {
-      for (const el of document.querySelectorAll<HTMLElement>(".rp-tag")) {
+      if (document.querySelector(".rp-over")) {
+        const icon = document.querySelector(".sq-free.replay .rp-icon")?.getBoundingClientRect();
+        during.push({ status: (document.querySelector(".sq-status")?.textContent ?? "").replace(/\s+/g, " ").trim(), icon: !!icon && icon.width > 0 && icon.height > 0 });
+      }
+      for (const el of document.querySelectorAll<HTMLElement>(".rp-over .rp-tag")) {
         const b = el.getBoundingClientRect();
+        if (!b.width || !b.height) continue;
         const text = el.querySelector<HTMLElement>(".rp-tag-text")!;
         out.push({ text: text.textContent ?? "", w: Math.round(b.width * 10) / 10, h: Math.round(b.height * 10) / 10, fs: parseFloat(getComputedStyle(text).fontSize) });
       }
@@ -183,11 +191,17 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
   expect(n).toBeGreaterThan(0);
   // The free time: the free seconds + 0.5 s for each move missed (the server's, the clock's).
   expect(back.duty!.freeMs).toBe(back.delayMs + 500 * n);
-  await expect(page.locator(".rp-over")).toBeVisible();
-  await expect(page.locator(".sq-status")).toContainText(/^Your move · Board \d · replay \d of \d/);
-  await expect(page.locator(".sq-free.replay .rp-icon")).toBeVisible();
+  // (These are read from the watcher above, every 40 ms from before the replay: a replay of one move lasts 0.5 s, and it came and went
+  // between the looks of toBeVisible, the tag and once the icon: CI and locally, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+  // The replay's board, with the status line's "replay x of y" and the replay's icon in the free seconds, in one look.
+  await expect
+    .poll(() => page.evaluate(() => ((window as any).__during as { status: string; icon: boolean }[]).some((d) => /^Your move · Board \d · replay \d of \d/.test(d.status) && d.icon)), {
+      message: "the replay's board, its status and its icon",
+      timeout: 500 * n + 3_000,
+    })
+    .toBe(true);
   // Mid-way: a move landed, its from and to marked on the replay's board, its player named over it.
-  await expect(page.locator(".rp-over .rp-tag")).toBeVisible({ timeout: 3_000 });
+  await expect.poll(() => page.evaluate(() => (window as any).__tags.length as number), { message: "a tag over a replayed move", timeout: 500 * n + 3_000 }).toBeGreaterThan(0);
   await still(page, "replay");
   // It ends as the extra time does (never later, never early), and the board is the board as it stands.
   await expect(page.locator(".rp-over")).toHaveCount(0, { timeout: 500 * n + 1_500 });

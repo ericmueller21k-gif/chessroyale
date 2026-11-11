@@ -1435,6 +1435,22 @@ test("a tap on a player's name: Profile, Mute and Report (a moderator also Remov
   await expect(own.getByRole("button", { name: "Remove" })).toHaveCount(0);
   await cy.keyboard.press("Escape");
   await expect(own).toHaveCount(0);
+  // Escape the moment the menu is in the page (before it's painted): it closes too. (Its listener waited for a paint, so an Escape
+  // pressed as it opened was lost: this test on CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+  await cy.evaluate(() => {
+    const w = window as unknown as { __menuEsc?: boolean };
+    w.__menuEsc = false;
+    const obs = new MutationObserver(() => {
+      if (!document.querySelector(".tc-menu")) return;
+      obs.disconnect();
+      w.__menuEsc = true;
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    });
+    obs.observe(document.body, { childList: true, subtree: true });
+  });
+  await lineOf(cy, `Cy says hello ${run}`).locator(".tc-name").click();
+  await expect.poll(() => cy.evaluate(() => (window as unknown as { __menuEsc?: boolean }).__menuEsc)).toBe(true);
+  await expect(own).toHaveCount(0);
 
   // Report: fair play's report with the line; the answer in the menu, which closes.
   await boLine.locator(".tc-name").click();

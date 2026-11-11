@@ -94,14 +94,19 @@ export function onAccountChange(fn: () => void): () => void {
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { credentials: "same-origin", ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = (await res.json().catch(() => ({}))) as T & { message?: string; askAge?: boolean; tooYoung?: boolean };
+  const read = (await res.json().catch(() => null)) as (T & { message?: string; askAge?: boolean; tooYoung?: boolean }) | null;
   if (!res.ok) {
+    const body: { message?: string; askAge?: boolean; tooYoung?: boolean } = read ?? {};
     // A sign-in the age gate refused: ask the question again, saying why (the answer ran out), or too young after all.
     if (body.askAge) askAgeAgain(body.message ?? ASK_AGE_LINE);
     if (body.tooYoung) rememberTooYoung();
     throw Object.assign(new Error(body.message ?? `Something went wrong (${res.status}).`), { status: res.status });
   }
-  return body;
+  // An answer that couldn't be read (cut off on the way, or not an object): a failure like the server's own (asked again where a
+  // server error is), never `{}` taken for the answer. A profile with no `user` threw on every screen that reads it (Nov 11,
+  // timber.spec on main: "Cannot read properties of undefined (reading 'signedIn')").
+  if (!read || typeof read !== "object") throw Object.assign(new Error("Something went wrong (an answer that couldn't be read)."), { status: 502 });
+  return read;
 }
 
 /** One action's id (a boss crate's buy, an open, an admin's grant): the server applies an action once per id (server/ledger.ts). */

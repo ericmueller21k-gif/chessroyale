@@ -183,6 +183,9 @@ export function BossMenu({
   useEffect(() => {
     if (maiaAhead()) prefetchMaia();
     picked.current?.scrollIntoView({ block: "nearest" });
+  }, []);
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
@@ -346,7 +349,8 @@ function FriendsSheet({
   const [code, setCode] = useState(initialCode ?? "");
   const { status } = useFriends();
   const news = friendsBadge();
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);

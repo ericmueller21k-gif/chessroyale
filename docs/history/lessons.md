@@ -970,3 +970,20 @@ was a floor; the stills at rest looked right.
 **The fix:** the tiles renamed; a room lists what may go see-through (`seeThru`). A unit test: every square has a floor tile baked
 in; an e2e check walks round the table: no tile stands, nothing but the door and near wall see-through.
 docs/decisions/2026-11-11-room-smooth.md.
+
+## Escapes lost as a pop-up opened (Nov 11, 2026)
+
+**What happened:** main's full run went red on retry-only passes in `town-chat.spec.ts:1410` (a player's own line menu stayed open
+after Escape) and `shop.spec.ts:1480` (the "Buying opens soon" pop-up stayed open after Escape, many runs), and on
+`squads-play.spec.ts:304`, the very test written for this in October.
+
+**Why:** the town chat's line menu and the shop's pop-up added their Escape listener in a `useEffect`, which Preact runs after a paint
+(up to about 100 ms later, more on a busy phone or CI): an Escape pressed as they opened was lost. The party sheet had been fixed for
+this on Oct 16, but its test's watcher fired on any `[role="dialog"]`, and `index.html` always holds one (the hidden "Turn your phone
+upright"), so it could send its Escape before the sheet existed.
+
+**How it was found:** the CI snapshots (the pop-up still open, the sheet still open with nothing else on screen), then an Escape sent
+from a MutationObserver the moment each pop-up is in the page: the menu and the pop-up stayed open on the old build, every time.
+
+**The fix:** layout effects for both listeners; each spec presses Escape at the pop-up's first frame; the party sheet's watcher waits
+for `.sq-party`. docs/decisions/2026-11-11-flaky-batch.md (it lists eight more pop-ups with the same `useEffect`).

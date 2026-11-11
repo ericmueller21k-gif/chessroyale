@@ -31,11 +31,14 @@ async function playOne(page: Page, onto?: string) {
   await expect.poll(() => phase(page), { timeout: 10_000 }).not.toBe("play");
 }
 
-/** Every frame: the power events shown, the banners' words, the timers' slots and the board's box, the timers' frames. */
+/**
+ * Every frame: the power events shown, the banners' words, the timers' slots and the board's box, the timers' frames, and the
+ * first lump's minutes left in the state (each change, in order).
+ */
 async function watch(page: Page) {
   await page.evaluate(() => {
     const w = window as any;
-    w.__dd = { kinds: [] as string[], banners: [] as string[], timers: [] as string[], board: [] as string[], frames: [] as string[], gold: [] as string[] };
+    w.__dd = { kinds: [] as string[], banners: [] as string[], timers: [] as string[], board: [] as string[], frames: [] as string[], gold: [] as string[], left0: [] as number[] };
     const box = (el: Element | null) => {
       if (!el) return "";
       const r = el.getBoundingClientRect();
@@ -56,6 +59,8 @@ async function watch(page: Page) {
         const f = (c as HTMLElement).dataset.frame ?? "";
         if (f && !r.frames.includes(f)) r.frames.push(f);
       }
+      const l0 = (w.match?.boss?.powers?.zebra?.lumps ?? []).find((l: { n: number }) => l.n === 0);
+      if (l0 && r.left0[r.left0.length - 1] !== l0.left) r.left0.push(l0.left);
       for (const p of document.querySelectorAll(".board-wrap piece.gold")) {
         const k = p.className;
         if (!r.gold.includes(k)) r.gold.push(k);
@@ -65,7 +70,7 @@ async function watch(page: Page) {
     requestAnimationFrame(look);
   });
 }
-const seen = (page: Page) => page.evaluate(() => (window as any).__dd as { kinds: string[]; banners: string[]; timers: string[]; board: string[]; frames: string[]; gold: string[] });
+const seen = (page: Page) => page.evaluate(() => (window as any).__dd as { kinds: string[]; banners: string[]; timers: string[]; board: string[]; frames: string[]; gold: string[]; left0: number[] });
 const zebraOf = (page: Page) => page.evaluate(() => (window as any).match.boss.powers.zebra as { lumps: { n: number; piece: string; square: string; left: number; slot: number }[]; drops: number; rise: { n: number; square: string; piece: string } | null; gold: string[] });
 
 test.describe("Don Dough", () => {
@@ -107,12 +112,14 @@ test.describe("Don Dough", () => {
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-kind", "p");
     expect((await seen(page)).kinds).toContain("doughDrop");
     // A minute off each move, yours and his: 3 after yours, 2 after his.
+    // (Read from the watcher, every frame: your move's minute comes off once the judge has scored it, which took over 5 s on CI's
+    // desktop (main's run 43016010621), and a look after his move has already seen 2.)
     await playOne(page);
-    await expect.poll(async () => (await zebraOf(page)).lumps.find((l) => l.n === 0)?.left ?? -1).toBe(3);
     await yourMove(page);
+    let s = await seen(page);
+    expect(s.left0).toEqual([BOSS_POWERS.doughTimers.p, 3, 2]);
     expect((await zebraOf(page)).lumps.find((l) => l.n === 0)?.left).toBe(2);
     await expect(page.locator('.dd-slot[data-slot="0"] .dd-timer')).toHaveAttribute("data-left", "2");
-    let s = await seen(page);
     // (The roll from 04:00 and from 03:00 played: their frames drawn.)
     expect(s.frames.some((f) => f.startsWith("pRoll04:"))).toBe(true);
     expect(s.frames.some((f) => f.startsWith("pRoll03:"))).toBe(true);

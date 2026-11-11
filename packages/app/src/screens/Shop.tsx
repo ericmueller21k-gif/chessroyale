@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useLayoutEffect, useState } from "preact/hooks";
 import { CHAT_PACKS_SHOP, GOD_KING_SHOP, SHOP, SHOP_CATEGORIES, SHOP_FREE, SHOP_ITEMS, chatPack, chatPickCap, chatSays, pausedLine, shopItem, shopOffersPack, shopPrice, discountLabel, wornFromLocker, type ShopSlot } from "@chessroyale/core";
 import { account, buyShopItem } from "../account.ts";
 import { openProfile } from "../profile-nav.ts";
@@ -280,7 +280,8 @@ function Price({ id, onTap }: { id: Offer; onTap: () => void }) {
 
 /** The shop's small pop-up (the limited clock's words, "Buying opens soon"): OK, Escape or a tap outside closes it. */
 function ShopPop({ text, onClose }: { text: string; onClose: () => void }) {
-  useEffect(() => {
+  // (A layout effect: an effect waits for a paint, and an Escape pressed as it opened was lost: shop.spec.ts, CI, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);

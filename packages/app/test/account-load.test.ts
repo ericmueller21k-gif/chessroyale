@@ -67,6 +67,29 @@ describe("loading the account", () => {
     expect(account().profile?.user.id).toBe("u");
   });
 
+  it("an answer cut off on the way (a 2xx that isn't JSON): asked again like a server error, never `{}` taken for your profile (Nov 11)", async () => {
+    const calls: string[] = [];
+    let me = 0;
+    vi.stubGlobal("fetch", async (path: string) => {
+      calls.push(path);
+      if (path.startsWith("/api/auth/config")) return Response.json(CONFIG);
+      return ++me === 1 ? new Response('{"user":{"id":', { status: 200, headers: { "content-type": "application/json" } }) : Response.json(PROFILE);
+    });
+    await loadAccount();
+    expect(calls.filter((c) => c.startsWith("/api/me"))).toHaveLength(2);
+    expect(account().profile?.user.id).toBe("u");
+  });
+
+  it("an answer cut off twice: no account for now, never a profile without its user", async () => {
+    vi.stubGlobal("fetch", async (path: string) =>
+      path.startsWith("/api/auth/config") ? Response.json(CONFIG) : new Response("", { status: 200, headers: { "content-type": "application/json" } }),
+    );
+    await loadAccount();
+    expect(account().config?.accounts).toBe(false);
+    const p = account().profile;
+    expect(p === null || !!p.user).toBe(true);
+  });
+
   it("a refusal (a 4xx) isn't asked again", async () => {
     const calls = server([403]);
     await loadAccount();
