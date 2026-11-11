@@ -32,7 +32,7 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
-import { FrameRec, P, REC, browserOf, setRec, summarize, timerStep } from "./frame-report.ts";
+import { FrameRec, NP, P, REC, browserOf, setRec, summarize, timerStep } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
@@ -1991,12 +1991,26 @@ function startTown(
     if (!testSwitchesAllowed()) return;
     town.nextBotAt = Infinity;
   };
+  // ... `__townReport()` (`?report`): the recorder's state ("wait", "rec", "done"; null without `?report`), the frames so far, and once
+  // done the panel's summary (frame-report.ts summarize).
+  const hookReport = (raw = false) => {
+    if (!testSwitchesAllowed() || !rec) return null;
+    const u = rec.run;
+    const n = u.n;
+    return {
+      state: rec.state,
+      frames: n,
+      summary: rec.state === "done" ? summarize(u) : null,
+      // (raw: every frame's numbers, for a measurement script.)
+      raw: raw ? { total: [...u.total.subarray(0, n)], part: [...u.part.subarray(0, n * NP)], flags: [...u.flags.subarray(0, n)], turn: [...u.turn.subarray(0, n)], ups: [...u.ups.subarray(0, n)], bakes: [...u.bakes.subarray(0, n)] } : null,
+    };
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -2020,6 +2034,7 @@ function startTown(
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
   hooks.__townHere = hookHere;
+  hooks.__townReport = hookReport;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -2197,6 +2212,7 @@ function startTown(
       delete hooks.__townRide;
       delete hooks.__townYou;
       delete hooks.__townHere;
+      delete hooks.__townReport;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();

@@ -618,14 +618,14 @@ class GLPainter implements Painter {
       e.tex = null;
       return;
     }
+    // (`?report`: the upload's time, its place in the atlas included, frame-report.ts.)
+    const t0 = REC ? performance.now() : 0;
     // Pending draws that read its old pixels go first.
     if (e.tex && e.gen === this.gen) this.flushUsing(e.tex);
     if (!(e.tex && e.gen === this.gen && e.w === w && e.h === h)) this.place(e, w, h);
     e.gen = this.gen;
     this.ups++;
     const t = e.tex!;
-    // (`?report`: the upload's time, frame-report.ts.)
-    const t0 = REC ? performance.now() : 0;
     if (t.layer >= 0) {
       gl.bindTexture(gl.TEXTURE_2D_ARRAY, t.t);
       gl.texSubImage3D(gl.TEXTURE_2D_ARRAY, 0, e.x, e.y, t.layer, w, h, 1, gl.RGBA, gl.UNSIGNED_BYTE, s);

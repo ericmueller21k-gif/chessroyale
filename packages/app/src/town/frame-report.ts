@@ -41,8 +41,9 @@ export const P = {
   chips: 13,
   /** The minimap's dot. */
   minimap: 14,
-  /** Loading: roofs painted (box-draw.ts bakeRoof), wherever in the frame it happens. */
-  roofs: 15,
+  /** Loading: pictures painted the first time they show (a roof for a heading: box-draw.ts bakeRoof; a wall's, a home's or a
+   * figure's frame: render.ts FrameCache), wherever in the frame it happens. */
+  paint: 15,
   /** Loading: what the rows let you see from a new square (seen.ts), wherever it happens. */
   sight: 16,
   /** Loading: pictures uploaded to the GPU (paint-gl.ts upload), wherever it happens. */
@@ -68,7 +69,7 @@ export const PART_NAMES: readonly string[] = [
   "WebGL submit",
   "Chips & card",
   "Minimap",
-  "Roof painting",
+  "New pictures",
   "Sight lines",
   "Texture uploads",
   "Outside our code",
@@ -94,7 +95,7 @@ export interface RunData {
   flags: Uint8Array;
   /** How fast the camera turned (degrees a second, unsigned). */
   turn: Float32Array;
-  /** Pictures uploaded, roofs painted (counts). */
+  /** Pictures uploaded, pictures painted (counts). */
   ups: Uint16Array;
   bakes: Uint16Array;
 }
@@ -150,8 +151,9 @@ export class FrameRec {
     this.ups++;
     this.flags |= F.upload;
   }
-  bake(ms: number): void {
-    this.take(P.roofs, ms);
+  /** A picture painted the first time it shows (a roof, a wall, a figure's frame). */
+  paint(ms: number): void {
+    this.take(P.paint, ms);
     this.bakes++;
     this.flags |= F.load;
   }
@@ -296,7 +298,7 @@ export function whatOf(r: RunData, i: number): string {
   if (f & F.walk) out.push("walking");
   if (f & F.turn) out.push(`turning ${Math.round(r.turn[i]!)}°/s`);
   if (f & F.zoom) out.push("zoom");
-  if (r.bakes[i]) out.push(`${r.bakes[i]} roof${r.bakes[i] === 1 ? "" : "s"} painted`);
+  if (r.bakes[i]) out.push(`${r.bakes[i]} new picture${r.bakes[i] === 1 ? "" : "s"}`);
   if (f & F.sight) out.push("sight lines");
   if (r.ups[i]) out.push(`${r.ups[i]} upload${r.ups[i] === 1 ? "" : "s"}`);
   if (f & F.reset) out.push("atlas page reset");

@@ -35,7 +35,7 @@ export function panelHtml(s: Summary, d: Device): string {
   lines.push(`<div class="tfr-fps" data-tfr-fps="${Math.round(s.p50)}"><b>${fps(s.p50)}</b> fps median · <b>${fps(s.p5)}</b> 5th % · <b>${fps(s.p1)}</b> 1st % · ${s.frames} frames in ${s.secs.toFixed(1)} s · over 20 ms ${pct(s.over20)} · over 33 ms ${pct(s.over33)}</div>`);
   const most = s.top >= 0 ? `Most time went to <b>${esc(PART_NAMES[s.top]!)}</b> (${ms(all!.avg[s.top]!)} of ${ms(all!.mean)} ms a frame)` : "No frames recorded";
   const mostTurn = s.topTurn >= 0 ? `; turning (up to ${Math.round(s.maxTurn)}°/s): <b>${esc(PART_NAMES[s.topTurn]!)}</b> (${ms(turn!.avg[s.topTurn]!)} of ${ms(turn!.mean)} ms)` : "; no turning recorded";
-  lines.push(`<div class="tfr-most">${most}${mostTurn}. Loading: ${s.bakes} roofs painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
+  lines.push(`<div class="tfr-most">${most}${mostTurn}. Loading: ${s.bakes} new pictures painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
   // The parts: the mean ms a frame overall and split, and the worst.
   let t = `<table class="tfr-parts"><thead><tr><th>ms a frame</th>`;
   for (const g of s.segs) t += `<th>${esc(g.name)}</th>`;
