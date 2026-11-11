@@ -97,6 +97,31 @@ reference's measured tempo, energy and brightness; none of its notes). Every mel
 Code: `scripts/reel/music/song_c.py` on `claude/trailer-v2` (`build.sh` builds all three). As with A and B, I can't listen:
 the notes and balance are set on paper and by measurement, so expect to want tweaks.
 
+## Song D (Nov 11): a 30-second song in a 16-bit RPG main theme's style
+Eric's reference this time is a 16-bit RPG's main theme. Song D takes its measured style (about 129 beats a minute, a
+major key, a warm tone with brightness near 1.9 kHz, steady level all through, a stretch where the drums drop out)
+and the console's kind of voices; none of its notes. Every melody, riff and chord progression is original.
+
+- **Files:** `track-D.ogg` / `.mp3` (the song alone, 30.0 s, loops). No video.
+- **Tempo and length:** 128 beats a minute, 64 beats = 16 bars of four = 30.0 s.
+- **Key:** D major, with a borrowed C chord in the theme for the adventure color.
+- **Voices:** a brass lead (in octaves in the fanfare); strings (short driving 8ths on the chords, a held pad, and an
+  octave line singing with the lead); a breathy flute; bells; a plucked harp in rolling 16ths; a round bass; timpani; a
+  soft kick, a marching snare and light hats. A small hall and a light echo on the lead and bells.
+- **Measured:** -16.0 LUFS; peak -3.6 dBFS (no clipping); every bar within 1 dB of the others; brightness about 1.8 kHz;
+  the tail of the last bar's roll rings across the loop point, so the loop has no gap.
+
+| Bars | Part | Chords (a bar each unless marked) | What plays |
+|---|---|---|---|
+| 1-2 | Fanfare | D, G to A | Brass in octaves over held strings, a timpani roll into the theme |
+| 3-6 | Theme | D, C, G over B, A | Brass leads a dotted, striding tune, strings an octave above; driving string 8ths, the marching drums |
+| 7-10 | Answer | Bm, G, Em, A | The flute joins an octave up, bells mark each bar; climbs to a held high E |
+| 11-14 | Bridge | G, A, F#m, Bm | The drums drop out: flute and bells over the harp and held strings |
+| 15-16 | Build | Em, A | Brass and tremolo strings, a timpani roll and a run up that loops back to bar 1 |
+
+Code: `scripts/reel/music/song_d.py` on `claude/trailer-v2` (`build.sh` builds all four). As before, I can't listen:
+the notes and balance are set on paper and by measurement, so expect to want tweaks.
+
 ## Editing it
 On branch `claude/trailer-v2`:
 - `scripts/reel/record-reel.ts`: records each scene (`npx playwright test -c scripts/reel/reel.config.ts -g " town$" --project reel|wide`).
