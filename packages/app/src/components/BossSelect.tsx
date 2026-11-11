@@ -4,7 +4,7 @@ import { isAdmin } from "../boss-brain.ts";
 import { DressedPawn } from "./FrontDoor.tsx";
 import { artOf, bossKit } from "../characters/kits.ts";
 import { frameKeys, type Character } from "../characters/sprite.ts";
-import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, TILES_PER_ROW } from "../characters/boss-select.ts";
+import { rowSizes, SELECT_SOUND, SELECT_TINT, selectLine, STAGE_SCALE, TILES_PER_ROW } from "../characters/boss-select.ts";
 import { isPaused, useServerStatus } from "../status.ts";
 import { playOnTap, warmSounds } from "../sound.ts";
 import { NORMAL, Voice, VoiceBubble } from "../speech.tsx";
@@ -48,11 +48,14 @@ export function selectBosses(admin = isAdmin()): { bosses: BossDef[]; hidden: Bo
 }
 
 /**
- * Where a boss stands on the stage, in % of the stage's width (cqi): one size of pixel for every boss (a bigger boss
- * stands taller, as on an old select screen), smaller only for one too tall for the stage (the Hidden Boss); its foot
- * on the platform's middle. Worked out once a character, from its idle's first frame (the rows it draws in).
+ * Where a boss stands on the stage, in % of the stage's width (cqi): one size of pixel for every boss, its foot on the
+ * platform's middle. Its figure is STAGE_SCALE times the old size (Eric, Nov 11: "they need to be a bit bigger"; the
+ * tuning knob is in characters/boss-select.ts), and never taller than the room above its feet: its head stays on the
+ * stage (a tall one, the giraffe or the Hidden Boss, is held to that room, not cut off). Worked out once a character, from
+ * its idle's first frame (the rows it draws in).
  */
 const PX = 0.8;
+/** The old cap (before Nov 11): a figure's head-to-feet height, in cqi. Never drawn smaller than that old size. */
 const TALLEST = 56;
 const FOOT_AT = 50;
 /**
@@ -60,6 +63,11 @@ const FOOT_AT = 50;
  * Big Boy stood off to one side of the platform). Big Boy's feet span x 33 to 66 in his idle; his `foot` is x 44.
  */
 const STAGE_FOOT_X: Readonly<Record<string, number>> = { bigboy: 49.5 };
+/**
+ * The room above a boss's feet on the stage, in cqi: its feet sit 12% up the stage's height (.bs-spot), a spot is 124:96, and
+ * the speech bubble's tail reaches about 12 cqi into the spot's top, so a head stays clear of it (never under the bubble).
+ */
+const STAGE_ROOM = (1 - 0.12) * ((100 * 96) / 124) - 12;
 const placed = new Map<string, { left: number; width: number }>();
 function placeOnStage(ch: Character, idle: string): { left: number; width: number } {
   let p = placed.get(ch.id);
@@ -67,7 +75,10 @@ function placeOnStage(ch: Character, idle: string): { left: number; width: numbe
     const rows = frameKeys(ch, ch.anims[idle]!.frames[0]!);
     const top = Math.max(0, rows.findIndex((r) => r.some((k) => k !== null)));
     // (Never wider than the stage: a wide one, Wrangler's lasso out to one side, slides over to stay whole.)
-    const px = Math.min(PX, TALLEST / Math.max(1, ch.foot[1] - top), 100 / ch.w);
+    const tall = Math.max(1, ch.foot[1] - top);
+    // (Bigger, never smaller than before: the old size is the floor, Eric's STAGE_SCALE the aim, the room above the feet the cap.)
+    const before = Math.min(PX, TALLEST / tall, 100 / ch.w);
+    const px = Math.max(before, Math.min(PX * STAGE_SCALE, STAGE_ROOM / tall, 100 / ch.w));
     const width = ch.w * px;
     const footX = STAGE_FOOT_X[ch.id] ?? ch.foot[0];
     placed.set(ch.id, (p = { left: Math.max(0, Math.min(100 - width, FOOT_AT - footX * px)), width }));

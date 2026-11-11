@@ -271,7 +271,8 @@ test("their tile and stage, their figure by the board and the dock's count: whol
   expect(fig.x).toBeGreaterThanOrEqual(stage.x - 1);
   expect(fig.x + fig.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
   // (Full size: drawn at the stage's one pixel size, 0.8 of a frame pixel per cqi, as every boss up to 70 px tall.)
-  expect(Math.abs(fig.width - (84 * 0.8 * stage.width) / 100)).toBeLessThanOrEqual(1);
+  // (Nov 11, Eric: bosses bigger on this stage: STAGE_SCALE, capped by the stage's room. At least the old full size, never past the stage.)
+  expect(fig.width).toBeGreaterThanOrEqual((84 * 0.8 * stage.width) / 100 - 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   await page.screenshot({ path: info.outputPath(`hopper-select-${info.project.name}.png`) });
   // In their battle (the Carrot Patch's switch, for the dock's count): on a phone in the bar's usual box at its left,

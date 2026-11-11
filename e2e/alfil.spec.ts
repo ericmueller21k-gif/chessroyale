@@ -346,7 +346,8 @@ test("Alfil's tile and stage, and his figure by the board: whole on a phone (320
   expect(fig.x).toBeGreaterThanOrEqual(stage.x - 1);
   expect(fig.x + fig.width).toBeLessThanOrEqual(stage.x + stage.width + 1);
   // (Full size: drawn at the stage's one pixel size, 0.8 of a frame pixel per cqi, as every boss up to 70 px tall.)
-  expect(Math.abs(fig.width - (81 * 0.8 * stage.width) / 100)).toBeLessThanOrEqual(1);
+  // (Nov 11, Eric: bosses bigger on this stage: STAGE_SCALE, capped by the stage's room. At least the old full size, never past the stage.)
+  expect(fig.width).toBeGreaterThanOrEqual((81 * 0.8 * stage.width) / 100 - 1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
   // In his battle: on a phone in the bar's wide box at its left, whole on the screen (his hops too: their room is in his
   // frame), never over the board; on a computer by the board's bottom-left corner.

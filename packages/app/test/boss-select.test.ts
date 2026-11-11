@@ -116,6 +116,16 @@ describe("the boss select", () => {
     for (const id of Object.keys(SELECT_FRAMING)) expect(BOSS_ROSTER.some((r) => r.id === id), id).toBe(true);
   });
 
+  it("has a framing and a tint for every boss in the roster with a sprite (a boss without one shows its icon in the grid: Don Dough's did, Nov 11)", () => {
+    const sprited = BOSS_ROSTER.filter((b) => b.kit);
+    expect(sprited.length).toBeGreaterThanOrEqual(17);
+    for (const b of sprited) {
+      expect(SELECT_FRAMING[b.id], `${b.id}: SELECT_FRAMING`).toBeDefined();
+      // (The Hidden Boss's tile is always dark: no tint, by design.)
+      if (b.id !== "recluse") expect(SELECT_TINT[b.id], `${b.id}: SELECT_TINT`).toBeDefined();
+    }
+  });
+
   it("gives every boss with a character a color of its own palette behind it (the Hidden Boss's tile is dark and '?' is plain), one that doesn't blend into the figure, in either theme", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
     const get = (name: string, from: number) => css.slice(from).match(new RegExp(`--${name}: ([^;]+);`))![1]!;
