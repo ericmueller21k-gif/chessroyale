@@ -38,3 +38,6 @@ Wait for green CI.
 
 ## Eric, Nov 11 (later): the ranked scene
 "For the ranked clip make it even a few seconds longer and shuffle through all the ranked symbols and names and add another line like 'become a grandmaster' or whatever the highest rank is. I trust your vision." (Director: the shuffle Wood → Transcendent, landing on Transcendent: "Become Transcendent.")
+
+## Eric, Nov 11: the size
+"Make it much bigger, on mobile it's as wide as we can go, on desktop it's also quite large, at least half the height or about half the screen height." (Phone: full width; computer: about 50vh tall.)
