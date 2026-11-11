@@ -3,22 +3,21 @@ of pulls"; a "garden sort of greenhouse comfy" feeling with "simple little wind 
 of a big drop" with 808s, "dueling strings" and "almost like orchestra level symphony", then back to the chimes.
 A waltz, the only one of the boss themes in three: 132 beats a minute, 264 beats = 88 bars of three = 120.0 s.
 D major in the garden; the drops turn to D minor.
-Voices: a solo violin (slow bow, vibrato, a swell on each long note) and a second one; a flute; a harp racing through
-the chords in 16ths; plucked bass and plucked chords in an oom-pah-pah; wind chimes; water drops and a bird (he waters
-his plants); and for the drops an 808, a kick, a clap, timpani, cymbals, short driving strings, brass, and the two
-violins dueling: a bar each, then together.
+Voices: a solo violin (slow bow, vibrato, a swell on each long note) and a second one; a flute; a soft marimba
+racing through the chords in 16ths; a round bass and marimba chords in an oom-pah-pah; wind chimes; water drops and a bird (he waters
+his plants); and for the one big drop an 808, a kick on every beat, a wobble bass, a clap, timpani, cymbals,
+short driving strings, brass, and the two violins dueling: a bar each, then together.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
   python3 song_o.py <out.wav>
 
   bars  1-8    wind chimes, water drops and a bird; the violin's first long pulls
-  bars  9-24   the garden waltz: the violin's tune over the harp and the oom-pah-pah
+  bars  9-24   the garden waltz: the violin's tune (pulls, turns and runs) over the marimba and a round bass
   bars 25-32   a second violin answers under the first
-  bars 33-36   the sky darkens: tremolo strings, a timpani roll, a riser
-  bars 37-52   the first drop (0:49): 808 and drums, driving strings, brass; the violins duel a bar each, then together
-  bars 53-56   back to the chimes and water; two long pulls
-  bars 57-72   a second garden tune on the flute, the violin in long pulls under it
-  bars 73-76   the sky darkens again
-  bars 77-84   the second drop (1:44): the brass takes a tune, both violins dueling at once
+  bars 33-48   a second garden tune on the flute, the violin answering under it
+  bars 49-52   the hush: everything falls away, the violin hums low
+  bars 53-66   the drop (1:11): a giant boom; kick on every beat, 808, wobble bass, strings, brass; the violins duel
+  bars 67-72   the way back, slowly
+  bars 73-84   the waltz again, a new turn of the tune, the flute joining
   bars 85-88   the chimes, a last long pull, and round to bar 1
 """
 import sys
@@ -32,16 +31,28 @@ BEATS = 264
 SECS = BEATS * 60 / BPM
 
 FIRST = "A5:6 F#5:3 E5:3"
+# The waltz, second go (Eric: "increase it a bit, add a little more variety to the violin playing throughout"):
+# long pulls still, with turns and runs between them.
 WALTZ = (
-    "F#5:3 | A5:2 G5:1 | B5:3 | G5:2 A5:1 | A5:3 | G5:2 E5:1 | D5:3 | -:1 D5:1 F#5:1 | "
-    "B5:3 | D6:2 C#6:1 | G5:3 | E5:2 F#5:1 | A5:3 | B5:1 C#6:1 E6:1 | D6:6"
+    "F#5:2 A5:.5 B5:.5 | A5:1.5 G5:.5 F#5:.5 E5:.5 | B5:2 D6:1 | B5:.5 A5:.5 G5:1 A5:1 | "
+    "A5:1.5 B5:.5 C#6:1 | E6:1 C#6:.5 A5:.5 G5:.5 E5:.5 | D5:2 F#5:.5 A5:.5 | D6:3 | "
+    "B5:1 D6:1 F#6:1 | E6:.5 D6:.5 C#6:.5 B5:.5 F#5:1 | G5:2 B5:.5 D6:.5 | E6:1.5 D6:.5 B5:.5 G5:.5 | "
+    "A5:1 C#6:1 E6:1 | G6:1.5 F#6:.5 E6:.5 C#6:.5 | D6:3 | F#6:.5 E6:.5 D6:.5 A5:.5 F#5:1"
 )
 SECOND = "-:1 A4:1 D5:1 | F#5:1 E5:1 D5:1 | -:1 D5:1 G5:1 | B4:1 D5:1 E5:1 | -:1 C#5:1 E5:1 | A4:1 B4:1 C#5:1 | A4:3 | F#4:3"
 FLUTE = (
     "B5:1 D6:2 | B5:2 G5:1 | A5:1 D6:2 | A5:2 F#5:1 | G5:1 B5:1 E6:1 | C#6:2 A5:1 | D6:3 | -:1 A5:1 D6:1 | "
     "E6:1 D6:2 | B5:2 D6:1 | C#6:1 A5:2 | F#5:2 B5:1 | G5:1 B5:1 E6:1 | G6:2 E6:1 | F#6:3 | D6:3"
 )
-PULLS = "D5:6 | F#5:3 | D5:3 | E5:6 | F#5:3 | A5:3 | G5:6 | F#5:6 | E5:3 | G5:3 | A5:3 | F#5:3"
+PULLS = (
+    "D5:3 | -:1 B4:.5 D5:.5 G5:1 | F#5:3 | -:1 D5:.5 F#5:.5 A5:1 | G5:2 E5:1 | C#5:.5 E5:.5 A5:2 | F#5:3 | A5:.5 G5:.5 F#5:.5 E5:.5 D5:1 | "
+    "G5:3 | -:1 B5:.5 A5:.5 G5:1 | F#5:2 C#5:1 | D5:.5 F#5:.5 B5:2 | G5:3 | E5:.5 G5:.5 A5:.5 C#6:.5 E6:1 | D6:3 | A5:3"
+)
+# The waltz's return after the drop: a new turn of the tune.
+RETURN = (
+    "F#5:1 A5:1 D6:1 | C#6:.5 D6:.5 E6:1 D6:1 | B5:2 G5:.5 B5:.5 | D6:1.5 E6:.5 D6:.5 B5:.5 | C#6:2 E6:1 | A6:1 G6:.5 E6:.5 C#6:1 | "
+    "D6:1 F#6:1 A6:1 | F#6:1.5 E6:.5 D6:1 | B5:.5 C#6:.5 D6:1 F#6:1 | G6:2 B5:1 | A5:.5 B5:.5 C#6:.5 E6:.5 A6:1 | D6:3"
+)
 # The duel: the first violin's bars and the second's, over the same chords.
 DUEL_1 = [
     "D5:.5 F5:.5 A5:.5 D6:.5 C#6:.25 D6:.25 E6:.5", "Bb5:.5 D6:.5 F6:.5 Bb6:.5 A6:.25 G6:.25 F6:.5",
@@ -55,8 +66,7 @@ TOGETHER = (
     "A6:1.5 F6:.5 D6:1 | E6:.5 F6:.5 G6:.5 A6:.5 F6:1 | Bb6:1.5 F6:.5 D6:1 | F6:.5 G6:.5 A6:.5 Bb6:.5 D7:1 | "
     "D7:1 Bb6:1 G6:1 | A6:.5 G6:.5 F6:.5 E6:.5 C#6:1 | D6:.5 E6:.5 F6:.5 A6:.5 D7:1 | C#7:1.5 A6:.5 E6:1"
 )
-BRASS_TUNE = "F5:3 | A5:2 G5:1 | Bb5:3 | D6:2 Bb5:1 | G5:2 Bb5:1 | A5:2 C#6:1 | D6:3 | C#6:3"
-for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (BRASS_TUNE, 24)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
+for name, beats in [(FIRST, 12), (WALTZ, 48), (SECOND, 24), (FLUTE, 48), (PULLS, 48), (TOGETHER, 24), (RETURN, 36)] + [(d, 3) for d in DUEL_1 + DUEL_2]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 CHORDS = {
@@ -64,9 +74,10 @@ CHORDS = {
     "F#m": ("F#4 A4 C#5", "F#2"), "Dm": ("D4 F4 A4", "D2"), "Bb": ("D4 F4 Bb4", "Bb2"), "Gm": ("D4 G4 Bb4", "G2"),
 }
 BARS = (
-    "D D D D D D D D  D D G G A A D D Bm Bm G Em A A D D  D D G G A A D D  Bb Bb A A  "
-    "Dm Dm Bb Bb Gm Gm A A Dm Dm Bb Bb Gm A Dm A  D D D D  G G D D Em A D D G G F#m Bm Em A D D  Bb Bb A A  "
-    "Dm Dm Bb Bb Gm A Dm A  D D D D"
+    "D D D D D D D D  D D G G A A D D Bm Bm G Em A A D D  D D G G A A D D  "  # 1-32
+    "G G D D Em A D D G G F#m Bm Em A D D  Bm Bm Bb A  "  # 33-52: the flute's tune, the hush
+    "Dm Dm Bb Bb Gm Gm A A Dm Bb Gm A Dm A  Dm Dm Bb Bb A A  "  # 53-72: the drop, the way back
+    "D D G G A A D D Bm G A D  D D D D"  # 73-88
 ).split()
 assert len(BARS) == 88
 MINOR = (2, 4, 5, 7, 9, 10, 13)  # D harmonic minor, for the second violin's line under the first
@@ -132,20 +143,29 @@ def main(out: str) -> None:
             ph = 2 * np.pi * np.cumsum(x.hz(m0 + (m1 - m0) * u)) / x.sr
             put("water", b + i * 0.28, np.sin(ph) * np.sin(np.pi * u) * vol, pan)
 
+    def wood(m, vol=0.2, decay=0.2):
+        """A marimba bar: the note, a quick overtone two octaves up and a knock."""
+        k = int(decay * 6 * x.sr)
+        t = np.arange(k) / x.sr
+        f = 2 * np.pi * x.hz(m) * t
+        w = np.sin(f) + 0.3 * np.sin(4 * f) * np.exp(-t / 0.03) + 0.08 * np.sin(9.2 * f) * np.exp(-t / 0.008)
+        return w * np.exp(-t / decay) * np.minimum(1, t / 0.002) * np.minimum(1, (k - 1 - np.arange(k)) / (0.01 * x.sr)) * vol
+
     def garden(bar, harp=1.0, pizz=True, fill=0):
-        """A garden bar: the harp racing through the chord in 16ths, a plucked bass on 1 and plucked chords on 2 and 3."""
+        """A garden bar: a soft marimba racing through the chord in 16ths, a round bass on 1 and soft marimba chords
+        on 2 and 3. (No plucked strings: Eric, on the first go's plucked bass and harp: "a really loose guitar
+        string ... cut that from the whole thing".)"""
         notes, root = chord(bar)
         b = bar * 3
         if harp:
             for i in range(12):
                 s = ((0, 1, 2, 3, 4, 5, 4, 3, 2, 3, 4, 3), (2, 1, 0, 1, 2, 3, 4, 5, 4, 3, 2, 1))[(bar + fill) % 2][i]
-                put("harp", b + i * 0.25, x.pluck(notes[s % 3] + 12 * (s // 3), 0.9, 0.14 * harp * (1.0 if i % 4 == 0 else 0.75), tone=0.7), 0.5 if i % 2 else -0.5)
+                put("harp", b + i * 0.25, wood(notes[s % 3] + 12 + 12 * (s // 3), 0.1 * harp * (1.0 if i % 4 == 0 else 0.75), 0.14), 0.5 if i % 2 else -0.5)
         if pizz:
-            put("pizz", b, x.pluck(root, 2.5, 0.42, tone=0.4))
-            put("pizz", b, x.fmbass(root, 1.2, 0.18))
+            put("pizz", b, x.fmbass(root + 12, 2.6, 0.3, index=0.8, decay=0.6))
             for o in (1, 2):
                 for j, m in enumerate(notes):
-                    put("pizz", b + o, x.pluck(m, 0.8, 0.13, tone=0.5), (-0.4, 0.0, 0.4)[j])
+                    put("pizz", b + o, wood(m, 0.09, 0.16), (-0.4, 0.0, 0.4)[j])
 
     def sub(b, m, beats, vol=0.5):
         k = x.k(beats)
@@ -154,6 +174,23 @@ def main(out: str) -> None:
         ph = 2 * np.pi * np.cumsum(f) / x.sr
         env = np.exp(-t / (beats * x.beat_s * 0.6)) * np.minimum(1, (k - 1 - np.arange(k)) / (0.02 * x.sr))
         put("sub", b, (np.tanh(2.4 * np.sin(ph) * env) / np.tanh(2.4) + 0.3 * np.sin(2 * ph) * env + 0.15 * np.sin(3 * ph) * env) * vol)
+
+    def wobble(b, m, beats, rate, vol=0.2, top=22.0, pan=0.0):
+        """The wobble bass: a sawtooth whose brightness sweeps open and shut `rate` times a beat, driven hard."""
+        k = x.k(beats)
+        t = np.arange(k) / x.sr
+        sweep = 0.5 - 0.5 * np.cos(2 * np.pi * rate * t / x.beat_s)
+        cut = 1.5 + sweep * top
+        w = np.zeros(k)
+        for c in (-9, 9):
+            ph = 2 * np.pi * x.hz(m + c / 100) * t
+            for h in range(1, 26):
+                w += np.sin(h * ph) / h * np.clip(cut - h + 1, 0, 1)
+        edge = np.minimum(1, t / 0.005) * np.minimum(1, (k - 1 - np.arange(k)) / (0.01 * x.sr))
+        put("wobble", b, np.tanh(1.8 * w) * edge * vol, pan)
+
+    # The wobble's bar of three: (beats, sweeps a beat), four ways round.
+    WOB = [((3, 1),), ((1.5, 2), (1.5, 4)), ((1, 2), (1, 3), (1, 6)), ((2, 1), (1, 4))]
 
     def clap(b, vol=0.22):
         for o in (0, 0.011, 0.023):
@@ -174,46 +211,40 @@ def main(out: str) -> None:
         put("fx", b, np.tanh(2 * np.sin(2 * np.pi * np.cumsum(f) / x.sr)) * np.exp(-t / 0.2) * vol * np.minimum(1, (k - 1 - np.arange(k)) / (0.02 * x.sr)))
         put("fx", b, x.noise(0.9, 16000, vol * 0.3, 0.2))
 
-    def storm(first, bars_):
-        """Under a drop, two bars at a time: the 808 and kick on the first beat, a clap and snare on the second bar's
-        first beat, hats in 8ths with a roll, short driving strings in 8ths, brass holding the chord, timpani."""
+    def storm(first, bars_, fade=None):
+        """Under the drop: a kick thumping on every beat and the 808 on the first; a clap and snare on every second
+        bar's first beat; the wobble bass at changing speeds; hats in 8ths with rolls; short driving strings; brass
+        holding the chord; timpani and cymbals. `fade`: the way back, each bar's level from 1 down to nothing."""
         for bar in range(first, first + bars_):
             notes, root = chord(bar)
             b, odd = bar * 3, (bar - first) % 2
-            if not odd:
-                sub(b, root - (12 if root >= 43 else 0), 4.5, 0.5)
-                x.kick(b, 0.7, soft=True), x.kick(b + 2.5, 0.5, soft=True)
-                put("drum", b, x.timp(root, 0.9, 0.34))
-            else:
-                clap(b, 0.26), x.snare(b, 0.22)
-                x.kick(b + 1.5, 0.5, soft=True)
-                sub(b + 1.5, root - (12 if root >= 43 else 0), 1.4, 0.4)
+            v = 1.0 if fade is None else fade[bar - first]
+            low = root - (12 if root >= 43 else 0)
+            sub(b, low, 2.6, 0.5 * v)
+            for i in range(3):
+                if v > 0.45 or i == 0:
+                    x.kick(b + i, (0.75 if i == 0 else 0.55) * v, soft=True)
+            if v > 0.45:
+                x.kick(b + 2.5, 0.45 * v, soft=True)
+            t = b
+            for d, rate in WOB[(bar - first) % 4] if v > 0.6 else WOB[0]:
+                wobble(t, low + 12, d, rate if v > 0.6 else 0.3333, 0.2 * v, 22.0 * max(v, 0.25))
+                t += d
+            if odd and v > 0.45:
+                clap(b, 0.26 * v), x.snare(b, 0.22 * v)
                 for i in range(6):
-                    x.hat(b + 2.5 + i / 12, 0.03 + 0.006 * i)
-            for i in range(6):
-                x.hat(b + i * 0.5, 0.055 if i % 2 == 0 else 0.035)
-                for j, m in enumerate(notes):
-                    put("strings", b + i * 0.5, x.strings(m, 0.32, 0.075 * (1.0 if i % 2 == 0 else 0.75), attack=0.01, sustain=0.5, decay=0.08, release=0.04), (-0.5, 0.0, 0.5)[j])
+                    x.hat(b + 2.5 + i / 12, (0.03 + 0.006 * i) * v)
+            elif not odd:
+                put("drum", b, x.timp(root, 0.9, 0.34 * v))
+            if v > 0.3:
+                for i in range(6):
+                    x.hat(b + i * 0.5, (0.055 if i % 2 == 0 else 0.035) * v)
+                    for j, m in enumerate(notes):
+                        put("strings", b + i * 0.5, x.strings(m, 0.32, 0.075 * v * (1.0 if i % 2 == 0 else 0.75), attack=0.01, sustain=0.5, decay=0.08, release=0.04), (-0.5, 0.0, 0.5)[j])
             for j, m in enumerate(notes):
-                put("brass", b, x.swell(x.brass(m - 12, 3.0, 0.11, attack=0.08, release=0.2), 0.6), (-0.3, 0.0, 0.3)[j])
-            if (bar - first) % 4 == 0:
+                put("brass", b, x.swell(x.brass(m - 12, 3.0, 0.11 * v, attack=0.08, release=0.2), 0.6), (-0.3, 0.0, 0.3)[j])
+            if (bar - first) % 4 == 0 and fade is None:
                 x.crash(b, 0.2, decay=0.4)
-
-    def darken(first):
-        """Four bars: tremolo strings swelling, a timpani roll, a riser, the violin climbing a note a bar."""
-        for bar in range(first, first + 4):
-            notes, root = chord(bar)
-            for i in range(12):
-                v = 0.02 + 0.07 * ((bar - first) * 12 + i) / 48
-                for j, m in enumerate(notes):
-                    put("strings", bar * 3 + i * 0.25, x.strings(m + 12, 0.2, v, attack=0.01, release=0.02), (-0.5, 0.0, 0.5)[j])
-            put("pizz", bar * 3, x.fmbass(root, 2.8, 0.22))
-        bow(first * 3, "F5:3 | Bb5:3 | C#6:3 | E6:3", 0.15)
-        for i in range(48):
-            put("drum", first * 3 + 6 + i * 0.125, x.timp(n("A2"), 0.25, 0.04 + 0.006 * i))
-        riser(first * 3 + 6, 6, 0.1)
-        for i in range(12):
-            x.snare(first * 3 + 9 + i * 0.25, 0.03 + 0.012 * i)
 
     # Bars 1-8: wind chimes, water and a bird; from bar 5 the violin's first pulls over a low held D.
     chimes(0, 24, 26, 0.06)
@@ -237,69 +268,63 @@ def main(out: str) -> None:
     bow(72, first_half)
     bow(72, SECOND, 0.13, pan=0.35, bus="violin2")
     for b, d, m in line(72, first_half):
-        put("chimes", b, x.bell(m + 12, d + 1, 0.05, ratio=4.0, index=1.4, decay=0.5), 0.2)
+        if d >= 1:
+            put("chimes", b, x.bell(m + 12, d + 1, 0.05, ratio=4.0, index=1.4, decay=0.5), 0.2)
     for bar in range(24, 32):
         garden(bar, fill=1)
     chimes(72, 96, 8, 0.04)
 
-    # Bars 33-36: the sky darkens.
-    darken(32)
+    # Bars 33-48: the second garden tune on the flute, the violin answering under it in pulls and turns.
+    for b, d, m in line(96, FLUTE):
+        put("flute", b, x.flute(m, d * 0.96, 0.2), 0.2)
+    bow(96, PULLS, 0.12, pan=-0.3)
+    for bar in range(32, 48):
+        garden(bar, fill=1)
+    chimes(96, 144, 18, 0.04)
+    drips(96, 144, 6, 0.07)
+    bird(118, 0.04, -0.5)
 
-    # Bars 37-52: the first drop. The violins duel a bar each (left, then right), then play together.
-    boom(108, 0.6)
-    storm(36, 16)
+    # Bars 49-52: the hush. Everything falls away: the violin hums low and soft, a last few chimes, then nothing.
+    bow(144, "F#4:6 | F4:3 | E4:2 -:1", 0.075, pan=0.0)
+    garden(48, harp=0.5, pizz=False), garden(49, harp=0.25, pizz=False)
+    chimes(144, 150, 4, 0.04)
+    for bar in (48, 49, 50):
+        put("pizz", bar * 3, x.fmbass(chord(bar)[1] + 12, 2.8, 0.2 - 0.05 * (bar - 48), index=0.8, decay=0.6))
+
+    # Bars 53-66: the drop (1:11, 19 seconds). A giant boom, then the thump: kick on every beat, the 808, the wobble
+    # bass, driving strings and brass. The violins duel a bar each (left, then right), then play together.
+    boom(156, 0.9), boom(156.02, 0.6)
+    put("fx", 156, x.noise(1.6, 16000, 0.3, 0.45))
+    storm(52, 14)
     for i in range(8):
         text = (DUEL_1 if i % 2 == 0 else DUEL_2)[i // 2]
-        bow((36 + i) * 3, text, 0.17, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin" if i % 2 == 0 else "violin2")
-    for b, d, m in line(132, TOGETHER):
+        bow((52 + i) * 3, text, 0.17, pan=-0.5 if i % 2 == 0 else 0.5, fast=True, bus="violin2")
+    together = TOGETHER.split("|")
+    for b, d, m in line(180, "|".join(together[i] for i in (0, 2, 4, 5, 6, 7))):
         fast = d < 1
-        put("violin", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
+        put("violin2", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
         put("violin2", b, violin(below(m), d * (0.9 if fast else 0.98), 0.14, fast), 0.4)
-    for b in (132, 144):
-        boom(b, 0.4)
+    boom(168, 0.45), boom(180, 0.5), boom(189, 0.4)
 
-    # Bars 53-56: back to the chimes and the water; two long pulls.
-    chimes(156, 168, 16, 0.06)
-    drips(156, 168, 6)
-    bird(159)
-    bow(156, "A5:6 F#5:6", 0.14)
-    for m, pan in ((n("D3"), -0.3), (n("A3"), 0.3), (n("F#4"), 0.0)):
-        put("strings", 156, x.swell(x.strings(m, 12, 0.045, attack=0.3, release=0.6), 0.4), pan)
-    garden(54, harp=0.5, pizz=False), garden(55, harp=0.8, pizz=False)
+    # Bars 67-72: the way back, slowly: the thump thins and the wobble slows to one long sweep a bar and fades; the
+    # violin returns in long pulls; the chimes, the water and the marimba come back.
+    storm(66, 6, fade=(0.8, 0.62, 0.45, 0.3, 0.18, 0.08))
+    bow(198, "A5:6 | F5:3 | D5:3 | E5:6", 0.13)
+    chimes(204, 216, 12, 0.05)
+    drips(207, 216, 4)
+    bird(212, 0.04)
+    garden(70, harp=0.4, pizz=False), garden(71, harp=0.8, pizz=False)
 
-    # Bars 57-72: the second garden tune on the flute, the violin in long pulls under it.
-    for b, d, m in line(168, FLUTE):
-        put("flute", b, x.flute(m, d * 0.96, 0.2), 0.2)
-    bow(168, PULLS, 0.12, pan=-0.3)
-    for bar in range(56, 72):
-        garden(bar, fill=1)
-    chimes(168, 216, 18, 0.04)
-    drips(168, 216, 6, 0.07)
-    bird(190, 0.04, -0.5)
-
-    # Bars 73-76: the sky darkens again.
-    darken(72)
-
-    # Bars 77-84: the second drop. The brass takes a tune; both violins duel at once, one each side.
-    boom(228, 0.6)
-    storm(76, 8)
-    for b, d, m in line(228, BRASS_TUNE):
-        put("brass", b, x.brass(m, d * 0.95, 0.16, attack=0.05, release=0.15))
-        put("brass", b, x.brass(m - 12, d * 0.95, 0.1, attack=0.05, release=0.15), 0.2)
-    one = DUEL_1[:2] + [DUEL_1[2], DUEL_1[3]]
-    two = DUEL_2[:2] + [DUEL_2[2], DUEL_2[3]]
-    order = (0, 0, 1, 1, 2, 3)  # the chords here: Dm Dm Bb Bb Gm A
-    for i, k in enumerate(order):
-        bow((76 + i) * 3, (one if i % 2 == 0 else two)[k], 0.16, pan=-0.5, fast=True)
-        bow((76 + i) * 3, (two if i % 2 == 0 else one)[k], 0.14, pan=0.5, fast=True, bus="violin2")
-    last = "|".join(TOGETHER.split("|")[6:])
-    for b, d, m in line(246, last):
-        fast = d < 1
-        put("violin", b, violin(m, d * (0.9 if fast else 0.98), 0.16, fast), -0.4)
-        put("violin2", b, violin(below(m), d * (0.9 if fast else 0.98), 0.14, fast), 0.4)
+    # Bars 73-84: the waltz back, a new turn of the tune; the flute joins an octave up from its seventh bar.
+    bow(216, RETURN)
+    for b, d, m in line(234, "|".join(RETURN.split("|")[6:])):
+        put("flute", b, x.flute(m + 12, d * 0.96, 0.13), 0.3)
+    for bar in range(72, 84):
+        garden(bar)
+    chimes(216, 252, 14, 0.04)
+    drips(216, 252, 5, 0.07)
 
     # Bars 85-88: the chimes, a last long pull, and round to bar 1.
-    boom(252, 0.3)
     chimes(252, 264, 16, 0.06)
     drips(252, 264, 6)
     bow(252, "F#5:6 D5:6", 0.14)
@@ -309,7 +334,7 @@ def main(out: str) -> None:
 
     x.echo("chimes", 1.0, 0.25, 0.1)
     x.echo("water", 0.75, 0.3, 0.12)
-    write_wav(out, x.mixdown({"chimes": 4.5, "water": 7.0, "harp": 3.0, "strings": 1.6, "sub": 0.62, "drum": 1.3, "brass": 1.7, "pizz": 1.4, "flute": 1.4, "violin": 1.15}, lowpass=9000, room=0.3))
+    write_wav(out, x.mixdown({"chimes": 4.5, "water": 7.0, "harp": 1.6, "strings": 1.6, "sub": 0.7, "drum": 1.6, "wobble": 1.3, "brass": 2.0, "pizz": 0.6, "flute": 1.4, "violin": 0.97, "violin2": 1.15}, lowpass=9000, room=0.3))
 
 
 if __name__ == "__main__":
