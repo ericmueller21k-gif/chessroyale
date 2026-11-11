@@ -65,3 +65,8 @@ suggestions"). Start on the artwork now.
   game." (Director: buildable the way Big Boy's blocks and Babur's hoops are: the crowd's pawn captures of it are filtered out
   (`crowdFilter`), the engines search only the moves left (searchmoves); calls to confirm with Eric: no queen → his strongest piece;
   a second Gold Plate gilds the next piece; if the filter would leave no legal move, it lifts for that turn, as the hoops do.)
+
+## Eric, Nov 11: art approved; Gold Plate's moment
+- "Art looks great." (The first batch: the cast, breadPop, volley, the crew's draw, drop, the dough, the timer, the splash.)
+- "For the gold ultimate animation: take a few seconds, like 10 total, where an animation plays, turns his piece gold, then he says a
+  note about how your pawns are worthless vs it."
