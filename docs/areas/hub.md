@@ -207,7 +207,7 @@ Lane: `hub`. Accounts and sign-in are on [accounts.md](accounts.md); matchmaking
     from 360×640 up in every mode. At 320×568 home fits too, with a small pawn (about 51 px).
     ([docs/decisions/2026-10-18-phone-home-fits.md](../decisions/2026-10-18-phone-home-fits.md)). Big tap targets, no
     sideways scroll at 320–430 px; a long name on your home card ellipsizes.
-  - **Your profile (Nov 11):** "View profile" at your card's top right (level with its top, the chevron 16 px from its edge, a 44 px tap box, the link blue, a light sweep every 6 s, still under reduced motion; on phones under ~660 px tall its words sit over your name's line, an open call): `.fd-hero-profile` in `Home.tsx`; it opens your profile, as the pawn did.
+  - **Your profile (Nov 11):** "View profile" in its own row above your name, right-aligned (the chevron 16 px from the card's edge, a 44 px tap box overlapping the padding, the link blue, a light sweep every 6 s, still under reduced motion; `e2e/home-layout.spec.ts`, "View profile's box never touches your name's box"): `.fd-hero-profile` in `Home.tsx`; it opens your profile, as the pawn did.
   - **Portrait (Nov 11, Eric: rotation off on phones):** a phone held sideways (landscape, 500 px high or less) is covered by `#rotate-lock` in `index.html`; the installed app is locked by its manifest, and `main.tsx` asks `screen.orientation.lock` where a browser allows it.
   - **Computer** (1024 px+): a side menu, the play column in the center in the phone's order (Eric, Oct 18): the RANKED
     row, its panel, the line above PLAY and PLAY (Oct 28), then Chess Town's button (PLAY's size), then Other modes with Boss Battle and Auto chess side by side (a little shorter) at the

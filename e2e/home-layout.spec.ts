@@ -509,7 +509,7 @@ async function topBarFits(page: Page, width: number, quests: boolean) {
   expect(fits, `${width} px`).toEqual({ count: quests ? 6 : 5, inOrder: true, inside: true, oneRow: true });
   for (const name of ["Chat", ...(quests ? ["Quests"] : []), "Shop & crates", "Friends", "Settings"]) {
     const b = (await bar.getByRole("button", { name, exact: true }).boundingBox())!;
-    expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 360 ? 40 : 44);
+    expect(Math.min(b.width, b.height), `${name} at ${width}`).toBeGreaterThanOrEqual(width < 375 ? 40 : 44);
   }
   // The chat is the shop's square (same size and corners, nothing animating in it).
   const shop = await bar.getByRole("button", { name: "Shop & crates", exact: true }).evaluate((el) => ({ w: el.getBoundingClientRect().width, h: el.getBoundingClientRect().height, r: getComputedStyle(el).borderRadius }));
@@ -521,17 +521,9 @@ async function topBarFits(page: Page, width: number, quests: boolean) {
   expect(await sideways(page), `${width} px`).toBe(0);
 }
 
-test("phone: the top bar (logo, the chat, Quests, the shop, Friends, the gear) fits at 320 px, with no coins in it", async ({ page }) => {
+test("phone: the top bar (logo, the chat, Quests, the shop, Friends, the gear) fits in one row at 320, 360, 375, 390, 414 and 430 px, with no coins in it", async ({ page }) => {
   test.skip(desktop(), "the phone's top bar");
-  await topBarFits(page, 320, true);
-});
-
-// Known and open (Nov 11): from 344 px up, the logo's word and six 44 px buttons (Quests, Nov 9) don't fit one row, so Quests and the
-// chat overlap or run past the edge (measured: 360 px, the gear 7 px past it, 375 px 14 px). Eric's call (the logo, Quests' place, or
-// the spacing); the brief for the chat change keeps every size. Remove test.fail when the row fits at these widths.
-test.fail("phone: the top bar's six buttons fit in one row from 360 px up (KNOWN: a decision for Eric, Nov 11)", async ({ page }) => {
-  test.skip(desktop(), "the phone's top bar");
-  for (const width of [360, 375, 390, 430]) await topBarFits(page, width, true);
+  for (const width of [320, 360, 375, 390, 414, 430]) await topBarFits(page, width, true);
 });
 
 test("phone: the top bar's chat button opens the global chat as a sheet over home; its × closes it, and home is as it was", async ({ page }) => {
@@ -559,7 +551,7 @@ test("computer: no pawn and no chat button in the top area (the side menu has Pr
   await expect(page.locator(".fd-ring, .fd-top-right, .fd-top-chat")).toHaveCount(0);
 });
 
-test("the card's View profile sits in its top-right corner (its chevron 16 px from the edge, its words clear of your name), 44 px tall, and opens your profile", async ({ page }) => {
+test("the card's View profile is a row above your name, its chevron 16 px from the card's right edge, 44 px tall, and it opens your profile", async ({ page }) => {
   await named(page, "Columned");
   await page.setViewportSize(desktop() ? { width: 1440, height: 900 } : { width: 390, height: 844 });
   await page.goto("/");
@@ -571,13 +563,26 @@ test("the card's View profile sits in its top-right corner (its chevron 16 px fr
   const inset = card.x + card.width - (chevron.x + chevron.width);
   expect(inset, "the chevron's inset from the right").toBeGreaterThanOrEqual(14);
   expect(inset, "the chevron's inset from the right").toBeLessThanOrEqual(18);
-  expect(b.y - card.y, "the box's top, level with the card's").toBeLessThanOrEqual(2);
   expect(b.height, "tap height").toBeGreaterThanOrEqual(44);
-  // The words sit above the name's line (a phone's card has no room beside the name for them).
+  // Its own row above your name's line (the director, Nov 11), so the words never sit on the name.
   const name = (await page.locator(".fd-hero-name").boundingBox())!;
-  if (!desktop()) expect(b.y + 30, "the words clear of the name").toBeLessThanOrEqual(name.y + 2);
+  expect(b.y + b.height, "the row above the name").toBeLessThanOrEqual(name.y + 1);
   await link.click();
   await expect(page.getByRole("button", { name: "Edit name & icon" })).toBeVisible();
+});
+
+test("phone: View profile's box never touches your name's box, at 360×640, 390×664 and 390×844", async ({ page }) => {
+  test.skip(desktop(), "a phone's card");
+  await named(page, "Columned");
+  for (const [w, h] of [[360, 640], [390, 664], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.goto("/");
+    await expect(page.getByRole("button", { name: "PLAY", exact: true })).toBeVisible();
+    const link = (await page.locator(".fd-hero-profile").boundingBox())!;
+    const name = (await page.locator(".fd-hero-name").boundingBox())!;
+    const overlap = link.x < name.x + name.width && name.x < link.x + link.width && link.y < name.y + name.height && name.y < link.y + link.height;
+    expect(overlap, `${w}×${h}: View profile over your name`).toBe(false);
+  }
 });
 
 test("a phone held sideways is covered by the 'turn upright' panel; a tablet or a computer at 768 px tall or more is not", async ({ page }) => {

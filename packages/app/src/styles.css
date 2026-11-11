@@ -9497,19 +9497,26 @@ button.fd-logo {
     gap: 6px;
   }
 }
-@media (max-width: 399px) {
-  .fd-top .fd-logo {
-    font-size: clamp(18px, 5.2vw, 20px);
-  }
-}
-@media (max-width: 359px) {
-  .fd-top .fd-logo {
-    font-size: 15px;
-  }
+/*
+ * The row (the logo, five buttons, the gaps) must fit the bar at every phone width (Nov 11, the director): below 375 px the
+ * buttons are 40 px, from 375 up 44 px; the word logo's width is about 5.3 times its font size, so it takes what the row leaves
+ * (the bar's 18 px margins and 6 px gaps; 10 px gaps from 430 px). Below 344 px the logo is the app's icon (below).
+ */
+@media (max-width: 374px) {
   .fd-top .fd-ring,
   .fd-top .fd-icon-btn {
     width: 40px;
     height: 40px;
+  }
+}
+@media (min-width: 344px) and (max-width: 374px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 270px) / 5.3), 20px);
+  }
+}
+@media (min-width: 375px) and (max-width: 459px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 296px) / 5.3), 20px);
   }
 }
 /*
@@ -9744,16 +9751,15 @@ button.fd-logo {
 }
 /*
  * "View profile" (Eric, Nov 11: "top right of that white container, not too small, not too big, moved over a bit more to the
- * right"): its words about 16 px in from the card's top-right corner, 15 px semibold in the link blue, a chevron after them, and a
- * 44 px tap box whose top is the card's (the words sit above your name's line, which a phone's card can't spare the corner from).
- * Out of the flow (absolute), so nothing else on the card moves. Its sweep: a light band crossing the words once every 6 s
+ * right"): its own row at the card's top, right-aligned (the director, Nov 11: above the name's line on every phone height). Its
+ * 44 px tap box overlaps the card's padding by 10 px top and bottom, so the row takes 24 px, and its words sit about 16 px in from
+ * the top-right corner, 15 px semibold in the link blue, a chevron after them. Its sweep: a light band crossing the words once every 6 s
  * (the gradient is clipped to the text), resting between sweeps; none under reduced motion.
  */
 .fd-hero-profile {
-  position: absolute;
-  top: 0;
-  right: 12px;
-  z-index: 5;
+  order: -2;
+  align-self: flex-end;
+  margin: -10px 12px -10px 0;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -9783,6 +9789,12 @@ button.fd-logo {
   30%,
   100% {
     background-position: 0% 0;
+  }
+}
+/* A computer's card has its side padding (18 px): the row reaches into it by that much less. */
+@media (min-width: 1024px) {
+  .fd-root.framed .fd-hero-profile {
+    margin-right: -6px;
   }
 }
 .fd-hero-profile:active {
