@@ -3,7 +3,7 @@
  * start" / "● Recording 12 s" with Done), and at the end one panel, the size of the world's box, made to be screenshotted. Made once
  * each (the pill's seconds set at most once a second), never per frame.
  */
-import { NP, PART_NAMES, type Summary } from "./frame-report.ts";
+import { NP, PART_NAMES, PART_SHORT, type Summary } from "./frame-report.ts";
 
 export interface Device {
   /** The browser and device ("Safari 18.1 · iPhone"). */
@@ -30,12 +30,13 @@ export function panelHtml(s: Summary, d: Device): string {
   const lines: string[] = [];
   lines.push(`<div class="tfr-head"><b>Town frame report</b><span class="tfr-btns"><button type="button" data-tfr="again">Again</button><button type="button" data-tfr="close">Close</button></span></div>`);
   lines.push(
-    `<div class="tfr-dev">${esc(d.browser)} · ratio ${d.ratio} (drawn ${d.drawn}) · ${d.w}×${d.h} px · ${esc(d.backend)} · ${s.refresh ? `${s.refresh} Hz` : "? Hz"} · timer ${d.timer >= 0.5 ? `${ms(d.timer)} ms` : `${Math.round(d.timer * 1000)} µs`}</div>`,
+    `<div class="tfr-dev">${esc(d.browser)} · ratio ${d.ratio} (drawn ${d.drawn}) · ${d.w}×${d.h} px · ${esc(d.backend)} · ${s.refresh ? `~${s.refresh} Hz` : "? Hz"} · timer ${d.timer >= 0.5 ? `${ms(d.timer)} ms` : `${Math.round(d.timer * 1000)} µs`}</div>`,
   );
-  lines.push(`<div class="tfr-fps" data-tfr-fps="${Math.round(s.p50)}"><b>${fps(s.p50)}</b> fps median · <b>${fps(s.p5)}</b> 5th % · <b>${fps(s.p1)}</b> 1st % · ${s.frames} frames in ${s.secs.toFixed(1)} s · over 20 ms ${pct(s.over20)} · over 33 ms ${pct(s.over33)}</div>`);
-  const most = s.top >= 0 ? `Most time went to <b>${esc(PART_NAMES[s.top]!)}</b> (${ms(all!.avg[s.top]!)} of ${ms(all!.mean)} ms a frame)` : "No frames recorded";
-  const mostTurn = s.topTurn >= 0 ? `; turning (up to ${Math.round(s.maxTurn)}°/s): <b>${esc(PART_NAMES[s.topTurn]!)}</b> (${ms(turn!.avg[s.topTurn]!)} of ${ms(turn!.mean)} ms)` : "; no turning recorded";
-  lines.push(`<div class="tfr-most">${most}${mostTurn}. Loading: ${s.bakes} new pictures painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
+  lines.push(`<div class="tfr-fps" data-tfr-fps="${Math.round(s.p50)}"><b>${fps(s.p50)}</b> fps median · <b>${fps(s.p5)}</b> 5th % · <b>${fps(s.p1)}</b> 1st % · over 20 ms ${pct(s.over20)} · over 33 ms ${pct(s.over33)}</div>`);
+  const part = (k: number, g: { avg: number[] }) => `<b>${esc(PART_NAMES[k]!)}</b> ${ms(g.avg[k]!)}`;
+  const most = s.top >= 0 ? `${s.frames} frames in ${s.secs.toFixed(1)} s. Most time: ${part(s.top, all!)} of ${ms(all!.mean)} ms (ours: ${part(s.ours, all!)})` : "No frames recorded";
+  const mostTurn = s.topTurn >= 0 ? `. Turning, to ${Math.round(s.maxTurn)}°/s: ${part(s.topTurn, turn!)} of ${ms(turn!.mean)} (ours: ${part(s.oursTurn, turn!)})` : ". No turning";
+  lines.push(`<div class="tfr-most">${most}${mostTurn}. ${s.bakes} painted, ${s.uploads} uploads, ${s.resets} atlas resets.</div>`);
   // The parts: the mean ms a frame overall and split, and the worst.
   let t = `<table class="tfr-parts"><thead><tr><th>ms a frame</th>`;
   for (const g of s.segs) t += `<th>${esc(g.name)}</th>`;
@@ -52,8 +53,8 @@ export function panelHtml(s: Summary, d: Device): string {
   for (const g of s.segs) t += `<td>${g.frames ? ms(g.mean) : "–"}</td>`;
   t += `<td>${ms(s.worst[0]?.ms ?? 0)}</td></tr></tbody></table>`;
   lines.push(t);
-  let w = `<div class="tfr-worst"><b>Worst 10 frames</b><ol>`;
-  for (const x of s.worst) w += `<li><b>${ms(x.ms)} ms</b> at ${(x.at / 1000).toFixed(1)} s · ${esc(x.what)} · most: ${esc(PART_NAMES[x.top]!)} ${ms(x.topMs)}</li>`;
+  let w = `<div class="tfr-worst"><b>Worst 10 frames</b> (ms, when, biggest part, what was happening)<ol>`;
+  for (const x of s.worst) w += `<li><b>${ms(x.ms)} ms</b> ${(x.at / 1000).toFixed(1)} s: ${esc(PART_SHORT[x.top]!)} ${ms(x.topMs)} · ${esc(x.what)}</li>`;
   w += `</ol></div>`;
   lines.push(w);
   return lines.join("");

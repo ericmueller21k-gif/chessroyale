@@ -2,7 +2,7 @@
  * The frame report (`/town?report`, anyone's, like `?fps`; Eric, Nov 11: "turning is dropping it to like 40 frames … maybe also
  * loading, when I go to a new spot"). It records every frame of a run (from your first move, for 30 s or until "Done"): the frame's
  * time, the time of each part of the town's frame (the parts below, named from the code), and what was happening (walking, turning
- * and how fast, a zoom, loading: roofs painted, sight lines worked out, textures uploaded, an atlas page started again; a long gap
+ * and how fast, a zoom, loading: new pictures painted, sight lines worked out, textures uploaded, an atlas page started again; a long gap
  * outside our code). Then it shows one panel sized to be screenshotted (frame-report-panel.ts), from `summarize` below.
  *
  * Plain typed arrays made once as the page opens with `?report`; nothing allocated per frame. Without `?report` there's no recorder
@@ -74,6 +74,8 @@ export const PART_NAMES: readonly string[] = [
   "Texture uploads",
   "Outside our code",
 ];
+/** The same, short (the worst frames' lines). */
+export const PART_SHORT: readonly string[] = ["Logic", "Camera", "Sky", "Ground", "Placing", "Buildings", "Props", "Bosses", "You", "Others", "Lights", "Labels", "Submit", "Chips", "Minimap", "Painting", "Sight", "Uploads", "Outside"];
 
 /** What was happening in a frame (bits). */
 export const F = { walk: 1, turn: 2, zoom: 4, load: 8, upload: 16, gap: 32, reset: 64, sight: 128 } as const;
@@ -279,9 +281,11 @@ export interface Summary {
   /** All, walking, turning, loading. */
   segs: Segment[];
   worst: Worst[];
-  /** Where the most time went: overall, and while turning (−1: no turning recorded). */
+  /** Where the most time went: overall, and while turning (−1: no turning recorded); and of our own parts (the outside part left out). */
   top: number;
   topTurn: number;
+  ours: number;
+  oursTurn: number;
   /** The fastest turn (degrees a second). */
   maxTurn: number;
   uploads: number;
@@ -291,18 +295,18 @@ export interface Summary {
 
 const fpsOf = (ms: number) => (ms > 0 ? 1000 / ms : 0);
 
-/** What was happening in frame `i`, in words ("turning 140°/s · 3 roofs painted · 12 uploads"). */
+/** What was happening in frame `i`, in a few words ("turning 140°/s · 3 painted · 12 uploads"). */
 export function whatOf(r: RunData, i: number): string {
   const f = r.flags[i]!;
   const out: string[] = [];
   if (f & F.walk) out.push("walking");
   if (f & F.turn) out.push(`turning ${Math.round(r.turn[i]!)}°/s`);
   if (f & F.zoom) out.push("zoom");
-  if (r.bakes[i]) out.push(`${r.bakes[i]} new picture${r.bakes[i] === 1 ? "" : "s"}`);
+  if (r.bakes[i]) out.push(`${r.bakes[i]} painted`);
   if (f & F.sight) out.push("sight lines");
   if (r.ups[i]) out.push(`${r.ups[i]} upload${r.ups[i] === 1 ? "" : "s"}`);
-  if (f & F.reset) out.push("atlas page reset");
-  if (f & F.gap) out.push("long gap outside our code");
+  if (f & F.reset) out.push("atlas reset");
+  if (f & F.gap) out.push("gap");
   return out.length ? out.join(" · ") : "standing";
 }
 
@@ -327,7 +331,7 @@ function segment(r: RunData, name: string, keep: (i: number) => boolean): Segmen
   return { name, frames: n, fps: n ? fpsOf(quantile(times, 0.5)) : 0, avg, max, mean: n ? sum / n : 0 };
 }
 
-const argmax = (xs: readonly number[]) => xs.reduce((b, x, i) => (x > xs[b]! ? i : b), 0);
+const argmax = (xs: readonly number[], n = xs.length) => xs.reduce((b, x, i) => (i < n && x > xs[b]! ? i : b), 0);
 
 export function summarize(r: RunData): Summary {
   const n = r.n;
@@ -375,6 +379,8 @@ export function summarize(r: RunData): Summary {
     worst,
     top: n ? argmax(segs[0]!.avg) : -1,
     topTurn: segs[2]!.frames ? argmax(segs[2]!.avg) : -1,
+    ours: n ? argmax(segs[0]!.avg, P.outside) : -1,
+    oursTurn: segs[2]!.frames ? argmax(segs[2]!.avg, P.outside) : -1,
     maxTurn,
     uploads,
     bakes,
