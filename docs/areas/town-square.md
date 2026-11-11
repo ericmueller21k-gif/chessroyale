@@ -652,8 +652,11 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
 - **Boingo's Funhouse (Nov 6).** Everyone's town. A 24 x 24 arcade (`shops/boingo-art.ts`, `RoomArt.n`) in `CLOWN_PALETTE` under an arcade ceiling of bulbs (`roof: "arcade"`): a 3-level net climb with a spiral slide and a ball pit, the spinning light game, roll-ball lanes, the squirt race (5 clown players, knights racing on a loop), the
   prize counter (the clown attendant `characters/sidekicks/funkeeper.ts`, "Shopkeeper"; "Boingo's Boss Crate" with Boingo's Pogo) and the pogo under a spotlight with its price sign (`pogoSign()`, the crate's price). **The claw machine** (19, 7): the kit model `town/kit/models/claw-cabinet.ts` placed by `shops/claw-cabinet.ts`, its claw posed
   from the play (`claw/view.ts`); walking up glides the camera in (`SHOP_FEEL.claw`), its coin slot opens `openClawMachine()`. His challenge: the default intro on his carnival mat. docs/decisions/2026-11-06-boingo-home.md.
-- **Rolling Dough (Nov 11), an admin's town only** (`zebra` in `BOSS_ADMIN_FIRST`; no town boss: `hasTownBoss`). Front room (`shops/zebra-art.ts`):
-  the counter zebra (no crate yet: Talk says a line), the guards' `watch` follows you. **The door between rooms** (`ShopPlace.door`,
+- **Rolling Dough (Nov 11), an admin's town only** (`zebra` in `BOSS_ADMIN_FIRST`; no town boss: `hasTownBoss`). **Out front, a stand-in**
+  (`STAND_IN` in `world.ts`: the "Bakery guard", the flat-cap guard's drawing, on the home's rest square, never roaming or talking on his
+  own; in today's town beside its door): his card is his name, a line row kept two lines high and **Talk** ("the boss is inside", one of
+  `ZEBRA_OUTSIDE_LINES` at random). Front room (`shops/zebra-art.ts`): a tapped guard and the counter zebra's Talk say he's in the back
+  (`ZEBRA_BACK_LINES`, at random, in a bubble); the guards' `watch` follows you. **The door between rooms** (`ShopPlace.door`,
   `Room.pass`; "Go in" / "Go out front"; Town.tsx `goThrough`) leads to the dim back room (`BACK_ROOMS`, its own fixed camera): the chatter,
   Don's card: **Challenge** alone (Nov 11, docs/decisions/2026-11-11-bakery-challenge.md). It plays his beat (the crew stand, draw and
   aim at you, each turned to your side, his roll at your angle, `aimAt`, following you as you move), then the walk-out (`WalkOut`: four

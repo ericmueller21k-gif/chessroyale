@@ -101,7 +101,7 @@ export function watchFrame(g: { readonly at: readonly [number, number]; readonly
 /** How long a line stays up: a base and a little more for each character (SHOP_FEEL.zebra). */
 export const lineMs = (text: string): number => SHOP_FEEL.zebra.lineMs + SHOP_FEEL.zebra.perCharMs * text.length;
 
-/** The front room: the guards watching you, their lines now and then, and the counter zebra's from his Talk. */
+/** The front room: the guards watching you, their lines now and then and when tapped, and the counter zebra's from his Talk. */
 export class FrontScene {
   private next = 0;
   private lineI = 0;
@@ -134,6 +134,11 @@ export class FrontScene {
   /** The counter zebra says `text` now (his Talk): over anyone else's. */
   keeper(now: number, text: string): void {
     this.say = { who: "keeper", text, until: now + lineMs(text) };
+    this.next = Math.max(this.next, this.say.until + SHOP_FEEL.zebra.guardNearMs[0]);
+  }
+  /** A guard you tapped says `text` now ("He's in the back."): over anyone else's. */
+  guard(now: number, who: "guard-a" | "guard-b", text: string): void {
+    this.say = { who, text, until: now + lineMs(text) };
     this.next = Math.max(this.next, this.say.until + SHOP_FEEL.zebra.guardNearMs[0]);
   }
   saying(): SceneSay | null {

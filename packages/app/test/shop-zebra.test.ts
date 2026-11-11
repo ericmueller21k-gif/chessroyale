@@ -10,7 +10,7 @@ import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_
 import { NPC_ZEBRA_CREW_C, NPC_ZEBRA_CREW_D, NPC_ZEBRA_CREW_E, NPC_ZEBRA_GUARD_A, ZEBRA_AIM_ANGLES, ZEBRA_AIM_LOOP, ZEBRA_WATCH_FRAME } from "../src/town/shops/zebra-crew.ts";
 import { BOSS_ZEBRA } from "../src/town/shops/zebra-don.ts";
 import { BackScene, FrontScene, SetupScene, WalkOut, ZEBRA_BACK_SET, ZEBRA_BACK_SET_SQUARES, ZEBRA_CREW, ZEBRA_GUARDS, aimAt, doorAlpha, lineMs, watchFrame, type CarriedNow, type SceneClips, type SceneFig, type SetupItem } from "../src/town/shops/zebra-scene.ts";
-import { ZEBRA_BATTLE_START, ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_KEEPER_LINES, ZEBRA_TALK } from "../src/town/shops/zebra-lines.ts";
+import { ZEBRA_BACK_LINES, ZEBRA_BATTLE_START, ZEBRA_CHATTER, ZEBRA_GUARD_LINES, ZEBRA_OUTSIDE_LINES, ZEBRA_TALK, pickLine } from "../src/town/shops/zebra-lines.ts";
 import { clipsOf, timelineAt, timelineBeats, timelineCues } from "../src/town/shops/timeline.ts";
 import { INTRO_ZEBRA_FRONT, INTRO_ZEBRA_STORM } from "../src/town/shops/zebra-intro-art.ts";
 import { ZEBRA_INTRO } from "../src/town/shops/intros/zebra.ts";
@@ -60,9 +60,9 @@ describe("the two rooms and the door between them (Nov 11)", () => {
       expect(["8,6", "8,7"]).toContain(sq(t.dest!));
     }
   });
-  it("the counter zebra has no crate yet: his Talk says his lines; Don's Challenge is open (his boss is in the game, admins first)", () => {
+  it("the counter zebra has no crate yet: his Talk says he's in the back; Don's Challenge is open (his boss is in the game, admins first)", () => {
     expect(front).toMatchObject({ crate: null, kid: "zebrakeeper", roof: "bakery", chatTone: "day" });
-    expect(front.says).toEqual(ZEBRA_KEEPER_LINES);
+    expect(front.says).toEqual(ZEBRA_BACK_LINES);
     expect(back).toMatchObject({ part: "back", name: "Don Dough", hideKid: true, chatTone: "night" });
     expect(canChallengeInside("zebra")).toBe(true);
     expect(introOf("zebra")).toMatchObject({ name: "Don Dough", fromDoor: true, seated: true, custom: true });
@@ -114,8 +114,11 @@ describe("the front room's lines", () => {
     }
     expect(first).toBeGreaterThan(0);
     expect(first).toBeLessThanOrEqual(SHOP_FEEL.zebra.guardNearMs[1] + 100);
-    n.keeper(30_000, ZEBRA_KEEPER_LINES[0]!);
-    expect(n.saying()).toEqual({ who: "keeper", text: ZEBRA_KEEPER_LINES[0] });
+    n.keeper(30_000, ZEBRA_BACK_LINES[0]!);
+    expect(n.saying()).toEqual({ who: "keeper", text: ZEBRA_BACK_LINES[0] });
+    // (A tapped guard: "He's in the back.", over anyone's.)
+    n.guard(31_000, "guard-b", ZEBRA_BACK_LINES[1]!);
+    expect(n.saying()).toEqual({ who: "guard-b", text: ZEBRA_BACK_LINES[1] });
   });
 });
 
@@ -344,13 +347,29 @@ describe("his intro, as data", () => {
 
 describe("the words", () => {
   it("every line fits a speech bubble (the art's: none over 58 characters), and none says \"stupid\"", () => {
-    const all = [...ZEBRA_CHATTER.flat(), ...ZEBRA_GUARD_LINES, ...Object.values(ZEBRA_TALK)].map((l) => l.text).concat(ZEBRA_KEEPER_LINES);
+    const all = [...ZEBRA_CHATTER.flat(), ...ZEBRA_GUARD_LINES, ...Object.values(ZEBRA_TALK)].map((l) => l.text).concat(ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES);
     for (const l of all) {
       expect(l.length, l).toBeLessThanOrEqual(58);
       expect(l, l).not.toMatch(/stupid/i);
     }
     expect(ZEBRA_CHATTER).toHaveLength(22);
     expect(ZEBRA_GUARD_LINES).toHaveLength(10);
+  });
+  it("\"he's in the back\" (Eric, Nov 11): 3 to 4 lines each in the room and out front, picked at random, never twice running", () => {
+    for (const lines of [ZEBRA_BACK_LINES, ZEBRA_OUTSIDE_LINES]) {
+      expect(lines.length).toBeGreaterThanOrEqual(3);
+      expect(lines.length).toBeLessThanOrEqual(4);
+      for (const l of lines) expect(l).toMatch(/back|inside/i);
+      const seen = new Set<string>();
+      let last: string | null = null;
+      for (let i = 0; i < 200; i++) {
+        const l = pickLine(lines, last);
+        expect(l).not.toBe(last);
+        seen.add((last = l));
+      }
+      expect(seen.size).toBe(lines.length);
+    }
+    expect(pickLine(["only"], "only", () => 0.999)).toBe("only");
   });
 });
 

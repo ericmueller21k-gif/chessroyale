@@ -9,7 +9,7 @@
  * Every decision goes in the case's log with who made it ("admin:<email>" or "reviewer") and why. The reviewer never
  * bans, decides appeals, nor changes a ban (fairplay.ts, decide).
  */
-import { CHAT_MOD, FAIRPLAY, atBanBar, crowdRate, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
+import { CHAT_MOD, FAIRPLAY, atBanBar, crowdRate, nearBest, skipReason, type FairMove, type FairSummary } from "@chessroyale/core";
 import { toSan, type ChatBlock } from "@chessroyale/chess";
 import { DELETED_NAME, d1Sql, ensureSchema, userFromToken, type Sql, type User } from "./accounts.ts";
 import { SESSION_COOKIE, readCookie, type AccountEnv } from "./api.ts";
@@ -349,9 +349,14 @@ export interface EvidenceMove {
   /** A premove (its time left out of timing: core's FairMove.premove). */
   premove: boolean;
   away: number;
-  /** The deep re-check: its best move (SAN) and the pick's rank among the candidates (1: its best), or null. */
+  /**
+   * The deep re-check: its best move (SAN), the pick's rank among the candidates (1: its best), the points it gives away by the
+   * search's numbers, and whether it counts as the engine's best (rank 1 or within FAIRPLAY.deep.nearBestLoss: core's nearBest); or null.
+   */
   deepBest: string | null;
   deepRank: number | null;
+  deepLoss: number | null;
+  deepNear: boolean | null;
 }
 
 function evidenceMove(m: FairMove): EvidenceMove {
@@ -384,6 +389,8 @@ function evidenceMove(m: FairMove): EvidenceMove {
     away: m.away,
     deepBest: m.deep ? san(m.deep.best) : null,
     deepRank: m.deep?.rank ?? null,
+    deepLoss: m.deep?.loss ?? null,
+    deepNear: m.deep ? nearBest(m.deep) : null,
   };
 }
 
@@ -658,8 +665,8 @@ function poolSection({ rows: pool, ids }: { rows: PoolRow[]; ids: string[] }): s
     const hint = poolHint(p);
     return `<tr><td><a href="/admin/fairplay/case/${esc(p.userId)}">${esc(p.name)}</a></td><td>${when(p.since)}${p.by && p.by !== "detection" ? ` <span class="pill">${esc(p.by)}</span>` : ""}</td><td class="wrap">${esc(p.why)}</td>
 <td>${p.rating ?? "–"} · 1 v 1 ${p.rating1v1 ?? "–"}</td><td>${p.games}</td>
-<td>${p.evidence.atBar} of ${p.evidence.matches} at the bar · deep ${pct(p.evidence.deepMatch, p.evidence.deepChecked)} of ${p.evidence.deepChecked} · best ${p.evidence.bestPerf ?? "–"} · pooled at ${p.evidence.pooledPerf ?? "–"}</td>
-<td class="wrap">${i.matches} matches, ${i.atBar} at the bar, strength ${i.avgPerf ?? "–"}, deep ${pct(i.deepMatch, i.deepChecked)} · 1 v 1 ${i.duelWins}-${i.duelLosses}-${i.duelDraws} (${i.vsPool} vs pooled, scoring ${pct(i.vsPoolScore, i.vsPool)}) · crowd and raid ${i.wins} of ${i.games} won${hint ? `<br><b>${esc(hint)}</b>` : ""}</td>
+<td>${p.evidence.atBar} of ${p.evidence.matches} at the bar · ${pct(p.evidence.deepMatch, p.evidence.deepChecked)} of ${p.evidence.deepChecked} near the engine's best · best ${p.evidence.bestPerf ?? "–"} · pooled at ${p.evidence.pooledPerf ?? "–"}</td>
+<td class="wrap">${i.matches} matches, ${i.atBar} at the bar, strength ${i.avgPerf ?? "–"}, ${pct(i.deepMatch, i.deepChecked)} near the engine's best · 1 v 1 ${i.duelWins}-${i.duelLosses}-${i.duelDraws} (${i.vsPool} vs pooled, scoring ${pct(i.vsPoolScore, i.vsPool)}) · crowd and raid ${i.wins} of ${i.games} won${hint ? `<br><b>${esc(hint)}</b>` : ""}</td>
 <td><form method="post" action="/admin/fairplay/case/${esc(p.userId)}"><button class="clear" name="action" value="release">Release</button></form></td></tr>`;
   };
   const size = FAIRPLAY.pool.exportPage;
@@ -750,12 +757,12 @@ function casePage(d: CaseDetail, note: string | null, chat: { block: ChatBlock |
   const match = (m: CaseDetail["matches"][number]) => {
     const s = m.summary;
     const head = `<b>${esc(m.mode)}</b> ${esc(m.lobby ?? "")} · ${when(m.playedAt)} · strength <b>${m.perf ?? "–"}</b> on ${m.counted} counted moves · score <b>${m.score}</b> (strength ${s.parts.perf}, jump ${s.parts.jump}, evidence ${s.parts.evidence ?? 0}, streak ${s.parts.streak}, time ${s.parts.time}, look-aways ${s.parts.away}) · level ${esc(m.level)}
-  <br><span class="muted">avg loss ${s.avgLoss ?? "–"}, found ${s.found}/${s.counted}, run ${s.topStreak}; hard ${s.hardFinds}/${s.hard} (run ${s.hardStreak}); evidence ${s.evidence ?? "–"}; deep matches ${s.deepMatch ?? 0}/${s.deepChecked ?? 0}; fast hard ${s.fastHard}; time vs difficulty ${s.timeCorr ?? "–"}; look-aways ${s.awayFound}/${s.awayMoves} found</span>`;
+  <br><span class="muted">avg loss ${s.avgLoss ?? "–"}, found ${s.found}/${s.counted}, run ${s.topStreak}; hard ${s.hardFinds}/${s.hard} (run ${s.hardStreak}); evidence ${s.evidence ?? "–"}; ${s.deepChecked ? `${Math.round((100 * (s.deepMatch ?? 0)) / s.deepChecked)}% near the engine's best (${s.deepMatch ?? 0}/${s.deepChecked}${s.deepExact === undefined ? "" : `, its very best ${s.deepExact}`})` : "not deep-checked"}; fast hard ${s.fastHard}; time vs difficulty ${s.timeCorr ?? "–"}; look-aways ${s.awayFound}/${s.awayMoves} found</span>`;
     const rows = m.moves
       ? `<div class="scroll"><table><tr><th>Move</th><th>Pick</th><th>Best</th><th>Loss</th><th>Crowd found</th><th>Near best</th><th>Think</th><th>Away</th><th>Deep</th><th>Counts</th></tr>${m.moves
           .map(
             (x) =>
-              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s${x.premove ? " (premove)" : ""}</td><td>${x.away || ""}</td><td>${x.deepRank === null ? "" : x.deepRank === 1 ? "= engine" : `#${x.deepRank} (${esc(x.deepBest)})`}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
+              `<tr class="${x.counted ? (x.crowdRate !== null && x.crowdRate < FAIRPLAY.signals.hardShare ? "hard" : "") : "skip"}"><td>${esc(x.moveNo)}</td><td>${esc(x.pick)}</td><td>${esc(x.best)}</td><td>${x.loss}</td><td>${x.crowdRate === null ? `– (${x.crowd})` : `${Math.round(x.crowdRate * 100)}% of ${x.crowd}`}</td><td>${x.near}</td><td>${x.thinkS} s${x.premove ? " (premove)" : ""}</td><td>${x.away || ""}</td><td>${x.deepRank === null ? "" : x.deepRank === 1 ? "= engine" : `${x.deepNear ? "≈ engine: " : ""}#${x.deepRank} (${esc(x.deepBest)}), ${x.deepLoss} off`}</td><td>${x.counted ? "yes" : esc(x.skip)}</td></tr>`,
           )
           .join("")}</table></div>`
       : `<p class="muted">Moves deleted (kept ${FAIRPLAY.evidenceDays} days for flagged or reported players).</p>`;

@@ -272,6 +272,14 @@ export type IndoorId = "zebra";
 /** A home whose boss roams the town round it. */
 export type TownBossId = Exclude<HomeId, IndoorId>;
 export const hasTownBoss = <H extends { id: HomeId }>(h: H): h is H & { id: TownBossId } => h.id !== "zebra";
+/**
+ * A home whose boss is inside has a stand-in out front, where the others' bosses stand (Eric, Nov 11: "people are going to be used to
+ * seeing a guy out front"): Rolling Dough's guard. He stands still on its rest square, says nothing on his own, and his card's Talk says
+ * the boss is inside (`ZEBRA_OUTSIDE_LINES`). His name here; his drawing is render.ts's BOSS_ART.
+ */
+export const STAND_IN: Readonly<Record<IndoorId, string>> = { zebra: "Bakery guard" };
+/** The name a town figure goes by: its boss's, or its stand-in's. */
+export const figureName = (h: Home): string => (hasTownBoss(h) ? h.boss : STAND_IN[h.id as IndoorId]);
 
 /**
  * A place with a picture, a name (floating over it and on its sign) and an edge chip: a boss's home, or the Colosseum.
@@ -360,7 +368,7 @@ export const ALL_HOMES: readonly Home[] = (
     // (Nov 11: Rolling Dough, Don Dough's bakery, Big Boy's size (Eric: "the total size will be like the other ones"). Today's town:
     // (9, 1), in the north-west between Puddles' Garden, Moo & Moon Meadow (across the wrap) and Chub & Chirp's, 7.1 to 7.6 squares
     // from each, the best open ground left, as Dash's. The street town: its lot on South Street between Puddles' Garden and Smudgy's
-    // Gallery (street-plan.json). No boss roams it: Don stays in his back room (hasTownBoss). Last of the homes, so the town's bosses
+    // Gallery (street-plan.json). No boss roams it: Don stays in his back room (hasTownBoss); his guard stands out front (STAND_IN, Nov 11). Last of the homes, so the town's bosses
     // keep the homes' order. Its ring the awning's burgundy. In an admin's town only while he's in the game for admins first.
     // docs/decisions/2026-11-11-zebra-home.md.)
     { id: "zebra", boss: "Don Dough", name: "Rolling Dough", color: "#8e2b3a", cx: 9, cy: 1 },
@@ -873,7 +881,8 @@ export function tableStates(people: readonly Person[]): TableState[] {
 }
 
 export interface Boss {
-  home: Home & { id: TownBossId };
+  /** Its home (a home with its boss inside, Rolling Dough: its stand-in, STAND_IN, standing still out front). */
+  home: Home;
   walker: Walker;
   /** When it next walks (null: pick a pause). */
   nextAt: number | null;
@@ -958,8 +967,9 @@ export function createTown(now: number, seed = 20261025, seat: Seat | null = nul
     you.walker.facing = stand.facing;
     you.walker.view = stand.view;
   }
-  // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square.
-  const bosses: Boss[] = HOMES.filter(hasTownBoss).map((home) => ({ home, walker: new Walker(home.rest, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
+  // Each boss starts on the square in front of its home's middle (toward the camera); in the street town, on its rest square. (A home
+  // whose boss is inside: its stand-in, there for good; in today's town, beside its door rather than on it, the others' start.)
+  const bosses: Boss[] = HOMES.map((home) => ({ home, walker: new Walker(hasTownBoss(home) || home.wander ? home.rest : { c: wrapI(home.cx + 1), r: home.rest.r }, f.bossStepMs, false), nextAt: null, onScreen: false, held: false, lastLine: null }));
   // Who's out (`botsOut` of them, shuffled by the town's seed, so the town opens the same way every time, as the tests
   // need; back from a game, the bot you played among them); the others are at home, and the turns change who's out.
   const order = TOWN_BOTS.map((_, i) => i);
@@ -1257,7 +1267,7 @@ function bossesRoam(t: Town, now: number): void {
   const f = TOWN_FEEL;
   for (const b of t.bosses) {
     const w = b.walker;
-    if (w.moving() || b.held) continue;
+    if (w.moving() || b.held || !hasTownBoss(b.home)) continue; // (a stand-in stays put)
     if (b.nextAt === null) {
       b.nextAt = now + between(t, f.bossPauseMs);
       continue;
@@ -1574,7 +1584,7 @@ function updateSpeech(t: Town, now: number): void {
   }
   if (s.boss || now < s.next) return;
   s.next = now + between(t, f.speechGapMs);
-  const cands = t.bosses.filter((b) => b.onScreen);
+  const cands = t.bosses.filter((b) => b.onScreen && hasTownBoss(b.home)); // (a stand-in talks only when you Talk to him)
   if (!cands.length) return;
   const b = pick(t, cands);
   const pool = SELECT_LINES[b.home.id] ?? [];

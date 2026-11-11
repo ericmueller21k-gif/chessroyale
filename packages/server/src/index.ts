@@ -18,7 +18,7 @@ import { caseMailer } from "./fairplay-mail.ts";
 import { handleAdmin, isAdmin, testSwitchesOn, type AdminEnv } from "./admin.ts";
 import { handleTestAccounts } from "./test-accounts.ts";
 import { asksTestSwitches, lobbyOptions } from "./lobby-options.ts";
-import { deepCheckRun } from "./fairplay-deep.ts";
+import { deepCheckRun, recountDeep } from "./fairplay-deep.ts";
 import { containerSearch } from "./fairplay-engine.ts";
 import { REGION_HINT, queueName, regionOf } from "./queue.ts";
 import { TOO_MANY, rateLimited } from "./limits.ts";
@@ -94,7 +94,7 @@ export default {
   /**
    * The Worker's schedule (wrangler.jsonc, every 15 minutes): old errors and player reports deleted (problems.ts), chat
    * moderation's old decisions (chat-mod.ts), ranked 1 v 1's old games and old marks for leaving early (ranked.ts), alerts to Discord (alerts.ts), old boss token drops (boss-tokens.ts), once a day the item ledger's check (ledger.ts), and fair play's deep re-check of flagged players' moves on the engine
-   * server (cases in review at once, the rest off-peak; fairplay-deep.ts). An error is logged and counted like any other; the first job's never skips the second.
+   * server (cases in review at once, the rest off-peak; fairplay-deep.ts), after its catch-up of summaries older than the near-best count (recountDeep). An error is logged and counted like any other; the first job's never skips the second.
    */
   async scheduled(event: ScheduledController, rawEnv: Env, ctx: ExecutionContext): Promise<void> {
     if (!rawEnv.DB) return;
@@ -128,6 +128,8 @@ export default {
             .catch(failed("ledger"));
         }
         const env = await withSecrets(rawEnv);
+        // Matches whose summary predates the near-best count, worked out again from their stored deep results (no searches; once each).
+        await recountDeep(sql, Date.now(), { mail: caseMailer(env) }).catch(failed("fairplay-recount"));
         const search = containerSearch(env);
         if (!search) return;
         const r = await deepCheckRun(sql, search, Date.now(), { mail: caseMailer(env) });

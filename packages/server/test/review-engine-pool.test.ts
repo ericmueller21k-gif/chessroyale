@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FAIRPLAY, banSpread, matchSignals, type FairMove } from "@chessroyale/core";
+import { FAIRPLAY, matchSignals, playerLevel, type FairMove } from "@chessroyale/core";
 import { createGuest, createSession, ensureSchema, recordResult, signInWithIdentity, type Sql, type User } from "../src/accounts.ts";
 import { caseOf, decide, recordFairPlay, setCase } from "../src/fairplay.ts";
 import { handleAdmin, poolExport, poolHint, poolPlayers } from "../src/admin.ts";
@@ -51,11 +51,10 @@ const bar = engineMatch(true);
 /** An honest match: the best move half the time, a few points lost otherwise (no deep re-check). */
 const plain = engineMatch(false).map((m, i) => (i % 2 ? { ...m, move: "a1b1", loss: 6 } : m));
 
-/** Into the pool as detection puts them: two matches at the bar, in two lobbies. */
+/** Into the pool as detection puts them: a match at the one-match bar (Nov 11: one pools; two did before). */
 async function pooled(sql: Sql, name: string, at: number): Promise<User> {
   const u = await player(sql, name);
-  await recordFairPlay(sql, u.id, { lobby: `${name.slice(0, 4).toUpperCase()}A`, mode: "crowd", moves: bar }, at - 1000);
-  await recordFairPlay(sql, u.id, { lobby: `${name.slice(0, 4).toUpperCase()}B`, mode: "crowd", moves: bar }, at);
+  await recordFairPlay(sql, u.id, { lobby: `${name.slice(0, 4).toUpperCase()}A`, mode: "crowd", moves: bar }, at);
   expect((await caseOf(sql, u.id))?.status).toBe("pool");
   return u;
 }
@@ -127,25 +126,21 @@ describe("the review of #618: its findings, fixed", () => {
     expect(poolHint(s)).toBe(`strength down ${s.evidence.pooledPerf! - s.inPool.avgPerf!} since pooled: maybe a false positive`);
   });
 
-  it("M3: a ban resting on one match pools no one, even with another lobby's honest match making the two-match bar; two at the bar do", async () => {
+  it("M3, replaced (Eric, Nov 11: \"It's better we put people in this queue than under\"): one match past every one-match bar pools on its own; a strong match short of the bars doesn't", async () => {
     vi.setSystemTime(T0);
     const now = T0 + 10_000;
-    // An honest strong match the deep re-check went through: the engine's best on 14 of 20, not at the one-match bar.
+    // A strong match the deep re-check went through: the engine's best on 14 of 20 and 4 points off on the rest (past nearBestLoss).
     const strong = bar.map((m, i) => (i % 10 < 3 ? { ...m, move: "a1b1", loss: 4, deep: { best: "a1a2", rank: 2, loss: 4, top: ["a1a2", "a1b1", "a1b2"] } } : m));
     const at = (moves: FairMove[], t: number) => ({ ...matchSignals(moves, 1500), at: t });
-    const lv = FAIRPLAY.levels;
-    // (The two-match bar on its own: the forged match's evidence and strength carry the pair.)
-    const pair = [at(bar, T0), at(strong, T0 + 1)];
-    expect(pair.reduce((a, m) => a + m.deepMatch, 0) / pair.reduce((a, m) => a + m.deepChecked, 0)).toBeGreaterThanOrEqual(lv.banDeep);
-    expect(banSpread(pair, now)).toBe(false);
-    expect(banSpread([at(bar, T0), at(bar, T0 + 1)], now)).toBe(true);
+    expect(at(strong, T0)).toMatchObject({ deepChecked: 20, deepMatch: 14, deepExact: 14 });
+    expect(playerLevel([at(strong, T0)], now).level).not.toBe("ban");
     const { sql } = memoryDb();
     await ensureSchema(sql);
+    const s = await player(sql, "Sam");
+    expect((await recordFairPlay(sql, s.id, { lobby: "AAAAA", mode: "crowd", moves: strong }, T0)).acted).not.toBe("pool");
     const p = await player(sql, "Pat");
-    await recordFairPlay(sql, p.id, { lobby: "AAAAA", mode: "crowd", moves: bar }, T0);
-    expect((await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: strong }, T0 + 1000)).verdict.level).toBe("ban");
-    expect((await caseOf(sql, p.id))?.status).toBe("review");
-    expect((await recordFairPlay(sql, p.id, { lobby: "CCCCC", mode: "crowd", moves: bar }, T0 + 2000)).acted).toBe("pool");
+    expect((await recordFairPlay(sql, p.id, { lobby: "BBBBB", mode: "crowd", moves: bar }, T0)).acted).toBe("pool");
+    expect(await caseOf(sql, p.id)).toMatchObject({ status: "pool", reason: expect.stringMatching(/^level ban: one match/) });
   });
 
   it("m1: a pooled player's matches are deep-checked in full, as a review's", async () => {
@@ -155,7 +150,9 @@ describe("the review of #618: its findings, fixed", () => {
     const checked = async (status: "pool" | "review") => {
       const u = await player(sql, `U${status}`);
       await setCase(sql, u.id, status, "detection", "test", QUIET - 3 * HOUR);
-      await recordFairPlay(sql, u.id, { lobby: status === "pool" ? "PPPPP" : "RRRRR", mode: "crowd", moves: engineMatch(false) }, QUIET - HOUR);
+      // (The review's player: half the picks 5 points off the engine's best, far from the one-match bar, so the case stays a review and
+      // shows a review's matches checked in full: the review of #629, m5.)
+      await recordFairPlay(sql, u.id, { lobby: status === "pool" ? "PPPPP" : "RRRRR", mode: "crowd", moves: status === "pool" ? engineMatch(false) : plain }, QUIET - HOUR);
       for (let i = 0; i < 3; i++) await deepCheckRun(sql, search, QUIET, { userId: u.id, perRun: 500 });
       expect((await caseOf(sql, u.id))?.status).toBe(status);
       const s = JSON.parse((await sql.first<{ summary: string }>("SELECT summary FROM fairplay_matches WHERE user_id = ?", u.id))!.summary) as { deepChecked: number };
