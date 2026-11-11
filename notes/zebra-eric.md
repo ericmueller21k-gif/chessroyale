@@ -70,3 +70,7 @@ suggestions"). Start on the artwork now.
 - "Art looks great." (The first batch: the cast, breadPop, volley, the crew's draw, drop, the dough, the timer, the splash.)
 - "For the gold ultimate animation: take a few seconds, like 10 total, where an animation plays, turns his piece gold, then he says a
   note about how your pawns are worthless vs it."
+
+## Eric, Nov 11: "Looks great" (the bakery: outside, front, back room, the walk-through)
+Defaults taken (he didn't object): the bakery is **Rolling Dough**; the counter zebra in a baker's cap is the shopkeeper; Gold Plate's
+closing line is one of the six, at random.
