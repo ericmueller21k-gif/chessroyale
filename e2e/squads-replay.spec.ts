@@ -168,8 +168,9 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
     const out: { text: string; w: number; h: number; fs: number }[] = [];
     (window as any).__tags = out;
     const t = setInterval(() => {
-      for (const el of document.querySelectorAll<HTMLElement>(".rp-tag")) {
+      for (const el of document.querySelectorAll<HTMLElement>(".rp-over .rp-tag")) {
         const b = el.getBoundingClientRect();
+        if (!b.width || !b.height) continue;
         const text = el.querySelector<HTMLElement>(".rp-tag-text")!;
         out.push({ text: text.textContent ?? "", w: Math.round(b.width * 10) / 10, h: Math.round(b.height * 10) / 10, fs: parseFloat(getComputedStyle(text).fontSize) });
       }
@@ -186,8 +187,10 @@ test("Relay: the replay button steps off, the last 2, all; your move on a board,
   await expect(page.locator(".rp-over")).toBeVisible();
   await expect(page.locator(".sq-status")).toContainText(/^Your move · Board \d · replay \d of \d/);
   await expect(page.locator(".sq-free.replay .rp-icon")).toBeVisible();
-  // Mid-way: a move landed, its from and to marked on the replay's board, its player named over it.
-  await expect(page.locator(".rp-over .rp-tag")).toBeVisible({ timeout: 3_000 });
+  // Mid-way: a move landed, its from and to marked on the replay's board, its player named over it. (Read from the watcher above, every
+  // 40 ms from before the replay: a replay of one move lasts 0.5 s, and its tag could come and go between two looks of toBeVisible:
+  // CI, Nov 11. docs/decisions/2026-11-11-flaky-batch.md)
+  await expect.poll(() => page.evaluate(() => (window as any).__tags.length as number), { message: "a tag over a replayed move", timeout: 500 * n + 3_000 }).toBeGreaterThan(0);
   await still(page, "replay");
   // It ends as the extra time does (never later, never early), and the board is the board as it stands.
   await expect(page.locator(".rp-over")).toHaveCount(0, { timeout: 500 * n + 1_500 });
