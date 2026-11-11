@@ -415,9 +415,9 @@ const cheatersSame = run(CHEATERS, Math.round(PLAYERS / 8), true, true);
 const honestFew = run(HONEST.filter((k) => k.elo >= 2200), Math.round(PLAYERS / 2), false);
 const cheatersFew = run(CHEATERS, Math.round(PLAYERS / 8), false);
 const maiaHonest = maiaData ? run(MAIA, PLAYERS) : [];
-// (A whole game alone: no crowd, no cuts, every move of one side; strong people only, for sustained strength. The review of #629, m4.)
+// (A whole game alone: no crowd, no cuts, every move of one side; strong people only, for sustained strength. The review of #629, m4.
+// Played in the report's near-best section, after every other draw, so the rest of the report's numbers stay as they were.)
 const STRONG = [...HONEST.filter((k) => k.elo >= 2200), ...(maiaData ? MAIA : [])];
-const strongWhole = run([...STRONG, CHEATERS[6]!, CHEATERS[7]!], Math.round(PLAYERS / 5), false, false, true);
 console.log(`played in ${Math.round((Date.now() - t0) / 1000)} s`);
 
 // ---------------- The hard-find model's slope, fitted on honest players ----------------
@@ -924,20 +924,34 @@ out("");
   );
   out("");
   // A whole game alone (the review of #629, m4): no crowd rates, no cuts, every move of one side of a bank game.
+  const strongWhole = run([...STRONG, CHEATERS[6]!, CHEATERS[7]!], Math.round(PLAYERS / 5), false, false, true);
   evaluate(strongWhole, base);
+  // Which path pooled them (the first match at the ban level): one match, the two-match path or sustained strength.
+  const paths = (subs: Subject[]) => {
+    const t = { one: 0, two: 0, strength: 0 };
+    for (const sub of subs) {
+      const i = sub.levels.indexOf("ban");
+      if (i < 0) continue;
+      const v = playerLevel(sub.summaries.slice(0, i + 1), (i + 1) * 3_600_000 + 1, base.levels);
+      if (v.path === "strength") t.strength++;
+      else if (v.reasons[0]?.startsWith("one match")) t.one++;
+      else t.two++;
+    }
+    return t;
+  };
   out(
     `**A whole game alone** (no crowd, no cuts: every move of one side of a bank game, as a boss raid played alone; ${Math.round(PLAYERS / 5).toLocaleString("en-US")} players each). Ranked 1 v 1 records no judged picks, so this path never reads it. The bank's positions don't follow the player's moves, so a game a strong player is winning, where most moves lose little, isn't here: unmeasured.`,
   );
   out("");
-  out(`| Who | Counted moves (median) | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ | Pool within ${MATCHES} (every path) |`);
-  out("| --- | --- | --- | --- | --- | --- |");
+  out(`| Who | Counted moves (median) | With ${lv.poolStrengthMatches} such matches | Average strength: median / 99th pct / max | At ${lv.poolStrength.toLocaleString("en-US")}+ | Pool within ${MATCHES} (every path) | By one match / two / strength (players) |`);
+  out("| --- | --- | --- | --- | --- | --- | --- |");
   for (const kind of [CHEATERS[6]!, CHEATERS[7]!, ...STRONG]) {
     const subs = strongWhole.filter((x) => x.kind === kind);
     const avgs = subs.map(avgOf).filter((x): x is number => x !== null);
     const at = avgs.filter((a) => a >= lv.poolStrength).length;
     const f = kind.cheat ? pct : per1000;
     out(
-      `| ${kind.name}${kind.cheat ? "" : " (per 1,000)"} | ${quant(subs.flatMap((x) => x.summaries.map((y) => y.counted)), 0.5)} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} | ${f(reached(subs, "ban", MATCHES))} |`,
+      `| ${kind.name}${kind.cheat ? "" : " (per 1,000)"} | ${quant(subs.flatMap((x) => x.summaries.map((y) => y.counted)), 0.5)} | ${avgs.length.toLocaleString("en-US")} of ${subs.length.toLocaleString("en-US")} | ${avgs.length ? `${Math.round(quant(avgs, 0.5))} / ${Math.round(quant(avgs, 0.99))} / ${Math.round(Math.max(...avgs))}` : "–"} | ${avgs.length ? `${at} (${pct(at / avgs.length)})` : "–"} | ${f(reached(subs, "ban", MATCHES))} | ${Object.values(paths(subs)).join(" / ")} |`,
     );
   }
   out("");

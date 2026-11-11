@@ -41,7 +41,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
   results count again), **closed** (a watch with nothing new for `FAIRPLAY.evidenceDays`).
 - **The engine pool** (Eric, Nov 10; [2026-11-10-engine-pool.md](../decisions/2026-11-10-engine-pool.md)): detection's ban level (one
   deep-checked match past every one-match bar, the two-match path, or sustained strength: the 5 newest matches of 8+ counted moves
-  averaging 3,000 (`levels.poolStrength*`); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
+  averaging 3,000 (`levels.poolStrength*`; the judges' numbers alone, so under `enforcement: "ban"` it opens a review, never a ban); Nov 11, [2026-11-11-near-best.md](../decisions/2026-11-11-near-best.md)),
   or a new account with 2 of its first 10 matches at the one-match ban bar (`FAIRPLAY.pool`), quietly: every queue seats them only with pooled players or bots (`mayPlay`, `queueName`'s `engine`), and matchmade
   lobbies turn away the other side's newcomers ("This match has already started."); results not held, their profile as ever, public rankings
   leave them out (`NOT_POOLED`), evidence kept and deep-checked in full. The review page's `pool` tab (grouped queries, never one a player):
@@ -81,7 +81,7 @@ Lane: `fairplay`. The reviewer's brief: `docs/fairplay-reviewer.md`. The numbers
 - **Near the engine's best** (Eric, Nov 11): a deep-checked pick counts as the engine's best at rank 1 or within `deep.nearBestLoss` (1 point)
   of it (`nearBest`): the share bars read that, and the evidence never counts such a pick as "neither". The review page says "82% near the
   engine's best" and marks a move "≈ engine". Summaries from before are worked out again from their stored deep results by the schedule, once
-  each (`recountDeep`). Its numbers: `reports/fairplay.md`, "Near the engine's best" (`fairplay-maia.ts`: Maia 2200-2600 people).
+  each (`recountDeep`, matches played before `RECOUNT_BEFORE` only: remove both after a week of catching up nothing). Its numbers: `reports/fairplay.md`, "Near the engine's best" (`fairplay-maia.ts`: Maia 2200-2600 people).
 - **1 v 1** ([ranked.md](ranked.md)): no judged picks, so no signals and no part in the suspicion score. Reports from
   the profile, as everywhere (one opened from the game names it). On a case's page, "Check the counted moves with the
   engine server" also checks the player's kept 1 v 1 games (`fairplay-duel.ts`, `checkDuelGames`): reported ones
