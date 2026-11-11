@@ -709,7 +709,6 @@
       "paths": [
         "packages/app/src/friends.ts",
         "packages/app/src/components/Friends.tsx",
-        "packages/app/src/components/FriendsOverlay.tsx",
         "packages/app/src/screens/Friends.tsx",
         "packages/server/src/friends.ts",
         "packages/server/src/friends-api.ts"
@@ -747,7 +746,7 @@
         "packages/app/src/components/QuickChat.tsx",
         "packages/app/src/components/MiniTower.tsx",
         "packages/app/src/components/ChatNotice.tsx",
-        "packages/app/src/components/GlobalChat.tsx", "packages/app/src/components/ChatOptIn.tsx", "packages/app/src/chat-emoji.tsx", "packages/app/src/chat-on.ts",
+        "packages/app/src/components/GlobalChat.tsx", "packages/app/src/components/ChatSheet.tsx", "packages/app/src/components/ChatOptIn.tsx", "packages/app/src/chat-emoji.tsx", "packages/app/src/chat-on.ts",
         "packages/server/src/chat-mod.ts",
         "packages/server/src/global-chat.ts",
         "packages/server/src/global-chat-api.ts",

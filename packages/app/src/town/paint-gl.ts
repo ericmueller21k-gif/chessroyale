@@ -30,6 +30,7 @@
  * Nothing is allocated per frame on the hot path: the streams, the path, the state stack and the scratch vertices are
  * typed arrays and objects that grow and are reused.
  */
+import { REC } from "./frame-report.ts";
 import type { TownGlFallback } from "@chessroyale/core";
 import type { Ctx, PaintLayer, Painter } from "./paint.ts";
 
@@ -617,6 +618,8 @@ class GLPainter implements Painter {
       e.tex = null;
       return;
     }
+    // (`?report`: the upload's time, its place in the atlas included, frame-report.ts.)
+    const t0 = REC ? performance.now() : 0;
     // Pending draws that read its old pixels go first.
     if (e.tex && e.gen === this.gen) this.flushUsing(e.tex);
     if (!(e.tex && e.gen === this.gen && e.w === w && e.h === h)) this.place(e, w, h);
@@ -630,6 +633,7 @@ class GLPainter implements Painter {
       gl.bindTexture(gl.TEXTURE_2D, t.t);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, e.x, e.y, gl.RGBA, gl.UNSIGNED_BYTE, s);
     }
+    if (REC) REC.upload(performance.now() - t0);
   }
 
   /** A place for a w x h picture: an atlas page's shelf, or its own texture. */
@@ -661,6 +665,7 @@ class GLPainter implements Painter {
       // Full: the page least lately drawn from starts again, empty (its pictures are uploaded again as they show).
       pg = this.pages.reduce((a, b) => (a.used <= b.used ? a : b));
       this.resets++;
+      REC?.reset();
       this.flushUsing(pg.tex);
       for (const o of pg.entries) if (o.page === pg) ((o.tex = null), (o.page = null));
       pg.entries.length = 0;

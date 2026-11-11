@@ -9093,6 +9093,9 @@ button.history-label {
   --fd-danger: #f2a3a3;
   --fd-danger-line: #5b2a2a;
   --fd-scrim: rgba(0, 0, 0, 0.55);
+  /* The card's "View profile" (Nov 11): a lighter blue on the dark card (6.4:1), and the sweep across it. */
+  --fd-link: #60a5fa;
+  --fd-shine: #e0f2fe;
 }
 :root[data-theme="light"] {
   --fd-bg: #f4f2ee;
@@ -9111,6 +9114,9 @@ button.history-label {
   --fd-danger: #b42318;
   --fd-danger-line: #f1b5ae;
   --fd-scrim: rgba(20, 22, 27, 0.4);
+  /* The card's "View profile": #2563eb on white (5.2:1). */
+  --fd-link: #2563eb;
+  --fd-shine: #8ab8f7;
   --fd-shadow: 0.16;
 }
 body:has(.fd-root) {
@@ -9491,19 +9497,26 @@ button.fd-logo {
     gap: 6px;
   }
 }
-@media (max-width: 399px) {
-  .fd-top .fd-logo {
-    font-size: clamp(18px, 5.2vw, 20px);
-  }
-}
-@media (max-width: 359px) {
-  .fd-top .fd-logo {
-    font-size: 15px;
-  }
+/*
+ * The row (the logo, five buttons, the gaps) must fit the bar at every phone width (Nov 11, the director): below 375 px the
+ * buttons are 40 px, from 375 up 44 px; the word logo's width is about 5.3 times its font size, so it takes what the row leaves
+ * (the bar's 18 px margins and 6 px gaps; 10 px gaps from 430 px). Below 344 px the logo is the app's icon (below).
+ */
+@media (max-width: 374px) {
   .fd-top .fd-ring,
   .fd-top .fd-icon-btn {
     width: 40px;
     height: 40px;
+  }
+}
+@media (min-width: 344px) and (max-width: 374px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 270px) / 5.3), 20px);
+  }
+}
+@media (min-width: 375px) and (max-width: 459px) {
+  .fd-top .fd-logo {
+    font-size: clamp(13px, calc((100vw - 296px) / 5.3), 20px);
   }
 }
 /*
@@ -9631,7 +9644,46 @@ button.fd-logo {
     margin: 0;
   }
 }
+/*
+ * The phone's chat (Eric, Nov 11: "a chat icon" in the top bar, in place of the pawn): the global chat as a full-screen sheet over
+ * home, its × a 44 px square at the top right. Home under it stays as it was (ChatSheet.tsx).
+ */
+.chat-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: var(--fd-bg);
+  padding: env(safe-area-inset-top, 0px) 12px env(safe-area-inset-bottom, 0px);
+}
+.chat-sheet-top {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  min-height: 44px;
+}
+.chat-sheet-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  font: 400 32px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.chat-sheet-close:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+.chat-sheet > .gchat {
+  flex: 1 1 0;
+  min-height: 0;
+}
 .fd-hero {
+  position: relative;
   flex: 1 1 auto;
   min-height: 230px;
   display: flex;
@@ -9696,6 +9748,62 @@ button.fd-logo {
 .fd-pawn.fd-tap:focus-visible {
   outline: 2px solid var(--fd-gold, #f5c542);
   outline-offset: 2px;
+}
+/*
+ * "View profile" (Eric, Nov 11: "top right of that white container", moved to the bottom right on the director's call, Nov 11, as
+ * it cut into the name): in the card's bottom-right corner, 12 px in from its right and bottom edges, so the words sit about 16 px
+ * in from the edge (the chevron's own padding). Its 44 px tap box is out of the flow, so nothing else on the card moves. Blue, a
+ * chevron, and a light sweep every 6 s (none under reduced motion). Its no-overlap check: home-layout.spec.ts.
+ */
+.fd-hero-profile {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--fd-link);
+  font: 600 15px/1 Archivo, system-ui, sans-serif;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+.fd-hero-profile-text {
+  background: linear-gradient(100deg, var(--fd-link) 40%, var(--fd-shine) 50%, var(--fd-link) 60%) no-repeat;
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: fd-profile-sweep 6s ease-in-out infinite;
+}
+@keyframes fd-profile-sweep {
+  0% {
+    background-position: 100% 0;
+  }
+  30%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+.fd-hero-profile:active {
+  transform: scale(0.97);
+}
+.fd-hero-profile:focus-visible {
+  outline: 2px solid var(--fd-gold, #f5c542);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-hero-profile-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
 }
 /* Your icon to the left of your name and rating: the pair centered under your pawn, the words ranged left. */
 .fd-hero-id {
@@ -10130,6 +10238,27 @@ button.fd-logo {
       -webkit-box-orient: vertical;
       -webkit-line-clamp: 2;
       overflow: hidden;
+    }
+  }
+  /*
+   * A very short card (under 110 px: a 360 × 640 phone): the pawn and name row starts at the left, so the "View profile" link
+   * (bottom right, Nov 11, the director's call) fits beside the name; the pawn fits inside the card's content height, always.
+   * Only this row moves, and only on these cards.
+   */
+  @container fd-hero (max-height: 110px) {
+    .fd-hero-in,
+    .fd-home:not(.queueing) .fd-hero-in {
+      justify-content: flex-start;
+    }
+    .fd-hero .fd-pawn-hero {
+      height: clamp(40px, calc(100cqh - 22px), 130px);
+    }
+    /* The link (the director, Nov 11): its box at the card's bottom edge and 13 px words, so the words clear the name's words. */
+    .fd-hero-profile {
+      bottom: 0;
+    }
+    .fd-hero-profile-text {
+      font-size: 13px;
     }
   }
 }
@@ -26298,142 +26427,194 @@ button.sq-tiny {
     padding: 5px 16px 8px;
   }
 }
-/* ---------------- The friends overlay (Nov 9; components/FriendsOverlay.tsx) ----------------
- * The Quests overlay's shell (.qo-back, .qo-card, .qo-crest, .qo-x, .qo-title), at a fixed height so nothing moves while the list
- * loads or a menu opens: the list scrolls inside the box, the footer's links stay at its foot, and a friend's menu covers the
- * box's foot (over the list), never pushing anything. */
-.fo-card {
-  height: min(560px, calc(100dvh - 62px));
-  min-height: 0;
+/* ---------------- The friends page (Nov 11; screens/Friends.tsx) ----------------
+ * A page with Back (it replaced the Nov 9 pop-up): the search box, Private lobby, then the lists. The search's results open in a
+ * box of their own over the page, always the same size, so nothing on the page moves as they come (Eric's rule: nothing shifts). */
+.fp-page {
+  width: 100%;
+  max-width: 560px;
+  margin-inline: auto;
 }
-.fo-list {
+.fp-search {
+  position: relative;
+  z-index: 5;
+}
+.fp-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 6px 0 14px;
+  border-radius: 14px;
+  background: var(--fd-panel);
+  border: 2px solid var(--fd-line);
+  color: var(--fd-muted);
+}
+.fp-box:focus-within {
+  border-color: var(--fd-gold);
+}
+.fp-box.off {
+  opacity: 0.55;
+}
+.fp-input {
   flex: 1 1 auto;
-  min-height: 0;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fd-text);
+  /* (16 px: a phone's browser doesn't zoom into it.) */
+  font: 600 16px Archivo, system-ui, sans-serif;
+}
+.fp-input::-webkit-search-cancel-button {
+  display: none;
+}
+.fp-input::placeholder {
+  color: var(--fd-muted);
+}
+.fp-clear {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.fp-clear:disabled {
+  opacity: 0.35;
+}
+/* The results: FRIENDS.searchMax (6) rows of 56 px and their gaps, or less where the window is short (its rows scroll inside). */
+.fp-results {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  height: min(386px, calc(var(--app-h, 100dvh) - 150px));
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 2px;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 16px;
+  background: var(--fd-panel-2);
+  border: 1px solid var(--fd-line);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
 }
-.fo-list section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.fp-results-note {
+  margin: 10px 8px;
 }
-.fo-label {
-  margin: 0 4px;
-  font: 800 12px Archivo, system-ui, sans-serif;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--fd-muted);
-}
-.fo-list .fr-row {
-  background: var(--qo-row);
-}
-.fo-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 4px;
-}
-.fo-friend {
+.fp-player {
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
   min-height: 56px;
-  padding: 6px 10px 6px 12px;
-  border-radius: 14px;
-  border: 2px solid transparent;
-  background: var(--qo-row);
-  color: inherit;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fd-panel);
+  color: var(--fd-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.fo-friend.picked {
-  border-color: var(--fd-gold);
+.fp-player:hover,
+.fp-player:focus-visible {
+  outline: 2px solid var(--fd-gold);
+  outline-offset: -2px;
 }
-/* (Offline: greyed, as on a computer's list. The dot already says so; the words fade with it.) */
-.fo-friend.off .fr-row-text {
-  opacity: 0.55;
+.fp-player.stale,
+.fp-results-note.stale {
+  opacity: 0.5;
 }
-.fo-name {
+.fp-icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--fd-panel-2);
+  font-size: 26px;
+  line-height: 1;
+}
+.fp-icon .user-icon.pixel {
+  width: 40px;
+  height: 40px;
+}
+.fp-name {
   font-weight: 800;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.fo-more {
+.fp-chev {
   flex: none;
-  font-size: 20px;
-  line-height: 1;
+  font-size: 22px;
   color: var(--fd-muted);
 }
-.fo-private {
+/* Greyed rows while something loads. */
+.fp-skel {
+  pointer-events: none;
+}
+.fp-skel-icon {
   flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--fd-line);
+}
+.fp-skel-bar {
+  flex: 0 1 140px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--fd-line);
+}
+.fp-private {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-height: 56px;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 14px;
   border: 2px solid var(--fd-gold);
-  background: var(--qo-row);
-  color: inherit;
+  background: var(--fd-panel);
+  color: var(--fd-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.fo-note {
-  margin: 0 4px;
+.fp-private .fp-name {
+  font-size: 15px;
 }
-.fo-foot {
-  flex: none;
+.fp-private .fp-chev {
+  color: var(--fd-gold-text);
+}
+.fp-empty {
   display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 2px 6px 0;
-  font-size: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
 }
-.fo-foot-link {
-  min-height: 36px;
+/* (Offline: greyed. The dot already says so; the words fade with it.) */
+.fp-offline .fr-row-text {
+  opacity: 0.55;
 }
-.fo-foot-link:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.fo-menu {
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 10px;
-  z-index: 2;
+.fp-foot {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px;
-  border-radius: 18px;
-  border: 2px solid var(--fd-gold);
-  background: var(--qo-card);
-  box-shadow: 0 -10px 28px rgba(0, 0, 0, 0.3);
+  margin-top: 4px;
 }
-.fo-menu-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.fp-foot .fd-row-link:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
-.fo-menu .fd-btn {
-  width: 100%;
-}
-.fo-why {
-  margin: -2px 2px 0;
-  font-size: 13px;
-}
-/* ---------------- (end of the friends overlay) ---------------- */
+/* ---------------- (end of the friends page) ---------------- */
 /* (The key is drawn across the middle of its square: a little bigger, so it reads beside the crate.) */
 .qo-thing .key-art svg {
   transform: scale(1.3);

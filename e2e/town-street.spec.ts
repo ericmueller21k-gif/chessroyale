@@ -263,3 +263,68 @@ test("the street town's WebGL context lost: nothing drawn until it's back, then 
   expect(await you(page), "today's town").toEqual([22, 17]);
   expect(await colors(), "the world drawn with Canvas 2D").toBeGreaterThan(40);
 });
+
+test("/town?report (Eric, Nov 11): it waits for your first move, records 3 s of walking and turning, and Done shows one panel with the numbers, inside the box; without ?report there's no pill and no panel", { tag: "@phone-only" }, async ({ page }) => {
+  type R = { __townReport: () => { state: string; frames: number; summary: { frames: number; p50: number; segs: { name: string; frames: number }[]; worst: unknown[] } | null } | null; __townHeading: (d: number | null) => void; __townWalk: (s: readonly [number, number]) => boolean };
+  const errors = watchErrors(page);
+  const pill = page.locator(".tfr-pill");
+  const panel = page.getByRole("dialog", { name: "Town frame report" });
+  await openStreet(page);
+  await page.waitForTimeout(1000);
+  await expect(pill).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as R).__townReport())).toBeNull();
+  await openStreet(page, "&report");
+  await expect(pill).toContainText("Report: walk or turn to start");
+  await expect(pill.getByRole("button", { name: "Done" })).toBeDisabled();
+  await page.waitForTimeout(500);
+  expect((await page.evaluate(() => (window as unknown as R).__townReport()))!.state).toBe("wait");
+  // Walking (1.5 s), then turning on the spot (1.5 s, 120° a second).
+  await page.evaluate(() => (window as unknown as R).__townWalk([4, 25]));
+  await expect(pill).toContainText(/● Recording \d+ s/);
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => {
+    const w = window as unknown as R & { __spin?: boolean };
+    let h = 0;
+    let last = performance.now();
+    w.__spin = true;
+    const f = (now: number) => {
+      if (!w.__spin) return;
+      h += (120 * (now - last)) / 1000;
+      last = now;
+      w.__townHeading(h);
+      requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  await page.waitForTimeout(1500);
+  await pill.getByRole("button", { name: "Done" }).click();
+  await page.evaluate(() => ((window as unknown as { __spin: boolean }).__spin = false));
+  await expect(panel).toBeVisible();
+  const rep = (await page.evaluate(() => (window as unknown as R).__townReport()))!;
+  expect(rep.state).toBe("done");
+  const s = rep.summary!;
+  expect(s.frames, "frames recorded").toBeGreaterThan(10);
+  expect(s.p50).toBeGreaterThan(0);
+  const seg = (n: string) => s.segs.find((g) => g.name === n)!.frames;
+  expect(seg("Walk"), "walking frames").toBeGreaterThan(0);
+  expect(seg("Turn"), "turning frames").toBeGreaterThan(0);
+  expect(s.worst.length).toBe(Math.min(10, s.frames));
+  // The panel: the device line, the frame rates, a row a part with numbers, the worst frames; all inside the world's box, nothing cut.
+  await expect(panel.locator(".tfr-dev")).toContainText(/ratio \d(\.\d+)? \(drawn \d(\.\d+)?\) · \d+×\d+ px · WebGL · /);
+  await expect(panel.locator(".tfr-fps b").first()).toHaveText(/^\d+$/);
+  await expect(panel.locator(".tfr-parts tbody tr")).toHaveCount(20);
+  await expect(panel.locator(".tfr-parts tbody tr").filter({ hasText: "New pictures" }).locator("td").nth(1)).toHaveText(/^\d+(\.\d)?$/);
+  await expect(panel.locator(".tfr-worst li")).toHaveCount(s.worst.length);
+  if (STILLS) {
+    mkdirSync(STILLS, { recursive: true });
+    await page.screenshot({ path: `${STILLS}/report-${test.info().project.name}.png` });
+  }
+  const fit = await panel.evaluate((el) => ({ sh: el.scrollHeight, ch: el.clientHeight, r: el.getBoundingClientRect(), box: el.parentElement!.getBoundingClientRect() }));
+  expect(fit.sh, "the panel's content fits it").toBeLessThanOrEqual(fit.ch + 1);
+  expect(fit.r.bottom).toBeLessThanOrEqual(fit.box.bottom + 0.5);
+  expect(fit.r.right).toBeLessThanOrEqual(fit.box.right + 0.5);
+  // Close: the panel goes; the town goes on.
+  await panel.getByRole("button", { name: "Close" }).click();
+  await expect(panel).toHaveCount(0);
+  expect(errors).toEqual([]);
+});

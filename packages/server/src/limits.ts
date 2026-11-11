@@ -35,6 +35,7 @@ const perIp = new RateLimiter(L.perIp.limit, L.perIp.windowMs);
 const perUser = new RateLimiter(L.perUser.limit, L.perUser.windowMs);
 const play = new RateLimiter(L.play.limit, L.play.windowMs);
 const friends = new RateLimiter(L.friends.limit, L.friends.windowMs);
+const search = new RateLimiter(L.search.limit, L.search.windowMs);
 
 export const TOO_MANY = "Too many requests. Wait a few seconds and try again.";
 
@@ -50,7 +51,7 @@ export const isSessionToken = (v: string | null): v is string => v !== null && /
  * like a session token (isSessionToken), and the limits are counted in order, the address first, stopping at the first
  * that refuses: a refused request uses up nothing further.
  */
-export function rateLimited(req: { ip: string | null; session: string | null; play: boolean; friends?: boolean }, now: number, ipExempt = false): number | null {
+export function rateLimited(req: { ip: string | null; session: string | null; play: boolean; friends?: boolean; search?: boolean }, now: number, ipExempt = false): number | null {
   const session = isSessionToken(req.session) ? req.session : null;
   const checks: [RateLimiter, string][] = [];
   if (req.ip && !ipExempt) checks.push([perIp, req.ip]);
@@ -58,6 +59,8 @@ export function rateLimited(req: { ip: string | null; session: string | null; pl
   if (req.play) checks.push([play, session ?? `ip:${req.ip}`]);
   // (Friends' actions: a burst limit here; the daily and hourly caps are counted in D1, friends.ts.)
   if (req.friends) checks.push([friends, session ?? `ip:${req.ip}`]);
+  // (The friends page's player search: its own limit, so typing never uses up friends' actions.)
+  if (req.search) checks.push([search, session ?? `ip:${req.ip}`]);
   for (const [l, k] of checks) {
     const r = l.hit(k, now);
     if (!r.ok) return r.retryMs;

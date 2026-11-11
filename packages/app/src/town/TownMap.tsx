@@ -3,7 +3,8 @@
  * see-through, the whole town from above with your dot; a tap opens it large in the middle of the town's box (Eric: "If you tap the
  * minimap, it comes to the center of your screen … all of Chess Town … put the little icon of which boss is at which shop … the Colosseum,
  * the park … tap it again or tap away, back to normal size"), each boss home with its boss's small portrait (the chips' faces), the
- * Colosseum and the park as small icons, you as the dot; no names. A tap on it or anywhere outside it closes it; it never walks you.
+ * Colosseum and the park as small icons, you as the dot; no names. A tap on it or anywhere outside it closes it; a tap on a boss's
+ * portrait or its home's block (Eric, Nov 11) closes it and walks you to that home, as a tap on the home in the town would.
  * The map button in the town's icon row (TownChatTools) turns it off and on (per device; on by default). Street town only.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -45,7 +46,7 @@ function paint(cv: HTMLCanvasElement, w: number): number {
   return s;
 }
 
-export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFace[] }) {
+export function TownMap({ hidden, faces, onHome }: { hidden: boolean; faces: () => MapFace[]; onHome: (id: string) => void }) {
   const on = useMapOn();
   const [big, setBig] = useState(false);
   const [boxSize, setBoxSize] = useState<{ w: number; h: number; computer: boolean }>({ w: 0, h: 0, computer: false });
@@ -57,6 +58,7 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
   const smallYou = useRef<HTMLDivElement>(null);
   const bigCv = useRef<HTMLCanvasElement>(null);
   const bigYou = useRef<HTMLDivElement>(null);
+  const bigBox = useRef<HTMLDivElement>(null);
   const show = on && !hidden;
   // The town's box: its size, and whether it's a computer's (in the front door's frame).
   useLayoutEffect(() => {
@@ -128,6 +130,28 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
     if (!show) setBig(false);
   }, [show]);
   const pt = { x: 0, y: 0 };
+  const faceSize = Math.round(Math.max(20, Math.min(40, bs * 3.4)));
+  const spots = big && show ? faces().map((face) => (mapPoint(face.x, face.y, bs, pt), { face, x: pt.x, y: pt.y })) : [];
+  // A tap closes the large map; on a boss's portrait or its home's block (within 2 squares of the home's middle, or the portrait's
+  // reach if that's more), the nearest such home is walked to.
+  const tapBig = (e: MouseEvent) => {
+    setBig(false);
+    const b = bigBox.current?.getBoundingClientRect();
+    if (!b) return;
+    const x = e.clientX - b.left;
+    const y = e.clientY - b.top;
+    const reach = Math.max(faceSize / 2, 2 * bs);
+    let best: string | null = null;
+    let bestD = reach;
+    for (const m of spots) {
+      const d = Math.hypot(m.x - x, m.y - y);
+      if (d <= bestD) {
+        best = m.face.id;
+        bestD = d;
+      }
+    }
+    if (best) onHome(best);
+  };
   const iconPx = Math.round(Math.max(18, Math.min(34, bs * 2.8)));
   const park = (parkPoint(bs, pt), { ...pt });
   const col = (colosseumPoint(bs, pt), { ...pt });
@@ -140,13 +164,12 @@ export function TownMap({ hidden, faces }: { hidden: boolean; faces: () => MapFa
         </button>
       )}
       {big && show && (
-        <div class="tm-scrim" role="dialog" aria-label="Map of the town" onClick={() => setBig(false)}>
-          <div class="tm-big" style={{ width: `${bw}px`, height: `${mapHeight(bw)}px` }}>
+        <div class="tm-scrim" role="dialog" aria-label="Map of the town" onClick={(e) => tapBig(e)}>
+          <div class="tm-big" ref={bigBox} style={{ width: `${bw}px`, height: `${mapHeight(bw)}px` }}>
             <canvas ref={bigCv} aria-hidden="true" />
-            {faces().map((m) => {
-              mapPoint(m.x, m.y, bs, pt);
-              return <Face key={m.id} face={m} x={pt.x} y={pt.y} size={Math.round(Math.max(20, Math.min(40, bs * 3.4)))} />;
-            })}
+            {spots.map((m) => (
+              <Face key={m.face.id} face={m.face} x={m.x} y={m.y} size={faceSize} />
+            ))}
             <ParkIcon x={park.x} y={park.y} size={iconPx} />
             <ColosseumIcon x={col.x} y={col.y} size={iconPx} />
             <div class="tm-you tm-you-big" ref={bigYou} aria-hidden="true" />

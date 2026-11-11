@@ -807,3 +807,142 @@ button.town-pic.player {
   pointer-events: none;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
+/* `/town?report` (frame-report.ts, Nov 11): the pill while a run waits or records, then one panel the size of the world's box, made
+   to be screenshotted on a phone. */
+.tfr-pill {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 600 12px/1.4 ui-monospace, monospace;
+  white-space: nowrap;
+}
+.tfr-pill[data-state="rec"] span {
+  color: #ffb4a8;
+}
+.tfr-pill button,
+.tfr-panel button {
+  font: 600 12px/1 system-ui, sans-serif;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 0;
+  background: #d9bb8c;
+  color: #20212a;
+  cursor: pointer;
+}
+.tfr-pill button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.tfr-panel {
+  position: absolute;
+  inset: 6px 6px auto;
+  max-height: calc(100% - 12px);
+  max-width: 560px;
+  margin-inline: auto;
+  z-index: 40;
+  overflow: hidden;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1.5px solid #d9bb8c;
+  background: #20212a;
+  color: #f2f2f2;
+  font: 400 10.5px/1.25 system-ui, sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tfr-panel b {
+  color: #fff;
+}
+.tfr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.tfr-btns {
+  display: flex;
+  gap: 6px;
+}
+.tfr-dev,
+.tfr-most {
+  color: #c9c9d2;
+}
+.tfr-fps {
+  font-size: 11px;
+}
+.tfr-fps b {
+  font-size: 15px;
+  color: #ffd98a;
+}
+.tfr-parts {
+  border-collapse: collapse;
+  font: 400 10px/1.15 ui-monospace, monospace;
+  width: 100%;
+}
+.tfr-parts th,
+.tfr-parts td {
+  padding: 0 2px;
+  text-align: right;
+  white-space: nowrap;
+}
+.tfr-parts th:first-child,
+.tfr-parts td:first-child {
+  text-align: left;
+}
+.tfr-parts thead th {
+  color: #d9bb8c;
+}
+.tfr-sub td {
+  color: #9a9aa6;
+  font-size: 9.5px;
+}
+.tfr-hot td {
+  color: #ffd98a;
+  font-weight: 700;
+}
+.tfr-total td {
+  border-top: 1px solid #555;
+  font-weight: 700;
+}
+.tfr-worst ol {
+  margin: 1px 0 0;
+  padding-left: 18px;
+  font-size: 10px;
+  line-height: 1.2;
+}
+/* (A 360 px phone: the table's six columns a size smaller, so the Worst column fits: Nov 11.) */
+@media (max-width: 380px) {
+  .tfr-parts {
+    font-size: 8.5px;
+  }
+}
+/* A computer's box is wide: the panel at a readable size in its middle. */
+@media (hover: hover) and (pointer: fine) {
+  .tfr-panel {
+    max-width: 660px;
+    font-size: 12.5px;
+  }
+  .tfr-head {
+    font-size: 17px;
+  }
+  .tfr-fps {
+    font-size: 13px;
+  }
+  .tfr-fps b {
+    font-size: 18px;
+  }
+  .tfr-parts,
+  .tfr-worst ol {
+    font-size: 12px;
+  }
+}

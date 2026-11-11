@@ -32,6 +32,8 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
+import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
+import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
@@ -201,6 +203,10 @@ export function TownScreen({
     el.style.pointerEvents = to ? "auto" : "none";
   };
   const townCanvas = () => box.current?.querySelector<HTMLCanvasElement>("canvas.town-canvas") ?? null;
+  /** (`?report`) The frames from now on are going in or out of a building (RF.goIn, RF.goOut; 0: neither): frame-report.ts. */
+  const doorPhase = (f: number) => {
+    if (REC) REC.door = f;
+  };
   const later = (ms: number) => new Promise<void>((ok) => setTimeout(ok, ms));
   /**
    * You stand at a shop's door (its "Go in"): the town zooms in on the door (`x`, `y` in the box) and fades to black; the room opens.
@@ -209,6 +215,7 @@ export function TownScreen({
   const goIn = async (id: HomeId, x: number, y: number, challenge = false) => {
     if (doorBusy.current) return;
     doorBusy.current = true;
+    doorPhase(RF.goIn);
     const F = SHOP_FEEL;
     if (challenge) step("atDoor");
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
@@ -230,6 +237,7 @@ export function TownScreen({
       if (cv) cv.style.transform = "";
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       if (challenge) {
         step("cancel");
         ctl.current?.endChallenge();
@@ -270,6 +278,7 @@ export function TownScreen({
     doorBusy.current = true;
     const F = SHOP_FEEL;
     const to = at.room.def.part === "back" ? "front" : "back";
+    doorPhase(RF.goIn);
     // (The back door's creak is off with the bakery's other room sounds: Eric, Nov 11.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(at.room.def.home, to));
     fadeTo(1, F.fadeMs);
@@ -278,6 +287,7 @@ export function TownScreen({
     if (!room || !box.current) {
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       return;
     }
     setShopOut(F.startZoom === 1);
@@ -301,6 +311,7 @@ export function TownScreen({
     // (Eric, Nov 11: "The main room is still where you fight": his intro plays in the front room, you both coming out of the back door.)
     const intro = import("./shops/intro.ts").then(async (m) => ({ m, intro: (await m.loadIntro(id))! }));
     const front = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id, "front"));
+    doorPhase(RF.goIn);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     const fight = await intro.catch(() => null);
@@ -309,6 +320,7 @@ export function TownScreen({
       step("cancel");
       fadeTo(0, F.fadeMs);
       doorBusy.current = false;
+      doorPhase(0);
       return;
     }
     ctl.current?.standHere();
@@ -318,7 +330,10 @@ export function TownScreen({
   /** The room drew its first frame: the black lifts. */
   const shopReady = () => {
     fadeTo(0, SHOP_FEEL.fadeMs);
-    setTimeout(() => (doorBusy.current = false), SHOP_FEEL.fadeMs);
+    setTimeout(() => {
+      doorBusy.current = false;
+      doorPhase(0);
+    }, SHOP_FEEL.fadeMs);
   };
   /** "Go out" (or the back button inside): the room fades to black, and the town zooms back out from the door. */
   const goOut = async () => {
@@ -331,6 +346,7 @@ export function TownScreen({
       ctl.current?.endChallenge();
     }
     const F = SHOP_FEEL;
+    doorPhase(RF.goOut);
     fadeTo(1, F.fadeMs);
     await later(F.fadeMs);
     setInside(null);
@@ -344,6 +360,7 @@ export function TownScreen({
     await later(F.doorZoomMs);
     if (cv) cv.style.transition = cv.style.transformOrigin = "";
     doorBusy.current = false;
+    doorPhase(0);
   };
 
   // (A layout effect: the world's first frame is drawn before the screen first shows.)
@@ -630,7 +647,7 @@ export function TownScreen({
         </div>
         {/* The street town's minimap (Nov 5): small at the top right, under the chips and cards; a tap opens it large over everything. Not
             inside a building (it's the town's). */}
-        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} />}
+        {STREET_TOWN && <TownMap hidden={!!inside} faces={() => ctl.current?.mapFaces() ?? []} onHome={(id) => ctl.current?.walkHome(id)} />}
         {/* The black the town zooms into as you go in, and the room fades in from (and back, going out). */}
         <div class="town-fade" ref={fade} />
         <div class="town-controls">
@@ -1013,11 +1030,9 @@ function startTown(
   // `/town?fps`, anyone's (Eric, Oct 30: no admin needed, the site is behind Cloudflare Access): a pill in the world's top-right
   // corner, "60 fps · 16.7 ms", frames over the last second and their mean time, the text set twice a second. Plain counters in
   // the frame loop, nothing else.
+  // (FpsCount, frame-report.ts: a room's frames count too, Nov 11.)
   let fpsEl: HTMLElement | null = null;
-  let fpsN = 0;
-  let fpsPrev = 0;
-  let fpsAt = 0;
-  let fpsPrevAt = 0;
+  let fps: FpsCount | null = null;
   if (TOWN_ASKED.fps) {
     fpsEl = document.createElement("div");
     fpsEl.className = "town-fps";
@@ -1025,6 +1040,42 @@ function startTown(
     // (The backend follows the numbers, "· WebGL" or "· 2D", from town.css: the pill's text stays the numbers.)
     fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
+    setFps((fps = new FpsCount(fpsEl)));
+  }
+  // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
+  // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
+  const rec = TOWN_ASKED.report ? new FrameRec() : null;
+  setRec(rec);
+  let recPill: ReturnType<typeof reportPill> | null = null;
+  let recPanel: HTMLElement | null = null;
+  let recSecs = -1;
+  if (rec) {
+    const host = cv.parentElement!;
+    const timer = timerStep();
+    recPill = reportPill(host, () => rec.finish());
+    recPill.set("Report: walk or turn to start", false);
+    rec.onDone = () => {
+      recPill?.set("Report ready", false);
+      setRec(null);
+      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: BACKEND_LABEL[painter.kind], timer };
+      recPanel = reportPanel(
+        host,
+        summarize(rec.run),
+        dev,
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+          recSecs = -1;
+          rec.again();
+          setRec(rec);
+          recPill?.set("Report: walk or turn to start", false);
+        },
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+        },
+      );
+    };
   }
   /** The game with a bot has been asked for (once). */
   let opened = false;
@@ -1207,6 +1258,7 @@ function startTown(
   const frame = (now: number) => {
     raf = 0;
     if (!alive) return;
+    REC?.begin(now);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (STREET_TOWN) {
@@ -1252,30 +1304,35 @@ function startTown(
     }
     stepClose(dt);
     updateCamera(dt, now);
+    REC?.mark(P.logic);
     draw(now, dt);
+    REC?.mark(P.chips);
     // (The minimap's dots: you and the way the camera faces; a transform only when they move. minimap.ts.)
     if (STREET_TOWN) {
       const y = town.you.walker.pose(now, POSE);
       mapFrame(y.x, y.y, heading);
     }
-    if (fpsEl) {
-      fpsN++;
-      if (!fpsAt) fpsAt = fpsPrevAt = now;
-      else if (now - fpsAt >= 500) {
-        const n = fpsN + fpsPrev;
-        const ms = now - fpsPrevAt;
-        fpsEl.textContent = `${Math.round((n * 1000) / ms)} fps · ${(ms / n).toFixed(1)} ms`;
-        fpsEl.dataset.fps = String(Math.round((n * 1000) / ms));
-        fpsPrev = fpsN;
-        fpsN = 0;
-        fpsPrevAt = fpsAt;
-        fpsAt = now;
+    const rc = REC;
+    if (rc) {
+      rc.mark(P.minimap);
+      rc.end(town.you.walker.moving(), heading, zoomCur);
+      // (The pill's seconds, set once a second.)
+      if (rc.state === "rec") {
+        const sec = Math.floor((now - rc.startAt) / 1000);
+        if (sec !== recSecs) recPill?.set(`● Recording ${(recSecs = sec)} s`, true);
       }
     }
+    FPS?.tick(now);
     raf = requestAnimationFrame(frame);
   };
-  const run = () => {
+  /** The frames start again. `gap`: after a pause (a hidden tab, a test's hold): the recorder and the pill start afresh. Back from a
+   * room (`resume`) they don't: the room's frames led up to this one, and its time is seen. */
+  const run = (gap = true) => {
     if (raf || !alive || document.hidden || held || away) return;
+    if (gap) {
+      rec?.pause();
+      FPS?.restart();
+    }
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
@@ -1942,12 +1999,26 @@ function startTown(
     if (!testSwitchesAllowed()) return;
     town.nextBotAt = Infinity;
   };
+  // ... `__townReport()` (`?report`): the recorder's state ("wait", "rec", "done"; null without `?report`), the frames so far, and once
+  // done the panel's summary (frame-report.ts summarize).
+  const hookReport = (raw = false) => {
+    if (!testSwitchesAllowed() || !rec) return null;
+    const u = rec.run;
+    const n = u.n;
+    return {
+      state: rec.state,
+      frames: n,
+      summary: rec.state === "done" ? summarize(u) : null,
+      // (raw: every frame's numbers, for a measurement script.)
+      raw: raw ? { total: [...u.total.subarray(0, n)], part: [...u.part.subarray(0, n * NP)], flags: [...u.flags.subarray(0, n)], turn: [...u.turn.subarray(0, n)], ups: [...u.ups.subarray(0, n)], bakes: [...u.bakes.subarray(0, n)] } : null,
+    };
+  };
   const hookPaint = () => {
     if (!testSwitchesAllowed()) return null;
     const p = painter as Painter & { uploads?: number; resets?: number };
     return { backend: painter.kind, drawCalls: painter.drawCalls, lost: painter.lost, uploads: p.uploads ?? 0, resets: p.resets ?? 0 };
   };
-  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere };
+  const hooks = window as unknown as { __townFull?: typeof hookFull; __townPlayer?: typeof hookPlayer; __townTurns?: typeof hookTurns; __townGlide?: typeof hookGlide; __townAt?: typeof hookAt; __townGather?: typeof hookGather; __townCam?: typeof hookCam; __townSeat?: typeof hookSeat; __townTables?: typeof hookTables; __townCall?: typeof hookCall; __townBots?: typeof hookBots; __townBossBack?: typeof hookBossBack; __townTags?: typeof hookTags; __townHold?: typeof hookHold; __townPaint?: typeof hookPaint; __townBench?: typeof hookBench; __townWalk?: typeof hookWalk; __townRide?: typeof hookRide; __townYou?: typeof hookYou; __townHeading?: typeof hookHeading; __townHush?: typeof hookHush; __townStill?: typeof hookStill; __townHere?: typeof hookHere; __townReport?: typeof hookReport };
   hooks.__townAt = hookAt;
   hooks.__townGlide = hookGlide;
   hooks.__townGather = hookGather;
@@ -1971,6 +2042,7 @@ function startTown(
   hooks.__townRide = hookRide;
   hooks.__townYou = hookYou;
   hooks.__townHere = hookHere;
+  hooks.__townReport = hookReport;
 
   run();
   draw(performance.now()); // the first frame, before the screen shows
@@ -2083,7 +2155,7 @@ function startTown(
         base = freshView(turn, look, baseHeading(h.c, h.r, 0));
         heading = turn.to;
       }
-      run();
+      run(false);
     },
     /** The large map's portraits (TownMap.tsx): each boss home's place and its boss's face, as its chip shows it. */
     mapFaces: (): MapFace[] =>
@@ -2091,6 +2163,28 @@ function startTown(
         const { img, box } = r.chipFace(h);
         return { id: h.id, x: h.cx, y: h.cy, color: h.color, img, box };
       }),
+    /**
+     * (Eric, Nov 11: "When you open the mini map, if you tap on one of the bosses' buildings, it'll make your guy run there. And that's
+     * it.") The large map's tap on a home: you walk to where a tap on that home in the town would take you (by its door), as that tap
+     * walks you; no card (tap the home when you're there).
+     */
+    walkHome: (id: string) => {
+      const home = HOMES.find((h) => h.id === id);
+      if (!home || away) return;
+      const dest = destFor(town, town.you.walker, { kind: "home", home });
+      if (!dest) return;
+      if (STREET_TOWN) {
+        const b = lockIn(turn, look, performance.now());
+        if (b !== null) base = b;
+      }
+      leaveClose();
+      walkOff();
+      if (card) setCard(null);
+      if (walkWalker(town.you.walker, dest)) {
+        follow = true;
+        glide = null;
+      }
+    },
     /** Your pawn's picture as the town draws it (your items on), for the room inside a shop. */
     youArt: () => r.youArt,
     /** The rider you're on as the town draws you (its frames ready), or null: on foot. Inside a shop it comes in with you. */
@@ -2115,6 +2209,10 @@ function startTown(
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
+      if (FPS === fps) setFps(null);
+      recPill?.remove();
+      recPanel?.remove();
+      if (REC === rec) setRec(null);
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
@@ -2145,6 +2243,7 @@ function startTown(
       delete hooks.__townRide;
       delete hooks.__townYou;
       delete hooks.__townHere;
+      delete hooks.__townReport;
       painter.dispose();
       if (card?.kind === "boss") town.bosses[card.i]!.held = false;
       detach();
