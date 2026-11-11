@@ -16,7 +16,7 @@ Sawyer's tunes are on the marimba, low, with the xylophone answering; the beaver
 chattering (his woodpecker foreman), with the marimba answering. `compose(who)` makes either.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
   python3 song_p.py <out.wav> [voice]      (Sawyer's)      python3 song_q.py <out.wav> [voice]      (the beaver's)
-  voice: another instrument for the lead: fiddle, harmonica, dulcimer, handpan, flute, gritty or square
+  voice: another instrument for the lead: fiddle, harmonica, dulcimer, handpan, flute, gritty, square or drive
 
   bars  1-8    the shop wakes: an axe alone; a hand saw; sandpaper, a hammer, the logs; the table saw spins up and cuts
   bars  9-16   the tune over the break and the bass
@@ -472,10 +472,14 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
         put(bus, b, x.pulse(m + 12, d * 0.9, 0.25, GAIN["square"] * vol, vib=0.012 if d >= 1 else 0.0, decay=0.2, sustain=0.6, release=0.008), pan)
         put(bus, b, x.pulse(m, d * 0.9, 0.5, 0.4 * GAIN["square"] * vol, decay=0.2, sustain=0.6, release=0.008), pan)
 
+    def driven(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """The overdriven lead measured from Eric's reference (synth.py's `drive`)."""
+        put(bus, b, x.drive(m, d * 0.96, GAIN["drive"] * vol), pan)
+
     # Each one's level, set by measurement so they all sit where the marimba does.
-    GAIN = {"fiddle": 0.145, "harmonica": 0.2, "dulcimer": 0.276, "handpan": 0.22, "flute": 0.19, "gritty": 0.21, "square": 0.15}
-    VOICES = {"fiddle": fiddle, "harmonica": harmonica, "dulcimer": dulcimer, "handpan": handpan, "flute": flute_marimba, "gritty": gritty, "square": square}
-    HELD = (fiddle, harmonica, flute_marimba, gritty, square)  # these hold a long note; the others are struck again
+    GAIN = {"fiddle": 0.145, "harmonica": 0.2, "dulcimer": 0.276, "handpan": 0.22, "flute": 0.19, "gritty": 0.21, "square": 0.15, "drive": 0.152}
+    VOICES = {"fiddle": fiddle, "harmonica": harmonica, "dulcimer": dulcimer, "handpan": handpan, "flute": flute_marimba, "gritty": gritty, "square": square, "drive": driven}
+    HELD = (fiddle, harmonica, flute_marimba, gritty, square, driven)  # these hold a long note; the others are struck again
 
     # ---- the bass ----
     def bass(b, m, beats, vol=0.42, slide=0.0):
@@ -690,6 +694,8 @@ def compose(who: str, voice: str | None = None) -> np.ndarray:
     x.buses["bass"] *= gain
     x.buses["logs"] *= 0.6 + 0.4 * gain
 
+    if voice == "drive":
+        x.echo("lead", 0.75, 0.14, 0.06)  # the old console's echo on its lead
     levels = {"snare": 1.7, "hats": 2.3, "toms": 0.9, "drum": 1.5, "bass": 0.58, "logs": 1.9, "sawing": 1.15, "taps": 2.2, "fx": 1.2, "lead": 0.85, "answer": 0.85}
     return x.mixdown(levels, lowpass=8500, room=0.12)
 

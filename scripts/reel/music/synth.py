@@ -3,7 +3,7 @@ into a circular buffer the length of the cut, so each track loops without a seam
 
 Chip voices (track A, as packages/app/src/characters/synth.ts makes the bosses' sounds): pulse waves, a 16-step
 triangle, noise. 16-bit-console voices (track B): additive "strings", a breathy flute, a plucked string
-(Karplus-Strong), an FM bell, a round FM bass, a timpani, a small brass stab.
+(Karplus-Strong), an FM bell, a round FM bass, a timpani, a small brass stab, an overdriven lead.
 """
 import wave
 
@@ -146,6 +146,27 @@ class Mix:
     def reed(self, m, beats, vol=0.15, **kw) -> np.ndarray:
         kw.setdefault("attack", 0.012), kw.setdefault("sustain", 0.75), kw.setdefault("decay", 0.12), kw.setdefault("release", 0.04)
         return self.add(m, beats, self.REED, vol, vib=0.005, **kw)
+
+    def drive(self, m, beats, vol=0.15, vib=0.007, vib_hz=4.2, attack=0.07, release=0.04, top=8500.0) -> np.ndarray:
+        """An overdriven lead, the 16-bit consoles' lead-guitar sound, built from measurements of a reference's lead
+        (Eric, Nov 11; no sample of it is used): every harmonic present, those up to 1.5 kHz all about 3 dB under the
+        fundamental, falling 9 dB an octave from there to 4 kHz and 6.5 above, nothing over `top` Hz; a soft start;
+        held, sinking only a little; a slow, shallow vibrato (4.2 times a second, 12 cents each way) once the note
+        settles. Each harmonic's level drifts a little on its own, as a driven string's do."""
+        k = self.k(beats)
+        f, t = self._freq(m, k, vib, None, vib_hz)
+        ph = 2 * np.pi * np.cumsum(f) / self.sr
+        f0 = self.hz(m)
+        out = np.sin(ph)
+        h = 2
+        while h * f0 < top:
+            fh = h * f0
+            db = -3.0 - 9.0 * np.clip(np.log2(fh / 1500.0), 0.0, np.log2(4000 / 1500)) - 6.5 * max(0.0, np.log2(fh / 4000.0))
+            drift = 1 + 0.1 * np.sin(2 * np.pi * (2.3 + 0.37 * ((h * 7) % 5)) * t + 1.9 * h)
+            out += 10 ** (db / 20) * drift * np.sin(h * ph + 2.4 * h * h)  # the phases scattered, so the wave isn't one spike a cycle
+            h += 1
+        a = min(attack, 0.4 * k / self.sr)
+        return out * np.minimum(1, t / a) * np.exp(-t / 1.5) * np.minimum(1, (k - 1 - np.arange(k)) / (release * self.sr)) * vol
 
     def pluck(self, m, beats, vol=0.25, damp=0.996, tone=0.5) -> np.ndarray:
         """A plucked string (Karplus-Strong): a burst of noise fed round a delay as long as the note's period."""
