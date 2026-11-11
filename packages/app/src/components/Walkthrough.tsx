@@ -243,7 +243,8 @@ export function Walkthrough({ onShop }: { onShop: () => void }) {
     if (!isLast) setStep(step + 1);
   };
 
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     if (!open) return;
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") close(dontShow);

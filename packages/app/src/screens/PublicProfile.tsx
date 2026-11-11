@@ -445,7 +445,8 @@ function CosmeticsCard({ p, loading, onAll }: { p: PublicProfile | null; loading
 
 /** A sheet over the page (the full list of matches, or each worn item's details): ✕, Escape or a tap outside closes it. */
 function Sheet({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: ComponentChildren }) {
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);

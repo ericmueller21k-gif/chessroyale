@@ -119,8 +119,9 @@ export function TownMap({ hidden, faces, onHome }: { hidden: boolean; faces: () 
     MAP_DOTS.add(dot);
     return () => void MAP_DOTS.delete(dot);
   }, [big, bw]);
-  // (Escape closes the large map; turning the map off or going inside closes it too.)
-  useEffect(() => {
+  // (Escape closes the large map; turning the map off or going inside closes it too. The key in a layout effect, as every pop-up's:
+  // an effect waits for a paint, and an Escape pressed as it opened was lost: LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     if (!big) return;
     const key = (e: KeyboardEvent) => e.key === "Escape" && setBig(false);
     addEventListener("keydown", key);

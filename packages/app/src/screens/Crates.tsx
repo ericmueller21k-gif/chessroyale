@@ -1,5 +1,5 @@
 import type { ComponentChildren, JSX } from "preact";
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   BOSS_CRATES,
   CRATES,
@@ -1217,7 +1217,8 @@ function DeleteDialog({ stack, wornId, onClose }: { stack: ItemStack; wornId: st
   const top = stack.items[0]!;
   const d = itemDef(top.def)!;
   const n = stack.items.length;
-  useEffect(() => {
+  // (A layout effect, as every pop-up's: an effect waits for a paint, and an Escape pressed as it opened was lost. LESSONS.md, Nov 11.)
+  useLayoutEffect(() => {
     const key = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
