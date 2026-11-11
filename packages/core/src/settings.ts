@@ -4231,7 +4231,7 @@ export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: fal
  * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
  * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
  */
-export const MUSIC = { volume: 0.35, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
+export const MUSIC = { volume: 0.25, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
 
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
