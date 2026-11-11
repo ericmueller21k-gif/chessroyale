@@ -87,3 +87,13 @@ closing line is one of the six, at random.
 ## Eric, Nov 11: the bakery live
 - Room sounds (thump, TV, murmur, door) "just sound like pounding ... really distracting ... disable that for now" → off (#630).
 - "Put a zebra out front ... when you talk to him, he just says the boss man is inside ... anyone else you talk to in the front tells you he's in the back." → helper on claude/bakery-front-zebra.
+
+## Eric, Nov 11 (after playing it): the back room
+- "When the boys in the back are pointing their bread ... ideally we'd want them to actually be pointing at where you are, and then when
+  you run, it actually kind of follows your character."
+- "The talk button, we don't need the talk button. The whole thing is when you hit challenge, it just goes through the talk animation no
+  matter what. So it takes a few seconds to challenge him." (Director: one button, Challenge; it plays the draw/aim/relax beat, then the
+  challenge.)
+- "When you challenge him ... I want actually to watch all of them walk out, like pick up the stuff in the back and walk out. At the
+  moment it just loaded it in." (Director: in the back room the goons pick up the table, chairs and board and walk out the back door; then
+  the front room, where they come through the door carrying them to the pad.)
