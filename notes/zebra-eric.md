@@ -99,3 +99,4 @@ closing line is one of the six, at random.
   the front room, where they come through the door carrying them to the pad.)
 - Town loading (Eric, Nov 11): "I have no issue with doing a loading screen for the town... even if it takes 3 or 5 seconds... loads it all in at once and then it stays there if you go in and out of buildings."
 - Room loading (Eric, Nov 11): "when you go into a building, just make it take an extra second. We probably don't even need to show a loading bar, and just load the whole inside."
+- Room loading 2 (Eric, Nov 11): start loading during the door zoom ("the screen's not interactable anyway, that's actually like part of the true loading"). Fallback if a room load is slow: the room boss sprite animating in the center of the black screen ("probably not necessary at the moment, but we'll fall back to it if it's too slow").
