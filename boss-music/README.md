@@ -9,8 +9,10 @@ whole folder (needs python3 with numpy, and ffmpeg).
 | Jefferson (`grex`) | `grex-intro`, `grex-loop` | 6.667 s | 113.333 s | Final (two minutes) |
 | Big Boy (`bigboy`) | `bigboy-loop` | none | 120.0 s | Final (two minutes) |
 | Hollow (`hollow`) | `hollow-intro`, `hollow-loop` | 6.0 s | 114.0 s | Final (two minutes) |
+| Folio (`folio`) | `folio-intro`, `folio-loop` | 24.545 s | 95.455 s | Final (two minutes; its intro is the soft opening, the loop starts on the first drop) |
 
-Ginger's (`gingerbread`) is not ready. Later songs and longer versions will keep these names and this shape, so
+Ginger's (`gingerbread`) is not ready. A finished song for a boss Eric calls Don Doe (`scripts/reel/music/song_n.py`)
+isn't here yet: it has no boss id. Later songs and longer versions will keep these names and this shape, so
 the wiring shouldn't hard-code lengths: read them from `themes.json`.
 
 ## The files
