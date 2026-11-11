@@ -15,3 +15,4 @@ New cut (in order):
 5. Fade, then a boss mashup: 3-4 cuts of a few seconds each, e.g. Hollow smashing bulbs, the elephant fusing his pieces, Big Boy bouncing on the board, plus a couple more.
 6. Hidden Boss scene: ~7 s, a very slow zoom in, NO caption at the bottom, just the darkness ("how you had it already looked perfect"). Also make it loud enough to hear (Eric: the audio was hard to hear there).
 Earlier asks still open: about +10 s overall, a standalone YouTube version.
+- Trailer v2 adds (Eric, Nov 11): boss caption -> "Battle bosses and earn special rewards" (or similar); show Squads a few seconds; a 2nd NEW Fable song over the same cut, horns trimmed, both unique but the 16-bit action/RPG vibe. "Be prepared I will wanna probably have a few more edits done."
