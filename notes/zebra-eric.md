@@ -83,3 +83,7 @@ closing line is one of the six, at random.
 
 ## Eric, Nov 11: placement
 "Make sure his building is not right next to another one." (Clear space all round, at least the other homes' gap; a test guards it.)
+
+## Eric, Nov 11: the bakery live
+- Room sounds (thump, TV, murmur, door) "just sound like pounding ... really distracting ... disable that for now" → off (#630).
+- "Put a zebra out front ... when you talk to him, he just says the boss man is inside ... anyone else you talk to in the front tells you he's in the back." → helper on claude/bakery-front-zebra.
