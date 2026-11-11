@@ -13,7 +13,7 @@
  * loop's start; the pads hide a decoder's silence at the file's ends). Lengths come from themes.json, never from here.
  */
 import { MUSIC } from "@chessroyale/core";
-import { isMuted, isPageHidden, loadAudioFile, musicBus, onAudioRebuilt, onMuteChange } from "./sound.ts";
+import { forgetAudioFile, isMuted, isPageHidden, loadAudioFile, musicBus, onAudioRebuilt, onMuteChange } from "./sound.ts";
 
 /** One boss's theme as themes.json lists it (other fields, `bpm`, `lufs`…, are notes). */
 export interface MusicTheme {
@@ -231,13 +231,28 @@ function maybeStart(loopOnly: boolean) {
 }
 
 function endBattle() {
+  const was = battle?.boss;
   battle = null;
   starting = null;
   const p = playing;
   playing = null;
+  if (was) setTimeout(() => forgetTheme(was), MUSIC.endFadeMs + 250);
   if (!p) return;
   log(`music:end:${p.boss}`);
   stopPlaying(p, MUSIC.endFadeMs);
+}
+
+/**
+ * Once its battle is over (and its fade done), a theme's decoded audio is let go: one boss's at a time in memory, never every
+ * boss met in a visit (two minutes decoded is about 45 MB). Not while a battle against the same boss has begun since.
+ */
+function forgetTheme(boss: string) {
+  if (battle?.boss === boss) return;
+  void loadThemes().then((t) => {
+    const th = t?.themes[boss];
+    if (!th || battle?.boss === boss) return;
+    for (const name of [th.intro, th.loop]) if (name) forgetAudioFile(musicUrl(name));
+  });
 }
 
 /** The switches or the page changed: fade to the level they make now (the loop keeps its place), or start if it hadn't. */

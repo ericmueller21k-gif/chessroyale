@@ -380,6 +380,14 @@ export function loadAudioFile(url: string): Promise<AudioBuffer | null> {
 }
 /** The page is hidden (another app, a locked phone, another tab). */
 export const isPageHidden = () => pageHidden();
+/**
+ * Lets a recorded file's decoded audio go (a boss theme after its battle: about 45 MB decoded for two minutes, and the
+ * phone has the town's pictures to keep). Fetched again it comes from the service worker's cache and is decoded anew.
+ */
+export function forgetAudioFile(url: string) {
+  files.delete(url);
+  decoded.delete(url);
+}
 
 /** The Colosseum's cheer (a queen taken): loaded by `warmFile` when the Colosseum opens. */
 export const COLOSSEUM_CHEER = "/sounds/colosseum/cheer.mp3";

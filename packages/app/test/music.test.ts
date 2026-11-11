@@ -61,12 +61,14 @@ const ctx = {
   },
 };
 const files: string[] = [];
+const forgot: string[] = [];
 const sound = vi.hoisted(() => ({ muted: false, hidden: false, muteListeners: [] as (() => void)[] }));
 vi.mock("../src/sound.ts", () => ({
   isMuted: () => sound.muted,
   isPageHidden: () => sound.hidden,
   musicBus: () => ({ ctx, master: {} }),
   loadAudioFile: (url: string) => (files.push(url), Promise.resolve({ url })),
+  forgetAudioFile: (url: string) => void forgot.push(url),
   onAudioRebuilt: () => () => undefined,
   onMuteChange: (fn: () => void) => (sound.muteListeners.push(fn), () => undefined),
 }));
@@ -180,6 +182,28 @@ describe("the player through a battle", () => {
     expect(g.lastRamp).toEqual([0, 50 + MUSIC.endFadeMs / 1000]);
     for (const s of ctx.sources) expect(s.stoppedAt).toBe(50 + MUSIC.endFadeMs / 1000);
     expect(musicNow()).toBeNull();
+  });
+
+  it("after the result's fade, the theme's decoded audio is let go (one boss's in memory at a time), unless its boss is fought again", async () => {
+    vi.useFakeTimers();
+    try {
+      forgot.length = 0;
+      battle("grex", true);
+      await vi.advanceTimersByTimeAsync(0);
+      bossMusic(null);
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(forgot.sort()).toEqual(["/music/grex-intro.mp3", "/music/grex-loop.mp3"]);
+      // A rematch against the same boss before the fade is done keeps it.
+      forgot.length = 0;
+      battle("grex", true);
+      await vi.advanceTimersByTimeAsync(0);
+      bossMusic(null);
+      battle("grex", false, key + 500);
+      await vi.advanceTimersByTimeAsync(MUSIC.endFadeMs + 300);
+      expect(forgot).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("another battle ends the last one's music", async () => {
