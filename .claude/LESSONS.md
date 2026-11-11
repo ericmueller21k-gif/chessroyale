@@ -253,6 +253,10 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A test that leans on a test switch names the boss (`?boss=`) unless it checks every boss on purpose: START's pick is
     random, and a switch can fail for one boss in seven (`?mate=1` against Wrangler's pull or Sawyer's pawn first move).
   - A spec that fails now and then on a random pick: run it once per boss (`?boss=<id>`) before calling it flaky.
+- **Escapes lost as a pop-up opened** (Nov 11, [story](../docs/history/lessons.md#escapes-lost-as-a-pop-up-opened-nov-11-2026)):
+  - A pop-up's, menu's or sheet's key and tap-away listeners go in a layout effect, never `useEffect` (which waits for a paint): a
+    test presses Escape the moment it is in the page (a MutationObserver), not after looking at it.
+  - Such a watcher waits for that pop-up's own class: `index.html` always holds a hidden `[role="dialog"]` ("Turn your phone upright").
 
 ## Eric's rules hold
 
