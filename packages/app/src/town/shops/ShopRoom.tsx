@@ -26,7 +26,7 @@
  * One requestAnimationFrame loop draws everything on one canvas (Canvas 2D); it stops when you go out or the tab is hidden. Every
  * frame of every piece is drawn into a canvas of its own as the room loads (behind the black fade), never in the loop.
  * Test hooks (test switches on): the canvas's `data-room` (its home), `data-you="c,r"`, `data-ready="1"`; `window.__shopAt("keeper"
- * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw.
+ * | "door" | "square", [c, r]?)` where to tap; `__shopLook("door")` the view to the door; `__shopCam()` the camera (its zoom: 0 Close, 1 the town's); `__shopBench(n)` ms a draw; `__shopStill()` the back kept while the view rests (frames drawn from it, copies made).
  */
 import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { onAccountChange } from "../../account.ts";
@@ -1477,6 +1477,7 @@ function startRoom(
     cv.style.width = `${W}px`;
     cv.style.height = `${H}px`;
     drawRoof();
+    bgStill[0] = NaN;
     return true;
   };
 
@@ -1559,6 +1560,26 @@ function startRoom(
       if (snd) play(snd);
     });
   };
+ /**
+   * The room's back, kept while the camera rests (Nov 11, Eric's iPhone: rooms short of 60 standing still; measured headless, slowed 4x:
+   * 20 fps with the floor drawn, 60 without). The ceiling, what's past the walls and the floor don't move unless the view does, but the
+   * floor is laid every frame as some hundreds of clipped, stretched triangles (`flat`): the most costly drawing of a room's frame. So
+   * the second frame the view is the same (the camera's place, its zoom, the claw machine's close-in, the canvas's size), that back is
+   * copied, as drawn, into a canvas of the room's own size; from then on, while the view stays, one copy draws it. A view that moves
+   * (walking, a drag, a zoom, an intro's camera) draws as before, nothing extra. Nothing drawn changes: the same pixels, once.
+   * Its key: camX, camY, the zoom now, clawE, W, H, DPR.
+   */
+  const bgNow = new Float64Array(7);
+  const bgLast = new Float64Array(7).fill(NaN);
+  const bgStill = new Float64Array(7).fill(NaN);
+  const sameBg = (a: Float64Array, b: Float64Array) => {
+    for (let i = 0; i < 7; i++) if (a[i] !== b[i]) return false;
+    return true;
+  };
+  let still: HTMLCanvasElement | null = null;
+  /** (Tests, `__shopStill`) Frames whose back came from the kept copy, and copies made. */
+  let stillDrawn = 0;
+  let stillMade = 0;
   /** Where things were drawn in the last frame (taps, cards, tests): the kid's box and the head points. */
   const kidBox = { x0: 0, y0: 0, x1: 0, y1: 0, on: false, hx: 0, hy: 0, px: 0 };
   const youHead = { x: 0, y: 0, on: false };
@@ -3520,20 +3541,17 @@ function startRoom(
     if (!p3(mx, c.z1 + 0.2, 0, lensA) || !p3(mx, c.z0, CAB_H.top, lensB)) return;
     setView(v, W, H, 0, mag, (S.claw.atY * H - (lensA.y + lensB.y) / 2) * clawE, 0, sets);
   };
-  const draw = (now: number) => {
-    emN = 0;
-    // (Closing in on the claw machine, the camera comes down to the Close camera too, so you look at the cabinet, not down into it.)
-    const zoomNow = cab ? zoomCur * (1 - clawE) : zoomCur;
-    for (const k of CAM_KEYS) {
-      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomNow;
-      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomNow;
-    }
-    setView(v, W, H, 0, 1, 0, 0, sets);
-    if (cab && clawE > 0) clawLens();
-    // (`?report`: the room's parts under the town's names, frame-report.ts: the ceiling and what's past the walls as the sky, the floor
-    // as the ground, the pieces and the fight's set as props, the figures, the lights, the tags and bubbles, the card.)
-    const rc = REC;
-    rc?.mark(RP.camera);
+  /** A plan lying flat on its squares (Puddles' pond garden), its frame now. */
+  const drawFlat = (p: ShopPlace, now: number) => {
+    const img = frameAt(p.name, now);
+    const d = p.d ?? 1;
+    flat(img, 0, img.height - d * SQ, p.col, p.row - d + 1, p.w ?? 1, d, S.floorBlock);
+  };
+  /** The plans that come first and have one frame (they never change): drawn with the floor, so kept with it. */
+  let backFlats = 0;
+  while (backFlats < flats.length && frames[flats[backFlats]!.name]!.frames.length === 1) backFlats++;
+  /** The room's back as the view sees it now (the ceiling, past the walls, the floor, the still plans); kept the second frame the view is the same. */
+  const drawBack = (rc: typeof REC) => {
     g.setTransform(DPR, 0, 0, DPR, 0, 0);
     g.imageSmoothingEnabled = false;
     g.drawImage(roof, 0, 0, W, H);
@@ -3563,11 +3581,56 @@ function startRoom(
     }
     rc?.mark(RP.sky);
     flat(floor, 0, 0, 0, 0, n, n, S.floorBlock);
-    for (const p of flats) {
-      const img = frameAt(p.name, now);
-      const d = p.d ?? 1;
-      flat(img, 0, img.height - d * SQ, p.col, p.row - d + 1, p.w ?? 1, d, S.floorBlock);
+    for (let i = 0; i < backFlats; i++) drawFlat(flats[i]!, 0);
+    rc?.mark(RP.ground);
+    if (sameBg(bgNow, bgLast)) {
+      if (!still) still = document.createElement("canvas");
+      if (still.width !== cv.width || still.height !== cv.height) {
+        still.width = cv.width;
+        still.height = cv.height;
+      }
+      const sg = still.getContext("2d")!;
+      sg.setTransform(1, 0, 0, 1, 0, 0);
+      sg.globalCompositeOperation = "copy";
+      sg.drawImage(cv, 0, 0);
+      sg.globalCompositeOperation = "source-over";
+      bgStill.set(bgNow);
+      stillMade++;
     }
+    bgLast.set(bgNow);
+  };
+  const draw = (now: number) => {
+    emN = 0;
+    // (Closing in on the claw machine, the camera comes down to the Close camera too, so you look at the cabinet, not down into it.)
+    const zoomNow = cab ? zoomCur * (1 - clawE) : zoomCur;
+    for (const k of CAM_KEYS) {
+      tall[k] = S.close[k] + (f.camTall[k] - S.close[k]) * zoomNow;
+      wide[k] = S.close[k] + (f.camWide[k] - S.close[k]) * zoomNow;
+    }
+    setView(v, W, H, 0, 1, 0, 0, sets);
+    if (cab && clawE > 0) clawLens();
+    // (`?report`: the room's parts under the town's names, frame-report.ts: the ceiling and what's past the walls as the sky, the floor
+    // as the ground, the pieces and the fight's set as props, the figures, the lights, the tags and bubbles, the card.)
+    const rc = REC;
+    rc?.mark(RP.camera);
+    bgNow[0] = camX;
+    bgNow[1] = camY;
+    bgNow[2] = zoomNow;
+    bgNow[3] = clawE;
+    bgNow[4] = W;
+    bgNow[5] = H;
+    bgNow[6] = DPR;
+    if (still && sameBg(bgNow, bgStill)) {
+      // The view rests: the back as it was kept, pixel for pixel.
+      g.setTransform(1, 0, 0, 1, 0, 0);
+      g.imageSmoothingEnabled = false;
+      g.drawImage(still, 0, 0);
+      g.setTransform(DPR, 0, 0, DPR, 0, 0);
+      stillDrawn++;
+      rc?.mark(RP.ground);
+    } else drawBack(rc);
+    // The plans lying flat on their squares (those of one frame are in the back already, as they come first).
+    for (let i = backFlats; i < flats.length; i++) drawFlat(flats[i]!, now);
     // (Folio's intro: the three flat sheets on the clean page, each until it starts folding up; from the walk in.)
     if (fo && marks) drawFolioSheets();
     // (Ginger's intro: the crack round the icicle's foot, flat on the ice, 3 squares by 2, centred on the table's spot.)
@@ -3813,6 +3876,13 @@ function startRoom(
       camY = gy + (y + jy * dt) * e;
       vx = (vx - w * jx * dt) * e;
       vy = (vy - w * jy * dt) * e;
+      // (Come to rest: there exactly, a ten-thousandth of a square (a hundredth of a pixel) away at most, so the view stops changing and
+      // the room's back is kept: drawBack.)
+      if (Math.abs(camX - gx) < 1e-4 && Math.abs(camY - gy) < 1e-4 && Math.abs(vx) < 1e-3 && Math.abs(vy) < 1e-3) {
+        camX = gx;
+        camY = gy;
+        vx = vy = 0;
+      }
     } else vx = vy = 0;
     REC?.mark(RP.logic);
     draw(now);
@@ -4186,6 +4256,8 @@ function startRoom(
     for (let i = 0; i < k; i++) draw(now);
     return (performance.now() - t0) / k;
   };
+  /** (Tests) The room's back kept while the view rests: frames that drew it from the kept copy, and copies made. */
+  const hookStill = () => (testSwitchesAllowed() ? { drawn: stillDrawn, made: stillMade } : null);
   /** (Tests) The view brought to the door, as a drag there would (a computer has no back button since Nov 7: e2e leaves by the door). */
   const hookLook = (kind: "door" | "pass") => {
     if (!testSwitchesAllowed() || (kind === "door" ? !room.doors.length : !room.pass)) return false;
@@ -4216,7 +4288,7 @@ function startRoom(
       alpha: Object.fromEntries(sceneFigs.map((p) => [p.name, p.a ?? 1])),
     };
   };
-  const hooks = window as unknown as { __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook; __shopZebra?: typeof hookZebra };
+  const hooks = window as unknown as { __shopStill?: typeof hookStill; __shopAt?: typeof hookAt; __shopCam?: typeof hookCam; __shopBench?: typeof hookBench; __shopRide?: typeof hookRide; __shopIntro?: typeof hookIntro; __shopCrew?: typeof hookCrew; __shopElves?: typeof hookElves; __shopLook?: typeof hookLook; __shopZebra?: typeof hookZebra };
   hooks.__shopZebra = hookZebra;
   hooks.__shopLook = hookLook;
   hooks.__shopElves = hookElves;
@@ -4226,6 +4298,7 @@ function startRoom(
   hooks.__shopRide = hookRide;
   hooks.__shopCam = hookCam;
   hooks.__shopBench = hookBench;
+  hooks.__shopStill = hookStill;
 
   run();
   draw(performance.now()); // the first frame, before the fade lifts
@@ -4265,6 +4338,7 @@ function startRoom(
       delete hooks.__shopCam;
       delete hooks.__shopLook;
       delete hooks.__shopBench;
+      delete hooks.__shopStill;
       delete hooks.__shopRide;
       delete hooks.__shopIntro;
       delete hooks.__shopCrew;
