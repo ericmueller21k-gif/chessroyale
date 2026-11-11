@@ -1098,6 +1098,8 @@ export type SoundName =
   | "zebraSquash"
   | "zebraStir"
   | "zebraGild"
+  | "zebraWhoosh"
+  | "zebraTumble"
   | "zebraShine"
   | "zebraKiss"
   | "zebraClink"
@@ -1488,6 +1490,8 @@ const SOUNDS: Record<SoundName, (t: number) => void> = {
   zebraSquash: zebraBoss("squash"),
   zebraStir: zebraBoss("stir"),
   zebraGild: zebraBoss("gild"),
+  zebraWhoosh: zebraBoss("whoosh"),
+  zebraTumble: zebraBoss("tumble"),
   zebraShine: zebraBoss("shine"),
   zebraKiss: zebraBoss("kiss"),
   zebraClink: zebraBoss("clink"),
@@ -1798,6 +1802,8 @@ const MAKE: Partial<Record<SoundName, readonly BossSound[]>> = {
   zebraCock: [["zebra", "cock"]],
   zebraRelax: [["zebra", "relax"]],
   zebraTsk: [["zebra", "tsk"]],
+  zebraWhoosh: [["zebra", "whoosh"]],
+  zebraTumble: [["zebra", "tumble"]],
   zebraTap: [["zebra", "tap"]],
   zebraThud: [["zebra", "thud"]],
   zebraTip: [["zebra", "tip"]],

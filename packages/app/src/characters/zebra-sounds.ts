@@ -37,6 +37,9 @@ export type ZebraSound =
   | "shine"
   | "kiss"
   | "clink"
+  // His splash (the wipe into his battle, Nov 11): the flour wall's whoosh as it sweeps in, the loaves tumbling behind it.
+  | "whoosh"
+  | "tumble"
   // Rolling Dough's room (the bakery's home, Nov 11): the back-room door, the Big Mix's thump, the TV's click, the table's murmur.
   | "door"
   | "thump"
@@ -264,6 +267,21 @@ const SOUNDS: Record<ZebraSound, (rate: number) => Float32Array> = {
     const tap = bandpass(rate, () => 4000, 2, noise(1523));
     return render(rate, 0.32, (t) => a(t) + 0.7 * b(t) + 0.8 * Math.exp(-t / 0.004) * tap(t));
   },
+  // His splash's front sweeping in: a soft floury rush of air rising and falling, a little brighter at its peak. Never a hiss.
+  whoosh: (rate) => {
+    const air = bandpass(rate, (t) => 500 + 900 * Math.sin((Math.PI * t) / 0.7), 1.1, murk(rate, 3200, 1601));
+    return render(rate, 0.7, (t) => 2.2 * bump(t, 0, 0.7, 1.6) * air(t));
+  },
+  // The loaves tumbling in the splash: three soft, crusty bumps (a loaf rolling over), a breath of flour under them.
+  tumble: (rate) => {
+    const bumps = [0, 0.16, 0.3].map((at, i) => {
+      const body = osc(rate, (t) => 150 - 40 * Math.max(0, t - at) + 20 * i, sine);
+      const crust = bandpass(rate, () => 1400 - 200 * i, 2, murk(rate, 5000, 1611 + i));
+      return (t: number) => (t < at ? 0 : roomEnv(t - at, 0.004, 0.05) * (body(t) + 0.8 * crust(t)));
+    });
+    const flour = bandpass(rate, () => 800, 0.8, murk(rate, 2500, 1619));
+    return render(rate, 0.5, (t) => mix(bumps)(t) + 0.6 * bump(t, 0, 0.5) * flour(t));
+  },
   // (Rolling Dough's room sounds, all quiet: zebra-home's, Nov 11.)
   // A heavy door: a slow wooden creak (a band of noise sliding down, ratcheting on the hinge) and its latch's click.
   door: (rate) => {
@@ -333,6 +351,8 @@ const LEVEL: Record<ZebraSound, number> = {
   shine: 0.14,
   kiss: 0.147,
   clink: 0.197,
+  whoosh: 0.27,
+  tumble: 0.19,
   // (The room's: quiet, under everything.)
   door: 0.32,
   thump: 0.16,
