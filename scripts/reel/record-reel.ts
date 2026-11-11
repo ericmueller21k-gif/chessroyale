@@ -10,13 +10,9 @@
 import { mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { expect, type Browser, type Page } from "@playwright/test";
 // (The e2e's own `test`: every context starts with the first-time walkthrough and the quests overlay marked seen.)
-import { BOARD_SEL, test } from "../../e2e/helpers.ts";
-import {
-  HIDDEN_BOSS_CAPTION,
-  RANKS_CAPTION,
-  REEL_CAPTIONS,
-  drawHiddenBoss,
-} from "./hidden-boss.ts";
+import { Chess } from "chess.js";
+import { BOARD_SEL, giveItems, test, wearItem } from "../../e2e/helpers.ts";
+import { REEL_CAPTIONS, drawHiddenBoss } from "./hidden-boss.ts";
 import { drawRankShuffle, shuffleSteps } from "./rank-shuffle.ts";
 
 const OUT = "reports/demo";
@@ -130,7 +126,7 @@ async function asAdmin(page: Page) {
 test("crowd", async ({ page }) => {
   test.setTimeout(150_000);
   // Scene 1: a solo 50 v 50 (as the old demo): you pick the engine's move after a moment, like a person.
-  await setUp(page, "Hunter");
+  await setUp(page, "Player");
   await page.goto(`/?debug&mode=crowd&augments=0&clock=10&nolanding`);
   // Home: 50 v 50, Bots, PLAY, the Bot level box's OK (as e2e/helpers.ts soloFromHome).
   const row = page.getByRole("radiogroup", { name: "RANKED" });
@@ -196,9 +192,14 @@ type TownHooks = {
   __shopIntro?: () => { step: string } | null;
 };
 
-test("town", async ({ page }) => {
-  // Scene 2: you run round the park (the town everyone gets), then Big Boy: his card, Fight, in to his Crib, his intro, the battle.
-  await setUp(page, "Hunter");
+/**
+ * Today's town (the street town, an admin's: Eric, Nov 11, "re-record on today's town"), opened and ready: the loading screen
+ * ("Building the town…") gone before anything is recorded. The chat box stays on screen but lets taps through; a slow clock
+ * (`__reelWarp(WARP)`: the page's performance.now and its animation frames at an eighth of the speed) lets the slow sharp
+ * screenshots (about 4 a second of the WebGL town) catch every frame of a run; scripts/encode-demo.sh plays those parts back 8x.
+ */
+async function openTown(page: Page, sky: "day" | "night") {
+  await asAdmin(page);
   await page.addInitScript(() => {
     document.addEventListener("DOMContentLoaded", () => {
       const s = document.createElement("style");
@@ -206,8 +207,6 @@ test("town", async ({ page }) => {
       document.head.append(s);
     });
   });
-  // A slow clock for the park run (`__reelWarp(0.5)`: the page's performance.now and its animation frames at half speed), so the
-  // screenshots catch twice the frames of it; scripts/encode-demo.sh plays it back at twice the speed. Back to 1 for the rest.
   await page.addInitScript(() => {
     const real = performance.now.bind(performance);
     let base = real();
@@ -225,47 +224,134 @@ test("town", async ({ page }) => {
       k = n;
     };
   });
-  await page.goto("/town?debug&nolanding&sky=day");
+  await page.goto(`/town?debug&nolanding&sky=${sky}`);
   await expect(page.locator("canvas.town-canvas")).toHaveAttribute(
     "data-ready",
     "1",
-    { timeout: 30_000 },
+    { timeout: 90_000 },
   );
+  await expect(page.getByText("Building the town…")).toHaveCount(0, {
+    timeout: 90_000,
+  });
   await page.waitForTimeout(2500);
-  const you = () =>
-    page.evaluate(() => (window as unknown as TownHooks).__townYou?.() ?? null);
-  const walk = async (sq: [number, number]) => {
-    await page.evaluate(
-      (s) => (window as unknown as TownHooks).__townWalk?.(s),
-      sq,
-    );
-    await page.waitForTimeout(150);
-    await expect
-      .poll(async () => (await you())?.moving, {
-        timeout: 20_000,
-        intervals: [100],
-      })
-      .toBe(false);
-  };
-  console.log("you start at", await you());
-  const route = (process.env.REEL_PARK ?? "17,17 28,17 28,12 18,12 18,16")
-    .split(" ")
-    .map((p) => p.split(",").map(Number) as [number, number]);
-  const warp = (n: number) =>
-    page.evaluate(
-      (x) =>
-        (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp(
-          x,
-        ),
-      n,
-    );
-  await warp(0.5);
+}
+const townYou = (page: Page) =>
+  page.evaluate(() => (window as unknown as TownHooks).__townYou?.() ?? null);
+async function townWalk(page: Page, sq: [number, number]) {
+  await page.evaluate(
+    (s) => (window as unknown as TownHooks).__townWalk?.(s),
+    sq,
+  );
+  await page.waitForTimeout(150);
+  await expect
+    .poll(async () => (await townYou(page))?.moving, {
+      timeout: 60_000,
+      intervals: [100],
+    })
+    .toBe(false);
+}
+const townWarp = (page: Page, n: number) =>
+  page.evaluate(
+    (x) =>
+      (window as unknown as { __reelWarp: (n: number) => void }).__reelWarp(x),
+    n,
+  );
+/** The slow clock's speed for the town's runs (the encoder plays them back at 1 / WARP). */
+const WARP = Number(process.env.REEL_WARP ?? 0.125);
+const routeOf = (text: string) =>
+  text.split(" ").map((p) => p.split(",").map(Number) as [number, number]);
+/** Someone in the town says a line now and then (the bosses' and their kids' own lines), so the chat log keeps moving. */
+const townTalk = (page: Page, everyMs: number) =>
+  page.evaluate((ms) => {
+    const say = () =>
+      (window as unknown as { __townSay?: () => void }).__townSay?.();
+    say();
+    setInterval(say, ms);
+  }, everyMs);
+
+test("town", async ({ page }) => {
+  // Scene 2: a run through the town by day, from the park up to Colosseum Row, the chat log moving in the top left.
+  await setUp(page, "Player");
+  await openTown(page, "day");
+  console.log("you start at", await townYou(page));
+  const route = routeOf(
+    process.env.REEL_TOWN ?? "24,33 23,39 36,37 53,37 53,29 40,29 28,29",
+  );
+  await townWarp(page, WARP);
+  await townTalk(page, 1300 / WARP);
   const rec = await recorder(page, "town");
-  rec.mark("park");
-  for (const sq of route) await walk(sq);
-  rec.mark("parkEnd");
-  await warp(1);
-  // Big Boy: the camera glides to his Crib (as his chip would), a tap on him, Challenge alone, Fight.
+  rec.mark("run");
+  for (const [i, sq] of route.entries()) {
+    await townWalk(page, sq);
+    rec.mark(`at${i + 1}`);
+  }
+  rec.mark("runEnd");
+  await rec.stop();
+});
+
+/** Your pawn's ride (Moon's Ride: a crescent, for the night), given and worn before the town opens. */
+async function giveRide(page: Page) {
+  await asAdmin(page);
+  await page.goto("/?nolanding");
+  await expect(
+    page.getByRole("button", { name: "PLAY", exact: true }),
+  ).toBeVisible();
+  const [ride] = await giveItems(page, [
+    {
+      def: process.env.REEL_RIDE ?? "moon-ride",
+      color: process.env.REEL_RIDE_COLOR ?? "cobalt",
+      blemish: 0,
+    },
+  ]);
+  await wearItem(page, "ride", ride!);
+}
+const rideReady = (page: Page) =>
+  expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (
+              window as unknown as {
+                __townRide?: () => { you: { ready: boolean } } | null;
+              }
+            ).__townRide?.()?.you.ready ?? false,
+        ),
+      { timeout: 60_000 },
+    )
+    .toBe(true);
+
+test("night", async ({ page }) => {
+  // Scene 3: the same town at night, riding (Moon's Ride) past the homes' lit windows on Fountain Street.
+  await setUp(page, "Player");
+  await giveRide(page);
+  await openTown(page, "night");
+  await rideReady(page);
+  const route = routeOf(process.env.REEL_NIGHT ?? "27,29 51,29 53,36 38,37");
+  await townWalk(page, route[0]!);
+  // (The night's frames take twice as long to grab: half the day's clock.)
+  await townWarp(page, WARP / 2);
+  await townTalk(page, 2600 / WARP);
+  const rec = await recorder(page, "night");
+  rec.mark("ride");
+  for (const [i, sq] of route.slice(1).entries()) {
+    await townWalk(page, sq);
+    rec.mark(`at${i + 1}`);
+  }
+  rec.mark("rideEnd");
+  await rec.stop();
+});
+
+test("bigboy", async ({ page }) => {
+  // Scene 4: Big Boy: his card, Fight, in to his Crib, his blocks building the table, his candy swirl, the battle.
+  // (At night, on the ride, as the scene before it ends at his door.)
+  await setUp(page, "Player");
+  await giveRide(page);
+  await openTown(page, "night");
+  await rideReady(page);
+  const rec = await recorder(page, "bigboy");
+  rec.mark("start");
+  // The camera glides to his Crib (as his chip would), a tap on him, Challenge alone, Fight.
   await page.evaluate(() =>
     (window as unknown as TownHooks).__townGlide?.("bigboy"),
   );
@@ -288,12 +374,13 @@ test("town", async ({ page }) => {
     const cv = (await page.locator("canvas.town-canvas").boundingBox())!;
     await page.mouse.click(cv.x + at!.x, cv.y + at!.y);
     await expect(card).toBeVisible({ timeout: 1500 });
-  }).toPass({ timeout: 30_000 });
+  }).toPass({ timeout: 60_000 });
   rec.mark("card");
   await expect
-    .poll(async () => (await you())?.moving, { timeout: 30_000 })
+    .poll(async () => (await townYou(page))?.moving, { timeout: 60_000 })
     .toBe(false);
-  await page.waitForTimeout(600);
+  rec.mark("arrived");
+  await page.waitForTimeout(900);
   await card.getByRole("button", { name: "Challenge alone" }).click();
   await page.waitForTimeout(700);
   rec.mark("confirm");
@@ -305,11 +392,11 @@ test("town", async ({ page }) => {
   await expect(page.locator("canvas.town-shop-canvas")).toHaveAttribute(
     "data-room",
     "bigboy",
-    { timeout: 30_000 },
+    { timeout: 60_000 },
   );
   rec.mark("room");
   const steps = new Set<string>();
-  const until = Date.now() + 40_000;
+  const until = Date.now() + 60_000;
   while (Date.now() < until) {
     const s = await page.evaluate(
       () => (window as unknown as TownHooks).__shopIntro?.()?.step ?? null,
@@ -333,6 +420,283 @@ test("town", async ({ page }) => {
   await rec.stop();
 });
 
+/**
+ * The boss mashup's clips: Boss alone against one boss with one power switched on (`?boss=&power=`), you playing quiet moves with
+ * taps; every screen of his and every power event is marked as it comes (`ev:<kinds>`), so the cut can find its moment.
+ */
+type BossSeen = {
+  kind: string | null;
+  intro: boolean;
+  thinking: boolean;
+  fen: string | null;
+  events: string[];
+  dark: string | null;
+  allowed: string[] | null;
+};
+async function bossBattle(
+  page: Page,
+  scene: string,
+  boss: string,
+  power: string,
+  opts: { turns: number; stopOn?: string; tail?: number; extra?: string },
+  each?: (
+    turn: number,
+    s: BossSeen,
+    tap: (sq: string) => Promise<void>,
+    mark: (name: string) => void,
+  ) => Promise<void>,
+) {
+  await setUp(page, "Player");
+  await page.goto(
+    `/?debug&clock=60&nolanding&boss=${boss}&power=${power}&laststand=0${opts.extra ?? ""}`,
+  );
+  await page
+    .getByRole("main")
+    .getByRole("button", { name: /^Boss Battle/ })
+    .click();
+  const rec = await recorder(page, scene);
+  await page.getByRole("main").getByRole("button", { name: "START" }).click();
+  rec.mark("start");
+  const seen = (): Promise<BossSeen> =>
+    page.evaluate(() => {
+      const m = (window as any).match;
+      const ph = m?.phase;
+      const b = ph?.boss ?? m?.boss ?? null;
+      return {
+        kind: ph?.kind ?? null,
+        intro: !!ph?.intro,
+        thinking: !!ph?.thinking,
+        fen: ph?.board?.fen ?? b?.board?.fen ?? null,
+        events: (b?.powers?.events ?? []).map((e: any) => e.kind),
+        dark:
+          (b?.powers?.events ?? []).find((e: any) => e.kind === "dark")
+            ?.square ?? null,
+        allowed: b?.powers?.allowed ?? null,
+      };
+    });
+  let lastSig = "";
+  let stop = false;
+  const watch = async (until: (s: BossSeen) => boolean, ms = 150_000) => {
+    const end = Date.now() + ms;
+    for (;;) {
+      const s = await seen();
+      const sig = `${s.kind}/${s.intro ? "intro" : ""}/${s.thinking ? "think" : ""}/${s.events.join("+")}`;
+      if (sig !== lastSig) {
+        lastSig = sig;
+        rec.mark(
+          `${s.kind}${s.intro ? ":intro" : ""}${s.thinking ? ":think" : ""}${s.events.length ? ` ev:${s.events.join("+")}` : ""}`,
+        );
+        if (opts.stopOn && s.events.includes(opts.stopOn) && !s.thinking)
+          stop = true;
+      }
+      if (until(s) || Date.now() > end) return s;
+      await page.waitForTimeout(60);
+    }
+  };
+  const tap = async (sq: string) => {
+    const box = (await page.locator(".hb-board").first().boundingBox())!;
+    const flip = await page.evaluate(
+      () =>
+        !!document
+          .querySelector(".hb")
+          ?.classList.contains("orientation-black"),
+    );
+    const f = sq.charCodeAt(0) - 97;
+    const r = Number(sq[1]) - 1;
+    await page.mouse.click(
+      box.x + ((flip ? 7 - f : f) + 0.5) * (box.width / 8),
+      box.y + ((flip ? r : 7 - r) + 0.5) * (box.height / 8),
+    );
+  };
+  const WANT = [
+    "e2e4",
+    "e7e5",
+    "g1f3",
+    "g8f6",
+    "b1c3",
+    "b8c6",
+    "d2d3",
+    "d7d6",
+    "f1e2",
+    "f8e7",
+    "h2h3",
+    "h7h6",
+    "a2a3",
+    "a7a6",
+  ];
+  for (let turn = 0; turn < opts.turns && !stop; turn++) {
+    const s = await watch((x) => x.kind === "play");
+    if (s.kind !== "play" || !s.fen) break;
+    await page.waitForTimeout(700);
+    if (each) await each(turn, s, tap, rec.mark);
+    const c = new Chess(s.fen);
+    const legal = c.moves({ verbose: true });
+    const ok = (m: string) => !s.allowed || s.allowed.includes(m);
+    const quiet = legal
+      .filter((m) => !m.captured && !m.san.includes("+") && !m.promotion)
+      .map((m) => m.from + m.to)
+      .filter(ok);
+    const move =
+      WANT.find((m) => quiet.includes(m)) ??
+      quiet[0] ??
+      legal.map((m) => m.from + m.to).filter(ok)[0]!;
+    for (let i = 0; i < 6 && (await seen()).kind === "play"; i++) {
+      await tap(move.slice(0, 2));
+      await tap(move.slice(2, 4));
+      await page.waitForTimeout(400);
+    }
+    rec.mark(`played ${move}`);
+    await watch((x) => x.kind !== "play", 10_000);
+  }
+  await watch((x) => x.kind === "play", 60_000);
+  await page.waitForTimeout(opts.tail ?? 2500);
+  rec.mark("end");
+  await rec.stop();
+}
+
+test("boss-hollow", async ({ page }) => {
+  // Hollow: he covers a square in the dark; you grope in it and get it wrong, and his bulbs go out one by one.
+  await bossBattle(
+    page,
+    "boss-hollow",
+    "hollow",
+    "dark",
+    { turns: 3 },
+    async (turn, s, tap, mark) => {
+      if (turn !== 1 || !s.dark || !s.fen) return;
+      const c = new Chess(s.fen);
+      const empty = ["a4", "h4", "a5", "h5", "a3", "h3", "a6", "h6"].filter(
+        (sq) => !c.get(sq as never),
+      );
+      for (let i = 0; i < 2; i++) {
+        mark(`wrong${i + 1}`);
+        await tap(s.dark);
+        await page.waitForTimeout(500);
+        await tap(empty[i]!);
+        await page.waitForTimeout(2600);
+      }
+    },
+  );
+});
+test("boss-alfil", async ({ page }) => {
+  // Alfil: TUSKS!, two of his pawns glow, then fuse into an elephant.
+  await bossBattle(page, "boss-alfil", "alfil", "tusks", {
+    turns: 6,
+    stopOn: "fuse",
+    tail: 3000,
+  });
+});
+test("boss-bigboy", async ({ page }) => {
+  // Big Boy: his toy block, then the Big Bounce across the board.
+  await bossBattle(page, "boss-bigboy", "bigboy", "bounce", {
+    turns: 5,
+    stopOn: "bounce",
+    tail: 3000,
+  });
+});
+test("boss-sawyer", async ({ page }) => {
+  // Sawyer: his saw through the board.
+  await bossBattle(page, "boss-sawyer", "sawyer", "boardsaw", {
+    turns: 5,
+    stopOn: "boardsaw",
+    tail: 3000,
+  });
+});
+test("boss-smudgy", async ({ page }) => {
+  // Smudgy: the board repainted.
+  await bossBattle(page, "boss-smudgy", "smudgy", "repaint", {
+    turns: 5,
+    stopOn: "repaint",
+    tail: 3000,
+  });
+});
+
+test("squads", async ({ page }) => {
+  // Scene 6: Squads (8 squads of 4): a test lobby's Relay, its three boards over yours; you move when it's your turn.
+  await setUp(page, "Player");
+  await page.goto(
+    `/squads/test/relay?nolanding&debug&clock=${process.env.REEL_SQUADS_CLOCK ?? "blitz"}`,
+  );
+  await page
+    .getByRole("button", { name: "Skip votes" })
+    .click({ timeout: 60_000 });
+  const seen = () =>
+    page.evaluate(() => {
+      const s = (window as any).squads;
+      if (!s?.lobby) return null;
+      const m = [...s.matches.values()].find(
+        (x: any) =>
+          x.state !== "over" &&
+          x.sides.some((sd: any) => sd.seats.includes(s.myId)),
+      ) as any;
+      const d =
+        m?.state === "half"
+          ? m.current?.duties.find((x: any) => x.players.includes(s.myId))
+          : null;
+      return {
+        phase: s.lobby.phase as string,
+        seq: m?.current?.seq as number | undefined,
+        role: (d?.role ?? null) as string | null,
+        fen: (d ? m.boards[d.board].fen : null) as string | null,
+        locked: !!m?.locked?.includes(s.myId),
+      };
+    });
+  await expect
+    .poll(async () => (await seen())?.phase, { timeout: 90_000 })
+    .toBe("bracket");
+  const rec = await recorder(page, "squads");
+  rec.mark("bracket");
+  const WANT = [
+    "e2e4",
+    "e7e5",
+    "d2d4",
+    "d7d5",
+    "g1f3",
+    "g8f6",
+    "b1c3",
+    "b8c6",
+    "f1c4",
+    "f8c5",
+    "c1f4",
+    "c8f5",
+  ];
+  const end = Date.now() + Number(process.env.REEL_SQUADS_MS ?? 45_000);
+  let last = "";
+  while (Date.now() < end) {
+    const s = await seen().catch(() => null);
+    if (s?.role === "move" && s.fen && !s.locked && `${s.seq}` !== last) {
+      last = `${s.seq}`;
+      rec.mark(`duty${s.seq}`);
+      await page.waitForTimeout(1500);
+      const legal = new Chess(s.fen).moves({ verbose: true });
+      const all = legal.map((m) => m.from + m.to);
+      const move =
+        WANT.find((m) => all.includes(m)) ??
+        legal.find((m) => m.captured)?.lan.slice(0, 4) ??
+        all[0]!;
+      const box = (await page
+        .locator(".board-area .hb-board")
+        .boundingBox())!;
+      const black = await page
+        .locator(".board-area .hb")
+        .evaluate((el) => el.classList.contains("orientation-black"));
+      for (const sq of [move.slice(0, 2), move.slice(2, 4)]) {
+        const f = sq.charCodeAt(0) - 97;
+        const r = Number(sq[1]) - 1;
+        await page.mouse.click(
+          box.x + ((black ? 7 - f : f) + 0.5) * (box.width / 8),
+          box.y + ((black ? r : 7 - r) + 0.5) * (box.height / 8),
+        );
+        await page.waitForTimeout(250);
+      }
+      rec.mark(`moved${s.seq} ${move}`);
+    }
+    await page.waitForTimeout(150);
+  }
+  rec.mark("end");
+  await rec.stop();
+});
+
 /** Both players queue in their own pool and meet; the vote; then a known opening, played with taps from both sides. */
 async function rankedPlayer(browser: Browser, name: string, rank: string) {
   const ctx = await browser.newContext({ ...test.info().project.use });
@@ -349,7 +713,7 @@ async function rankedPlayer(browser: Browser, name: string, rank: string) {
 test("ranked", async ({ browser }) => {
   test.setTimeout(150_000);
   // Scene 3: a ranked 1 v 1 between two players (two pages), recorded from one: the stage, the vote, a quick opening.
-  const a = await rankedPlayer(browser, "Hunter", "gold-2");
+  const a = await rankedPlayer(browser, "Player", "gold-2");
   const b = await rankedPlayer(browser, "Knightowl", "gold-3");
   const pool = `reel${Math.random().toString(36).slice(2, 8)}`;
   // (Both players' views are recorded until the board is up; the one playing White is kept: the board the right way up.)
@@ -435,7 +799,7 @@ test("hidden", async ({ page }) => {
   await page.evaluate(drawHiddenBoss, isWide());
   const rec = await recorder(page, "hidden");
   rec.mark("start");
-  await page.waitForTimeout(7000);
+  await page.waitForTimeout(11_000);
   rec.mark("end");
   await rec.stop();
 });
@@ -463,11 +827,7 @@ test("captions", async ({ page }) => {
   );
   await page.goto("/?nolanding");
   await page.waitForTimeout(800);
-  for (const [i, text] of [
-    ...REEL_CAPTIONS,
-    HIDDEN_BOSS_CAPTION,
-    RANKS_CAPTION,
-  ].entries()) {
+  for (const [i, text] of REEL_CAPTIONS.entries()) {
     await page.evaluate(
       ([t, w]) => {
         document.body.innerHTML = "";
