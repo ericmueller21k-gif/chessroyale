@@ -96,12 +96,14 @@ const rollIn = (seed: number, range: readonly [number, number], ...parts: (strin
  * The kind of his `n`-th lump (`fen`: any position; `his`: his side): rolled from doughOdds over every kind (so a rook's and a queen's
  * stay as rare as the odds say), from the seed; one he can't have now (a ninth pawn, more pieces than promotions could make, or past
  * doughLeadMax pawns ahead of you on material, a queen's excepted with doughQueenFree) steps down to the next cheaper one he can
- * (a rook's to a bishop's or knight's, then a pawn's). Null: none.
+ * (a rook's to a bishop's or knight's, then a pawn's). Null: none. The lumps still waiting (`lumps`) count as risen: a second
+ * pawn's lump at seven pawns, or a second knight's with room for one promotion, would never rise.
  */
-export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax" | "doughQueenFree"> = BOSS_POWERS): DoughPiece | null {
+export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pick<BossPowerSettings, "doughOdds" | "doughLeadMax" | "doughQueenFree"> = BOSS_POWERS, lumps: readonly Pick<DoughLump, "square" | "piece">[] = []): DoughPiece | null {
+  const all = withLumps(fen, his, lumps);
   // (Never one that would put him more than doughLeadMax pawns ahead of you on material.)
-  const room = materialOf(fen, other(his)) + s.doughLeadMax - materialOf(fen, his);
-  const ok = (k: DoughPiece) => s.doughOdds[k] > 0 && (VALUE[k]! <= room || (k === "q" && s.doughQueenFree)) && !landRefused(fen, k, his);
+  const room = materialOf(all, other(his)) + s.doughLeadMax - materialOf(all, his);
+  const ok = (k: DoughPiece) => s.doughOdds[k] > 0 && (VALUE[k]! <= room || (k === "q" && s.doughQueenFree)) && !landRefused(all, k, his);
   const total = DOUGH_PIECES.reduce((t, k) => t + s.doughOdds[k], 0);
   if (!total) return null;
   let x = powerRoll(seed, "doughKind", n) * total;
@@ -116,6 +118,13 @@ export function doughKind(fen: string, his: Side, seed: number, n: number, s: Pi
   // (Down from the one rolled, cheapest last: queen, rook, then the minor pieces (the one rolled first), then a pawn.)
   const down: Record<DoughPiece, DoughPiece[]> = { q: ["q", "r", "b", "n", "p"], r: ["r", "b", "n", "p"], b: ["b", "n", "p"], n: ["n", "b", "p"], p: ["p"] };
   return down[rolled].find(ok) ?? null;
+}
+
+/** The position with his waiting lumps risen (for counting only: they stand on empty squares off his back rank). */
+export function withLumps(fen: string, his: Side, lumps: readonly Pick<DoughLump, "square" | "piece">[]): string {
+  let out = fen;
+  for (const l of lumps) if (!pieceAt(out, l.square)) out = withPiece(out, l.square, { color: his, type: l.piece });
+  return out;
 }
 
 /** How far a square is from his back rank (0 on it, 7 on yours). */
@@ -554,7 +563,7 @@ export const zebraBattle = {
       const his = other(boss.crowdSide);
       const n = z.drops;
       // (The test switch: his first lump a pawn's.)
-      const piece = b.settings.bossPowerTest === "dough" && n === 0 && !landRefused(fen, "p", his) ? "p" : doughKind(fen, his, p.seed, n, s);
+      const piece = b.settings.bossPowerTest === "dough" && n === 0 && !landRefused(withLumps(fen, his, z.lumps), "p", his) ? "p" : doughKind(fen, his, p.seed, n, s, z.lumps);
       const square = piece ? doughSquare(fen, piece, p.seed, n, z.lumps, s) : null;
       if (piece && square) {
         // (Its timer's place: the lowest one free.)

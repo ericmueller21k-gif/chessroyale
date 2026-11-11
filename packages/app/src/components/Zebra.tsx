@@ -10,7 +10,7 @@ import type { BossView } from "../game.ts";
 import { play } from "../sound.ts";
 import { bossVoice, CRITICAL } from "../speech.tsx";
 import { BoardEffects, type BoardItem } from "./BossEffect.tsx";
-import type { BoardLayerProps, BossUi, Moment, MomentProps, MomentUi } from "./PowerParts.tsx";
+import { momentKey, type BoardLayerProps, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 
 /**
  * Don Dough's powers on screen (his rules: packages/chess/src/bosses/zebra.ts; docs/decisions/2026-11-11-don-dough.md), all from the
@@ -152,15 +152,30 @@ const seenLeft = new Map<string, number>();
 const nn = (n: number) => String(Math.max(0, Math.min(15, n))).padStart(2, "0");
 
 /**
- * One oven timer, drawn on its own canvas from ZEBRA_TIMER's frames on a chain of timeouts (its roll's or ding's frames, then its
- * still): nothing per frame. `play`: the animation to run from now (`kRollNN`, `kDing`), else the still `kNN`.
+ * What a lump's timer plays as it shows `left` minutes (`seen`: its key in seenLeft): the roll from the minute before (`kRollNN`) if
+ * its minute dropped since this device last showed it, else null (its still). Notes `left` as seen: called once per change of
+ * minute (TimerCanvas's effect), never while drawing, so a redraw at the same minute doesn't cut the roll short.
  */
-function TimerCanvas({ kind, left, run }: { kind: DoughPiece; left: number; run: string | null }) {
+export function timerRun(seen: string, kind: DoughPiece, left: number): string | null {
+  const before = seenLeft.get(seen);
+  seenLeft.set(seen, left);
+  if (seenLeft.size > 32) seenLeft.delete(seenLeft.keys().next().value!);
+  return before !== undefined && left === before - 1 && before >= 1 ? `${kind}Roll${nn(before)}` : null;
+}
+
+/**
+ * One oven timer, drawn on its own canvas from ZEBRA_TIMER's frames on a chain of timeouts (its roll's or ding's frames, then its
+ * still): nothing per frame. `ding`: it rings (`kDing`); else `seen` (the lump's key) decides, as its minutes change, whether a
+ * roll plays (timerRun) before the still `kNN`. Its props stay the same through redraws at the same minute (the bar redraws every
+ * frame while his move shows), so a roll plays to its end.
+ */
+function TimerCanvas({ kind, left, ding, seen }: { kind: DoughPiece; left: number; ding?: boolean; seen?: string }) {
   const cv = useRef<HTMLCanvasElement>(null);
   useLayoutEffect(() => {
     const g = cv.current?.getContext("2d");
     if (!g) return;
     const still = `${kind}${nn(left)}`;
+    const run = ding ? `${kind}Ding` : seen ? timerRun(seen, kind, left) : null;
     const draw = (anim: string, i: number) => {
       const a = ZEBRA_TIMER.anims[anim];
       const f = a?.frames[i];
@@ -178,7 +193,7 @@ function TimerCanvas({ kind, left, run }: { kind: DoughPiece; left: number; run:
     const step = (i: number) => {
       if (i >= frames.length) {
         // (A ding ends on the timer's last look: the rise takes the lump away.)
-        if (!run.endsWith("Ding")) draw(still, 0);
+        if (!ding) draw(still, 0);
         return;
       }
       draw(run, i);
@@ -188,49 +203,37 @@ function TimerCanvas({ kind, left, run }: { kind: DoughPiece; left: number; run:
     };
     step(0);
     return () => clearTimeout(timer);
-  }, [kind, left, run]);
+  }, [kind, left, ding]);
   return <canvas ref={cv} class="dd-timer" width={ZEBRA_TIMER.w} height={ZEBRA_TIMER.h} data-kind={kind} data-left={left} aria-hidden="true" />;
 }
 
 /**
  * His oven timers: a slot for each lump the rules allow at once (doughLive), in the boss bar's prop slot. A lump's slot shows its
- * minutes, rolling down each move; at 00:00 it rings as its dough rises (the rise's moment); an empty slot is a faint outline.
+ * minutes, rolling down each move; at 00:00 it rings as its dough rises (the rise's moment: after his move, from the screen's
+ * moments; after yours, as he thinks, from his turn's own, zebraTurnMoments); an empty slot is a faint outline.
  */
 export function OvenTimers({ boss, moments }: { boss: BossView; moments: () => Moment[] }) {
   const z = boss.powers?.zebra;
   if (!z) return null;
   const key = battleKey(boss);
-  const ms = moments();
+  noteSlots(key, z);
+  // (The screen's moments are none while he thinks: a rise after your move is one of his turn's own.)
+  const ms = [...moments(), ...zebraTurnMoments(boss)];
   const now = Date.now();
   // (A rise playing now: its lump's timer rings in its slot, though the lump has left the view. A drop: its timer shows as the lump
   // lands.)
   const rising = ms.filter((m) => m.kind === "doughRise" && now < m.at + m.ms);
   const landing = ms.find((m) => m.kind === "doughDrop" && now < m.at + B.drop.landAt)?.square;
-  const slots: { lump: DoughLump | null; run: string | null; ding?: boolean }[] = [];
-  for (let slot = 0; slot < BOSS_POWERS.doughLive; slot++) {
-    const lump = z.lumps.find((l) => l.slot === slot && l.square !== landing) ?? null;
-    if (lump) {
-      const k = `${key}:${lump.n}`;
-      const before = seenLeft.get(k);
-      seenLeft.set(k, lump.left);
-      if (seenLeft.size > 32) seenLeft.delete(seenLeft.keys().next().value!);
-      // (Its minute dropped since this device last looked: the roll from the minute before, a quarter second.)
-      const run = before !== undefined && lump.left === before - 1 && before >= 1 ? `${lump.piece}Roll${nn(before)}` : null;
-      slots.push({ lump, run: run ?? (lump.left === 0 ? null : null) });
-      continue;
-    }
-    slots.push({ lump: null, run: null });
-  }
   return (
     <span class="dd-timers" role="group" aria-label="Don Dough's oven timers" data-lumps={z.lumps.length}>
-      {slots.map((s, i) => {
-        const ring = !s.lump ? rising.find((m) => m.square && slotOfRise(z, m.square) === i) : null;
-        if (ring && ring.shape) return <span key={`r${i}`} class="dd-slot" data-slot={i} data-ring="1"><TimerCanvas kind={ring.shape as DoughPiece} left={0} run={`${ring.shape}Ding`} /></span>;
-        if (!s.lump) return <span key={`e${i}`} class="dd-slot empty" data-slot={i} />;
-        const l = s.lump;
+      {Array.from({ length: BOSS_POWERS.doughLive }, (_, i) => {
+        const l = z.lumps.find((x) => x.slot === i && x.square !== landing) ?? null;
+        const ring = !l ? rising.find((m) => m.square && slotOfRise(key, z, m.square) === i) : null;
+        if (ring && ring.shape) return <span key={`r${i}`} class="dd-slot" data-slot={i} data-ring="1"><TimerCanvas kind={ring.shape as DoughPiece} left={0} ding /></span>;
+        if (!l) return <span key={`e${i}`} class="dd-slot empty" data-slot={i} />;
         return (
           <span key={`l${l.n}`} class="dd-slot" data-slot={i} data-square={l.square} aria-label={`${PIECE_NAME[l.piece]} dough on ${l.square}: ${l.left} ${l.left === 1 ? "move" : "moves"} left`}>
-            <TimerCanvas kind={l.piece} left={l.left} run={s.run} />
+            <TimerCanvas kind={l.piece} left={l.left} seen={`${key}:${l.n}`} />
           </span>
         );
       })}
@@ -238,11 +241,22 @@ export function OvenTimers({ boss, moments }: { boss: BossView; moments: () => M
   );
 }
 
-/** Which slot a lump that just rose on `square` had (this device's memory of the slots; 0 if it never saw it). */
+/**
+ * Which slot each lump has, by battle and square: noted every time the timers draw, so a lump that just rose (gone from the view)
+ * rings in its own slot.
+ */
 const slotOf = new Map<string, number>();
-function slotOfRise(z: { lumps: readonly DoughLump[] }, square: string): number {
-  for (const l of z.lumps) slotOf.set(l.square, l.slot);
-  return slotOf.get(square) ?? 0;
+function noteSlots(key: string, z: { lumps: readonly DoughLump[] }): void {
+  for (const l of z.lumps) slotOf.set(`${key}:${l.square}`, l.slot);
+  while (slotOf.size > 16) slotOf.delete(slotOf.keys().next().value!);
+}
+/** The slot a lump that just rose on `square` had; one this device never saw: the first free slot. */
+function slotOfRise(key: string, z: { lumps: readonly DoughLump[] }, square: string): number {
+  const seen = slotOf.get(`${key}:${square}`);
+  if (seen !== undefined) return seen;
+  let free = 0;
+  while (z.lumps.some((l) => l.slot === free)) free++;
+  return free;
 }
 
 // ---------------- His moments ----------------
@@ -274,7 +288,8 @@ const MOMENTS: Record<"doughDrop" | "doughRise" | "doughSquash" | "goldPlate" | 
     kit: "ultimate",
     // (Eric, Nov 11: his line at the end, how your pawns are worthless against it; "her" for his queen, "it" for any other.)
     lineAt: B.gold.lineAt,
-    line: (_, m) => goldClose(m.key, (m as Moment).shape === "q"),
+    // (Nothing left to gild, his last piece taken after the warning: no brag; the banner says so.)
+    line: (_, m) => ((m as Moment).square ? goldClose(m.key, (m as Moment).shape === "q") : null),
     view: goldMoment,
   },
   doughSquash: { order: 3, kit: "power", line: (kit, m) => (kit ? pickLine(kit, "squashed", m.key) : null), view: squashMoment },
@@ -317,7 +332,7 @@ export function zebraTurnMoments(boss: BossView, now = Date.now()): Moment[] {
     .map((e) => {
       // (Its banner's hold first, as momentsOf's: GOLD PLATE!.)
       const lead = bannerLeadMs(e.kind);
-      const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}:crowd`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.shape ? { shape: e.shape } : {}) };
+      const m: Moment = { kind: e.kind, key: momentKey(boss.id, { ...e, by: "crowd" }), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.shape ? { shape: e.shape } : {}) };
       t += lead + m.ms;
       return m;
     });

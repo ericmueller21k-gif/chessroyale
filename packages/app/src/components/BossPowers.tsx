@@ -24,7 +24,7 @@ import { FOLIO_UI } from "./Folio.tsx";
 import { TIMBER_UI } from "./Timber.tsx";
 import { DASH_UI } from "./Dash.tsx";
 import { ZEBRA_UI } from "./Zebra.tsx";
-import { Cast, PowerBanner, kitLine, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
+import { Cast, PowerBanner, kitLine, momentKey, rageWarn, ragePct, type BossUi, type Moment, type MomentProps, type MomentUi } from "./PowerParts.tsx";
 import { CRITICAL, NORMAL, bossVoice, type Priority } from "../speech.tsx";
 import { useFrameNow } from "./Countdown.tsx";
 
@@ -108,7 +108,7 @@ export function momentsOf(boss: BossView, until: number): Moment[] {
   return list.map((e) => {
     // (Chub & Chirp's carrots: one pulled by each side in one turn, two moments.)
     const lead = bannerLeadMs(e.kind);
-    const m: Moment = { kind: e.kind, key: `${boss.id}:${e.kind}:${e.turn}${e.by ? `:${e.by}` : ""}`, at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}) };
+    const m: Moment = { kind: e.kind, key: momentKey(boss.id, e), at: t + lead, ms: powerFxMs(e) - lead, ...(lead ? { lead } : {}), ...(e.square ? { square: e.square } : {}), ...(e.squares ? { squares: e.squares } : {}), ...(e.fizzled ? { fizzled: e.fizzled } : {}), ...(e.first ? { first: true as const } : {}), ...(e.size ? { size: e.size } : {}), ...(e.pick !== undefined ? { pick: e.pick } : {}), ...(e.ult ? { ult: true as const } : {}), ...(e.by ? { by: e.by } : {}), ...(e.tier !== undefined ? { tier: e.tier } : {}), ...(e.prize ? { prize: e.prize } : {}), ...(e.growth ? { growth: e.growth } : {}), ...(e.kind === "clockFit" && e.count ? { count: e.count } : {}), ...(e.shape ? { shape: e.shape } : {}), ...(e.opening ? { opening: e.opening } : {}) };
     t += lead + m.ms;
     return m;
   });

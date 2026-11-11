@@ -138,6 +138,18 @@ describe("Rising Dough: what and where", () => {
     expect(rq / 2000).toBeLessThan(0.2);
   });
 
+  it("counts the lumps still waiting as risen: never a lump that could never rise (a ninth pawn, a knight past promotion's room, past the lead)", () => {
+    // (QUIET_W: his seven pawns, two knights; room for one promotion.)
+    const only = (k: "p" | "n", lead: number = S.doughLeadMax) => ({ ...S, doughLeadMax: lead, doughOdds: { p: 0, n: 0, b: 0, r: 0, q: 0, [k]: 1 } });
+    expect(doughKind(QUIET_W, "b", 5, 1, only("p", 99))).toBe("p");
+    expect(doughKind(QUIET_W, "b", 5, 1, only("p", 99), [{ square: "h5", piece: "p" }])).toBeNull();
+    expect(doughKind(QUIET_W, "b", 5, 1, only("n", 99))).toBe("n");
+    expect(doughKind(QUIET_W, "b", 5, 1, only("n", 99), [{ square: "h5", piece: "n" }])).toBeNull();
+    // (The lead: level on material, a pawn's fits; with a knight's waiting it would put him past doughLeadMax.)
+    expect(doughKind(QUIET_W, "b", 5, 1, only("p"))).toBe("p");
+    expect(doughKind(QUIET_W, "b", 5, 1, only("p"), [{ square: "h5", piece: "n" }])).toBeNull();
+  });
+
   it("puts a pawn, knight or bishop on the two ranks of his half nearest the middle, a rook or queen behind them over a pawn of yours; never his back rank, a lump's square or one your move reaches now", () => {
     const crowd = "w";
     const reach = new Set(legalMoves(QUIET_W).map((m) => m.slice(2, 4)));

@@ -146,9 +146,10 @@ export const KING_LINES: Record<KingCue, readonly string[]> = {
     "Hot ground! Step off before it flares up.",
     "Mind the fire underfoot. Move on soon!",
   ],
+  // Don Dough's lump landing on the board (Nov 11): once a drop.
+  dough: ["Squash it before it rises!"],
   // Dash's Scramble Rush (Eric, Nov 6): after his sweep, and the crowd putting enough of the pieces back. Said whether he has
   // fallen or not (his Last Stand spent): the test needs his word.
-  dough: ["Squash it before it rises!"],
   rushAsk: ["Put the pieces back where they came from. Hurry!", "Every piece to its own square. Quickly now!", "You saw the board. Set it right, fast!"],
   rushWell: ["Well remembered!", "Every piece home. Well done!", "Sharp eyes! The board is ours again."],
 };

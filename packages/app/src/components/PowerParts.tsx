@@ -1,7 +1,7 @@
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import { BoardTurn, type QuarterTurn } from "../board-view.ts";
 import type { ComponentChildren, JSX } from "preact";
-import type { PowerEventKind, WaterGrowth } from "@chessroyale/core";
+import type { PowerEvent, PowerEventKind, WaterGrowth } from "@chessroyale/core";
 import type { BossKit } from "../characters/kits.ts";
 import type { BossView } from "../game.ts";
 import { BossFace, playInPlace } from "./BossCharacter.tsx";
@@ -364,3 +364,11 @@ export function SoundAt({ id, at, now, sound }: { id: string; at: number; now: n
 }
 
 export type { BoardItem };
+
+const DOUGH_KINDS = new Set<string>(["doughDrop", "doughRise", "doughSquash"]);
+/**
+ * A moment's key (its line's pick and the voice's dedupe): the boss, the kind, the turn, who caused it; for Don Dough's dough also
+ * its square, since two lumps can rise (or be squashed) on one move.
+ */
+export const momentKey = (bossId: string | undefined, e: Pick<PowerEvent, "kind" | "turn" | "by" | "square">): string =>
+  `${bossId}:${e.kind}:${e.turn}${DOUGH_KINDS.has(e.kind) && e.square ? `:${e.square}` : ""}${e.by ? `:${e.by}` : ""}`;

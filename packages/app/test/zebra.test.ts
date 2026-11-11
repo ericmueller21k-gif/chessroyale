@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_POWERS } from "@chessroyale/core";
+import { BOSS_POWERS, type PowerEvent } from "@chessroyale/core";
+import type { VNode } from "preact";
 import { POWER_FX, ZEBRA_ANIM } from "@chessroyale/chess";
 import { BOSS_KITS } from "../src/characters/kits.ts";
 import { SELECT_SOUND } from "../src/characters/boss-select.ts";
@@ -8,7 +9,8 @@ import { ZEBRA_DOUGH } from "../src/characters/zebra-dough.ts";
 import { GOLD_FX } from "../src/characters/zebra-gold.ts";
 import { GOLD_CLOSE, OPENING_FALLBACK, OPENING_LINES, barRows, goldClose, goldFor, openingLine, speechParts } from "../src/characters/zebra-lines.ts";
 import { ZEBRA_ROOM_SOUNDS, ZEBRA_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
-import { ZEBRA_BEATS, zebraFen, zebraGold, zebraItems } from "../src/components/Zebra.tsx";
+import { OvenTimers, ZEBRA_BEATS, timerRun, zebraFen, zebraGold, zebraItems, zebraTurnMoments } from "../src/components/Zebra.tsx";
+import { momentsOf, powerLine } from "../src/components/BossPowers.tsx";
 import type { Moment } from "../src/components/PowerParts.tsx";
 import type { BossView } from "../src/game.ts";
 
@@ -114,6 +116,57 @@ describe("his dough and gold on the board", () => {
       expect(ZEBRA_TIMER.anims[`${k}Ding`]!.frames[0]!.cue).toBe("ding");
     }
     expect(BOSS_POWERS.doughLive).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("his oven timers (the review of Nov 11)", () => {
+  type Z = { lumps: { n: number; slot: number; piece: string; square: string; left: number; at: number }[] };
+  const view = (startMove: number, z: Z, events: PowerEvent[] = [], turn = 3) =>
+    ({ id: "zebra", name: "Don Dough", startMove, powers: { events, turn, zebra: { gold: [], ...z } } }) as unknown as BossView;
+  /** The timers' slots as drawn: each slot's attributes and its timer's props. */
+  const slots = (b: BossView, moments: Moment[] = []) => {
+    const root = OvenTimers({ boss: b, moments: () => moments }) as VNode<{ children: VNode<Record<string, unknown>>[] }>;
+    return root.props.children.map((s) => ({ ...s.props, timer: (s.props.children as VNode<Record<string, unknown>> | undefined)?.props }));
+  };
+
+  it("a knight's, bishop's or queen's lump rising after your move (while he thinks: no screen moments) rings in its own slot", () => {
+    const pawn = { n: 0, slot: 0, piece: "p", square: "h5", left: 2, at: 1 };
+    const knight = { n: 1, slot: 1, piece: "n", square: "c5", left: 1, at: 2 };
+    slots(view(101, { lumps: [pawn, knight] }));
+    const rise: PowerEvent = { kind: "doughRise", turn: 3, square: "c5", shape: "n", by: "crowd" };
+    const after = slots(view(101, { lumps: [{ ...pawn, left: 1 }] }, [rise]), []);
+    expect(after[1]).toMatchObject({ "data-ring": "1", timer: { kind: "n", left: 0, ding: true } });
+    expect(after[0]).toMatchObject({ "data-square": "h5", timer: { kind: "p", left: 1 } });
+  });
+
+  it("the roll after a move plays to its end: the timer's props don't change as the bar redraws at the same minute", () => {
+    const lump = (left: number) => ({ lumps: [{ n: 0, slot: 0, piece: "p", square: "h5", left, at: 1 }] });
+    slots(view(102, lump(4)));
+    const first = slots(view(102, lump(3)))[0]!.timer;
+    const again = slots(view(102, lump(3)))[0]!.timer;
+    expect(again).toEqual(first);
+    // (The roll is chosen once per minute, in the timer's effect.)
+    expect(timerRun("t:102", "p", 4)).toBeNull();
+    expect(timerRun("t:102", "p", 3)).toBe("pRoll04");
+    expect(timerRun("t:102", "p", 3)).toBeNull();
+  });
+
+  it("two lumps rising on one move each have their own moment (their own line), after your move and after his", () => {
+    const two: PowerEvent[] = [
+      { kind: "doughRise", turn: 4, square: "c5", shape: "r", by: "crowd" },
+      { kind: "doughRise", turn: 4, square: "h5", shape: "p", by: "crowd" },
+    ];
+    const yours = zebraTurnMoments(view(103, { lumps: [] }, two, 4), 5000);
+    expect(new Set(yours.map((m) => m.key)).size).toBe(2);
+    const his = two.map(({ by: _by, ...e }) => e);
+    const after = momentsOf(view(104, { lumps: [] }, his, 4), 20_000);
+    expect(after.filter((m) => m.kind === "doughRise")).toHaveLength(2);
+    expect(new Set(after.map((m) => m.key)).size).toBe(2);
+  });
+
+  it("Gold Plate with nothing left to gild says no brag (the banner says so)", () => {
+    expect(powerLine(kit, { kind: "goldPlate", key: "zebra:goldPlate:5:crowd" })).toBeNull();
+    expect(powerLine(kit, { kind: "goldPlate", key: "zebra:goldPlate:5:crowd", square: "d8", shape: "q" } as Moment)).toMatch(/worthless/);
   });
 });
 
