@@ -1,10 +1,10 @@
-# The zebra bakery's characters (Nov 10-11): Don Dough, his five crew, the bread rifle, the puff, the bread splash, Rising Dough
+# The zebra bakery's characters (Nov 10-11): Don Dough, his five crew, the bread rifle, the puff, the bread splash, Rising Dough, Gold Plate
 
 **Eric's design (Nov 10, `notes/zebra-eric.md`):** a mob that runs "just a bakery", really chess-obsessed nerds; the zebras are
 the giraffes' rivals. They stand upright like the giraffes and hold big French rolls two-handed like rifles. The kingpin has a
 big pudgy belly. His battle start: he pulls the roll, "fires" at you (a little *pop*), and laughs. His God King save is the
 same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)** and gave him his passive, **Rising Dough**
-("Eric, Nov 11" in `notes/zebra-eric.md`); its art is the last section here.
+("Eric, Nov 11" in `notes/zebra-eric.md`), and his ultimate, **Gold Plate**; their art is in the last two sections.
 
 **Drawn by hand** on the weekly plan usage (no API spend). Art only: nothing is wired into the game.
 
@@ -12,20 +12,23 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 | Folder | Exports | What |
 |---|---|---|
 | `crew-zebra/zebra-rig.ts` | `build`, `frame`, `ZEBRA_PALETTE`, `PARTS`, `ARMS`, `paintRoll`, `ZEBRA_TABLE_TOP` | The one zebra, dressed six ways (as `npc-grex/giraffe-rig.ts` is for the giraffes) |
-| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`, name "Don Dough"), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | Don Dough: 21 animations |
+| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`, name "Don Dough"), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | Don Dough: 22 animations |
 | `crew-zebra/crew-zebra.ts` | `NPC_ZEBRA_GUARD_A`, `_GUARD_B`, `NPC_ZEBRA_CREW_C`, `_D`, `_E`, `ZEBRA_WATCH_FRAME`, `LOOKS` | The five crew |
 | `zebra-props/zebra-props.ts` | `ZEBRA_ROLL`, `INTRO_ZEBRA_PUFF`, `INTRO_ZEBRA_STORM`, `INTRO_ZEBRA_FRONT` | The roll on its own, the muzzle puff, the splash |
 | `zebra-props/zebra-dough.ts` | `ZEBRA_DOUGH`, `ZEBRA_TIMER`, `KINDS` | Rising Dough: the dough on the board, the oven timer |
+| `zebra-gold/zebra-gold.ts`, `zebra-gold/pieces/*.svg` | `GOLD_FX`, `GOLD_CLINK_PAWN`; `gold-<q\|r\|b\|n><l\|d>.svg` | Gold Plate: the gold pieces, the gilding, glint and clink |
 
 **Pictures** (all on the game's dark ground):
 - `zebra-sheet.png`: the dealer giraffe (left, for scale), then the kingpin and the five crew, feet on one line, at 3x.
-- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 21).
+- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 22).
 - `crew-zebra/frames-guards.png` and `frames-table.png` (2x); `crew-zebra/gifs/<anim>.gif` (3x, each with every crew member
   that has it, side by side); `back-room-chatter.gif` (the kingpin's `sitScoff` beside C talking, D listening, E arguing).
 - `zebra-props/props.png` (the roll lying and leaning, the puff's frames, 4x), `splash.png` (two tiles and the front, 3x),
   `gifs/splash.gif`, `gifs/puff.gif` (6x).
 - `zebra-props/dough.png` and `timer.png` (4x); `zebra-props/gifs/dough-proof.gif`, `dough-rise.gif`, `dough-squash.gif`,
   `dough-land.gif`, `timer-roll.gif`, `timer-ding.gif` (6x).
+- `zebra-gold/pieces.png` (each piece beside its gold one, both colors, on the board's squares), `zebra-gold/effects.png` (the
+  gilding, glint and clink over real pieces), `zebra-gold/gifs/gild.gif`, `glint.gif`, `clink.gif` (6x); `boss-zebra/gifs/goldPlate.gif`.
 - Make them again: `scripts/boss-art/zebra-stills.ts` (`sheet`, `gif`; its header has the usage).
 
 ## Size, frame and feet
@@ -67,6 +70,7 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 | **`volley`** | 8 x 70-80 ms, 0.6 s, loops | **`volley` f0** | His God King save: aimed, rapid fire. The roll kicks up and back, four puffs a loop drifting off, a mad grin, the belly shaking. To start from his rest, play `breadPop` f1-f4 (the pull) first, or cut straight in. |
 | **`relax`** | 6, 1.0 s | **`relax` f1** | Standing: a calm-down pat of the air to his crew, "easy, easy", eyes half shut, a smile |
 | `sitRelax` | 6, 1.0 s | `relax` f1 | The same, seated |
+| **`goldPlate`** | 10, 1.9 s | **`gild` f3**, `kiss` f7 | Gold Plate: a white glaze bowl of gold against his belly, he dips a pastry brush and brushes broad strokes out toward the board, gold glitter flying (start GOLD_FX `gild` on the piece at f3), then a proud chef's kiss: hoof to his lips, flung open with a sparkle. It ends on `idle` frame 0 |
 | **`drop`** | 9, 1.2 s | **`drop` f5** | Rising Dough: a hoof into his apron pocket, up with a lump of raw dough, a little toss in his hoof, a wind-back and a lob out to our right (it leaves the frame at about (90, 34) on f7), a smug look after it. The board then plays `ZEBRA_DOUGH` `land` on its square |
 | `sitTalk` | 10, 1.5 s, loops | `tap` f4, f6 | Seated, gesturing, then two pokes at the table ("rook b1 takes, check") |
 | `sitListen` | 10, 2.3 s, loops | none | Seated, hooves on the belly, a nod, then one brow up |
@@ -166,6 +170,33 @@ square's bottom middle, drawn at the board's square size. For each kind `k` (p, 
 
 Eric's times (pawn 4, knight and bishop 7, rook 10, queen 15) fit: the timer goes to 15.
 
+## Gold Plate
+Eric: "He makes his queen gold plated and it becomes shiny gold, and can no longer be captured by pawns for the rest of the
+game."
+
+**The gold pieces** (`zebra-gold/pieces/gold-<k><l|d>.svg`):
+- They are the board's own cburnett drawings (BSD; `board/pieces/SOURCES.md`), recolored gold, the same size and shape.
+  Draw one as the board draws `piece.<color>.<kind>`, in his piece's place once it's gilded.
+- There are four kinds (queen, rook, bishop, knight) in both colors, so he can be either side and still gild something if he
+  has no queen.
+- White's set (`l`): bright gold with a metallic shine, a dark brown outline.
+- Black's set (`d`): antique gold, the black outline kept, its light details pale gold. The two sides stay distinct.
+- The license's credit stays as it is (the files are derived from the set already credited). A line in `SOURCES.md` will say
+  they are recolors.
+
+**`GOLD_FX`: 32 x 32, foot [16, 31].** A board square's effect, drawn over the piece's square:
+
+| Animation | Frames, length | Cues | What it does |
+|---|---|---|---|
+| `gild` | 8, 0.8 s | `gild` f0, `shine` f5 | A see-through band of gold sweeps up the piece from its foot, glitter falling behind it, then a big four-point sparkle at its top and two small ones. **Swap in the gold piece at f3**, under the band |
+| `glint` | 5, 2.6 s, loops | `glint` f2 | The gold piece's idle. Nothing for 1.8 s, then a sparkle runs up it: shoulder, middle, top. Only three frames carry pixels, so it's cheap. Its cue should be very soft, or none |
+| `clink` | 6, 0.5 s | `clink` f1 | A pawn bouncing off it: sparks at the corner it hits, little "ting" lines, a spark falling |
+
+- **The clink** is drawn for a pawn coming from the square's bottom left. Mirror it left to right, and top to bottom for a
+  pawn coming down.
+- **`GOLD_CLINK_PAWN`** = [0.3, 0.42, 0.28, 0.12, 0.04, 0]. It is how far the real pawn has come along its diagonal toward the
+  gold piece on each frame, in squares: it comes in, touches, and bounces back home.
+
 ## Cues for the sound round
 None of these have sounds yet.
 
@@ -190,6 +221,11 @@ None of these have sounds yet.
 | `ding` | `ZEBRA_TIMER` `kDing` f0 | A kitchen timer's *ding-ding* (bright, short, not a harsh alarm) |
 | `rise`, `pop` | `ZEBRA_DOUGH` `kRise` f0, f4 | A soft swelling *fwoomp*, then a light oven *pop* with a puff |
 | `squash` | `ZEBRA_DOUGH` `kSquash` f0 | A squishy *splat* with a flour puff |
+| `gild` | Don Dough's `goldPlate` f3; `GOLD_FX` `gild` f0 | A rising shimmer, a soft glissando of chimes |
+| `shine` | `GOLD_FX` `gild` f5 | A bright *shing* |
+| `kiss` | Don Dough's `goldPlate` f7 | A chef's-kiss *mwah* |
+| `glint` | `GOLD_FX` `glint` f2 (loops) | A tiny high *tink*, very soft (it repeats every 2.6 s, so maybe none) |
+| `clink` | `GOLD_FX` `clink` f1 | A bright metallic *clink*, a pawn bouncing off gold |
 
 ## Calls for Eric
 1. **The kingpin's look**:
@@ -218,7 +254,11 @@ None of these have sounds yet.
    - The dough is raw-dough cream, shaped like its piece; the rise browns it before the pop.
    - The timer's kind icon is printed on it, so each timer matches its dough.
    - The last minute is red, and the seconds race on every move: 0.25 s, so a move never waits on it.
-10. **Gameplay ideas** (from before his passive was chosen; the ultimate is still open, "something with the black and white cookie"):
+10. **Gold Plate:**
+   - His cast is a baker's golden glaze: a pastry brush and a bowl of gold glaze, then a chef's kiss.
+   - The gold pieces are recolors of the board's own set, bright gold for white and antique gold for black.
+   - The idle glint is a sparkle every 2.6 s; its sound may be better left out.
+11. **Gameplay ideas** (from before his passive and ultimate were chosen; Eric has since picked Rising Dough and Gold Plate, so these are only for later):
    - *Bread Line*: a row of pieces is "on hold" (frozen) for a turn.
    - *Crumb Trail*: a capture leaves a crumb square the next piece to land on loses its turn.
    - *Hot Out of the Oven*: his ultimate drops a loaf on three squares; pieces there are blocked for two turns.
@@ -226,6 +266,7 @@ None of these have sounds yet.
 
 ## For the code round
 - Register `BOSS_ZEBRA` (Don Dough) in `characters/index.ts` and its kit (portrait `BOSS_ZEBRA_PORTRAIT` from `idle` f0).
+- Gold Plate: `goldPlate` (him); on the piece, `GOLD_FX` `gild`, the swap to the gold SVG at its f3, then `glint` looping; a pawn's blocked capture plays `clink` with the pawn moved by `GOLD_CLINK_PAWN`. Add the gold SVGs to `board/pieces/` with a line in `SOURCES.md`.
 - Rising Dough: `drop` (him), then `ZEBRA_DOUGH` `land` and `k` on the square; each move plays the timer's `kRollNN`; at 00:00 `kDing` then `kRise`; your piece landing on it plays `kSquash`.
 - `breadPop` is the battle start; `volley` is the God King save.
 - Add the sounds above in a `zebra-sounds.ts`. They must pass `boss-sounds-finite.test.ts`, and they should be quiet: the
