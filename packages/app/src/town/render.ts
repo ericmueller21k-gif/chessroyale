@@ -52,7 +52,8 @@ import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
-import { seenEither, seenFrom, seenReady } from "./seen.ts";
+import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
+import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
@@ -995,6 +996,8 @@ export class Renderer {
     // from the higher steps, which see over the rows: the default since Nov 5 (2, Eric: "number three") draws everything in reach, as
     // round 4's "out" did.)
     this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= 1.01;
+    // (`?report`: the sight lines' time, frame-report.ts.)
+    const sightT = REC && this.cull ? performance.now() : 0;
     if (this.cull) {
       // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
       // glide to a home's middle), nothing is left out.)
@@ -1017,11 +1020,17 @@ export class Renderer {
         else if (cc >= 0 && cr >= 0 && !seenReady(cc + ax, cr + ay)) seenFrom(cc + ax, cr + ay);
       }
     }
+    if (sightT && this.sightN !== seenWorked()) {
+      this.sightN = seenWorked();
+      REC!.sight(performance.now() - sightT);
+    }
     this.buildCloseUps(now);
+    REC?.mark(P.camera);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     // (The street town's turn: the clouds slide across as the camera turns; the sun stays put.)
     this.sky.draw(ctx, this.view, camX, camY, now, dt, (heading / 90) * W * TOWN_FEEL.streetTurnClouds);
+    REC?.mark(P.sky);
     this.drawGround();
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
@@ -1030,7 +1039,9 @@ export class Renderer {
     this.nClear = 0;
     this.bubble.on = false;
     this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
+    REC?.mark(P.ground);
     const lit = this.beginLights();
+    REC?.mark(P.lights);
     this.drawThings(now);
     // The light of the hour over the world and everything on it: one fill (none by day).
     if (this.tint) {
@@ -1039,6 +1050,7 @@ export class Renderer {
     }
     // The lights at dusk and night, over the tint, so they really glow (under the tags, the names and the bubble).
     if (lit) this.layLights();
+    REC?.mark(P.lights);
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.kind, t.size, t.alpha);
@@ -1047,9 +1059,14 @@ export class Renderer {
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
+    REC?.mark(P.labels);
     this.paint.done();
+    REC?.mark(P.submit);
     this.placeChips(now);
+    REC?.mark(P.chips);
   }
+  /** (`?report`) seen.ts's count of sight lines worked out, as last seen. */
+  private sightN = 0;
 
   // ---- The close-up on a statue: the lens, the close-up drawings (made ahead), the statues, the quote.
 
@@ -1597,8 +1614,12 @@ export class Renderer {
     // (The street town's, the north edge round, is a solid: its ring's and portal's boxes, drawn where they stand like any other, its
     // walls over the rows' roofs from near enough; past the rim, nothing, as for every building.)
     if (!STREET_TOWN && !col.on) this.drawFarColiseum(col, now);
+    const rec = REC;
+    rec?.mark(P.plan);
     for (const it of items) {
       if (!it.on) continue;
+      if (rec) rec.mark(this.partNow);
+      this.partNow = it.kind === "house" || it.kind === "part" ? P.buildings : it.kind === "prop" ? (this.propBox[it.i] ? P.buildings : P.props) : it.kind === "boss" ? P.bosses : people[it.i]!.you ? P.you : P.people;
       if (it.kind === "house") {
         const bx = this.homeBox[it.i];
         if (bx) this.drawBoxFront(it, bx, now);
@@ -1702,7 +1723,11 @@ export class Renderer {
         this.sitting = false;
       }
     }
+    rec?.mark(this.partNow);
+    this.partNow = P.plan;
   }
+  /** (`?report`) The part the thing being drawn is (frame-report.ts). */
+  private partNow: PartId = P.plan;
 
   // ---- The street town's boxes (Nov 5, round 3): planned each frame (boxes.ts planBox), drawn here (the art's order: each part by its
   // own depth among everything else; a roof's faces far to near; a shed and a hedge whole, with their fronts).
@@ -1775,7 +1800,11 @@ export class Renderer {
     const flat = geomOf(box).faces.every((f) => f.nz > 0.999);
     const key = flat ? "flat" : `${b.facing}${q}`;
     let a = m.get(key);
-    if (!a) m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+    if (!a) {
+      const t0 = REC ? performance.now() : 0;
+      m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+      if (REC) REC.bake(performance.now() - t0);
+    }
     this.instArt[q]![b.i] = a;
     return a;
   }

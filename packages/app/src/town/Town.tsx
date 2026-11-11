@@ -32,6 +32,8 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
+import { FrameRec, P, REC, browserOf, setRec, summarize, timerStep } from "./frame-report.ts";
+import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
 import { createPortal } from "preact/compat";
 import { RIGHT_SLOT_TOOLS } from "../components/FrontMenu.tsx";
@@ -1025,6 +1027,41 @@ function startTown(
     fpsEl.dataset.backend = BACKEND_LABEL[painter.kind];
     cv.parentElement?.append(fpsEl);
   }
+  // `/town?report`, anyone's, as `?fps` (Eric, Nov 11): the frame report (frame-report.ts). Every frame of a run recorded from your
+  // first move, for 30 s or until Done, then one panel to screenshot. Without `?report` there's no recorder: the marks are null checks.
+  const rec = TOWN_ASKED.report ? new FrameRec() : null;
+  setRec(rec);
+  let recPill: ReturnType<typeof reportPill> | null = null;
+  let recPanel: HTMLElement | null = null;
+  let recSecs = -1;
+  if (rec) {
+    const host = cv.parentElement!;
+    const timer = timerStep();
+    recPill = reportPill(host, () => rec.finish());
+    recPill.set("Report: walk or turn to start", false);
+    rec.onDone = () => {
+      recPill?.set("Report ready", false);
+      setRec(null);
+      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: BACKEND_LABEL[painter.kind], timer };
+      recPanel = reportPanel(
+        host,
+        summarize(rec.run),
+        dev,
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+          recSecs = -1;
+          rec.again();
+          setRec(rec);
+          recPill?.set("Report: walk or turn to start", false);
+        },
+        () => {
+          recPanel?.remove();
+          recPanel = null;
+        },
+      );
+    };
+  }
   /** The game with a bot has been asked for (once). */
   let opened = false;
   let raf = 0;
@@ -1206,6 +1243,7 @@ function startTown(
   const frame = (now: number) => {
     raf = 0;
     if (!alive) return;
+    REC?.begin(now);
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
     if (STREET_TOWN) {
@@ -1251,11 +1289,23 @@ function startTown(
     }
     stepClose(dt);
     updateCamera(dt, now);
+    REC?.mark(P.logic);
     draw(now, dt);
+    REC?.mark(P.chips);
     // (The minimap's dots: you and the way the camera faces; a transform only when they move. minimap.ts.)
     if (STREET_TOWN) {
       const y = town.you.walker.pose(now, POSE);
       mapFrame(y.x, y.y, heading);
+    }
+    const rc = REC;
+    if (rc) {
+      rc.mark(P.minimap);
+      rc.end(town.you.walker.moving(), heading, zoomCur);
+      // (The pill's seconds, set once a second.)
+      if (rc.state === "rec") {
+        const sec = Math.floor((now - rc.startAt) / 1000);
+        if (sec !== recSecs) recPill?.set(`● Recording ${(recSecs = sec)} s`, true);
+      }
     }
     if (fpsEl) {
       fpsN++;
@@ -2114,6 +2164,9 @@ function startTown(
       clearTimeout(lostWait);
       offAccount();
       fpsEl?.remove();
+      recPill?.remove();
+      recPanel?.remove();
+      if (REC === rec) setRec(null);
       halt();
       ro.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
