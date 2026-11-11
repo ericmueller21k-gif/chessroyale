@@ -704,7 +704,7 @@ export function paintRoll(c: Cv, a: Pt, deg: number, len: number, broken = false
       const u = dx * ux + dy * uy;
       const v = dx * vx + dy * vy; // + toward the top side
       if (u < 0 || u > len) continue;
-      if (broken && Math.abs(u - len * 0.55) < 0.6) continue; // the break
+      if (broken && Math.abs(u - len * 0.55) < 1.3) continue; // the break
       const end = Math.min(u, len - u);
       const r = end < 4 ? ROLL_R * Math.sqrt(Math.max(0, end / 4)) * 0.85 + 0.6 : ROLL_R;
       if (Math.abs(v) > r) continue;
@@ -715,7 +715,7 @@ export function paintRoll(c: Cv, a: Pt, deg: number, len: number, broken = false
       if (end > 3 && rr > -0.35 && sl < 1.1) k = "%";
       else if (end > 3 && rr > -0.35 && sl < 1.9) k = "&";
       // The broken ends: pale crumb.
-      if (broken && Math.abs(u - len * 0.55) < 1.6) k = "%";
+      if (broken && Math.abs(u - len * 0.55) < 2.4) k = "%";
       put(c, x, y, k);
     }
 }
