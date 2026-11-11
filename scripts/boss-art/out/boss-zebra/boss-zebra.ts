@@ -23,12 +23,12 @@ const K = KINGPIN;
 const REST: Pose = { armN: ARMS.belly, armF: ARMS.bellyF, slung: true, eyes: "half", mouth: "smirk" };
 /** The roll's places (the near hoof from the near shoulder). */
 const GRAB: Pose = { armN: [[2, -6], [-2, -12]], armF: ARMS.bellyF, slung: true }; // reaching over his shoulder for it
-const OUT: Pose["gun"] = { deg: -78, at: [4, -4], grip: 6 }; // pulled out, pointing up
+const OUT: Pose["gun"] = { deg: -78, at: [4, -4], grip: 6, back: true }; // pulled out, pointing up
 const SWING: Pose["gun"] = { deg: -30, at: [6, 0], both: true, far: 12 };
 const AIM: Pose["gun"] = { deg: -2, at: [4, 1], both: true, far: 13 };
 const KICK: Pose["gun"] = { deg: -9, at: [3, 0], both: true, far: 13 };
 const HUG: Pose["gun"] = { deg: 28, at: [6, 8], both: true, far: 12 }; // lowered over the belly, laughing
-const STOW: Pose["gun"] = { deg: -100, at: [1, -7], grip: 10 }; // going back over his shoulder
+const STOW: Pose["gun"] = { deg: -100, at: [1, -7], grip: 10, back: true }; // going back over his shoulder
 
 /** Where each animation's puffs leave the roll (filled in as the frames are made). */
 export const BOSS_ZEBRA_MUZZLE: Record<string, (Pt | null)[]> = {};
@@ -39,14 +39,19 @@ const f = (ms: number, p: Pose, extra: Extra = {}): Frame => frame(K, ms, p, ext
 
 /** An animation whose frames may fire: `shots` lists, per frame, how many frames ago the last shot left (0 the pop, -1 none). */
 function anim(name: string, loop: boolean, frames: { ms: number; p: Pose; x?: Extra; shot?: number[] }[]): Anim {
-  const muz: (Pt | null)[] = [];
-  const out = frames.map(({ ms, p, x = {}, shot = [] }) => {
-    const b = build(K, p);
-    muz.push(shot.includes(0) ? b.muzzle : null);
-    const puffs = (bb: Built): Speck[] => shot.flatMap((t) => (bb.muzzle ? puff(bb.muzzle, t) : []));
-    return frame(K, ms, p, { ...x, specks: (bb) => [...puffs(bb), ...(x.specks?.(bb) ?? [])] });
+  // The muzzle at each frame; a puff stays where its shot left the roll (the frame `t` back), not following the roll.
+  const at = frames.map(({ p }) => build(K, p).muzzle);
+  const n = frames.length;
+  MUZ[name] = frames.map(({ shot = [] }, i) => (shot.includes(0) ? at[i]! : null));
+  const out = frames.map(({ ms, p, x = {}, shot = [] }, i) => {
+    const puffs = (): Speck[] =>
+      shot.flatMap((t) => {
+        const j = loop ? (i - t + n) % n : i - t;
+        const m = (j >= 0 ? at[j] : null) ?? at[i];
+        return m ? puff(m, t) : [];
+      });
+    return frame(K, ms, p, { ...x, specks: (bb) => [...puffs(), ...(x.specks?.(bb) ?? [])] });
   });
-  MUZ[name] = muz;
   return { loop, frames: out };
 }
 
@@ -177,10 +182,10 @@ const cheer: Anim = {
 };
 const bigCheer = anim("bigCheer", false, [
   ...pull(100),
-  { ms: 110, p: { gun: { deg: -84, at: [5, -14], grip: 8 }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", air: 3, feet: [[-5, 2], [5, 3]] }, x: { cue: "laugh" } },
-  { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8 }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", jig: 2, bob: 1 }, x: { specks: (b) => hahas(b.mouth, 0) } },
-  { ms: 110, p: { gun: { deg: -84, at: [5, -14], grip: 8 }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", air: 3, feet: [[-5, 2], [5, 3]] }, x: { specks: (b) => hahas(b.mouth, 1) } },
-  { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8 }, armF: ARMS.wave, eyes: "shut", mouth: "grin", jig: 2, bob: 1 } },
+  { ms: 110, p: { gun: { deg: -84, at: [5, -14], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", air: 3, feet: [[-5, 2], [5, 3]] }, x: { cue: "laugh" } },
+  { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", jig: 2, bob: 1 }, x: { specks: (b) => hahas(b.mouth, 0) } },
+  { ms: 110, p: { gun: { deg: -84, at: [5, -14], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "laugh", air: 3, feet: [[-5, 2], [5, 3]] }, x: { specks: (b) => hahas(b.mouth, 1) } },
+  { ms: 130, p: { gun: { deg: -80, at: [5, -12], grip: 8, back: true }, armF: ARMS.wave, eyes: "shut", mouth: "grin", jig: 2, bob: 1 } },
   ...stow(),
   { ms: 200, p: { ...REST } },
 ]);
@@ -189,7 +194,7 @@ const victory: Anim = {
   frames: Array.from({ length: 8 }, (_, i) => {
     const up = i % 4 < 2;
     return f(140, {
-      gun: { deg: up ? -86 : -76, at: up ? [5, -15] : [6, -11], grip: 8 },
+      gun: { deg: up ? -86 : -76, at: up ? [5, -15] : [6, -11], grip: 8, back: true },
       armF: up ? ARMS.wave : [[7, -1], [11, -9]],
       air: up && i % 2 === 0 ? 3 : 0,
       feet: up && i % 2 === 0 ? [[-5, 2], [5, 3]] : [[-5, 0], [5, 0]],
@@ -205,10 +210,10 @@ const defeat: Anim = {
   frames: [
     f(100, { ...REST, slung: false, gun: { deg: -40, at: [6, 0], grip: 6 }, eyes: "wide", mouth: "o", brows: "up", jig: 2, hatAt: [40, 30] }, { cue: "hurt", shake: [-1, 0] }),
     f(110, { slung: false, gun: { deg: 10, at: [9, 6], grip: 6, broken: true }, armF: ARMS.shrug, eyes: "wide", mouth: "o", brows: "up", jig: -1, hatAt: [30, 20] }, { cue: "snap" }),
-    f(120, { sit: 4, gun: { deg: 50, at: [10, 9], grip: 6, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "o", jig: 2, hatAt: [20, 40], hatGone: true }, { cue: "thud", shake: [0, 2] }),
-    f(150, { sit: 2, gun: { deg: 70, at: [10, 11], grip: 6, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "frown", jig: 1, hatAt: [14, 101] }, { specks: (b) => stars([b.head[0] - 2, b.head[1] - 9], 0) }),
+    f(120, { sit: 11, gun: { deg: 40, at: [10, 9], grip: 10, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "o", jig: -1, hatAt: [20, 40], hatGone: true }, { cue: "thud", shake: [0, 1] }),
+    f(150, { sit: 7, gun: { deg: 38, at: [10, 9], grip: 10, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "frown", jig: 1, hatAt: [14, 101] }, { specks: (b) => stars([b.head[0] - 2, b.head[1] - 9], 0) }),
     ...[1, 2, 3, 4].map((t) =>
-      f(170, { sit: 2, gun: { deg: 70, at: [10, 11], grip: 6, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "frown", jig: t % 2 ? -1 : 0, hatAt: [14, 101] }, { specks: (b) => stars([b.head[0] - 2, b.head[1] - 9], t) }),
+      f(170, { sit: 7, gun: { deg: 38, at: [10, 9], grip: 10, broken: true }, armF: ARMS.hip, eyes: "dizzy", mouth: "frown", jig: t % 2 ? -1 : 0, hatAt: [14, 101] }, { specks: (b) => stars([b.head[0] - 2, b.head[1] - 9], t) }),
     ),
   ],
 };

@@ -39,13 +39,13 @@ export const LOOKS = {
 /** Port arms: across the chest, pointing up and forward. */
 export const PORT: Pose["gun"] = { deg: -50, at: [3, 13], both: true };
 /** At his side, hanging from the near hoof (to be drawn). */
-const SIDE: Pose["gun"] = { deg: 78, at: [3, 14], grip: 3 };
+const SIDE: Pose["gun"] = { deg: 78, at: [3, 14], grip: 9 };
 /** Pointed at you, level, at the shoulder. */
 export const AIM: Pose["gun"] = { deg: 0, at: [4, 2], both: true };
 /** Lowered, pointing at the floor in front. */
 const DOWN: Pose["gun"] = { deg: 62, at: [3, 12], both: true };
 /** Down at his side in the far hoof (his near hoof free). */
-const FAR_SIDE: Pose["gun"] = { deg: 80, at: [2, 15], grip: 3, farHold: true };
+const FAR_SIDE: Pose["gun"] = { deg: 112, at: [-2, 14], grip: 9, farHold: true };
 const SEAT = 11;
 
 const char = (id: string, name: string, anims: Record<string, Anim>): Character => ({
@@ -219,7 +219,7 @@ function standUpAnim(look: Look): Anim {
     frames: [
       sitF(look, 120, { eyes: "wide", brows: "up", mouth: "o" }),
       sitF(look, 110, { armN: ARMS.poke, hx: 2, hy: 1, eyes: "fwd", brows: "down" }),
-      frame(look, 100, { sit: 5, gun: { deg: 60, at: [8, 10], grip: 4 }, feet: [[-2, 0], [2, 0]], eyes: "fwd", brows: "down", hy: 1 }),
+      frame(look, 100, { sit: 5, gun: { deg: 35, at: [8, 8], grip: 8 }, feet: [[-2, 0], [2, 0]], eyes: "fwd", brows: "down", hy: 1 }),
       frame(look, 140, { gun: SIDE, eyes: "fwd", brows: "down", mouth: "flat" }),
     ],
   };
