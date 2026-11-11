@@ -4222,6 +4222,17 @@ export const SQUADS: SquadsSettings = {
  */
 export const BOARD: { readonly checkHighlight: boolean } = { checkHighlight: false };
 
+/**
+ * Boss battle music (Eric, Nov 11: "Wire boss battle music into the game"; docs/decisions/2026-11-11-boss-music.md;
+ * `packages/app/src/music.ts`). Each boss's theme (`packages/app/public/music/themes.json`) plays from the moment the
+ * battle starts (the intro's end) until its result, on its own gain into the game's sound, under its effects.
+ * - `volume`: the music's gain, where a sound effect plays at 1 (the boss packs, a move's knock).
+ * - `fadeMs`: Music or Sound switched off, or the page hidden: faded out over this (and back in).
+ * - `endFadeMs`: the battle's result (a win, a loss, leaving): faded out over this, then stopped.
+ * - `startDelayS`: from asking to the first note (s), so the intro and the loop are scheduled together.
+ */
+export const MUSIC = { volume: 0.35, fadeMs: 300, endFadeMs: 1500, startDelayS: 0.05 } as const;
+
 /** A vibration: one pulse (ms), or on, off, on… (ms) as `navigator.vibrate` takes it. */
 export type HapticPattern = number | readonly number[];
 

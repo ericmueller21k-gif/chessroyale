@@ -88,6 +88,9 @@ function serviceWorker(): Plugin {
         // Nor pictures and video (Nov 10, phone load): the service worker keeps a picture the first time it's shown (LAZY in
         // sw-template.js), and the landing page's demo video (one format, MP4) streams like the ambience.
         .filter((f) => !LAZY_FILES.test(f) && !f.startsWith("/media/"))
+        // Nor the bosses' music (Nov 11, 1 to 2 MB a piece): fetched when its boss's battle is picked (music.ts), then kept like a
+        // picture (MUSIC in sw-template.js).
+        .filter((f) => !f.startsWith("/music/"))
         // Hosts redirect /index.html to /, and a cached redirect can't answer a page load.
         .map((f) => (f === "/index.html" ? "/" : f))
         .sort();

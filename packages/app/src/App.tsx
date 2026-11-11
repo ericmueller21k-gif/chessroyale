@@ -51,6 +51,7 @@ import { confirmLeaveSearch, keepInQueue, saveAwayLobby, savedAwayLobby, searchF
 import { chosenBotLevel } from "./components/BotLevelBox.tsx";
 import { clockShown } from "./clock-text.ts";
 import { measureSound } from "./sound.ts";
+import { bossMusic, type MusicBattle } from "./music.ts";
 import { noteWhere } from "./problems.ts";
 import { queuePool, testParams } from "./test-switches.ts";
 import { evalBarOn, practiceOn } from "./prefs.ts";
@@ -1000,6 +1001,9 @@ export function App() {
   });
   // Home's rows and the bar on every other page read it (search.ts; the bar after every render).
   useLayoutEffect(() => setAwaySearch(awaySearchNow));
+  // The boss's music (music.ts): its theme fetched as the battle is picked (its loading step and intro), started as the battle
+  // starts (the intro's end), faded out at the result or on leaving. Solo, raids and online alike: it goes by the match shown.
+  useLayoutEffect(() => bossMusic(musicBattle(match)));
 
   // ?debug (a test switch): the match, the Squads clients and the 1 v 1 game on `window`, for tests and the console. (Each render, so
   // they're there once your account says you may, and a match joined before that, from a link, is too.)
@@ -2293,6 +2297,19 @@ export function App() {
         />
       );
   }
+}
+
+/**
+ * The boss battle a match is in, for its music: none before it, or once it's decided (`result`: the last move's moments and
+ * the fade play out before the result screen) or at its result; live once its intro ("START!") is over and the first move is
+ * being played (a battle joined in the middle: at once).
+ */
+function musicBattle(match: AnyMatch | null): MusicBattle | null {
+  const p = match?.phase;
+  if (!match || !p || p.kind === "results") return null;
+  const boss = p.kind === "boss" ? p.boss : match.boss;
+  if (!boss?.id || boss.result) return null;
+  return { key: match, boss: boss.id, live: !(p.kind === "boss" && (p.intro || p.loading)) };
 }
 
 /** A profile as a page (outside a match): its address, and back to where you were. */
