@@ -60,10 +60,18 @@ let busy = false;
 export function setLiveBusy(on: boolean) {
   busy = on;
 }
-/** What this app is doing (App says): the request says so, and friends' lists show it ("In Chess Town"; core's ACTIVITIES). */
+/**
+ * What this app is doing (App says): the request says so, and friends' lists show it ("In Chess Town"; core's ACTIVITIES). A change
+ * is told at once (one request), not at the next heartbeat, so a friend's list is right within seconds.
+ */
 let doing: Activity | null = null;
 export function setLiveDoing(what: Activity) {
+  if (doing === what) return;
+  const told = doing !== null;
   doing = what;
+  if (!told || !started) return;
+  if (inFlight) again = true;
+  else void poll();
 }
 /** Hears every answer (friends.ts reads `inbox`). */
 export function onLive(fn: () => void): () => void {

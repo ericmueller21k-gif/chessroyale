@@ -2,8 +2,9 @@ import { expect, type Browser, type Page } from "@playwright/test";
 import { named, test } from "./helpers.ts";
 
 /**
- * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md), with two players through the real server: a request from a
- * profile, accepted from the friends list; each sees the other online; the invites setting (no one, then friends);
+ * Friends and invites (docs/decisions/2026-10-15-friends-and-invites.md; the friends page, docs/decisions/2026-11-11-friends-page.md),
+ * with two players through the real server: a request from a profile, accepted from the friends page; each sees the other online, with
+ * what they're doing; the invites setting (no one, then friends);
  * an invite from the list makes a lobby and shows on the other's home as a toast, and Join puts them in it; a block
  * ends the friendship, refuses invites and keeps requests from reaching the blocker. FRIENDS_SHOTS=<dir> saves the
  * screenshots Eric reviews (a profile's buttons, the list, a request, the invite toast, the settings).
@@ -22,13 +23,10 @@ async function player(browser: Browser, name: string): Promise<{ page: Page; id:
   return { page, id };
 }
 
-/** The friends list: the live panel's "All friends" on a computer, your profile's Friends on a phone (Eric, Oct 18). */
+/** The friends page (Eric, Nov 11): home's Friends in a phone's top bar; the right column's FRIENDS › on a computer. */
 async function openFriends(page: Page) {
-  if (isComputer()) await page.locator(".fr-panel").getByRole("button", { name: "All friends ›" }).click();
-  else {
-    await page.locator(".fd-top .fd-ring").click();
-    await page.getByRole("button", { name: /^Friends/ }).click();
-  }
+  if (isComputer()) await page.locator(".rc-friends").click();
+  else await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/friends$/);
 }
@@ -56,7 +54,7 @@ test("two players: a request accepted, online in each other's list, the invites 
 
   // Bo, on his home: "1 new" within seconds; his list has the request; he accepts.
   // (A phone: a count on Friends in the top bar.)
-  if (isComputer()) await expect(bo.page.locator(".fr-panel .fr-badge")).toHaveText("1 new", NEWS);
+  if (isComputer()) await expect(bo.page.locator(".rc-friends .fr-badge")).toHaveText("1 new", NEWS);
   else await expect(bo.page.locator(".fd-top .fd-top-friends .fd-news")).toHaveText("1", NEWS);
   await openFriends(bo.page);
   const request = bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" });
@@ -64,14 +62,14 @@ test("two players: a request accepted, online in each other's list, the invites 
   await shot(bo.page, "request");
   await request.getByRole("button", { name: "Accept" }).click();
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
-  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Online");
+  // (Online, with what she's doing: she's on a front-door page, Bo's profile.)
+  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("On the home screen", NEWS);
 
   // Ann sees Bo online: in the live panel on a computer, in her friends list on a phone.
   await ann.page.goto("/?nolanding");
-  if (isComputer()) await expect(ann.page.locator(".fr-panel .fr-row", { hasText: "Bo Friend" })).toContainText("Online", NEWS);
   await openFriends(ann.page);
   const boRow = ann.page.locator(".fr-page .fr-row", { hasText: "Bo Friend" });
-  await expect(boRow).toContainText("Online");
+  await expect(boRow).toContainText("On the home screen");
   await shot(ann.page, "list");
 
   // Bo takes invites from no one: Ann's invite is refused, and no lobby is made for it.
@@ -127,64 +125,79 @@ test("two players: a request accepted, online in each other's list, the invites 
   await ann.page.getByRole("button", { name: "Add Friend" }).click();
   await expect(ann.page.locator(".fr-note")).toHaveText("Request sent.");
   await bo.page.goto("/friends?nolanding");
-  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Unblock");
   await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
-  await expect(bo.page.locator("#fr-friends")).toHaveText("FRIENDS · 0");
+  await expect(bo.page.locator("#fp-online")).toHaveText("ONLINE · 0");
+  await expect(bo.page.locator("#fp-offline")).toHaveText("OFFLINE · 0");
+  await bo.page.getByRole("button", { name: "Requests sent and blocked ›" }).click();
+  await expect(bo.page.locator(".fr-page .fr-row", { hasText: "Ann Friend" })).toContainText("Unblock");
 });
 
 
-test("the friends overlay (Eric, Nov 9): the top bar's Friends opens your friends in a centered box; tap one for Invite to play or View profile; Private lobby opens the code sheet; the dim closes it", { tag: "@phone-only" }, async ({ browser }) => {
-  test.setTimeout(2 * 60_000);
-  const ann = await player(browser, "Ann Overlay");
-  const bo = await player(browser, "Bo Overlay");
-  // (Friends through the API: the request and its answer, as the first test does from a profile and the list.)
-  const post = (page: Page, action: string, body: object) =>
-    page.evaluate(([a, b]) => fetch(`/api/friends/${a}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(b) }).then((r) => r.status), [action, body] as const);
-  expect(await post(ann.page, "request", { id: bo.id })).toBe(200);
-  expect(await post(bo.page, "answer", { id: ann.id, accept: true })).toBe(200);
-  await ann.page.reload();
+test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up; a search finds a player by name as you type, nothing moving; their profile's Add Friend; accepted, each sees the other online with what they're doing; Private lobby opens the code sheet", async ({ browser }) => {
+  test.setTimeout(3 * 60_000);
+  // (A name of each project's own: both projects share the server, and a search finds every name that starts the same.)
+  const tag = isComputer() ? "C" : "P";
+  const ann = await player(browser, `Ann Seeker ${tag}`);
+  const bo = await player(browser, `Bo Findme ${tag}`);
+  const page = ann.page;
 
-  // The top bar's Friends: a centered box titled Friends (not the old sheet), Bo in it, online.
-  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  const box = ann.page.getByRole("dialog", { name: "Friends", exact: true });
-  await expect(box).toBeVisible();
-  await expect(ann.page.getByRole("dialog", { name: "Play with friends" })).toHaveCount(0);
-  const row = box.getByRole("button", { name: /^Bo Overlay, / });
-  await expect(row).toHaveAccessibleName("Bo Overlay, Online", NEWS);
-  await expect(box.getByRole("button", { name: "Requests sent and blocked ›" })).toBeEnabled();
-  // (Its opening scale done, then measured.)
-  await box.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
-  // Centered: the box's middle within a few pixels of the window's.
-  const b = (await box.boundingBox())!;
-  const vw = ann.page.viewportSize()!.width;
-  expect(Math.abs(b.x + b.width / 2 - vw / 2)).toBeLessThan(3);
+  // Home's Friends: the page (no pop-up), with Back.
+  await openFriends(page);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back" })).toBeVisible();
+  await expect(page.locator("#fp-online")).toHaveText("ONLINE · 0");
+  await expect(page.locator("#fp-offline")).toHaveText("OFFLINE · 0");
+  const lobby = page.getByRole("button", { name: "Private lobby: make one or join with a code" });
+  const lobbyBox = await lobby.boundingBox();
+  const search = page.getByRole("searchbox", { name: "Search players by name" });
+  const results = page.getByRole("region", { name: "Players found" });
 
-  // Tap Bo: his menu, Invite to play (on: he's online) and View profile; opening it moves nothing in the box.
-  const before = await row.boundingBox();
-  await row.click();
-  const menu = box.getByRole("menu", { name: "Bo Overlay: what to do" });
-  await expect(menu.getByRole("button", { name: "Invite to play" })).toBeEnabled();
-  await expect(menu.getByRole("button", { name: "View profile" })).toBeVisible();
-  expect(await row.boundingBox()).toEqual(before);
-  await menu.getByRole("button", { name: "Close the menu" }).click();
-  await expect(menu).toHaveCount(0);
+  // One character: nothing asked. Then his name, any case: his row (icon, name, level) in the results' box, which keeps one size
+  // from its greyed rows to the answer, and nothing on the page under it moves.
+  await search.fill("b");
+  await expect(results).toHaveCount(0);
+  await search.fill(`bo findme ${tag.toLowerCase()}`);
+  await expect(results).toBeVisible();
+  const resultsBox = await results.boundingBox();
+  const hit = results.getByRole("button", { name: `Bo Findme ${tag}, Level 1` });
+  await expect(hit).toBeVisible();
+  await expect(results.locator(".fp-player")).toHaveCount(1);
+  expect(await results.boundingBox()).toEqual(resultsBox);
+  expect(await lobby.boundingBox()).toEqual(lobbyBox);
+  await shot(page, "page-search");
 
-  // Private lobby ›: Play with friends' sheet (make a lobby or join by code), as the top bar opened before; its ✕ back home.
-  await box.getByRole("button", { name: /^Private lobby ›/ }).click();
-  const sheet = ann.page.getByRole("dialog", { name: "Play with friends" });
-  await expect(sheet.getByRole("button", { name: "Get friend code" })).toBeVisible();
-  await expect(box).toHaveCount(0);
-  await sheet.getByRole("button", { name: "Close" }).click();
-  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
+  // His profile: Add Friend sends the request (Cancel Request then); Back is the friends page, the search as it was.
+  await hit.click();
+  await page.getByRole("button", { name: "Add Friend" }).click();
+  await expect(page.locator(".fr-note")).toHaveText("Request sent.");
+  await expect(page.getByRole("button", { name: "Cancel Request" })).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).first().click();
+  await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/friends$/);
+  await expect(search).toHaveValue(`bo findme ${tag.toLowerCase()}`);
 
-  // A tap on the dim closes the box.
-  await ann.page.mouse.click(4, ann.page.viewportSize()!.height - 4);
-  await expect(box).toHaveCount(0);
+  // Bo: the request on his friends page; he accepts. Ann is online, on a front-door page.
+  await openFriends(bo.page);
+  const request = bo.page.locator("#fr-requests ~ .fr-list .fr-row", { hasText: `Ann Seeker ${tag}` });
+  await expect(request).toContainText("wants to be friends", NEWS);
+  await request.getByRole("button", { name: "Accept" }).click();
+  await expect(bo.page.locator("#fr-requests")).toHaveCount(0);
+  await expect(bo.page.locator("#fp-online")).toHaveText("ONLINE · 1");
+  await expect(bo.page.locator(".fr-row", { hasText: `Ann Seeker ${tag}` })).toContainText("On the home screen");
 
-  // View profile: his profile, and the box is gone.
-  await ann.page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
-  await box.getByRole("button", { name: /^Bo Overlay, / }).click();
-  await box.getByRole("menu").getByRole("button", { name: "View profile" }).click();
-  await expect(box).toHaveCount(0);
-  await expect(ann.page.getByRole("button", { name: "Challenge" })).toBeVisible();
+  // Bo goes to Chess Town: Ann's page says so (his app tells the server as it changes; her list on its next load).
+  await bo.page.goto("/town?nolanding");
+  await expect(bo.page.getByRole("heading", { name: "Town square" })).toBeVisible();
+  const boRow = page.locator("#fp-online ~ .fr-list .fr-row", { hasText: `Bo Findme ${tag}` });
+  await expect(async () => {
+    await page.reload();
+    await expect(boRow).toContainText("In Chess Town", { timeout: 4_000 });
+  }).toPass({ timeout: 45_000 });
+  await expect(boRow.getByRole("button", { name: "Invite" })).toBeEnabled();
+  await expect(page.locator("#fp-online")).toHaveText("ONLINE · 1");
+  await shot(page, "page-online");
+
+  // Private lobby: Play with friends' sheet (make a lobby or join by its code).
+  await lobby.click();
+  await expect(page.getByRole("dialog", { name: "Play with friends" }).getByRole("button", { name: "Get friend code" })).toBeVisible();
 });

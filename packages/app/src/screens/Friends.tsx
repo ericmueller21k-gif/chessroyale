@@ -29,6 +29,10 @@ export function FriendsScreen({
 }) {
   const { state, status } = useFriends(true);
   const [more, setMore] = useState(false);
+  // (The page's own address, back from a profile opened here too: a reload or a shared link lands on it.)
+  useEffect(() => {
+    if (location.pathname !== "/friends") history.replaceState(null, "", "/friends");
+  }, []);
   const [note, setNoteState] = useState<{ text: string; error: boolean } | null>(null);
   const setNote = (text: string, error = true) => setNoteState({ text, error });
   const run = (p: Promise<unknown>) => {
