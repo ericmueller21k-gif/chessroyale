@@ -8,6 +8,7 @@ import { ErrorBoundary, ReportSheet } from "./components/Problems.tsx";
 import { MaintenanceBanner } from "./components/MaintenanceBanner.tsx";
 import { SearchBar } from "./components/SearchBar.tsx";
 import { startStatus } from "./status.ts";
+import { hapticsDebug } from "./haptics.ts";
 import { setUpInstall } from "./install.ts";
 import { watchErrors } from "./problems.ts";
 import { watchStaleChunks } from "./stale.ts";
@@ -64,6 +65,8 @@ prepareAudio();
 for (const ev of ["pointerdown", "touchend", "click", "keydown"]) window.addEventListener(ev, wakeAudio, { passive: true, capture: true });
 // The kill switches and the maintenance banner (status.ts), asked now and every minute.
 startStatus();
+// (`?haptics=debug`: the on-screen log of each tick tried, haptics.ts.)
+hapticsDebug();
 // (The shell in index.html goes as soon as #app draws anything but the splash: shell.ts.)
 watchShell();
 // (Fair play's ban notice sits over any screen: PLAY, a new lobby or joining one can bring it up; so does the

@@ -667,6 +667,10 @@
         "e2e/piece-sounds.spec.ts"
       ]
     },
+    "boss music (Nov 11): each boss's theme from the battle's start to its result, the Music switch": {
+      "paths": ["packages/app/src/music.ts", "packages/app/public/music/**"],
+      "specs": ["e2e/grex.spec.ts", "e2e/match-menu.spec.ts"]
+    },
     "sounds": {
       "paths": [
         "packages/app/src/sound.ts",

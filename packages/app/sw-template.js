@@ -12,6 +12,8 @@ const STREAMED = ["/sounds/colosseum/ambient.mp3"];
 // Pictures (not precached: vite.config.ts's LAZY_FILES, the same test): kept in this version's cache the first time they're
 // shown, then answered from it. The landing page's demo video (/media/) streams from the network like the ambience.
 const LAZY = /\.(png|jpe?g|webp|gif|avif)$/;
+// The bosses' music (/music/, not precached: fetched when a boss's battle is picked, music.ts): kept like a picture once fetched.
+const MUSIC = "/music/";
 
 // Each precached file's contents' hash (but under /assets/, where Vite puts it in the name), kept on its cached copy as HASH_HEADER.
 const HASHES = __HASHES__;
@@ -94,7 +96,7 @@ self.addEventListener("fetch", (event) => {
         cached ||
         fetch(request).then((res) => {
           // (And a Vite asset fetched here, a new version's while the old worker still answers: the next version's precache copies it.)
-          if ((LAZY.test(url.pathname) || url.pathname.startsWith("/assets/")) && res.ok && res.status === 200) {
+          if ((LAZY.test(url.pathname) || url.pathname.startsWith("/assets/") || url.pathname.startsWith(MUSIC)) && res.ok && res.status === 200) {
             const copy = res.clone();
             void caches.open(VERSION).then((cache) => cache.put(request, copy));
           }
