@@ -105,7 +105,7 @@ if (cmd === "sheet") {
 }
 
 // ---- GIF (looping, full frames, one global palette): scripts/preview-characters.ts's writer.
-function writeGif(path: string, frames: { img: Img; ms: number }[]) {
+export function writeGif(path: string, frames: { img: Img; ms: number }[]) {
   const { w, h } = frames[0]!.img;
   const colours = new Map<number, number>();
   const indexed = frames.map(({ img }) => {

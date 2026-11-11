@@ -12,7 +12,7 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 | Folder | Exports | What |
 |---|---|---|
 | `crew-zebra/zebra-rig.ts` | `build`, `frame`, `ZEBRA_PALETTE`, `PARTS`, `ARMS`, `paintRoll`, `ZEBRA_TABLE_TOP` | The one zebra, dressed six ways (as `npc-grex/giraffe-rig.ts` is for the giraffes) |
-| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`, name "Don Dough"), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | Don Dough: 22 animations |
+| `boss-zebra/boss-zebra.ts` | `BOSS_ZEBRA` (id `boss-zebra`, name "Don Dough"), `BOSS_ZEBRA_MUZZLE`, `BOSS_ZEBRA_PORTRAIT`, `KINGPIN` | Don Dough: 23 animations |
 | `crew-zebra/crew-zebra.ts` | `NPC_ZEBRA_GUARD_A`, `_GUARD_B`, `NPC_ZEBRA_CREW_C`, `_D`, `_E`, `ZEBRA_WATCH_FRAME`, `LOOKS` | The five crew |
 | `zebra-props/zebra-props.ts` | `ZEBRA_ROLL`, `INTRO_ZEBRA_PUFF`, `INTRO_ZEBRA_STORM`, `INTRO_ZEBRA_FRONT` | The roll on its own, the muzzle puff, the splash |
 | `zebra-props/zebra-dough.ts` | `ZEBRA_DOUGH`, `ZEBRA_TIMER`, `KINDS` | Rising Dough: the dough on the board, the oven timer |
@@ -20,7 +20,7 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 
 **Pictures** (all on the game's dark ground):
 - `zebra-sheet.png`: the dealer giraffe (left, for scale), then the kingpin and the five crew, feet on one line, at 3x.
-- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 22).
+- `boss-zebra/frames-1.png` and `frames-2.png` (every frame at 2x); `boss-zebra/gifs/<anim>.gif` (3x, all 23).
 - `crew-zebra/frames-guards.png` and `frames-table.png` (2x); `crew-zebra/gifs/<anim>.gif` (3x, each with every crew member
   that has it, side by side); `back-room-chatter.gif` (the kingpin's `sitScoff` beside C talking, D listening, E arguing).
 - `zebra-props/props.png` (the roll lying and leaning, the puff's frames, 4x), `splash.png` (two tiles and the front, 3x),
@@ -28,7 +28,11 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 - `zebra-props/dough.png` and `timer.png` (4x); `zebra-props/gifs/dough-proof.gif`, `dough-rise.gif`, `dough-squash.gif`,
   `dough-land.gif`, `timer-roll.gif`, `timer-ding.gif` (6x).
 - `zebra-gold/pieces.png` (each piece beside its gold one, both colors, on the board's squares), `zebra-gold/effects.png` (the
-  gilding, glint and clink over real pieces), `zebra-gold/gifs/gild.gif`, `glint.gif`, `clink.gif` (6x); `boss-zebra/gifs/goldPlate.gif`.
+  gilding, glint and clink over real pieces), `zebra-gold/gifs/gild.gif`, `shine.gif`, `glint.gif`, `clink.gif` (6x);
+  `boss-zebra/gifs/goldPlate.gif`, `goldBrag.gif`.
+- **The whole Gold Plate moment:** `zebra-gold/gifs/gold-plate-moment.gif` (10 s, 3x) and `zebra-gold/moment-keyframes.png`.
+  - It is a mockup: Don Dough on the left, three board squares with his queen (black's), and a placeholder speech bubble.
+  - It was made by a one-off script, not kept.
 - Make them again: `scripts/boss-art/zebra-stills.ts` (`sheet`, `gif`; its header has the usage).
 
 ## Size, frame and feet
@@ -70,7 +74,8 @@ same, as rapid fire. Working id **`zebra`**. **Eric named him Don Dough (Nov 11)
 | **`volley`** | 8 x 70-80 ms, 0.6 s, loops | **`volley` f0** | His God King save: aimed, rapid fire. The roll kicks up and back, four puffs a loop drifting off, a mad grin, the belly shaking. To start from his rest, play `breadPop` f1-f4 (the pull) first, or cut straight in. |
 | **`relax`** | 6, 1.0 s | **`relax` f1** | Standing: a calm-down pat of the air to his crew, "easy, easy", eyes half shut, a smile |
 | `sitRelax` | 6, 1.0 s | `relax` f1 | The same, seated |
-| **`goldPlate`** | 10, 1.9 s | **`gild` f3**, `kiss` f7 | Gold Plate: a white glaze bowl of gold against his belly, he dips a pastry brush and brushes broad strokes out toward the board, gold glitter flying (start GOLD_FX `gild` on the piece at f3), then a proud chef's kiss: hoof to his lips, flung open with a sparkle. It ends on `idle` frame 0 |
+| **`goldPlate`** | 15, 4.2 s | `stir` f2, **`gild` f8**, `kiss` f12 | Gold Plate, his cast. A white bowl of gold glaze against his belly. He stirs it with a pastry brush, humming, eyes shut (the build-up he enjoys). He lifts the brush dripping gold and admires it, then brushes three broad strokes out at the board, glitter flying (start GOLD_FX `gild` at f8). Then a proud chef's kiss, flung open with a sparkle. It ends on `idle` frame 0 |
+| **`goldBrag`** | 8 x 200 ms, loops | none | After the gilding, while the piece shines and he says his line: chin up, talking, a hoof pointing down at the board (your pawns), then patting his belly with a smug chuckle |
 | **`drop`** | 9, 1.2 s | **`drop` f5** | Rising Dough: a hoof into his apron pocket, up with a lump of raw dough, a little toss in his hoof, a wind-back and a lob out to our right (it leaves the frame at about (90, 34) on f7), a smug look after it. The board then plays `ZEBRA_DOUGH` `land` on its square |
 | `sitTalk` | 10, 1.5 s, loops | `tap` f4, f6 | Seated, gesturing, then two pokes at the table ("rook b1 takes, check") |
 | `sitListen` | 10, 2.3 s, loops | none | Seated, hooves on the belly, a nod, then one brow up |
@@ -188,13 +193,35 @@ game."
 
 | Animation | Frames, length | Cues | What it does |
 |---|---|---|---|
-| `gild` | 8, 0.8 s | `gild` f0, `shine` f5 | A see-through band of gold sweeps up the piece from its foot, glitter falling behind it, then a big four-point sparkle at its top and two small ones. **Swap in the gold piece at f3**, under the band |
+| `gild` | 8, 0.8 s | `gild` f0 | A see-through band of gold sweeps up the piece from its foot, glitter falling behind it, then a big four-point sparkle at its top and two small ones. **Swap in the gold piece at f3**, under the band |
+| `shine` | 8, 1.5 s | `shine` f0 | The beat where it shines: a glare sweeps across it corner to corner, then a big sparkle blooms at its top with little ones round it, and fades |
 | `glint` | 5, 2.6 s, loops | `glint` f2 | The gold piece's idle. Nothing for 1.8 s, then a sparkle runs up it: shoulder, middle, top. Only three frames carry pixels, so it's cheap. Its cue should be very soft, or none |
 | `clink` | 6, 0.5 s | `clink` f1 | A pawn bouncing off it: sparks at the corner it hits, little "ting" lines, a spark falling |
 
 - **The clink** is drawn for a pawn coming from the square's bottom left. Mirror it left to right, and top to bottom for a
   pawn coming down.
-- **`GOLD_CLINK_PAWN`** = [0.3, 0.42, 0.28, 0.12, 0.04, 0]. It is how far the real pawn has come along its diagonal toward the
+- **`GOLD_CLINK_PAWN`** = [0.3, 0.42, 0.28, 0.12, 0.04, 0].
+
+**The moment, 10 s end to end** (Eric, Nov 11: "take a few seconds, like 10 total, where an animation plays, turns his piece
+gold, then he says a note about how your pawns are worthless vs it"):
+
+| Time (ms) | Him | His piece's square | Words |
+|---|---|---|---|
+| 0 | `goldPlate` starts: the bowl comes out (cue `stir` at 580 ms) | his piece as it is | |
+| 580-1780 | stirring the glaze, humming, eyes shut | | |
+| 1780-2480 | lifts the brush, dripping gold, admires it | | |
+| 2480 | the first of three strokes at the board (cue `gild`) | `GOLD_FX` `gild` starts | |
+| 2720 | | **swap in the gold piece** (`gild` f3, under the band) | |
+| 2840 | follow-through | | |
+| 3240 | | `gild` ends | |
+| 3300 | | `shine` (1.5 s, cue `shine`): the glare, the big sparkle | |
+| 3100-3900 | the chef's kiss (cue `kiss` at 3100), flung open with a sparkle | | |
+| 4200 | `goldPlate` ends on his idle's first frame (held 100 ms) | | |
+| 4300 | `goldBrag` (loops): chin up, pointing at your pawns, belly pats | | |
+| 4780 | | `glint` loops from here on, for the rest of the game | |
+| 5200-7700 | `goldBrag` | | **his line**, a speech bubble for 2.5 s (the code round's line: your pawns are worthless against it) |
+| 8400 | `idle` | | |
+| 10000 | the moment ends; play resumes | | | It is how far the real pawn has come along its diagonal toward the
   gold piece on each frame, in squares: it comes in, touches, and bounces back home.
 
 ## Cues for the sound round
@@ -221,9 +248,10 @@ None of these have sounds yet.
 | `ding` | `ZEBRA_TIMER` `kDing` f0 | A kitchen timer's *ding-ding* (bright, short, not a harsh alarm) |
 | `rise`, `pop` | `ZEBRA_DOUGH` `kRise` f0, f4 | A soft swelling *fwoomp*, then a light oven *pop* with a puff |
 | `squash` | `ZEBRA_DOUGH` `kSquash` f0 | A squishy *splat* with a flour puff |
-| `gild` | Don Dough's `goldPlate` f3; `GOLD_FX` `gild` f0 | A rising shimmer, a soft glissando of chimes |
-| `shine` | `GOLD_FX` `gild` f5 | A bright *shing* |
-| `kiss` | Don Dough's `goldPlate` f7 | A chef's-kiss *mwah* |
+| `stir` | Don Dough's `goldPlate` f2 | A gentle glaze stir with a pleased hum, "mm-mm-mmm" |
+| `gild` | Don Dough's `goldPlate` f8; `GOLD_FX` `gild` f0 | A rising shimmer, a soft glissando of chimes |
+| `shine` | `GOLD_FX` `shine` f0 | A bright *shing* |
+| `kiss` | Don Dough's `goldPlate` f12 | A chef's-kiss *mwah* |
 | `glint` | `GOLD_FX` `glint` f2 (loops) | A tiny high *tink*, very soft (it repeats every 2.6 s, so maybe none) |
 | `clink` | `GOLD_FX` `clink` f1 | A bright metallic *clink*, a pawn bouncing off gold |
 
@@ -255,7 +283,9 @@ None of these have sounds yet.
    - The timer's kind icon is printed on it, so each timer matches its dough.
    - The last minute is red, and the seconds race on every move: 0.25 s, so a move never waits on it.
 10. **Gold Plate:**
-   - His cast is a baker's golden glaze: a pastry brush and a bowl of gold glaze, then a chef's kiss.
+   - His cast is a baker's golden glaze: stirring a bowl of gold glaze with a pastry brush, humming, then strokes at the board
+     and a chef's kiss.
+   - The moment runs 10 s: cast 4.2 s, the gilding and shine over it, his line at 5.2-7.7 s, idle by 8.4 s.
    - The gold pieces are recolors of the board's own set, bright gold for white and antique gold for black.
    - The idle glint is a sparkle every 2.6 s; its sound may be better left out.
 11. **Gameplay ideas** (from before his passive and ultimate were chosen; Eric has since picked Rising Dough and Gold Plate, so these are only for later):
@@ -266,7 +296,7 @@ None of these have sounds yet.
 
 ## For the code round
 - Register `BOSS_ZEBRA` (Don Dough) in `characters/index.ts` and its kit (portrait `BOSS_ZEBRA_PORTRAIT` from `idle` f0).
-- Gold Plate: `goldPlate` (him); on the piece, `GOLD_FX` `gild`, the swap to the gold SVG at its f3, then `glint` looping; a pawn's blocked capture plays `clink` with the pawn moved by `GOLD_CLINK_PAWN`. Add the gold SVGs to `board/pieces/` with a line in `SOURCES.md`.
+- Gold Plate: the 10 s timeline in "Gold Plate"; `goldPlate` then `goldBrag` (him); on the piece, `GOLD_FX` `gild`, the swap to the gold SVG at its f3, `shine`, then `glint` looping; a pawn's blocked capture plays `clink` with the pawn moved by `GOLD_CLINK_PAWN`. Add the gold SVGs to `board/pieces/` with a line in `SOURCES.md`.
 - Rising Dough: `drop` (him), then `ZEBRA_DOUGH` `land` and `k` on the square; each move plays the timer's `kRollNN`; at 00:00 `kDing` then `kRise`; your piece landing on it plays `kSquash`.
 - `breadPop` is the battle start; `volley` is the God King save.
 - Add the sounds above in a `zebra-sounds.ts`. They must pass `boss-sounds-finite.test.ts`, and they should be quiet: the

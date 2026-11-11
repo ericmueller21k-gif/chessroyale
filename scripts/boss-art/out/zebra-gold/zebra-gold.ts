@@ -9,7 +9,8 @@
  *
  * GOLD_FX (32 x 32, a board square's effect frame as effects/common.ts SQUARE; foot [16, 31]), drawn over the square:
  * - `gild` (once, 8 frames, about 0.8 s): a band of gold sweeps up over the piece from its foot, a shower of glitter, a big
- *   four-point sparkle at its top (cue `gild` f0, `shine` f5). Swap his piece for the gold one at f3, under the band.
+ *   four-point sparkle at its top (cue `gild` f0). Swap his piece for the gold one at f3, under the band.
+ * - `shine` (once, 8 frames, about 1.5 s): the beat where it shines: a glare across it, a big sparkle blooming (cue `shine` f0).
  * - `glint` (loops, about 2.6 s): the gold piece's idle: nothing for most of it, then a small sparkle runs over it (a twinkle at
  *   its shoulder, then its top). Three frames carry pixels; the rest are empty (cue `glint` f2: very soft, or none).
  * - `clink` (once, 6 frames, about 0.5 s): a pawn bouncing off it. Drawn for a pawn coming from the square's bottom left (a
@@ -29,6 +30,7 @@ const PALETTE: Record<string, string> = {
   a: "#f6cf5570", // the gilding band, see-through: light, bright edge
   A: "#fff2b0a0",
   t: "#e8f4ff", // the clink's ting lines
+  s: "#ffffffa0", // the shine's glare across the piece, see-through
 };
 type Pt = readonly [number, number];
 function hash(x: number, y: number, seed = 1): number {
@@ -79,8 +81,34 @@ const gild: Anim = {
     if (f === 5) sp.push(...sparkle([16, 6], 3));
     if (f === 6) sp.push(...sparkle([16, 6], 5), ...sparkle([7, 18], 1), ...sparkle([25, 14], 1));
     if (f === 7) sp.push(...sparkle([16, 6], 2));
-    return { ms: f === 6 ? 160 : f === 7 ? 120 : 80, layers: [], specks: inside(sp), ...(f === 0 ? { cue: "gild" } : f === 5 ? { cue: "shine" } : {}) };
+    return { ms: f === 6 ? 160 : f === 7 ? 120 : 80, layers: [], specks: inside(sp), ...(f === 0 ? { cue: "gild" } : {}) };
   }),
+};
+/**
+ * shine (once, 8 frames, about 1.5 s): the beat after the gilding where it shines: a glare sweeps across the piece corner to
+ * corner, then a big sparkle blooms at its top with little ones round it, and fades (cue `shine` f0). Then `glint` loops.
+ */
+function glare(c: number): Speck[] {
+  const out: Speck[] = [];
+  for (let y = 3; y <= 28; y++)
+    for (let x = 5; x <= 26; x++) {
+      const d = x + (28 - y) * 0.8 - c;
+      if (d >= 0 && d < 3) out.push([x, y, "s"]);
+    }
+  return out;
+}
+const shine: Anim = {
+  loop: false,
+  frames: [
+    { ms: 90, layers: [], specks: inside(glare(4)), cue: "shine" },
+    { ms: 90, layers: [], specks: inside(glare(14)) },
+    { ms: 90, layers: [], specks: inside(glare(24)) },
+    { ms: 90, layers: [], specks: inside([...glare(34), ...sparkle([16, 6], 2)]) },
+    { ms: 160, layers: [], specks: inside([...sparkle([16, 6], 4), ...sparkle([8, 15], 1), ...sparkle([24, 20], 1)]) },
+    { ms: 260, layers: [], specks: inside([...sparkle([16, 6], 6), ...sparkle([7, 14], 2), ...sparkle([25, 19], 2), ...sparkle([12, 24], 1)]) },
+    { ms: 300, layers: [], specks: inside([...sparkle([16, 6], 4), ...sparkle([7, 14], 1), ...sparkle([25, 19], 1)]) },
+    { ms: 400, layers: [], specks: inside(sparkle([16, 6], 2)) },
+  ],
 };
 const glint: Anim = {
   loop: true,
@@ -118,5 +146,5 @@ export const GOLD_FX: Character = {
   foot: [16, 31],
   palette: PALETTE,
   parts: {},
-  anims: { gild, glint, clink },
+  anims: { gild, shine, glint, clink },
 };

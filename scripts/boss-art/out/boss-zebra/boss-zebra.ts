@@ -301,9 +301,10 @@ const drop: Anim = {
 
 /**
  * goldPlate (his ultimate, Gold Plate, Eric Nov 11): a baker's golden glaze. He brings out a little pot of gold glaze against his
- * belly, dips a pastry brush in it, and brushes broad strokes out toward the board, gold glitter flying off the bristles (cue
- * `gild` f3, as the board's GOLD_FX `gild` starts), then a proud chef's kiss: hoof to his lips (cue `kiss` f7) and flung open,
- * eyes shut, a sparkle. About 1.9 s; it ends on his idle's first frame.
+ * belly, stirs it with a pastry brush, humming, eyes shut (cue `stir` f2), lifts the brush dripping gold and admires it, then brushes
+ * three broad strokes out at the board, gold glitter flying (cue `gild` f8, as the board's GOLD_FX `gild` starts), then a
+ * proud chef's kiss: hoof to his lips (cue `kiss` f12) and flung open with a sparkle. 4.2 s; it ends on his idle's first frame.
+ * Then `goldBrag` while the piece shines and he says his line (the whole moment: zebra-nov10.md, "Gold Plate").
  */
 const pot = (): Speck[] => {
   // A white glaze bowl held against his belly front, brimming with gold glaze, a shine on it; outlined.
@@ -341,17 +342,45 @@ const fling = (h: Pt, t: number): Speck[] =>
 const goldPlate: Anim = {
   loop: false,
   frames: [
-    f(160, { ...REST, eyes: "fwd", mouth: "smirk" }),
-    f(170, { ...REST, armN: [[6, 8], [9, 9]], eyes: "half", mouth: "smirk", hy: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 1, 2, false)] }),
-    f(170, { ...REST, armN: [[7, 3], [11, 0]], eyes: "half", mouth: "grin" }, { specks: (b) => [...pot(), ...brush(b.hoofN, 2, -3)] }),
-    f(110, { ...REST, armN: [[9, -1], [16, -6]], eyes: "fwd", mouth: "grin", hx: 1 }, { cue: "gild", specks: (b) => [...pot(), ...brush(b.hoofN, 3, 1), ...fling(b.hoofN, 0)] }),
-    f(110, { ...REST, armN: [[9, 3], [17, 4]], eyes: "fwd", mouth: "open", hx: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 3, -1), ...fling(b.hoofN, 1)] }),
-    f(110, { ...REST, armN: [[9, -1], [16, -7]], eyes: "half", mouth: "grin", hx: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 3, 1), ...fling(b.hoofN, 2)] }),
-    f(150, { ...REST, armN: [[7, 4], [10, 2]], eyes: "half", mouth: "smirk" }, { specks: () => pot() }),
-    f(220, { ...REST, armN: ARMS.mouth, eyes: "shut", mouth: "o", hy: -1 }, { cue: "kiss" }),
-    f(260, { ...REST, armN: ARMS.open, eyes: "shut", mouth: "smile", hy: -2, hx: -1 }, { specks: (b) => [[b.hoofN[0] + 4, b.hoofN[1] - 3, "*"], [b.hoofN[0] + 5, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 3, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 4, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 2, "g"]] }),
-    f(260, { ...REST, eyes: "half", mouth: "smirk", brows: "one" }),
+    f(300, { ...REST, eyes: "fwd", mouth: "smirk", brows: "one" }),
+    f(280, { ...REST, armN: [[6, 8], [9, 9]], eyes: "half", mouth: "smirk", hy: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 1, 2, false)] }),
+    // The build-up he enjoys: stirring the glaze, humming, eyes shut.
+    f(300, { ...REST, armN: [[6, 8], [8, 8]], eyes: "half", mouth: "smile", hy: 1 }, { cue: "stir", specks: (b) => [...pot(), ...brush(b.hoofN, 1, 2)] }),
+    f(300, { ...REST, armN: [[6, 8], [11, 9]], eyes: "shut", mouth: "smile", hy: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, -1, 2)] }),
+    f(300, { ...REST, armN: [[6, 8], [8, 8]], eyes: "half", mouth: "smile", hy: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 1, 2)] }),
+    f(300, { ...REST, armN: [[6, 8], [11, 9]], eyes: "shut", mouth: "o", hy: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, -1, 2)] }),
+    // Up comes the brush, dripping gold; he admires it by his nose.
+    f(300, { ...REST, armN: [[7, 3], [11, 0]], eyes: "open", mouth: "grin" }, { specks: (b) => [...pot(), ...brush(b.hoofN, 2, -3), [b.hoofN[0] + 2, b.hoofN[1] + 3, "g"], [b.hoofN[0] + 2, b.hoofN[1] + 5, "G"]] }),
+    f(400, { ...REST, armN: [[8, 1], [10, -6]], eyes: "shut", mouth: "smile", hy: -1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 2, -3), [b.hoofN[0] + 6, b.hoofN[1] - 7, "*"]] }),
+    // Three broad strokes out at the board (the board's gilding starts here).
+    f(120, { ...REST, armN: [[9, -1], [16, -6]], eyes: "fwd", mouth: "grin", hx: 1 }, { cue: "gild", specks: (b) => [...pot(), ...brush(b.hoofN, 3, 1), ...fling(b.hoofN, 0)] }),
+    f(120, { ...REST, armN: [[9, 3], [17, 4]], eyes: "fwd", mouth: "open", hx: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 3, -1), ...fling(b.hoofN, 1)] }),
+    f(120, { ...REST, armN: [[9, -1], [16, -7]], eyes: "half", mouth: "grin", hx: 1 }, { specks: (b) => [...pot(), ...brush(b.hoofN, 3, 1), ...fling(b.hoofN, 2)] }),
+    f(260, { ...REST, armN: [[7, 4], [10, 2]], eyes: "half", mouth: "smirk" }, { specks: () => pot() }),
+    // The chef's kiss.
+    f(380, { ...REST, armN: ARMS.mouth, eyes: "shut", mouth: "o", hy: -1 }, { cue: "kiss" }),
+    f(420, { ...REST, armN: ARMS.open, eyes: "shut", mouth: "smile", hy: -2, hx: -1 }, { specks: (b) => [[b.hoofN[0] + 4, b.hoofN[1] - 3, "*"], [b.hoofN[0] + 5, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 3, b.hoofN[1] - 3, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 4, "g"], [b.hoofN[0] + 4, b.hoofN[1] - 2, "g"]] }),
+    f(300, { ...REST, eyes: "half", mouth: "smirk", brows: "one" }),
   ],
+};
+/**
+ * goldBrag (loops, 8 frames, 1.6 s): after the gilding, while the piece shines and he says his line (your pawns are worthless
+ * against it): chin up, talking, a hoof pointing down at the board (your pawns), then patting his belly, a smug chuckle.
+ */
+const goldBrag: Anim = {
+  loop: true,
+  frames: Array.from({ length: 8 }, (_, i) =>
+    f(200, {
+      ...REST,
+      armN: i < 4 ? (i % 2 ? [[9, 5], [16, 9]] : [[9, 4], [16, 7]]) : i % 2 ? [[7, 6], [11, 9]] : ARMS.belly,
+      eyes: i < 4 ? "half" : i === 6 ? "shut" : "half",
+      brows: "one",
+      mouth: i % 2 ? "open" : i < 4 ? "grin" : "smirk",
+      hy: -1,
+      hx: i < 4 ? 1 : 0,
+      jig: i >= 4 ? (i % 2 ? 1 : -1) : 0,
+    }),
+  ),
 };
 
 // ---- At the back room's table (seated on a chair 11 px up; his roll lies on the table: ZEBRA_ROLL `table`).
@@ -403,7 +432,7 @@ export const BOSS_ZEBRA: Character = {
   palette: ZEBRA_PALETTE,
   halo: "#3a3440",
   parts: PARTS,
-  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, cheer, bigCheer, victory, defeat, breadPop, volley, relax, drop, goldPlate, sitTalk, sitListen, sitScoff, sitRelax },
+  anims: { idle, entrance, thinking, move, capture, hurt, check, smug, rattled, cheer, bigCheer, victory, defeat, breadPop, volley, relax, drop, goldPlate, goldBrag, sitTalk, sitListen, sitScoff, sitRelax },
 };
 /** The part of `idle` frame 0 a portrait shows (his head, ears and fedora), in frame px. */
 export const BOSS_ZEBRA_PORTRAIT = { x: 22, y: 22, w: 40, h: 36 } as const;
