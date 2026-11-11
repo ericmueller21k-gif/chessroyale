@@ -363,15 +363,16 @@ describe("the review page and the reviewer's API", () => {
 });
 
 describe("the review page's deep re-check button", () => {
-  it("runs the deep re-check on that player's matches now, whatever the hour", async () => {
+  it("runs the deep re-check on that player's matches now, whatever the hour; the page says how many picks were near the engine's best (Nov 11)", async () => {
     const { sql, d1 } = memoryDb();
     await ensureSchema(sql, d1);
     const eric = await player(sql, "Eric", "eric@example.com");
     const cheat = await player(sql, "Cheat", "cheat@example.com");
-    await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12) }, Date.now() - 1000);
+    // (One pick another engine's: Kb1, half a point off the deep search's best.)
+    await recordFairPlay(sql, cheat.id, { lobby: "AAAAA", mode: "crowd", moves: picks(12).map((m, i) => (i === 1 ? { ...m, move: "a1b1" } : m)) }, Date.now() - 1000);
     const cookie = `hc_session=${await createSession(sql, eric.id, Date.now())}`;
     const searched: string[][] = [];
-    const search = async (_fen: string, moves: readonly string[]) => (searched.push([...moves]), moves.map((m) => ({ move: m, expected: m === "a1a2" ? 0.6 : 0.5 })));
+    const search = async (_fen: string, moves: readonly string[]) => (searched.push([...moves]), moves.map((m) => ({ move: m, expected: m === "a1a2" ? 0.6 : m === "a1b1" ? 0.595 : 0.5 })));
     const res = (await handleAdmin(
       new Request(`https://hunchess.test/admin/fairplay/case/${cheat.id}`, { method: "POST", body: new URLSearchParams({ action: "deep" }), headers: { cookie, origin: "https://hunchess.test", "content-type": "application/x-www-form-urlencoded" } }),
       { DB: d1, ADMIN_EMAILS: "eric@example.com" },
@@ -382,6 +383,9 @@ describe("the review page's deep re-check button", () => {
     expect(res.status).toBe(303);
     expect(decodeURIComponent(res.headers.get("location")!)).toContain("Deep re-check: 12 searches, 1 matches done.");
     expect(searched).toHaveLength(12);
+    const page = await (await handleAdmin(new Request(`https://hunchess.test/admin/fairplay/case/${cheat.id}`, { headers: { cookie } }), { DB: d1, ADMIN_EMAILS: "eric@example.com" }))!.text();
+    expect(page).toContain("100% near the engine's best (12/12, its very best 11)");
+    expect(page).toContain("≈ engine: #2 (Ka2), 0.5 off");
   });
 });
 
