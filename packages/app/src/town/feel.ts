@@ -221,6 +221,8 @@ export const TOWN_FEEL = {
   boxStripsFine: 24,
   /** How long a frame may spend getting buildings' roofs ready before they're seen (ms; the nearest first). (Round 4: 2.5 before.) */
   boxBakeMs: 1.5,
+  /** The same while you stand still and the view isn't turning (Nov 11: a still frame has room, and what a look round shows gets ready sooner). */
+  boxBakeStillMs: 4,
   /** A home's floating name: how far over its roof it floats (px), and the step it drops by to keep off the buildings behind. */
   nameOverRoof: 6,
   nameDropStep: 3,

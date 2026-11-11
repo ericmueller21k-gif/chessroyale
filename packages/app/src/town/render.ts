@@ -1769,16 +1769,18 @@ export class Renderer {
     // Paint ahead (Nov 11, Eric: "turning is dropping it to like 40 frames"): the pictures of the boxes within reach, nearest first,
     // until the frame's budget is spent, in the order they're needed. Always: the roofs for the quarter the camera faces, then the sides'
     // and backs' pictures and their shaded steps (a side shows at the screen's edge as you walk). Mid-turn, the next quarter's roofs.
-    // Standing still (when you look round), the rest a look round shows: the fronts' frames and their shaded steps (a front at a
-    // slant), and the other quarters' roofs. Before, only the faced quarter's roofs (and the next, mid-turn) were painted ahead, so a
-    // first look round painted hundreds of pictures as they showed, up to 20 ms a frame (the frame report, `?report`); painting all of
-    // them while walking too cost the walk frames (pictures a walk never shows). (One being drawn this frame and not yet painted is
-    // still painted then, whatever the budget.)
+    // Standing still (when you look round), the rest a look round shows: the fronts' frames and their shaded steps (a front at a slant),
+    // and the other quarters' roofs, with a bigger budget while the view is at rest (`boxBakeStillMs`). Before, only the faced quarter's
+    // roofs (and the next, mid-turn) were painted ahead, so a first look round painted hundreds of pictures as they showed, up to 20 ms
+    // a frame (the frame report, `?report`); painting all of them while walking too cost the walk frames (pictures a walk never shows).
+    // (One being drawn this frame and not yet painted is still painted then, whatever the budget.)
     const t0 = performance.now();
     const hq = ((this.heading % 360) + 360) % 360;
     const q0 = Math.floor(hq / 90) % 4;
     const still = !this.town.you.walker.moving();
     const turning = hq - q0 * 90 >= 0.5;
+    // (Standing still with the view at rest, a frame has room: a bigger budget.)
+    const budget = still && !turning ? TOWN_FEEL.boxBakeStillMs : TOWN_FEEL.boxBakeMs;
     const qs = this.warmQ;
     qs[0] = q0;
     qs[1] = (q0 + 1) % 4;
@@ -1798,12 +1800,12 @@ export class Renderer {
           if (at ? at[b.i]! < 0 : this.instArt[q]![b.i]) continue;
           if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
         }
-        if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
+        if (best < 0 || performance.now() - t0 > budget) break;
         const b = this.boxes[ahead[best]!]!;
         if (list >= 0) this.warmNext(b, list);
         else this.roofArt(b, q);
       }
-      if (performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
+      if (performance.now() - t0 > budget) break;
     }
   }
   /** The quarters in the order they're painted ahead (planBoxes). */
