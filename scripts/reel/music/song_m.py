@@ -1,6 +1,6 @@
 """Song M (Eric, Nov 11): Jefferson's theme (the firework stall), a one-minute loop: "lots of sparkles, sparklers,
 firework whistling, firework exploding and crackling. With a safari twist."
-144 beats a minute, 144 beats = 36 bars = 60.0 s. A, on the five-note scale (A B C# E F#) with a G for color, sliding
+144 beats a minute, 288 beats = 72 bars = 120.0 s. A, on the five-note scale (A B C# E F#) with a G for color, sliding
 whole to C, D, E and F; the low chant bends it minor.
 Voices: a marimba lead (Eric's pick of seven) and a pan flute that answers it, duels it and joins it; marimba
 chords on the off-beats, a thin pulse circling the
@@ -14,8 +14,14 @@ Every melody, riff and chord progression here is original: none of it is any fil
   bars  5-12   the tune: on A, up to C, back
   bars 13-20   the chant: low voices call, the flute answers high; a pop in each gap (A, D, E)
   bars 21-28   the second tune as a duel, marimba against flute: D, A, F, E
-  bars 29-32   the barrage: hand drums alone under three rockets, each higher, sparkles, a sparkler and a last long whistle
-  bars 33-36   the tune's start (marimba and flute together), a run, three hits with a boom on each, and the last crackle falls into bar 1's whistle
+  bars 29-32   the barrage: hand drums alone under three rockets, each higher, sparkles, a sparkler and a long whistle
+  bars 33-36   the tune back, marimba and flute together (1:00)
+  bars 37-44   the flute's solo: F sharp minor, D, B minor, E
+  bars 45-48   the solo lands on the main tune, flute and marimba in harmony
+  bars 49-56   a third tune on the square wave: A, G, F, E
+  bars 57-64   the chant again: the square wave answers, then flute and marimba together
+  bars 65-68   the big barrage: five rockets
+  bars 69-72   the tune's start, a run, three hits with a boom on each, and the last crackle falls into bar 1's whistle
 """
 import sys
 
@@ -24,7 +30,7 @@ import numpy as np
 from synth import Mix, length, line, n, write_wav
 
 BPM = 144.0
-BEATS = 144
+BEATS = 288
 SECS = BEATS * 60 / BPM
 
 TUNE = (
@@ -53,8 +59,28 @@ DUEL = (
     "-:.5 C6:.25 D6:.25 -:2 F6:.5 G6:.5 | A6:1.5 G6:.5 F6:.5 D6:.5 C6:1 | "
     "E6:1 -:1 G#6:.25 B6:.25 -:.5 B6:.5 C#7:.5 | E7:.25 C#7:.25 B6:.25 G#6:.25 E6:.25 G#6:.25 B6:.25 C#7:.25 E7:1.5 -:.5"
 )
+# ---- the second minute (Eric, Nov 11: "make the full 2 min song") ----
+# The flute's solo, over F sharp minor, D, B minor and E.
+SOLO = (
+    "C#6:1.5 E6:.5 F#6:1 -:.5 E6:.5 | C#6:.25 E6:.25 F#6:.25 A6:.25 B6:1 A6:.5 F#6:.5 E6:.5 -:.5 | "
+    "F#6:1 -:.5 D6:.25 E6:.25 F#6:.5 A6:.5 B6:.5 A6:.5 | F#6:.75 E6:.75 D6:.5 A5:.25 B5:.25 D6:.25 E6:.25 F#6:1 | "
+    "B6:1.5 A6:.25 F#6:.25 D6:.5 E6:.5 F#6:1 | A6:.25 B6:.25 D7:.5 B6:.25 A6:.25 F#6:.5 -:.5 F#6:.25 A6:.25 B6:.5 D7:.5 | "
+    "E7:1.5 C#7:.5 B6:.5 G#6:.5 B6:1 | G#6:.25 B6:.25 C#7:.25 E7:.25 C#7:.25 B6:.25 G#6:.25 E6:.25 F#6:.5 G#6:.5 B6:1"
+)
+# As the solo ends, the flute lands on the main tune in harmony with the marimba: two steps of the scale above it.
+HARMONY = (
+    "A5:.5 A5:.5 B5:.5 C#6:1 -:.5 C#6:.5 E6:.5 | F#6:.75 E6:.75 C#6:.5 B5:1 -:.5 A5:.5 | "
+    "A5:.5 A5:.5 B5:.5 C#6:1 -:.5 E6:.5 F#6:.5 | A6:1.5 F#6:.5 E6:.5 C#6:.5 -:1"
+)
+# A third tune, for the square wave: A, G, F, E.
+THIRD = (
+    "A5:.75 A5:.75 B5:.5 C#6:1 -:.5 E6:.5 | F#6:1 E6:.5 C#6:.5 B5:.5 C#6:.5 A5:1 | "
+    "B5:.5 D6:.5 -:.5 D6:.5 E6:1 D6:.5 B5:.5 | A5:.75 B5:.75 G5:.5 -:.5 D5:.5 G5:.5 A5:.5 | "
+    "C6:1.5 A5:.5 -:.5 F5:.5 G5:.5 A5:.5 | C6:.5 D6:.5 F6:1 -:.5 D6:.5 C6:.5 A5:.5 | "
+    "G#5:.5 B5:.5 -:.5 B5:.5 C#6:.5 E6:.5 -:.5 G#6:.5 | B6:1.5 G#6:.5 E6:.25 G#6:.25 B6:.25 E7:.25 -:1"
+)
 END = "A5:.5 -:.5 A5:.5 -:.5 A5:.5 -:1.5"
-for name, beats in [(TUNE, 32), (CHANT, 32), (SECOND, 32), (DUEL, 32), (END, 4)]:
+for name, beats in [(TUNE, 32), (CHANT, 32), (SECOND, 32), (DUEL, 32), (SOLO, 32), (HARMONY, 16), (THIRD, 32), (END, 4)]:
     assert abs(length(name) - beats) < 1e-9, (name, length(name))
 
 ROOTS = (
@@ -62,9 +88,16 @@ ROOTS = (
     + ["A2"] * 4 + ["D3"] * 2 + ["E3"] * 2  # 13-20
     + ["D3"] * 2 + ["A2"] * 2 + ["F2"] * 2 + ["E2"] * 2  # 21-28
     + ["A2"] * 8  # 29-36
+    + ["F#2"] * 2 + ["D3"] * 2 + ["B2"] * 2 + ["E2"] * 2  # 37-44, the flute's solo
+    + ["A2"] * 4  # 45-48, the tune in harmony
+    + ["A2"] * 2 + ["G2"] * 2 + ["F2"] * 2 + ["E2"] * 2  # 49-56, the third tune
+    + ["A2"] * 4 + ["D3"] * 2 + ["E3"] * 2  # 57-64, the chant again
+    + ["A2"] * 8  # 65-72
 )
-assert len(ROOTS) == 36
+assert len(ROOTS) == 72
+MINOR = {"F#2", "B2"}
 PENT = (0, 2, 4, 7, 9, 12, 14, 16)
+MINOR_PENT = (0, 3, 5, 7, 10, 12, 15, 17)
 
 
 def main(out: str, voice: str = "marimba") -> None:
@@ -145,22 +178,22 @@ def main(out: str, voice: str = "marimba") -> None:
 
     def band(bar, circle=True, chords=True):
         """Bass in a 3-3-2 push, marimba chords on the off-beats, the fast pulse, the hand drums, kick and snare."""
-        b, root = bar * 4, n(ROOTS[bar])
+        b, root, minor = bar * 4, n(ROOTS[bar]), ROOTS[bar] in MINOR
         for (o, d), up in zip(((0, 0.75), (0.75, 0.75), (1.5, 0.5), (2, 0.75), (2.75, 0.75), (3.5, 0.5)), (0, 0, 7, 0, 7, 10)):
             put("bass", b + o, x.tri(root + up, d * 0.8, 0.32, release=0.01))
         if chords:
             for o in (0.5, 1.5, 2.5, 3.5):
-                for j, up in enumerate((16, 19, 21)):
+                for j, up in enumerate((15, 19, 22) if minor else (16, 19, 21)):
                     put("marimba", b + o, wood(root + up, 0.15, 0.11), (-0.4, 0.0, 0.4)[j])
         if circle:
             for i in range(16):
                 s = (0, 1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 5, 6, 5, 4, 3)[i]
-                put("arp", b + i * 0.25, x.pulse(root + 24 + PENT[s], 0.2, 0.125, 0.075, decay=0.04, sustain=0.4, release=0.004), -0.3)
+                put("arp", b + i * 0.25, x.pulse(root + 24 + (MINOR_PENT if minor else PENT)[s], 0.2, 0.125, 0.075, decay=0.04, sustain=0.4, release=0.004), -0.3)
         hands(bar), shaker(bar)
         x.kick(b, 0.42, soft=True), x.kick(b + 2, 0.38, soft=True), x.kick(b + 1.5, 0.22, soft=True)
         x.snare(b + 3, 0.1)
 
-    def sing(t, m, d, vol=1.0, pan=-0.1):
+    def sing(t, m, d, vol=1.0, pan=-0.1, voice=voice):
         """The main melody's note, on the voice asked for (`python3 song_m.py out.wav <voice>`): Eric is choosing one."""
         if voice == "thumb":  # a thumb piano with a pulse an octave under it
             put("thumb", t, wood(m + 12, 0.2 * vol, 0.2), pan)
@@ -189,7 +222,7 @@ def main(out: str, voice: str = "marimba") -> None:
         for b, d, m in line(start, text):
             put("flute", b, x.flute(m + up, max(d * 0.95, 0.22), vol), pan)
 
-    def tune(start, text, bell=False, vol=1.0):
+    def tune(start, text, bell=False, vol=1.0, voice=voice):
         """The thumb piano with a pulse an octave under it; a hand-drum slap answers in each half-beat gap."""
         t = start
         for tok in text.replace("|", " ").split():
@@ -199,12 +232,12 @@ def main(out: str, voice: str = "marimba") -> None:
                 conga(t, True, 0.2, slap=True) if d == 0.5 else None
             else:
                 m = n(name)
-                sing(t, m, d, vol)
+                sing(t, m, d, vol, voice=voice)
                 if bell:
                     put("sparkle", t, x.bell(m + 24, 1, 0.05, ratio=3.5, index=1.2, decay=0.2), 0.35)
             t += d
 
-    def chant(t, text):
+    def chant(t, text, answer="flute"):
         """Low notes: reed voices in fifths with the bass. High notes: the thumb piano and a thin pulse. A small
         burst pops in each one-beat gap."""
         for tok in text.replace("|", " ").split():
@@ -219,8 +252,26 @@ def main(out: str, voice: str = "marimba") -> None:
                     put("voices", t, x.reed(m + 19, d * 0.85, 0.1), 0.25)
                     put("bass", t, x.tri(m, d * 0.85, 0.3, release=0.01))
                 else:
-                    put("flute", t, x.flute(m, max(d * 0.95, 0.22), 0.2), 0.3)
+                    if answer in ("flute", "both"):
+                        put("flute", t, x.flute(m, max(d * 0.95, 0.22), 0.2), 0.3)
+                    if answer in ("square", "both"):
+                        sing(t, m - 12, d, voice="square" if answer == "square" else voice)
             t += d
+
+    def chant_band(first):
+        """Under the chant: hand drums and a kick; under each high answer also a held bass, a snare and the fast pulse."""
+        for bar in range(first, first + 8):
+            b = bar * 4
+            answer = bar % 2 == 1
+            hands(bar, FILL if answer else DRUMS), shaker(bar)
+            x.kick(b, 0.42, soft=True), x.kick(b + 2, 0.38, soft=True)
+            if answer:
+                root = n(ROOTS[bar])
+                put("bass", b, x.tri(root, 3.6, 0.3, release=0.02))
+                x.snare(b + 1, 0.1), x.snare(b + 3, 0.1)
+                for i in range(16):
+                    s = (0, 1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 5, 6, 5, 4, 3)[i]
+                    put("arp", b + i * 0.25, x.pulse(root + 24 + PENT[s], 0.2, 0.125, 0.07, decay=0.04, sustain=0.4, release=0.004), -0.3)
 
     # Bars 1-4: one rocket alone, its burst; the hand drums; the tune's first notes, far off; a sparkler; a rocket.
     whistle(0, 3, 76, 98, 0.2, -0.2)
@@ -246,18 +297,7 @@ def main(out: str, voice: str = "marimba") -> None:
     # Bars 13-20: the chant. No chords or fast pulse under the low calls; both under the high answers.
     boom(48, 0.4, 1.0)
     chant(48.0, CHANT)
-    for bar in range(12, 20):
-        b = bar * 4
-        answer = bar % 2 == 1
-        hands(bar, FILL if answer else DRUMS), shaker(bar)
-        x.kick(b, 0.42, soft=True), x.kick(b + 2, 0.38, soft=True)
-        if answer:
-            root = n(ROOTS[bar])
-            put("bass", b, x.tri(root, 3.6, 0.3, release=0.02))
-            x.snare(b + 1, 0.1), x.snare(b + 3, 0.1)
-            for i in range(16):
-                s = (0, 1, 2, 3, 4, 3, 2, 1, 2, 3, 4, 5, 6, 5, 4, 3)[i]
-                put("arp", b + i * 0.25, x.pulse(root + 24 + PENT[s], 0.2, 0.125, 0.07, decay=0.04, sustain=0.4, release=0.004), -0.3)
+    chant_band(12)
     whistle(78, 2, 81, 100, 0.08, 0.4)
 
     # Bars 21-28: the second tune, sparkling on top.
@@ -270,40 +310,88 @@ def main(out: str, voice: str = "marimba") -> None:
     sparkle(94, 2, 8), sparkle(104, 8, 20, 0.04)
     fizz(108, 4, 0.05)
 
-    # Bars 29-32: the barrage. The hand drums alone (a kick under them): three rockets, each higher, and their
-    # bursts; sparkles; then a sparkler and one long whistle into the tune.
-    boom(112, 0.5, 1.2)
-    for bar in range(28, 32):
-        hands(bar, FILL, 1.1), shaker(bar, 0.035)
-        x.kick(bar * 4, 0.42, soft=True), x.kick(bar * 4 + 2, 0.38, soft=True)
-    for i, (at, pan) in enumerate(((113, -0.5), (116, 0.5), (119, 0.0))):
-        whistle(at, 2, 79 + 3 * i, 96 + 3 * i, 0.09, pan)
-        boom(at + 2, 0.4 + 0.04 * i, 1.0, pan)
-        sparkle(at + 2.1, 2, 10, 0.05, 93 + 3 * i)
-    put("bass", 112, x.tri(n("A2"), 15.5, 0.24, attack=0.05, release=0.3))
-    fizz(120, 8, 0.07)
-    whistle(124, 4, 74, 101, 0.11)
-    for i in range(16):
-        x.snare(124 + i * 0.25, 0.03 + 0.008 * i)
+    def barrage(at, rockets):
+        """The hand drums alone (a kick under them) under rockets, each higher, and their bursts; sparkles; then a
+        sparkler and one long whistle."""
+        boom(at, 0.5, 1.2)
+        for bar in range(at // 4, at // 4 + 4):
+            hands(bar, FILL, 1.1), shaker(bar, 0.035)
+            x.kick(bar * 4, 0.42, soft=True), x.kick(bar * 4 + 2, 0.38, soft=True)
+        for i, (o, d, pan) in enumerate(rockets):
+            whistle(at + o, d, 79 + 3 * i, 96 + 3 * i, 0.09, pan)
+            boom(at + o + d, 0.4 + 0.03 * i, 1.0, pan)
+            sparkle(at + o + d + 0.1, 2, 10, 0.05, 93 + 3 * (i % 3))
+        put("bass", at, x.tri(n("A2"), 15.5, 0.24, attack=0.05, release=0.3))
+        fizz(at + 8, 8, 0.07)
+        whistle(at + 12, 4, 74, 101, 0.11)
+        for i in range(16):
+            x.snare(at + 12 + i * 0.25, 0.03 + 0.008 * i)
 
-    # Bars 33-36: the tune's first two bars, a run, then three hits with a burst on each; the last crackle falls on
-    # into bar 1.
+    # Bars 29-32: the barrage: three rockets.
+    barrage(112, ((1, 2, -0.5), (4, 2, 0.5), (7, 2, 0.0)))
+
+    # Bars 33-36: the tune back, marimba and flute together, and a rocket up into the solo.
     boom(128, 0.55, 1.4)
     x.crash(128, 0.18, decay=0.3)
     bars = TUNE.split("|")
-    tune(128, "|".join(bars[:2] + bars[6:7]), bell=True)
-    flute(128, "|".join(bars[:2] + bars[6:7]), 0.16, up=12)  # the two together at the end
-    for bar in (32, 33, 34):
+    back = "|".join(bars[:2] + bars[6:])
+    tune(128, back, bell=True)
+    flute(128, back, 0.16, up=12)
+    for bar in range(32, 36):
         band(bar)
-    sparkle(128, 12, 30, 0.04)
-    for b, d, m in line(140, END):
+    sparkle(128, 12, 24, 0.04)
+    whistle(141.5, 2.5, 78, 99, 0.09, -0.3)
+
+    # Bars 37-44: the flute's solo. The band moves to F sharp minor, D, B minor and E; no marimba lead.
+    boom(144, 0.45, 1.2)
+    flute(144, SOLO, 0.22, pan=0.15)
+    for bar in range(36, 44):
+        band(bar)
+    sparkle(158, 2, 8), sparkle(174, 2, 8)
+
+    # Bars 45-48: the solo lands on the main tune, flute and marimba in harmony.
+    x.crash(176, 0.16, decay=0.3)
+    tune(176, "|".join(bars[:4]))
+    flute(176, HARMONY, 0.2, pan=0.3)
+    for bar in range(44, 48):
+        band(bar)
+    whistle(190, 2, 81, 98, 0.07, 0.4)
+
+    # Bars 49-56: the third tune, on the square wave (Eric's close second), the band without its chords.
+    boom(192, 0.4, 1.0)
+    tune(192, THIRD, voice="square")
+    for bar in range(48, 56):
+        band(bar, chords=False)
+    sparkle(200, 8, 16, 0.04), sparkle(216, 8, 20, 0.04)
+    fizz(220, 4, 0.05)
+
+    # Bars 57-64: the chant again. The square wave answers the first two calls; flute and marimba together the last two.
+    boom(224, 0.4, 1.0)
+    chant(224.0, "|".join(CHANT.split("|")[:4]), answer="square")
+    chant(240.0, "|".join(CHANT.split("|")[4:]), answer="both")
+    chant_band(56)
+
+    # Bars 65-68: the big barrage: five rockets, closer together.
+    barrage(256, ((0.5, 1.5, -0.5), (2.5, 1.5, 0.5), (4.5, 1.5, -0.2), (6.5, 1.5, 0.2), (8.5, 1.5, 0.0)))
+
+    # Bars 69-72: the tune's first two bars (marimba and flute together), a run, then three hits with a burst on
+    # each; the last crackle falls on into bar 1.
+    boom(272, 0.55, 1.4)
+    x.crash(272, 0.18, decay=0.3)
+    last = "|".join(bars[:2] + bars[6:7])
+    tune(272, last, bell=True)
+    flute(272, last, 0.16, up=12)
+    for bar in (68, 69, 70):
+        band(bar)
+    sparkle(272, 12, 30, 0.04)
+    for b, d, m in line(284, END):
         put("thumb", b, wood(m + 12, 0.22, 0.2), -0.1)
         put("marimba", b, wood(m - 12, 0.24, 0.16), 0.2)
         put("bass", b, x.tri(m - 36, 0.4, 0.34, release=0.01))
         put("lead", b, x.pulse(m, 0.3, 0.25, 0.075, decay=0.1, sustain=0.5, release=0.01), 0.1)
         conga(b, False, 0.26), x.kick(b, 0.42, soft=True)
-        boom(b, 0.3 + 0.1 * (b - 140) / 2, 0.6 if b < 142 else 2.2, (-0.5, 0.5, 0.0)[int(b - 140) // 1 % 3])
-    sparkle(142.2, 1.8, 16)
+        boom(b, 0.3 + 0.1 * (b - 284) / 2, 0.6 if b < 286 else 2.2, (-0.5, 0.5, 0.0)[int(b - 284) // 2])
+    sparkle(286.2, 1.8, 16)
 
     x.echo("sparkle", 0.75, 0.25, 0.1)
     write_wav(out, x.mixdown({"bass": 0.55, "thumb": 1.4, "hand": 1.6, "sparkle": 2.2, "voices": 1.6, "arp": 1.3, "fx": 1.3}, lowpass=9500, room=0.18))
