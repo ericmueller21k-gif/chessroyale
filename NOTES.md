@@ -68,6 +68,35 @@ slow low line, a heartbeat, breaths and three glints.
 I can't listen to audio: levels, timing and the loop are checked by measurement, the notes and balance on paper. Expect to want
 balance tweaks.
 
+## Song C (Nov 11): a new 30-second song, in place of Song B
+Eric on Song B: "The 2nd song is awful." Song C is a new tune in the style of an 8-bit action game's stage theme (his
+reference's measured tempo, energy and brightness; none of its notes). Every melody, riff and chord progression is original.
+
+- **Files:** `track-C.ogg` / `.mp3` (the song alone, 30.0 s, loops), and `trailer-phone-C.mp4`: the phone trailer's first
+  30 s with Song C under it, the music fading over the last 0.5 s. The picture is cut for 150 beats a minute, so its cuts
+  don't land on Song C's beats; it's there to hear the song against the game, not as a finished cut.
+- **Tempo and length:** 160 beats a minute, 80 beats = 20 bars of four = 30.0 s.
+- **Key:** F sharp minor (Song A is D minor, Song B E major).
+- **Voices:** only the old console's four, one note at a time each. Pulse 1, the lead (a quarter pulse in the hook, a square
+  in the intro, the lift and the tag; vibrato on held notes, a quick slide up into the longer ones). Pulse 2, the chords as
+  fast broken 16ths (an eighth pulse; a quarter in the lift). A 16-step triangle bass in octave jumps on 8ths with 16th
+  pickups. Noise drums: a low burst for the kick, a snare, short hats, a crash at each section. No echo.
+- **Measured:** -16.0 LUFS; peak -5.4 dBFS (pulse waves are flat-topped, so at this loudness the peaks sit well under the
+  -1 dBFS ceiling: no clipping); every bar within 1 dB of the others (no quiet part); brightness (spectral centroid) about
+  3.5 kHz; the loop point's jump 0.003 of full scale.
+
+| Bars | Part | Chords (a bar each unless marked) | What plays |
+|---|---|---|---|
+| 1-2 | Intro | F#m, D to E | All four voices hit one syncopated riff together, then a run up and a snare roll |
+| 3-6 | Hook | F#m, E, D, Bm to C# | The main tune: a leap up to the fifth, a syncopated fall, ending on a held leading note |
+| 7-10 | Hook, the answer | F#m, A, D, E to C# | The same opening bar, then higher, up to the top G sharp; a roll into the lift |
+| 11-16 | Lift | D, E, C#m, F#m, D, E | Longer, higher notes on a square wave; pulse 2 climbs each chord; the hats go to 16ths |
+| 17-18 | Turnaround | Bm, C# | A quick run up, then the leading note; a fast roll |
+| 19-20 | Tag | F#m, C# | The intro's riff again, and a run up that loops back to bar 1 |
+
+Code: `scripts/reel/music/song_c.py` on `claude/trailer-v2` (`build.sh` builds all three). As with A and B, I can't listen:
+the notes and balance are set on paper and by measurement, so expect to want tweaks.
+
 ## Editing it
 On branch `claude/trailer-v2`:
 - `scripts/reel/record-reel.ts`: records each scene (`npx playwright test -c scripts/reel/reel.config.ts -g " town$" --project reel|wide`).
