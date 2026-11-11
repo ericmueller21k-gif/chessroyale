@@ -891,7 +891,7 @@ button.town-pic.player {
 }
 .tfr-parts th,
 .tfr-parts td {
-  padding: 0 3px;
+  padding: 0 2px;
   text-align: right;
   white-space: nowrap;
 }
@@ -919,6 +919,12 @@ button.town-pic.player {
   padding-left: 18px;
   font-size: 10px;
   line-height: 1.2;
+}
+/* (A 360 px phone: the table's six columns a size smaller, so the Worst column fits: Nov 11.) */
+@media (max-width: 380px) {
+  .tfr-parts {
+    font-size: 8.5px;
+  }
 }
 /* A computer's box is wide: the panel at a readable size in its middle. */
 @media (hover: hover) and (pointer: fine) {
