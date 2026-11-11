@@ -294,10 +294,15 @@ export function SpeechBox({ class: cls, text, at, until, now, fits = 0, balanced
     const e = el.current;
     if (!e || fit.dx || fit.dy) return;
     const r = e.getBoundingClientRect();
-    const out = r.top < 0 || r.left < 0 || r.right > innerWidth;
+    if (!r.width && !r.height) return; // (not drawn just now)
+    // (A computer's side menu down the window's left edge counts as off screen: a box under it is hidden. Don Dough's, Nov 11: his roll
+    // stands him further from the board, and his words came out under the menu.)
+    const nav = document.querySelector(".gm-frame > .fd-side")?.getBoundingClientRect();
+    const minX = nav && nav.width > 0 && nav.right < innerWidth / 2 ? Math.ceil(nav.right) : 0;
+    const out = r.top < 0 || r.left < minX || r.right > innerWidth;
     if (!out) return;
     if (fit.step < fits) setFit({ step: fit.step + 1, dx: 0, dy: 0 });
-    else setFit({ step: fit.step, dx: r.left < 0 ? -r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
+    else setFit({ step: fit.step, dx: r.left < minX ? minX - r.left : r.right > innerWidth ? innerWidth - r.right : 0, dy: r.top < 0 ? -r.top : 0 });
   }, [fit]);
   const { shown, rest } = sliceLine(text, typedCount(text, at, now));
   const leaving = until - now < SPEECH.fadeMs;

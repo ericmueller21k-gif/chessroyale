@@ -46,8 +46,8 @@ const B = ZEBRA_BEATS;
 const PIECE_NAME: Record<DoughPiece, string> = { p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen" };
 /** The words in the dock and under his banner: what each means for you. */
 export const ZEBRA_WORDS = {
-  drop: "His dough rises into his piece when its timer runs out. Land a piece on it to squash it.",
-  rise: "His dough rose into his piece.",
+  drop: "Land on his dough to squash it.",
+  rise: "His dough rose.",
   gold: "Your pawns can't take his gold piece.",
   goldNone: "Nothing of his to gild.",
 } as const;
@@ -202,11 +202,13 @@ export function OvenTimers({ boss, moments }: { boss: BossView; moments: () => M
   const key = battleKey(boss);
   const ms = moments();
   const now = Date.now();
-  // (A rise playing now: its lump's timer rings in its slot, though the lump has left the view.)
+  // (A rise playing now: its lump's timer rings in its slot, though the lump has left the view. A drop: its timer shows as the lump
+  // lands.)
   const rising = ms.filter((m) => m.kind === "doughRise" && now < m.at + m.ms);
+  const landing = ms.find((m) => m.kind === "doughDrop" && now < m.at + B.drop.landAt)?.square;
   const slots: { lump: DoughLump | null; run: string | null; ding?: boolean }[] = [];
   for (let slot = 0; slot < BOSS_POWERS.doughLive; slot++) {
-    const lump = z.lumps.find((l) => l.slot === slot) ?? null;
+    const lump = z.lumps.find((l) => l.slot === slot && l.square !== landing) ?? null;
     if (lump) {
       const k = `${key}:${lump.n}`;
       const before = seenLeft.get(k);
