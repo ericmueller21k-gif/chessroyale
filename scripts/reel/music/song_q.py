@@ -1,7 +1,7 @@
 """Song Q (Eric, Nov 11): Timber the beaver's theme, a two-minute loop: Song P's woodshop (the same kit, bass and tools,
 bar for bar) with the beaver's own tunes over it, on a high chattering xylophone with the marimba answering.
 See song_p.py for the form and the sounds.
-  python3 song_q.py <out.wav>
+  python3 song_q.py <out.wav> [voice]
 """
 import sys
 
@@ -9,9 +9,9 @@ from song_p import BEATS, BPM, SECS, compose  # noqa: F401 (the handoff reads BP
 from synth import write_wav
 
 
-def main(out: str) -> None:
-    write_wav(out, compose("beaver"))
+def main(out: str, voice: str | None = None) -> None:
+    write_wav(out, compose("beaver", voice))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])

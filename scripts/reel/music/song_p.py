@@ -15,7 +15,8 @@ The fast pattern under it all: logs in 16ths, zigzagging up the scale like a saw
 Sawyer's tunes are on the marimba, low, with the xylophone answering; the beaver's are on the xylophone, high and
 chattering (his woodpecker foreman), with the marimba answering. `compose(who)` makes either.
 Every melody, riff and chord progression here is original: none of it is any song's or any game's.
-  python3 song_p.py <out.wav>      (Sawyer's)      python3 song_q.py <out.wav>      (the beaver's)
+  python3 song_p.py <out.wav> [voice]      (Sawyer's)      python3 song_q.py <out.wav> [voice]      (the beaver's)
+  voice: another instrument for the lead: fiddle, harmonica, dulcimer, handpan, flute, gritty or square
 
   bars  1-8    the shop wakes: an axe alone; a hand saw; sandpaper, a hammer, the logs; the table saw spins up and cuts
   bars  9-16   the tune over the break and the bass
@@ -166,8 +167,9 @@ RIFFS = {
 }
 
 
-def compose(who: str) -> np.ndarray:
-    """The whole song as a stereo mix: the same woodshop for both, `who`'s tunes over it ("sawyer" or "beaver")."""
+def compose(who: str, voice: str | None = None) -> np.ndarray:
+    """The whole song as a stereo mix: the same woodshop for both, `who`'s tunes over it ("sawyer" or "beaver").
+    `voice`: another instrument for the lead (see VOICES below), for Eric to choose from."""
     x = Mix(SECS, BEATS, os=2, seed=149)
     put = x.put
     rng = np.random.default_rng(19)
@@ -378,11 +380,11 @@ def compose(who: str) -> np.ndarray:
             s = (0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5, 3, 4, 2, 3, 1)[i]
             put("logs", bar * 4 + i * 0.25, wood(n(root) + scale[s % 5] + 12 * (s // 5), vol * (1.0 if i % 4 == 0 else 0.7), 0.07, 0.5, 3.0), 0.4 if i % 2 else -0.4)
 
-    def marimba(b, m, vol=1.0, pan=0.0, bus="lead"):
+    def marimba(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
         put(bus, b, wood(m, 0.3 * vol, 0.24, 0.3, 4.0), pan)
         put(bus, b, wood(m + 12, 0.18 * vol, 0.16, 0.3, 4.0), pan)  # in octaves, so it carries over the kit
 
-    def xylo(b, m, vol=1.0, pan=0.0, bus="lead"):
+    def xylo(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
         put(bus, b, wood(m, 0.34 * vol, 0.11, 0.55, 3.0), pan)
         put(bus, b, wood(m - 12, 0.1 * vol, 0.16, 0.3, 4.0), pan)
 
@@ -398,10 +400,82 @@ def compose(who: str) -> np.ndarray:
         `harmony`: each note's third instead of the note."""
         for b, d, m in line(start, text):
             m = (third(m) if harmony else m) + up
-            inst(b, m, vol, pan, bus)
-            if roll and d >= 1.5:
+            inst(b, m, vol, pan, bus, d)
+            if roll and d >= 1.5 and inst not in HELD:
                 for j in range(1, int(d / 0.25)):
-                    inst(b + j * 0.25, m, vol * 0.5, pan, bus)
+                    inst(b + j * 0.25, m, vol * 0.5, pan, bus, 0.25)
+
+    # ---- other leads (Eric, on the marimba and xylophone: "sounds really basic"; these are his choices) ----
+    def tone(m, beats, harm, vol, detune=(0.0,), vib=0.0, vib_hz=5.5, scoop=0.0, scoop_s=0.03, attack=0.02, release=0.03, trem=0.0, trem_hz=6.0, bright=None):
+        """A held note built from its harmonics: `detune` cents, a copy each; `vib` once the note settles; `scoop`
+        semitones: it slides up into the note from that far under; `trem`: the level wobbles; `bright` (s): the
+        upper harmonics die away that fast."""
+        k = x.k(beats)
+        t = np.arange(k) / sr
+        out = np.zeros(k)
+        for c in detune:
+            f = x.hz(m + c / 100) * (1 + vib * np.sin(tau * vib_hz * t) * np.clip((t - 0.1) / 0.12, 0, 1)) * 2 ** (-scoop * np.exp(-t / scoop_s) / 12)
+            ph = tau * np.cumsum(f) / sr
+            for i, a in enumerate(harm):
+                if a == 0 or x.hz(m) * (i + 1) > 0.45 * 48000:
+                    continue
+                w = a * np.sin((i + 1) * ph + 0.7 * i)
+                out += w * (0.25 + 0.75 * np.exp(-t * i / (bright * 3))) if bright is not None and i > 0 else w
+        env = np.minimum(1, t / attack) * np.minimum(1, (k - 1 - np.arange(k)) / (release * sr))
+        if trem:
+            env = env * (1 - trem * (0.5 - 0.5 * np.cos(tau * trem_hz * t)))
+        return out / len(detune) * env * vol
+
+    FIDDLE = [1, 0.72, 0.55, 0.42, 0.3, 0.24, 0.18, 0.13, 0.1, 0.07, 0.05]
+    REEDS = [1, 0.5, 0.7, 0.3, 0.5, 0.2, 0.35, 0.12, 0.2, 0.08, 0.12]
+    STRUCK = [1, 0.8, 0.6, 0.5, 0.4, 0.3, 0.22, 0.16, 0.12, 0.09, 0.07, 0.05]
+    SAWS = [1 / h for h in range(1, 17)]
+
+    def fiddle(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A fiddle: a bowed string, a little slide up into each note, vibrato on the long ones."""
+        long = d >= 0.75
+        put(bus, b, tone(m + 12, d * (0.97 if long else 0.9), FIDDLE, GAIN["fiddle"] * vol, vib=0.01 if long else 0.0, vib_hz=6.0,
+                         scoop=0.6 if long else 0.25, scoop_s=0.025, attack=0.04 if long else 0.014), pan)
+
+    def harmonica(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A harmonica: two reeds a hair apart, bent up into each note, the hand's wobble on the long ones, breath."""
+        long = d >= 0.75
+        w = tone(m + 12, d * 0.95, REEDS, GAIN["harmonica"] * vol, detune=(-6, 6), scoop=0.9 if long else 0.4, scoop_s=0.04, attack=0.018, trem=0.25 if long else 0.0, trem_hz=6.5)
+        put(bus, b, w + hiss(len(w), 7000, 0.6) * np.minimum(1, np.arange(len(w)) / (0.02 * sr)) * tail(len(w), 0.03) * 0.12 * GAIN["harmonica"] * vol, pan)
+
+    def dulcimer(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A hammered dulcimer: bright strings in pairs a hair apart, struck and left to ring."""
+        w = tone(m + 12, d + 1.2, STRUCK, GAIN["dulcimer"] * vol, detune=(-8, 7), attack=0.003, release=0.05, bright=0.16)
+        put(bus, b, w * np.exp(-np.arange(len(w)) / sr / 0.26), pan)
+
+    def handpan(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A handpan: a steel bowl struck with the fingers: the note, its octave and the fifth over that, each fading
+        at its own pace."""
+        k = int(1.2 * sr)
+        t = np.arange(k) / sr
+        f = tau * x.hz(m) * t
+        w = np.sin(f) * np.exp(-t / 0.45) + 0.6 * np.sin(2.003 * f) * np.exp(-t / 0.3) + 0.4 * np.sin(2.997 * f) * np.exp(-t / 0.2) + 0.12 * np.sin(4.1 * f) * np.exp(-t / 0.08)
+        put(bus, b, (w + 0.25 * hiss(k, 3000) * np.exp(-t / 0.004)) * np.minimum(1, t / 0.003) * tail(k) * GAIN["handpan"] * vol, pan)
+
+    def flute_marimba(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A wooden flute with the marimba an octave under it."""
+        marimba(b, m, 0.7 * vol, pan, bus)
+        put(bus, b, x.flute(m + 12, max(d * 0.95, 0.2), GAIN["flute"] * vol), pan + 0.2)
+
+    def gritty(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """A drum-and-bass lead: three sawtooths a hair apart, driven hard, each note opening bright and closing."""
+        w = tone(m, d * 0.92, SAWS, 1.0, detune=(-14, 0, 13), scoop=0.5, scoop_s=0.02, attack=0.006, release=0.02, bright=0.12)
+        put(bus, b, np.tanh(2.2 * w) * GAIN["gritty"] * vol, pan)
+
+    def square(b, m, vol=1.0, pan=0.0, bus="lead", d=0.5):
+        """The old console's lead: a pulse wave, vibrato on the long notes, a square an octave under."""
+        put(bus, b, x.pulse(m + 12, d * 0.9, 0.25, GAIN["square"] * vol, vib=0.012 if d >= 1 else 0.0, decay=0.2, sustain=0.6, release=0.008), pan)
+        put(bus, b, x.pulse(m, d * 0.9, 0.5, 0.4 * GAIN["square"] * vol, decay=0.2, sustain=0.6, release=0.008), pan)
+
+    # Each one's level, set by measurement so they all sit where the marimba does.
+    GAIN = {"fiddle": 0.145, "harmonica": 0.2, "dulcimer": 0.276, "handpan": 0.22, "flute": 0.19, "gritty": 0.21, "square": 0.15}
+    VOICES = {"fiddle": fiddle, "harmonica": harmonica, "dulcimer": dulcimer, "handpan": handpan, "flute": flute_marimba, "gritty": gritty, "square": square}
+    HELD = (fiddle, harmonica, flute_marimba, gritty, square)  # these hold a long note; the others are struck again
 
     # ---- the bass ----
     def bass(b, m, beats, vol=0.42, slide=0.0):
@@ -589,6 +663,7 @@ def compose(who: str) -> np.ndarray:
     # ======== the tunes ========
     tunes = TUNES[who]
     lead, answer = (marimba, xylo) if who == "sawyer" else (xylo, marimba)
+    lead = VOICES[voice] if voice else lead
     far = 12 if who == "sawyer" else -12  # where the answering instrument sits against the lead
     first, second = "|".join(tunes["tune"].split("|")[:8]), "|".join(tunes["tune"].split("|")[8:])
     sing(lead, "lead", 32, tunes["tune"])  # bars 9-24
@@ -619,9 +694,9 @@ def compose(who: str) -> np.ndarray:
     return x.mixdown(levels, lowpass=8500, room=0.12)
 
 
-def main(out: str) -> None:
-    write_wav(out, compose("sawyer"))
+def main(out: str, voice: str | None = None) -> None:
+    write_wav(out, compose("sawyer", voice))
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])
