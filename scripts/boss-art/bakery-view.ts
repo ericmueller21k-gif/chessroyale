@@ -500,7 +500,7 @@ if (cmd === "stills") {
     ["outside", (W, H) => shoot(W, H, [0, 1.5], "town", 1300, [], [0.4, 2.6])],
     ["front", (W, H) => shoot(W, H, [9.5, 15.5], FRONT, 400, frontFigs(400, [9.5, 15.5]), [9.5, 15.5])],
     ["front-counter", (W, H) => shoot(W, H, [11, 10], FRONT, 900, frontFigs(900, [11, 10]), [11, 10])],
-    ["back", (W, H) => shoot(W, H, CHALLENGE_CAM, BACK, 1200, backFigs(1200), [9.2, 8.4])],
+    ["back", (W, H) => shoot(W, H, CHALLENGE_CAM, BACK, 1200, backFigs(1200), [8.6, 8.3])],
   ];
   for (const [name, mk] of shots) {
     const s = mk(PHONE.W, PHONE.H);
@@ -559,7 +559,8 @@ if (cmd === "stills") {
   // 4. The talk beat: you're at his table. The crew stand up and draw (the crew's line), he waves them down (relax), they lower, his
   // challenge line.
   const YOU: [number, number] = [8.45, 6.75];
-  const lines = { crew: "Hey! Who let HIM back here?!", relax: "Relax, relax. Put the bread down.", challenge: "So. You came to play, or to look?" };
+  // (The talk beat's lines: out/zebra-chatter-nov10.md.)
+  const lines = { crew: "Hey! Who let HIM back here?!", relax: "Relax, relax. Put the bread down.", challenge: "So. You came to play, or to watch the stream?" };
   const beat = async (dur: number, f: (t: number) => Parameters<typeof backFigs>[1]) => {
     for (let t = 0; t < dur; t += STEP) await snap(shoot(PHONE.W, PHONE.H, CHALLENGE_CAM, BACK, (ms += STEP), backFigs(ms, f(t)), YOU));
   };
