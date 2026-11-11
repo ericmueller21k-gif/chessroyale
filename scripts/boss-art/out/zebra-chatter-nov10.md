@@ -5,8 +5,8 @@ theory ("Rb1, takes, check"), and teasing, never "are you stupid". Plus the fron
 and the battle-start pair. Lines are kept to speech-bubble length (the other bosses' run about 35 to 50 characters; none here is over 58 characters).
 
 **Who speaks.** The crew by their look (crew-zebra.ts): **Toque** (`npc-zebra-crew-c`, the theory nerd: toque, glasses, pencil),
-**Fedora** (`npc-zebra-crew-d`: grey fedora, scar), **Beanie** (`npc-zebra-crew-e`: red beanie, bow tie); the **Kingpin** (the boss: his
-name is Eric's call). The guards: **Flat cap** (`npc-zebra-guard-a`) and **Paper cap** (`npc-zebra-guard-b`); the **Counter zebra**.
+**Fedora** (`npc-zebra-crew-d`: grey fedora, scar), **Beanie** (`npc-zebra-crew-e`: red beanie, bow tie); the **Kingpin**, **Don Dough** (the boss;
+Eric named him Nov 11). His opening comments and power lines: [zebra-openings-nov10.md](zebra-openings-nov10.md). The guards: **Flat cap** (`npc-zebra-guard-a`) and **Paper cap** (`npc-zebra-guard-b`); the **Counter zebra**.
 Suggested animations: the crew line on `sitArgue` or `sitTalk`, the others `sitListen`; the kingpin on `sitScoff` (a correction) or
 `sitTalk`.
 
@@ -88,7 +88,7 @@ are his.
 | 6 | Paper cap | We sell bread. Only bread. Ask anybody. |
 | 7 | Flat cap | Chess? Never heard of it. Croissant? |
 | 8 | Paper cap | Don't mind the yelling. That's the oven. |
-| 9 | Flat cap | Nobody plays nothing in here. Capisce? |
+| 9 | Flat cap | Nobody plays nothing in here. Got it? |
 | 10 | Paper cap | Hooves off the baguettes, pal. |
 | 11 | Counter zebra | Rye, sourdough, or... the special box? |
 | 12 | Counter zebra | Fresh today. Fresh every day. No questions. |

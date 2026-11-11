@@ -27,4 +27,31 @@ PASS lucena: legal (3 plies); eval ok: 1.00 for the side to move (c1d1) in [0.9,
 PASS philidor: legal (1 plies); eval ok: 0.50 for the side to move (e8e7) in [0.35, 0.65]: rook on the third rank (the sixth from his side), king in front: a draw
 PASS philidor-behind: legal (1 plies); eval ok: 0.50 for the side to move (a2f2) in [0.35, 0.65]: once the pawn steps to the sixth, the rook goes behind and checks from the back: still a draw
 PASS opposition: legal (1 plies); eval ok: 1.00 for the side to move (e1f2) in [0.9, 1]: king and pawn (Ke1, e2 against Ke8): White to move wins; compare ok: Kd2 1.00 vs e4 0.50 for the mover: the king first (Kd2) wins; the pawn first (e4) lets Black take the opposition: a draw
+PASS op-italian: legal (5 plies); book: "Italian Game: Giuoco Piano" (7 plies) has "Italian Game"; attacks ok: c4 hits f7
+PASS op-italian-slow: legal (9 plies); book: "Italian Game: Giuoco Piano" (7 plies) has "Italian Game"
+PASS op-ruy: legal (5 plies); book: "Ruy Lopez: Berlin Defense" (7 plies) has "Ruy Lopez"; attacks ok: b5 hits c6; attacks ok: c6 hits e5
+PASS op-scotch: legal (7 plies); book: "Scotch Game" (7 plies) has "Scotch Game"
+PASS op-petrov: legal (5 plies); book: "Petrov's Defense" (5 plies) has "Petrov"; compare ok: d6 0.47 vs Nxe4 0.39 for the mover: 3...d6 first; copying with 3...Nxe4 scores worse (4.Qe2)
+PASS op-petrov-qe2: legal (7 plies); book: "Petrov's Defense" (5 plies); attacks ok: e2 hits e4
+PASS op-kings-gambit: legal (6 plies); book: "King's Gambit Accepted" (5 plies) has "King's Gambit Accepted"
+PASS op-sicilian: legal (2 plies); book: "Sicilian Defense" (3 plies) has "Sicilian Defense"; attacks ok: c5 hits d4
+PASS op-open-sicilian: legal (6 plies); book: "Sicilian Defense: Modern Variations" (5 plies) has "Sicilian Defense"
+PASS op-french: legal (4 plies); book: "French Defense" (3 plies) has "French Defense"
+PASS op-caro: legal (4 plies); book: "Caro-Kann Defense" (3 plies) has "Caro-Kann"; attacks ok: c6 hits d5
+PASS op-scandinavian: legal (5 plies); book: "Scandinavian Defense: Mieses-Kotroc Variation" (5 plies) has "Scandinavian Defense"; attacks ok: c3 hits d5
+PASS op-pirc: legal (6 plies); book: "Pirc Defense" (5 plies) has "Pirc Defense"
+PASS op-modern: legal (4 plies); book: "Modern Defense" (3 plies) has "Modern Defense"; attacks ok: g7 hits d4
+PASS op-alekhine: legal (7 plies); book: "Alekhine Defense: Normal Variation" (5 plies) has "Alekhine"; attacks ok: d4 hits e5
+PASS op-alekhine-chase: legal (5 plies); book: "Alekhine Defense: Normal Variation" (5 plies) has "Alekhine"; attacks ok: c4 hits d5
+PASS op-qgd: legal (8 plies); book: "Queen's Gambit Declined: Normal Defense" (7 plies) has "Queen's Gambit Declined"
+PASS op-qga: legal (4 plies); book: "Queen's Gambit Accepted" (5 plies) has "Queen's Gambit Accepted"
+PASS op-slav: legal (10 plies); book: "Slav Defense: Two Knights Attack" (9 plies) has "Slav"; attacks ok: c6 hits d5
+PASS op-london: legal (10 plies); book: "Queen's Pawn Game: London System" (7 plies) has "London"; hangs ok: b2 (the side to move's) attacked, defended by nobody
+PASS op-kid: legal (8 plies); book: "King's Indian Defense" (7 plies) has "King's Indian"
+PASS op-nimzo: legal (6 plies); book: "Nimzo-Indian Defense" (7 plies) has "Nimzo-Indian"; attacks ok: b4 hits c3
+PASS op-qid: legal (8 plies); book: "Queen's Indian Defense" (7 plies) has "Queen's Indian"; attacks ok: b7 hits e4
+PASS op-dutch: legal (2 plies); book: "Dutch Defense" (3 plies) has "Dutch Defense"; attacks ok: f5 hits e4
+PASS op-stonewall: legal (10 plies); book: "Dutch Defense: Fianchetto Variation" (7 plies) has "Dutch"
+PASS op-english: legal (2 plies); book: "English Opening: King's English Variation" (3 plies) has "English Opening"
+PASS op-reti: legal (3 plies); book: "Réti Opening" (13 plies) has "Réti Opening"; attacks ok: c4 hits d5
 all passed
