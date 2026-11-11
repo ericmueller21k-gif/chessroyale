@@ -254,6 +254,13 @@ describe("rooms, and going in and out (Nov 11: Eric's iPhone, inside shop rooms 
       ["Room", 2],
       ["In/out", 4],
     ]);
+    // (Nov 11, Eric: "?report is pausing when I run into the building": the pill's seconds were set by the town's frames alone.)
+    const secs: number[] = [];
+    rec.onSec = (s) => secs.push(s);
+    rec.door = F.goIn;
+    frame(16.7, false, 0, 2);
+    for (let i = 0; i < 120; i++) frame(16.7, i % 2 === 0, NaN, NaN, F.room);
+    expect(secs, "a room's frames count the pill's seconds on").toEqual([1, 2]);
   });
 
   it("the ?fps pill counts every frame it's given (the town's and a room's), twice a second; a restart never spans the pause", () => {

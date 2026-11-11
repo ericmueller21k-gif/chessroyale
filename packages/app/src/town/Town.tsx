@@ -1073,12 +1073,14 @@ function startTown(
   setRec(rec);
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
-  let recSecs = -1;
   if (rec) {
     const host = cv.parentElement!;
     const timer = timerStep();
     recPill = reportPill(host, () => rec.finish());
     recPill.set("Report: walk or turn to start", false);
+    // (The pill's seconds, once a second, from whichever loop records: the town's or a room's. Nov 11, Eric: "?report is pausing when
+    // I run into the building": they were set by the town's frames alone, so inside a room the pill stood still.)
+    rec.onSec = (sec) => recPill?.set(`● Recording ${sec} s`, true);
     rec.onDone = () => {
       recPill?.set("Report ready", false);
       setRec(null);
@@ -1090,7 +1092,6 @@ function startTown(
         () => {
           recPanel?.remove();
           recPanel = null;
-          recSecs = -1;
           rec.again();
           setRec(rec);
           recPill?.set("Report: walk or turn to start", false);
@@ -1343,11 +1344,6 @@ function startTown(
     if (rc) {
       rc.mark(P.minimap);
       rc.end(town.you.walker.moving(), heading, zoomCur);
-      // (The pill's seconds, set once a second.)
-      if (rc.state === "rec") {
-        const sec = Math.floor((now - rc.startAt) / 1000);
-        if (sec !== recSecs) recPill?.set(`● Recording ${(recSecs = sec)} s`, true);
-      }
     }
     FPS?.tick(now);
     raf = requestAnimationFrame(frame);
