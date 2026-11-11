@@ -7,7 +7,7 @@ import { MOVE_MEAN_DB, MOVE_PEAK } from "../src/characters/synth.ts";
 import { ZEBRA_DOUGH } from "../src/characters/zebra-dough.ts";
 import { GOLD_FX } from "../src/characters/zebra-gold.ts";
 import { GOLD_CLOSE, OPENING_FALLBACK, OPENING_LINES, barRows, goldClose, goldFor, openingLine, speechParts } from "../src/characters/zebra-lines.ts";
-import { ZEBRA_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
+import { ZEBRA_ROOM_SOUNDS, ZEBRA_SOUNDS, zebraSound } from "../src/characters/zebra-sounds.ts";
 import { ZEBRA_BEATS, zebraFen, zebraGold, zebraItems } from "../src/components/Zebra.tsx";
 import type { Moment } from "../src/components/PowerParts.tsx";
 import type { BossView } from "../src/game.ts";
@@ -119,7 +119,8 @@ describe("his dough and gold on the board", () => {
 
 describe("his sounds", () => {
   it("no louder than a piece's move, in line with the other bosses', and the same every time", () => {
-    for (const name of ZEBRA_SOUNDS) {
+    // (His own: the room's four are quieter by design, shop-zebra.test.ts.)
+    for (const name of ZEBRA_SOUNDS.filter((n) => !ZEBRA_ROOM_SOUNDS.includes(n))) {
       const s = zebraSound(name, 44100);
       let peak = 0;
       let sum = 0;

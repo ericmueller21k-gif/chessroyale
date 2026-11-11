@@ -39,7 +39,7 @@ describe("one fixed view (round 5; Eric: \"There should be one view point no mat
       }
   });
   it("each home has a strip: the sidewalk squares right before its front, as wide as it, its door square among them", () => {
-    expect(STRIPS).toHaveLength(16);
+    expect(STRIPS).toHaveLength(17);
     for (const s of STRIPS) {
       const l = STREET_HOMES.find((h) => h.id === s.home)!;
       expect(s.squares.length, s.home).toBeGreaterThanOrEqual(2);
@@ -196,7 +196,7 @@ describe("the Colosseum against the back wall (round 5; Eric: \"you can't go pas
             });
           }
     // (The Colosseum is one thing in the world: drawn where the shortest way round puts it, once.)
-    expect(HOMES.length).toBe(16);
+    expect(HOMES.length).toBe(17);
   });
   it("the statues and chess pieces stand on the plaza, planted, never overlapping: the queen and king by the portal, the statues before the flanks, the lesser pieces at its front corners", () => {
     const fig = PROPS.filter((p) => p.kind === "statue" || p.kind === "piece");

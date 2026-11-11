@@ -34,7 +34,7 @@ import { renderFrame, type Character } from "../characters/sprite.ts";
 import { BOSS_ART, pawnImage } from "../town/render.ts";
 import { dressedPawn } from "../town/you-look.ts";
 import type { SidekickSheet } from "../town/sidekick-sheets.ts";
-import { BOTS, isSprite, type HomeId, type TownBot } from "../town/world.ts";
+import { BOTS, hasTownBoss, isSprite, type HomeId, type TownBossId, type TownBot } from "../town/world.ts";
 import { ARENA_BANNER } from "./sprites/arena-banner.ts";
 import { ARENA_FLOOR } from "./sprites/arena-floor.ts";
 import { ARENA_PILLAR } from "./sprites/arena-pillar.ts";
@@ -335,7 +335,7 @@ async function sidekickPicture(sheet: SidekickSheet): Promise<{ c: HTMLCanvasEle
 }
 
 /** A boss's idle first frame (its sprite), standing on what's drawn. */
-function bossPicture(id: HomeId): { c: HTMLCanvasElement; foot: number; meters: number } {
+function bossPicture(id: TownBossId): { c: HTMLCanvasElement; foot: number; meters: number } {
   const ch = BOSS_ART[id];
   const { w, h, data } = renderFrame(ch, ch.anims.idle!.frames[0]!);
   let y0 = h;
@@ -359,7 +359,7 @@ function bossPicture(id: HomeId): { c: HTMLCanvasElement; foot: number; meters: 
 }
 
 /** The bosses that come to watch: every boss with a sidekick (each sits once, its sidekick beside it: arena.ts `bossSeats`). */
-const WATCHING: readonly HomeId[] = BOTS.flatMap((b) => (isSprite(b.look) && b.boss ? [b.boss] : []));
+const WATCHING: readonly TownBossId[] = BOTS.flatMap((b) => (isSprite(b.look) && b.boss && hasTownBoss({ id: b.boss }) ? [b.boss as TownBossId] : []));
 /** The pawn tints of the crowd's plain pawns (the town's bots' tints, and a few more). */
 const TINTS: readonly (string | null)[] = [null, "#ffb3c6", "#9fd3ff", "#3c6e5a", "#c9a46b", "#b48ad6", "#f2d16b"];
 /** How many crowd pawns in crate items (looks seeded the way every bot's is: `botLook`). */
