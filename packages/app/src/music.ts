@@ -11,6 +11,9 @@
  * The handoff's rules (branch stills/trailer-v2, boss-music/README.md): play the intro at t0; start the loop at
  * t0 + introSeconds from offset `pad`, looping between `pad` and `pad + loopSeconds` (the intro's tails ring over the
  * loop's start; the pads hide a decoder's silence at the file's ends). Lengths come from themes.json, never from here.
+ *
+ * Its room too (Nov 11, docs/decisions/2026-11-11-area-banner-room-music.md): walked into through the door on your own, the boss's
+ * theme plays there (`roomMusic`), until you leave or a battle takes over (which restarts it from its intro).
  */
 import { MUSIC } from "@chessroyale/core";
 import { forgetAudioFile, isMuted, isPageHidden, loadAudioFile, musicBus, onAudioRebuilt, onMuteChange } from "./sound.ts";

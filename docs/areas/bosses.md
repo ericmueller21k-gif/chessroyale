@@ -27,6 +27,13 @@ moments, lines and sounds), `engine` (the boss's chess strength). The God King h
   plays nothing. **Adding a boss's theme:** its `.mp3` pieces from the handoff (`boss-music/` on `stills/trailer-v2`) into
   `public/music/`, its entry into `themes.json` (lengths from there, never from code); no code change (`public/music/README.md`).
   Tests: `packages/app/test/music.test.ts`, `e2e/grex.spec.ts` ("Jefferson's music").
+  **In the boss's room (Nov 11, Eric: "only play the music if you walk in on your own through the door, not via challenging the
+  boss"):** walking into a home through its door (Town.tsx) loads its theme as the door zooms (`roomMusicLoad`) and plays it, intro
+  then loop, as the room shows (`roomMusic`); the same player, gain, switches and fades. Rolling Dough's door between rooms carries
+  on with no restart (Don's theme plays in both: you must walk in). Leaving fades it out over 1.5 s and lets the theme go, unless a
+  battle with that boss has begun. Challenging from inside: the battle fades the room's music out as it's picked and restarts the
+  same decoded theme from its intro as it starts (no second fetch). Arriving by a challenge from the town: no room music.
+  docs/decisions/2026-11-11-area-banner-room-music.md.
 - **Banners and lines (Eric, Nov 5):** a power's banner shows your pawn on the right (the God King only for his save, LastStand); a boss's name is his small portrait plus his name, never his emoji (`BossTag`, the status line); the banner's name stays whole. [decision](../decisions/2026-11-05-banners-emoji-cards.md); rules in [eric.md](../rules/eric.md).
 - **A boss can be rested** (`PAUSE_BOSS_<ID>`, [ops.md](ops.md) "Kill switches"): the boss menu hides him, a raid
   lobby picked for him is refused, and every match's pick skips him (`rosterWithout` in `boss.ts`, a lobby's or solo

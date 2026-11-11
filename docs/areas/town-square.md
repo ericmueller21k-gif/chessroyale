@@ -675,6 +675,15 @@ and [2026-11-02-bigger-showpieces.md](../decisions/2026-11-02-bigger-showpieces.
   `fadeMs`), the room's code and art load (only now: `shops/ShopRoom.tsx` and each room's art are chunks of their own), the town waits
   (`pause`: no frames, nothing moves, its chips put away) and the room fades in from black. **Going out** ("Go out", or the back button,
   which inside a shop means out, not home): the room fades to black and the town zooms back out from the door, you where you stood.
+  **The area banner (Nov 11, Eric's mockup):** as the black lifts on a room you walked into through its door (the town's, or Rolling
+  Dough's door between rooms; never one you arrive in by a challenge), its name across a soft dark band a third down the room's view:
+  the boss's name and 's in gold in the pixel font ("DON DOUGH'S"; Rolling Dough's back room "BACK ROOM"; a room with no boss nothing),
+  gold rules above and below, the home's name in Archivo Black (`town/AreaBanner.tsx`, `areaBannerOf`, from the homes' and rooms'
+  data). Fades in 0.4 s, holds 1.8 s, fades out 0.6 s (`AREA_BANNER`; reduced motion: no fades); taps pass through it; sized from
+  the room's view (container units). **Room music:** the boss's theme loads as the door zooms and plays as the room shows (below,
+  and docs/areas/bosses.md "Music"). Tests: `e2e/zebra-home.spec.ts` (the banner's words, place, taps through it, gone by 4 s; none
+  arriving by the challenge), `packages/app/test/music.test.ts` ("a boss's room").
+  docs/decisions/2026-11-11-area-banner-room-music.md.
 - **The room** (`shops/ShopRoom.tsx`): 20 × 20 squares from the art's layout (`shops/babur-art.ts`, `shops/puddles-art.ts`, copied from
   `claude/boss-art`), drawn as the approved mockup (`scripts/boss-art/shop-view.ts` there) drew it, through `camera.ts` (`setView`'s
   `sets`: the room's own camera sets): the floor tiles baked once into one picture and laid flat in blocks of two squares (a block drawn
