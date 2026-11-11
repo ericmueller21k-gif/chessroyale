@@ -3667,10 +3667,12 @@ export const FAIRPLAY = {
     /** An engine user picks the judges' best at least this often, wherever the crowd stands (the evidence's other side). */
     cheatFind: 0.8,
     /**
-     * An engine user's picks against the deep re-check: its best this often, one of its next two, neither (its own
-     * engine, depth or version can differ from ours).
+     * An engine user's picks against the deep re-check: its best this often, one of its next two or near its best
+     * (`deep.nearBestLoss`), neither (its own engine, depth or version can differ from ours). Measured Nov 11: the live demo's
+     * Stockfish 19 was our 17.1's exact best 74% of the time; the simulation's other engine splits the rest about 12 to 1
+     * (reports/fairplay.md, "Near the engine's best"). Was [0.85, 0.13, 0.02], a guess.
      */
-    cheatDeep: [0.85, 0.13, 0.02] as readonly [number, number, number],
+    cheatDeep: [0.74, 0.24, 0.02] as readonly [number, number, number],
     /** Timing: a hard find this fast is suspicious; timing needs this many counted moves with a crowd. */
     fastHardMs: 5_000,
     minTimed: 8,
