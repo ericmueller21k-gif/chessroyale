@@ -190,7 +190,9 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
       async () => {
         const z = (await zebra(page))!;
         if (z.beat && steps[steps.length - 1] !== z.beat) steps.push(z.beat);
-        if (z.say && lines[lines.length - 1] !== z.say.text) lines.push(z.say.text);
+        // (Only the beat's lines: until the scene's next frame starts the beat, the hook can still report the chatter line that was up
+        // as Talk was tapped; from the beat on, the chatter is stopped for good.)
+        if (z.beat && z.say && lines[lines.length - 1] !== z.say.text) lines.push(z.say.text);
         for (const f of z.figs) if (f.name !== "don") anims.add(f.anim);
         // (The stills: the crew aiming with Fedora's line; Don waving them down with his.)
         const still = z.say?.text === ZEBRA_LINES.draw ? "talk-aim" : z.say?.text === ZEBRA_LINES.relax ? "talk-relax" : null;
