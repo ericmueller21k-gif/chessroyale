@@ -52,7 +52,8 @@ import { ROW_GROUND, STREET_BUILDINGS, STREET_GROUND, STREET_GROUND_KEY, STREET_
 /** The lots' squares (a camera standing in one, backed up to a front, sees from your square only). */
 const ROW_LOT = STREET_GROUND.map((g) => +(g === STREET_GROUND_KEY.L));
 import { affine, boxPoint, geomOf, lotArt, newPlan, planBox, streetBoxes, type BoxInst, type BoxPlan, type WallPlan } from "./boxes.ts";
-import { seenEither, seenFrom, seenReady } from "./seen.ts";
+import { seenEither, seenFrom, seenReady, seenWorked } from "./seen.ts";
+import { P, REC, type PartId } from "./frame-report.ts";
 import { bakeRoof, type Piece, type RoofArt } from "./box-draw.ts";
 import { stepChar } from "./kit/bake.ts";
 import { ARENA, COLISEUM_PLACE, GARDEN, WALL, GRASS, LAMPS, LOT, PAVING, PROPS, STATUES, TABLES, figureName, groundAt, hasTownBoss, isSprite, onColiseum, plotAt, seated, spriteAnim, tableStates, type Boss, type SpriteAnim, type Home, type HomeId, type IndoorId, type TownBossId, type Person, type Place, type Pose, type Prop, type Statue, type StatueId, type Table, type TableState, type Town, type Walker } from "./world.ts";
@@ -279,6 +280,7 @@ class FrameCache {
   get(i: number): HTMLCanvasElement {
     let c = this.frames[i];
     if (c) return c;
+    const t0 = REC ? performance.now() : 0;
     const { w, h, data } = renderFrame(this.ch, this.ch.anims.idle!.frames[i]!);
     c = document.createElement("canvas");
     c.width = w;
@@ -286,6 +288,7 @@ class FrameCache {
     c.getContext("2d")!.putImageData(new ImageData(new Uint8ClampedArray(data), w, h), 0, 0);
     this.frames[i] = c;
     frameOf.set(c, { fc: this, i });
+    if (REC) REC.paint(performance.now() - t0);
     return c;
   }
   /** Frame `i` one ramp step darker. */
@@ -864,6 +867,7 @@ export class Renderer {
     // and roof items of their own (sorted with everything else); a shed's and a hedge's drawn with their front.
     this.boxes = STREET_TOWN ? streetBoxes(PROPS) : [];
     this.plans = this.boxes.map((b) => newPlan(b.box));
+    this.warmAt = [new Int32Array(this.boxes.length), new Int32Array(this.boxes.length)];
     // (Each box's footprint's squares: it shows when the rows let you see any of them, seen.ts.)
     const pt = { x: 0, y: 0 };
     this.boxSq = this.boxes.map((b) => {
@@ -995,6 +999,8 @@ export class Renderer {
     // from the higher steps, which see over the rows: the default since Nov 5 (2, Eric: "number three") draws everything in reach, as
     // round 4's "out" did.)
     this.cull = STREET_TOWN && TOWN_FEEL.streetCull && zoom <= 1.01;
+    // (`?report`: the sight lines' time, frame-report.ts.)
+    const sightT = REC && this.cull ? performance.now() : 0;
     if (this.cull) {
       // (From where the camera looks: you, as it follows you; wherever it glides to as you look round. Looking from inside a lot (a
       // glide to a home's middle), nothing is left out.)
@@ -1017,11 +1023,17 @@ export class Renderer {
         else if (cc >= 0 && cr >= 0 && !seenReady(cc + ax, cr + ay)) seenFrom(cc + ax, cr + ay);
       }
     }
+    if (sightT && this.sightN !== seenWorked()) {
+      this.sightN = seenWorked();
+      REC!.sight(performance.now() - sightT);
+    }
     this.buildCloseUps(now);
+    REC?.mark(P.camera);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.globalAlpha = 1;
     // (The street town's turn: the clouds slide across as the camera turns; the sun stays put.)
     this.sky.draw(ctx, this.view, camX, camY, now, dt, (heading / 90) * W * TOWN_FEEL.streetTurnClouds);
+    REC?.mark(P.sky);
     this.drawGround();
     this.drawHorizonHaze(); // on the ground, behind every home, boss and pawn
     if (TOWN_FEEL.rimLine) this.drawRimLine();
@@ -1030,7 +1042,9 @@ export class Renderer {
     this.nClear = 0;
     this.bubble.on = false;
     this.drawMarks(now); // on the ground, under everyone: the trail, your destination, the pressed square
+    REC?.mark(P.ground);
     const lit = this.beginLights();
+    REC?.mark(P.lights);
     this.drawThings(now);
     // The light of the hour over the world and everything on it: one fill (none by day).
     if (this.tint) {
@@ -1039,6 +1053,7 @@ export class Renderer {
     }
     // The lights at dusk and night, over the tint, so they really glow (under the tags, the names and the bubble).
     if (lit) this.layLights();
+    REC?.mark(P.lights);
     for (let i = 0; i < this.nTags; i++) {
       const t = this.tags[i]!;
       this.drawTag(t.text, t.x, t.y, t.kind, t.size, t.alpha);
@@ -1047,9 +1062,14 @@ export class Renderer {
     ctx.globalAlpha = 1;
     if (TOWN_FEEL.floatingNames) this.drawNames(now);
     if (this.bubble.on) this.drawBubble(this.bubble.text, this.bubble.x, this.bubble.y); // (over a home's name)
+    REC?.mark(P.labels);
     this.paint.done();
+    REC?.mark(P.submit);
     this.placeChips(now);
+    REC?.mark(P.chips);
   }
+  /** (`?report`) seen.ts's count of sight lines worked out, as last seen. */
+  private sightN = 0;
 
   // ---- The close-up on a statue: the lens, the close-up drawings (made ahead), the statues, the quote.
 
@@ -1597,8 +1617,14 @@ export class Renderer {
     // (The street town's, the north edge round, is a solid: its ring's and portal's boxes, drawn where they stand like any other, its
     // walls over the rows' roofs from near enough; past the rim, nothing, as for every building.)
     if (!STREET_TOWN && !col.on) this.drawFarColiseum(col, now);
+    const rec = REC;
+    rec?.mark(P.plan);
     for (const it of items) {
       if (!it.on) continue;
+      if (rec) {
+        rec.mark(this.partNow);
+        this.partNow = it.kind === "house" || it.kind === "part" ? P.buildings : it.kind === "prop" ? (this.propBox[it.i] ? P.buildings : P.props) : it.kind === "boss" ? P.bosses : people[it.i]!.you ? P.you : P.people;
+      }
       if (it.kind === "house") {
         const bx = this.homeBox[it.i];
         if (bx) this.drawBoxFront(it, bx, now);
@@ -1702,7 +1728,13 @@ export class Renderer {
         this.sitting = false;
       }
     }
+    if (rec) {
+      rec.mark(this.partNow);
+      this.partNow = P.plan;
+    }
   }
+  /** (`?report`) The part the thing being drawn is (frame-report.ts). */
+  private partNow: PartId = P.plan;
 
   // ---- The street town's boxes (Nov 5, round 3): planned each frame (boxes.ts planBox), drawn here (the art's order: each part by its
   // own depth among everything else; a roof's faces far to near; a shed and a hedge whole, with their fronts).
@@ -1734,27 +1766,88 @@ export class Renderer {
       // camera and you; left out, a drag round beside it would look into its bowl.)
       planBox(p, b, b.box, v, this.camX, this.camY, b.kind === "hedge" || big ? -Infinity : cut);
     }
-    // Paint ahead: the roofs within reach not yet painted for this heading (both while it turns, the north one first), nearest first,
-    // until the frame's budget is spent. (One being drawn this frame and not yet painted is painted then, whatever the budget.)
+    // Paint ahead (Nov 11, Eric: "turning is dropping it to like 40 frames"): the pictures of the boxes within reach, nearest first,
+    // until the frame's budget is spent, in the order they're needed. Always: the roofs for the quarter the camera faces, then the sides'
+    // and backs' pictures and their shaded steps (a side shows at the screen's edge as you walk). Mid-turn, the next quarter's roofs.
+    // Standing still (when you look round), the rest a look round shows: the fronts' frames and their shaded steps (a front at a slant),
+    // and the other quarters' roofs, with a bigger budget while the view is at rest (`boxBakeStillMs`). Before, only the faced quarter's
+    // roofs (and the next, mid-turn) were painted ahead, so a first look round painted hundreds of pictures as they showed, up to 20 ms
+    // a frame (the frame report, `?report`); painting all of them while walking too cost the walk frames (pictures a walk never shows).
+    // (One being drawn this frame and not yet painted is still painted then, whatever the budget.)
     const t0 = performance.now();
-    // (Round 4's chase camera faces any of the four ways: the quarter it faces, and the next one round while it turns.)
     const hq = ((this.heading % 360) + 360) % 360;
     const q0 = Math.floor(hq / 90) % 4;
-    for (let pass = 0; pass < 2; pass++) {
-      const q = (q0 + pass) % 4;
-      if (pass === 1 && hq - q0 * 90 < 0.5) continue;
+    const still = !this.town.you.walker.moving();
+    const turning = hq - q0 * 90 >= 0.5;
+    // (Standing still with the view at rest, a frame has room: a bigger budget.)
+    const budget = still && !turning ? TOWN_FEEL.boxBakeStillMs : TOWN_FEEL.boxBakeMs;
+    const qs = this.warmQ;
+    qs[0] = q0;
+    qs[1] = (q0 + 1) % 4;
+    qs[2] = (q0 + 3) % 4;
+    qs[3] = (q0 + 2) % 4;
+    // (Tiers: 0, the faced quarter's roofs; 1, the sides' pictures; 2, the next quarter's roofs; 3, the fronts' pictures; 4 and 5, the
+    // other quarters' roofs.)
+    for (let tier = 0; tier < 6; tier++) {
+      if (tier >= 2 && !still && !(tier === 2 && turning)) break;
+      const list = tier === 1 ? 0 : tier === 3 ? 1 : -1;
+      const q = qs[tier === 0 ? 0 : tier === 2 ? 1 : tier - 2]!;
+      const at = list < 0 ? null : this.warmAt[list as 0 | 1];
       for (;;) {
         let best = -1;
         for (let j = 0; j < na; j++) {
           const b = this.boxes[ahead[j]!]!;
-          if (this.instArt[q]![b.i]) continue;
+          if (at ? at[b.i]! < 0 : this.instArt[q]![b.i]) continue;
           if (best < 0 || this.aheadD[j]! < this.aheadD[best]!) best = j;
         }
-        if (best < 0 || performance.now() - t0 > TOWN_FEEL.boxBakeMs) break;
+        if (best < 0 || performance.now() - t0 > budget) break;
         const b = this.boxes[ahead[best]!]!;
-        this.roofArt(b, q);
+        if (list >= 0) this.warmNext(b, list);
+        else this.roofArt(b, q);
       }
+      if (performance.now() - t0 > budget) break;
     }
+  }
+  /** The quarters in the order they're painted ahead (planBoxes). */
+  private readonly warmQ = new Int32Array(4);
+  /** Each box's next picture to paint ahead in each of its two lists (warmList); -1: all painted. */
+  private warmAt!: [Int32Array, Int32Array];
+  private readonly warmLists: ({ fc: FrameCache; k: number; dark: boolean }[] | undefined)[][] = [[], []];
+  /**
+   * Box `b`'s pictures to paint ahead (made once a box): list 0, its sides' and back's (as drawWall shows them, and a step darker,
+   * turned from the light); list 1, its front's frames and each a step darker (a front at a slant: drawBoxFront's drawWall).
+   */
+  private warmList(b: BoxInst, list: number): { fc: FrameCache; k: number; dark: boolean }[] {
+    let l = this.warmLists[list]![b.i];
+    if (l) return l;
+    l = [];
+    if (list === 0) {
+      const B = b.box;
+      for (const side of [b.hideL ? null : B.left, b.hideR ? null : B.right, B.back ?? B.rear]) {
+        if (!side) continue;
+        const fc = this.wallFc(side.ch);
+        l.push({ fc, k: 0, dark: false }, { fc, k: 0, dark: true });
+      }
+    } else {
+      const hi = b.home ? this.places.findIndex((h) => h.id === b.home) : -1;
+      const pi = hi < 0 ? this.propBox.indexOf(b) : -1;
+      const fc = hi >= 0 ? this.houseFrames[hi] : pi >= 0 ? this.propFrames[pi] : undefined;
+      if (fc) for (let k = 0; k < fc.frames.length; k++) l.push({ fc, k, dark: false }, { fc, k, dark: true });
+    }
+    this.warmLists[list]![b.i] = l;
+    return l;
+  }
+  /** Paints the next picture of box `b`'s list ahead (one a call: a frame's budget is checked between them). */
+  private warmNext(b: BoxInst, list: number): void {
+    const l = this.warmList(b, list);
+    const at = this.warmAt[list]!;
+    const k = at[b.i]!;
+    const w = l[k];
+    if (w) {
+      if (w.dark) w.fc.dark(w.k);
+      else w.fc.get(w.k);
+    }
+    at[b.i] = k + 1 >= l.length ? -1 : k + 1;
   }
   /** Whether any square of box `i`'s footprint is seen this frame. */
   private boxSeen(i: number): boolean {
@@ -1775,7 +1868,11 @@ export class Renderer {
     const flat = geomOf(box).faces.every((f) => f.nz > 0.999);
     const key = flat ? "flat" : `${b.facing}${q}`;
     let a = m.get(key);
-    if (!a) m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+    if (!a) {
+      const t0 = REC ? performance.now() : 0;
+      m.set(key, (a = bakeRoof(b, box, flat ? 0 : q)));
+      if (REC) REC.paint(performance.now() - t0);
+    }
     this.instArt[q]![b.i] = a;
     return a;
   }
@@ -1915,9 +2012,12 @@ export class Renderer {
   }
   /** A side's or back's picture (one frame), made once. */
   private wallFrame(ch: Character): HTMLCanvasElement {
+    return this.wallFc(ch).get(0);
+  }
+  private wallFc(ch: Character): FrameCache {
     let fc = this.wallFrames.get(ch);
     if (!fc) this.wallFrames.set(ch, (fc = new FrameCache(ch)));
-    return fc.get(0);
+    return fc;
   }
   /** A side's windows lit at dusk and night (the art's: its own lights, baked as a front's are), once a picture. */
   private wallGlowOf(ch: Character, lights: readonly LightSpot[]): Glow | null {
