@@ -306,6 +306,54 @@ test("?fps in a room (Nov 11, Eric's iPhone: frozen at 42-44 inside, 2-4 going o
   expect(Math.min(...out.map((x) => Number.parseInt(x))), `going out, against ${room} fps inside: ${out.join(" | ")}`).toBeGreaterThan(room / 5);
 });
 
+test("a room's report records while walking, and walking lays no floor triangles (Nov 11, Eric: inside it's \"just like capped\"; ?report \"is pausing when I run into the building\"): the pill counts on inside; WebGL draws the back, the same picture as the 2D way's", { tag: "@phone-only" }, async ({ page }) => {
+  await page.goto("/town?sky=day&report");
+  await townReady(page);
+  await goIn(page, "gardener", "Puddles' Botanical Garden");
+  type Back = { drawn: number; made: number; gl: boolean; backTris: number; glTris: number };
+  type Seen = { __pill: string[]; __backs: Back[]; __stop: boolean; __shopStill?: () => Back | null; __shopCam?: () => { focus: [number, number] } | null };
+  // Every text the pill shows from here, and the back's numbers each frame the view moved.
+  await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    const el = document.querySelector(".tfr-pill span")!;
+    w.__pill = [];
+    new MutationObserver(() => w.__pill.push(el.textContent ?? "")).observe(el, { childList: true, characterData: true, subtree: true });
+    w.__backs = [];
+    w.__stop = false;
+    let last = "";
+    const tick = () => {
+      const at = String(w.__shopCam?.()?.focus);
+      const b = w.__shopStill?.();
+      if (b && at !== last && last) w.__backs.push(b);
+      last = at;
+      if (!w.__stop) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  for (const k of ["ArrowLeft", "ArrowRight", "ArrowLeft"]) {
+    await page.keyboard.down(k);
+    await page.waitForTimeout(1100);
+    await page.keyboard.up(k);
+  }
+  const seen = await page.evaluate(() => {
+    const w = window as unknown as Seen;
+    w.__stop = true;
+    return { pill: [...w.__pill], backs: [...w.__backs] };
+  });
+  // The pill counts the seconds inside (before: it stood still on "walk or turn to start" or the town's last second).
+  await expect(page.locator(".tfr-pill")).toBeVisible();
+  expect(seen.pill.filter((x) => /Recording [1-9] s/.test(x)).length, `the pill inside: ${seen.pill.join(" | ")}`).toBeGreaterThanOrEqual(2);
+  const rep = await page.evaluate(() => (window as unknown as { __townReport?: (raw: boolean) => { raw: { flags: number[] } } | null }).__townReport?.(true) ?? null);
+  // (Frames in a room (256) while walking (1), not going in or out.)
+  expect(rep!.raw.flags.filter((f) => f & 256 && f & 1 && !(f & 1536)).length, "the room's walking frames recorded").toBeGreaterThan(30);
+  // Walking: the back is WebGL's, no floor triangle laid on the 2D canvas in any frame the view moved (before: some hundreds a frame).
+  expect(seen.backs.length, "frames the view moved").toBeGreaterThan(20);
+  expect(seen.backs.every((b) => b.gl && b.backTris === 0 && b.glTris > 0), JSON.stringify(seen.backs.slice(0, 3))).toBe(true);
+  // The same picture: drawn both ways at this view, all but tile edges a pixel off (measured Nov 11: 1 to 6% of pixels past 48).
+  const diff = await page.evaluate(() => (window as unknown as { __shopBackDiff?: () => { over48: number; mean: number } | null }).__shopBackDiff?.() ?? null);
+  expect(diff!.over48, JSON.stringify(diff)).toBeLessThan(0.1);
+});
+
 test("Alfil's Pyramid (Nov 2): Go in, Woolly's crate with Alfil's Howdah; the chat's words dark over the sandstone", { tag: "@phone-only" }, async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));

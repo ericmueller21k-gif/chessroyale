@@ -115,6 +115,12 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
     the atlas for the next reset.
   - Measure on a device: a headless frame report can miss what costs a phone (Eric's iPhone run found both).
 
+- **Floor tiles that stood up** (Nov 11, [story](../docs/history/lessons.md#floor-tiles-that-stood-up-nov-11-2026)):
+  - A room's floor tiles' names start `floor-` (room.ts `isFloor`), or they stand up as pieces every frame. A new room's test
+    checks every square has a floor tile baked in (`shop-zebra.test.ts`).
+  - A rule made for one kind of room (a cave's see-through) is opted into by what it's for, not by a field another room also
+    has. Walk round every piece in a new room mid-walk, not only at rest.
+
 - **Lag that grows with the match** (Oct 9, [story](../docs/history/lessons.md#lag-that-grows-with-the-match-oct-9-2026)):
   - Anything a screen reads while rendering must be cheap and must not depend on how long the match is. A getter that
     looks like a field gets read dozens of times a frame, so it must never rebuild anything.
@@ -253,6 +259,9 @@ Tests check *what* ends up on the screen, not *how it gets there*, nor how long 
   - A test that leans on a test switch names the boss (`?boss=`) unless it checks every boss on purpose: START's pick is
     random, and a switch can fail for one boss in seven (`?mate=1` against Wrangler's pull or Sawyer's pawn first move).
   - A spec that fails now and then on a random pick: run it once per boss (`?boss=<id>`) before calling it flaky.
+- **A report that looked paused in every room** (Nov 11, [story](../docs/history/lessons.md#a-report-that-looked-paused-in-every-room-nov-11-2026)):
+  anything a player reads about a run (a count, a pill) is set by the thing that records it, not by one of the loops that feed it:
+  a second loop (a room's) then keeps it going. Test it where the other loop runs (inside a room), by what's on screen.
 - **Escapes lost as a pop-up opened** (Nov 11, [story](../docs/history/lessons.md#escapes-lost-as-a-pop-up-opened-nov-11-2026)):
   - A pop-up's, menu's or sheet's key and tap-away listeners go in a layout effect, never `useEffect` (which waits for a paint): a
     test presses Escape the moment it is in the page (a MutationObserver), not after looking at it.

@@ -945,6 +945,32 @@ picture.
 start again. The town's 2D pictures are made in memory (`art2d`). docs/decisions/2026-11-11-town-loading.md.
 
 
+## A report that looked paused in every room (Nov 11, 2026)
+
+**What Eric saw:** `/town?report` on his iPhone "is pausing when I run into the building, so I don't know how to capture it", the day
+#638 made the report record rooms.
+
+**The cause:** the rooms' frames were recorded, but the pill's "● Recording N s" was set in the town's frame loop, which stops while
+you're in a room. Inside, the pill stood still. #638's tests checked the recorded frames and the `?fps` pill, not the report's pill.
+
+**The fix:** the recorder tells the pill each new second (`FrameRec.onSec`), whichever loop records. The e2e check walks in a room and
+reads the pill's texts. docs/decisions/2026-11-11-room-smooth.md.
+
+
+## Floor tiles that stood up (Nov 11, 2026)
+
+**What Eric saw:** in Rolling Dough's back room, on his iPhone, the table and its board ghosted, and dark squares on the floor as he
+walked round it; "the same in the main bakery".
+
+**The cause:** the back room's tiles were named `bfloor-` and `rug-`, and the room bakes only names starting `floor-` into its floor.
+Every tile stood up as a piece each frame, and went see-through over you, as a cave's rock does. The see-through rule reached the
+whole room (and the table) because the room has a floor's shape. The room's unit tests checked walls and paths, not that its floor
+was a floor; the stills at rest looked right.
+
+**The fix:** the tiles renamed; a room lists what may go see-through (`seeThru`). A unit test: every square has a floor tile baked
+in; an e2e check walks round the table: no tile stands, nothing but the door and near wall see-through.
+docs/decisions/2026-11-11-room-smooth.md.
+
 ## Escapes lost as a pop-up opened (Nov 11, 2026)
 
 **What happened:** main's full run went red on retry-only passes in `town-chat.spec.ts:1410` (a player's own line menu stayed open

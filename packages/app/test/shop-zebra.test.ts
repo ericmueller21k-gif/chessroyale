@@ -4,9 +4,9 @@
  * as data, the words and the room's sounds. Pure: the room (room.ts), the scene (zebra-scene.ts), the timeline (timeline.ts).
  */
 import { describe, expect, it } from "vitest";
-import { findPath, makeRoom, onPass, passArrive, tapTarget, inTalkRange, walkable } from "../src/town/shops/room.ts";
+import { findPath, isFloor, makeRoom, onPass, passArrive, tapTarget, inTalkRange, walkable } from "../src/town/shops/room.ts";
 import { BACK_ROOMS, SHOPS, canChallengeInside } from "../src/town/shops/shops.ts";
-import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_ZEBRA_DOORS, SHOP_ZEBRA_BACK_DOORS, SHOP_ZEBRA_FLOOR, SHOP_ZEBRA_LAYOUT, SHOP_ZEBRA_PAD } from "../src/town/shops/zebra-art.ts";
+import { SHOP_ZEBRA_BACK_FLOOR, SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N, SHOP_ZEBRA_DOORS, SHOP_ZEBRA_BACK_DOORS, SHOP_ZEBRA_FLOOR, SHOP_ZEBRA_LAYOUT, SHOP_ZEBRA_PAD, SHOP_ZEBRA_PIECES } from "../src/town/shops/zebra-art.ts";
 import { NPC_ZEBRA_CREW_C, NPC_ZEBRA_CREW_D, NPC_ZEBRA_CREW_E, NPC_ZEBRA_GUARD_A, ZEBRA_AIM_ANGLES, ZEBRA_AIM_LOOP, ZEBRA_WATCH_FRAME } from "../src/town/shops/zebra-crew.ts";
 import { BOSS_ZEBRA } from "../src/town/shops/zebra-don.ts";
 import { BackScene, FrontScene, SetupScene, WalkOut, ZEBRA_BACK_SET, ZEBRA_BACK_SET_SQUARES, ZEBRA_CREW, ZEBRA_GUARDS, aimAt, doorAlpha, lineMs, watchFrame, type CarriedNow, type SceneClips, type SceneFig, type SetupItem } from "../src/town/shops/zebra-scene.ts";
@@ -28,6 +28,16 @@ const sq = (s: { c: number; r: number }) => `${s.c},${s.r}`;
 const walkableSq = (c: number, r: number) => walkable(frontRoom, c, r) || ZEBRA_GUARDS.some((g) => Math.round(g.at[0]) === c && Math.round(g.at[1]) === r);
 
 describe("the two rooms and the door between them (Nov 11)", () => {
+  it("every square of both rooms has its floor tile baked into the floor (isFloor), and no flat tile stands up as a piece", () => {
+    // (Eric, Nov 11: dark patches and a ghosted table in the back room. Its tiles were named `bfloor-` and `rug-`, so each stood up as a
+    // piece, drawn every frame, and went see-through as you walked behind it.)
+    for (const [layout, n] of [[SHOP_ZEBRA_LAYOUT, 20], [SHOP_ZEBRA_BACK_LAYOUT, SHOP_ZEBRA_BACK_N]] as const) {
+      const tiles = new Set(layout.filter((p) => isFloor(p.name)).map((p) => `${p.col},${p.row}`));
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) expect(tiles.has(`${c},${r}`), `${c},${r}`).toBe(true);
+      const standing = layout.filter((p) => !isFloor(p.name));
+      expect(standing.filter((p) => SHOP_ZEBRA_PIECES[p.name]!.h <= 37 && /floor|rug|tile/.test(p.name)).map((p) => p.name)).toEqual([]);
+    }
+  });
   it("the front room's door at the back left leads to the back room: its squares blocked, its card on the two just inside, as the art has them", () => {
     expect(frontRoom.pass!.to).toBe("back");
     expect(frontRoom.pass!.squares.map(sq).sort()).toEqual(SHOP_ZEBRA_DOORS.back.squares.map(sq).sort());

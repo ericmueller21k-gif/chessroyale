@@ -148,8 +148,8 @@ tile("floor-stock", (x, y) => (hash(x, y, 4) < 0.1 ? "z" : "Z"));
     }
   textC(c, T, 13, "MOVE", "6");
   textC(c, T, 20, "ALONG", "6");
-  still("mat-w", [1, 1], slice(c, 0, 0, T, T), [18, 18]);
-  still("mat-e", [1, 1], slice(c, T, 0, T, T), [18, 18]);
+  still("floor-mat-w", [1, 1], slice(c, 0, 0, T, T), [18, 18]);
+  still("floor-mat-e", [1, 1], slice(c, T, 0, T, T), [18, 18]);
 }
 
 // ---- The back wall (row 6): one painting 18 squares wide (columns 1-18), cut into cards. Cream plaster over white subway tile, a
@@ -746,7 +746,7 @@ const FRONT = layoutOf();
   for (let row = 0; row < 20; row++)
     for (let col = 0; col < 20; col++) {
       if (!isOpen(col, row)) at("floor-stock", col, row, false);
-      else if (row === 18 && (col === 9 || col === 10)) at(col === 9 ? "mat-w" : "mat-e", col, row, false);
+      else if (row === 18 && (col === 9 || col === 10)) at(col === 9 ? "floor-mat-w" : "floor-mat-e", col, row, false);
       else if (col >= SHOP_ZEBRA_PAD.c0 && col <= SHOP_ZEBRA_PAD.c1 && row >= SHOP_ZEBRA_PAD.r0 && row <= SHOP_ZEBRA_PAD.r1) at(`circle-${col}-${row}`, col, row, false);
       else if (FLOUR.has(`${col},${row}`)) at("floor-flour", col, row, false);
       else at((col * 7 + row * 3) % 5 === 0 ? "floor-b" : "floor-a", col, row, false);
@@ -841,13 +841,13 @@ function planks(x: number, y: number, seed: number): string {
   const s = hash(x >> 2, y, seed + row);
   return s < 0.15 ? "$" : s > 0.85 ? "^" : "%";
 }
-tile("bfloor-a", (x, y) => planks(x, y, 1));
-tile("bfloor-b", (x, y) => planks(x, y, 2));
-tile("bfloor-stock", (x, y) => (hash(x, y, 4) < 0.1 ? "%" : "$"));
+tile("floor-back-a", (x, y) => planks(x, y, 1));
+tile("floor-back-b", (x, y) => planks(x, y, 2));
+tile("floor-back-stock", (x, y) => (hash(x, y, 4) < 0.1 ? "%" : "$"));
 const RUG = { c0: 3, c1: 9, r0: 4, r1: 8 };
 for (let r = RUG.r0; r <= RUG.r1; r++)
   for (let c = RUG.c0; c <= RUG.c1; c++)
-    tile(`rug-${c}-${r}`, (x, y) => {
+    tile(`floor-rug-${c}-${r}`, (x, y) => {
       const gx = (c - RUG.c0) * T + x;
       const gy = (r - RUG.r0) * T + y;
       const W = (RUG.c1 - RUG.c0 + 1) * T;
@@ -1311,16 +1311,17 @@ const GLAMP_Y = 27;
   still("wastebasket", [1, 1], c, [18, 27], true);
 }
 
-// ---- The back room's layout.
+// ---- The back room's layout. (Its tiles' names start `floor-` (room.ts isFloor), so they're baked into the floor's one picture. As
+// `bfloor-` and `rug-` (Nov 11) they stood up as pieces, 196 a frame, and went see-through as you walked behind them: Eric's dark patches.)
 
 const BACK = layoutOf();
 {
   const { at } = BACK;
   for (let row = 0; row < 14; row++)
     for (let col = 0; col < 14; col++) {
-      if (!isBackOpen(col, row)) at("bfloor-stock", col, row, false);
-      else if (col >= RUG.c0 && col <= RUG.c1 && row >= RUG.r0 && row <= RUG.r1) at(`rug-${col}-${row}`, col, row, false);
-      else at((col + row) % 3 ? "bfloor-a" : "bfloor-b", col, row, false);
+      if (!isBackOpen(col, row)) at("floor-back-stock", col, row, false);
+      else if (col >= RUG.c0 && col <= RUG.c1 && row >= RUG.r0 && row <= RUG.r1) at(`floor-rug-${col}-${row}`, col, row, false);
+      else at((col + row) % 3 ? "floor-back-a" : "floor-back-b", col, row, false);
     }
 }
 const BACK_FLOOR_COUNT = BACK.list.length;

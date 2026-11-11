@@ -134,6 +134,9 @@ export class FrameRec {
   private zoom = NaN;
   /** The run ended (30 s, or Done): the panel's to show. */
   onDone: (() => void) | null = null;
+  /** A new second of the run (0 the first recorded frame's): the pill's count, from whichever loop records (the town's or a room's). */
+  onSec: ((sec: number) => void) | null = null;
+  private sec = -1;
   /** Going in or out of a building (F.goIn, F.goOut; 0: neither): Town.tsx sets it, every frame meanwhile carries it. */
   door = 0;
   constructor(private readonly clock: () => number = () => performance.now()) {}
@@ -219,6 +222,11 @@ export class FrameRec {
     r.ups[i] = this.ups;
     r.bakes[i] = this.bakes;
     r.n = i + 1;
+    const sec = Math.floor((now - this.startAt) / 1000);
+    if (sec !== this.sec) {
+      this.sec = sec;
+      this.onSec?.(sec);
+    }
     if (now - this.startAt >= RUN_MS || r.n >= r.total.length) this.finish();
   }
   finish(): void {
@@ -233,6 +241,7 @@ export class FrameRec {
   /** Again: an empty run, waiting for the first move. */
   again(): void {
     this.run.n = 0;
+    this.sec = -1;
     this.state = "wait";
     this.prevNow = -1;
     this.heading = this.zoom = NaN;

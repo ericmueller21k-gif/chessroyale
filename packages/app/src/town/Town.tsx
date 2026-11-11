@@ -32,6 +32,7 @@
  * with someone unseen (no table is free for a game: a bot's card greys its Play); `__townTags()` the name tags drawn in the last frame.
  * docs/areas/town-square.md.
  */
+import { roomLoadSlice } from "./shops/load-slice.ts";
 import { F as RF, FPS, FpsCount, FrameRec, NP, P, REC, browserOf, setFps, setRec, summarize, timerStep } from "./frame-report.ts";
 import { reportPanel, reportPill, type Device } from "./frame-report-panel.ts";
 import { useLayoutEffect, useRef, useState } from "preact/hooks";
@@ -224,6 +225,8 @@ export function TownScreen({
     doorBusy.current = true;
     doorPhase(RF.goIn);
     const F = SHOP_FEEL;
+    // (The room's pictures painted a slice a frame while the town zooms, the rest once it's black: shops/load-slice.ts.)
+    roomLoadSlice(F.loadSliceMs);
     if (challenge) step("atDoor");
     // (Its code and art load now, while the town zooms: nothing of a shop loads while you walk round the town.)
     const load = import("./shops/ShopRoom.tsx").then((m) => m.loadRoom(id).then((room) => ({ room, View: m.ShopRoom })));
@@ -237,6 +240,7 @@ export function TownScreen({
     }
     fadeTo(1, F.fadeMs, F.doorZoomMs - F.fadeMs);
     await later(F.doorZoomMs);
+    roomLoadSlice(0);
     const got = await load.catch(() => null);
     const fight = intro ? await intro.catch(() => null) : null;
     if (!got || !box.current || (challenge && !fight)) {
@@ -1073,16 +1077,18 @@ function startTown(
   setRec(rec);
   let recPill: ReturnType<typeof reportPill> | null = null;
   let recPanel: HTMLElement | null = null;
-  let recSecs = -1;
   if (rec) {
     const host = cv.parentElement!;
     const timer = timerStep();
     recPill = reportPill(host, () => rec.finish());
     recPill.set("Report: walk or turn to start", false);
+    // (The pill's seconds, once a second, from whichever loop records: the town's or a room's. Nov 11, Eric: "?report is pausing when
+    // I run into the building": they were set by the town's frames alone, so inside a room the pill stood still.)
+    rec.onSec = (sec) => recPill?.set(`● Recording ${sec} s`, true);
     rec.onDone = () => {
       recPill?.set("Report ready", false);
       setRec(null);
-      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: BACKEND_LABEL[painter.kind], timer };
+      const dev: Device = { browser: browserOf(navigator.userAgent), ratio: window.devicePixelRatio || 1, drawn: r.DPR, w: cv.width, h: cv.height, backend: `${BACKEND_LABEL[painter.kind]}${TOWN_ASKED.back2d ? " (rooms 2D)" : ""}`, timer };
       recPanel = reportPanel(
         host,
         summarize(rec.run),
@@ -1090,7 +1096,6 @@ function startTown(
         () => {
           recPanel?.remove();
           recPanel = null;
-          recSecs = -1;
           rec.again();
           setRec(rec);
           recPill?.set("Report: walk or turn to start", false);
@@ -1343,11 +1348,6 @@ function startTown(
     if (rc) {
       rc.mark(P.minimap);
       rc.end(town.you.walker.moving(), heading, zoomCur);
-      // (The pill's seconds, set once a second.)
-      if (rc.state === "rec") {
-        const sec = Math.floor((now - rc.startAt) / 1000);
-        if (sec !== recSecs) recPill?.set(`● Recording ${(recSecs = sec)} s`, true);
-      }
     }
     FPS?.tick(now);
     raf = requestAnimationFrame(frame);
