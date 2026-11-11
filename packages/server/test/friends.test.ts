@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FRIENDS } from "@chessroyale/core";
+import { CAPACITY, FRIENDS } from "@chessroyale/core";
 import { createGuest, d1Sql, ensureSchema, publicProfile, recordResult, signInWithIdentity, type Sql } from "../src/accounts.ts";
 import { dayOf, handleAccountApi } from "../src/api.ts";
 import {
@@ -13,6 +13,9 @@ import {
   pruneFriends,
   recentNews,
   removeFriend,
+  searchParams,
+  searchPlayers,
+  searchSql,
   sendInvite,
   sendRequest,
   setFriendSettings,
@@ -395,5 +398,121 @@ describe("the friends API", () => {
     for (let i = 0; i < 40 && wait === null; i++) wait = rateLimited({ ip: null, session: "friends-burst".padEnd(43, "x"), play: false, friends: true }, T0);
     expect(wait).not.toBeNull();
     expect(rateLimited({ ip: null, session: "friends-burst".padEnd(43, "x"), play: false }, T0)).toBeNull();
+  });
+});
+
+describe("the player search (the friends page, Eric, Nov 11)", () => {
+  const origin = "https://hunchess.com";
+  const search = async (env: object, token: string | null, q: string) => {
+    const headers = new Headers();
+    if (token) headers.set("cookie", `hc_session=${token}`);
+    const res = (await handleFriendsApi(new Request(`${origin}/api/friends/search?q=${encodeURIComponent(q)}`, { headers }), env as never, () => undefined))!;
+    return { status: res.status, body: (await res.json()) as any };
+  };
+  const names = (body: { players: { name: string }[] }) => body.players.map((p) => p.name);
+
+  it("names starting with what was typed, any case, by name, at most FRIENDS.searchMax; public fields only, never an email; not you", async () => {
+    const many = Array.from({ length: FRIENDS.searchMax + 3 }, (_, i) => `Rook ${String(i).padStart(2, "0")}`);
+    const { d1, sql, users, ids } = await world(["Ann", "anna Smith", "ANNIKA", "Bo", "Banna", ...many]);
+    const env = { DB: d1 };
+    // (Anna has signed in: her email is on her row, and must never leave the server.)
+    await sql.run("UPDATE users SET email = 'anna@example.com' WHERE id = ?", ids[1]!);
+    await sql.run("INSERT INTO wallets (user_id, coins, xp) VALUES (?, 0, ?)", ids[2]!, 6 * 1000 + 10);
+    const bo = users[3]!;
+    const r = await search(env, bo.token, "an");
+    expect(r.status).toBe(200);
+    expect(names(r.body)).toEqual(["Ann", "anna Smith", "ANNIKA"]);
+    for (const p of r.body.players) expect(Object.keys(p).sort()).toEqual(["icon", "id", "level", "name"]);
+    expect(JSON.stringify(r.body)).not.toContain("example.com");
+    expect(r.body.players.find((p: { name: string }) => p.name === "ANNIKA").level).toBe(7);
+    expect(r.body.players.find((p: { name: string }) => p.name === "Ann").level).toBe(1);
+    // Case and a space at either end don't matter; the middle of a name doesn't match ("Banna").
+    expect(names((await search(env, bo.token, " ANNA ")).body)).toEqual(["anna Smith"]);
+    // At most FRIENDS.searchMax, in name order.
+    expect(names((await search(env, bo.token, "rook")).body)).toEqual(many.slice(0, FRIENDS.searchMax));
+    // Fewer than FRIENDS.searchMinChars characters: nobody (no read).
+    expect((await search(env, bo.token, "a")).body).toEqual({ players: [] });
+    // Not you: Bo searching "bo" doesn't find himself.
+    expect(names((await search(env, bo.token, "bo")).body)).toEqual([]);
+    // No account: 401.
+    expect((await search(env, null, "an")).status).toBe(401);
+  });
+
+  it("leaves out banned accounts, test accounts and (where signing in is set up) guests; the engine pool shows as anyone", async () => {
+    const { d1, sql, users, ids } = await world(["Searcher", "Pawn Banned", "Pawn Test", "Pawn Pool", "Pawn Guest", "Pawn Plain"]);
+    const [me, banned, test, pool, , plain] = ids as [string, string, string, string, string, string];
+    await sql.run("INSERT INTO fairplay_cases (user_id, status, opened_at, updated_at) VALUES (?, 'banned', ?, ?)", banned, T0, T0);
+    await sql.run("INSERT INTO fairplay_cases (user_id, status, opened_at, updated_at) VALUES (?, 'pool', ?, ?)", pool, T0, T0);
+    await sql.run("UPDATE users SET test = 1 WHERE id = ?", test);
+    const env = { DB: d1 };
+    expect(names((await search(env, users[0]!.token, "pawn")).body)).toEqual(["Pawn Guest", "Pawn Plain", "Pawn Pool"]);
+    // Signing in set up: only signed-in players can be friends, so only they are found (and a guest searching is asked to sign in).
+    for (const id of [me, pool, plain, banned, test]) await sql.run("UPDATE users SET email = ? WHERE id = ?", `${id}@example.com`, id);
+    const signedUp = { DB: d1, RESEND_API_KEY: "re_test" };
+    const r = await search(signedUp, users[0]!.token, "pawn");
+    expect(names(r.body)).toEqual(["Pawn Plain", "Pawn Pool"]);
+    // (Nothing marks the pool.)
+    expect(Object.keys(r.body.players[1]).sort()).toEqual(["icon", "id", "level", "name"]);
+    expect((await search(signedUp, users[4]!.token, "pawn")).body).toEqual({ signIn: true });
+    // Switched off: { off }.
+    expect((await search({ DB: d1, PAUSE_FRIENDS: "1" }, users[0]!.token, "pawn")).body).toEqual({ off: true });
+  });
+
+  it("is one read on the name index (a range, never a scan of the players)", async () => {
+    const { sql, ids } = await world(["Ann"]);
+    for (const signIn of [false, true]) {
+      const plan = await sql.all<{ detail: string }>(`EXPLAIN QUERY PLAN ${searchSql(signIn)}`, ...searchParams("an", ids[0]!));
+      expect(plan.map((p) => p.detail).join(" | ")).toMatch(/SEARCH u USING INDEX users_name \(name>\? AND name<\?\)/);
+      expect(plan.map((p) => p.detail).join(" | ")).not.toMatch(/SCAN u\b/);
+    }
+    expect(await searchPlayers(sql, ids[0]!, "zz", false)).toEqual([]);
+  });
+
+  it("has its own rate limit (CAPACITY.rateLimits.search), apart from friends' actions", () => {
+    const session = "search-burst".padEnd(43, "x");
+    let wait: number | null = null;
+    let n = 0;
+    for (; n < 100 && wait === null; n++) wait = rateLimited({ ip: null, session, play: false, search: true }, T0);
+    expect(n).toBe(CAPACITY.rateLimits.search.limit + 1);
+    expect(wait).toBeGreaterThan(0);
+    // (Friends' actions still go: a separate count.)
+    expect(rateLimited({ ip: null, session, play: false, friends: true }, T0)).toBeNull();
+    // A minute on, searching again.
+    expect(rateLimited({ ip: null, session, play: false, search: true }, T0 + CAPACITY.rateLimits.search.windowMs)).toBeNull();
+  });
+});
+
+describe("what a friend is doing (the live line's ?doing=)", () => {
+  it("the hub keeps what each app last said while they're online; nothing offline; a deleted account forgets it", () => {
+    const board = new LiveBoard();
+    board.markSeen(["a", "b"], T0, { a: false, b: true }, { a: "town", b: "crowd" });
+    expect(board.presenceOf(["a", "b", "c"], T0)).toEqual({
+      a: { online: true, busy: false, doing: "town" },
+      b: { online: true, busy: true, doing: "crowd" },
+      c: { online: false, busy: false },
+    });
+    // A request that doesn't say keeps it; a new one replaces it.
+    board.markSeen(["a"], T0 + 1000);
+    board.markSeen(["b"], T0 + 1000, { b: false }, { b: "home" });
+    expect(board.presenceOf(["a", "b"], T0 + 1000)).toEqual({ a: { online: true, busy: false, doing: "town" }, b: { online: true, busy: false, doing: "home" } });
+    // Gone past the online window: offline, and nothing said about what they're doing.
+    expect(board.presenceOf(["a"], T0 + 10 * 60_000).a).toEqual({ online: false, busy: false });
+    board.forgetSeen("a");
+    board.markSeen(["a"], T0 + 2000);
+    expect(board.presenceOf(["a"], T0 + 2000).a).toEqual({ online: true, busy: false });
+  });
+
+  it("a friends list carries it for friends online who show it, never for one who hides it", async () => {
+    const { sql, ids } = await world();
+    const [a, b, c] = ids as [string, string, string];
+    await sendRequest(sql, a, b, false, T0);
+    await answerRequest(sql, b, a, true, T0);
+    await sendRequest(sql, a, c, false, T0);
+    await answerRequest(sql, c, a, true, T0);
+    await setFriendSettings(sql, c, { showOnline: false });
+    const presenceOf = async (list: string[]) => Object.fromEntries(list.map((id) => [id, { online: true, busy: false, doing: "boss" as const }]));
+    const s = await friendsState(sql, a, T0, presenceOf);
+    expect(s.friends.find((f) => f.id === b)).toMatchObject({ online: true, doing: "boss" });
+    expect(s.friends.find((f) => f.id === c)!.doing).toBeUndefined();
   });
 });

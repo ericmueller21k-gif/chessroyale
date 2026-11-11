@@ -307,6 +307,8 @@ const COLUMNS: { table: string; column: string; type: string; then?: string[] }[
 ];
 const AFTER_COLUMNS = [
   `CREATE INDEX IF NOT EXISTS users_rating ON users (rating)`,
+  // (The friends page's player search, Nov 11, 2026: a name's prefix in any case is a range on this, never a scan: friends.ts, searchPlayers.)
+  `CREATE INDEX IF NOT EXISTS users_name ON users (name COLLATE NOCASE)`,
   // (The few test accounts, so 1 v 1's top places leave them out without scanning the table: ranked-schema.ts, topPlace.)
   `CREATE INDEX IF NOT EXISTS users_test ON users (id) WHERE test = 1`,
   // (The deep re-check's queue: only the matches waiting, so the scheduled run never scans the whole table.)

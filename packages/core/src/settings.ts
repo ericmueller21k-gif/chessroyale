@@ -3169,6 +3169,12 @@ export const FRIENDS = {
   toastMs: 20_000,
   /** The computer's live panel lists at most this many friends who are online. */
   panelMax: 8,
+  /** The friends page's player search (Eric, Nov 11): it asks once a name has this many characters… */
+  searchMinChars: 2,
+  /** …this long after the last keystroke… */
+  searchDebounceMs: 250,
+  /** …and shows at most this many players (names starting with what was typed, any case). */
+  searchMax: 8,
 } as const;
 
 /**
@@ -3258,6 +3264,8 @@ export const CAPACITY = {
     play: { limit: 40, windowMs: 60_000 },
     /** Friends' actions (requests, answers, invites, blocks, settings): FRIENDS has the daily and hourly caps. */
     friends: { limit: 30, windowMs: 60_000 },
+    /** The friends page's player search, per account (a search asks after a pause in typing: FRIENDS.searchDebounceMs). */
+    search: { limit: 40, windowMs: 60_000 },
   },
 } as const;
 

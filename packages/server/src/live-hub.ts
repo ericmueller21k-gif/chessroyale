@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
-import { CAPACITY, FRIENDS, FRONT_DOOR, type ItemLook, type PawnColor } from "@chessroyale/core";
+import { CAPACITY, FRIENDS, FRONT_DOOR, type Activity, type ItemLook, type PawnColor } from "@chessroyale/core";
 import { d1Sql, ensureSchema } from "./accounts.ts";
-import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary } from "./live.ts";
+import { LiveBoard, pruneLive, typicalWait, writeLastSeen, type LiveCounts, type LiveHealth, type LobbySummary, type Presence } from "./live.ts";
 import { countCall } from "./ops.ts";
 import { GlobalChat, TEST_GLOBAL_CHAT, type GlobalChatSnapshot, type GlobalLine, type GlobalPost, type GlobalSender } from "./global-chat.ts";
 import { TOWN_CHAT_ROOM, TownChat, type ChallengeNote, type TownLine, type TownPost, type TownSender, type TownSnapshot } from "./town-chat.ts";
@@ -71,12 +71,13 @@ export class LiveHub extends DurableObject<Env> {
   }
 
   /**
-   * Accounts a Worker instance has seen (each request from the app, the 30 s heartbeat), and which of them said they're
-   * in a match. Answers with friends' news for any of them (FRIENDS: the instance passes it on in their live line).
+   * Accounts a Worker instance has seen (each request from the app, the 30 s heartbeat), which of them said they're in a
+   * match, and what they said they're doing. Answers with friends' news for any of them (FRIENDS: the instance passes it on
+   * in their live line).
    */
-  async seen(ids: string[], at: number, busy?: Record<string, boolean>): Promise<Record<string, number>> {
+  async seen(ids: string[], at: number, busy?: Record<string, boolean>, doing?: Record<string, Activity>): Promise<Record<string, number>> {
     countCall("hub.seen");
-    this.board.markSeen(ids, Math.min(at, Date.now()), busy);
+    this.board.markSeen(ids, Math.min(at, Date.now()), busy, doing);
     await this.keepAlarm();
     return this.board.newsFor(ids);
   }
@@ -85,9 +86,9 @@ export class LiveHub extends DurableObject<Env> {
    * Someone just arrived (their first request to a Worker instance in a minute): counted at once, and the numbers, with
    * their friends' news as `inbox` (the Worker takes it off before caching the numbers for everyone).
    */
-  async arrive(id: string, at: number, busy?: boolean): Promise<LiveCounts & { inbox?: number }> {
+  async arrive(id: string, at: number, busy?: boolean, doing?: Activity): Promise<LiveCounts & { inbox?: number }> {
     countCall("hub.arrive");
-    this.board.markSeen([id], Math.min(at, Date.now()), busy === undefined ? undefined : { [id]: busy });
+    this.board.markSeen([id], Math.min(at, Date.now()), busy === undefined ? undefined : { [id]: busy }, doing ? { [id]: doing } : undefined);
     await this.keepAlarm();
     const inbox = this.board.newsFor([id])[id];
     return inbox === undefined ? this.counts() : { ...(await this.counts()), inbox };
@@ -99,8 +100,8 @@ export class LiveHub extends DurableObject<Env> {
     this.board.notify(ids, Math.min(at, Date.now()));
   }
 
-  /** A friends list: who's online and who's in a match (one call per list, however long). */
-  async presenceOf(ids: string[]): Promise<Record<string, { online: boolean; busy: boolean }>> {
+  /** A friends list: who's online, who's in a match and what they're doing (one call per list, however long). */
+  async presenceOf(ids: string[]): Promise<Record<string, Presence>> {
     countCall("hub.friends");
     return this.board.presenceOf(ids.slice(0, FRIENDS.max), Date.now());
   }
