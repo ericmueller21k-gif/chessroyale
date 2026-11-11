@@ -74,3 +74,6 @@ suggestions"). Start on the artwork now.
 ## Eric, Nov 11: "Looks great" (the bakery: outside, front, back room, the walk-through)
 Defaults taken (he didn't object): the bakery is **Rolling Dough**; the counter zebra in a baker's cap is the shopkeeper; Gold Plate's
 closing line is one of the six, at random.
+
+## Eric, Nov 11: the challenge
+"Make sure when you challenge him, all his followers also come out to watch." (All five crew, the door guards too, gather to watch the challenge intro.)
