@@ -7,7 +7,7 @@ scale in 16ths, a triangle bass in a 3-3-2 push, low reed voices chanting in fif
 a shaker, a kick and a light snare; and the fireworks: whistles climbing, booms, crackle, sparkles (a scatter of high
 pings) and a sparkler's fizz.
 Every melody, riff and chord progression here is original: none of it is any film's or any game's.
-  python3 song_m.py <out.wav>
+  python3 song_m.py <out.wav> [the melody's voice: thumb, square, flute, kora, steel, brass or marimba]
 
   bars  1-4    a whistle climbs alone, a boom and crackle; the hand drums come in; a sparkler fizzes up; another rocket
   bars  5-12   the tune: on A, up to C, back
@@ -58,7 +58,7 @@ assert len(ROOTS) == 36
 PENT = (0, 2, 4, 7, 9, 12, 14, 16)
 
 
-def main(out: str) -> None:
+def main(out: str, voice: str = "thumb") -> None:
     x = Mix(SECS, BEATS, os=2, seed=127)
     put = x.put
     rng = np.random.default_rng(11)
@@ -151,6 +151,31 @@ def main(out: str) -> None:
         x.kick(b, 0.42, soft=True), x.kick(b + 2, 0.38, soft=True), x.kick(b + 1.5, 0.22, soft=True)
         x.snare(b + 3, 0.1)
 
+    def sing(t, m, d, vol=1.0, pan=-0.1):
+        """The main melody's note, on the voice asked for (`python3 song_m.py out.wav <voice>`): Eric is choosing one."""
+        if voice == "thumb":  # a thumb piano with a pulse an octave under it
+            put("thumb", t, wood(m + 12, 0.2 * vol, 0.2), pan)
+            put("lead", t, x.pulse(m, d * 0.7, 0.25, 0.075 * vol, decay=0.1, sustain=0.5, release=0.01), 0.1)
+        elif voice == "square":  # the old console's lead: a pulse wave, vibrato on held notes
+            put("thumb", t, x.pulse(m + 12, d * 0.9, 0.25, 0.13 * vol, vib=0.012 if d >= 1 else 0.0, decay=0.2, sustain=0.6, release=0.008), pan)
+            put("lead", t, x.pulse(m, d * 0.9, 0.5, 0.05 * vol, decay=0.2, sustain=0.6, release=0.008), 0.1)
+        elif voice == "flute":  # a breathy pan flute
+            put("thumb", t, x.flute(m + 12, max(d * 0.95, 0.3), 0.2 * vol), pan)
+        elif voice == "kora":  # a plucked string, bright
+            put("thumb", t, x.pluck(m + 12, 1.4, 0.85 * vol, tone=0.85), pan)
+            put("thumb", t, x.pluck(m, 1.4, 0.4 * vol, tone=0.6), -pan)
+        elif voice == "steel":  # a steel drum: a ringing, slightly bent bell
+            put("thumb", t, x.bell(m + 12, d + 0.8, 0.24 * vol, ratio=2.0, index=1.6, decay=0.3) * 0.65, pan)
+            put("thumb", t, x.bell(m, d + 0.8, 0.1 * vol, ratio=2.0, index=1.0, decay=0.3) * 0.65, -pan)
+        elif voice == "brass":  # horns in octaves
+            put("thumb", t, x.brass(m, max(d * 0.85, 0.3), 0.19 * vol), pan)
+            put("thumb", t, x.brass(m + 12, max(d * 0.85, 0.3), 0.1 * vol), -pan)
+        elif voice == "marimba":  # a marimba an octave lower than the thumb piano: rounder, less click
+            put("thumb", t, wood(m, 0.22 * vol, 0.26), pan)
+            put("thumb", t, wood(m + 12, 0.065 * vol, 0.2), -pan)
+        else:
+            raise ValueError(voice)
+
     def tune(start, text, bell=False, vol=1.0):
         """The thumb piano with a pulse an octave under it; a hand-drum slap answers in each half-beat gap."""
         t = start
@@ -161,8 +186,7 @@ def main(out: str) -> None:
                 conga(t, True, 0.2, slap=True) if d == 0.5 else None
             else:
                 m = n(name)
-                put("thumb", t, wood(m + 12, 0.2 * vol, 0.2), -0.1)
-                put("lead", t, x.pulse(m, d * 0.7, 0.25, 0.075 * vol, decay=0.1, sustain=0.5, release=0.01), 0.1)
+                sing(t, m, d, vol)
                 if bell:
                     put("sparkle", t, x.bell(m + 24, 1, 0.05, ratio=3.5, index=1.2, decay=0.2), 0.35)
             t += d
@@ -182,8 +206,7 @@ def main(out: str) -> None:
                     put("voices", t, x.reed(m + 19, d * 0.85, 0.1), 0.25)
                     put("bass", t, x.tri(m, d * 0.85, 0.3, release=0.01))
                 else:
-                    put("thumb", t, wood(m, 0.2, 0.14), -0.1)
-                    put("lead", t, x.pulse(m - 12, d * 0.7, 0.125, 0.07, decay=0.1, sustain=0.5, release=0.01), 0.1)
+                    sing(t, m - 12, d)
             t += d
 
     # Bars 1-4: one rocket alone, its burst; the hand drums; the tune's first notes, far off; a sparkler; a rocket.
@@ -194,7 +217,7 @@ def main(out: str) -> None:
         hands(bar, DRUMS if bar < 3 else FILL, 1.3 + 0.1 * bar), shaker(bar, 0.03 + 0.005 * bar)
     for at in (8, 12):
         for b, d, m in line(at, "E5:.5 E5:.5 F#5:.5 A5:1"):
-            put("thumb", b, wood(m + 12, 0.11, 0.2), 0.3)
+            sing(b, m, d, 0.55, 0.3)
     fizz(8, 8, 0.05)
     whistle(13.5, 2.5, 79, 100, 0.1, 0.3)
     boom(16, 0.5, 1.4)
@@ -272,4 +295,4 @@ def main(out: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:3])
