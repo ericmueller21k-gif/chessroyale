@@ -2312,14 +2312,15 @@ function ProfilePage({
   useEffect(() => {
     // (Yours is /profile; anyone's public profile, yours as others see it included, is /profile/ID.)
     const path = target.you && !target.public ? "/profile" : target.uid ? `/profile/${target.uid}` : null;
-    if (path && location.pathname !== path) history.replaceState(null, "", path);
+    // (The query stays: test switches and links, back to the friends page's search too, Nov 11.)
+    if (path && location.pathname !== path) history.replaceState(null, "", `${path}${location.search}`);
   }, [target]);
   return (
     <PlayerProfileScreen
       target={target}
       onBack={() => {
         closeProfile();
-        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", "/");
+        if (location.pathname.startsWith("/profile")) history.replaceState(null, "", `/${location.search}`);
       }}
       onLocker={onLocker}
       onSettings={onSettings}

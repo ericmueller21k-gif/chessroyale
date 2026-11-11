@@ -28,7 +28,8 @@ async function openFriends(page: Page) {
   if (isComputer()) await page.locator(".rc-friends").click();
   else await page.locator(".fd-top").getByRole("button", { name: /^Friends/ }).click();
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/friends$/);
+  // (The address keeps home's query: test switches and links survive the page, Nov 11 fix round.)
+  await expect(page).toHaveURL(/\/friends\?nolanding$/);
 }
 
 async function shot(page: Page, name: string) {
@@ -175,7 +176,7 @@ test("the friends page (Eric, Nov 11): home's Friends opens a page, not a pop-up
   await expect(page.getByRole("button", { name: "Cancel Request" })).toBeVisible();
   await page.getByRole("button", { name: "Back" }).first().click();
   await expect(page.getByRole("heading", { name: "Friends", exact: true })).toBeVisible();
-  await expect(page).toHaveURL(/\/friends$/);
+  await expect(page).toHaveURL(/\/friends\?nolanding$/);
   await expect(search).toHaveValue(`bo findme ${tag.toLowerCase()}`);
 
   // Bo: the request on his friends page; he accepts. Ann is online, on a front-door page.

@@ -6,6 +6,7 @@ import { PlayerName } from "../components/PlayerName.tsx";
 import { UserIcon } from "../components/PixelIcon.tsx";
 import { answerFriend, cancelFriendRequest, findPlayers, inviteMode, keepSearch, keptSearch, openInvites, unblockPlayer, useFriends } from "../friends.ts";
 import { openProfile } from "../profile-nav.ts";
+import { watchLive } from "../live.ts";
 
 /**
  * Friends (/friends; Eric, Nov 11: "We just need this friends page", docs/decisions/2026-11-11-friends-page.md): a page, with Back,
@@ -31,6 +32,9 @@ export function FriendsScreen({
   const [more, setMore] = useState(false);
   // (The page's own address, back from a profile opened here too: a reload or a shared link lands on it. Its query and hash
   // stay: test switches and links, Nov 11.)
+  // (The live line asks every few seconds while the page is open, as home's does: its inbox count is how a new request or invite
+  // reaches this list, and its ?doing= keeps you "On the home screen" for your friends. Fix round, Nov 11.)
+  useEffect(() => watchLive(), []);
   useEffect(() => {
     if (location.pathname !== "/friends") history.replaceState(null, "", `/friends${location.search}${location.hash}`);
   }, []);
