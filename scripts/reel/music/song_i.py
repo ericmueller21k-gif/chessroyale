@@ -3,7 +3,7 @@ The second go (Eric on the first: "I wish there was just more notes and more goi
 tune in running notes, a second voice in harmony under it, two chords in most bars, a walking bass, and more players.
 A minor, a lilting four beats of three (12/8): 112 beats a minute, 56 beats = 14 bars = 30.0 s.
 Voices: a glockenspiel lead (a pulse an octave under it), pulse 2 in harmony below, plucked strings in broken chords,
-held strings, chimes on the chord changes, quick high bell runs, sleigh bells on every third of a beat, a walking
+a thin pulse racing through\nthe chords six notes a beat, held strings, chimes on the chord changes, quick high bell runs, sleigh bells on every third of a beat, a walking
 triangle bass, timpani, a kick, a snare and cymbals.
 Every melody, riff and chord progression here is original: none of it is any carol's or any game's.
   python3 song_i.py <out.wav>
@@ -84,6 +84,13 @@ def main(out: str) -> None:
             # The chord broken in threes over two octaves on plucked strings, and sleigh bells on every third.
             put("pluck", t, x.pluck(notes[s % 3] + 12 * (s // 3), 0.9, 0.2, tone=0.7), -0.4 if i % 2 else 0.4)
             sleigh(t, 0.075 if i % 3 == 0 else 0.045)
+        # The fast pattern under it all (Eric: "much faster pace background patterns that play under the main sound"):
+        # a thin pulse racing through the chord, six notes a beat, up one beat and down the next.
+        for i in range(24):
+            t = bar + i / 6
+            notes, _ = CHORD(t)
+            s = (0, 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1)[i % 12]
+            put("arp", t, x.pulse(notes[s % 3] + 12 + 12 * (s // 3), 0.14, 0.125, 0.085, decay=0.04, sustain=0.4, release=0.004), -0.3)
         # A kick on 1 and 3 (and the skip into 3), a snare on 2 and 4 with a light stroke before each.
         x.kick(bar, 0.4, soft=True), x.kick(bar + 2, 0.36, soft=True), x.kick(bar + 5 / 3, 0.22, soft=True)
         for o in (1, 3):
