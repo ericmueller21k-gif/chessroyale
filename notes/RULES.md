@@ -121,3 +121,5 @@ checks it (stills at phone + computer sizes). Guard: docs/rules/eric.md + a chec
 - **Nov 9: two Opus helpers allowed while XP is built** (XP phases 1–3 all merged Nov 9 ~13:20: back to ONE Opus at a time) (Eric: "I'm debating if we may break our rule of having another, just have
   Opus do it alongside, so we can continue to build other stuff"; then "Yes"). XP's builder is one; at most one other Opus beside it.
   Back to one Opus when XP's phases are done. Other workers stay off the result screens while XP phase 1 is open.
+
+- **Fable (Eric, Nov 11):** at most ONE Fable helper at a time, at `medium` effort, and only when Eric asks for Fable ("if it's Fable, just do one Fable at medium, because otherwise that's going to kill [our usage]").
