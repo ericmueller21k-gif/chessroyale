@@ -7,7 +7,7 @@
  */
 
 /** Scenes 1 to 3's captions (scene 2 has two: the park, then Big Boy). */
-export const REEL_CAPTIONS = ["50 players.\nOne board.", "Explore the town.", "Challenge bosses.\nUnlock gear.", "Climb the\nranked ladder."] as const;
+export const REEL_CAPTIONS = ["100 players.\nOne board.", "Explore the town.", "Challenge bosses.\nUnlock gear.", "Climb the\nranked ladder."] as const;
 export const HIDDEN_BOSS_CAPTION = "…and the most powerful\nof them all.";
 /** Scene 3's second caption, over the run up the ranks (its top rank). */
 export const RANKS_CAPTION = "Become\nTranscendent.";
