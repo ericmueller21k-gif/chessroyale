@@ -9,7 +9,7 @@ import {
   chooseBlizzard,
   bossMoveFrom,
   chooseFreeze,
-  choosePie,
+  choosePieThrow,
   crowdAllowed,
   boardAngle,
   funhouseAngle,
@@ -93,11 +93,12 @@ describe("boss powers: the ground rules", () => {
         const legal = legalMoves(fen);
         if (!legal.length) continue;
         const freeze = chooseFreeze(fen, "w", seed, 3);
-        const pie = choosePie(fen, seed, 3);
+        const pie = choosePieThrow(fen, "w", seed, 3, [], [], { pieSplatsToFreeze: 1 });
         for (const [id, powers] of [
           ["gingerbread", { frozen: freeze ? { ...freeze, until: 9 } : null }],
           ["gingerbread", { ultAt: 1, frozen: freeze ? { ...freeze, until: 9 } : null }],
-          ["clown", { pie: pie ? { square: pie, until: 9 } : null }],
+          // (Boingo's pie: its two squares pied and, a second splat, the piece frozen.)
+          ["clown", { pies: pie ? pie.pied.map((square) => ({ square, until: 9 })) : [], frozen: pie ? { square: pie.square, piece: pie.piece, until: 9 } : null }],
         ] as const) {
           const b = battle(id, fen);
           const state = { ...b, powers: { ...b.powers!, ...powers } };
@@ -176,7 +177,7 @@ describe("boss powers: the ground rules", () => {
     const b = battle("clown", fen);
     // (The pie is near the center in play; here it sits on the escape square to test the rule.)
     for (const sq of new Set(legal.map((m) => m.slice(2, 4)))) {
-      const pied = { ...b, powers: { ...b.powers!, pie: { square: sq, until: 3 } } };
+      const pied = { ...b, powers: { ...b.powers!, pies: [{ square: sq, until: 3 }] } };
       const allowed = crowdAllowed(pied, fen) ?? legal;
       expect(allowed.length).toBeGreaterThan(0);
       if (legal.length === 1) expect(allowed).toEqual(legal);
@@ -266,20 +267,10 @@ describe("boss powers: as each turn begins", () => {
     const fens = positions(30, 9);
     for (const fen of fens) {
       expect(chooseFreeze(fen, "w", 42, 5)).toEqual(chooseFreeze(fen, "w", 42, 5));
-      expect(choosePie(fen, 42, 5)).toEqual(choosePie(fen, 42, 5));
+      expect(choosePieThrow(fen, "w", 42, 5)).toEqual(choosePieThrow(fen, "w", 42, 5));
     }
     const picks = new Set(fens.slice(0, 10).map((fen) => JSON.stringify([1, 2, 3, 4, 5, 6, 7, 8].map((s) => chooseFreeze(fen, "w", s, 5)))));
     expect(picks.size).toBeGreaterThan(1);
-  });
-
-  it("puts the pie on an empty square near the center that the fewest moves can reach", () => {
-    for (const fen of positions(30, 3)) {
-      const sq = choosePie(fen, 1, 2);
-      if (!sq) continue;
-      expect(pieceAt(fen, sq)).toBeNull();
-      expect("cdef").toContain(sq[0]!);
-      expect("3456").toContain(sq[1]!);
-    }
   });
 
   it("freezes every 4-6 turns from turn 2, for 2 turns; the second call for the same turn changes nothing", () => {
@@ -295,37 +286,6 @@ describe("boss powers: as each turn begins", () => {
     for (let i = 1; i < freezes.length; i++) {
       expect(freezes[i]! - freezes[i - 1]!).toBeGreaterThanOrEqual(BOSS_POWERS.freezeEvery[0]);
       expect(freezes[i]! - freezes[i - 1]!).toBeLessThanOrEqual(BOSS_POWERS.freezeEvery[1]);
-    }
-  });
-
-  it("pies: each for 3 turns, a new one every 2 turns, up to 2 at once, never two on one square, nobody moves onto one", () => {
-    let b = battle("clown", RUY_FEN);
-    const counts: number[] = [];
-    for (let turn = 1; turn <= 12; turn++) {
-      b = prepareTurn({ ...b, crowdMoves: turn - 1 }, RUY_FEN);
-      counts.push(b.powers!.pies?.length ?? 0);
-    }
-    expect(counts).toEqual([0, 1, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2]);
-    // Over many positions: never more than two, never on one square, each lasts its 3 turns, and no move (either side's)
-    // lands on one.
-    for (const [i, fen] of positions(30, 5).entries()) {
-      let c = battle("clown", fen, {}, 100 + i);
-      const born = new Map<string, number>();
-      for (let turn = 1; turn <= 9; turn++) {
-        c = prepareTurn({ ...c, crowdMoves: turn - 1 }, fen);
-        const pies = c.powers!.pies ?? [];
-        expect(pies.length).toBeLessThanOrEqual(BOSS_POWERS.pieMax);
-        expect(new Set(pies.map((p) => p.square)).size).toBe(pies.length);
-        for (const p of pies) {
-          if (!born.has(`${p.square}:${p.until}`)) born.set(`${p.square}:${p.until}`, turn);
-          expect(p.until - born.get(`${p.square}:${p.until}`)! + 1).toBe(BOSS_POWERS.pieTurns);
-        }
-        const allowed = crowdAllowed(c, fen) ?? legalMoves(fen);
-        if (allowed.length < legalMoves(fen).length) for (const m of allowed) expect(pies.some((p) => p.square === m.slice(2, 4))).toBe(false);
-        const after = applyMove(fen, legalMoves(fen)[0]!);
-        const bossOk = bossAllowed(c, after);
-        if (bossOk) for (const m of bossOk) expect(pies.some((p) => p.square === m.slice(2, 4))).toBe(false);
-      }
     }
   });
 
@@ -395,7 +355,9 @@ describe("boss powers: as each turn begins", () => {
     expect(b.powers!.warnAt).toBeUndefined();
     b = prepareTurn({ ...b, crowdMoves: 1 }, RUY_FEN, "funhouse");
     expect(b.powers!.warnAt).toBe(2);
-    expect(b.powers!.pies?.length).toBe(1); // the passive's first turn too
+    // (The passive's first turn too: no piece in the Ruy Lopez has both squares behind it empty, so no throw: it tries again next turn.)
+    expect(b.powers!.pies ?? []).toEqual([]);
+    expect(b.powers!.nextPassive).toBe(3);
     b = prepareTurn({ ...b, crowdMoves: 2 }, RUY_FEN, "funhouse");
     expect(b.powers!.funhouse!.turn).toBe(3);
     expect(boardAngle(b)).toBe(180);
@@ -638,7 +600,7 @@ describe("Boingo's powers", () => {
     expect(seen.find((x) => x.turn === 15)!.ultAt).toBeNull();
     expect(seen.find((x) => x.turn === 17)!.rage).toBeGreaterThan(0);
     // The turns it's turned are power turns (fair play doesn't count them); back the right way up, not for the funhouse.
-    expect(powerTurn({ ...runner.boss!, powers: { ...runner.boss!.powers!, pies: [] } })).toBe(false);
+    expect(powerTurn({ ...runner.boss!, powers: { ...runner.boss!.powers!, pies: [], frozen: null } })).toBe(false);
   });
 
   it("each funhouse plays the crowd's move exactly once: a repeat ultimate plays it again, once", async () => {

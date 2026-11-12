@@ -13,6 +13,7 @@ import { fullMoonMoment, noteMooMoments } from "../components/Moo.tsx";
 import { popOffMoments } from "../components/Dash.tsx";
 import { folioMoments, revisionFen } from "../components/Folio.tsx";
 import { gardenerFen } from "../components/Gardener.tsx";
+import { boingoDecor } from "../components/Boingo.tsx";
 import { timberFen } from "../components/Timber.tsx";
 import { ZEBRA_BEATS, zebraFen, zebraGold, zebraTurnMoments } from "../components/Zebra.tsx";
 import { pickLine } from "../characters/boss-beats.ts";
@@ -550,7 +551,7 @@ export function BossScreen({ match, boss, until, thinking: thinkingNow, intro, l
         <div class={`board-row${fun.spin === "half" ? " pw-flipping" : fun.spin ? ` pw-turning-${fun.spin}` : ""}`}>
           {bossSide}
           <EvalBar fen={evalFen} orientation={orientation === "white" ? "w" : "b"} evaluate={(f) => match.evaluate(f)} />
-          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} gold={intro ? undefined : zebraGold(boss, moments, now)} decor={gardener?.decor} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
+          <Board fen={boardFen} orientation={orientation} turn={view.turn} lastMove={pig?.lastMove ?? revised?.lastMove ?? lastShown} animate={!rush && !bounceShown && !splitStill(split, now) && !pig?.still && !alfil && !hopper && !smudgy?.still} elephants={intro ? undefined : boss.powers?.elephants} gold={intro ? undefined : zebraGold(boss, moments, now)} decor={gardener?.decor ?? (intro ? undefined : boingoDecor(boss, moments, now))} premove={{ key: seatKey(match, boss.board.id, boss.crowdSide), side: boss.crowdSide, watch: !!lights || !!rush || !!loading }}>
             {!intro && <PowerBoard boss={boss} orientation={orientation} moments={moments} now={now} fen={boardFen} />}
             {rush && <RushLayer boss={boss} view={rush} now={now} orientation={orientation} onPlace={(from, to) => match.rushPlace(from, to)} />}
             {lights && <LightsOutLayer boss={boss} lights={lights} now={now} orientation={orientation} graceMs={match.settings.lateGraceMs} onTap={(sq) => match.lightsTap(sq)} />}

@@ -15081,6 +15081,54 @@ img.qicon {
     scale: 1;
   }
 }
+/* Boingo's pie splitting off a piece's face: two small pieces of it lobbed onto the two squares behind (Nov 12). */
+.pw-flight.pieFly.bit {
+  animation-name: pw-lob-bit;
+}
+@keyframes pw-lob-bit {
+  from {
+    scale: 0.45;
+  }
+  50% {
+    scale: 0.7;
+  }
+  to {
+    left: var(--fx);
+    top: var(--fy);
+    scale: 0.45;
+  }
+}
+/* The pie in a piece's face: over the piece. */
+.pw-pie.pw-pie-face {
+  z-index: 4;
+}
+/* Boingo's splat mark (Nov 12; Eric: "the way to mark it should be subtle"): a small cream smear on the piece's face with a
+   drip, drawn as part of the piece (a board decor), so it slides and fades with it. */
+.hb piece .pw-splat-mark {
+  position: absolute;
+  left: 37%;
+  top: 25%;
+  width: 26%;
+  height: 12%;
+  border-radius: 48% 55% 50% 45%;
+  background: #fff8ef;
+  box-shadow:
+    inset 0 -1.5px 0 #e6cbb6,
+    0 0 0 0.5px rgba(43, 24, 16, 0.5);
+  pointer-events: none;
+}
+.hb piece .pw-splat-mark::after {
+  content: "";
+  position: absolute;
+  left: 56%;
+  top: 78%;
+  width: 20%;
+  height: 85%;
+  border-radius: 0 0 50% 50%;
+  background: #fff8ef;
+  box-shadow: inset 0 -1px 0 #e6cbb6;
+}
+
 /* The blizzard's sweep covers the whole board (clipped to it). */
 .pw-clip {
   position: absolute;
