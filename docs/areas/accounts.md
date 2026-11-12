@@ -13,17 +13,23 @@ Lane: `hub`. What a profile shows is on [hub.md](hub.md).
   ([docs/decisions/2026-10-16-integrity-followups.md](../decisions/2026-10-16-integrity-followups.md)). Codes and session tokens are stored
   hashed (SHA-256). Google's ID token comes straight from Google's token endpoint over TLS; `aud` is checked and the
   email used only when Google marks it verified.
-- **The age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md)):
-  13 or older for an account (Eric). Before every sign-in, the sign-in box asks "when were you born?" (a month and a
-  year, nothing chosen, no age mentioned).
+- **The age gate** (Oct 16; [docs/decisions/2026-10-16-age-gate-and-real-money.md](../decisions/2026-10-16-age-gate-and-real-money.md);
+  since Nov 12, [2026-11-12-signin-without-age.md](../decisions/2026-11-12-signin-without-age.md)): 13 or older for an account
+  (Eric). The sign-in box has **Sign in** first, with no question, and **Sign up** below it, which asks "when were you born?"
+  (a month and a year, nothing chosen, no age mentioned) before the account is made.
   - The app works the answer out (`oldEnough` in `packages/core/src/age-gate.ts`, whole months) and posts only
     `{oldEnough}` to POST `/api/auth/age`. The birth date is never sent or stored.
-  - **Old enough:** the cookie `hc_age=ok` lets this device sign in once, within `AGE_GATE.answerMinutes`. Each
-    sign-in's start (an emailed code, the trip to Google) gives it that time again, so it can't run out halfway. The
-    sign-in uses it up and sets `users.age_ok_at` (the first time only). Accounts from before the gate are asked at
-    their next sign-in.
-  - **Refused for want of it** (it ran out, or another tab's sign-in used it up): the question comes back with
-    `ASK_AGE_LINE` (Google's start: `?signin=age`).
+  - **Old enough:** the cookie `hc_age=ok` lets this device make an account (or sign in to one that never answered) once,
+    within `AGE_GATE.answerMinutes`. Each sign-in's start (an emailed code, the trip to Google) gives an answer that time
+    again, so it can't run out halfway. The sign-in uses it up and sets `users.age_ok_at` (the first time only).
+  - **No answer on the device:** the server decides once it knows who is signing in (the code checked, or Google's callback).
+    An account that has answered (`age_ok_at` set; or, for an identity new to us, the signed-in account it would join) signs
+    in with no question. Anything else (an email or Google account with no account yet, an account from before the question)
+    is asked first, with nothing made, moved or signed in: the email's check answers 403 `{askAge, message: AGE_STEP_LINE}`
+    and keeps the code live (`verifyEmailCode(…, keep)`); Google's callback sends the page back with `?signin=age-google`. The
+    box asks; the answer finishes it: the same code sent again (nothing typed again), or Google once more (one more pick of the
+    account; nothing about the Google account is kept before the answer). `signInIfAnswered`, `answeredSignIn` in
+    `accounts.ts`; the app's `pending` sign-in in `account.ts`.
   - **Too young:** `hc_age=under` (HttpOnly, `AGE_GATE.tooYoungDays`) and the app's `brc.tooYoung` flag, each putting
     the other back. Every sign-in step refuses that device (email start and verify, Google start and callback), and no
     later answer replaces it. Any `hc_age=under` in a request counts (`ageAnswer`), however many `hc_age` it carries.
@@ -195,14 +201,19 @@ offered, how long each answer lasts).
   the weekly, the pause, merge, download and delete, the API); `e2e/quests.spec.ts`.
 - XP: `packages/core/test/xp.test.ts` (the rules, the fill), `packages/server/test/xp.test.ts` (granted once, races, the caps, each "No
   XP" reason, the result row, the solo clock, merge, download and delete, each match room's facts); `e2e/xp.spec.ts`.
-- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (every
-  sign-in behind the answer, a too-young device refused, the guest's defaults, nothing but the answer kept), with the
-  rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts`; `account-data.test.ts` (every
+- Unit: `packages/server/test/accounts.test.ts` (an in-memory SQLite, `memory-db.ts`); `age-gate.test.ts` (Sign up behind the
+  answer; Sign in with no question into an account that answered; asked first, with nothing written, for an unknown email or
+  Google account and an account from before the question, and the finish; a too-young device refused with every kind of
+  account; the kept code's limits; between steps, two tabs, a replayed callback; the guest's defaults; nothing but the answer
+  kept), with the rule's in `packages/core/test/age-gate.test.ts` and the app's in `packages/app/test/age-gate.test.ts` (the
+  waiting sign-in and its finish); `account-data.test.ts` (every
   table covered, the download, deleting in every store, a kept ban, the API, the live hub's part); `friends.test.ts` (requests,
   blocks, invites and the settings, the caps, expiry, hidden status, `deleteSocial`, the API and its kill switch, the
   live board's news and "in a match"); `packages/app/test/friends.test.ts` (the list, the toast, hiding blocked chat,
   inviting from the front door).
-- e2e: `e2e/age-gate.spec.ts` (the question, the under-13 path into guest play, the 13+ path making an account),
+- e2e: `e2e/age-gate.spec.ts` (Sign up's question, the under-13 path into guest play, the 13+ path making an account, a
+  fresh browser signing in with no question and an account from before it asked once), `landing.spec.ts` (Sign in first;
+  Sign up and back move nothing),
   `e2e/account.spec.ts`, `account-delete.spec.ts` (download, the confirmation, deleting; reads the local D1),
   `profile.spec.ts`, `legal.spec.ts` (the privacy policy, terms and copyright page),
   `friends.spec.ts` (two players: request, accept, online, the invites setting, an invite joined from its toast, a
@@ -212,9 +223,11 @@ offered, how long each answer lasts).
 
 - Secrets never in the repo or in output; Eric does sign-ups and purchases.
 - A profile others can see never shows an email, a sign-in method or anything not on the approved list.
-- Every way to sign in goes through `ageRefusal`, and a guest under the gate gets nothing that takes typed text or lets
-  others reach them (the decision file's guest audit). A new way to sign in, or a new place to type, checks the age
-  answer in the same PR.
+- Every way to sign in goes through `ageRefusal` (a device that's too young is refused at every step, Sign in included) and
+  finishes only through `signInWithIdentity` after an "old enough" answer or `signInIfAnswered` without one; a guest under the
+  gate gets nothing that takes typed text or lets others reach them (the decision file's guest audit). A new way to sign in, or
+  a new place to type, checks the age answer in the same PR. No account is made, and none that never answered signs in,
+  without this device's answer (Nov 12).
 - A new table goes in `ACCOUNT_STORES` (`account-data.ts`: its part of the download, and what deleting does to it)
   with its line in the privacy policy, or in `NO_ACCOUNT_DATA` with why it holds nothing about anyone, in the same PR.
 - The app's `api()` (`account.ts`) never takes an answer it couldn't read for one: a 2xx that isn't a JSON object fails like a server

@@ -41,7 +41,8 @@ function Draft() {
         </li>
         <li>
           <strong>Minimum age outside the US:</strong> 13 for an account is decided and built (Eric, Oct 16), asked as a neutral
-          birth month and year before signing in; under 13, guest play only. Whether some EU countries need a higher age (up to
+          birth month and year before an account is made (since Nov 12, not again at an account's later sign-ins); under 13, guest
+          play only. Whether some EU countries need a higher age (up to
           16), and the UK's, is a lawyer's call.
         </li>
         <li>
@@ -409,9 +410,12 @@ function Privacy() {
         {AGE_GATE.minAge} and older.
       </p>
       <p>
-        Before anyone signs in, we ask their birth month and year. It's checked on the device and never sent to us or kept: only
-        the answer is. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the default name and icon, and
-        nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
+        Before an account is made, we ask the birth month and year, and we ask once at the next sign-in of an account made before
+        we asked. An account that has answered signs in without the question. The date is checked on the device and never sent to
+        us or kept: only the answer is. Signing in with an email sends a code first; if that email has no account yet, the
+        question comes before the account, and if the answer is under {AGE_GATE.minAge}, nothing is made and the code's record,
+        the only thing kept, goes within the hour. Under {AGE_GATE.minAge}, you play as a guest: no sign-in and no email, the
+        default name and icon, and nothing you type reaches us or other players (a bug report sends its details without a note). Guests can't play online,
         post in the global chat, type in the town square or see other players' messages there, add friends or get invites. The
         device remembers the answer, so it can't simply be answered again.
       </p>
