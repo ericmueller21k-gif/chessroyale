@@ -5,7 +5,7 @@ import { asAdmin, asSignedIn, named, pickMode, test } from "./helpers.ts";
  * The computer's right column and its typed global chat (Eric's approved mockup, Nov 7: docs/decisions/2026-11-07-typed-chat-column.md).
  * The column is in the same place and size on every front-door page (number checks, at three window sizes); chat is off until you
  * turn it on (the one-time notice); signed-in players type (the filter, one message every 5 s, our `:name:` emoji); the server's
- * cap ("Chat is busy, try again", a test's own chat with a cap of one a second); a device the age gate marked too young keeps the
+ * cap ("Chat is busy, try again", a test's own chat with a cap of one every 3 s); a device the age gate marked too young keeps the
  * quick chips; guests read. Each test uses its own chat (`?chatroom=`, the test switches) so other tests' lines and the bots stay out.
  * (Replaces the quick chips' spec of Oct 9: "post a line, everyone on the home page sees it, then the 30 s limit".)
  */
@@ -113,14 +113,14 @@ test("chat is off by default; turning it on shows the notice once (Not now keeps
   await bo.context().close();
 });
 
-test("under load: past the server's line the sender sees \"Chat is busy, try again\" (a test's chat: one a second, a 2 s line)", async ({ browser }) => {
+test("under load: past the server's line the sender sees \"Chat is busy, try again\" (a test's chat: one every 3 s, a 6 s line)", async ({ browser }) => {
   desktopOnly();
   test.setTimeout(180_000);
   const room = `t2${run}`;
   const ps: Page[] = [];
   for (const n of ["Al", "Bea", "Cal", "Dee"]) ps.push(await player(browser, `${n}${run}`, room));
   const [a, b, c, d] = ps as [Page, Page, Page, Page];
-  // Three at once fill the line (now, in 1 s, in 2 s); the fourth, a moment later, would wait 3 s: busy.
+  // Three at once fill the line (now, in 3 s, in 6 s); the fourth, within 3 s of the first, would wait over 6 s: busy.
   await field(d).fill("me too");
   const sent = await Promise.all([a, b, c].map((p, i) => p.request.post("/api/chat", { data: { text: `rush ${i}`, chatroom: room } })));
   expect(sent.map((r) => r.status())).toEqual([200, 200, 200]);
@@ -153,7 +153,8 @@ test("a device the age gate marked too young keeps the quick chips (typed text r
   await expect(chat.getByRole("tab", { name: "Lobby" })).toHaveAttribute("aria-selected", "true");
   await expect(chat.getByRole("textbox")).toHaveCount(0);
   await chat.getByRole("button", { name: "Anyone up for a Boss Battle?" }).click();
-  await expect(chat.locator(".gline.you").filter({ hasText: "Anyone up for a Boss Battle?" })).toBeVisible();
+  // (It can wait its turn behind Ann's line, up to the test chat's 3 s, and a line that waited comes with the next live poll, every 5 s.)
+  await expect(chat.locator(".gline.you").filter({ hasText: "Anyone up for a Boss Battle?" })).toBeVisible({ timeout: 10_000 });
   // Ann's typed line never reaches this device; the server refuses its typing whatever the app shows.
   await expect(chat.locator(".gline").filter({ hasText: "typed hello" })).toHaveCount(0);
   const typed = await kid.request.post("/api/chat", { data: { text: "hi", chatroom: room } });

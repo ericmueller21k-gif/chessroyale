@@ -140,10 +140,10 @@ describe("global chat: typed messages, the filter, the age gate and the server-w
     for (let i = 0; i < 300; i++) expect(d.postText({ ...typer, id: `q${i}` }, "hi", T0 + i * 200)).toMatchObject({ ok: true, delayMs: 0 });
   });
 
-  it("a test's own chat has a cap of one a second and a 2 s line", () => {
+  it("a test's own chat has a cap of one every 3 s and a 6 s line", () => {
     const c = new GlobalChat(TEST_GLOBAL_CHAT);
     const r = ["a", "b", "c", "d"].map((id) => c.postText({ ...typer, id }, "hi", T0));
-    expect(r.map((p) => (p.ok ? p.delayMs : p.reason))).toEqual([0, 1000, 2000, "busy"]);
+    expect(r.map((p) => (p.ok ? p.delayMs : p.reason))).toEqual([0, 3000, 6000, "busy"]);
   });
 });
 
