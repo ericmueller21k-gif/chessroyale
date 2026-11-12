@@ -148,6 +148,19 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   await expect(room(page)).toHaveAttribute("data-room", "zebra");
   await expect(page.getByRole("heading", { name: "Rolling Dough" })).toBeVisible();
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "day");
+  // The area banner (Eric's mockup, Nov 11): walked in through the door, "DON DOUGH'S" over "ROLLING DOUGH" a third down the room,
+  // taps passing through it to the room (the topmost thing under its middle is the room's canvas), gone after AREA_BANNER's 2.8 s.
+  const banner = page.locator(".area-banner");
+  await expect(banner.locator(".area-banner-sub")).toHaveText("DON DOUGH'S");
+  await expect(banner.locator(".area-banner-title")).toHaveText("ROLLING DOUGH");
+  const band = (await banner.locator(".area-banner-band").boundingBox())!;
+  const view = (await room(page).boundingBox())!;
+  expect(band.x).toBeGreaterThanOrEqual(view.x - 1);
+  expect(band.x + band.width).toBeLessThanOrEqual(view.x + view.width + 1);
+  expect(band.y + band.height / 2).toBeGreaterThan(view.y + view.height * 0.2);
+  expect(band.y + band.height / 2).toBeLessThan(view.y + view.height * 0.45);
+  expect(await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.className, [band.x + band.width / 2, band.y + band.height / 2])).toContain("town-shop-canvas");
+  await expect(banner).toHaveCount(0, { timeout: 4000 });
 
   // The guards by the door: each on his `watch` frame for where you stand, following you as you walk in past them.
   const G = [
@@ -199,6 +212,8 @@ test("Rolling Dough: in, the guards watch you, the counter zebra's line, through
   // Through the door at the back left: the back room, its own room (dim: the night tone).
   await goThrough(page, "Go in", "back");
   await expect(page.locator(".town-chat")).toHaveAttribute("data-tone", "night");
+  // (Through the door between rooms: the banner again, the back room's.)
+  await expect(page.locator(".area-banner .area-banner-sub")).toHaveText("BACK ROOM");
   await expect(room(page)).toHaveAttribute("data-you", "4,9");
   const back = (await zebra(page))!;
   expect(back.figs.map((f) => f.name).sort()).toEqual(["crew-c", "crew-d", "crew-e", "don"]);
@@ -268,6 +283,10 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  // (The music's log, and its files' fetches: Don's theme plays from walking in, carried through his splash into the battle.)
+  await page.addInitScript(() => void ((window as unknown as { __soundLog: string[] }).__soundLog = []));
+  const themeGets: string[] = [];
+  page.on("request", (r) => void (new URL(r.url()).pathname.startsWith("/music/zebra") && themeGets.push(new URL(r.url()).pathname)));
   await asAdmin(page);
   await page.goto("/town?sky=day");
   await townReady(page);
@@ -354,9 +373,15 @@ test("Rolling Dough: Challenge plays the beat (the crew aim at you, following yo
   await expect(room(page)).not.toHaveAttribute("data-part", /./, { timeout: 20_000 });
   await page.waitForTimeout(1200);
   await shot(page, "front-setup");
+  // (Arriving by his challenge: no area banner.)
+  await expect(page.locator(".area-banner"), "no banner arriving by the challenge").toHaveCount(0);
   await expect(page.getByRole("status", { name: /^Don Dough, threat/ }), "the battle against Don Dough").toBeVisible({ timeout: 120_000 });
   await expect(page.getByRole("group", { name: "Don Dough's oven timers" })).toBeAttached();
   await shot(page, "challenge-battle");
+  // His theme (Eric, Nov 11): started as you walked in, carried through his splash into the battle: no restart, fetched once.
+  const musicLog = await page.evaluate(() => (window as unknown as { __soundLog: string[] }).__soundLog.filter((l) => l.startsWith("music:")));
+  expect(musicLog.filter((l) => !l.startsWith("music:level") && !l.startsWith("music:load"))).toEqual(["music:room:zebra", "music:splash:zebra:room", "music:carry:zebra"]);
+  expect(themeGets.sort()).toEqual(["/music/zebra-intro.mp3", "/music/zebra-loop.mp3"]);
   const zb = await page.evaluate(() => (window as unknown as { __zb: { crew: boolean; storm: boolean; wipe: boolean; outOn: boolean; kept: number[]; carried: string[]; faded: string[]; frontFirst: Record<string, number>; steps: string[]; lines: string[] } }).__zb);
   // The beat, in order: they stand, draw and aim with Fedora's line, Don's "Relax", they lower, his challenge line.
   expect(zb.steps).toEqual(["stand", "draw", "aim", "relax", "lower", "challenge", "done"]);
