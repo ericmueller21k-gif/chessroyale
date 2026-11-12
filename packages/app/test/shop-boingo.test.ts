@@ -83,6 +83,16 @@ describe("Boingo's Boss Crate and his pogo", () => {
     expect(pogoSign(1)).toBe("BOINGO'S POGO: 1 Boingo token");
   });
 
+  it("its crate's drawing: below the lid, every frame's stripes inside the box, x 3 to 28 (Eric, Nov 12: no yellow past its right edge)", () => {
+    const ch = SHOP_BOINGO_PIECES["crate"]!;
+    const xs = new Set<number>();
+    for (const anim of Object.values(ch.anims))
+      for (const fr of anim.frames)
+        for (const L of fr.layers)
+          ch.parts[L.part]!.grid.forEach((row, y) => [...row].forEach((k, x) => k !== "." && L.y + y >= 12 && xs.add(L.x + x)));
+    expect([Math.min(...xs), Math.max(...xs)]).toEqual([3, 28]);
+  });
+
   it("his challenge: the default intro, his line", () => {
     expect(introOf("clown")).toMatchObject({ custom: false, name: "Boingo", line: "Step right up! Honk honk!", layout: "across" });
   });

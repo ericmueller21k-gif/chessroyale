@@ -1481,6 +1481,50 @@ test("Boingo's Funhouse (Nov 6): Go in, the arcade (the play structure and slide
 });
 
 /**
+ * Boingo's Boss Crate bought in his Funhouse (Eric, Nov 12: "I just bought his box, and it just deducted my tokens ... but nothing
+ * popped up"): the price line is plain words in the card's own color (not the Shop screen's cream button); a buy says so in the card's
+ * row and pops up "You got Boingo's Boss Crate!" with its picture, Open now and Later. Later closes it (the crate is in your inventory);
+ * a second buy's Open now opens it with the Crates tab's own opening (the strip, then the reveal), and the crate's count goes down.
+ * docs/decisions/2026-11-12-boss-crate-bought.md.
+ */
+test("Boingo's Boss Crate bought in his Funhouse: the price line is plain words, a buy pops up \"You got Boingo's Boss Crate!\" with Open now and Later; Later keeps it, Open now opens it with the usual strip and reveal (Eric, Nov 12)", { tag: "@phone-only" }, async ({ page }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await asServerAdmin(page);
+  await page.goto("/town?sky=day");
+  await townReady(page);
+  // Six of Boingo's tokens and a key: two buys, one each way.
+  for (const body of [{ boss: "clown", tokens: 3 }, { boss: "clown", tokens: 3 }, { keys: 1 }]) {
+    const r = await page.request.post("/api/locker/grant", { data: { ...body, request: `grant-${Math.random()}` } });
+    expect(r.ok()).toBe(true);
+  }
+  await page.reload();
+  await townReady(page);
+  await page.evaluate(() => (window as unknown as { __townGlide?: (id: string) => void }).__townGlide?.("clown"));
+  await goIn(page, "clown", "Boingo's Funhouse");
+  const walkTo = async (sq: readonly [number, number]) => {
+    await viewOnYou(page);
+    await expect.poll(() => shopAt(page, "square", sq), { message: `square ${sq} drawn` }).not.toBeNull();
+    const at = (await shopAt(page, "square", sq))!;
+    await page.mouse.click(at.x, at.y);
+    await expect(room(page)).toHaveAttribute("data-you", `${sq[0]},${sq[1]}`, { timeout: 20_000 });
+  };
+  await walkTo([14, 16]);
+  await walkTo([15, 10]);
+  await walkTo([13, 6]);
+  await viewOnYou(page);
+  await talk(page);
+  const crate = page.getByRole("dialog", { name: "Boingo's Boss Crate", exact: true });
+  await expect(crate).toContainText("You have 6 Boingo tokens and 1 crate key.");
+  const answer = crate.locator(".shop-msg");
+  await crate.getByRole("button", { name: "Buy with 3 Boingo tokens" }).click();
+  await expect(crate).toContainText("You have 3 Boingo tokens and 1 crate key.");
+  await expect(answer).toHaveText("Boingo's Boss Crate is in your inventory.");
+  expect(errors).toEqual([]);
+});
+
+/**
  * The shop's screens (Eric, Nov 7), on a phone and a computer: no "Shop" title on any tab (the tab row says where you are); the
  * locker's tabs are All, Head, Face, Skin, Weapon and Ride (the God King tab is gone; its effects stay under All); the preview is
  * one pawn in a box twice its old height (126 px with its frame before, 252 now), with W and B bottom right. B makes the pawn black
