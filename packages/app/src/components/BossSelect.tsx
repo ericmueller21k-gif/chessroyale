@@ -198,6 +198,9 @@ export function BossSelect({
   const still = useMedia("(prefers-reduced-motion: reduce)");
   // (The speech band rises over a boss on a window 740 px tall or more, guests only: the admins' fourth row takes that room.)
   const roomy = useMedia("(min-height: 740px)");
+  // (A computer's two rows (styles.css, the rd-page container's content of 660 px or more: a window 1236 px wide and up) have no fourth
+  // row: there everyone gets the band, and the admins' bosses stay clear of their bubbles at the bigger stage.)
+  const twoRows = useMedia("(min-width: 1236px)");
   // Each tap (re)starts the drop and the idle under it.
   const [drop, setDrop] = useState({ n: 0, at: Date.now() });
   const hiddenIds = new Set(hidden.map((b) => b.id));
@@ -230,7 +233,7 @@ export function BossSelect({
     if (next) onDifficulty(next.id);
   };
   const kit = def ? bossKit(def.name) : null;
-  const rise = roomy && rowSizes(bosses.length + hidden.length + 1, TILES_PER_ROW).length <= 3;
+  const rise = roomy && (twoRows || rowSizes(bosses.length + hidden.length + 1, TILES_PER_ROW).length <= 3);
   const idle = kit ? (kit.anims.idle ?? "idle") : null;
   const tile = (id: string, label: string, body: preact.ComponentChildren, cls = "", tint?: string) => (
     <button type="button" role="radio" key={id || "random"} aria-checked={value === id} aria-label={label} class={`bs-tile${cls}${value === id ? " on" : ""}`} data-boss={hiddenIds.has(id) ? "hidden" : id || "random"} onClick={() => tap(id)}>

@@ -1,0 +1,8 @@
+# Boss Battle select on a computer: the stage grows into the room (Nov 12)
+
+**Eric, Nov 12:** "can we make this different on desktop like 3X the pawn and boss size even 4[x]" (his screenshot, the grid on top, the pawn and boss small, a big empty middle).
+
+- **What changed:** on a computer's two-row grid (a window 1236 px wide and up) the platform is the smaller of 46cqi of the stage's column and (window height less 625 px) / 1.034, never under today's 200 px (`styles.css`, `@container rd-page`). The speech band is set on `.bs-say` there, and admins get it too (no fourth row on a computer; `twoRows` in `BossSelect.tsx`). The names grow to 24 px, the level to 20 px, the dots to 6 and 12 px.
+- **Sizes, today → now (pawn box, boss's painted figure):** 145 → 285 px and 178 → 350 px (Jefferson) at 1490 x 1090, 1920 x 1080, 2560 x 1440 and 4K, about 1.96x. At 1536 x 864 about 1.15x (the grid leaves little room). At 1280 x 800 and 1236 x 800 unchanged (the floor). Windows under 1236 px and the phone are unchanged.
+- **Not reached:** 3x and 4x, and the 2.5x the brief asked for at 1536 x 864 and 1920 x 1080. The stage's column is 856 px, so two platforms with the VS top out near 394 px each. At 1080 tall the grid and START leave about 440 px for a platform (about 2.2x at best). Getting past about 2x needs Eric's call: a stage wider than the 920 px column, a shorter grid on short windows, or both.
+- **Checks:** one added (`boss-select.spec.ts`, "on a computer the pawn and the picked boss stand bigger"), with floors of 1.1x at 1536 x 864 and 1.9x at 1920 x 1080 (what the room gives), not 2.5x; no existing check changed.
