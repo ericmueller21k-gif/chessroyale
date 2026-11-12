@@ -1,3 +1,4 @@
+- Nov 12 03:50: #654 music mono 64 + town preload MERGED (d211455). Watching main full run. Running: landing (Opus xhigh), desktop select (Haiku).
 - Nov 12 03:40: #653 batch 4 MERGED (b44dcb8). Open: #654 music (CI on 353bc39). Left from batch 4: autochess-board desktop (local wrangler drops), global-chat:266 desktop 1920, shop:870, multiplayer:18; lazyGroup never re-asks a failed chunk (small follow-up).
 - Nov 12 03:35: #654 unit red: image under docs/ (check.yml). Removed it (353bc39), still moved to stills/music-mono-preload. Watcher byn81edwh for #653 + #654.
 - Nov 12 03:30: Landing sign-in helper session_01JuCWRuPiye3RoXKuWvaNaB (Opus xhigh, alone) on claude/landing-signin; PR gets full-e2e label + independent review. Running: landing (Opus xhigh) + desktop select (Haiku).
