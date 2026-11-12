@@ -81,7 +81,7 @@ describe("town chat in the app", () => {
     vi.useRealTimers();
   });
 
-  it("a guest reads players' lines but can't type (Eric, on #542); a device marked too young never asks for them", () => {
+  it("a guest reads players' lines but can't type (Eric, on #542); a device marked too young reads the server's \"entered the town\" lines alone (Nov 12: no one's typed words) and can't type", () => {
     who.signedIn = false;
     close = openTownFeed(log().sink);
     expect(live.rider).not.toBeNull();
@@ -89,9 +89,24 @@ describe("town chat in the app", () => {
     close();
     who.signedIn = true;
     who.young = true;
-    close = openTownFeed(log().sink);
-    expect(live.rider).toBeNull();
+    const { lines, sink } = log();
+    close = openTownFeed(sink);
+    expect(live.rider).not.toBeNull();
     expect(townChatOff()).toBe("Chat with other players is for accounts 13 and older.");
+    // (The server sends such a device the "entered" lines alone; the app keeps nothing else should anything else come.)
+    const enter: TownLine = { n: 2, at: T0, from: "", name: "", text: "Ann has entered the town.", sys: "enter" };
+    const challenge: TownLine = { n: 3, at: T0, from: "", name: "", text: "Ann challenged Alfil!", sys: "challenge" };
+    live.rider!.take({ town: { n: 3, lines: [line(1), enter, challenge] } });
+    expect(lines.map((l) => l.text)).toEqual(["Ann has entered the town."]);
+  });
+
+  it("everyone else gets the \"entered\" lines with the rest, the server's (no one behind them: muting no one hides them)", () => {
+    const { lines, sink } = log();
+    close = openTownFeed(sink);
+    mutes.set("", true);
+    live.rider!.take({ town: { n: 2, lines: [line(1), { n: 2, at: T0, from: "", name: "", text: "Bo has entered the town.", sys: "enter" }] } });
+    expect(lines.map((l) => l.text)).toEqual(["hello 1", "Bo has entered the town."]);
+    mutes.clear();
   });
 
   it("a signed-in player's lines ride on the live poll every few seconds, only what's new, until the town closes", () => {

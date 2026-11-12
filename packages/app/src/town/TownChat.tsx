@@ -8,7 +8,8 @@
  *
  * v4 (Eric's phone, Oct 28): **you chat by tapping the box anywhere but a player's name.** That opens typing: a slight blur behind
  * the whole box (`.tc-back`: one rounded rectangle, a faint tint and, while you type, a `backdrop-filter` blur), the typing line in the strip at the box's
- * foot (an input with no placeholder, no border and no backing; reserved by the stream, so nothing moves when it shows), focused (the
+ * foot (an input with no placeholder, no border and no backing; reserved by the stream, so nothing moves when it shows; while you aren't
+ * typing the strip holds a faint "Tap here to type" / "Click here to type", Eric, Nov 12, `.tc-hint`), focused (the
  * keyboard opens on a phone, the cursor goes in on a computer). Enter or the keyboard's Send sends and closes it; a press on the map,
  * or Escape, closes it (the words stay for the next tap); the blur goes with it, and the tint with it unless "Chat background" (Town
  * settings) is on, which keeps the tint behind the box whenever the box shows (the blur only while you type: the frame rate's corner,
@@ -48,13 +49,16 @@ import { mutes } from "../chat-mod.ts";
 import { openProfile } from "../profile-nav.ts";
 import { useServerStatus } from "../status.ts";
 import { testSwitchesAllowed } from "../test-switches.ts";
-import { CHAT, CHAT_BOX, ChatLog, Stick, chatBlurs, chatShows, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
+import { CHAT, CHAT_BOX, ChatLog, Stick, chatBlurs, chatHint, chatShows, clampBox, loadChatPos, onTownChatLineTap, saveChatPos, say, setTownChatLineTap, startChatter, tooSoonText, townTone, type ChatKind, type ChatLine, type Rect } from "./chat.ts";
 import type { SkyTone } from "./sky.ts";
-import { GUEST_CHAT, cutTownText, mayReadTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
+import { GUEST_CHAT, cutTownText, mayHearTown, mayReadTownChat, openTownFeed, removeTownLine, reportTownLine, sendTownChat, townChars, townChatOff } from "./chat-net.ts";
 import { NAME_COLORS, nameColorIndex } from "./names.ts";
 import { TOWN_FEEL } from "./feel.ts";
 import { useChatBackground, useChatMode } from "./TownChatTools.tsx";
 import "./town-chat.css";
+
+/** What of the town's lines this device reads now (TownChat's `hear`). */
+const hearing = (): "all" | "enter" | "none" => (mayReadTownChat() ? "all" : mayHearTown() ? "enter" : "none");
 
 export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room's tone (shops.ts' `chatTone`), whatever the sky outside. */ tone?: SkyTone; /** A guest's tap on their greyed typing line: the app's sign-in. */ onSignIn?: () => void } = {}) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -68,8 +72,8 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
   const modeNow = useRef(mode);
   modeNow.current = mode;
   const [computer, setComputer] = useState(() => matchMedia(CHAT.computerQuery).matches);
-  /** Whether this device chats with other players (a signed-in account, not marked too young): players' lines come in. */
-  const [mayChat, setMayChat] = useState(mayReadTownChat);
+  /** What of the town's lines this device reads: every one (an account here, a guest's too), the server's "entered the town" alone (a device marked too young), or none (no account yet). */
+  const [hear, setHear] = useState(hearing);
   /** Typing is open: a tap on the box opened it; a send, a press on the map or Escape closes it. (`typingNow`: the same, for the handlers set up once.) */
   const [typing, setTyping] = useState(false);
   const typingNow = useRef(false);
@@ -114,17 +118,20 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
   // longer see them (signed out, a device marked too young, the chat paused); the switch redraws the field. They keep coming
   // whatever the mode (off too: no extra requests, and turning it on shows the last minute).
   useEffect(() => {
-    if (!mayChat) {
-      log.drop((l) => l.uid !== undefined);
-      return;
-    }
+    // (What this device may read changed: the server's lines start over, from what it may read now.)
+    log.drop((l) => l.uid !== undefined);
+    if (hear === "none") return;
     return openTownFeed({
-      // (The server's own lines, a boss challenged from the town and how it went: its blue, no name, no menu: no account behind it.)
-      line: (l) => (l.sys ? log.say("", l.text, "server", Date.now(), { uid: "", n: l.n }) : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color })),
+      // (The server's own lines, no name, no menu, no account behind them: a boss challenged from the town and how it went, in its
+      // blue; "Ann has entered the town.", in a quiet gray: Nov 12.)
+      line: (l) =>
+        l.sys
+          ? log.say("", l.text, l.sys === "enter" ? "arrival" : "server", Date.now(), { uid: "", n: l.n })
+          : log.say(l.name, l.text, "player", Date.now(), { uid: l.from, n: l.n, color: l.color }),
       drop: (test) => log.drop((l) => l.uid !== undefined && l.n !== undefined && test({ n: l.n, from: l.uid })),
       paused: () => redraw((n) => n + 1),
     });
-  }, [log, mayChat]);
+  }, [log, hear]);
 
   // The computer's size (a window crossing it) changes the box's size and type; the test switches can turn on late (the
   // account loads after the town opens), which is when the field appears.
@@ -132,7 +139,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
     const mq = matchMedia(CHAT.computerQuery);
     const on = () => setComputer(mq.matches);
     mq.addEventListener("change", on);
-    const off = onAccountChange(() => setMayChat(mayReadTownChat()));
+    const off = onAccountChange(() => setHear(hearing()));
     return () => {
       mq.removeEventListener("change", on);
       off();
@@ -390,6 +397,7 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
   // Shown: always (always on), or from a message until the wait runs out (new messages; typing holds it). The blur: while it shows and you're typing, or whenever it shows with the setting on.
   const on = chatShows(mode, log.shown);
   const blur = chatBlurs(mode, log.shown, typing, background);
+  const hint = chatHint(mode, log.shown, typing, computer);
 
   return (
     <div class="town-chat" ref={wrap} hidden={mode === "off"} data-size={computer ? "computer" : "phone"} data-mode={mode} data-on={on ? "1" : "0"} data-blur={blur ? "1" : "0"} data-typing={typing ? "1" : "0"} data-tone={room ?? tone} style={`--chat-out:${CHAT.fadeMs}ms;--chat-in:${CHAT.fadeInMs}ms`}>
@@ -446,6 +454,12 @@ export function TownChat({ tone: room, onSignIn }: { /** Inside a shop: its room
         {/* A guest (Eric, on #542): the greyed line says "Make a free account to chat." and a tap on it is the app's sign-in. */}
         {off === GUEST_CHAT && onSignIn && <button type="button" class="tc-signup" aria-label={GUEST_CHAT} onClick={onSignIn} />}
       </form>
+      {/* The hint (Eric, Nov 12: "in very faint, like gray… tap the box to type… it will disappear when the text box disappears as well"):
+          on the typing line's strip, in line with the timestamps' "[", while the box shows and you aren't typing (the form's `data-open`
+          hides it the instant a tap opens typing: town-chat.css); it fades and goes with the box. Not a line, not the field's placeholder. */}
+      <div class="tc-hint" aria-hidden="true" data-show={hint.shows ? "1" : "0"}>
+        {hint.text}
+      </div>
       <LineMenu box={wrap} log={log} />
     </div>
   );

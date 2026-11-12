@@ -31,8 +31,11 @@ export interface TownLine {
   text: string;
   /** The name color their device picked when it joined the town (a number into the palette: names.ts); absent from an older app. */
   color?: number;
-  /** The server's own line (no player behind it: `from` and `name` empty): a boss challenged from the town, and how it ended. */
-  sys?: "challenge";
+  /**
+   * The server's own line (no player behind it: `from` and `name` empty): "challenge", a boss challenged from the town and how it ended;
+   * "enter", "Ann has entered the town." (Nov 12).
+   */
+  sys?: "challenge" | "enter";
 }
 
 interface Slice {
@@ -75,6 +78,11 @@ export const mayTownChat = () => !!account().profile?.user.signedIn && !tooYoung
  * it"): anyone with an account here, a guest's too, not on a device answered "too young".
  */
 export const mayReadTownChat = () => !!account().profile && !tooYoung();
+/**
+ * Whether the town's lines are asked for at all: anyone with an account here (Nov 12: a device marked too young gets the server's
+ * "Ann has entered the town." lines alone, no one's typed words; the server sends it nothing else, and `take` keeps nothing else).
+ */
+export const mayHearTown = () => !!account().profile;
 /** A guest's typing line (greyed; a tap on it is the app's sign-in). */
 export const GUEST_CHAT = "Make a free account to chat.";
 
@@ -114,13 +122,14 @@ class TownFeed {
       sink.drop((l) => gone.has(l.n));
     }
     const after = fresh ? 0 : this.last;
-    for (const l of slice.lines) if (isLine(l) && l.n > after && !mutes.has(l.from) && !isBlocked(l.from)) sink.line(l);
+    const young = !mayReadTownChat();
+    for (const l of slice.lines) if (isLine(l) && l.n > after && (!young || l.sys === "enter") && !mutes.has(l.from) && !isBlocked(l.from)) sink.line(l);
     this.last = fresh ? slice.n : Math.max(this.last, slice.n);
   }
 
   /** The town opened its log: players' lines flow into `sink` until the returned function is called. */
   open(sink: TownSink): () => void {
-    if (!mayReadTownChat()) return () => undefined;
+    if (!mayHearTown()) return () => undefined;
     this.sink = sink;
     this.color = pickNameColor();
     this.last = 0;
@@ -132,7 +141,8 @@ class TownFeed {
     // (Someone muted, here or in another chat, or blocked: their lines leave the log at once.)
     const unmute = mutes.on(() => sink.drop((l) => mutes.has(l.from)));
     const unblock = onFriendsChange(() => sink.drop((l) => isBlocked(l.from)));
-    // (Signed out, or the device marked too young: every player's line leaves the log at once.)
+    // (Signed out, or the device marked too young: every line from the server leaves the log at once; the screen opens the feed
+    // again for what this device may still read: TownChat.tsx.)
     const unaccount = onAccountChange(() => {
       if (!mayReadTownChat()) sink.drop(() => true);
     });

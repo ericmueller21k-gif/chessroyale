@@ -276,7 +276,10 @@ export class LiveHub extends DurableObject<Env> {
       this.here.leave(id);
       return [];
     }
-    this.here.beat(id, name, room, beat, now, limits, look ?? null, pawn);
+    const fresh = this.here.beat(id, name, room, beat, now, limits, look ?? null, pawn);
+    // "Ann has entered the town." (Eric, Nov 12) in the chat room of the same name as this town (the town's own, or a test's).
+    const chat = this.townIn(room);
+    if (chat.arrive({ id, name }, now, fresh) || chat.holdsEntering) await this.townAlarm();
     return this.here.view(room, now, id);
   }
 

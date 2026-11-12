@@ -8,7 +8,7 @@ import { LINE_GONE } from "../src/fairplay.ts";
 import { LiveHub } from "../src/live-hub.ts";
 import { CHAT_NOT_ALLOWED, CHAT_NO_CONTACT, rot13 } from "../src/text-filter.ts";
 import { SIGN_IN_TO_TOWN_CHAT, TOWN_CHAT_AGE, TOWN_CHAT_PAUSED, expireTownCache, forgetTownCache, townRemoveResponse, townSlice, type TownHub } from "../src/town-chat-api.ts";
-import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, challengeText, charCount, endsChallenge, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
+import { TOWN_COLOR_LIMIT, TOWN_EMPTY, TOWN_REPEAT, TOWN_TOO_LONG, TownChat, challengeText, charCount, endsChallenge, enterOnly, enterText, tidyColor, tidyMessage, townSince, townWait, type TownSender } from "../src/town-chat.ts";
 import { caseDetail } from "../src/admin.ts";
 import { decide } from "../src/fairplay.ts";
 import { memoryDb } from "./memory-db.ts";
@@ -184,6 +184,72 @@ function hubWith(store = new Map<string, unknown>()) {
   return { hub, store, alarm, ready: () => ready };
 }
 
+describe("town chat: \"Ann has entered the town.\" (Eric, Nov 12: \"we have to wait for someone to say something… when you join… it should say… has entered the town\")", () => {
+  const cy = { id: "cy", name: "Cy" };
+  const enters = (c: TownChat, now: number) => c.snapshot(now).lines.filter((l) => l.sys === "enter").map((l) => l.text);
+
+  it("the words: one, two, three, and a crowd", () => {
+    expect(enterText(["Ann"])).toBe("Ann has entered the town.");
+    expect(enterText(["Ann", "Bo"])).toBe("Ann and Bo entered the town.");
+    expect(enterText(["Ann", "Bo", "Cy"])).toBe("Ann, Bo and Cy entered the town.");
+    expect(enterText(["Ann", "Bo", "Cy", "Di", "Ed"])).toBe("Ann, Bo and 3 others entered the town.");
+    expect(TOWN_CHAT.enterRejoinMs).toBe(120_000);
+    expect(TOWN_CHAT.enterBurstMs).toBe(6_000);
+  });
+
+  it("once per visit: a fresh pawn gets a line at once (the server's: no one behind it), later beats none", () => {
+    const c = new TownChat();
+    expect(c.arrive(ann, T0, true)).toMatchObject({ n: 1, from: "", name: "", text: "Ann has entered the town.", sys: "enter" });
+    for (let t = 5_000; t <= 60_000; t += 5_000) expect(c.arrive(ann, T0 + t, false)).toBeNull();
+    expect(enters(c, T0 + 60_000)).toEqual(["Ann has entered the town."]);
+  });
+
+  it("a quick reconnect (back within 2 minutes of the last beat) is the same visit: no line; back later, a new line", () => {
+    const c = new TownChat();
+    c.arrive(ann, T0, true);
+    c.arrive(ann, T0 + 10_000, false);
+    // A reload, a trip home: the pawn comes back fresh, 1 minute 59 after its last beat.
+    expect(c.arrive(ann, T0 + 10_000 + 119_000, true)).toBeNull();
+    // Gone 2 minutes or more: a new visit.
+    expect(c.arrive(ann, T0 + 129_000 + 120_000, true)).toMatchObject({ text: "Ann has entered the town." });
+    expect(enters(c, T0 + 250_000)).toEqual(["Ann has entered the town.", "Ann has entered the town."]);
+  });
+
+  it("a burst is one line: arrivals within 6 s of an \"entered\" line wait and go out together when it's up", () => {
+    const c = new TownChat();
+    expect(c.arrive(ann, T0, true)).not.toBeNull();
+    expect(c.arrive(bo, T0 + 1_000, true)).toBeNull();
+    expect(c.arrive(cy, T0 + 2_000, true)).toBeNull();
+    expect(c.holdsEntering).toBe(true);
+    expect(c.nextExpiry()).toBe(T0 + 6_000);
+    expect(enters(c, T0 + 5_999)).toEqual(["Ann has entered the town."]);
+    expect(enters(c, T0 + 6_000)).toEqual(["Ann has entered the town.", "Bo and Cy entered the town."]);
+    expect(c.holdsEntering).toBe(false);
+    // A crowd in the next window: one line, two names and a count; at most one "entered" line every 6 s.
+    for (const [i, id] of ["di", "ed", "fy", "gu"].entries()) expect(c.arrive({ id, name: id.toUpperCase() }, T0 + 7_000 + i * 100, true)).toBeNull();
+    expect(enters(c, T0 + 12_000)).toHaveLength(3);
+    expect(enters(c, T0 + 12_000).at(-1)).toBe("DI, ED and 2 others entered the town.");
+    // Quiet for a while: the next one goes out at once.
+    expect(c.arrive({ id: "hal", name: "Hal" }, T0 + 30_000, true)).toMatchObject({ text: "Hal has entered the town." });
+  });
+
+  it("the lines are the room's: held 5 minutes like any line, numbered with the players' lines; the ids it keeps go after 2 minutes", () => {
+    const c = new TownChat();
+    c.post(ann, "hi", T0);
+    expect(c.arrive(bo, T0 + 1_000, true)).toMatchObject({ n: 2 });
+    expect(c.snapshot(T0 + TOWN_CHAT.lineMs + 1_000).lines).toEqual([]);
+    expect(c.empty).toBe(true);
+  });
+
+  it("a device marked too young reads the \"entered\" lines alone: no one's typed words, no challenge lines", () => {
+    const c = new TownChat();
+    c.post(ann, "hello", T0);
+    c.arrive(bo, T0, true);
+    c.challenge(ann, "Alfil", { kind: "start", boss: "alfil", battle: "b1" }, T0);
+    expect(enterOnly(townSince(c.snapshot(T0), 0)).lines.map((l) => l.text)).toEqual(["Bo has entered the town."]);
+  });
+});
+
 describe("town chat: the live hub holds it in memory only", () => {
   afterEach(() => vi.useRealTimers());
 
@@ -201,6 +267,28 @@ describe("town chat: the live hub holds it in memory only", () => {
     expect((await again.hub.townRead()).lines).toEqual([]);
     vi.setSystemTime(T0 + TOWN_CHAT.lineMs + 1_000);
     expect((await hub.townRead()).lines).toEqual([]);
+  });
+
+  it("a pawn coming into a town posts \"entered\" in the chat room of the same name (the town's own, a test's), once per visit; the alarm is set for the line's 5 minutes and a burst's line", async () => {
+    vi.useFakeTimers({ now: T0 });
+    const { hub, alarm, ready } = hubWith();
+    await ready();
+    const beat = { c: 3, r: 4, idleMs: 0, hidden: false, shop: null };
+    await hub.townHere("ann", "Ann", "town", beat);
+    await hub.townHere("bo", "Bo", "test:chat9", beat);
+    vi.setSystemTime(T0 + 1_000);
+    await hub.townHere("ann", "Ann", "town", beat);
+    await hub.townHere("cy", "Cy", "town", beat);
+    expect(alarm.at).toBe(T0 + 6_000);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["Ann has entered the town."]);
+    expect((await hub.townRead("test:chat9")).lines.map((l) => l.text)).toEqual(["Bo has entered the town."]);
+    vi.setSystemTime(T0 + 6_000);
+    expect((await hub.townRead()).lines.map((l) => l.text)).toEqual(["Ann has entered the town.", "Cy has entered the town."]);
+    // Left and back within 2 minutes: no line.
+    await hub.townHere("ann", "", "town", null);
+    vi.setSystemTime(T0 + 60_000);
+    await hub.townHere("ann", "Ann", "town", beat);
+    expect((await hub.townRead()).lines).toHaveLength(2);
   });
 
   it("a test's own room keeps its lines apart from the town's (each test its own chat, where the test switches are on)", async () => {
@@ -358,12 +446,15 @@ describe("town chat: the API", () => {
     expect((await call("/api/town/chat", guest.token, { text: "hi" })).status).toBe(401);
   });
 
-  it("a device the age gate marked too young gets none and can't send, even signed in from before", async () => {
+  it("a device the age gate marked too young gets no one's typed words (only the server's \"entered the town\" lines: Nov 12) and can't send, even signed in from before", async () => {
     const { call, signedIn } = await setup();
     const a = await signedIn("Ann");
     const b = await signedIn("Bo");
     expect((await call("/api/town/chat", a.token, { text: "hello" })).status).toBe(200);
-    expect("town" in (await live(await call("/api/live?town=0", b.token, undefined, "; hc_age=under")))).toBe(false);
+    expect((await call("/api/town/here", a.token, { c: 3, r: 4, idleMs: 0, hidden: false })).status).toBe(200);
+    forgetTownCache(); // (this Worker's copy of the room is up to TOWN_CHAT.readCacheMs old: the line shows on the next read)
+    expect((await live(await call("/api/live?town=0", b.token))).town!.lines.map((l) => l.text)).toEqual(["hello", "Ann has entered the town."]);
+    expect((await live(await call("/api/live?town=0", b.token, undefined, "; hc_age=under"))).town!.lines).toMatchObject([{ text: "Ann has entered the town.", sys: "enter", from: "", name: "" }]);
     const r = await call("/api/town/chat", b.token, { text: "hi" }, "; hc_age=under");
     expect(r.status).toBe(403);
     expect(await r.json()).toEqual({ message: TOWN_CHAT_AGE });
