@@ -5,7 +5,8 @@
  * - `RECLUSE_CHILD`, about 9: a skinny kid in a 1950s red-and-cream striped tee, cuffed dungarees and canvas sneakers.
  * - `RECLUSE_TEEN`, about 13: a 1950s schoolboy, a maroon V-neck sweater over a white collar, khaki slacks, white socks and
  *   loafers, his hands in his pockets.
- * - `RECLUSE_YOUNG`, about 20: a white shirt, a narrow plain blue tie, charcoal trousers, black shoes.
+ * - `RECLUSE_YOUNG`, about 20: a black suit (jacket and trousers) over a white shirt with a narrow black tie, black shoes
+ *   (Eric, Nov 12: a black suit instead of the bare white shirt and tie).
  * Each keeps today's strong features so all four read as one person growing up: the swept hair parted on our left with a
  * loose lock to the brow, heavy brows, the eyes rolled up at us from under them, the long straight nose, the thin lips in
  * a half-smirk, the narrow chin. Taller, a longer face and longer hair with each age. The same drawing space as today's
@@ -48,17 +49,19 @@ export const AGES_PALETTE: Record<string, string> = {
   ">": "#84704c",
   "?": "#a8936a",
   $: "#c4b085",
-  // Charcoal trousers (20), dark to light.
-  ":": "#1d1f26",
-  ";": "#2c2f38",
-  _: "#3e4250",
-  "-": "#555a69",
+  // The black suit (20): jacket and trousers, dark to light, the last a cool sheen so the shape reads on a dark ground.
+  ":": "#15161c",
+  ";": "#22242d",
+  _: "#343744",
+  "-": "#50566a",
   // Black shoes (20), dark to light.
   ",": "#121217",
   "'": "#26262e",
   "`": "#4a4a57",
 };
 
+/** The black suit's ramp (20): the jacket, its sleeves and the trousers. */
+const SUIT = ":;_-";
 const ramp = (r: string, l: number) => r[Math.max(0, Math.min(r.length - 1, Math.floor(l * r.length)))]!;
 function fill(cv: Canvas, x0: number, y0: number, inside: (x: number, y: number) => boolean, key: (x: number, y: number) => string): void {
   for (let y = 0; y < cv.length; y++) for (let x = 0; x < cv[0]!.length; x++) if (inside(x + x0, y + y0)) cv[y]![x] = key(x + x0, y + y0);
@@ -284,7 +287,7 @@ function kidHead(age: Age, f: KidFace): Part {
 
 /**
  * The torso by age: the neck, then the child's striped tee (a crew neck), the 13-year-old's V-neck sweater over a white
- * collar (ribbed at the waist), or the young man's white shirt (an open collar, a belt).
+ * collar (ribbed at the waist), or the young man's black suit jacket over a white shirt (lapels, two buttons).
  */
 function torso(age: Age): { part: Part; at: Pt } {
   const b = BODY[age];
@@ -318,24 +321,37 @@ function torso(age: Age): { part: Part; at: Pt } {
     stamp(cv, X0, Y0, ["..rr", ".rr.", ".r.."], 46 + neckW - 2, sy - 3);
     stamp(cv, X0, Y0, ["b", "a"], 46, sy - 3);
   } else {
-    F(body, (x, y) => ramp("qrst", light(x, y) - (y > b.waistY - 6 ? 0.12 : 0)));
-    const fold = (pts: Pt[], k: string) => pts.forEach(([x, y]) => stamp(cv, X0, Y0, [k], x, y));
-    fold([[46 - sw - 0.5, sy + 7], [46 - sw + 0.5, sy + 8], [46 - sw + 1, sy + 9]], "r");
-    fold([[46 + sw + 0.5, sy + 6], [46 + sw - 0.5, sy + 7], [46 + sw - 1, sy + 8]], "q");
-    fold([[46 - 7, b.waistY - 4], [46 - 6, b.waistY - 3], [46 + 6, b.waistY - 4], [46 + 5, b.waistY - 3]], "r");
-    // The collar's two points over his collarbones.
+    // The black suit jacket, its hem over his hips (a little opening at the front below the button).
+    const hem = inPoly([[46 - b.waist - 0.4, b.waistY - 1], [46 + b.waist + 0.4, b.waistY - 1], [46 + b.waist + 1, b.waistY + 4], [46 + 1.2, b.waistY + 4], [46, b.waistY + 2], [46 - 1.2, b.waistY + 4], [46 - b.waist - 1, b.waistY + 4]]);
+    const coat = (x: number, y: number) => body(x, y) || hem(x, y);
+    F(coat, (x, y) => ramp(SUIT, light(x, y) + 0.08));
+    // The shirt in the jacket's opening: a V from his collar down to the button.
+    const vy = sy + 15;
+    const vee = inPoly([[46 - neckW - 1.6, sy - 3], [46 + neckW + 1.6, sy - 3], [46 + 0.8, vy], [46 - 0.8, vy]]);
+    F(vee, (x, y) => ramp("rst", light(x, y) + 0.25));
+    // The lapels down each side of the V: a sheen on our left (the light), a shade on our right, a notch near the top.
+    const edge = (x: number, y: number) => coat(x, y) && !vee(x, y) && y < vy + 1;
+    F((x, y) => edge(x, y) && (vee(x + 1, y) || vee(x + 2, y)) && x < 46, (_x, y) => (y === sy + 2 ? ":" : "-"));
+    F((x, y) => edge(x, y) && (vee(x - 1, y) || vee(x - 2, y)) && x >= 46, (_x, y) => (y === sy + 2 ? ":" : "_"));
+    // A seam where the lapels meet the jacket, and the jacket's two buttons, the front edge down to the hem.
+    stamp(cv, X0, Y0, ["`"], 46, vy + 1);
+    stamp(cv, X0, Y0, ["`"], 46, vy + 7);
+    stamp(cv, X0, Y0, [":", ":", ":", ":", ":"], 46, vy + 2);
+    stamp(cv, X0, Y0, [":", ":", ":", ":", ":"], 46, vy + 8);
+    // A breast pocket's line on our right, and the pockets' flaps at his hips.
+    stamp(cv, X0, Y0, ["::::"], 46 + 4, sy + 9);
+    stamp(cv, X0, Y0, ["-----"], 46 - b.waist + 1, b.waistY);
+    stamp(cv, X0, Y0, ["_____"], 46 + b.waist - 5, b.waistY);
+    // The shirt collar's two points over his collarbones.
     const cL = inPoly([[46 - neckW - 1.6, sy - 3.6], [46 + 0.4, sy + 0.8], [46 - 1.8, sy + 3.6], [46 - neckW - 2.6, sy + 1]]);
     const cR = inPoly([[46 + neckW + 1.6, sy - 3.6], [46 + neckW + 2.6, sy + 1], [46 + 1.8, sy + 3.6], [46 - 0.4, sy + 0.8]]);
     F(cL, (x, y) => (!cL(x + 1, y + 1) ? "r" : "t"));
     F(cR, (x, y) => (!cR(x - 1, y + 1) ? "q" : "s"));
-    // The belt.
-    F(inPoly([[46 - b.waist - 0.4, b.waistY - 2], [46 + b.waist + 0.4, b.waistY - 2], [46 + b.waist + 0.4, b.waistY + 1], [46 - b.waist - 0.4, b.waistY + 1]]), (_x, y) => (y < b.waistY - 1 ? "E" : "D"));
-    stamp(cv, X0, Y0, ["KWK", "KKK"], 45, b.waistY - 2);
   }
   return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
 }
 
-/** The young man's tie: narrow and plain, dark blue; `sway` swings its blade. */
+/** The young man's tie: narrow, plain black with a thin sheen down its left edge, its tip under the jacket's button; `sway` swings its blade. */
 function tie(sway: number): { part: Part; at: Pt } {
   const b = BODY.young;
   const X0 = 40;
@@ -343,9 +359,9 @@ function tie(sway: number): { part: Part; at: Pt } {
   const cv = canvas(14, b.waistY - Y0);
   const sy = b.shoulderY;
   const knot = inPoly([[44.4, sy - 3], [47.6, sy - 3], [47, sy + 0.6], [45, sy + 0.6]]);
-  const blade = inPoly([[45, sy], [47, sy], [48 + sway * 0.4, sy + 14], [48.4 + sway * 0.9, b.waistY - 6], [46 + sway * 1.1, b.waistY - 3], [43.6 + sway * 0.9, b.waistY - 6], [44 + sway * 0.4, sy + 14]]);
-  fill(cv, X0, Y0, knot, (x) => (x > 46.4 ? "T" : "U"));
-  fill(cv, X0, Y0, blade, (x, y) => (!blade(x + 1, y) ? "T" : "U"));
+  const blade = inPoly([[45.2, sy], [46.8, sy], [47.4 + sway * 0.3, sy + 9], [47.4 + sway * 0.5, sy + 14.5], [44.6 + sway * 0.5, sy + 14.5], [44.6 + sway * 0.3, sy + 9]]);
+  fill(cv, X0, Y0, knot, (x) => (x > 46.4 ? "," : "`"));
+  fill(cv, X0, Y0, blade, (x, y) => (!blade(x - 1, y) ? "`" : ","));
   return { part: { grid: toGrid(cv) }, at: [X0, Y0] };
 }
 
@@ -370,7 +386,7 @@ function boxOf(pts: readonly Pt[], pad: number): { x0: number; y0: number; w: nu
 const SLEEVE: Record<Age, { keys: string; until: number; cuff: string; cuffLen: number }> = {
   child: { keys: "PRRI", until: 0.55, cuff: "R", cuffLen: 0.12 },
   teen: { keys: "*~^!", until: 1.82, cuff: "*", cuffLen: 0.18 },
-  young: { keys: "qrst", until: 1.82, cuff: "rst", cuffLen: 0.18 },
+  young: { keys: SUIT, until: 1.82, cuff: "rst", cuffLen: 0.18 },
 };
 
 /** An arm from its points: the sleeve, its cuff, the bare forearm; shaded like a cylinder lit from the top left. */
@@ -421,7 +437,7 @@ function paintLimb(pts: readonly Pt[], r: number, r1: number, keys: string, base
 }
 
 /** Each age's trousers: the ramp (dark to light), and the hem: the child's turned-up cuffs, the 13-year-old's socks. */
-const TROUSERS: Record<Age, string> = { child: "Z%&", teen: "<>?$", young: ":;_-" };
+const TROUSERS: Record<Age, string> = { child: "Z%&", teen: "<>?$", young: SUIT };
 
 /** His hips and legs for an age; `toe`: one foot's heel lifted (the child scuffing his toe): `l` or `r`. */
 function legs(age: Age, splay = 0): { part: Part; at: Pt } {
