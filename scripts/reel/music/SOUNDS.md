@@ -20,6 +20,8 @@ from the liked list, keep off the other one. Eric's words are quoted; the date i
 | Rockets, booms, crackle, sparkles; hand drums; a low chant | song_m.py | "It's perfect" |
 | An overdriven lead (the 16-bit consoles' lead guitar), built from measurements of a reference he sent | `Mix.drive` | of the reference: "a really badass instrument"; of the build's sample: "swap that instrument with the one that's currently in his actual completed one" (it is Sawyer's lead) |
 | A talking synth (each note a "wah") in small doses, and the cow's moos, kept quiet | song_r.py (`talk`, `moo`) | "the moos and the noise that sounds like anime wawawa or something is nice"; then, when given eight bars of it, "I didn't want more of it. I was just saying I liked it", and "turn down the moo volume a little bit" |
+| Tunes off the grid: triplets, octave jumps that float back down, notes held over the bar line, three-bar phrases, a lead that slides into long notes; a chord a bar over a bass stepping down by half steps | song_r.py (`TUNE`, `VERSE`) | 25 seconds in: "this slaps bro, way sicker already, bro you nailed it" |
+| A motif five 8ths long that lands somewhere new in the bar each time, over chords dropping by whole steps; and the last tune arriving a minor third up | song_r.py (`SHIFT`, bars 57-64) | "holy shit the key change and second tune was fire" |
 | A fast pattern racing under everything | every song since song_i.py | asked for in all of them |
 | The NES's four voices | song_c.py, song_f.py | "much much better" than the 16-bit orchestra |
 
