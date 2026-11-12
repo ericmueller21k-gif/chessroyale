@@ -129,3 +129,12 @@ Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quote
 18 Kid: (fading) Don't forget me.
 19 Man: (alone, at the book) ...If the machines took the beauty, then I'll take the machines.
    (alt 19: "Then let's show them what it looked like.")
+
+## Nov 12 (evening): the child in his room plays himself
+- Eric: when you walk into the top-floor room, the child sits on the floor playing a game against himself: he plays a move, looks, leans
+  over and plays one from the other side. A REAL game (small on screen, but real chess), about 30 moves, on a loop. When it ends, the
+  pieces reset (simplest) or, if not much work, he puts them back himself, then it plays again.
+- Director's calls (for the brief): the game is a fixed move list in the code (no engine running in the room: no lag). Make it a strong,
+  sensible game, generated once with Stockfish self-play (or a public classic), but NOT one of his own famous games (that would hint
+  at who he is). Start with the reset as a quick fade; his putting the pieces back is an extra if cheap.
+- Cutscene: Eric doesn't like line 4 ("I forgot that part"); he's writing his own version of the lines. Wait for it; don't send another draft.
