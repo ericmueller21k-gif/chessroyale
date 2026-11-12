@@ -35,12 +35,6 @@ export function useTicks(secs: number, from = TICK_FROM_SECONDS, active = true) 
 }
 
 /**
- * The same bar mirrored under the board (Eric, Oct 9: "might pull this out later"). Set to false to take it out; the
- * bar's thickness is --timer-bar-h in styles.css.
- */
-export const TIMER_BAR_BELOW = true;
-
-/**
  * The move clock as a bar snug to the top edge of the board (and mirrored along the bottom edge): full when
  * the clock starts, shrinking from both ends toward the middle until it's
  * gone at the deadline, and fading from dark green through yellow to red as time
@@ -76,11 +70,10 @@ export function TimerBar({
       <div class="timer-bar" role="timer" aria-label={`${secs} seconds left`}>
         {fill()}
       </div>
-      {TIMER_BAR_BELOW && (
-        <div class="timer-bar below" aria-hidden="true">
-          {fill()}
-        </div>
-      )}
+      {/* The same bar mirrored under the board (Eric, Oct 9); its thickness is --timer-bar-h in styles.css. */}
+      <div class="timer-bar below" aria-hidden="true">
+        {fill()}
+      </div>
     </>
   );
 }

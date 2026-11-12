@@ -470,7 +470,7 @@ test("Babur online: a reload mid-hoops draws the rings as they are, without the 
 
 // The pump on a phone (docs/decisions/2026-10-24-babur-bigger.md): 2x (68 × 72) in the bar's room at its right end, inside the bar, its
 // balloon's top under the status (the phone's one bar, 99 px: the room is 72 px tall under the status).
-test("Babur's pump on a phone at 390 × 844 and 428 × 777: 68 × 72 at the room's right end, inside the bar, its balloon's top under the status", async ({ page }) => {
+test("Babur's pump on a phone at 390 × 844 and 428 × 777: 68 × 72 at the room's right end, inside the bar, its balloon's top under the status", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -500,7 +500,7 @@ test("Babur's pump on a phone at 390 × 844 and 428 × 777: 68 × 72 at the room
   expect(errors).toEqual([]);
 });
 
-test("Babur's balloon on the board is as tall as a queen piece on its square: its flight drawn within 10% of the piece's height", async ({ page }) => {
+test("Babur's balloon on the board is as tall as a queen piece on its square: its flight drawn within 10% of the piece's height", { tag: "@phone-only" }, async ({ page }) => {
   test.setTimeout(150_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
