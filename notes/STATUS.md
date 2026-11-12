@@ -1,3 +1,4 @@
+- Nov 12 15:45: #661 e2e red on boss-smoke clown (knight-only smoke never gives a target). Fix f4919ea: SMOKE_FIRST clown e2e4 (local pass). Full suite rerunning.
 - Nov 12 15:20: #661 unit red (pieHit cue without sound) + review (no blockers; castling rook onto pie should-fix; ranking test) -> director fixed all in 8771bde (pieFace copy, lands(), tests proven). Full suite rerunning. Left nits 4,5,7 in decision note. Review helper archived.
 - Nov 12 14:50: Boingo pie was DONE at 08:37 (missed 6 h: director did not check; apologized). #661 opened (9247713, full suite via protocol), helper archived, stills sent. Quick boss-lane review session_01JuCWRvvUwpQik238BMNJMv (Opus high, read-only) -> claude/review-boingo-pie. Watcher: CI + review .done.
 - Nov 12 09:10: #660 age-gate race MERGED (ebe4ba4). Boingo pie still running.
