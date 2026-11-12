@@ -107,3 +107,25 @@ Draft 2 is in the chat of Nov 12 and below; Eric's to change. Unattributed quote
 18 Kid: (fading) Don't forget me.
 19 Man: (alone, at the book) ...If the machines took the beauty, then I'll take the machines.
    (alt 19: "Then let's show them what it looked like.")
+
+## Nov 12 (evening): cutscene draft 3 (Eric: drop the kitchen table; machines in one line; the kid questions "good moves"; "best by test, right?")
+1 Kid: Why are you on the floor?
+2 Man: I lost.
+3 Kid: So? We lose all the time. Then we set them up again.
+4 Man: I forgot that part.
+5 Kid: Do you still find them? The moves that make you laugh out loud?
+6 Man: The machines find them now. They don't need us anymore.
+7 Kid: They don't love it, though. Not like we do.
+8 Man: All that matters on the chessboard is good moves.
+9 Kid: And how do you know they're good? Because a machine says so?
+10 Kid: We never had to believe that.
+11 Man: ...
+12 Kid: Best by test, right?
+13 Man: (a small laugh) ...You remember that.
+14 Kid: I'm you. Of course I remember.
+15 Man: I never cared about the trophies. I wanted to play the most beautiful game anyone ever played.
+16 Kid: Then why'd you stop?
+17 Man: Because I let them tell me what beautiful was.
+18 Kid: (fading) Don't forget me.
+19 Man: (alone, at the book) ...If the machines took the beauty, then I'll take the machines.
+   (alt 19: "Then let's show them what it looked like.")
