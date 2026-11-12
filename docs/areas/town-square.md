@@ -1118,6 +1118,16 @@ sets, the zoom, the camera's follow and glide, the drag, the haze, the clouds' p
 how often bots walk, the sizes, the names, the sky's hours and its four looks' colors, the lights at dusk and night (`lightsAt`, their glow's bands, the flicker), the rim line. The earlier value is
 noted wherever a slice changed one.
 
+- **The Hidden Boss's child's room (Nov 12, a mockup; no home opens it yet).** A 12 x 12 room (`shops/recluse-art.ts`: oak boards
+  and the window's sun baked into the floor, a braided rug, sailboat wallpaper, a rocket poster, the bed, the rocking horse, the little
+  table) drawn by the real room: `loadRoomWith(key, def, art)` loads a room no home lists, and `ShopRoom`'s optional `fx` (`RoomFx`:
+  figures sorted by row among the pieces and you, a pass over everything, `hideYou`) lets a caller draw its own scene; no `fx`, no
+  change. The scene (`shops/recluse-scene.ts`): the child (age 9, `recluse-ages.ts` `RECLUSE_CHILD_SIT`) plays his 1956 game against
+  himself on a board on the floor (`shops/recluse-game.ts`, stored squares, no engine; the last move tinted, a fade back to the start),
+  and the summoning with four stand-in pawns. Times: `feel.ts` `HIDDEN_ROOM_FEEL`. Seen only on the dev server,
+  `/hidden-room-preview.html` (`src/dev/hidden-room-preview.tsx`; `?t=`, `?summon=`, `?ui=0`). Test: `test/recluse-room.test.ts`.
+  [2026-11-12-hidden-boss-room-mockup.md](../decisions/2026-11-12-hidden-boss-room-mockup.md).
+
 ## Adding a home
 
 1. Draw it in `town/houses/<boss>.ts` like the others (the game's pixel art: `characters/sprite.ts` parts and frames,
