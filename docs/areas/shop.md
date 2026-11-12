@@ -133,7 +133,9 @@ Lane: `item-builder` (crate items and shop cosmetics; its checklist for adding a
     counts can't go below zero (a CHECK on `boss_tokens.n`, and the guards). A double tap or two devices are two buys, each paid in full or
     refused. The shop's kill switch refuses it. Answers `{crate, locker}`. The shop card's answer: **"Babur's Boss Crate is in your
     inventory."** (Eric, Nov 2; until then a buy opened it at once into the Locker), or "You need 3 Babur tokens." / "You need 1 Babur
-    token and 1 crate key.".
+    token and 1 crate key.". Since Nov 12 a buy also pops up **"You got Babur's Boss Crate!"** with **Open now** (the Crates tab's own
+    opening, `CrateOpening`, over the room) and **Later** ([town-square.md](town-square.md), "The crate's card";
+    [2026-11-12-boss-crate-bought.md](../decisions/2026-11-12-boss-crate-bought.md)).
   - **Boss crates you hold** (Eric, Nov 2: "Buying a boss crate from shopkeepers adds the crate to your inventory … they open and shuffle
     the same way normal crate animations work"; [2026-11-02-nov2-fixes-b.md](../decisions/2026-11-02-nov2-fixes-b.md)): the Crates tab
     lists every boss crate under **"Boss crates"**, below the others, its boss's token on the crate's corner, its blurb and **"You have

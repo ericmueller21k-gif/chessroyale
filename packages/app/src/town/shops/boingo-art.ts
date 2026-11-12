@@ -206,7 +206,8 @@ export const SHOP_BOINGO_CRATE_AT: Pt = [118, 10];
 function crateCv(lid: number): Cv {
   const c = cv(32, 32);
   rect(c, 3, 10, 26, 20, "r");
-  for (let x = 3; x < 29; x += 6) rect(c, x, 10, 3, 20, "y");
+  // (Every stripe inside the box, x 3 to 28: the last one 2 wide, not 3 past the box's right edge; Eric, Nov 12: "yellow at the bottom".)
+  for (let x = 3; x < 29; x += 6) rect(c, x, 10, Math.min(3, 29 - x), 20, "y");
   rect(c, 2, 8 - lid, 28, 4, "R");
   ellipse(c, 16, 5 - lid, 3, 3, "y");
   rect(c, 3, 28, 26, 2, "q");
